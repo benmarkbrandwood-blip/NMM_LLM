@@ -149,6 +149,7 @@ function handleMessage(msg) {
 
     case "capture_required":
       phase = "capture";
+      board.isHuman = true;   // ensure _drawHints() draws capture rings
       if (msg.projected_board) board.grid = msg.projected_board;
       board._drawPieces();
       board.enterCapture(msg.legal_captures);
@@ -223,11 +224,11 @@ function onNodeClick(name) {
 
   if (gameState.phase === "place") {
     if (gameState.legal_dests.includes(name) && !gameState.board[name]) {
-      // Optimistic render: show piece immediately before server confirms
+      // Optimistic render: show piece immediately before server confirms.
+      // Keep isHuman=true so _drawHints() still runs if capture_required follows.
       board.grid = { ...gameState.board, [name]: gameState.turn };
       board.legalDests = new Set();
       board.legalSrcs  = new Set();
-      board.isHuman    = false;
       board._drawPieces();
       board._drawHints();
       ws.send(JSON.stringify({ type: "move", from: null, to: name }));
@@ -252,7 +253,8 @@ function onNodeClick(name) {
     const pairs = board._movePairs || [];
     const valid = pairs.some(([f, t]) => f === src && t === name);
     if (valid) {
-      // Optimistic render: move piece to destination immediately
+      // Optimistic render: move piece to destination immediately.
+      // Keep isHuman=true so _drawHints() still runs if capture_required follows.
       const newGrid = { ...gameState.board };
       newGrid[name] = newGrid[src];
       delete newGrid[src];
@@ -260,7 +262,6 @@ function onNodeClick(name) {
       board.selected = null;
       board.legalDests = new Set();
       board.legalSrcs  = new Set();
-      board.isHuman    = false;
       board._drawPieces();
       board._drawHints();
       ws.send(JSON.stringify({ type: "move", from: src, to: name }));
