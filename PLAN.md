@@ -10,6 +10,7 @@
 | 4     | Opening Book                 | ✅ Complete |
 | 5     | Web GUI                      | ✅ Complete |
 | 5.5   | Install & Run Scripts        | ✅ Complete |
+| 5.6   | In-Game Hint System          | ⬜ Planned  |
 | 6     | Self-Play Training Loop      | 🔄 Current  |
 | 7     | Heuristic Parameter Evolution| ⬜ Planned  |
 | 8     | Adaptive Difficulty          | ⬜ Planned  |
@@ -144,6 +145,41 @@ The game as shipped today can:
 ---
 
 ## Planned Stages
+
+---
+
+### Stage 5.6 — In-Game Hint System ⬜
+
+**Goal:** Let the human player request a hint at any point during their turn, getting both a visual board highlight and a plain-English explanation from MillsAI.
+
+**User flow:**
+1. Player clicks **Hint** button (visible only on the human's turn).
+2. The board immediately highlights the GameAI's top suggestion:
+   - Placement phase: green pulse on the recommended empty node.
+   - Movement phase: yellow pulse on the piece to move, then a blue pulse on its destination.
+3. Simultaneously, MillsAI is asked for a one- or two-sentence explanation of why that move is strong — this appears in the commentary feed.
+4. The player can ignore the hint and play wherever they like; the hint highlight fades after 4 seconds or on the next click.
+
+**Implementation sketch:**
+
+*Server side (`web/app.py`):*
+- New WebSocket message type `hint_request` (client → server).
+- Handler calls `game_ai.choose_move(board)` to get the engine's top move, then `llm.player_chat(hint_prompt, board)` for the explanation (reusing the existing player-chat LLM path so no new prompt engineering is needed).
+- Response message type `hint` carries `{ from, to, explanation }`.
+
+*Client side (`web/static/game.js`, `board.js`):*
+- `btn-hint` button; disabled when it is not the human's turn or when waiting for AI.
+- On `hint` message: call `board.showHint(from, to)` which draws temporary highlight rings in the hint layer (same SVG group used for legal-move hints), then `setTimeout` clears them after 4 s.
+- Explanation text emitted as a commentary line tagged `[Hint]`.
+
+*Rate limiting:*
+- Cap at 3 hints per game (tracked server-side in `Session`) to discourage over-reliance; the button is greyed out once the cap is hit and shows "No hints left".
+
+**Deliverables:**
+- `web/app.py` — `hint_request` handler; `Session.hints_used` counter.
+- `web/static/game.js` — Hint button wiring, `hint` message handler.
+- `web/static/board.js` — `showHint(from, to)` method with timed fade.
+- `web/static/style.css` — `#btn-hint` styles matching the undo button.
 
 ---
 
