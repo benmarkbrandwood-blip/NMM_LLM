@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nine Men's Morris</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Nine Men's Morris</h1>
+    <button id="toggle-settings">Settings</button>
+  </header>
+
+  <main>
+    <!-- Board column -->
+    <div id="board-col">
+      <div id="board-wrap">
+        <svg id="board-svg"></svg>
+      </div>
+      <div id="status-bar">Configure a game and click New Game.</div>
+
+      <!-- Strength history graph -->
+      <div id="eval-graph-wrap">
+        <div class="eval-graph-labels">
+          <span class="piece-w">⬜</span>
+          <span id="eval-graph-title">Position strength</span>
+          <span class="piece-b">⬛</span>
+        </div>
+        <svg id="eval-graph" preserveAspectRatio="none"></svg>
+      </div>
+
+      <button id="btn-undo" disabled>&larr; Undo move</button>
+    </div>
+
+    <!-- Side panel (info + settings only) -->
+    <div id="side-panel">
+
+      <!-- Turn / result -->
+      <div class="panel-box">
+        <h3>Status</h3>
+        <span id="turn-badge" class="badge"></span>
+      </div>
+
+      <!-- Game info -->
+      <div class="panel-box">
+        <h3>Game Info</h3>
+        <div class="piece-row">
+          <span>Phase</span>
+          <span id="info-phase">—</span>
+        </div>
+        <div class="piece-row">
+          <span class="piece-w">⬜ Placed</span>
+          <span id="info-w-placed" class="piece-w">—</span>
+        </div>
+        <div class="piece-row">
+          <span class="piece-b">⬛ Placed</span>
+          <span id="info-b-placed" class="piece-b">—</span>
+        </div>
+        <div class="piece-row">
+          <span class="piece-w">⬜ Taken</span>
+          <span id="info-w-taken" class="piece-w">—</span>
+        </div>
+        <div class="piece-row">
+          <span class="piece-b">⬛ Taken</span>
+          <span id="info-b-taken" class="piece-b">—</span>
+        </div>
+      </div>
+
+      <!-- Settings -->
+      <div class="panel-box" id="settings-panel">
+        <h3>New Game</h3>
+
+        <div class="form-row">
+          <label for="sel-human-color">Play as</label>
+          <select id="sel-human-color">
+            <option value="R">Random</option>
+            <option value="W">White (moves first)</option>
+            <option value="B">Black</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="sel-opponent">Opponent</label>
+          <select id="sel-opponent">
+            <option value="ai">AI</option>
+            <option value="human">Human (local)</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label for="sel-difficulty">AI Difficulty</label>
+          <select id="sel-difficulty">
+            <option value="1">1 — Beginner</option>
+            <option value="2">2 — Easy</option>
+            <option value="3" selected>3 — Medium</option>
+            <option value="4">4 — Hard</option>
+            <option value="5">5 — Strong</option>
+            <option value="6">6 — Expert</option>
+            <option value="7">7 — Master</option>
+            <option value="8">8 — Grandmaster</option>
+            <option value="9">9 — Deep (20 s)</option>
+            <option value="10">10 — Maximum (45 s)</option>
+          </select>
+        </div>
+
+        <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-llm" checked>
+          <label for="chk-llm" style="color:var(--text); font-size:.9rem;">MillsAI commentary (LLM)</label>
+        </div>
+
+        <button id="btn-new-game">New Game</button>
+      </div>
+
+    </div><!-- /side-panel -->
+  </main>
+
+  <!-- Commentary + player chat — full width below -->
+  <div id="commentary-wrap">
+    <div class="panel-box">
+      <h3>Commentary</h3>
+      <div id="commentary-feed"></div>
+      <div id="player-chat-row">
+        <input type="text" id="player-chat-input" placeholder="Ask MillsAI…" maxlength="300" autocomplete="off">
+        <button id="player-chat-send">Send</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="/static/game.js"></script>
+</body>
+</html>

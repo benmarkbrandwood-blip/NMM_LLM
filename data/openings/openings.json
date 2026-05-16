@@ -1,7 +1,7 @@
 [
   {
     "opening_id": "mill-rush-parallel",
-    "name": "Mill Rush \u2014 Parallel",
+    "name": "Mill Rush — Parallel",
     "aliases": [
       "Parallel Lines",
       "Double Horizontal"
@@ -24,7 +24,7 @@
         "branch_id": "mill-rush-parallel-b2-alt",
         "deviation_ply": 7,
         "deviation_move": "d1",
-        "name": "Mill Rush Parallel \u2014 d1 Variant",
+        "name": "Mill Rush Parallel — d1 Variant",
         "line_continuation": [
           "d1",
           "b6"
@@ -77,11 +77,11 @@
       "placement",
       "parallel"
     ],
-    "source_reference": "Chapter 15.2, Game 1a \u2014 parallel lines mill rush"
+    "source_reference": "Chapter 15.2, Game 1a — parallel lines mill rush"
   },
   {
     "opening_id": "mill-rush-perpendicular",
-    "name": "Mill Rush \u2014 Perpendicular",
+    "name": "Mill Rush — Perpendicular",
     "aliases": [
       "Perpendicular Lines"
     ],
@@ -136,11 +136,11 @@
       "placement",
       "perpendicular"
     ],
-    "source_reference": "Chapter 15.2, Game 2a \u2014 perpendicular lines mill rush"
+    "source_reference": "Chapter 15.2, Game 2a — perpendicular lines mill rush"
   },
   {
     "opening_id": "mill-rush-parallel-alt",
-    "name": "Mill Rush \u2014 Parallel (Alt)",
+    "name": "Mill Rush — Parallel (Alt)",
     "aliases": [
       "Parallel Lines Alt"
     ],
@@ -199,11 +199,11 @@
       "placement",
       "parallel"
     ],
-    "source_reference": "Chapter 15.2, Game 1b \u2014 parallel lines (alt) mill rush"
+    "source_reference": "Chapter 15.2, Game 1b — parallel lines (alt) mill rush"
   },
   {
     "opening_id": "mill-rush-perpendicular-alt",
-    "name": "Mill Rush \u2014 Perpendicular (Alt)",
+    "name": "Mill Rush — Perpendicular (Alt)",
     "aliases": [
       "Perpendicular Lines Alt"
     ],
@@ -256,11 +256,11 @@
       "placement",
       "perpendicular"
     ],
-    "source_reference": "Chapter 15.2, Game 2b \u2014 perpendicular lines (alt) mill rush"
+    "source_reference": "Chapter 15.2, Game 2b — perpendicular lines (alt) mill rush"
   },
   {
     "opening_id": "mill-rush-extended-parallel",
-    "name": "Mill Rush \u2014 Extended Parallel",
+    "name": "Mill Rush — Extended Parallel",
     "aliases": [
       "Extended Parallel"
     ],
@@ -320,11 +320,11 @@
       "parallel",
       "outer-ring"
     ],
-    "source_reference": "Chapter 15.2, Game 3 \u2014 extended parallel mill rush"
+    "source_reference": "Chapter 15.2, Game 3 — extended parallel mill rush"
   },
   {
     "opening_id": "inverted-mill-rush-parallel",
-    "name": "Inverted Mill Rush \u2014 Parallel",
+    "name": "Inverted Mill Rush — Parallel",
     "aliases": [
       "Inverted Parallel"
     ],
@@ -379,11 +379,11 @@
       "parallel",
       "inverted"
     ],
-    "source_reference": "Chapter 15.3 \u2014 Inverted Mill Rush, parallel lines"
+    "source_reference": "Chapter 15.3 — Inverted Mill Rush, parallel lines"
   },
   {
     "opening_id": "inverted-mill-rush-perpendicular",
-    "name": "Inverted Mill Rush \u2014 Perpendicular",
+    "name": "Inverted Mill Rush — Perpendicular",
     "aliases": [
       "Inverted Perpendicular"
     ],
@@ -437,7 +437,7 @@
       "perpendicular",
       "inverted"
     ],
-    "source_reference": "Chapter 15.3 \u2014 Inverted Mill Rush, perpendicular"
+    "source_reference": "Chapter 15.3 — Inverted Mill Rush, perpendicular"
   },
   {
     "opening_id": "battle-lines",
@@ -479,7 +479,7 @@
         "fen": ".B...W..BBWWWWBB........|W|5|5"
       }
     ],
-    "strategic_notes": "W builds multiple potential mills aggressively across all ring sections. B responds by mirroring. The game rewards the side that converts potential mills first \u2014 W usually has more options if it keeps removing B pieces strategically and does not allow B to isolate its pieces.",
+    "strategic_notes": "W builds multiple potential mills aggressively across all ring sections. B responds by mirroring. The game rewards the side that converts potential mills first — W usually has more options if it keeps removing B pieces strategically and does not allow B to isolate its pieces.",
     "common_blunders": [
       "a7",
       "g7",
@@ -504,11 +504,11 @@
       "placement",
       "centre"
     ],
-    "source_reference": "Chapter 15.4 \u2014 Battle Lines"
+    "source_reference": "Chapter 15.4 — Battle Lines"
   },
   {
     "opening_id": "z-mill-closed",
-    "name": "Z Mill \u2014 Closed",
+    "name": "Z Mill — Closed",
     "aliases": [
       "Z Mill",
       "Closed Z Mill"
@@ -531,7 +531,7 @@
         "branch_id": "z-mill-closed-c4-e3",
         "deviation_ply": 5,
         "deviation_move": "e5",
-        "name": "Z Mill \u2014 c4/e3 Variant",
+        "name": "Z Mill — c4/e3 Variant",
         "line_continuation": [
           "e5",
           "d3",
@@ -584,11 +584,11 @@
       "placement",
       "centre"
     ],
-    "source_reference": "Chapter 15.5 \u2014 The Z Mill"
+    "source_reference": "Chapter 15.5 — The Z Mill"
   },
   {
     "opening_id": "z-mill-open",
-    "name": "Z Mill \u2014 Open",
+    "name": "Z Mill — Open",
     "aliases": [
       "Open Z Mill",
       "Z Mill Variation"
@@ -643,7 +643,7 @@
       "placement",
       "centre"
     ],
-    "source_reference": "Chapter 15.6 \u2014 The Open Z Mill"
+    "source_reference": "Chapter 15.6 — The Open Z Mill"
   },
   {
     "opening_id": "corner-gambit",
@@ -679,7 +679,7 @@
         "fen": "W.W.W.W.BB.B...B........|W|4|4"
       }
     ],
-    "strategic_notes": "W occupies all four outer ring corners early. Each pair threatens a potential mill along the outer ring sides. B must respond to contain the outer ring. This can be a gambit trap \u2014 the predictability of needing to block open mills can help W plan traps.",
+    "strategic_notes": "W occupies all four outer ring corners early. Each pair threatens a potential mill along the outer ring sides. B must respond to contain the outer ring. This can be a gambit trap — the predictability of needing to block open mills can help W plan traps.",
     "common_blunders": [
       "d7",
       "d1"
@@ -692,9 +692,13 @@
       ]
     },
     "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
+      "W": 2,
+      "B": 1,
+      "D": 0,
+      "ai_wins": 2,
+      "human_losses": 2,
+      "human_wins": 1,
+      "ai_losses": 1
     },
     "confidence": 1.0,
     "tags": [
@@ -703,6 +707,134 @@
       "placement",
       "gambit"
     ],
-    "source_reference": "Chapter 15 \u2014 A Gambit"
+    "source_reference": "Chapter 15 — A Gambit"
+  },
+  {
+    "opening_id": "novel-e69dc499",
+    "name": "The Focal Four Gambit",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "f2",
+      "b2",
+      "d1",
+      "d3",
+      "g1",
+      "e4",
+      "g4",
+      "g7",
+      "a1",
+      "g7",
+      "a7",
+      "a4",
+      "b4",
+      "c3",
+      "e3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.WBB..........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....B...W.WBBW.........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "....BB...W.WBBW......W..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...BBB...W.WBBW....W.W..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": ""
+  },
+  {
+    "opening_id": "novel-5f22d2bf",
+    "name": "The Triangular Fortress Opening",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d7",
+      "f4",
+      "a7",
+      "g7",
+      "a4",
+      "a1",
+      "c4",
+      "b4",
+      "c3",
+      "c5",
+      "d3",
+      "e3",
+      "e5",
+      "g4",
+      "d2",
+      "g1",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "BB.......W.W............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "BBW....B.W.W............|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "BBW...WB.W.W...........B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "BBW...WB.W.W...W......BB|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": ""
   }
 ]

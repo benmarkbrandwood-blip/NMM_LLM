@@ -78,18 +78,18 @@ GENERAL STYLE:
 _MOVE_SYSTEM = _BOARD_RULES + "\n" + _DECISION_POLICY + """
 
 TASK:
-Choose the single best move for the side to move.
+Choose the single best move for the side to move from LEGAL MOVES.
 
-OUTPUT:
-Return exactly two lines:
-MOVE: <one exact move from LEGAL MOVES>
-REASON: <one short sentence, max 18 words>
+YOUR RESPONSE MUST BEGIN WITH EXACTLY THIS FORMAT — NO EXCEPTIONS:
+MOVE: <exact string from LEGAL MOVES>
+REASON: <one sentence, max 18 words>
 
-RULES:
-- MOVE must exactly match one string from LEGAL MOVES
-- Do not explain alternatives
-- Do not add markdown
-- Do not add extra lines
+CRITICAL RULES:
+- Line 1 MUST be "MOVE: " followed by one exact entry from LEGAL MOVES
+- Line 2 MUST be "REASON: " followed by one sentence
+- Do NOT write anything before the MOVE: line
+- Do NOT add markdown, headers, or extra explanation
+- If you are unsure, still pick the safest move from LEGAL MOVES
 """
 
 _COMMENT_SYSTEM = _BOARD_RULES + """
@@ -187,6 +187,20 @@ OUTPUT RULES:
 - 2 to 4 words
 - No punctuation at the end
 - Tone: memorable, serious, game-opening style
+"""
+
+_PLAYER_CHAT_SYSTEM = _BOARD_RULES + """
+
+TASK:
+Respond to the human player's message during a live game.
+
+OUTPUT RULES:
+- 1 to 3 sentences maximum
+- Stay focused on Nine Men's Morris strategy or their question
+- You may comment on the current position if relevant
+- Do NOT suggest a specific move to play next
+- Do NOT use chess terminology
+- Be concise and coaching in tone
 """
 
 
@@ -425,13 +439,25 @@ No other text.
         reply = self._chat(_QUESTION_SYSTEM, user, keep_history=False)
         return reply.strip() if reply.strip() else None
 
+    def player_chat(self, message: str, board: "BoardState") -> str:
+        """Respond to an in-game message from the human player."""
+        user = f"Player: {message}\n\nCURRENT BOARD:\n{board.to_display_grid()}"
+        reply = self._chat(_PLAYER_CHAT_SYSTEM, user, keep_history=True)
+        return reply.strip() if reply else ""
+
     def summarise_session(self, game_records: list[dict]) -> str:
         if not game_records:
             return ""
         lines = []
         for rec in game_records:
+            moves = rec.get("moves", [])
+            notations = [m.get("notation", "") for m in moves if m.get("notation")]
+            move_seq = " ".join(notations) if notations else "none"
             lines.append(
-                f"- winner={rec.get('winner', '?')} moves={len(rec.get('moves', []))} opening={rec.get('opening_name', 'unknown')}"
+                f"- winner={rec.get('winner', '?')} "
+                f"opening={rec.get('recognised_opening_name') or rec.get('opening_name', 'unknown')} "
+                f"total_moves={len(moves)} "
+                f"move_sequence: {move_seq}"
             )
         return self._chat(_SESSION_SYSTEM, "\n".join(lines), keep_history=False)
 

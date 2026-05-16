@@ -1,0 +1,325 @@
+/**
+ * game.js — WebSocket game controller for Nine Men's Morris.
+ */
+import { Board } from "./board.js";
+
+const $ = id => document.getElementById(id);
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let ws        = null;
+let board     = null;
+let gameState = null;
+let phase     = "idle";
+let evalHistory = [];   // [{move: n, score: f}] — history for the graph
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", () => {
+  board = new Board($("board-svg"), onNodeClick);
+
+  $("btn-new-game").addEventListener("click", startNewGame);
+  $("toggle-settings").addEventListener("click", () => {
+    const p = $("settings-panel");
+    p.hidden = !p.hidden;
+  });
+  $("btn-undo").addEventListener("click", () => {
+    if (!ws || phase === "idle") return;
+    ws.send(JSON.stringify({ type: "undo" }));
+  });
+  $("player-chat-send").addEventListener("click", sendPlayerMessage);
+  $("player-chat-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") sendPlayerMessage();
+  });
+
+  $("settings-panel").hidden = false;
+  renderIdle();
+});
+
+function renderIdle() {
+  setStatus("Configure a game and click New Game.");
+  setTurnBadge(null, null);
+}
+
+// ── New game ──────────────────────────────────────────────────────────────────
+
+function startNewGame() {
+  const hc     = $("sel-human-color").value;
+  const diff   = parseInt($("sel-difficulty").value);
+  const vs     = $("sel-opponent").value === "human";
+  const useLlm = $("chk-llm").checked;
+
+  clearCommentary();
+  setStatus("Starting…");
+  phase = "idle";
+  evalHistory = [];
+  drawEvalGraph();
+  $("btn-undo").disabled = true;
+
+  if (ws) { ws.close(); ws = null; }
+
+  const wsUrl = `ws://${location.host}/ws`;
+  ws = new WebSocket(wsUrl);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      type: "new_game",
+      human_color: hc,
+      difficulty: diff,
+      vs_human: vs,
+      use_llm: useLlm,
+    }));
+    $("settings-panel").hidden = true;
+  };
+
+  ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
+  ws.onerror   = () => setStatus("Connection error.");
+  ws.onclose   = () => {
+    if (phase !== "game_over") setStatus("Disconnected.");
+  };
+}
+
+// ── Message handling ──────────────────────────────────────────────────────────
+
+function handleMessage(msg) {
+  switch (msg.type) {
+
+    case "state":
+      gameState = msg;
+      phase = msg.finished ? "game_over" : "playing";
+      board.render(msg);
+      if (msg.move_pairs) board.setMovePairs(msg.move_pairs);
+      updateInfoPanel(msg);
+      if (msg.eval_score !== undefined) {
+        evalHistory.push(msg.eval_score);
+        drawEvalGraph();
+      }
+      $("btn-undo").disabled = (phase === "idle" || phase === "game_over");
+      if (msg.is_human_turn) {
+        setStatus(
+          msg.phase === "place"
+            ? "Your turn — click a green node to place."
+            : "Your turn — select a piece, then its destination."
+        );
+      }
+      break;
+
+    case "capture_required":
+      phase = "capture";
+      if (msg.projected_board) board.grid = msg.projected_board;
+      board._drawPieces();
+      board.enterCapture(msg.legal_captures);
+      setStatus("Mill! Click an opponent piece to capture.");
+      break;
+
+    case "thinking":
+      setStatus(`AI (${msg.color === "W" ? "White" : "Black"}) is thinking…`);
+      break;
+
+    case "ai_move": {
+      const from    = msg.from ? msg.from : "—";
+      const to      = msg.to;
+      const cap     = msg.capture ? ` × ${msg.capture}` : "";
+      const blunder = msg.was_blunder ? " ← deliberate mistake!" : "";
+      addCommentary("GameAI", `Played ${from === "—" ? to : from + "→" + to}${cap}${blunder}`);
+      break;
+    }
+
+    case "commentary":
+      addCommentary("MillsAI", msg.text);
+      break;
+
+    case "game_over":
+      phase = "game_over";
+      setStatus(msg.message);
+      setTurnBadge(null, msg.winner);
+      addCommentary("Game", msg.message);
+      $("btn-undo").disabled = true;
+      break;
+
+    case "error":
+      addCommentary("Error", msg.message);
+      break;
+  }
+}
+
+// ── Click handling ────────────────────────────────────────────────────────────
+
+function onNodeClick(name) {
+  if (!ws || phase === "idle" || phase === "game_over" || !gameState) return;
+  if (!gameState.is_human_turn) return;
+
+  if (phase === "capture") {
+    ws.send(JSON.stringify({ type: "capture", position: name }));
+    return;
+  }
+
+  if (gameState.phase === "place") {
+    if (gameState.legal_dests.includes(name) && !gameState.board[name]) {
+      ws.send(JSON.stringify({ type: "move", from: null, to: name }));
+    }
+    return;
+  }
+
+  // Movement phase
+  if (!board.selected) {
+    if (gameState.legal_sources.includes(name) &&
+        gameState.board[name] === gameState.turn) {
+      board.selectSource(name);
+    }
+  } else {
+    const src = board.selected;
+    if (name === src) {
+      board.selected = null;
+      board._drawPieces();
+      board._drawHints();
+      return;
+    }
+    const pairs = board._movePairs || [];
+    const valid = pairs.some(([f, t]) => f === src && t === name);
+    if (valid) {
+      ws.send(JSON.stringify({ type: "move", from: src, to: name }));
+      board.selected = null;
+    } else if (gameState.legal_sources.includes(name) &&
+               gameState.board[name] === gameState.turn) {
+      board.selectSource(name);
+    }
+  }
+}
+
+// ── Player chat ───────────────────────────────────────────────────────────────
+
+function sendPlayerMessage() {
+  const input = $("player-chat-input");
+  const text  = input.value.trim();
+  if (!text || !ws || phase === "idle") return;
+  ws.send(JSON.stringify({ type: "player_message", text }));
+  input.value = "";
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function updateInfoPanel(state) {
+  const color = state.turn;
+  const name  = color === "W" ? "White" : "Black";
+  setTurnBadge(name, null);
+
+  $("info-phase").textContent    = state.phase;
+  $("info-w-placed").textContent = state.pieces_placed?.W ?? 0;
+  $("info-b-placed").textContent = state.pieces_placed?.B ?? 0;
+  // pieces_captured[W] = pieces White has taken from Black
+  $("info-w-taken").textContent  = state.pieces_captured?.W ?? 0;
+  $("info-b-taken").textContent  = state.pieces_captured?.B ?? 0;
+}
+
+function setStatus(text) {
+  $("status-bar").textContent = text;
+}
+
+// ── Eval graph ────────────────────────────────────────────────────────────────
+
+function drawEvalGraph() {
+  const svg = $("eval-graph");
+  if (!svg) return;
+
+  const W = 560, H = 72;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", "100%");
+  svg.setAttribute("height", H);
+  svg.innerHTML = "";
+
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = (tag, attrs) => {
+    const el = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  };
+
+  // Background
+  svg.appendChild(mk("rect", { x:0, y:0, width:W, height:H, fill:"#1e1a12", rx:4 }));
+
+  // Centre line (equal position)
+  svg.appendChild(mk("line", { x1:0, y1:H/2, x2:W, y2:H/2, stroke:"#3d3325", "stroke-width":1 }));
+
+  // Label extremes
+  const labelAttrs = { fill:"#5a5040", "font-size":"9", "font-family":"monospace" };
+  const tw = mk("text", { ...labelAttrs, x:3, y:10, "dominant-baseline":"hanging" });
+  tw.textContent = "White";
+  svg.appendChild(tw);
+  const tb = mk("text", { ...labelAttrs, x:3, y:H-2 });
+  tb.textContent = "Black";
+  svg.appendChild(tb);
+
+  const n = evalHistory.length;
+  if (n < 2) return;
+
+  const mid    = H / 2;
+  const xScale = (W - 2) / Math.max(n - 1, 1);
+  const pts    = evalHistory.map((s, i) => ({
+    x: 1 + i * xScale,
+    y: mid - s * (mid - 4),   // 4px padding from edges
+  }));
+
+  // Build area path (filled between line and centre)
+  let area = `M ${pts[0].x},${mid}`;
+  for (const p of pts) area += ` L ${p.x},${p.y}`;
+  area += ` L ${pts[pts.length-1].x},${mid} Z`;
+
+  // Fill: white when White leading (positive), black when Black leading
+  // Use gradient-like split: positive fill = white-tan, negative = dark
+  const lastScore = evalHistory[n - 1];
+  const fillCol   = lastScore > 0.05 ? "rgba(242,237,224,0.18)"
+                  : lastScore < -0.05 ? "rgba(30,26,46,0.5)"
+                  : "rgba(100,90,70,0.15)";
+  svg.appendChild(mk("path", { d: area, fill: fillCol }));
+
+  // Line
+  let linePath = `M ${pts[0].x},${pts[0].y}`;
+  for (const p of pts.slice(1)) linePath += ` L ${p.x},${p.y}`;
+  svg.appendChild(mk("path", { d: linePath, stroke:"#c8a96e", "stroke-width":1.5, fill:"none" }));
+
+  // Current value dot
+  const last = pts[n - 1];
+  svg.appendChild(mk("circle", { cx: last.x, cy: last.y, r: 3,
+    fill: lastScore > 0 ? "#f2ede0" : "#4040a0", stroke:"#c8a96e", "stroke-width":1 }));
+
+  // Score label
+  const pct = Math.round(Math.abs(lastScore) * 100);
+  const who = lastScore > 0.05 ? `+${pct} W` : lastScore < -0.05 ? `+${pct} B` : "=";
+  const lbl = mk("text", { x: Math.min(last.x + 4, W - 32), y: Math.max(last.y - 3, 10),
+    fill:"#c8a96e", "font-size":"9", "font-family":"monospace" });
+  lbl.textContent = who;
+  svg.appendChild(lbl);
+}
+
+function setTurnBadge(name, winner) {
+  const el = $("turn-badge");
+  if (winner) {
+    el.textContent = winner === "W" ? "⬜ White wins" : "⬛ Black wins";
+    el.className   = "badge " + (winner === "W" ? "badge-white" : "badge-black");
+  } else if (name) {
+    el.textContent = name === "White" ? "⬜ White to move" : "⬛ Black to move";
+    el.className   = "badge " + (name === "White" ? "badge-white" : "badge-black");
+  } else {
+    el.textContent = "";
+    el.className   = "badge";
+  }
+}
+
+function addCommentary(speaker, text) {
+  if (!text) return;
+  const feed  = $("commentary-feed");
+  const div   = document.createElement("div");
+  div.className = "commentary-line";
+  const label = document.createElement("span");
+  label.className   = "speaker";
+  label.textContent = speaker + ": ";
+  div.appendChild(label);
+  div.appendChild(document.createTextNode(text));
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function clearCommentary() {
+  $("commentary-feed").innerHTML = "";
+}

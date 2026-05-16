@@ -18,9 +18,10 @@ from game.board import BoardState
 from game.rules import get_all_legal_moves, is_terminal
 from .heuristics import INF, evaluate
 
-# Maps difficulty (1–5) to minimax search depth.
-_DEPTH_TABLE = {1: 2, 2: 3, 3: 4, 4: 5, 5: 6}
-_TIME_LIMIT = 10.0  # seconds budget for difficulty-5 iterative deepening
+# Maps difficulty (1–10) to minimax search depth.
+# Difficulties 9–10 use iterative deepening; 9 gets 20 s, 10 gets 45 s.
+_DEPTH_TABLE = {1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
+_TIME_LIMIT = {5: 10.0, 9: 20.0, 10: 45.0}  # difficulty → iterative-deepening budget
 
 
 class GameAI:
@@ -46,7 +47,7 @@ class GameAI:
         blunder_probability: float = 0.0,
     ) -> None:
         self.color = color
-        self.difficulty = max(1, min(5, difficulty))
+        self.difficulty = max(1, min(10, difficulty))
         self.blunder_probability = max(0.0, min(1.0, blunder_probability))
         self._nodes = 0
         self.last_was_blunder: bool = False  # flag readable by Coordinator / MillsLLM
@@ -75,8 +76,8 @@ class GameAI:
 
         self.last_was_blunder = False
 
-        if self.difficulty == 5:
-            return self._iterative_deepen(board)
+        if self.difficulty in _TIME_LIMIT:
+            return self._iterative_deepen(board, _TIME_LIMIT[self.difficulty])
 
         depth = _DEPTH_TABLE[self.difficulty]
 
@@ -102,7 +103,7 @@ class GameAI:
         if not moves:
             return 0.5
 
-        depth = max(2, _DEPTH_TABLE.get(self.difficulty, 4) - 1)
+        depth = max(2, _DEPTH_TABLE.get(self.difficulty, 9) - 1)
         scored = self._score_all(board, moves, depth)
 
         move_key = (move.get("from"), move["to"], move.get("capture"))
@@ -232,21 +233,39 @@ class GameAI:
         Select a deliberately poor move from the bottom quartile of scored moves.
         Used by blunder mode to create teachable mistakes.
         """
-        depth = max(2, _DEPTH_TABLE.get(self.difficulty, 4) - 1)
+        depth = max(2, _DEPTH_TABLE.get(self.difficulty, 9) - 1)
         scored = self._score_all(board, moves, depth)
         scored.sort(key=lambda x: x[1])  # ascending: worst first
         cutoff = max(1, len(scored) // 4)
         worst = scored[:cutoff]
         return random.choice(worst)[0]
 
-    def _iterative_deepen(self, board: BoardState) -> dict:
-        """Difficulty-5 iterative deepening up to _TIME_LIMIT seconds."""
+    def _iterative_deepen(self, board: BoardState, time_limit: float = 10.0) -> dict:
+        """Iterative deepening up to `time_limit` seconds."""
         start = time.time()
         moves = get_all_legal_moves(board)
         best_move = moves[0]
-        for depth in range(2, 12):
-            if time.time() - start >= _TIME_LIMIT * 0.8:
+        for depth in range(2, 20):
+            if time.time() - start >= time_limit * 0.8:
                 break
             move, _ = self._root_search(board, depth)
             best_move = move
         return best_move
+
+    def position_eval(self, board: BoardState) -> float:
+        """
+        Return tanh-normalised score in (-1, +1): positive = White winning.
+        Uses phase-specific scale so each game stage reads meaningfully.
+        """
+        import math
+        from .heuristics import evaluate as _eval, TANH_SCALE
+        from game.rules import is_terminal, get_game_phase
+        terminal, winner = is_terminal(board)
+        if terminal:
+            return 1.0 if winner == "W" else (-1.0 if winner == "B" else 0.0)
+        w_score = _eval(board, "W")
+        b_score = _eval(board, "B")
+        raw   = w_score - b_score
+        phase = get_game_phase(board, board.turn)
+        scale = TANH_SCALE.get(phase, 180)
+        return math.tanh(raw / scale)

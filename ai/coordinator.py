@@ -98,11 +98,20 @@ class Coordinator:
                     f"(score {self._target_opening.opening_score(self.game_ai.color):.2f})",
                 )
 
-        recent = self.memory.load_recent_games(n=5)
+        recent = self.memory.load_recent_games(n=10)
         if recent:
             patterns = self.memory.analyse_patterns(recent)
+            game_summaries = []
+            for g in recent[:10]:
+                notations = [m.get("notation", "") for m in g.get("moves", []) if m.get("notation")]
+                move_str = " ".join(notations) if notations else "no moves recorded"
+                game_summaries.append(
+                    f"winner={g.get('winner','?')} opening={g.get('recognised_opening_name','unknown')} "
+                    f"moves=({move_str})"
+                )
             self.mills_llm.narrative_memory = (
-                f"Recent pattern analysis: {json.dumps(patterns, indent=2)}"
+                f"Recent pattern analysis: {json.dumps(patterns, indent=2)}\n\n"
+                f"Last {len(recent)} games:\n" + "\n".join(game_summaries)
             )
 
     def on_game_end(self, game_record: dict) -> None:
@@ -246,8 +255,8 @@ class Coordinator:
                         f"(score {ai_score:.2f})",
                     )
 
-        # 5. Log LLM's reasoning (strip the MOVE: line — already acted on)
-        if opinion:
+        # 5. Log LLM's reasoning only when it successfully recommended a move
+        if opinion and llm_notation:
             reason = _extract_reason(opinion)
             if reason:
                 self.emit("MillsLLM", reason)
