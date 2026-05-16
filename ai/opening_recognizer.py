@@ -27,6 +27,7 @@ Recognition pipeline per ply
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from dataclasses import dataclass, field
 from typing import Optional, TYPE_CHECKING
@@ -148,6 +149,9 @@ class OpeningRecognizer:
         # D4 symmetry index (0 = identity).  Set once when a rotated/reflected
         # variant is first detected; all subsequent matching uses this symmetry.
         self._active_symmetry: int = 0
+        # True once the recognised opening's stored line runs out (ply > max
+        # stored), so we freeze the last result instead of switching to "novel".
+        self._book_exhausted: bool = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -160,6 +164,7 @@ class OpeningRecognizer:
         self._last_matched_opening = None
         self._placement_phase_ended = False
         self._active_symmetry = 0
+        self._book_exhausted = False
 
     def update(self, move_notation: str, board: "BoardState") -> RecognitionResult:
         """
@@ -180,6 +185,10 @@ class OpeningRecognizer:
         """
         # Once the placement phase ends, freeze and return unchanged.
         if self._placement_phase_ended:
+            return self.current_result
+
+        # Once the book runs out (line shorter than game), keep the last result.
+        if self._book_exhausted:
             return self.current_result
 
         # Check whether placement just ended.
@@ -241,8 +250,17 @@ class OpeningRecognizer:
                     return result
 
         # ── Step 4: deviation detection ───────────────────────────────────────
-        # Previous ply had candidates but this ply has none — we deviated.
+        # Previous ply had candidates but this ply has none — either the book
+        # ran out of stored moves, or the player genuinely deviated.
         if self._prev_candidates:
+            # If every previous candidate's line ends before this ply, the book
+            # simply has no more moves recorded — not a deviation.
+            if all(len(o.line_moves) < ply for o in self._prev_candidates):
+                self.current_result = dataclasses.replace(self.current_result, book_move=None)
+                self._book_exhausted = True
+                self._active_candidates = []
+                return self.current_result
+
             deviation_ply = ply
             deviation_move = move_notation
 
