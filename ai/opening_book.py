@@ -49,10 +49,26 @@ class Opening:
     strategic_notes: str
     common_blunders: list[str]
     recommended_responses: dict         # {"W": [...], "B": [...]}
-    outcome_stats: dict                 # {"W": int, "B": int, "D": int}
+    outcome_stats: dict                 # {"W":int,"B":int,"D":int, plus human_*/ai_* breakdown}
     confidence: float
     tags: list[str]
     source_reference: str = ""
+
+    def opening_score(self, ai_color: str = "W") -> float:
+        """
+        Rate this opening from 0.0 (bad for ai_color) to 1.0 (excellent).
+        Draws count 0.4.  Unexplored openings return 0.55 so the AI is
+        mildly curious about trying them before penalising or boosting them.
+        """
+        stats = self.outcome_stats
+        w = stats.get("W", 0)
+        b = stats.get("B", 0)
+        d = stats.get("D", 0)
+        total = w + b + d
+        if total == 0:
+            return 0.55  # unexplored — slight curiosity bonus
+        wins = w if ai_color == "W" else b
+        return (wins + 0.4 * d) / total
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -245,11 +261,18 @@ class OpeningBook:
         self._index[opening.opening_id] = opening
         self._write_openings_json()
 
-    def update_outcome_stats(self, opening_id: str, winner: str) -> None:
+    def update_outcome_stats(
+        self,
+        opening_id: str,
+        winner: str,
+        human_color: Optional[str] = None,
+    ) -> None:
         """
-        Increment outcome_stats[winner] for the given opening and persist.
+        Record the outcome of a game that used this opening.
 
         winner must be "W", "B", or "D".
+        human_color, if supplied, splits the tally into human_wins/losses/draws
+        and ai_wins/losses/draws so the AI can distinguish its own performance.
         """
         opening = self._index.get(opening_id)
         if opening is None:
@@ -264,8 +287,60 @@ class OpeningBook:
             )
             return
 
-        opening.outcome_stats[winner] = opening.outcome_stats.get(winner, 0) + 1
+        stats = opening.outcome_stats
+        stats[winner] = stats.get(winner, 0) + 1
+
+        if human_color in ("W", "B"):
+            ai_color = "B" if human_color == "W" else "W"
+            if winner == "D":
+                stats["human_draws"] = stats.get("human_draws", 0) + 1
+                stats["ai_draws"] = stats.get("ai_draws", 0) + 1
+            elif winner == human_color:
+                stats["human_wins"] = stats.get("human_wins", 0) + 1
+                stats["ai_losses"] = stats.get("ai_losses", 0) + 1
+            else:
+                stats["ai_wins"] = stats.get("ai_wins", 0) + 1
+                stats["human_losses"] = stats.get("human_losses", 0) + 1
+
         self._write_openings_json()
+
+    def select_opening(
+        self,
+        ai_color: str = "W",
+        exploration_rate: float = 0.25,
+    ) -> Optional["Opening"]:
+        """
+        Pick an opening for the AI to target at game start using UCB1.
+
+        UCB1 naturally balances exploitation of known-good openings with
+        exploration of under-tried ones.  exploration_rate scales the
+        exploration term; higher values favour variety over winning percentage.
+        """
+        import math
+
+        openings = list(self._index.values())
+        if not openings:
+            return None
+
+        global_games = sum(
+            o.outcome_stats.get("W", 0)
+            + o.outcome_stats.get("B", 0)
+            + o.outcome_stats.get("D", 0)
+            for o in openings
+        )
+        log_n = math.log(max(1, global_games) + 1)
+
+        def _ucb(op: "Opening") -> float:
+            base = op.opening_score(ai_color)
+            local = (
+                op.outcome_stats.get("W", 0)
+                + op.outcome_stats.get("B", 0)
+                + op.outcome_stats.get("D", 0)
+            )
+            # UCB exploration term — large for untried openings
+            return base + exploration_rate * math.sqrt(log_n / (local + 1))
+
+        return max(openings, key=_ucb)
 
     def record_deviation(
         self, opening_id: str, ply: int, move_played: str, board_fen: str

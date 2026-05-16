@@ -70,7 +70,7 @@ def _print_list(openings: list[Opening], page: int, total_pages: int) -> None:
 
     # Column widths
     # #  │ Name (30) │ Family (16) │ Src (7) │ Moves (5) │ W/B/D
-    hdr = f"{'#':>3}  {'Name':<30}  {'Family':<16}  {'Src':<7}  {'Moves':>5}  {'W/B/D'}"
+    hdr = f"{'#':>3}  {'Name':<30}  {'Family':<16}  {'Src':<7}  {'Moves':>5}  {'Score':>6}  {'W/B/D'}"
     print(hdr)
     print(_divider())
 
@@ -82,9 +82,11 @@ def _print_list(openings: list[Opening], page: int, total_pages: int) -> None:
         name_trunc = o.name[:29] if len(o.name) > 29 else o.name
         family_trunc = o.family[:15] if len(o.family) > 15 else o.family
         wbd = _fmt_wbd(o.outcome_stats)
+        score = o.opening_score("W")   # table shows White perspective
+        score_str = f"{score:.2f}" if (o.outcome_stats.get("W", 0) + o.outcome_stats.get("B", 0) + o.outcome_stats.get("D", 0)) > 0 else "  new"
         print(
             f"  {num:>2}  {name_trunc:<30}  {family_trunc:<16}  {o.seed_source:<7}  "
-            f"{len(o.line_moves):>5}  {wbd}"
+            f"{len(o.line_moves):>5}  {score_str:>6}  {wbd}"
         )
 
     print()
@@ -190,12 +192,26 @@ def _print_detail(o: Opening) -> None:
         print()
         print("  Variations: none")
 
-    # Outcome stats
+    # Outcome stats + score
     print()
     wbd = o.outcome_stats
+    score_w = o.opening_score("W")
+    score_b = o.opening_score("B")
+    total = wbd.get("W", 0) + wbd.get("B", 0) + wbd.get("D", 0)
+    ai_w = wbd.get("ai_wins", 0)
+    ai_l = wbd.get("ai_losses", 0)
+    ai_d = wbd.get("ai_draws", 0)
+    hu_w = wbd.get("human_wins", 0)
+    hu_l = wbd.get("human_losses", 0)
+    hu_d = wbd.get("human_draws", 0)
     print(
-        f"  Outcome stats: W: {wbd.get('W', 0)}  B: {wbd.get('B', 0)}  D: {wbd.get('D', 0)}"
+        f"  Results (W/B/D):  {wbd.get('W', 0)} / {wbd.get('B', 0)} / {wbd.get('D', 0)}"
+        f"  ({total} games)"
     )
+    print(f"  Score (as White): {score_w:.3f}   Score (as Black): {score_b:.3f}")
+    if total:
+        print(f"  AI:    {ai_w} wins  {ai_l} losses  {ai_d} draws")
+        print(f"  Human: {hu_w} wins  {hu_l} losses  {hu_d} draws")
 
     # Source reference
     if getattr(o, "source_reference", ""):
@@ -267,16 +283,18 @@ def _print_oneshot(openings: list[Opening], label: str) -> None:
         f"(book: {counts['book']}  human: {counts['human']}  learned: {counts['learned']})"
     )
     print()
-    hdr = f"  {'#':>2}  {'Name':<30}  {'Family':<16}  {'Src':<7}  {'Moves':>5}  {'W/B/D'}"
+    hdr = f"  {'#':>2}  {'Name':<30}  {'Family':<16}  {'Src':<7}  {'Moves':>5}  {'Score':>6}  {'W/B/D'}"
     print(hdr)
     print("  " + _divider())
     for i, o in enumerate(openings, start=1):
         name_trunc = o.name[:29] if len(o.name) > 29 else o.name
         family_trunc = o.family[:15] if len(o.family) > 15 else o.family
         wbd = _fmt_wbd(o.outcome_stats)
+        score = o.opening_score("W")
+        score_str = f"{score:.2f}" if (o.outcome_stats.get("W", 0) + o.outcome_stats.get("B", 0) + o.outcome_stats.get("D", 0)) > 0 else "  new"
         print(
             f"  {i:>2}  {name_trunc:<30}  {family_trunc:<16}  {o.seed_source:<7}  "
-            f"{len(o.line_moves):>5}  {wbd}"
+            f"{len(o.line_moves):>5}  {score_str:>6}  {wbd}"
         )
     print()
 

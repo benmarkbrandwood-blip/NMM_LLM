@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 from ai.game_ai import GameAI
 from ai.mills_llm import MillsLLM
 from ai.memory_manager import MemoryManager
-from ai.opening_recognizer import OpeningRecognizer, INACTIVE_RESULT
+from ai.opening_book import Opening
+from ai.opening_recognizer import OpeningRecognizer, RecognitionResult, INACTIVE_RESULT
 from ai.endgame_recognizer import EndgameRecognizer, INACTIVE_ENDGAME
 from game.rules import get_all_legal_moves, get_game_phase
 
@@ -47,6 +48,7 @@ class Coordinator:
         self._session_id = str(uuid.uuid4())
         self._game_moves: list[dict] = []
         self._endgame_state = INACTIVE_ENDGAME
+        self._target_opening: Opening | None = None
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -83,6 +85,19 @@ class Coordinator:
             self.endgame_recognizer.reset()
         self._endgame_state = INACTIVE_ENDGAME
 
+        # Pick an opening to target this game using UCB-scored selection.
+        self._target_opening = None
+        if self.opening_recognizer:
+            self._target_opening = self.opening_recognizer.book.select_opening(
+                ai_color=self.game_ai.color,
+            )
+            if self._target_opening:
+                self.emit(
+                    "GameAI",
+                    f"Targeting opening: {self._target_opening.name} "
+                    f"(score {self._target_opening.opening_score(self.game_ai.color):.2f})",
+                )
+
         recent = self.memory.load_recent_games(n=5)
         if recent:
             patterns = self.memory.analyse_patterns(recent)
@@ -93,11 +108,21 @@ class Coordinator:
     def on_game_end(self, game_record: dict) -> None:
         self.memory.save_game_record(game_record)
 
-        # Auto-save novel opening sequences discovered during this game.
+        winner = game_record.get("winner")
+        human_color = game_record.get("human_color", "W")
+
         if self.opening_recognizer:
             final = self.opening_recognizer.get_current_result()
             if final.status == "novel":
                 self._save_novel_opening(game_record)
+            elif final.opening_id and final.status in ("exact", "probable", "transposition"):
+                # Record this game's outcome against the recognised opening so
+                # future UCB selection can learn which openings perform well.
+                self.opening_recognizer.book.update_outcome_stats(
+                    final.opening_id,
+                    winner=winner or "D",
+                    human_color=human_color,
+                )
 
         summary = self.mills_llm.summarise_session([game_record])
         if summary:
@@ -151,6 +176,34 @@ class Coordinator:
             self.opening_recognizer.get_current_result()
             if self.opening_recognizer else INACTIVE_RESULT
         )
+
+        # If recognition hasn't found an opening yet but we have a target,
+        # synthesise a recognition hint from the target so the AI's opening
+        # bonus steers it along the preferred line from the very first move.
+        phase = get_game_phase(board, board.turn)
+        if (
+            phase == "place"
+            and self._target_opening is not None
+            and recognition.status in ("inactive", "novel")
+        ):
+            ply = len(self._game_moves)
+            line = self._target_opening.line_moves
+            if ply < len(line):
+                recognition = RecognitionResult(
+                    opening_id=self._target_opening.opening_id,
+                    name=self._target_opening.name,
+                    family=self._target_opening.family,
+                    confidence=self._target_opening.confidence,
+                    status="probable",
+                    matched_ply=ply,
+                    deviation_ply=None,
+                    deviation_move=None,
+                    book_move=line[ply],
+                    branch_name=None,
+                    strategic_notes=self._target_opening.strategic_notes,
+                    common_blunders=list(self._target_opening.common_blunders),
+                    tags=list(self._target_opening.tags),
+                )
         if self.endgame_recognizer:
             self._endgame_state = self.endgame_recognizer.update(board)
             for msg in self.endgame_recognizer.transition_announcements():
