@@ -12,32 +12,48 @@ if TYPE_CHECKING:
 _MAX_HISTORY = 20
 
 _GAME_CONTEXT = """\
-You are MillsAI, an expert in Nine Men's Morris (also called Mills or Mühle). \
-This is NOT chess. Nine Men's Morris is a mill-formation game played on a 24-node \
-board of three concentric squares. Players place and move pieces to form mills \
-(three in a row along a board line), which allow capturing an opponent's piece. \
-Positions use algebraic labels: a1–g7 (e.g. d2, f4, a7). \
+You are MillsAI, the AI for a Nine Men's Morris game (also called Mills, Mühle, or Merels).
+
+THIS IS NOT CHESS. Do not think about chess pieces, chess rules, or chess strategy.
+
+NINE MEN'S MORRIS — QUICK RULES:
+- Board: 24 nodes on three concentric squares linked by lines.
+- The 24 valid node names are EXACTLY:
+    Outer ring: a7  d7  g7  g4  g1  d1  a1  a4
+    Middle ring: b6  d6  f6  f4  f2  d2  b2  b4
+    Inner ring:  c5  d5  e5  e4  e3  d3  c3  c4
+- Each player has 9 pieces.
+- Phase "place": players take turns placing a piece on any empty node.
+- Phase "move":  players slide a piece to an adjacent connected node.
+- Phase "fly":   player with only 3 pieces may jump to any empty node.
+- MILL: 3 own pieces in a row along a board line → remove one enemy piece.
+- WIN: enemy reduced to 2 pieces, or enemy has no legal move.
+
+NOTATION (lower-case, no spaces):
+  Placement:            d2          (place on node d2)
+  Movement:             a4-a7       (slide from a4 to a7)
+  Placement + capture:  d2xb6       (place on d2 then capture b6)
+  Movement + capture:   a4-a7xb6    (move to a7 then capture b6)
 """
 
 _MOVE_SYSTEM = _GAME_CONTEXT + """
-Your response MUST follow this exact format — no other text before the MOVE line:
-MOVE: <notation>
-REASON: <one sentence explaining your choice>
+TASK: Choose the best move for the current player from the LEGAL MOVES list.
 
-Move notation rules (use exactly this format):
-  Placement only:       d2
-  Movement only:        a4-a7
-  Placement + capture:  d2xb6
-  Movement + capture:   a4-a7xb6
+OUTPUT FORMAT — follow this EXACTLY, two lines only:
+MOVE: <exact notation from the legal moves list>
+REASON: <one sentence>
 
-You MUST pick a move from the LEGAL MOVES list. Do not invent squares.\
+RULES:
+- Your MOVE must be copied EXACTLY from the LEGAL MOVES list — do not alter it.
+- Do not invent node names. Only the 24 nodes listed above are valid.
+- Do not output anything before the MOVE line.
 """
 
 _COMMENT_SYSTEM = _GAME_CONTEXT + """
-You are commenting on the human's last move in Nine Men's Morris.
-Write 1–2 sentences. Be encouraging and specific about the mill-formation risk.
-Do NOT suggest a move. Do NOT mention chess.
-If you are not confident the move was bad, reply with exactly: NO_COMMENT\
+TASK: Comment on the human's last move in Nine Men's Morris.
+- Write 1–2 short sentences about mill-formation risk or strategic impact.
+- Do NOT suggest a move. Do NOT mention chess.
+- If the move was fine, reply with exactly: NO_COMMENT
 """
 
 
@@ -162,10 +178,14 @@ class MillsLLM:
 
         strategy = self._strategy_context(board.to_fen_string())
 
+        # Legal moves go first so the LLM sees them before anything else.
+        legal_block = "LEGAL MOVES (choose one of these EXACT strings):\n  " + \
+                      "  ".join(notations)
+
         user = (
-            f"Phase: {board.turn}'s turn\n"
-            f"Legal moves: {', '.join(notations)}\n"
-            f"Engine suggests: {ai_notation}{score_hint}\n\n"
+            f"{legal_block}\n\n"
+            f"Engine top choice: {ai_notation}{score_hint}\n"
+            f"Player to move:    {board.turn}\n\n"
             f"Board:\n{board.to_display_grid()}\n"
         )
         if recognition and recognition.status not in ("inactive", "novel"):
@@ -174,10 +194,29 @@ class MillsLLM:
             user += _endgame_context_block(endgame_state)
         if strategy:
             user += f"\nStrategy hints:\n{strategy}\n"
-        user += "\nSelect the best move from the legal moves list."
+        user += (
+            f"\nPick the single best move from the LEGAL MOVES list above.\n"
+            f"Output format:\nMOVE: <exact notation>\nREASON: <one sentence>"
+        )
 
         reply = self._chat(_MOVE_SYSTEM, user, keep_history=False)
         notation = self._parse_move(reply, notations)
+
+        # Retry with a minimal prompt if the first pass failed to parse.
+        if notation is None and self._client is not None:
+            retry_system = (
+                "You are playing Nine Men's Morris (not chess). "
+                "Output ONLY one move notation from the list, nothing else."
+            )
+            retry_user = (
+                f"Legal moves: {', '.join(notations)}\n"
+                f"Respond with just one notation from that list, e.g.: {notations[0]}"
+            )
+            retry_reply = self._chat(retry_system, retry_user, keep_history=False)
+            notation = self._parse_move(retry_reply, notations)
+            if notation:
+                reply = retry_reply  # use the cleaner reply for reasoning display
+
         return reply, notation
 
     def _parse_move(self, response: str, legal_notations: list[str]) -> str | None:
