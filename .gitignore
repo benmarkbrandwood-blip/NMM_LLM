@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / editor lock files
+.~lock.*
+
+# Claude Code local settings
+.claude/
+
+# ChromaDB data (generated at runtime)
+data/chroma/
+
+# OS
+.DS_Store
+Thumbs.db
