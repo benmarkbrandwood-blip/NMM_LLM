@@ -223,6 +223,13 @@ function onNodeClick(name) {
 
   if (gameState.phase === "place") {
     if (gameState.legal_dests.includes(name) && !gameState.board[name]) {
+      // Optimistic render: show piece immediately before server confirms
+      board.grid = { ...gameState.board, [name]: gameState.turn };
+      board.legalDests = new Set();
+      board.legalSrcs  = new Set();
+      board.isHuman    = false;
+      board._drawPieces();
+      board._drawHints();
       ws.send(JSON.stringify({ type: "move", from: null, to: name }));
     }
     return;
@@ -245,8 +252,18 @@ function onNodeClick(name) {
     const pairs = board._movePairs || [];
     const valid = pairs.some(([f, t]) => f === src && t === name);
     if (valid) {
-      ws.send(JSON.stringify({ type: "move", from: src, to: name }));
+      // Optimistic render: move piece to destination immediately
+      const newGrid = { ...gameState.board };
+      newGrid[name] = newGrid[src];
+      delete newGrid[src];
+      board.grid     = newGrid;
       board.selected = null;
+      board.legalDests = new Set();
+      board.legalSrcs  = new Set();
+      board.isHuman    = false;
+      board._drawPieces();
+      board._drawHints();
+      ws.send(JSON.stringify({ type: "move", from: src, to: name }));
     } else if (gameState.legal_sources.includes(name) &&
                gameState.board[name] === gameState.turn) {
       board.selectSource(name);

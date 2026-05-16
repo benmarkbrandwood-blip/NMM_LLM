@@ -10,9 +10,14 @@ deliberately poor move so the human can practise exploiting mistakes.
 
 from __future__ import annotations
 
+import math
 import random
 import time
 from typing import Optional, Tuple
+
+
+class _SearchAbort(Exception):
+    """Raised inside _negamax when the search deadline has passed."""
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves, is_terminal
@@ -23,10 +28,10 @@ from .heuristics import INF, evaluate
 _DEPTH_TABLE = {1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8, 8: 9}
 _TIME_LIMIT = {5: 10.0, 9: 20.0, 10: 45.0}  # difficulty → iterative-deepening budget
 
-# First 2 placements per AI colour use a short time budget regardless of
-# difficulty — the tree is tiny with so few pieces on the board.
-_EARLY_GAME_MOVES = 2
-_EARLY_GAME_TIME  = 1.5  # seconds
+# While fewer than this many pieces are on the board in total, use a short
+# time budget regardless of difficulty — the tree is tiny and deep search wastes time.
+_EARLY_GAME_PIECE_THRESHOLD = 10  # covers roughly the first 5 placements per side
+_EARLY_GAME_TIME            = 2.0  # seconds
 
 
 class GameAI:
@@ -55,6 +60,7 @@ class GameAI:
         self.difficulty = max(1, min(10, difficulty))
         self.blunder_probability = max(0.0, min(1.0, blunder_probability))
         self._nodes = 0
+        self._deadline: float = math.inf   # set by _iterative_deepen; checked in _negamax
         self.last_was_blunder: bool = False   # flag readable by Coordinator / MillsLLM
         self.force_aggressive: bool = False   # when True, disables fly-sacrifice heuristic
 
@@ -82,11 +88,10 @@ class GameAI:
 
         self.last_was_blunder = False
 
-        # Early-game fast path: use a short time budget for the first two
-        # placements this AI makes — the position tree is tiny with so few
-        # pieces on the board and deep search wastes time.
-        if (board.pieces_placed.get(self.color, 0) < _EARLY_GAME_MOVES
-                and sum(board.pieces_placed.values()) < _EARLY_GAME_MOVES * 2):
+        # Early-game fast path: while few pieces are on the board the tree is
+        # tiny — cap the search to a short budget regardless of difficulty.
+        total_on_board = sum(board.pieces_on_board.values())
+        if total_on_board < _EARLY_GAME_PIECE_THRESHOLD:
             return self._iterative_deepen(board, _EARLY_GAME_TIME)
 
         if self.difficulty in _TIME_LIMIT:
@@ -203,8 +208,12 @@ class GameAI:
         """
         Negamax with alpha-beta pruning.
         Returns score from board.turn's perspective (higher = better for board.turn).
+        Raises _SearchAbort when the search deadline is exceeded.
         """
         self._nodes += 1
+        # Check deadline every 4096 nodes to avoid time.time() call overhead.
+        if self._nodes & 0xFFF == 0 and time.time() >= self._deadline:
+            raise _SearchAbort()
 
         terminal, _ = is_terminal(board)
         if terminal:
@@ -254,15 +263,23 @@ class GameAI:
         return random.choice(worst)[0]
 
     def _iterative_deepen(self, board: BoardState, time_limit: float = 10.0) -> dict:
-        """Iterative deepening up to `time_limit` seconds."""
-        start = time.time()
+        """
+        Iterative deepening up to `time_limit` seconds.
+        Sets a hard deadline checked inside _negamax so the budget is respected
+        even when a single depth iteration takes longer than expected.
+        """
+        self._deadline = time.time() + time_limit
         moves = get_all_legal_moves(board)
         best_move = moves[0]
         for depth in range(2, 20):
-            if time.time() - start >= time_limit * 0.8:
+            if time.time() >= self._deadline:
                 break
-            move, _ = self._root_search(board, depth)
-            best_move = move
+            try:
+                move, _ = self._root_search(board, depth)
+                best_move = move          # only update if depth completed cleanly
+            except _SearchAbort:
+                break                     # deadline hit mid-depth; keep previous best
+        self._deadline = math.inf
         return best_move
 
     def position_eval(self, board: BoardState) -> float:
