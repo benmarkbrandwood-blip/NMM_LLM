@@ -1,0 +1,28 @@
+[
+  {
+    "prior_notations": [
+      "g1",
+      "d6",
+      "f4",
+      "g4",
+      "b2",
+      "b4",
+      "g7",
+      "c3"
+    ],
+    "bad_notation": "e4"
+  },
+  {
+    "prior_notations": [
+      "g1",
+      "d6",
+      "f4",
+      "g4",
+      "b2",
+      "b4",
+      "g7",
+      "c3"
+    ],
+    "bad_notation": "e4"
+  }
+]

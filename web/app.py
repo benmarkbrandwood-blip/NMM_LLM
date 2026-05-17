@@ -52,9 +52,10 @@ from ai.endgame_recognizer import EndgameRecognizer
 from ai.trajectory_db import TrajectoryDB
 
 # Load trajectory DB once at startup — updated incrementally as games complete.
-_trajectory_db = TrajectoryDB(_ROOT / "data" / "games")
+_trajectory_db    = TrajectoryDB(_ROOT / "data" / "games")
+_BAD_MOVES_PATH   = _ROOT / "data" / "bad_moves.json"
 try:
-    _trajectory_db.load()
+    _trajectory_db.load(bad_moves_path=_BAD_MOVES_PATH)
     log.info(
         "TrajectoryDB: %d games, %d prefix entries",
         _trajectory_db.game_count, _trajectory_db.entry_count,
@@ -92,6 +93,14 @@ class Session:
         self._pending: Optional[dict] = None   # move awaiting a capture choice
         self._board_before = None              # board snapshot before human move
         self._board_history: list = []         # list of BoardState for undo
+        # Snapshot captured just before the AI applies its move — used for undo
+        self._pre_ai_board = None
+        self._pre_ai_move_log: list = []
+        self._pre_ai_game_record_len: int = 0
+        self._pre_ai_post_placement: int = 0
+        self._pre_ai_engine_turn: int = 1
+        self._last_ai_move: Optional[dict] = None
+        self._can_undo_ai: bool = False        # True only right after an AI move
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -256,6 +265,15 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         })
         return
 
+    # Snapshot state BEFORE applying so the human can mark this move as bad.
+    session._pre_ai_board            = session.engine.board
+    session._pre_ai_move_log         = list(session.engine._move_log)
+    session._pre_ai_game_record_len  = len(session.engine.game_record["moves"])
+    session._pre_ai_post_placement   = session.engine._post_placement_moves
+    session._pre_ai_engine_turn      = session.engine._turn_num
+    session._last_ai_move            = move
+    session._can_undo_ai             = True
+
     session.engine.apply_move(move)
 
     await _send(ws, {
@@ -264,6 +282,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         "to":          move.get("to"),
         "capture":     move.get("capture"),
         "was_blunder": bool(session.game_ai and session.game_ai.last_was_blunder),
+        "can_mark_bad": True,
     })
     await _commentary(ws, session)
     await _send(ws, _state(session))
@@ -404,6 +423,72 @@ async def ws_endpoint(websocket: WebSocket):
                 await _commentary(websocket, session)
                 _maybe_start_ai()
 
+            # ── bad_move — mark last AI move as bad, undo it, re-deliberate ───
+            elif kind == "bad_move" and session and not session.vs_human:
+                if not session._can_undo_ai or session._last_ai_move is None:
+                    await _send(websocket, {"type": "error", "message": "Nothing to undo"})
+                    continue
+                if ai_thinking:
+                    # Can't undo while AI is currently computing
+                    await _send(websocket, {"type": "error", "message": "AI is thinking — wait"})
+                    continue
+
+                bad_move_dict  = session._last_ai_move
+                bad_notation   = (
+                    f"{bad_move_dict['from']}-{bad_move_dict['to']}"
+                    if bad_move_dict.get("from")
+                    else bad_move_dict["to"]
+                )
+                if bad_move_dict.get("capture"):
+                    bad_notation += f"x{bad_move_dict['capture']}"
+
+                # Collect move history BEFORE the bad move (coordinator records both sides)
+                prior_notations: list[str] = []
+                if session.coordinator:
+                    prior_notations = [
+                        m.get("notation", "")
+                        for m in session.coordinator._game_moves[:-1]
+                        if m.get("notation")
+                    ]
+                else:
+                    prior_notations = [
+                        m.get("notation", "")
+                        for m in session.engine.game_record["moves"][:-1]
+                        if m.get("notation")
+                    ]
+
+                # Persist and apply the ban to the trajectory DB
+                _trajectory_db.save_bad_move(_BAD_MOVES_PATH, prior_notations, bad_notation)
+                log.info("Bad move marked: %r  prior_len=%d", bad_notation, len(prior_notations))
+
+                # ── Restore engine to pre-AI-move state ──────────────────────
+                session.engine.board                 = session._pre_ai_board
+                session.engine._move_log             = session._pre_ai_move_log
+                session.engine.game_record["moves"]  = (
+                    session.engine.game_record["moves"][:session._pre_ai_game_record_len]
+                )
+                session.engine._post_placement_moves = session._pre_ai_post_placement
+                session.engine._turn_num             = session._pre_ai_engine_turn
+                session.engine.finished              = False
+                session.engine.winner                = None
+                session.engine.draw_reason           = None
+
+                # ── Restore coordinator ──────────────────────────────────────
+                if session.coordinator:
+                    if session.coordinator._game_moves:
+                        session.coordinator._game_moves.pop()
+                    session.coordinator._turn_num = max(0, session.coordinator._turn_num - 1)
+                    # Reset opening recognizer — slight context loss but board is correct
+                    if session.coordinator.opening_recognizer:
+                        session.coordinator.opening_recognizer.reset()
+
+                session._can_undo_ai   = False
+                session._last_ai_move  = None
+
+                await _send(websocket, {"type": "bad_move_ack", "bad_notation": bad_notation})
+                await _send(websocket, _state(session))
+                _maybe_start_ai()
+
             # ── move ──────────────────────────────────────────────────────────
             elif kind == "move" and session:
                 frm = msg.get("from")  # None for placement
@@ -436,6 +521,7 @@ async def ws_endpoint(websocket: WebSocket):
 
                 board_before = board
                 session._board_history.append(board)
+                session._can_undo_ai = False   # human move committed — no more undo of AI
                 session.engine.apply_move(move)
 
                 if session.coordinator and not session.vs_human:
@@ -466,6 +552,7 @@ async def ws_endpoint(websocket: WebSocket):
                 board_before    = session._board_before
                 completed_move  = dict(session._pending)   # save before clearing
                 session._board_history.append(board_before)
+                session._can_undo_ai = False   # human move committed
                 session.engine.apply_move(completed_move)
                 session._pending      = None
                 session._board_before = None

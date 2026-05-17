@@ -7,8 +7,34 @@ Positive = good for color, negative = bad.
 
 from __future__ import annotations
 import math
+from dataclasses import dataclass, field
 from game.board import ADJACENCY, MILLS, POSITIONS, BoardState
 from game.rules import get_game_phase, is_terminal
+
+
+@dataclass
+class HeuristicWeights:
+    """Configurable tactical and positional weights sent from the UI."""
+    # ── Tactical urgency (delta-based, applied per move) ─────────────────
+    close_mill: int            = 500   # bonus per mill closed this move
+    cycling_mill: int          = 300   # bonus for gaining a cycling mill setup (capped at 1 per move)
+    block_opponent_mill: int   = 400   # bonus per opponent closeable mill neutralised
+    stop_opponent_mills: int   = 450   # bonus per opponent 2-config dismantled
+    feeder_diamond: int        = 200   # bonus for gaining a diamond/fork structure (capped at 1 per move)
+    mill_wrapping: int         = 150   # bonus per own piece surrounding an opponent closed mill
+    cardinal_block: int        = 400   # bonus for taking/clearing cross-node squares
+    scatter_placement: int    = 100   # bonus for non-adjacent placement in first 6 moves
+    # ── Positional base scale (applied inside evaluate) ──────────────────
+    long_term_position: int   = 100   # % multiplier on entire positional base score
+    mill_count_scale: int     = 100   # % multiplier on mill-count weights
+    mobility_scale: int       = 100   # % multiplier on mobility weights
+    blocked_scale: int        = 100   # % multiplier on blocked-pieces weights
+    # ── Behaviour (consumed by GameAI, not heuristics) ───────────────────
+    make_mistakes: int        = 0     # blunder probability 0-100 %
+    opening_adherence: int    = 50    # how strongly to follow the opening book (0-100)
+
+
+DEFAULT_WEIGHTS = HeuristicWeights()
 
 INF: int = 10_000_000
 
@@ -60,6 +86,7 @@ def evaluate(
     color: str,
     endgame_state=None,
     force_aggressive: bool = False,
+    weights: HeuristicWeights | None = None,
 ) -> int:
     """Evaluate board from `color`'s perspective. Higher is better for color."""
     terminal, winner = is_terminal(board)
@@ -69,6 +96,11 @@ def evaluate(
     opp   = "B" if color == "W" else "W"
     phase = get_game_phase(board, color)
     w     = _WEIGHTS[phase]
+
+    # Apply per-weight UI scale factors
+    mill_w  = int(w[0] * weights.mill_count_scale / 100) if weights else w[0]
+    block_w = int(w[1] * weights.blocked_scale    / 100) if weights else w[1]
+    mob_w   = int(_MOB_WEIGHTS[phase] * weights.mobility_scale / 100) if weights else _MOB_WEIGHTS[phase]
 
     our_mills  = _closed_mills(board, color)
     opp_mills  = _closed_mills(board, opp)
@@ -94,13 +126,13 @@ def evaluate(
     fly_asym   = 0 if force_aggressive else _fly_asymmetry(board, color)
 
     base = (
-        w[0] * (our_mills - opp_mills)
-        + w[1] *  blocked
-        + w[2] *  piece_diff
-        + w[3] * (our_two  - opp_two)
-        + w[4] * (our_dbl  - opp_dbl)
-        + w[5] *  win_cfg
-        + _MOB_WEIGHTS[phase]    * (our_mob - opp_mob)
+        mill_w  * (our_mills - opp_mills)
+        + block_w *  blocked
+        + w[2]  *  piece_diff
+        + w[3]  * (our_two  - opp_two)
+        + w[4]  * (our_dbl  - opp_dbl)
+        + w[5]  *  win_cfg
+        + mob_w                  * (our_mob - opp_mob)
         + _THREAT_WEIGHTS[phase] * (our_thr - opp_thr)
         + 2 * (our_pos - opp_pos)
         + _CYCLE_WEIGHTS[phase]  * (our_cycle - opp_cycle)
@@ -108,6 +140,11 @@ def evaluate(
         + _HERD_WEIGHTS[phase]   * (our_herd  - opp_herd)
         + _FLY_ASYM_WEIGHTS[phase] * fly_asym
     )
+
+    # Apply overall positional scale (long_term_position=100 means no change)
+    if weights and weights.long_term_position != 100:
+        base = int(base * weights.long_term_position / 100)
+
     return base + endgame_score(board, color, endgame_state)
 
 
@@ -262,6 +299,159 @@ def _encirclement(board: BoardState, color: str) -> int:
         if board.positions[pos] == opp:
             count += sum(1 for nb in ADJACENCY[pos] if board.positions[nb] == color)
     return count
+
+
+# ── Tactical urgency (Stage 5.12) ────────────────────────────────────────────
+
+def _closeable_mills(board: BoardState, color: str) -> int:
+    """Count 2-config mills that color can close in exactly one move."""
+    phase = get_game_phase(board, color)
+    can_place = board.pieces_placed.get(color, 0) < 9
+    count = 0
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            empty = next(p for p in mill if board.positions[p] == "")
+            if phase == "place":
+                reachable = can_place
+            elif phase == "fly":
+                reachable = True
+            else:
+                reachable = any(board.positions[nb] == color for nb in ADJACENCY[empty])
+            if reachable:
+                count += 1
+    return count
+
+
+def _cycling_mill_setup(board: BoardState, color: str) -> int:
+    """Count pairs of own 2-configs whose empty closing squares are adjacent.
+
+    The classic cycling mill: two mills share a common pivot position.  The pivot
+    slides from E1 (closing mill M1, forcing a capture) to E2 (closing M2, forcing
+    another capture), then back — a capture every two turns.  E1 and E2 must be
+    adjacent so a single piece can shuttle between them.  In fly phase every empty
+    square is reachable so all pairs of 2-configs qualify.
+    """
+    phase = get_game_phase(board, color)
+    empties = []
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            empties.append(next(p for p in mill if board.positions[p] == ""))
+    count = 0
+    n = len(empties)
+    for i in range(n):
+        for j in range(i + 1, n):
+            if phase == "fly" or empties[j] in ADJACENCY[empties[i]]:
+                count += 1
+    return count
+
+
+def _feeder_diamond(board: BoardState, color: str) -> int:
+    """Count empty squares shared by 2+ own 2-configs (diamond / fork structures).
+
+    A diamond is 4 own pieces all adjacent to one key empty square, forming two
+    simultaneous mill threats.  Example: a4-c4-b2-b6 all border b4; either
+    a4-b4-c4 or b2-b4-b6 closes when b4 is filled.  If one anchor is captured,
+    a remaining piece slides to b4 to close the other mill.
+    """
+    closing: dict[str, int] = {}
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            empty = next(p for p in mill if board.positions[p] == "")
+            closing[empty] = closing.get(empty, 0) + 1
+    return sum(1 for c in closing.values() if c >= 2)
+
+
+def _mill_wrapping_pressure(board: BoardState, color: str) -> int:
+    """Own pieces occupying exit squares of every opponent closed mill.
+
+    An exit square is any square adjacent to a mill piece but not in the mill
+    itself.  High coverage means the opponent's mill is surrounded and cannot
+    be easily exploited by cycling (the pivot has nowhere to slide to).
+    Counted per mill so a piece bordering two mills contributes twice.
+    """
+    opp = "B" if color == "W" else "W"
+    total = 0
+    for mill in MILLS:
+        if all(board.positions[p] == opp for p in mill):
+            mill_set = set(mill)
+            covered: set[str] = set()
+            for pos in mill:
+                for nb in ADJACENCY[pos]:
+                    if nb not in mill_set and board.positions[nb] == color:
+                        covered.add(nb)
+            total += len(covered)
+    return total
+
+
+def _cross_node_count(board: BoardState, color: str) -> int:
+    """Count pieces of `color` sitting on cross/cardinal nodes."""
+    return sum(1 for p in _CROSS_NODES if board.positions[p] == color)
+
+
+def tactical_move_bonus(
+    before: BoardState,
+    after: BoardState,
+    color: str,
+    weights: HeuristicWeights | None = None,
+) -> int:
+    """Delta-based tactical bonus added directly to the root-move score.
+
+    Applied in _score_all / _root_search AFTER the negamax score is computed,
+    so it does not invert through negamax negation.
+    """
+    if weights is None:
+        weights = DEFAULT_WEIGHTS
+    opp = "B" if color == "W" else "W"
+
+    # Mills closed this move
+    mills_delta = max(0, _closed_mills(after, color) - _closed_mills(before, color))
+
+    # Cycling mill setup gained (own) or disrupted for opponent this move.
+    # Capped at 1: a move either creates/destroys a cycling opportunity or it doesn't.
+    # Without the cap, moves that create many pairs at once would score 3-4× too high
+    # and dominate the close_mill bonus, causing the AI to build structure over winning.
+    cycling_gain   = min(1, max(0, _cycling_mill_setup(after, color) - _cycling_mill_setup(before, color)))
+    opp_cycle_lost = min(1, max(0, _cycling_mill_setup(before, opp)  - _cycling_mill_setup(after,  opp)))
+
+    # Opponent immediate closeable threats neutralised
+    blocked = max(0, _closeable_mills(before, opp) - _closeable_mills(after, opp))
+
+    # Opponent 2-configs dismantled (broader than closeable — any 2-piece setup)
+    two_cfg_broken = max(0, _two_configs(before, opp) - _two_configs(after, opp))
+
+    # Diamond / fork structures gained this move (capped at 1 for same reason as cycling).
+    diamond_gain = min(1, max(0, _feeder_diamond(after, color) - _feeder_diamond(before, color)))
+
+    # Mill wrapping pressure gained (own pieces covering opponent mill exit squares)
+    wrap_gain = max(0, _mill_wrapping_pressure(after, color) - _mill_wrapping_pressure(before, color))
+
+    # Cardinal / cross-node control gained or opponent evicted
+    our_cross_gained = max(0, _cross_node_count(after, color) - _cross_node_count(before, color))
+    opp_cross_lost   = max(0, _cross_node_count(before, opp)  - _cross_node_count(after,  opp))
+
+    # Early-game scatter: bonus for placing non-adjacent in first 6 placements
+    scatter = 0
+    if (get_game_phase(before, color) == "place"
+            and before.pieces_placed.get(color, 0) < 6):
+        for pos in POSITIONS:
+            if after.positions[pos] == color and before.positions[pos] != color:
+                if not any(before.positions[nb] == color for nb in ADJACENCY[pos]):
+                    scatter = weights.scatter_placement
+                break
+
+    return (
+        weights.close_mill            * mills_delta
+        + weights.cycling_mill        * (cycling_gain + opp_cycle_lost)
+        + weights.block_opponent_mill * blocked
+        + weights.stop_opponent_mills * two_cfg_broken
+        + weights.feeder_diamond      * diamond_gain
+        + weights.mill_wrapping       * wrap_gain
+        + weights.cardinal_block      * (our_cross_gained + opp_cross_lost)
+        + scatter
+    )
 
 
 # ── Endgame supplement ────────────────────────────────────────────────────────

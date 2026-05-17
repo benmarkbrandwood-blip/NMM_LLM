@@ -27,5 +27,21 @@
   "debrief_window_width": 1300,
   "debrief_window_height": 750,
   "window_width": 1200,
-  "window_height": 700
+  "window_height": 700,
+  "ai_weights": {
+    "close_mill": 450,
+    "cycling_mill": 350,
+    "block_opponent_mill": 400,
+    "stop_opponent_mills": 400,
+    "feeder_diamond": 250,
+    "mill_wrapping": 200,
+    "cardinal_block": 450,
+    "scatter_placement": 400,
+    "long_term_position": 175,
+    "mill_count_scale": 100,
+    "mobility_scale": 200,
+    "blocked_scale": 125,
+    "make_mistakes": 0,
+    "opening_adherence": 90
+  }
 }

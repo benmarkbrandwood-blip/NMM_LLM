@@ -12,6 +12,7 @@
     <h1>Nine Men's Morris</h1>
     <button id="toggle-moves">Moves</button>
     <button id="toggle-settings">Settings</button>
+    <button id="toggle-ai-tuning">AI Tuning</button>
   </header>
 
   <main>
@@ -117,6 +118,16 @@
         <button id="btn-new-game">New Game</button>
       </div>
 
+      <!-- AI Tuning panel (toggled via header button, stays open during play) -->
+      <div class="panel-box" id="ai-tuning-panel" hidden>
+        <h3>AI Tuning</h3>
+        <div id="ai-weight-sliders"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <button id="btn-reset-weights" class="btn-small">Reset defaults</button>
+          <button id="btn-save-weights"  class="btn-small">Save settings</button>
+        </div>
+      </div>
+
     </div><!-- /side-panel -->
   </main>
 
@@ -131,6 +142,7 @@
       <svg id="eval-graph" preserveAspectRatio="none"></svg>
     </div>
     <button id="btn-force-move" hidden title="Stop AI search now and play best move found so far">Force Move</button>
+    <button id="btn-bad-move" hidden title="Mark AI's last move as bad, undo it, and let it try again">&#x26D4; Bad Move</button>
     <button id="btn-force-cap" disabled title="Force AI to capture aggressively — disables fly-sacrifice strategy">Force Capture</button>
     <button id="btn-draw" disabled>Offer Draw</button>
     <button id="btn-hint" disabled>Hint (3)</button>

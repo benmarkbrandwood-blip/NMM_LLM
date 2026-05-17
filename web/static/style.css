@@ -50,7 +50,8 @@ header h1 {
 }
 
 #toggle-moves,
-#toggle-settings {
+#toggle-settings,
+#toggle-ai-tuning {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-dim);
@@ -59,11 +60,13 @@ header h1 {
   cursor: pointer;
   font-size: .85rem;
 }
-#toggle-settings { margin-left: auto; }
+#toggle-settings  { margin-left: auto; }
 #toggle-moves:hover,
-#toggle-settings:hover  { border-color: var(--accent); color: var(--accent); }
+#toggle-settings:hover,
+#toggle-ai-tuning:hover { border-color: var(--accent); color: var(--accent); }
 #toggle-moves.btn-active,
-#toggle-settings.btn-active { border-color: var(--tan); color: var(--tan); }
+#toggle-settings.btn-active,
+#toggle-ai-tuning.btn-active { border-color: var(--tan); color: var(--tan); }
 
 /* ── Main 3-column grid ──────────────────────────────────────────────── */
 /*   [commentary 260px] [board 1fr] [side 280px]                         */
@@ -265,6 +268,57 @@ main {
 }
 #btn-new-game:hover { background: #e09050; }
 
+/* ── AI Tuning sliders ───────────────────────────────────────────────── */
+.tuning-summary {
+  font-size: .8rem;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 6px;
+  list-style: none;
+}
+.tuning-summary::before { content: "▸ "; }
+#ai-tuning-details[open] .tuning-summary::before { content: "▾ "; }
+
+.slider-row {
+  margin-bottom: 7px;
+}
+.slider-row .slider-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: .75rem;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+.slider-row .slider-label span { color: var(--tan); font-weight: 600; }
+.slider-row input[type=range] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.slider-group-hdr {
+  font-size: .68rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  margin: 8px 0 4px;
+}
+
+.btn-small {
+  flex: 1;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: .78rem;
+  cursor: pointer;
+}
+.btn-small:hover { border-color: var(--accent); color: var(--text); }
+
 /* ── Bottom bar: eval graph + undo ───────────────────────────────────── */
 #bottom-bar {
   display: flex;
@@ -298,6 +352,7 @@ main {
 
 /* ── Draw / Hint / Undo buttons ──────────────────────────────────────── */
 #btn-force-move,
+#btn-bad-move,
 #btn-force-cap,
 #btn-draw,
 #btn-hint,
@@ -313,10 +368,17 @@ main {
   white-space: nowrap;
 }
 #btn-force-move:hover                { border-color: #e0c040; color: #e0c040; }
+#btn-bad-move                        { border-color: #803030; color: #c05050;
+                                       animation: pulse-bad 1.4s ease-in-out infinite; }
+#btn-bad-move:hover                  { border-color: var(--red); color: var(--red); }
 #btn-force-cap:hover:not(:disabled)  { border-color: var(--red);    color: var(--red); }
 #btn-draw:hover:not(:disabled)       { border-color: var(--green);  color: var(--green); }
 #btn-hint:hover:not(:disabled)       { border-color: var(--tan);    color: var(--tan); }
 #btn-undo:hover:not(:disabled)       { border-color: var(--accent); color: var(--accent); }
+@keyframes pulse-bad {
+  0%, 100% { border-color: #803030; }
+  50%       { border-color: #c05050; }
+}
 #btn-force-move { border-color: #806030; color: #c8a030; animation: pulse-border 1.2s ease-in-out infinite; }
 @keyframes pulse-border {
   0%, 100% { border-color: #806030; }

@@ -1946,9 +1946,9 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 0,
+      "W": 2,
       "B": 0,
-      "D": 3
+      "D": 5
     },
     "confidence": 0.3,
     "tags": [
@@ -5709,6 +5709,136 @@
     },
     "outcome_stats": {
       "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-4950bfde",
+    "name": "The Morning March",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "b2",
+      "d3",
+      "g4",
+      "c4",
+      "d7",
+      "g7",
+      "a1",
+      "e5",
+      "a4",
+      "c3",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBBBB........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...B....WWWWBBBB.....W..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-7fb20cbe",
+    "name": "The Crimson Rampart Opening",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "f2",
+      "c4",
+      "c5",
+      "e3",
+      "e5",
+      "b2",
+      "d7",
+      "d1",
+      "e4",
+      "a1",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.BB......W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
       "B": 0,
       "D": 0
     },
