@@ -428,9 +428,9 @@ async def ws_endpoint(websocket: WebSocket):
             ai_thinking = False
             log.debug("AI background task finished, ai_thinking=False")
 
-    def _maybe_start_ai() -> None:
+    def _maybe_start_ai(force: bool = False) -> None:
         nonlocal ai_thinking
-        if _is_ai_turn(session) and not ai_thinking:
+        if (force or _is_ai_turn(session)) and not ai_thinking:
             ai_thinking = True
             asyncio.create_task(_run_ai_background())
 
@@ -603,12 +603,11 @@ async def ws_endpoint(websocket: WebSocket):
                 _maybe_start_ai()
 
             # ── bad_move — mark last AI move as bad, undo it, re-deliberate ───
-            elif kind == "bad_move" and session and not session.vs_human:
+            elif kind == "bad_move" and session and session.game_ai:
                 if not session._can_undo_ai or session._last_ai_move is None:
                     await _send(websocket, {"type": "error", "message": "Nothing to undo"})
                     continue
                 if ai_thinking:
-                    # Can't undo while AI is currently computing
                     await _send(websocket, {"type": "error", "message": "AI is thinking — wait"})
                     continue
 
@@ -620,6 +619,10 @@ async def ws_endpoint(websocket: WebSocket):
                 )
                 if bad_move_dict.get("capture"):
                     bad_notation += f"x{bad_move_dict['capture']}"
+
+                # Immediately ban the move from the live game — AI won't pick it again
+                # regardless of how scoring resolves.
+                session.game_ai.ban_move(bad_notation)
 
                 # Collect move history BEFORE the bad move (coordinator records both sides)
                 prior_notations: list[str] = []
@@ -636,7 +639,7 @@ async def ws_endpoint(websocket: WebSocket):
                         if m.get("notation")
                     ]
 
-                # Persist and apply the ban to the trajectory DB
+                # Persist to TrajectoryDB for future games
                 _trajectory_db.save_bad_move(_BAD_MOVES_PATH, prior_notations, bad_notation)
                 log.info("Bad move marked: %r  prior_len=%d", bad_notation, len(prior_notations))
 
@@ -657,7 +660,6 @@ async def ws_endpoint(websocket: WebSocket):
                     if session.coordinator._game_moves:
                         session.coordinator._game_moves.pop()
                     session.coordinator._turn_num = max(0, session.coordinator._turn_num - 1)
-                    # Reset opening recognizer — slight context loss but board is correct
                     if session.coordinator.opening_recognizer:
                         session.coordinator.opening_recognizer.reset()
 
@@ -666,7 +668,7 @@ async def ws_endpoint(websocket: WebSocket):
 
                 await _send(websocket, {"type": "bad_move_ack", "bad_notation": bad_notation})
                 await _send(websocket, _state(session))
-                _maybe_start_ai()
+                _maybe_start_ai(force=True)  # force=True so it fires in human vs AI mode too
 
             # ── move ──────────────────────────────────────────────────────────
             elif kind == "move" and session:

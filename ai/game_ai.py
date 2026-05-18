@@ -152,8 +152,17 @@ class GameAI:
         self._force_stop: bool = False     # set by force_stop(); cleared by choose_move()
         self.last_was_blunder: bool = False   # flag readable by Coordinator / MillsLLM
         self.force_aggressive: bool = False   # when True, disables fly-sacrifice heuristic
+        self.banned_game_moves: set[str] = set()  # notations banned via bad-move button
 
     # ── Public API ────────────────────────────────────────────────────────────
+
+    def ban_move(self, notation: str) -> None:
+        """Prevent the AI from playing `notation` for the rest of this game."""
+        self.banned_game_moves.add(notation)
+
+    def reset_game_bans(self) -> None:
+        """Clear all per-game move bans (call when a new game starts)."""
+        self.banned_game_moves.clear()
 
     def force_stop(self) -> None:
         """Interrupt any running search immediately; _negamax raises _SearchAbort.
@@ -190,6 +199,13 @@ class GameAI:
             blocking = [m for m in moves if m["to"] in threats]
             if blocking:
                 moves = blocking
+
+        # Per-game move bans (set via bad-move button): filter AFTER mandatory block
+        # so a banned blocking move can still be played if it's the only way to block.
+        if self.banned_game_moves:
+            non_banned = [m for m in moves if self._move_notation(m) not in self.banned_game_moves]
+            if non_banned:  # safety: never reduce to zero legal moves
+                moves = non_banned
 
         # Blunder mode: occasionally play a bad move on purpose
         if self.blunder_probability > 0.0 and random.random() < self.blunder_probability:
