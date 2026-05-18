@@ -572,6 +572,20 @@ def main() -> None:
         print(f"  Personality: random from [{', '.join(pool)}]")
     if n_workers > 1:
         print(f"  Parallel:    {n_workers} workers")
+
+    if use_llm:
+        avg_move_s  = 22          # typical Ollama local inference time
+        avg_moves   = 50          # typical moves per game
+        est_minutes = n_games * avg_moves * avg_move_s / 60
+        print()
+        print(f"  ⚠  LLM mode: each move waits for Ollama (~{avg_move_s}s/move).")
+        print(f"     Estimated total time: ~{est_minutes:.0f} min for {n_games} games.")
+        print(f"     For bulk runs use --no-llm (parallel also becomes available):")
+        print(f"       python tools/self_play.py --no-llm --games {n_games} "
+              f"--white {w_diff} --black {b_diff}"
+              + (f" --blunder {args.blunder}" if args.blunder else "")
+              + (f" --parallel {n_workers}" if n_workers > 1 else " --parallel 4"))
+
     print()
 
     results     = {"W": 0, "B": 0, "D": 0}

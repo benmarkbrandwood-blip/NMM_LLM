@@ -98,6 +98,9 @@ class EndgameDB:
         )
 
     def _index_game(self, record: dict) -> None:
+        # Skip adaptive-softened games — blunder-inflated play pollutes the library.
+        if record.get("adaptive_softened"):
+            return
         winner = record.get("winner")
         moves = record.get("moves", [])
         if not moves:

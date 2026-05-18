@@ -79,6 +79,9 @@ class TrajectoryDB:
             self.load_bad_moves(bad_moves_path)
 
     def _index_game(self, record: dict) -> None:
+        # Skip adaptive-softened games — blunder-inflated play pollutes the library.
+        if record.get("adaptive_softened"):
+            return
         winner = record.get("winner")       # "W", "B", or None/missing
         moves  = record.get("moves", [])
         if not moves:

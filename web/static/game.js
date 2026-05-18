@@ -638,6 +638,20 @@ function handleMessage(msg) {
       $("btn-force-cap").disabled = true;
       updateHintButton(false);
       updateDrawButton();
+
+      // Adaptive difficulty feedback
+      if (msg.adaptive) {
+        const ad = msg.adaptive;
+        if (ad.action === "softened") {
+          addCommentary("Adaptive", `After ${AdaptiveTracker.SOFTEN_AFTER} losses I've dropped to difficulty ${ad.difficulty} and will make more deliberate mistakes. Keep playing — you'll improve!`, "ai");
+          setAdaptiveBadge(ad.difficulty, true);
+        } else if (ad.action === "restored") {
+          addCommentary("Adaptive", `Great improvement! Restoring difficulty to ${ad.difficulty}.`, "ai");
+          setAdaptiveBadge(ad.difficulty, false);
+        } else if (ad.action === "suggest_harder") {
+          addCommentary("Adaptive", `You're on a ${AdaptiveTracker.HARDEN_SUGGEST}-game win streak! Consider trying difficulty ${ad.difficulty} for a tougher challenge.`, "ai");
+        }
+      }
       break;
     }
 
@@ -769,10 +783,41 @@ function updateInfoPanel(state) {
   } else {
     $("opening-family-row").hidden = true;
   }
+
+  const ad = state.adaptive;
+  if (ad && ad.softened) {
+    setAdaptiveBadge(ad.difficulty, true);
+  } else if (ad && !ad.softened && ad.difficulty === ad.base) {
+    setAdaptiveBadge(null, false);
+  }
 }
 
 function setStatus(text) {
   $("status-bar").textContent = text;
+}
+
+// ── Adaptive difficulty badge ─────────────────────────────────────────────────
+
+// Mirror of server constants — used in message text only.
+const AdaptiveTracker = { SOFTEN_AFTER: 3, HARDEN_SUGGEST: 3 };
+
+function setAdaptiveBadge(difficulty, softened) {
+  let badge = document.getElementById("adaptive-badge");
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.id = "adaptive-badge";
+    const sb = $("status-bar");
+    sb.parentNode.insertBefore(badge, sb.nextSibling);
+  }
+  if (difficulty === null) {
+    badge.hidden = true;
+    return;
+  }
+  badge.hidden = false;
+  badge.className = softened ? "adaptive-badge adaptive-softened" : "adaptive-badge";
+  badge.textContent = softened
+    ? `Adaptive: Diff ${difficulty} (easing)`
+    : `Adaptive: Diff ${difficulty}`;
 }
 
 function startThinkingTimer(color, expectedSec, socket) {

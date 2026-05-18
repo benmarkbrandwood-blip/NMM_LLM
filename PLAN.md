@@ -19,18 +19,20 @@
 | 5.12 | AI Tactical Imperatives | ✅ Complete |
 | 5.13 | AI Settings & Weight Tuning UI | ✅ Complete |
 | 5.14 | Opening Replay on GUI | ✅ Complete |
-| 5.15 | User Guide & README Expansion | 🔄 Current |
+| 5.15 | User Guide & README Expansion | ✅ Complete |
 | 5.16 | Starting Play Variants & Opening Database | ✅ Complete |
 | 5.17 | Game Trajectory Memory & Winner-Aware Learning | ✅ Complete |
+| 5.18 | Per-Personality Saved Settings | ✅ Complete |
 | 5.23 | UI Layout & Default Preference Fixes | ✅ Complete |
 | 5.24 | Endgame Position Memory | ✅ Complete |
 | 5.25 | AI Personality Selector in Header | ✅ Complete |
 | 5.26 | Setup Position Button in Header | ✅ Complete |
 | 6 | Self-Play Training Loop | ✅ Complete |
 | 7 | Heuristic Parameter Evolution | ⬜ Planned |
-| 8 | Adaptive Difficulty | ⬜ Planned |
+| 8 | Adaptive Difficulty | ✅ Complete |
 | 9 | Tournament / Match Mode | ⬜ Planned |
-| 10 | Advanced Search (MCTS / NN) | ⬜ Stretch |
+| 10 | Player Profiles & Persistent Stats | ⬜ Planned |
+| 11 | Advanced Search (MCTS / NN) | ⬜ Stretch |
 
 
 ## Completed Stages
@@ -1134,27 +1136,42 @@ python tools/self\\\_play.py --games 20 --white 7 --black 5 --summary
 
 **Risk:** Overfitting to self-play. Mitigate by evaluating against fixed reference engines (difficulty 4 and difficulty 8).
 
-### Stage 8 — Adaptive Difficulty ⬜
+### Stage 8 — Adaptive Difficulty ✅
 
-**Goal:** Keep human games competitive by auto-adjusting difficulty to match the player's skill. Potentially develop different playing styles so the computer AI can have different ‘personalities; eg, defensive, offensive, etc.
+**Goal:** Keep human games competitive by auto-adjusting difficulty to match the player’s skill in session.
 
-**Approach:**
+**Delivered (session-only, 2026-05-18):**
 
-- Track win/loss/draw history for the current player (`data/player\\\_profile.json`).
+- `web/app.py` — `AdaptiveTracker` class. Persists across `new_game` messages on the same WebSocket connection. After 3 consecutive losses, automatically drops difficulty by 1 and adds 15% extra blunder rate (capped at 35%). After 3 consecutive wins at a softened level, restores difficulty by 1. After 3 consecutive wins at the player’s chosen level, suggests trying the next difficulty. If the player manually changes difficulty, all streaks reset.
 
-- Estimate player Elo from recent outcomes (K=32, initial=1000; AI difficulties map to approximate Elo).
+- `web/static/game.js` — Handles `adaptive` field in `game_over` message: shows commentary for soften/restore/suggest events, updates `#adaptive-badge` pill near the status bar.
 
-- After each game, nudge difficulty ±1 toward the target win-rate band (40–60%).
+- `web/static/style.css` — `.adaptive-badge` and `.adaptive-softened` (amber pulsing) styles.
 
-- Expose current estimated Elo in the UI info panel.
+**Library protection:** Adaptive games are flagged with `self_play: false` and the adaptive blunder boost only affects live blunder injection, not heuristic weights. The trajectory and endgame DBs index moves by board state and outcome — a softened loss still records what happened; it does not teach the AI to play badly (the AI’s own move search is unchanged; only blunder injection probability increases). See Stage 8 Library Protection note below.
 
-**Deliverables:**
+**Future extensions:**
+- Persistent player profile (across sessions) — see Stage 10.
+- Elo estimation from recent outcomes.
+- Per-personality adaptive ranges (Scholar adjusts slower than Chaos).
 
-- `ai/player\\\_profile.py` — Profile manager with Elo estimation.
+#### Stage 8 Library Protection Note
 
-- `web/app.py` — Reads profile on `new\\\_game`, writes outcome on `game\\\_over`.
+When adaptive difficulty lowers the AI's level and increases blunder rate, there is a risk that the resulting games (lower-quality moves, intentional blunders) are stored in `data/games/` and used to train TrajectoryDB and EndgameDB. This would teach the AI that bad moves are "good" in those positions.
 
-- `web/templates/index.html` — Estimated Elo and adaptive mode toggle in settings.
+**Current protection:** TrajectoryDB and EndgameDB only weight moves by the game *outcome* (win/loss/draw), not by which moves were played. A blundered move that leads to a loss is recorded as a losing move — so blunders naturally accumulate negative weight, not positive. The AI's own search is minimax and remains unaffected by blunder injection.
+
+**Additional protection (to implement):** Tag adaptive-softened games in the JSONL record with `"adaptive_softened": true`. TrajectoryDB and EndgameDB loaders should skip or down-weight these records so they don't pollute the opening/endgame library with beginner-level play patterns. See Bug 8-A below.
+
+#### Bug 8-A — Adaptive Games Polluting TrajectoryDB / EndgameDB ⬜
+
+**Symptom:** After many adaptive-softened games, TrajectoryDB move hints degrade as the AI "learns" from its own intentional blunders (even if negatively weighted, high-blunder games add noise).
+
+**Planned fix:**
+1. Add `"adaptive_softened": true` to the JSONL game record when `adaptive.extra_blunder > 0` at game start.
+2. In `TrajectoryDB.load()` and `EndgameDB.load()`, skip records where `adaptive_softened == true`.
+3. Expose a `--include-adaptive` flag in self-play and the DB loaders for analysis purposes.
+
 
 ### Stage 9 — Tournament / Match Mode ⬜
 
@@ -1178,7 +1195,28 @@ python tools/self\\\_play.py --games 20 --white 7 --black 5 --summary
 
 - Results include per-opening breakdown, average game length, eval trajectory summary.
 
-### Stage 10 — Advanced Search (MCTS / Neural Evaluation) ⬜ *(Stretch)*
+### Stage 10 — Player Profiles & Persistent Stats ⬜
+
+**Goal:** Allow players to sign in with a username, persist their stats and adaptive difficulty across sessions, and participate in tournaments against the AI personalities at appropriate difficulty levels.
+
+**User flow:**
+
+1. On first visit, player enters a name. Profile saved to `data/players/<name>.json`.
+2. Stats shown in a small profile panel: games played, W/L/D record, current adaptive difficulty, Elo estimate, favourite personality (most played), best win streak.
+3. Adaptive difficulty initialised from profile history rather than starting fresh each session.
+4. **Tournament mode**: player joins a round-robin against all 6 personalities. Difficulty for each personality matchup is set automatically from the player's adaptive level. Results recorded to profile.
+5. Leaderboard: `data/leaderboard.json` aggregates all player profiles. Viewable via `/leaderboard` page.
+
+**Implementation sketch:**
+
+- `ai/player_profile.py` — `PlayerProfile` dataclass; load/save JSON; Elo update (`K=32`, initial `1000`; difficulty maps to Elo: `diff 1≈600, 3≈900, 5≈1100, 7≈1300, 10≈1600`).
+- `web/app.py` — `GET/POST /api/profile/<name>`. `new_game` accepts optional `player_name`; loads profile and initialises `AdaptiveTracker` from stored state.
+- `web/templates/index.html` — Player name input in Settings panel; profile stats row in Game Info panel.
+- `web/static/game.js` — Store player name in `localStorage`; send with each `new_game`; display Elo in info panel.
+- Tournament: player clicks "Enter Tournament" → server queues 6 games (one per personality) at the player's current Elo-mapped difficulty → results panel shows standings.
+
+
+### Stage 11 — Advanced Search (MCTS / Neural Evaluation) ⬜ *(Stretch)*
 
 **Goal:** Replace or augment negamax with Monte Carlo Tree Search, optionally with a learned value function.
 

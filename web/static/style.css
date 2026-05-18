@@ -518,6 +518,23 @@ main {
   color: var(--tan);
 }
 
+/* ── Adaptive difficulty badge ───────────────────────────────────────── */
+.adaptive-badge {
+  display: inline-block;
+  font-size: .72rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.adaptive-softened {
+  border-color: #806030;
+  color: #c8a030;
+  animation: pulse-border 1.8s ease-in-out infinite;
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────── */
 @media (max-width: 860px) {
   main {

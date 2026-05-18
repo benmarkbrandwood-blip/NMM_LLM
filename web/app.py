@@ -85,6 +85,97 @@ def _load_settings() -> dict:
         return {}
 
 
+# ── Adaptive Difficulty Tracker ───────────────────────────────────────────────
+
+class AdaptiveTracker:
+    """
+    Tracks human win/loss streaks within one WebSocket session and adjusts
+    the AI difficulty automatically.
+
+    Softening: after SOFTEN_AFTER consecutive losses, difficulty drops by 1
+    and extra blunder rate is added — the AI starts making deliberate mistakes.
+
+    Hardening: after HARDEN_SUGGEST consecutive wins at the current level,
+    the tracker suggests the player try a harder difficulty.  If the player
+    was previously softened, difficulty is gradually restored toward their
+    original setting instead.
+    """
+
+    SOFTEN_AFTER   = 3     # consecutive losses → auto-soften
+    HARDEN_SUGGEST = 3     # consecutive wins  → suggest harder / restore
+    BLUNDER_BOOST  = 0.15  # extra blunder probability per softening step
+
+    def __init__(self) -> None:
+        self.base_difficulty: int    = 3
+        self.current_difficulty: int = 3
+        self.extra_blunder: float    = 0.0
+        self.win_streak: int         = 0
+        self.loss_streak: int        = 0
+        self._ever_played: bool      = False  # True after first game completes
+
+    # ── Property helpers ──────────────────────────────────────────────────────
+
+    @property
+    def is_softened(self) -> bool:
+        return self.current_difficulty < self.base_difficulty
+
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    def on_new_game(self, requested_difficulty: int) -> int:
+        """
+        Called at the start of each game with the player's chosen difficulty.
+        If the player changed the difficulty manually, reset all streaks.
+        Returns the effective difficulty to use for this game.
+        """
+        if requested_difficulty != self.base_difficulty:
+            self.base_difficulty    = requested_difficulty
+            self.current_difficulty = requested_difficulty
+            self.extra_blunder      = 0.0
+            self.win_streak         = 0
+            self.loss_streak        = 0
+        return self.current_difficulty
+
+    def record(self, human_won: bool | None) -> dict:
+        """
+        Record a completed game result and update streaks.
+        human_won=None means draw — streaks are not changed.
+
+        Returns an action dict:
+          {"action": "softened"|"restored"|"suggest_harder"|None,
+           "difficulty": int, "streak": int}
+        """
+        self._ever_played = True
+        if human_won is None:
+            return {"action": None, "difficulty": self.current_difficulty}
+
+        if human_won:
+            self.win_streak  += 1
+            self.loss_streak  = 0
+            if self.win_streak >= self.HARDEN_SUGGEST:
+                self.win_streak = 0
+                if self.is_softened:
+                    self.current_difficulty = min(
+                        self.base_difficulty, self.current_difficulty + 1
+                    )
+                    self.extra_blunder = max(0.0, self.extra_blunder - self.BLUNDER_BOOST)
+                    return {"action": "restored", "difficulty": self.current_difficulty}
+                else:
+                    return {
+                        "action": "suggest_harder",
+                        "difficulty": self.current_difficulty + 1,
+                    }
+        else:
+            self.loss_streak += 1
+            self.win_streak   = 0
+            if self.loss_streak >= self.SOFTEN_AFTER and self.current_difficulty > 1:
+                self.loss_streak        = 0
+                self.current_difficulty -= 1
+                self.extra_blunder       = min(0.35, self.extra_blunder + self.BLUNDER_BOOST)
+                return {"action": "softened", "difficulty": self.current_difficulty}
+
+        return {"action": None, "difficulty": self.current_difficulty}
+
+
 # ── Session ───────────────────────────────────────────────────────────────────
 
 _HINT_CAP = 3
@@ -115,6 +206,7 @@ class Session:
         self._pre_ai_engine_turn: int = 1
         self._last_ai_move: Optional[dict] = None
         self._can_undo_ai: bool = False        # True only right after an AI move
+        self.adaptive: Optional[AdaptiveTracker] = None
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -250,6 +342,17 @@ def _state(session: Session) -> dict:
         "draw_reason":           engine.draw_reason,
         "post_placement_moves":  engine._post_placement_moves,
         "early_families":        early_families,
+        "adaptive": (
+            {
+                "softened":    session.adaptive.is_softened,
+                "difficulty":  session.adaptive.current_difficulty,
+                "base":        session.adaptive.base_difficulty,
+                "win_streak":  session.adaptive.win_streak,
+                "loss_streak": session.adaptive.loss_streak,
+            }
+            if session.adaptive and not session.vs_human
+            else None
+        ),
         "moves":            [
             {
                 "color":    m["color"],
@@ -303,12 +406,31 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         msg = f"Draw — {draw_reason}."
     else:
         msg = "Draw!"
-    await _send(ws, {"type": "game_over", "winner": winner, "draw_reason": draw_reason, "message": msg})
+
+    adaptive_action: dict | None = None
+    if session.adaptive and not session.vs_human:
+        human_won: bool | None = (
+            None if not winner else winner == session.human_color
+        )
+        result = session.adaptive.record(human_won)
+        if result.get("action"):
+            adaptive_action = result
+
+    payload: dict = {
+        "type": "game_over", "winner": winner,
+        "draw_reason": draw_reason, "message": msg,
+    }
+    if adaptive_action:
+        payload["adaptive"] = adaptive_action
+    await _send(ws, payload)
 
     if session.coordinator:
         record = session.coordinator.build_game_record(
             winner=winner, human_color=session.human_color
         )
+        # Tag softened games so DB loaders can skip them (Bug 8-A protection).
+        if session.adaptive and session.adaptive.extra_blunder > 0:
+            record["adaptive_softened"] = True
         await asyncio.to_thread(session.coordinator.on_game_end, record)
         await _commentary(ws, session)
 
@@ -407,6 +529,7 @@ async def ws_endpoint(websocket: WebSocket):
     await websocket.accept()
     session: Optional[Session] = None
     ai_thinking: bool = False
+    adaptive = AdaptiveTracker()   # persists across new_game messages on this connection
 
     async def _run_ai_background() -> None:
         nonlocal ai_thinking
@@ -475,6 +598,7 @@ async def ws_endpoint(websocket: WebSocket):
                 coord    = None
 
                 if not vs_human:
+                    eff_diff = adaptive.on_new_game(diff)
                     ai_color = "B" if hc == "W" else "W"
                     _aw      = msg.get("ai_weights") or {}
                     def _w(key, default): return int(_aw.get(key, default))
@@ -496,9 +620,14 @@ async def ws_endpoint(websocket: WebSocket):
                         make_mistakes=_w("make_mistakes", 0),
                         opening_adherence=_w("opening_adherence", 50),
                     )
+                    base_blunder = _hw.make_mistakes / 100.0
                     game_ai  = GameAI(
-                        color=ai_color, difficulty=diff, weights=_hw,
-                        blunder_probability=_hw.make_mistakes / 100.0,
+                        color=ai_color, difficulty=eff_diff, weights=_hw,
+                        blunder_probability=min(1.0, base_blunder + adaptive.extra_blunder),
+                    )
+                    log.info(
+                        "Adaptive: requested diff=%d effective diff=%d extra_blunder=%.2f",
+                        diff, eff_diff, adaptive.extra_blunder,
                     )
 
                     if use_llm:
@@ -526,6 +655,8 @@ async def ws_endpoint(websocket: WebSocket):
                         await asyncio.to_thread(coord.on_game_start)
 
                 session = Session(engine, game_ai, coord, hc, vs_human)
+                if not vs_human:
+                    session.adaptive = adaptive
                 log.info("New game  human=%s diff=%s vs_human=%s llm=%s", hc, diff, vs_human, use_llm)
                 await _send(websocket, _state(session))
                 await _commentary(websocket, session)
