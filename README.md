@@ -254,6 +254,36 @@ python tools/self_play.py --games 20 --no-llm --personalities aggressive,defensi
 python tools/self_play.py --games 1 --white 5 --black 1 -v --white-personality scholar
 ```
 
+### Endgame Self-Play
+
+```bash
+python tools/endgame_play.py --positions 200 --parallel 4
+```
+
+Full-game self-play produces only a handful of endgame positions per game. This tool generates (or extracts) endgame starting positions directly and plays them out, building up `EndgameDB` much faster. Each completed game is saved to `data/games/` in the standard JSONL format and indexed by the server on the next restart.
+
+| Flag | Description |
+|------|-------------|
+| `--positions N` | Number of endgame positions to play (default: 100) |
+| `--difficulty D` | AI difficulty for both sides (default: 5) |
+| `--parallel N` | Run N games simultaneously |
+| `--min-pieces` / `--max-pieces` | Total piece count range (default: 6–11) |
+| `--personalities LIST` | Comma-separated personality pool (default: all except Chaos) |
+| `--seed-from-games` | Seed from real positions extracted from `data/games/` rather than random generation |
+
+**Examples:**
+
+```bash
+# 500 random endgame positions, 4 parallel workers, difficulty 5
+python tools/endgame_play.py --positions 500 --parallel 4 --difficulty 5
+
+# Replay real endgame positions from existing game records
+python tools/endgame_play.py --seed-from-games --positions 300 --parallel 4
+
+# Narrow to 6–8 piece positions with mixed personalities
+python tools/endgame_play.py --positions 100 --min-pieces 6 --max-pieces 8 --personalities balanced,positional,defensive
+```
+
 ### Weight Evolution
 
 ```bash
@@ -358,7 +388,8 @@ NMM_ollama/
 │   │   └── style.css            # Dark wood theme
 │   └── templates/index.html
 ├── tools/
-│   ├── self_play.py             # AI vs AI training loop
+│   ├── self_play.py             # AI vs AI training loop (full games)
+│   ├── endgame_play.py          # Endgame self-play for rapid EndgameDB enrichment
 │   ├── evolve_weights.py        # (1+1) evolution strategy to tune heuristic weights
 │   ├── import_openings.py       # Import openings from strategy book text file
 │   ├── import_book_games.py     # Import games into opening book

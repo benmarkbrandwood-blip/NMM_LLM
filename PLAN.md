@@ -33,7 +33,7 @@
 | 8 | Adaptive Difficulty | ✅ Complete |
 | 9 | Tournament / Match Mode | ✅ Complete |
 | 10 | Player Profiles & Persistent Stats | ⬜ Planned |
-| 11 | Endgame Self-Play | ⬜ Planned |
+| 11 | Endgame Self-Play | ✅ Complete |
 | 12 | Advanced Search (MCTS / NN) | ⬜ Stretch |
 
 
@@ -1258,7 +1258,7 @@ When adaptive difficulty lowers the AI's level and increases blunder rate, there
 - Tournament: player clicks "Enter Tournament" → server queues 6 games (one per personality) at the player's current Elo-mapped difficulty → results panel shows standings.
 
 
-### Stage 11 — Endgame Self-Play ⬜
+### Stage 11 — Endgame Self-Play ✅
 
 **Goal:** Rapidly build up EndgameDB with high-quality position data by running self-play games that start directly from generated endgame positions, bypassing the placement and mid-game phases entirely.
 
