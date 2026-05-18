@@ -381,6 +381,8 @@ function enterSetupMode() {
 function exitSetupMode() {
   setupMode = false;
   $("setup-panel").hidden = true;
+  // Restore piece layer click interception (disabled during setup for erase to work)
+  board._pieceGroup.setAttribute("pointer-events", "");
   // Restore live board if game is running
   if (gameState) {
     board.render(gameState);
@@ -402,7 +404,10 @@ function _renderSetupBoard() {
   board._hintGroup.innerHTML   = "";
   board._hintOverlay.innerHTML = "";
   board._drawPieces();
-  // Node circles retain their own click listeners from _init(), so no extra overlay needed
+  // Pieces sit above node circles in the SVG z-order. Setting pointer-events:none
+  // on the piece layer lets clicks fall through to the node circles, which carry
+  // the click→onNodeClick listener needed for the erase/place brush to work.
+  board._pieceGroup.setAttribute("pointer-events", "none");
 }
 
 function _setupValidation() {

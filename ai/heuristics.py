@@ -58,7 +58,7 @@ _WEIGHTS = {
 # _THREAT_WEIGHTS weights CLOSEABLE mills (reachable in one move only),
 # giving an additional urgency signal on top of the structural two_cfg baseline.
 _MOB_WEIGHTS    = {"place": 3,  "move": 8,  "fly": 20}
-_THREAT_WEIGHTS = {"place": 15, "move": 18, "fly": 22}
+_THREAT_WEIGHTS = {"place": 15, "move": 18, "fly": 80}
 
 # tanh normalization scales per phase (used by position_eval display, not search)
 TANH_SCALE = {"place": 120, "move": 180, "fly": 280}
@@ -191,6 +191,20 @@ def evaluate(
     # can't defend each other, allowing the fly attacker to threaten one group at a time.
     if phase == "fly" and opp_pieces == 4:
         base += 180 * _piece_separation(board, color)
+
+    # Fly fork: when both players are in fly phase, each 2-config is an immediate
+    # threat (closeable in 1 move).  We can block at most 1 per turn, so any
+    # surplus threats the opponent holds are essentially guaranteed captures.
+    # Penalise (or reward) each uncoverable surplus threat heavily.
+    if phase == "fly" and get_game_phase(board, opp) == "fly":
+        opp_surplus = max(0, opp_thr - 1)  # we block 1 max; remainder are automatic
+        own_surplus = max(0, our_thr - 1)
+        base += 600 * (own_surplus - opp_surplus)
+
+    # Move-phase: reward non-contributing pieces that are adjacent to a 2-config
+    # piece (assembling toward a productive formation — free piece assembly).
+    if phase == "move":
+        base += 40 * (_free_piece_assembly(board, color) - _free_piece_assembly(board, opp))
 
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
@@ -456,6 +470,35 @@ def _contested_mills(board: BoardState, color: str) -> int:
         vals = [board.positions[p] for p in mill]
         if vals.count(color) == 2 and vals.count(opp) == 1:
             count += 1
+    return count
+
+
+def _free_piece_assembly(board: BoardState, color: str) -> int:
+    """Count own 'free' pieces that neighbour a piece already in a 2-config.
+
+    A free piece is one not currently in any closed mill or 2-config.  If it
+    sits adjacent to a piece that IS in a 2-config, moving it one step could
+    contribute to mill formation (it is 'assembling').  Counts such pieces
+    so the evaluator can reward gradually gathering toward productive lines.
+    Only meaningful in move phase (fly phase pieces jump anywhere, adjacency
+    doesn't constrain assembly).
+    """
+    in_mill: set[str] = set()
+    in_two: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if all(v == color for v in vals):
+            for p in mill:
+                in_mill.add(p)
+        elif vals.count(color) == 2 and vals.count("") == 1:
+            for p in mill:
+                if board.positions[p] == color:
+                    in_two.add(p)
+    count = 0
+    for pos in POSITIONS:
+        if board.positions[pos] == color and pos not in in_mill and pos not in in_two:
+            if any(nb in in_two for nb in ADJACENCY[pos]):
+                count += 1
     return count
 
 
@@ -726,12 +769,19 @@ def tactical_move_bonus(
                 break
 
     # New two-configs gained this move (setup for future mill opportunities).
-    # Only counted during placement phase when the player still has pieces to place,
-    # so it incentivises building toward mills rather than random placement.
+    # In placement phase: reward building toward mills during piece deployment.
+    # In movement phase: also reward — gaining a new 2-config in move phase is
+    # equally important since mills can no longer be created by placement alone.
     setup_mill_bonus = 0
-    if get_game_phase(before, color) == "place" and before.pieces_placed.get(color, 0) < 9:
+    before_phase = get_game_phase(before, color)
+    if before_phase == "place" and before.pieces_placed.get(color, 0) < 9:
         two_cfg_gained = max(0, own_two_after - own_two_before)
         setup_mill_bonus = weights.setup_mill * two_cfg_gained
+    elif before_phase == "move":
+        two_cfg_gained = max(0, own_two_after - own_two_before)
+        # Slightly higher weight in move phase — gaining a 2-config is now a
+        # concrete mill threat, not just a structural seed.
+        setup_mill_bonus = int(weights.setup_mill * 1.3) * two_cfg_gained
 
     # Mill-opening bonus: reward sliding out of a closed mill when the position
     # still has a cycling-ready mill (i.e. the move enables a future recapture).

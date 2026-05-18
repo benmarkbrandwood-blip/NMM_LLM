@@ -101,7 +101,12 @@ class EndgameRecognizer:
         else:
             phase = "deep_endgame"
 
-        active = placement_done and total <= self.active_threshold
+        # Endgame is active when total pieces fall below the threshold OR when
+        # either side individually reaches ≤5 pieces (asymmetric endgame begins
+        # even when the other side still has more pieces on board).
+        active = placement_done and (
+            total <= self.active_threshold or min(pieces_w, pieces_b) <= 5
+        )
         deep = placement_done and total <= self.deep_threshold
 
         mob_w = _mobility(board, "W")

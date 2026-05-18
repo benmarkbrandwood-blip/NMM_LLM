@@ -19,9 +19,74 @@ from typing import Optional, Tuple
 class _SearchAbort(Exception):
     """Raised inside _negamax when the search deadline has passed."""
 
-from game.board import BoardState
+from game.board import ADJACENCY, MILLS, BoardState
 from game.rules import get_all_legal_moves, is_terminal
 from .heuristics import INF, evaluate, HeuristicWeights, DEFAULT_WEIGHTS, tactical_move_bonus
+
+
+def _immediate_mill_threats(board: BoardState) -> set[str]:
+    """Return empty squares where the opponent can close a mill in exactly 1 move.
+
+    In fly phase the opponent can reach any empty square, so every 2-config is
+    an immediate threat.  In move phase only 2-configs where an opponent piece is
+    adjacent to the empty closing square count.
+    """
+    opp = "B" if board.turn == "W" else "W"
+    opp_placed = board.pieces_placed.get(opp, 0)
+    opp_in_fly = opp_placed >= 9 and board.pieces_on_board[opp] <= 3
+
+    threats: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(opp) == 2 and vals.count("") == 1:
+            empty = next(p for p in mill if board.positions[p] == "")
+            if opp_in_fly:
+                threats.add(empty)
+            elif opp_placed >= 9:  # move phase: need adjacent opp piece
+                if any(board.positions[nb] == opp for nb in ADJACENCY[empty]):
+                    threats.add(empty)
+    return threats
+
+
+def _order_moves(board: BoardState, moves: list) -> list:
+    """Sort moves so the most urgent are tried first (better alpha-beta pruning).
+
+    Priority 0 — close own mill (immediate win/capture opportunity).
+    Priority 1 — block opponent mill (prevent their immediate threat).
+    Priority 2 — all other moves.
+
+    In fly phase with ~54 legal moves per side, this ensures blocking/closing
+    moves are evaluated before the search deadline, so force_move returns a
+    tactically sound choice even if the full tree isn't searched.
+    """
+    color = board.turn
+    opp = "B" if color == "W" else "W"
+
+    close: set[str] = set()
+    block: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        c = vals.count(color)
+        o = vals.count(opp)
+        e = vals.count("")
+        if c == 2 and e == 1:
+            close.add(next(p for p in mill if board.positions[p] == ""))
+        if o == 2 and e == 1:
+            block.add(next(p for p in mill if board.positions[p] == ""))
+
+    if not close and not block:
+        return moves  # nothing to prioritize — skip the pass
+
+    p0, p1, p2 = [], [], []
+    for m in moves:
+        t = m["to"]
+        if t in close:
+            p0.append(m)
+        elif t in block:
+            p1.append(m)
+        else:
+            p2.append(m)
+    return p0 + p1 + p2
 
 # Fixed-depth table for quick levels (1–4): search completes fast so no time cap needed.
 _DEPTH_TABLE = {1: 2, 2: 3, 3: 4, 4: 5}
@@ -104,6 +169,16 @@ class GameAI:
             self.last_was_blunder = False
             return moves[0]
 
+        # Mandatory block: if the opponent has an immediate mill threat (closeable
+        # in exactly one move), restrict candidates to blocking moves only.
+        # In fly phase every 2-config is an immediate threat regardless of
+        # adjacency; in move phase only 2-configs with an adjacent opponent piece count.
+        threats = _immediate_mill_threats(board)
+        if threats:
+            blocking = [m for m in moves if m["to"] in threats]
+            if blocking:
+                moves = blocking
+
         # Blunder mode: occasionally play a bad move on purpose
         if self.blunder_probability > 0.0 and random.random() < self.blunder_probability:
             blunder = self._pick_blunder(board, moves)
@@ -123,14 +198,16 @@ class GameAI:
                 and self.difficulty in _TIME_LIMIT):
             return self._iterative_deepen(
                 board, _EARLY_GAME_TIME,
-                recognition=recognition, trajectory_hints=trajectory_hints, top_n=top_n,
+                recognition=recognition, trajectory_hints=trajectory_hints,
+                top_n=top_n, moves=moves,
             )
 
         if self.difficulty in _TIME_LIMIT:
             time_budget = 2.0 if fast_early_game else _TIME_LIMIT[self.difficulty]
             return self._iterative_deepen(
                 board, time_budget,
-                recognition=recognition, trajectory_hints=trajectory_hints, top_n=top_n,
+                recognition=recognition, trajectory_hints=trajectory_hints,
+                top_n=top_n, moves=moves,
             )
 
         depth = _DEPTH_TABLE[self.difficulty]
@@ -158,7 +235,7 @@ class GameAI:
                 return random.choice(scored_sorted[:top_n])[0]
             return max(scored, key=lambda x: x[1])[0]
 
-        move, _ = self._root_search(board, depth, top_n=top_n)
+        move, _ = self._root_search(board, depth, top_n=top_n, moves=moves)
         return move
 
     # Time budget for score_move() — kept short because it is only used for relative
@@ -287,12 +364,16 @@ class GameAI:
     # ── Internals ─────────────────────────────────────────────────────────────
 
     def _root_search(self, board: BoardState, depth: int,
-                     top_n: int = 1) -> Tuple[dict, int]:
+                     top_n: int = 1, moves: list | None = None) -> Tuple[dict, int]:
         """Search all root moves and return (best_move, best_score).
         When top_n > 1, pick randomly from the top-N scoring moves.
         If _SearchAbort fires (force_stop called mid-search), returns the
-        best move found so far rather than propagating the exception."""
-        moves = get_all_legal_moves(board)
+        best move found so far rather than propagating the exception.
+        `moves` may be pre-filtered (e.g. mandatory-block constraint); if None
+        all legal moves are used."""
+        if moves is None:
+            moves = get_all_legal_moves(board)
+        moves = _order_moves(board, moves)
         self._nodes = 0
         best_move = moves[0]
         best_score = -INF
@@ -348,6 +429,10 @@ class GameAI:
         if not moves:
             return -(INF - depth)
 
+        # Sort at upper levels only — biggest benefit to alpha-beta, negligible overhead
+        if depth >= 2:
+            moves = _order_moves(board, moves)
+
         value = -INF
         for move in moves:
             nb = board.apply_move(move)
@@ -402,6 +487,7 @@ class GameAI:
         recognition=None,
         trajectory_hints=None,
         top_n: int = 1,
+        moves: list | None = None,
     ) -> dict:
         """
         Iterative deepening up to `time_limit` seconds.
@@ -409,9 +495,12 @@ class GameAI:
         When opening recognition or trajectory hints are active, scores every
         root move at each depth so the adjustments can be applied before
         picking the best.  Otherwise uses the faster _root_search path.
+        `moves` may be pre-filtered (e.g. mandatory-block constraint); if None
+        all legal moves are used.
         """
         self._deadline = time.time() + time_limit
-        moves         = get_all_legal_moves(board)
+        if moves is None:
+            moves = get_all_legal_moves(board)
         best_move     = moves[0]
         _has_hard_bans = bool(trajectory_hints and any(
             d <= -1.0 for d in trajectory_hints.values()
@@ -439,7 +528,7 @@ class GameAI:
                     else:
                         best_move = max(scored, key=lambda x: x[1])[0]
                 else:
-                    move, _ = self._root_search(board, depth, top_n=top_n)
+                    move, _ = self._root_search(board, depth, top_n=top_n, moves=moves)
                     best_move = move      # only update if depth completed cleanly
             except _SearchAbort:
                 break                     # deadline hit mid-depth; keep previous best
