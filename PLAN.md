@@ -1020,16 +1020,15 @@ If Ollama is already running but the model is missing, only the pull is needed. 
 - `data/game_count.json` — Persistent counter file.
 
 
-#### Bug 9-A — Bad Move Ban Should Be Position-Specific ⬜
+#### Bug 9-A — Bad Move Ban Should Be Position-Specific ✅ Fixed
 
-**Symptom:** When the user marks an AI move as "bad", the ban is stored in `TrajectoryDB` for any game reaching that move-sequence prefix — i.e. it persists into future games. But the move may be perfectly valid from a similar board position where pieces are in different squares. Banning by notation alone is too broad.
+**Symptom:** Bad-move button was banning a notation for any position in the game (and persisting it to `bad_moves.json` for all future games), which was too broad — the move may be valid in a different board configuration.
 
-**Desired behaviour:** The ban should apply only to the specific board position (FEN key) at which the move was made. Once the board changes significantly (pieces captured, moved), the move should be allowed again.
-
-**Planned fix:**
-1. Store bad-move bans keyed by `board_fen_before` rather than move-notation prefix in `_trajectory_db`.
-2. Provide a position-aware lookup in `TrajectoryDB.query()` that checks FEN key instead of notation prefix.
-3. Alternatively, ban only within the current game session (in-memory, via `GameAI.ban_move()`) and do not persist to `bad_moves.json`.
+**Fix (implemented):**
+1. `GameAI.banned_game_moves: set[str]` replaced with `_pos_bans: dict[str, set[str]]` — a dict mapping `board_fen → set[notation]`.
+2. `ban_move(notation, board_fen)` stores the ban under the exact position FEN at the time the move was made.
+3. `choose_move()` looks up `board.to_fen_string()` on each call — if any piece moves or is captured the FEN changes and the ban no longer applies.
+4. Removed `_trajectory_db.save_bad_move()` call — bans are now session-local and position-specific rather than permanent global notation bans.
 
 #### Bug 9-B — "Offer Draw" Button Not Visible to Players ⬜
 

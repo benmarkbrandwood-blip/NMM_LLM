@@ -939,28 +939,13 @@ async def ws_endpoint(websocket: WebSocket):
                 if bad_move_dict.get("capture"):
                     bad_notation += f"x{bad_move_dict['capture']}"
 
-                # Immediately ban the move from the live game — AI won't pick it again
-                # regardless of how scoring resolves.
-                session.game_ai.ban_move(bad_notation)
-
-                # Collect move history BEFORE the bad move (coordinator records both sides)
-                prior_notations: list[str] = []
-                if session.coordinator:
-                    prior_notations = [
-                        m.get("notation", "")
-                        for m in session.coordinator._game_moves[:-1]
-                        if m.get("notation")
-                    ]
-                else:
-                    prior_notations = [
-                        m.get("notation", "")
-                        for m in session.engine.game_record["moves"][:-1]
-                        if m.get("notation")
-                    ]
-
-                # Persist to TrajectoryDB for future games
-                _trajectory_db.save_bad_move(_BAD_MOVES_PATH, prior_notations, bad_notation)
-                log.info("Bad move marked: %r  prior_len=%d", bad_notation, len(prior_notations))
+                # Ban the move for this exact board position only.
+                # If any piece moves or is captured afterward, the FEN changes and
+                # the move becomes legal again — matching the player's expectation
+                # that the ban is contextual, not permanent.
+                _ban_fen = session._pre_ai_board.to_fen_string()
+                session.game_ai.ban_move(bad_notation, _ban_fen)
+                log.info("Bad move banned: %r  at fen=%s", bad_notation, _ban_fen[:24])
 
                 # ── Restore engine to pre-AI-move state ──────────────────────
                 session.engine.board                 = session._pre_ai_board

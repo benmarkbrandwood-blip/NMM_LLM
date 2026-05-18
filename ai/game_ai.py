@@ -152,17 +152,25 @@ class GameAI:
         self._force_stop: bool = False     # set by force_stop(); cleared by choose_move()
         self.last_was_blunder: bool = False   # flag readable by Coordinator / MillsLLM
         self.force_aggressive: bool = False   # when True, disables fly-sacrifice heuristic
-        self.banned_game_moves: set[str] = set()  # notations banned via bad-move button
+        # Position-specific move bans: board_fen → set of banned notations.
+        # A ban only applies when the board is in the exact state it was in when
+        # the move was marked bad; if any piece moves or is captured the position
+        # key changes and the move becomes legal again.
+        self._pos_bans: dict[str, set[str]] = {}
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def ban_move(self, notation: str) -> None:
-        """Prevent the AI from playing `notation` for the rest of this game."""
-        self.banned_game_moves.add(notation)
+    def ban_move(self, notation: str, board_fen: str) -> None:
+        """Ban `notation` from this exact board position only.
+
+        If any piece moves or is captured the FEN changes and the ban
+        no longer applies — the move is valid again from the new position.
+        """
+        self._pos_bans.setdefault(board_fen, set()).add(notation)
 
     def reset_game_bans(self) -> None:
         """Clear all per-game move bans (call when a new game starts)."""
-        self.banned_game_moves.clear()
+        self._pos_bans.clear()
 
     def force_stop(self) -> None:
         """Interrupt any running search immediately; _negamax raises _SearchAbort.
@@ -200,10 +208,11 @@ class GameAI:
             if blocking:
                 moves = blocking
 
-        # Per-game move bans (set via bad-move button): filter AFTER mandatory block
-        # so a banned blocking move can still be played if it's the only way to block.
-        if self.banned_game_moves:
-            non_banned = [m for m in moves if self._move_notation(m) not in self.banned_game_moves]
+        # Position-specific move bans (set via bad-move button): filter AFTER mandatory
+        # block so a banned blocking move can still be played if it's the only way to block.
+        _banned_here = self._pos_bans.get(board.to_fen_string())
+        if _banned_here:
+            non_banned = [m for m in moves if self._move_notation(m) not in _banned_here]
             if non_banned:  # safety: never reduce to zero legal moves
                 moves = non_banned
 
