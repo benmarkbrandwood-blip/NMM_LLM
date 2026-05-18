@@ -22,6 +22,7 @@
 | 5.15 | User Guide & README Expansion | 🔄 Current |
 | 5.16 | Starting Play Variants & Opening Database | ⬜ Planned |
 | 5.17 | Game Trajectory Memory & Winner-Aware Learning | ✅ Complete |
+| 5.23 | UI Layout & Default Preference Fixes | ⬜ Planned |
 | 6 | Self-Play Training Loop | ⬜ Planned |
 | 7 | Heuristic Parameter Evolution | ⬜ Planned |
 | 8 | Adaptive Difficulty | ⬜ Planned |
@@ -289,7 +290,7 @@ The game as shipped today can:
 
 **Fix:**
 
-- `ai/endgame\\\_recognizer.py` — Lower the endgame detection trigger from the current threshold to **12 pieces on board** (≤ 6 per side) for midgame → endgame and 8 pieces for endgame → deep-endgame. This causes deeper search and more decisive evaluation earlier.
+- `ai/endgame\\\_recognizer.py` — Lower the endgame detection trigger: **endgame fires when either player has ≤5 pieces OR total pieces ≤ 12**; deep-endgame remains at ≤8 total. This causes deeper search and more decisive evaluation earlier, and catches the 7v5 / 6v5 asymmetric positions the current threshold misses.
 
 - `game/rules.py` — Audit `is\\\_terminal()`: ensure it correctly returns `True` when a side drops to 2 pieces or has no legal moves; add a unit test for each terminal condition.
 
@@ -665,6 +666,19 @@ Set `OLLAMA\\\_HOST` / `OLLAMA\\\_PORT` environment variables to override the de
 - `web/static/game.js` — Personality load/save wiring.
 - `data/personalities/` directory support.
 
+### Stage 5.23 — UI Layout & Default Preference Fixes ⬜
+
+**Goal:** Small UI improvements requested after playtest.
+
+**Items:**
+1. **Move list shown by default** — The moves panel should be visible on page load without the player having to press a button. The current "Moves" toggle button moves to the left sidebar near the Settings button.
+2. **Start New Game to top-centre** — Relocate the "Start New Game" button to the top-centre of the page so it is easily accessible during replay and between games.
+
+**Implementation:**
+- `web/static/game.js` — Set moves panel initial state to `visible`; wire Moves toggle button in left sidebar.
+- `web/templates/index.html` — Move Moves button to left sidebar; move Start New Game button to top-centre header.
+- `web/static/style.css` — Layout adjustments for new button positions.
+
 ### Stage 5.19 — Commentary Feed Improvements ⬜
 
 **Goal:** New commentary messages appear at the top (most-recent-first). The feed is split into two sections: AI internal monologue (AI vs AI strategy discussion) and Player Chat (AI ↔ human conversation).
@@ -683,6 +697,42 @@ Set `OLLAMA\\\_HOST` / `OLLAMA\\\_PORT` environment variables to override the de
 **Fix:**
 - `ai/heuristics.py` — Add a late-game danger penalty: when one side has ≤4 pieces and the opponent has ≥6 pieces with ≥2 open mills, apply a large negative adjustment (e.g. `−800`) to the weaker side's score before tanh normalisation.
 - `ai/heuristics.py` — Reduce `TANH_SCALE` for the fly phase from 280 to ~180 so extreme positions are less compressed near ±1.
+
+### Bug 5.11-E — AI Not Moving Toward Mill Closure or Block in Move Phase ⬜
+
+**Symptom:** During the move phase the AI sometimes ignores clear opportunities to approach a mill (e.g. c5→c4 to set up c3-c4-c5, or f4→g4 to set up g7-g4-g1) and instead moves another piece ineffectually. It also fails to move d3→d2 to block an opponent's b2-d2-f2 mill threat, choosing c3 instead.
+
+**Root cause (suspected):** The `_mill_threats` term only rewards mills closeable in **one** adjacency move from the current position. Pieces that are two hops away from joining a mill line contribute nothing. When positional value of a cross-node (c3 = 3-connection, high `_position_value`) competes with a blocking move that only triggers `block_opponent_mill` at moderate weight, the positional score can win incorrectly.
+
+**Which sliders currently cover this:**
+- `close_mill` (500) — bonus for closing a mill *this* move (correct, fires when mill closes)
+- `block_opponent_mill` (400) — bonus for neutralising an opponent's immediately closeable mill (should fire for d3→d2, investigate why it doesn't dominate)
+- `setup_mill` (100) — bonus for new 2-configs, but **placement phase only**; does not help in move phase
+
+**Fix:**
+- `ai/heuristics.py` — Extend `setup_mill` logic into move phase: add a `_two_configs_gained_move` delta that rewards gaining a new own 2-config (two pieces + one empty slot in a mill line) during the move phase, weighted at ~120. This captures c5→c4 creating c3-c4-c5 with c3 empty = new 2-config.
+- `ai/heuristics.py` — Add a `_mill_approach_bonus`: in move phase, reward moves that bring an own piece adjacent to the empty slot of an existing own 2-config (enabling closure next turn). Weight ~80.
+- Investigate why `block_opponent_mill` (400) does not override c3 positional score: add debug logging to `tactical_move_bonus` for the specific position.
+
+### Bug 5.11-F — AI Resign Does Not Trigger LLM Debrief ⬜
+
+**Symptom:** When the AI resigns (via the `offer_defeat` path added in Stage 5.11-D), the MillsAI post-game debrief does not run. The game ends but no summary or debrief commentary is shown.
+
+**Root cause:** The `ai_resignation` path in `web/app.py` sends `game_over` without calling `coordinator.on_game_end()`, which is where `mills_llm.debrief_game()` is triggered.
+
+**Fix:**
+- `web/app.py` — In the `offer_defeat` / `ai_resignation` handler, call `await asyncio.to_thread(session.coordinator.on_game_end, board, result="ai_resignation")` before sending the `game_over` WebSocket message so the debrief runs just as it does for normal termination.
+
+### Bug 5.11-G — Self-Play Crashes in Parallel Mode ⬜
+
+**Symptom:** `tools/self_play.py` crashes when run with parallel game flags, especially with `--parallel N > 1`.
+
+**Root cause (suspected):** Multiple game threads sharing mutable state (opening book file I/O, ChromaDB writes, or the trajectory DB index) without locking.
+
+**Fix:**
+- `tools/self_play.py` — Add a `threading.Lock` around all `book.save_opening()`, `memory.save_game_record()`, and `trajectory_db.add_game()` calls in parallel worker threads.
+- `ai/opening_book.py` — Make `save_opening()` and `merge_duplicates()` thread-safe (file-level lock or in-memory lock around JSON read-modify-write).
+- Reproduce the crash deterministically with `--parallel 2 --games 4 --no-llm`, then confirm the fix.
 
 ### Stage 5.21 — Bad Move Button Fix ⬜
 
@@ -839,41 +889,39 @@ Once enough self-play and human-play data exists, promote the variant store into
 
 ### Stage 5.9 — Move Replay Viewer ⬜
 
-**Goal:** Let the player step forward and backward through all moves of the completed game directly in the browser, with the board re-rendered at each ply.
+**Goal:** Let the player step forward and backward through any moves of the game (mid-game or post-game) directly in the browser, with a "Back to Live" button to resume the active game.
 
 **User flow:**
 
-1. After the game ends, **◀ Prev** and **Next ▶** arrow buttons appear below the Game Info panel.
+1. **During or after the game**, a Replay button is available in the top-left area (near Settings). Clicking it enters replay mode at the current position.
 
-2. Clicking steps the board one half-move at a time; the current ply is shown (e.g. "Move 7 / 24").
+2. **◀ Prev** and **Next ▶** arrow buttons step one half-move at a time; current ply shown (e.g. "Move 7 / 24").
 
 3. The moves list highlights the current ply.
 
-4. MillsAI commentary feed is unaffected (read-only during replay).
+4. A **"▶ Back to Live"** button returns the board to the current live position and re-enables play (if game still in progress).
+
+5. **Start New Game** button moves to top-centre of the page for easy access mid-replay.
+
+6. MillsAI commentary feed is unaffected (read-only during replay).
 
 **Implementation sketch:**
 
-*Server side:* No changes — the full move list is already in the `state` message's `moves` array, and `board\\\_fen\\\_before` is stored per move.
+*Server side:* No changes — full move list already in `state` message `moves` array.
 
 *Client side:*
 
-- Keep a `replayMoves\\\[\\\]` array (populated from the final state message).
-
-- Replay buttons shown only when `phase === "game\\\_over"`.
-
-- On each step, reconstruct the board from the stored FEN and redraw the SVG.
-
-- Use `board.renderFromFen(fen)` — a new method on `Board`.
+- Keep a `replayMoves[]` array (populated from every `state` message, not only final).
+- Replay mode available any time (not only on `phase === "game_over"`).
+- `board.renderFromFen(fen)` — new method on `Board`.
+- On "Back to Live": restore the board from the latest `state` message and resume normal play.
 
 **Deliverables:**
 
 - `web/static/board.js` — `renderFromFen(fen)` method.
-
-- `web/static/game.js` — Replay state machine, prev/next handlers.
-
-- `web/templates/index.html` — Replay control buttons under Game Info.
-
-- `web/static/style.css` — Replay button styles.
+- `web/static/game.js` — Replay state machine, prev/next, back-to-live handlers.
+- `web/templates/index.html` — Replay button top-left; Start New Game top-centre.
+- `web/static/style.css` — Replay button and Back-to-Live button styles.
 
 ### Stage 5.10 — Position Setup / Editor ⬜
 

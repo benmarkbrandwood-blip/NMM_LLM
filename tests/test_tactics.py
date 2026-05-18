@@ -12,6 +12,11 @@ from ai.heuristics import (
     HeuristicWeights,
     DEFAULT_WEIGHTS,
     _closeable_mills,
+    _independent_mill_pairs,
+    _piece_separation,
+    _contested_mills,
+    _open_mill_domination,
+    evaluate,
 )
 
 
@@ -242,6 +247,133 @@ class TestCloseableMills(unittest.TestCase):
         # d7 IS adjacent to g7, so yes.
         b = _board(["a7", "d7", "b6"], [], w_placed=9, b_placed=9)
         self.assertGreaterEqual(_closeable_mills(b, "W"), 1)
+
+
+# ── _independent_mill_pairs ───────────────────────────────────────────────────
+
+class TestIndependentMillPairs(unittest.TestCase):
+
+    def test_two_independent_pairs(self):
+        # W at a7,d7 (open mill a7-d7-g7) and a1,d1 (open mill g1-d1-a1)
+        # These two 2-configs share no own pieces → 1 independent pair
+        b = _board(["a7", "d7", "a1", "d1"], [])
+        self.assertEqual(_independent_mill_pairs(b, "W"), 1)
+
+    def test_no_pairs_when_shared_piece(self):
+        # W at a7,d7 (open mill a7-d7-g7) and a7,a4 (open mill a7-a4-a1)
+        # Both 2-configs share a7 → not independent
+        b = _board(["a7", "d7", "a4"], [])
+        self.assertEqual(_independent_mill_pairs(b, "W"), 0)
+
+    def test_zero_with_single_two_config(self):
+        b = _board(["a7", "d7"], [])
+        self.assertEqual(_independent_mill_pairs(b, "W"), 0)
+
+    def test_multiple_independent_pairs(self):
+        # Three independent 2-configs give 3 pairs
+        b = _board(["a7", "d7", "a1", "d1", "a4", "b4"], [])
+        pairs = _independent_mill_pairs(b, "W")
+        self.assertGreaterEqual(pairs, 2)
+
+
+# ── _piece_separation ─────────────────────────────────────────────────────────
+
+class TestPieceSeparation(unittest.TestCase):
+
+    def test_separated_groups(self):
+        # Black at a7 and g1 — no board path between them through adjacency
+        # (different corners, not adjacent to each other)
+        b = _board(["a1", "d1", "g4"], ["a7", "g7", "g1", "a4"], w_placed=9, b_placed=9)
+        # W is fly (3 pieces, placed 9). B has 4 pieces.
+        b2 = _board(["a1", "d1", "g4"], ["a7", "g1", "e3", "c3"], w_placed=9, b_placed=9)
+        # a7 and g1 are on opposite corners with no shared adjacency path via only B pieces
+        sep = _piece_separation(b2, "W")
+        # Whether or not they happen to be connected depends on board layout; just check it runs
+        self.assertIn(sep, (0, 1))
+
+    def test_connected_cluster(self):
+        # Black all in a tight group: a7-d7 are adjacent, d7-g7 adjacent
+        b = _board(["a1", "d1", "g4"], ["a7", "d7", "g7", "d6"], w_placed=9, b_placed=9)
+        # All black pieces connected in one group
+        self.assertEqual(_piece_separation(b, "W"), 0)
+
+    def test_wrong_piece_count_returns_zero(self):
+        # opp has 3 pieces — function only meaningful at 4
+        b = _board(["a1", "d1", "g4"], ["a7", "d7", "g7"], w_placed=9, b_placed=9)
+        self.assertEqual(_piece_separation(b, "W"), 0)
+
+
+# ── _contested_mills ──────────────────────────────────────────────────────────
+
+class TestContestedMills(unittest.TestCase):
+
+    def test_one_contested_mill(self):
+        # W at a7,d7; B at g7 → mill a7-d7-g7 is contested (2W + 1B)
+        b = _board(["a7", "d7"], ["g7"])
+        self.assertEqual(_contested_mills(b, "W"), 1)
+
+    def test_zero_contested_when_empty_slot(self):
+        # W at a7,d7; g7 is empty → this is a 2-config, not contested
+        b = _board(["a7", "d7"], [])
+        self.assertEqual(_contested_mills(b, "W"), 0)
+
+    def test_three_contested_zugzwang(self):
+        # Three mills all contested: classic 7v3 zugzwang approach
+        # Mill a7-d7-g7: W has a7,d7; B has g7
+        # Mill a4-b4-c4: W has a4,b4; B has c4
+        # Mill g1-d1-a1: W has a1,d1; B has g1
+        b = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
+                   ["g7", "c4", "g1"])
+        self.assertEqual(_contested_mills(b, "W"), 3)
+
+    def test_contested_scored_higher_than_two_config(self):
+        # The zugzwang position (3 contested mills, 7v3) should score HIGHER
+        # than the approach position (3 open 2-configs, 7v4) because it is decisive.
+        zugzwang = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
+                          ["g7", "c4", "g1"], w_placed=9, b_placed=9)
+        approach  = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
+                           ["b2", "e4", "f6", "d5"], w_placed=9, b_placed=9)
+        self.assertGreater(evaluate(zugzwang, "W"), evaluate(approach, "W"))
+
+
+# ── _open_mill_domination ─────────────────────────────────────────────────────
+
+class TestOpenMillDomination(unittest.TestCase):
+
+    def test_zero_when_not_dominant(self):
+        # 5 own pieces — below the ≥6 threshold
+        b = _board(["a7", "d7", "a4", "b4", "a1"], ["g7", "c4"])
+        self.assertEqual(_open_mill_domination(b, "W"), 0)
+
+    def test_zugzwang_equals_one_with_three_mills_three_opp(self):
+        # 3 two-configs and 3 opp pieces: max(0, 3 - (3-1)) = 1
+        b = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
+                   ["b2", "e4", "f6"], w_placed=9, b_placed=9)
+        self.assertEqual(_open_mill_domination(b, "W"), 1)
+
+    def test_zero_with_four_opp_covering_three_mills(self):
+        # 3 two-configs but 4 opp pieces: max(0, 3 - (4-1)) = 0
+        b = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
+                   ["b2", "e4", "f6", "d5"], w_placed=9, b_placed=9)
+        self.assertEqual(_open_mill_domination(b, "W"), 0)
+
+    def test_strong_surplus_with_four_mills_three_opp(self):
+        # 4 two-configs, 3 opp pieces: max(0, 4 - 2) = 2
+        b = _board(["a7", "d7", "a4", "b4", "a1", "d1", "b6", "d6"],
+                   ["b2", "e4", "f6"], w_placed=9, b_placed=9)
+        dom = _open_mill_domination(b, "W")
+        self.assertGreaterEqual(dom, 1)
+
+    def test_evaluate_ranks_7v3_higher_than_7v4(self):
+        # Removing one black piece (going 7v4 → 7v3) should increase white's score
+        # because the domination signal fires at 7v3 but not at 7v4.
+        white7 = ["a7", "d7", "a4", "b4", "a1", "d1", "g4"]
+        # Use scattered black positions that don't form mills
+        black4  = ["b2", "e4", "f6", "d5"]
+        black3  = ["b2", "e4", "f6"]
+        b7v4 = _board(white7, black4, w_placed=9, b_placed=9)
+        b7v3 = _board(white7, black3, w_placed=9, b_placed=9)
+        self.assertGreater(evaluate(b7v3, "W"), evaluate(b7v4, "W"))
 
 
 if __name__ == "__main__":

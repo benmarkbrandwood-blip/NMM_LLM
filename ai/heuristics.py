@@ -26,6 +26,7 @@ class HeuristicWeights:
     scatter_placement: int    = 75    # bonus for non-adjacent placement in first 6 moves
     setup_mill: int           = 100   # bonus per new two-config gained this move (placement phase)
     mill_opening: int         = 200   # bonus for opening a cycling-ready mill (enables next capture)
+    mill_trap_build: int      = 180   # bonus for adding a 3rd+ open mill when already dominant (endgame)
     # ── Positional base scale (applied inside evaluate) ──────────────────
     long_term_position: int   = 100   # % multiplier on entire positional base score
     mill_count_scale: int     = 100   # % multiplier on mill-count weights
@@ -101,6 +102,10 @@ _HERD_WEIGHTS  = {"place": 2, "move": 12, "fly": 0}
 # capturing an opponent piece (4v3, them in fly).
 _FLY_ASYM_WEIGHTS = {"place": 0, "move": 80, "fly": 0}
 
+# Open-mill domination: uncoverable 2-configs in the dominant asymmetric endgame.
+# Active when own pieces ≥ 6 and opp pieces ≤ 5 (7v4, 7v3, 6v4, 6v3 scenarios).
+_DOMINATION_WEIGHTS = {"place": 0, "move": 150, "fly": 80}
+
 
 def evaluate(
     board: BoardState,
@@ -145,6 +150,8 @@ def evaluate(
     our_herd   = _encirclement(board, color)
     opp_herd   = _encirclement(board, opp)
     fly_asym   = 0 if force_aggressive else _fly_asymmetry(board, color)
+    our_dom    = _open_mill_domination(board, color)
+    opp_dom    = _open_mill_domination(board, opp)
 
     base = (
         mill_w  * (our_mills - opp_mills)
@@ -159,8 +166,31 @@ def evaluate(
         + _CYCLE_WEIGHTS[phase]  * (our_cycle - opp_cycle)
         + _FORK_WEIGHTS[phase]   * (our_fork  - opp_fork)
         + _HERD_WEIGHTS[phase]   * (our_herd  - opp_herd)
-        + _FLY_ASYM_WEIGHTS[phase] * fly_asym
+        + _FLY_ASYM_WEIGHTS[phase]   * fly_asym
+        + _DOMINATION_WEIGHTS[phase] * (our_dom - opp_dom)
     )
+
+    # Asymmetric endgame: boost two-config weight when piece-count dominant (7v4, 6v4).
+    # The global two_cfg weight is kept low for balance across all phases; this correction
+    # raises it only when spreading open mills is the primary winning mechanism.
+    own_pieces = board.pieces_on_board[color]
+    opp_pieces = board.pieces_on_board[opp]
+    if own_pieces >= 6 and opp_pieces <= 4 and phase == "move":
+        base += 25 * (our_two - opp_two)
+
+    # 4v3: when facing a fly-mobile opponent, a fork (dual closeable mills) is the
+    # primary winning mechanism — one threat is always blockable, two are not.
+    # Boost fork weight from 14 → ~54 and reward independent mill pairs (insurance
+    # structure so piece loss doesn't eliminate all mill potential).
+    opp_in_fly = board.pieces_placed.get(opp, 0) >= 9 and opp_pieces == 3
+    if own_pieces == 4 and opp_in_fly and phase == "move":
+        base += 40 * our_fork
+        base += 90 * _independent_mill_pairs(board, color)
+
+    # 3v4: fly attacker rewards separated opponent groups — disconnected pieces
+    # can't defend each other, allowing the fly attacker to threaten one group at a time.
+    if phase == "fly" and opp_pieces == 4:
+        base += 180 * _piece_separation(board, color)
 
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
@@ -310,9 +340,11 @@ def _fork_threats(board: BoardState, color: str) -> int:
 def _fly_asymmetry(board: BoardState, color: str) -> int:
     """
     +1 if color has entered fly phase (3 pieces, all 9 placed) and opponent has not.
-    -1 if opponent has fly and color does not.
-    0 if both or neither are in fly.
+    -1 if opponent has fly and color does not, BUT only when own pieces ≤ 5.
 
+    The -1 penalty is capped at ≤ 5 own pieces because fly mobility is only a
+    meaningful threat when piece counts are close.  At 6v3 or 7v3 the opponent's
+    3 fly pieces are still losing badly, so penalising white for their fly is wrong.
     Rewards sacrificing down to 3 pieces to gain fly mobility before the opponent
     does, and penalises giving the opponent fly (e.g. capturing their 4th piece
     in a 4v4 position to leave them with 3 = fly advantage).
@@ -322,7 +354,7 @@ def _fly_asymmetry(board: BoardState, color: str) -> int:
     opp_fly   = (board.pieces_placed.get(opp,   0) >= 9 and board.pieces_on_board[opp]   == 3)
     if color_fly and not opp_fly:
         return 1
-    if opp_fly and not color_fly:
+    if opp_fly and not color_fly and board.pieces_on_board[color] <= 5:
         return -1
     return 0
 
@@ -344,14 +376,99 @@ def _encirclement(board: BoardState, color: str) -> int:
     return count
 
 
-def _late_game_danger(board: BoardState, color: str) -> int:
-    """Penalty when the position is structurally hopeless despite surface mobility.
+def _open_mill_domination(board: BoardState, color: str) -> int:
+    """Open-mill surplus in asymmetric endgame (own ≥ 6 pieces, opp ≤ 5).
 
-    Two danger patterns:
-    1. Material + mill imbalance: ≤5 own pieces vs opponent with ≥2 closed mills.
+    Counts own 2-configs in excess of what the opponent can physically block.
+    With 3 open mills and 2 opponent pieces, one mill closes regardless of opp play.
+    With 3 open mills and 3 opponent pieces, ALL opp pieces are pinned to blocking —
+    the attacker's spare piece forces zugzwang (opp must move, uncovering a mill).
+    Formula uses (opp_pieces - 1) so that equal-count pinning (3 mills, 3 opp) scores 1.
+    """
+    opp = "B" if color == "W" else "W"
+    own_pieces = board.pieces_on_board[color]
+    opp_pieces = board.pieces_on_board[opp]
+    if own_pieces < 6 or opp_pieces > 5:
+        return 0
+    return max(0, _two_configs(board, color) - (opp_pieces - 1))
+
+
+def _independent_mill_pairs(board: BoardState, color: str) -> int:
+    """Count pairs of own 2-configs that share no own pieces.
+
+    In 4v3 (own in move, opp in fly): two independent pairs ensure that even after
+    the opponent captures one of our pieces, the remaining 3 still contain a 2-config.
+    This is the 'insurance' structure the book prescribes for the 4-piece player.
+    """
+    two_cfg = [
+        m for m in MILLS
+        if ([board.positions[p] for p in m].count(color) == 2
+            and [board.positions[p] for p in m].count("") == 1)
+    ]
+    count = 0
+    for i in range(len(two_cfg)):
+        for j in range(i + 1, len(two_cfg)):
+            own_i = frozenset(p for p in two_cfg[i] if board.positions[p] == color)
+            own_j = frozenset(p for p in two_cfg[j] if board.positions[p] == color)
+            if not (own_i & own_j):
+                count += 1
+    return count
+
+
+def _piece_separation(board: BoardState, color: str) -> int:
+    """Return 1 if the opponent's pieces are graph-disconnected, else 0.
+
+    In 3v4 (own fly, opp move): separated opponent groups can't defend each other.
+    The fly-mobile attacker can threaten one group while the other is too far to help.
+    Measured by BFS reachability among opponent pieces via board adjacency edges.
+    Only meaningful when own is fly (3 pieces) and opp has exactly 4.
+    """
+    opp = "B" if color == "W" else "W"
+    if board.pieces_on_board[opp] != 4:
+        return 0
+    opp_pos = [p for p in POSITIONS if board.positions[p] == opp]
+    if not opp_pos:
+        return 0
+    opp_set = set(opp_pos)
+    visited: set[str] = {opp_pos[0]}
+    queue = [opp_pos[0]]
+    while queue:
+        curr = queue.pop()
+        for nb in ADJACENCY[curr]:
+            if nb in opp_set and nb not in visited:
+                visited.add(nb)
+                queue.append(nb)
+    return 1 if len(visited) < len(opp_pos) else 0
+
+
+def _contested_mills(board: BoardState, color: str) -> int:
+    """Count mills where own has 2 pieces and the opponent occupies the closing square.
+
+    These are 'blocked' own mill attempts: color threatens a mill but the opponent
+    is sitting in the only empty slot.  At the zugzwang position (6+v3 endgame),
+    all 3 opponent pieces are in contested lines — any move uncovers a mill.
+    Unlike _two_configs (requires an empty closing square), this detects the final
+    zugzwang position where the closing squares are occupied by the opponent.
+    """
+    opp = "B" if color == "W" else "W"
+    count = 0
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count(opp) == 1:
+            count += 1
+    return count
+
+
+def _late_game_danger(board: BoardState, color: str) -> int:
+    """Structural danger/dominance bonus in asymmetric endgame positions.
+
+    Three patterns:
+    1. Defensive penalty: ≤5 own pieces vs opponent with ≥2 closed mills.
        Fly mobility inflates the losing side's score; this corrects for that.
     2. Cycling mill dominance: opponent has ≥2 cycling-ready mills (can force a
        capture every 2 turns).  This is nearly always decisive.
+    3. Attack reward: own pieces ≥ 6, opp ≤ 4, with 2+ open mills — the dominant
+       side should aggressively accumulate open mills toward the three-mill trap.
     """
     opp = "B" if color == "W" else "W"
     our_pieces = board.pieces_on_board[color]
@@ -366,6 +483,22 @@ def _late_game_danger(board: BoardState, color: str) -> int:
     opp_cycle = _mill_cycle_ready(board, opp)
     if opp_cycle >= 2:
         penalty -= opp_cycle * 130
+
+    # Attack reward: reward positions where the dominant side has spread open mills
+    # beyond the opponent's blocking capacity (the three-mill-trap pattern).
+    own_open = _two_configs(board, color)
+    if our_pieces >= 6 and opp_pieces <= 4 and own_open >= 2:
+        uncoverable = max(0, own_open - opp_pieces)
+        penalty += own_open * 80 + uncoverable * 180
+
+    # Zugzwang detection: own ≥ 6 pieces, opp has exactly 3 with all pieces
+    # occupying own contested mills (closing squares blocked).  _two_configs
+    # returns 0 here because closing squares are full, so this is the only
+    # signal that captures the final zugzwang configuration.
+    if our_pieces >= 6 and opp_pieces == 3:
+        contested = _contested_mills(board, color)
+        if contested >= 2:
+            penalty += contested * 120 + max(0, contested - 2) * 230
 
     return penalty
 
@@ -568,6 +701,8 @@ def tactical_move_bonus(
     blocked = max(0, _closeable_mills(before, opp) - _closeable_mills(after, opp))
 
     # Opponent 2-configs dismantled (broader than closeable — any 2-piece setup)
+    own_two_before = _two_configs(before, color)
+    own_two_after  = _two_configs(after,  color)
     two_cfg_broken = max(0, _two_configs(before, opp) - _two_configs(after, opp))
 
     # Diamond / fork structures gained this move (capped at 1 for same reason as cycling).
@@ -595,7 +730,7 @@ def tactical_move_bonus(
     # so it incentivises building toward mills rather than random placement.
     setup_mill_bonus = 0
     if get_game_phase(before, color) == "place" and before.pieces_placed.get(color, 0) < 9:
-        two_cfg_gained = max(0, _two_configs(after, color) - _two_configs(before, color))
+        two_cfg_gained = max(0, own_two_after - own_two_before)
         setup_mill_bonus = weights.setup_mill * two_cfg_gained
 
     # Mill-opening bonus: reward sliding out of a closed mill when the position
@@ -621,6 +756,16 @@ def tactical_move_bonus(
                     late_mill_bonus += 1
         late_mill_bonus *= int(weights.close_mill * 0.6)  # 60% extra urgency
 
+    # Three-mill-trap builder: bonus for gaining the 3rd+ open mill when already dominant.
+    # At this point opp can't cover all mills and must leave one open; actively accelerates
+    # the zugzwang setup the book describes for 7v4 and 6v4 endgames.
+    trap_build_bonus = 0
+    if (own_two_before >= 2
+            and own_two_after > own_two_before
+            and after.pieces_on_board[color] >= 6
+            and after.pieces_on_board[opp] <= 5):
+        trap_build_bonus = weights.mill_trap_build
+
     return (
         weights.close_mill            * mills_delta
         + weights.cycling_mill        * (cycling_gain + opp_cycle_lost)
@@ -633,6 +778,7 @@ def tactical_move_bonus(
         + setup_mill_bonus
         + mill_open_bonus
         + late_mill_bonus
+        + trap_build_bonus
     )
 
 
