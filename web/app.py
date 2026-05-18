@@ -66,6 +66,22 @@ try:
 except Exception as _exc:
     log.warning("TrajectoryDB: load failed — %s", _exc)
 
+# Load evolved weights if available — produced by tools/evolve_weights.py.
+_WEIGHTS_DIR = _ROOT / "data" / "weights"
+
+def _load_evolved_weights() -> dict:
+    path = _WEIGHTS_DIR / "best.json"
+    if path.exists():
+        try:
+            d = json.loads(path.read_text())
+            log.info("Evolved weights loaded from %s", path)
+            return d
+        except Exception as exc:
+            log.warning("Could not load evolved weights: %s", exc)
+    return {}
+
+_evolved_weights: dict = _load_evolved_weights()
+
 # Load endgame DB once at startup — provides position-exact move guidance.
 _endgame_db = EndgameDB(_ROOT / "data" / "games")
 try:
@@ -228,7 +244,9 @@ async def index(request: Request):
 async def get_weights():
     from fastapi.responses import JSONResponse
     settings = _load_settings()
-    return JSONResponse(settings.get("ai_weights", {}))
+    # Evolved weights are the baseline; user-saved settings override them.
+    merged = {**_evolved_weights, **settings.get("ai_weights", {})}
+    return JSONResponse(merged)
 
 
 @app.post("/api/weights")
@@ -600,7 +618,9 @@ async def ws_endpoint(websocket: WebSocket):
                 if not vs_human:
                     eff_diff = adaptive.on_new_game(diff)
                     ai_color = "B" if hc == "W" else "W"
-                    _aw      = msg.get("ai_weights") or {}
+                    # Merge: evolved weights < user-saved weights < per-game weights
+                    _aw = {**_evolved_weights, **settings.get("ai_weights", {}),
+                           **(msg.get("ai_weights") or {})}
                     def _w(key, default): return int(_aw.get(key, default))
                     _hw      = HeuristicWeights(
                         close_mill=_w("close_mill", 500),

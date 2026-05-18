@@ -27,8 +27,9 @@
 | 5.24 | Endgame Position Memory | ✅ Complete |
 | 5.25 | AI Personality Selector in Header | ✅ Complete |
 | 5.26 | Setup Position Button in Header | ✅ Complete |
+| 5.27 | Game Counter & Automatic Library Consolidation | ⬜ Planned |
 | 6 | Self-Play Training Loop | ✅ Complete |
-| 7 | Heuristic Parameter Evolution | ⬜ Planned |
+| 7 | Heuristic Parameter Evolution | ✅ Complete |
 | 8 | Adaptive Difficulty | ✅ Complete |
 | 9 | Tournament / Match Mode | ⬜ Planned |
 | 10 | Player Profiles & Persistent Stats | ⬜ Planned |
@@ -993,6 +994,32 @@ If Ollama is already running but the model is missing, only the pull is needed. 
 - CSS: same rule block as `#toggle-moves`, `#toggle-settings`, `#toggle-openings`.
 
 
+### Stage 5.27 — Game Counter & Automatic Library Consolidation ⬜
+
+**Goal:** Every time 50 new opening or endgame positions have been added to the library (via self-play or human games), automatically trigger a consolidation pass: run `tools/name_openings.py` to name any un-named novel openings, rebuild the TrajectoryDB and EndgameDB indexes, and log a summary.
+
+**Motivation:** As self-play runs accumulate, the games directory fills with JSONL files and the TrajectoryDB/EndgameDB in-memory indexes grow stale relative to what's on disk. Un-named openings also accumulate (`needs_llm_name=True` in opening records). A periodic housekeeping step keeps the library clean and ensures the AI is always learning from the most current data.
+
+**Trigger logic:**
+
+- Maintain a `data/game_count.json` file with `{"total": N, "last_consolidated": M}`.
+- After each game is written to `data/games/`, increment `total`.
+- When `total - last_consolidated >= 50`, run consolidation and update `last_consolidated`.
+- Consolidation runs in a background thread (non-blocking).
+
+**Consolidation steps:**
+
+1. Call `tools/name_openings.py` (or its library equivalent) to rename any openings with `needs_llm_name=True`. Skip if LLM is unavailable.
+2. Reload `TrajectoryDB` and `EndgameDB` from disk (picks up all new games).
+3. Log a summary line: `"Consolidated: N games, M openings named, P trajectory entries, Q endgame positions"`.
+
+**Implementation:**
+
+- `web/app.py` — `_increment_game_counter()` called from `_game_over` and `on_game_end`. If threshold crossed, spawn `_consolidate_library()` as `asyncio.create_task`.
+- `tools/self_play.py` — After each batch of 50 fast games, call consolidation (already loads EndgameDB; extend to reload TrajectoryDB too).
+- `data/game_count.json` — Persistent counter file.
+
+
 ## Planned Stages
 
 ### Stage 5.9 — Move Replay Viewer ⬜
@@ -1108,33 +1135,34 @@ python tools/self\\\_play.py --no-llm --games 500 --white 8 --black 6 --swap --b
 python tools/self\\\_play.py --games 20 --white 7 --black 5 --summary
 ```
 
-### Stage 7 — Heuristic Parameter Evolution ⬜
+### Stage 7 — Heuristic Parameter Evolution ✅
 
 **Goal:** Automatically tune the weights in `ai/heuristics.py` to maximise win rate in self-play.
 
-**Approach:** Simple (1+1) evolution / hill-climbing:
+**Delivered (2026-05-18):**
 
-1. Start from the current weight vector as the baseline.
+- `tools/evolve_weights.py` — (1+1) evolution strategy driver. Each generation: mutates baseline weights by Gaussian noise (σ = 12% of each weight by default), evaluates candidate vs baseline in N symmetric games (colours swapped), promotes if candidate win rate ≥ threshold (default 55%). Saves `data/weights/best.json` and numbered checkpoints on every promotion. Logs all generations to `data/weights/evolution_log.jsonl`.
 
-2. Perturb weights by Gaussian noise.
+- `web/app.py` — Loads `data/weights/best.json` at server startup. Exposes evolved weights via `GET /api/weights` (merged with user-saved settings; user overrides take priority). In `new_game`, applies evolved weights as the default base before personality/slider overrides.
 
-3. Play N self-play games (candidate vs baseline).
+**Usage:**
 
-4. If candidate win rate \> 50% + margin, promote to new baseline.
+```bash
+# Quick 20-generation run, 4 parallel workers
+python tools/evolve_weights.py --generations 20 --parallel 4
 
-5. Repeat until convergence or time budget exhausted.
+# Continue hill-climbing from the best weights found so far
+python tools/evolve_weights.py --generations 50 --from-best --parallel 4
 
-**Deliverables:**
+# Strong evaluation (difficulty 6, 30 games/generation)
+python tools/evolve_weights.py --difficulty 6 --games-per-gen 30 --parallel 6
+```
 
-- `tools/evolve\\\_weights.py` — Evolution driver; saves checkpoints to `data/weights/`.
+**Flags:** `--generations N`, `--games-per-gen G`, `--difficulty D`, `--sigma S`, `--threshold T`, `--parallel N`, `--from-best`, `--seed S`
 
-- Serialisable `HeuristicWeights` dataclass (extracted from `heuristics.py`).
+**Weight priority (lowest → highest):** evolved best.json → user-saved settings.json → per-game personality sliders
 
-- `ai/heuristics.py` refactored to accept a weights parameter.
-
-- Best weights auto-loaded at game start if `data/weights/best.json` exists.
-
-**Risk:** Overfitting to self-play. Mitigate by evaluating against fixed reference engines (difficulty 4 and difficulty 8).
+**Anti-overfitting note:** Evaluations are symmetric (colour swap) to avoid first-mover bias. Future work: periodically test promoted weights against a fixed reference engine (difficulty 4 or 8) to catch overfitting to the current baseline's style.
 
 ### Stage 8 — Adaptive Difficulty ✅
 
