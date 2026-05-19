@@ -128,7 +128,10 @@
 
       <!-- Moves list (toggled via header button) -->
       <div class="panel-box" id="moves-panel">
-        <h3>Moves</h3>
+        <h3 style="display:flex;align-items:center;justify-content:space-between">
+          Moves
+          <button id="copy-moves-btn" onclick="copyMoveNotation()" style="font-size:.7rem;padding:2px 7px;cursor:pointer">Copy</button>
+        </h3>
         <div id="moves-list"></div>
       </div>
 

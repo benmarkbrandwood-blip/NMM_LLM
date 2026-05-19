@@ -275,10 +275,12 @@ def evaluate(
     if phase == "move":
         base -= w_conv * _double_mill_convergence(board, opp)
 
-    # Move-phase: reward non-contributing pieces that are adjacent to a 2-config
-    # piece (assembling toward a productive formation — free piece assembly).
+    # Move-phase: reward non-contributing pieces assembling toward a 2-config.
+    # Direct neighbours (1 step) score at full weight; pieces 2 steps away score
+    # at a lower weight to create a gradient that pulls isolated pieces inward.
     if phase == "move":
-        base += 40 * (_free_piece_assembly(board, color) - _free_piece_assembly(board, opp))
+        base += 65 * (_free_piece_assembly(board, color) - _free_piece_assembly(board, opp))
+        base += 22 * (_assembly_reach_count(board, color) - _assembly_reach_count(board, opp))
 
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
@@ -592,6 +594,44 @@ def _free_piece_assembly(board: BoardState, color: str) -> int:
         if board.positions[pos] == color and pos not in in_mill and pos not in in_two:
             if any(nb in in_two for nb in ADJACENCY[pos]):
                 count += 1
+    return count
+
+
+def _assembly_reach_count(board: BoardState, color: str) -> int:
+    """Count free pieces within 2 adjacency steps of a 2-config piece (step-2 only).
+
+    Complements _free_piece_assembly (step-1) to create a pull gradient: pieces
+    that are two hops away from the nearest 2-config are rewarded at a lower
+    weight, encouraging them to drift toward productive formations.
+    """
+    in_mill: set[str] = set()
+    in_two: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if all(v == color for v in vals):
+            for p in mill:
+                in_mill.add(p)
+        elif vals.count(color) == 2 and vals.count("") == 1:
+            for p in mill:
+                if board.positions[p] == color:
+                    in_two.add(p)
+    if not in_two:
+        return 0
+    # Squares directly adjacent to any in_two piece
+    step1_squares: set[str] = set()
+    for p in in_two:
+        step1_squares.update(ADJACENCY[p])
+    # Count free own pieces adjacent to step1 squares but not already step-1
+    count = 0
+    for pos in POSITIONS:
+        if board.positions[pos] != color:
+            continue
+        if pos in in_mill or pos in in_two:
+            continue
+        if any(nb in in_two for nb in ADJACENCY[pos]):
+            continue  # already counted as step-1 by _free_piece_assembly
+        if any(nb in step1_squares for nb in ADJACENCY[pos]):
+            count += 1
     return count
 
 

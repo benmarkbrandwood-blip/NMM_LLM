@@ -18,6 +18,12 @@ A special early-game fast path applies while fewer than 10 pieces are on the boa
 
 `choose_move()` calls `_score_all()`, which runs a full negamax search from every legal root move and returns a scored list. The move with the highest score wins. If `blunder_probability > 0`, there is a chance the AI instead picks from the **bottom quartile** of scored moves — a deliberate mistake for teaching purposes.
 
+#### Bad-move bans and LLM override safety
+
+The player can flag any AI move as bad (via the "Bad Move" button in the UI). This bans the move's notation for the exact board FEN it was played from. The ban is stored in `GameAI._pos_bans` and filtered out at the top of `choose_move()` before the search runs.
+
+When the `Coordinator` (LLM mode) is active, after `choose_move()` returns its (already filtered) best move, the Coordinator may override it with the LLM's recommendation if the LLM's score exceeds the engine's score plus `LLM_BONUS`. To prevent a banned move from re-entering through this path, `deliberate()` checks the ban set against the LLM's suggestion before adopting it — if the LLM recommends the banned move, the suggestion is discarded and the engine's choice is kept.
+
 ### MCTS mode (Stage 12)
 
 `GameAI` optionally delegates move selection to **Monte Carlo Tree Search** (`ai/mcts.py`) when constructed with `use_mcts=True`. MCTS runs within the same time budget as negamax for the chosen difficulty.
@@ -188,7 +194,23 @@ The herding strategy from book Figure 82 — where Black places one piece adjace
 
 ### Free-piece assembly
 
-In the move phase, `_free_piece_assembly(board, color)` counts own pieces that are *not* participating in any closed mill or 2-config but sit adjacent to a piece that *is* in a 2-config. The evaluator rewards the difference between own and opponent assembly counts (weight ×40), steering stranded pieces toward productive formations over several moves without requiring the search to see all the way to the eventual mill.
+In the move phase, two complementary signals create a pull gradient that steers isolated pieces toward productive formations:
+
+**`_free_piece_assembly(board, color)`** counts own pieces that are *not* participating in any closed mill or 2-config but sit **directly adjacent** (1 step) to a piece that *is* in a 2-config. These pieces are one slide away from joining a developing formation. Weight: ×65.
+
+**`_assembly_reach_count(board, color)`** counts the same category of free pieces that are **2 adjacency steps** from any 2-config piece — adjacent to a step-1 neighbour but not adjacent to the 2-config piece itself. This captures pieces that are still converging from further away. Weight: ×22.
+
+Together the two terms create a distance-graduated incentive: step-1 pieces (×65) are strongly rewarded for being close; step-2 pieces (×22) receive a softer pull. A piece 3+ steps from any 2-config earns nothing, so only pieces making genuine convergence progress are rewarded. Neither term fires in fly phase, where adjacency constraints do not limit assembly.
+
+### Fly-phase pin rule
+
+When the AI enters fly phase (3 pieces remaining), each piece can jump to any empty square. This freedom introduces a trap: if an own piece occupies the **closing square** of an opponent 2-config (opponent has the other two squares in that mill), moving that piece away gives the opponent an immediate mill closure and a capture.
+
+`_pinned_fly_squares(board, color)` detects these situations. For every mill, if it contains 2 opponent pieces and 1 own piece, that own square is "pinned" — the piece is the sole blocker of an opponent closure. The function returns the set of all such pinned squares.
+
+In `choose_move()`, after mandatory-block and bad-move-ban filtering, moves that slide FROM a pinned square are removed from the candidate list. The safety guard — `if unpinned` — ensures this filter never reduces the move list to zero (in the rare case that every remaining fly piece is simultaneously pinned, the AI retains all moves rather than returning an empty result).
+
+**Example**: Black has `g4` and `g1` (2-config in the `g7-g4-g1` mill), White (fly) has a piece on `g7`. `g7` is pinned — moving it gives Black a free mill closure. White's other two pieces remain unpinned and are preferred.
 
 ### Endgame supplement
 

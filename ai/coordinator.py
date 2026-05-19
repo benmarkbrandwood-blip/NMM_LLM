@@ -371,6 +371,12 @@ class Coordinator:
             from ai.mills_llm import _notation_to_move
             llm_move = _notation_to_move(llm_notation, legal)
             if llm_move and llm_move != ai_move:
+                # Don't adopt if the LLM recommendation is a banned move
+                _fen = board.to_fen_string()
+                _banned = self.game_ai._pos_bans.get(_fen, set())
+                if self.game_ai._move_notation(llm_move) in _banned:
+                    llm_move = None
+            if llm_move and llm_move != ai_move:
                 llm_score = self.game_ai.score_move(board, llm_move)
                 if llm_score + self.LLM_BONUS > ai_score:
                     move = llm_move

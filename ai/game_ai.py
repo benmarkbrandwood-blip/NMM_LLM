@@ -48,6 +48,24 @@ def _immediate_mill_threats(board: BoardState) -> set[str]:
     return threats
 
 
+def _pinned_fly_squares(board: BoardState, color: str) -> frozenset:
+    """Return own squares that are the sole blocker of an opponent 2-config.
+
+    When in fly phase, each own piece can jump anywhere — but if an own piece
+    sits in the closing square of an opponent 2-config (opp has the other two
+    slots), vacating it hands the opponent an immediate mill closure.  Those
+    squares are "pinned": the piece must not move unless no other move exists.
+    """
+    opp = "B" if color == "W" else "W"
+    pinned: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(opp) == 2 and vals.count(color) == 1:
+            our_sq = next(p for p in mill if board.positions[p] == color)
+            pinned.add(our_sq)
+    return frozenset(pinned)
+
+
 def _squeeze_targets(board: BoardState) -> set[str]:
     """Return empty squares that are the last escape route of an opponent piece.
 
@@ -267,6 +285,16 @@ class GameAI:
             non_banned = [m for m in moves if self._move_notation(m) not in _banned_here]
             if non_banned:  # safety: never reduce to zero legal moves
                 moves = non_banned
+
+        # Fly-phase pin rule: don't vacate the sole blocker of an opponent 2-config.
+        # Moving a pinned piece immediately gives the opponent a free mill closure.
+        from game.rules import get_game_phase
+        if get_game_phase(board, self.color) == "fly":
+            pinned = _pinned_fly_squares(board, self.color)
+            if pinned:
+                unpinned = [m for m in moves if m.get("from") not in pinned]
+                if unpinned:
+                    moves = unpinned
 
         # Blunder mode: occasionally play a bad move on purpose
         if self.blunder_probability > 0.0 and random.random() < self.blunder_probability:

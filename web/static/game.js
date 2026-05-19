@@ -23,6 +23,7 @@ let isVsHuman         = false; // true when current game is human vs human (hand
 let replayMoves       = [];   // moves with FEN data, populated when game ends
 let replayIdx         = -1;   // -1 = not replaying; 0..n-1 = ply index
 let _openingsData     = [];   // cached openings from /api/openings
+let _currentMoves     = [];   // latest moves array, kept for copyMoveNotation()
 
 // ── Setup mode state ──────────────────────────────────────────────────────────
 let setupMode       = false;  // true while the position editor is open
@@ -1065,6 +1066,7 @@ function drawEvalGraph() {
 // ── Moves list ────────────────────────────────────────────────────────────────
 
 function renderMoves(moves) {
+  _currentMoves = moves || [];
   const list = $("moves-list");
   if (!list) return;
   list.innerHTML = "";
@@ -1117,6 +1119,38 @@ function renderMoves(moves) {
 
   // Auto-scroll to bottom
   list.scrollTop = list.scrollHeight;
+}
+
+function copyMoveNotation() {
+  const moves = _currentMoves;
+  if (!moves || moves.length === 0) return;
+
+  // Pair moves into rows the same way renderMoves does
+  const rows = [];
+  let i = 0;
+  while (i < moves.length) {
+    const w = moves[i].color === "W" ? moves[i] : null;
+    const b = moves[i].color === "B" && !w ? moves[i] : null;
+    if (w) {
+      const bNext = moves[i + 1] && moves[i + 1].color === "B" ? moves[i + 1] : null;
+      rows.push([w.notation, bNext ? bNext.notation : ""]);
+      i += bNext ? 2 : 1;
+    } else {
+      rows.push(["—", b ? b.notation : moves[i].notation]);
+      i += 1;
+    }
+  }
+
+  const text = rows.map((pair, idx) => `${idx + 1}.${pair[0]}${pair[1] ? " " + pair[1] : ""}`).join("\n");
+
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = $("copy-moves-btn");
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    }
+  }).catch(() => {});
 }
 
 function setTurnBadge(name, winner) {
