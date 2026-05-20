@@ -283,6 +283,14 @@ def evaluate(
         base += 65 * (_free_piece_assembly(board, color) - _free_piece_assembly(board, opp))
         base += 22 * (_assembly_reach_count(board, color) - _assembly_reach_count(board, opp))
 
+    # Fly-phase structural bonuses: reward interpose pieces (own between two opp in a
+    # mill line — blocks opp from closing while enabling own jump-to-close tactics) and
+    # perpendicular-block pieces (own 2-config piece that simultaneously blocks an opp
+    # 2-config, yielding double structural value from a single piece).
+    if phase == "fly":
+        base += 100 * (_interpose_count(board, color) - _interpose_count(board, opp))
+        base += 80 * (_perp_block_count(board, color) - _perp_block_count(board, opp))
+
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
         base = int(base * weights.long_term_position / 100)
@@ -650,6 +658,43 @@ def _fly_sacrifice_quality(board: BoardState, color: str) -> int:
         if vals.count(color) == 2 and vals.count("") == 1:
             return 1  # keep scanning for a closed mill
     return 0
+
+
+def _interpose_count(board: BoardState, color: str) -> int:
+    """Count own pieces sandwiched between two opponent pieces in a mill (own at middle index)."""
+    opp = "B" if color == "W" else "W"
+    count = 0
+    for a, b, c in MILLS:
+        if (board.positions[b] == color
+                and board.positions[a] == opp
+                and board.positions[c] == opp):
+            count += 1
+    return count
+
+
+def _perp_block_count(board: BoardState, color: str) -> int:
+    """Count own pieces that are simultaneously in an own 2-config and blocking an opponent 2-config.
+
+    Example: white e5 in e3-e4-e5 (own 2-config) also blocks c5-d5-e5 (opp 2-config) at e5.
+    """
+    opp = "B" if color == "W" else "W"
+    own_two_pieces: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            for p in mill:
+                if board.positions[p] == color:
+                    own_two_pieces.add(p)
+    if not own_two_pieces:
+        return 0
+    counted: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(opp) == 2 and vals.count(color) == 1:
+            for p in mill:
+                if board.positions[p] == color and p in own_two_pieces and p not in counted:
+                    counted.add(p)
+    return len(counted)
 
 
 def _double_mill_convergence(board: BoardState, opp: str) -> int:
@@ -1284,6 +1329,12 @@ def tactical_move_bonus(
                     if capture_diamond_bonus:
                         break
 
+    # Safe-capture bonus: reward captures that remove ALL opponent closeable mills when opp
+    # had at least one before — the capture actively neutralised all remaining mill threats.
+    safe_capture_bonus = 0
+    if capture_this_move and _closeable_mills(before, opp) > 0 and _closeable_mills(after, opp) == 0:
+        safe_capture_bonus = 180
+
     # Outer-ring mill penalty during early placement (pieces 1–6).
     # Each outer-ring side mill (a7-d7-g7, g7-g4-g1, g1-d1-a1, a1-a4-a7)
     # contains two corner squares with only 2 connections each.  Completing
@@ -1335,6 +1386,23 @@ def tactical_move_bonus(
     after_phase = get_game_phase(after, color)
     if after_phase == "fly" and own_two_after >= 2 and own_two_before < 2:
         fly_fork_bonus = 750
+
+    # Fly-free-close bonus: in fly phase, reward closing a mill using a piece that
+    # was NOT already in that mill before the move — the "free piece" jumped in from
+    # elsewhere, keeping the other two mill pieces intact as an ongoing threat.
+    fly_free_close_bonus = 0
+    if after_phase == "fly" and mills_delta > 0:
+        moved_from = next(
+            (p for p in POSITIONS if before.positions[p] == color and after.positions[p] != color),
+            None,
+        )
+        if moved_from is not None:
+            for mill in MILLS:
+                if (all(after.positions[p] == color for p in mill)
+                        and not all(before.positions[p] == color for p in mill)
+                        and moved_from not in mill):
+                    fly_free_close_bonus = 200
+                    break
 
     # Ring-crowding penalty: fires when own placement is the 6th+ piece on one ring
     # (outer/middle/inner).  Concentrating ≥4 pieces on a single ring reduces
@@ -1431,6 +1499,8 @@ def tactical_move_bonus(
         + busy_chain_bonus
         + conv_bonus
         + dmc_bonus
+        + safe_capture_bonus
+        + fly_free_close_bonus
         - outer_mill_penalty
         - ring_crowd_penalty
     )
