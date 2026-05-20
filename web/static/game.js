@@ -19,6 +19,7 @@ let thinkingInterval  = null; // setInterval handle while AI is thinking
 let thinkingStarted   = 0;    // Date.now() when thinking began
 let thinkingExpected  = 0;    // expected seconds from server
 let canMarkBad        = false; // true only between ai_move and the next human move commit
+let lastAiBadMoveDesc = "";   // move notation shown in the ban confirmation dialog
 let canMarkGoodGame   = false; // true after a draw ends (AI vs human)
 let isVsHuman         = false; // true when current game is human vs human (handoff buttons visible)
 let replayMoves       = [];   // moves with FEN data, populated when game ends
@@ -267,6 +268,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("btn-bad-move").addEventListener("click", () => {
     if (!ws || !canMarkBad) return;
+    const desc = lastAiBadMoveDesc ? `"${lastAiBadMoveDesc}"` : "this move";
+    const confirmed = window.confirm(
+      `Ban ${desc} from this position?\n\n` +
+      `The AI will avoid it for the rest of this game and in future games ` +
+      `with the same move sequence. This is saved to disk and cannot be easily undone.`
+    );
+    if (!confirmed) return;
     canMarkBad = false;
     $("btn-bad-move").hidden = true;
     ws.send(JSON.stringify({ type: "bad_move" }));
@@ -681,6 +689,7 @@ function handleMessage(msg) {
       addCommentary("GameAI", `Played ${from === "—" ? to : from + "→" + to}${cap}${blunder}`, "ai");
       if (msg.can_mark_bad) {
         canMarkBad = true;
+        lastAiBadMoveDesc = msg.from + "→" + msg.to + (msg.capture ? "×" + msg.capture : "");
         $("btn-bad-move").hidden = false;
       }
       break;
