@@ -1,18 +1,26 @@
 """
 ai/opening_book.py — Opening book management for Nine Men's Morris.
 
-Manages two JSON files:
-  data/openings/book_openings.json  — read-only canonical book (shipped with project)
-  data/openings/openings.json       — mutable working copy (seeded from book on first run)
+Manages three JSON files:
+  data/openings/book_openings.json    — read-only canonical book (shipped with project)
+  data/openings/openings.json         — mutable copy of book openings with updated stats
+  data/openings/learned_openings.json — novel/learned openings discovered at runtime
 
-The _index is keyed by opening_id and always reflects the merged state, with
-openings.json taking precedence over book_openings.json for duplicate IDs.
+book_openings.json is NEVER written.  openings.json is seeded from the book on
+first use and tracks per-opening outcome stats for the 11 canonical lines.
+Learned openings (novel game sequences, self-play discoveries) live exclusively
+in learned_openings.json and can be pruned without touching book data.
+
+On first run after the split is introduced, any learned entries found inside
+openings.json are migrated to learned_openings.json automatically (a backup of
+openings.json is created first).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -72,11 +80,12 @@ class Opening:
     source_reference: str = ""
     needs_llm_name: bool = False        # True when auto-named without LLM; candidate for naming
 
-    def opening_score(self, ai_color: str = "W") -> float:
+    def opening_score(self, ai_color: str = "W", penalty: float = 0.0) -> float:
         """
         Rate this opening from 0.0 (bad for ai_color) to 1.0 (excellent).
         Draws count 0.4.  Unexplored openings return 0.55 so the AI is
         mildly curious about trying them before penalising or boosting them.
+        An optional penalty (0.0–0.3) reduces the score for recent poor performance.
         """
         stats = self.outcome_stats
         w = stats.get("W", 0)
@@ -84,9 +93,10 @@ class Opening:
         d = stats.get("D", 0)
         total = w + b + d
         if total == 0:
-            return 0.55  # unexplored — slight curiosity bonus
+            return max(0.0, 0.55 - penalty)
         wins = w if ai_color == "W" else b
-        return (wins + 0.4 * d) / total
+        raw = (wins + 0.4 * d) / total
+        return max(0.0, raw - penalty)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,8 +144,23 @@ def _dict_to_opening(d: dict) -> Opening:
 
 def _opening_to_dict(o: Opening) -> dict:
     """Serialise an Opening (and its BranchMoves) to a JSON-serialisable dict."""
-    d = asdict(o)
-    return d
+    return asdict(o)
+
+
+def _load_json_list(path: Path, label: str) -> list[dict]:
+    """Load a JSON array from path; return [] on any error."""
+    if not path.exists():
+        return []
+    try:
+        with path.open("r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        if not isinstance(data, list):
+            logger.warning("%s is not a JSON array; treating as empty.", label)
+            return []
+        return data
+    except (json.JSONDecodeError, OSError) as exc:
+        logger.warning("Could not read %s: %s", label, exc)
+        return []
 
 
 # ── OpeningBook ───────────────────────────────────────────────────────────────
@@ -145,54 +170,39 @@ class OpeningBook:
     Load, query, and persist the Nine Men's Morris opening book.
 
     book_openings.json is NEVER written; it is the canonical source.
-    openings.json is the mutable working copy seeded from book_openings.json
-    on first use.  All runtime mutations are applied to openings.json only.
+    openings.json tracks outcome stats for the 11 book lines.
+    learned_openings.json stores all novel/self-play discoveries; these
+    can be pruned individually without affecting the book.
     """
 
     def __init__(
         self,
         book_path: str = "data/openings/book_openings.json",
         openings_path: str = "data/openings/openings.json",
+        learned_path: str = "data/openings/learned_openings.json",
     ) -> None:
         self._book_path = Path(book_path)
         self._openings_path = Path(openings_path)
+        self._learned_path = Path(learned_path)
         self._index: dict[str, Opening] = {}   # opening_id -> Opening
-        # Track which IDs originated exclusively from the read-only book file
-        # (before openings.json may have overridden them).
-        self._book_ids: set[str] = set()
+        self._book_ids: set[str] = set()       # IDs from the canonical book file
+        self._learned_ids: set[str] = set()    # IDs in learned_openings.json
         self.load()
 
     # ── Load ──────────────────────────────────────────────────────────────────
 
     def load(self) -> None:
         """
-        1. Read book_openings.json (read-only).  Warn if missing.
-        2. Seed openings.json from the book if it doesn't exist yet.
-        3. Read openings.json and merge into _index (takes precedence).
+        1. Read book_openings.json (read-only).
+        2. Migrate: if openings.json contains learned entries and
+           learned_openings.json doesn't exist yet, split them out.
+        3. Seed openings.json from the book if it doesn't exist.
+        4. Read openings.json (book entries with updated stats).
+        5. Seed learned_openings.json as [] if it doesn't exist.
+        6. Read learned_openings.json into the index.
         """
-        book_data: list[dict] = []
-
-        # Step 1: read book
-        if self._book_path.exists():
-            try:
-                with self._book_path.open("r", encoding="utf-8") as fh:
-                    book_data = json.load(fh)
-                if not isinstance(book_data, list):
-                    logger.warning(
-                        "book_openings.json is not a JSON array; skipping book load."
-                    )
-                    book_data = []
-            except (json.JSONDecodeError, OSError) as exc:
-                logger.warning("Could not read book_openings.json: %s", exc)
-                book_data = []
-        else:
-            logger.warning(
-                "book_openings.json not found at %s; continuing without book data.",
-                self._book_path,
-            )
-
-        # Populate _index with book entries first
-        for raw in book_data:
+        # Step 1: canonical book
+        for raw in _load_json_list(self._book_path, "book_openings.json"):
             try:
                 opening = _dict_to_opening(raw)
                 self._index[opening.opening_id] = opening
@@ -200,7 +210,16 @@ class OpeningBook:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skipping malformed book entry: %s", exc)
 
-        # Step 2: seed openings.json if it doesn't exist
+        if not self._book_ids:
+            logger.warning(
+                "book_openings.json not found or empty at %s.", self._book_path
+            )
+
+        # Step 2: migration — split learned out of openings.json if needed
+        if self._openings_path.exists() and not self._learned_path.exists():
+            self._migrate_split_learned()
+
+        # Step 3: seed openings.json from book if missing
         if not self._openings_path.exists():
             self._openings_path.parent.mkdir(parents=True, exist_ok=True)
             self._write_openings_json()
@@ -209,27 +228,84 @@ class OpeningBook:
                 len(self._index),
             )
 
-        # Step 3: read openings.json and merge (overrides book entries for same ID)
-        try:
-            with self._openings_path.open("r", encoding="utf-8") as fh:
-                openings_data: list[dict] = json.load(fh)
-            if not isinstance(openings_data, list):
-                logger.warning(
-                    "openings.json is not a JSON array; skipping openings load."
-                )
-                openings_data = []
-        except (json.JSONDecodeError, OSError) as exc:
-            logger.warning("Could not read openings.json: %s", exc)
-            openings_data = []
-
-        for raw in openings_data:
+        # Step 4: read openings.json (book entries + their updated stats)
+        for raw in _load_json_list(self._openings_path, "openings.json"):
             try:
                 opening = _dict_to_opening(raw)
                 self._index[opening.opening_id] = opening
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skipping malformed opening entry: %s", exc)
 
-        logger.info("OpeningBook loaded: %d opening(s) in index.", len(self._index))
+        # Step 5: seed learned_openings.json as empty if missing
+        if not self._learned_path.exists():
+            self._learned_path.parent.mkdir(parents=True, exist_ok=True)
+            self._write_learned_json()
+            logger.info("learned_openings.json created (empty).")
+
+        # Step 6: read learned_openings.json
+        for raw in _load_json_list(self._learned_path, "learned_openings.json"):
+            try:
+                opening = _dict_to_opening(raw)
+                self._index[opening.opening_id] = opening
+                self._learned_ids.add(opening.opening_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Skipping malformed learned entry: %s", exc)
+
+        logger.info(
+            "OpeningBook loaded: %d opening(s) (%d book, %d learned).",
+            len(self._index),
+            len(self._book_ids),
+            len(self._learned_ids),
+        )
+
+    # ── Migration ─────────────────────────────────────────────────────────────
+
+    def _migrate_split_learned(self) -> None:
+        """
+        One-time migration: split learned entries out of openings.json into
+        learned_openings.json.  A backup of openings.json is written first.
+        """
+        data = _load_json_list(self._openings_path, "openings.json (migration)")
+        if not data:
+            return
+
+        book_entries = [e for e in data if e.get("seed_source") == "book"]
+        learned_entries = [e for e in data if e.get("seed_source") != "book"]
+
+        if not learned_entries:
+            return  # nothing to split
+
+        # Back up openings.json
+        backup = self._openings_path.with_suffix(".json.pre-split-backup")
+        try:
+            shutil.copy2(self._openings_path, backup)
+            logger.info("Migration: backed up openings.json → %s", backup.name)
+        except OSError as exc:
+            logger.warning("Migration: could not create backup: %s", exc)
+
+        # Write learned_openings.json
+        try:
+            self._learned_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._learned_path.open("w", encoding="utf-8") as fh:
+                json.dump(learned_entries, fh, indent=2, ensure_ascii=False)
+            logger.info(
+                "Migration: wrote %d learned opening(s) → learned_openings.json",
+                len(learned_entries),
+            )
+        except OSError as exc:
+            logger.error("Migration: failed to write learned_openings.json: %s", exc)
+            return  # abort; openings.json untouched
+
+        # Rewrite openings.json with only book entries
+        try:
+            with self._openings_path.open("w", encoding="utf-8") as fh:
+                json.dump(book_entries, fh, indent=2, ensure_ascii=False)
+            logger.info(
+                "Migration: rewrote openings.json with %d book entry/entries.",
+                len(book_entries),
+            )
+        except OSError as exc:
+            logger.error("Migration: failed to rewrite openings.json: %s", exc)
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
@@ -258,6 +334,10 @@ class OpeningBook:
         """Return all openings flagged needs_llm_name=True (queued for LLM naming)."""
         return [o for o in self._index.values() if o.needs_llm_name]
 
+    def is_prunable(self, opening_id: str) -> bool:
+        """Return True if this opening can be pruned (i.e. it lives in learned_openings.json)."""
+        return opening_id in self._learned_ids
+
     def values(self):
         """Iterate over all Opening objects in the index."""
         return self._index.values()
@@ -266,7 +346,10 @@ class OpeningBook:
 
     def save_opening(self, opening: Opening) -> None:
         """
-        Write/update an opening in openings.json (never touches book_openings.json).
+        Write/update an opening in the appropriate file.
+
+        Learned openings (seed_source != "book" or already in _learned_ids) go
+        to learned_openings.json.  Book openings go to openings.json.
 
         Raises ValueError if seed_source == "book" and the ID is brand-new
         (prevents accidentally minting new canonical book entries at runtime).
@@ -281,8 +364,19 @@ class OpeningBook:
                 f"openings may be created dynamically."
             )
 
+        is_learned = (
+            opening.seed_source != "book"
+            or opening.opening_id in self._learned_ids
+        )
+        if is_learned:
+            self._learned_ids.add(opening.opening_id)
+
         self._index[opening.opening_id] = opening
-        self._write_openings_json()
+
+        if is_learned:
+            self._write_learned_json()
+        else:
+            self._write_openings_json()
 
     def update_outcome_stats(
         self,
@@ -314,7 +408,6 @@ class OpeningBook:
         stats[winner] = stats.get(winner, 0) + 1
 
         if human_color in ("W", "B"):
-            ai_color = "B" if human_color == "W" else "W"
             if winner == "D":
                 stats["human_draws"] = stats.get("human_draws", 0) + 1
                 stats["ai_draws"] = stats.get("ai_draws", 0) + 1
@@ -325,7 +418,51 @@ class OpeningBook:
                 stats["ai_wins"] = stats.get("ai_wins", 0) + 1
                 stats["human_losses"] = stats.get("human_losses", 0) + 1
 
-        self._write_openings_json()
+        if opening_id in self._learned_ids:
+            self._write_learned_json()
+        else:
+            self._write_openings_json()
+
+    def prune_opening(self, opening_id: str) -> bool:
+        """
+        Remove a learned opening permanently.
+
+        Returns True if the opening was removed, False if not found or if
+        the opening is a protected book entry.
+        """
+        if opening_id not in self._learned_ids:
+            logger.warning(
+                "prune_opening: %r is not a prunable learned opening.", opening_id
+            )
+            return False
+        if opening_id not in self._index:
+            return False
+        del self._index[opening_id]
+        self._learned_ids.discard(opening_id)
+        self._write_learned_json()
+        return True
+
+    def set_name(
+        self,
+        opening_id: str,
+        name: str,
+        needs_llm_name: bool = False,
+    ) -> bool:
+        """
+        Set the display name on any opening (book or learned).
+
+        Returns True if the opening was found and updated, False otherwise.
+        """
+        opening = self._index.get(opening_id)
+        if opening is None:
+            return False
+        opening.name = name
+        opening.needs_llm_name = needs_llm_name
+        if opening_id in self._learned_ids:
+            self._write_learned_json()
+        else:
+            self._write_openings_json()
+        return True
 
     def select_opening(
         self,
@@ -341,8 +478,6 @@ class OpeningBook:
         """
         import math
 
-        # Only consider openings where this AI colour plays the winning side.
-        # side='both' means the line is colour-neutral (e.g. draws, or unknown outcome).
         openings = [
             o for o in self._index.values()
             if o.side in (ai_color, "both")
@@ -365,7 +500,6 @@ class OpeningBook:
                 + op.outcome_stats.get("B", 0)
                 + op.outcome_stats.get("D", 0)
             )
-            # UCB exploration term — large for untried openings
             return base + exploration_rate * math.sqrt(log_n / (local + 1))
 
         return max(openings, key=_ucb)
@@ -386,7 +520,6 @@ class OpeningBook:
         if opening is None:
             return None
 
-        # Look for an existing branch that covers this exact deviation
         for branch in opening.branch_moves:
             if (
                 branch.deviation_ply == ply
@@ -394,7 +527,6 @@ class OpeningBook:
             ):
                 return branch
 
-        # Create a new learned branch
         branch_id = f"{opening_id}-dev-{ply}-{move_played}"
         new_branch = BranchMove(
             branch_id=branch_id,
@@ -422,8 +554,7 @@ class OpeningBook:
         move sequence that didn't match any known opening.
 
         outcome, if provided, must be "W", "B", or "D".
-        needs_llm_name=True marks this opening as pending LLM naming (use when
-        no LLM is available at game time — run tools/name_openings.py later).
+        needs_llm_name=True marks this opening as pending LLM naming.
         """
         outcome_stats: dict[str, int] = {"W": 0, "B": 0, "D": 0}
         if outcome in outcome_stats:
@@ -473,8 +604,7 @@ class OpeningBook:
         """Merge auto-named openings that share the same first `min_common` moves.
 
         Rules:
-        - Named openings (LLM or book names) are NEVER merged with each other —
-          they represent intentionally distinct variations of the same opening family.
+        - Named openings (LLM or book names) are NEVER merged with each other.
         - Auto-named openings sharing a prefix with a named opening are merged INTO
           the named opening that has the most recorded games.
         - Auto-named openings sharing a prefix with only other auto-named openings
@@ -504,21 +634,18 @@ class OpeningBook:
             unnamed = [o for o in group if is_auto_named(o.name)]
 
             if not unnamed:
-                # Every entry in this group has a real name → distinct lines, skip
                 continue
 
             def _by_games(o: Opening) -> int:
                 return sum(o.outcome_stats.get(k, 0) for k in ("W", "B", "D"))
 
             if named:
-                # Fold all unnamed into the named entry with the most games
                 canonical = max(named, key=_by_games)
                 to_merge  = unnamed
             else:
-                # No named entry → fold all auto-named into the most-played one
                 unnamed.sort(key=_by_games, reverse=True)
                 canonical = unnamed[0]
-                canonical.needs_llm_name = True  # flag for later naming pass
+                canonical.needs_llm_name = True
                 to_merge  = unnamed[1:]
 
             for dup in to_merge:
@@ -528,28 +655,42 @@ class OpeningBook:
                         + dup.outcome_stats.get(k, 0)
                     )
                 del self._index[dup.opening_id]
+                self._learned_ids.discard(dup.opening_id)
                 removed += 1
 
             self._index[canonical.opening_id] = canonical
 
         if removed:
             self._write_openings_json()
+            self._write_learned_json()
         return removed
 
     # ── Persistence ───────────────────────────────────────────────────────────
 
     def _write_openings_json(self) -> None:
-        """
-        Serialise the entire _index to openings.json.
-
-        All openings (including those originally seeded from book_openings.json)
-        are written, making openings.json a self-contained mutable copy.
-        """
+        """Serialise non-learned openings (book entries with updated stats) to openings.json."""
         self._openings_path.parent.mkdir(parents=True, exist_ok=True)
-        data = [_opening_to_dict(o) for o in self._index.values()]
+        data = [
+            _opening_to_dict(o) for o in self._index.values()
+            if o.opening_id not in self._learned_ids
+        ]
         try:
             with self._openings_path.open("w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
         except OSError as exc:
             logger.error("Failed to write openings.json: %s", exc)
+            raise
+
+    def _write_learned_json(self) -> None:
+        """Serialise learned openings to learned_openings.json."""
+        self._learned_path.parent.mkdir(parents=True, exist_ok=True)
+        data = [
+            _opening_to_dict(o) for o in self._index.values()
+            if o.opening_id in self._learned_ids
+        ]
+        try:
+            with self._learned_path.open("w", encoding="utf-8") as fh:
+                json.dump(data, fh, indent=2, ensure_ascii=False)
+        except OSError as exc:
+            logger.error("Failed to write learned_openings.json: %s", exc)
             raise

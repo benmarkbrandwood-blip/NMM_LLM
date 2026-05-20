@@ -24,6 +24,7 @@ def _make_book(tmp_dir: str) -> OpeningBook:
     return OpeningBook(
         book_path=BOOK_PATH,
         openings_path=os.path.join(tmp_dir, "openings.json"),
+        learned_path=os.path.join(tmp_dir, "learned_openings.json"),
     )
 
 
