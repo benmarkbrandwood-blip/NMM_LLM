@@ -1841,6 +1841,7 @@ def tactical_move_bonus(
                 )
                 is_case_b = (not is_case_a) and any(
                     nb not in mill
+                    and _from_sq not in mill  # exclude the mill piece itself (that's cycling, not escaping)
                     and all(before.positions[p] == color for p in mill)
                     and any(nb in ADJACENCY[p] for p in mill)
                     for mill in MILLS
