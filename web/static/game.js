@@ -854,6 +854,61 @@ function handleMessage(msg) {
         `${msg.endgame_positions} endgame positions.`, "ai");
       break;
 
+    case "openings_updated":
+      _loadOpenings();
+      break;
+
+    case "name_opening_prompt": {
+      const opId   = msg.opening_id;
+      const autoNm = msg.auto_name || "";
+      const feed   = $("commentary-ai");
+      if (!feed) break;
+
+      const div = document.createElement("div");
+      div.className = "commentary-line opening-name-prompt";
+
+      const label = document.createElement("span");
+      label.className = "speaker";
+      label.textContent = "[Opening]: ";
+      div.appendChild(label);
+
+      const preview = document.createElement("span");
+      preview.textContent = `New sequence detected: "${autoNm}" · Rename: `;
+      div.appendChild(preview);
+
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "opening-name-input";
+      input.value = autoNm;
+      input.placeholder = "Opening name…";
+      div.appendChild(input);
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "opening-name-btn";
+      saveBtn.textContent = "Save";
+      saveBtn.onclick = () => {
+        const name = input.value.trim();
+        if (!name) return;
+        ws.send(JSON.stringify({ type: "rename_opening", opening_id: opId, name }));
+        div.remove();
+      };
+      div.appendChild(saveBtn);
+
+      const skipBtn = document.createElement("button");
+      skipBtn.className = "opening-name-btn opening-name-skip";
+      skipBtn.textContent = "Skip";
+      skipBtn.onclick = () => div.remove();
+      div.appendChild(skipBtn);
+
+      feed.insertBefore(div, feed.firstChild);
+      break;
+    }
+
+    case "rename_opening_ack":
+      _loadOpenings();
+      addCommentary("[Opening]", `Saved as "${msg.name}".`, "ai");
+      break;
+
     case "error":
       addCommentary("Error", msg.message, "ai");
       break;

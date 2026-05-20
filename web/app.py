@@ -415,6 +415,7 @@ class Session:
         self.adaptive: Optional[AdaptiveTracker] = None
         self.is_tournament_game: bool = False
         self._last_game_record: Optional[dict] = None  # stored after game ends for good_game
+        self.opening_recognizer: Optional["OpeningRecognizer"] = None  # no-LLM recognition
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -697,6 +698,7 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         if novel_id:
             opening = session.coordinator.opening_recognizer.book.get_by_id(novel_id)
             if opening:
+                await _send(ws, {"type": "openings_updated"})
                 await _send(ws, {
                     "type":       "name_opening_prompt",
                     "opening_id": novel_id,
@@ -714,12 +716,69 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
             record["draw_reason"] = draw_reason
         if session.adaptive and session.adaptive.extra_blunder > 0:
             record["adaptive_softened"] = True
+
+        # Populate opening recognition fields from the standalone recognizer.
+        if session.opening_recognizer:
+            final_rec = session.opening_recognizer.get_current_result()
+            record["recognised_opening_id"]    = final_rec.opening_id
+            record["recognised_opening_name"]  = final_rec.name
+            record["opening_recognition_status"] = final_rec.status
+
         session._last_game_record = record
         await asyncio.to_thread(_persist_game_record, record)
         if _trajectory_db is not None:
             await asyncio.to_thread(_trajectory_db.add_game, record)
         if _endgame_db is not None:
             await asyncio.to_thread(_endgame_db.add_game, record)
+
+        # Save novel / unmatched openings and notify the frontend.
+        novel_id = None
+        if session.opening_recognizer:
+            final_rec = session.opening_recognizer.get_current_result()
+            if final_rec.status in ("novel", "inactive"):
+                placement_moves = [
+                    m["to"] for m in record.get("moves", [])
+                    if m.get("type") == "place"
+                ]
+                if len(placement_moves) >= 6:
+                    book = session.opening_recognizer.book
+                    first3 = "-".join(placement_moves[:3])
+                    auto_name = f"Novel — {first3}"
+                    sigs = Coordinator._compute_fen_signatures(placement_moves)
+                    similar = book.find_similar(placement_moves, min_common=4)
+                    if similar:
+                        canonical = max(
+                            similar,
+                            key=lambda o: sum(o.outcome_stats.get(k, 0) for k in ("W","B","D")),
+                        )
+                        if winner in ("W", "B", "D"):
+                            canonical.outcome_stats[winner] = canonical.outcome_stats.get(winner, 0) + 1
+                        book.save_opening(canonical)
+                        novel_id = canonical.opening_id
+                    else:
+                        novel = book.save_novel_opening(
+                            placement_moves, sigs,
+                            outcome=winner,
+                            needs_llm_name=True,
+                        )
+                        novel.name = auto_name
+                        book.save_opening(novel)
+                        novel_id = novel.opening_id
+                    # Notify frontend; /api/openings reads from disk each call so
+                    # the client will get the new entry on its next fetch.
+                    await _send(ws, {"type": "openings_updated"})
+
+        if novel_id:
+            book = session.opening_recognizer.book  # type: ignore[union-attr]
+            opening = book.get_by_id(novel_id)
+            if opening:
+                await _send(ws, {
+                    "type":       "name_opening_prompt",
+                    "opening_id": novel_id,
+                    "auto_name":  opening.name,
+                    "moves":      opening.line_moves[:8],
+                })
+
         asyncio.create_task(_maybe_consolidate(ws))
 
 
@@ -802,6 +861,10 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
     session._can_undo_ai             = True
 
     session.engine.apply_move(move)
+
+    # Advance no-LLM opening recognizer for AI placement moves.
+    if session.opening_recognizer and not session.coordinator and move.get("from") is None:
+        session.opening_recognizer.update(move.get("to", ""), session.engine.board)
 
     await _send(ws, {
         "type":        "ai_move",
@@ -1042,6 +1105,12 @@ async def ws_endpoint(websocket: WebSocket):
                 if not vs_human:
                     session.adaptive = adaptive
                     session.hint_cap = _hint_cap_for_elo(player_elo)
+                    # Always run opening recognition, even without LLM.
+                    # The coordinator owns its own recognizer; only wire up
+                    # the standalone one when no coordinator is present.
+                    if coord is None and game_ai is not None:
+                        _nollm_book = OpeningBook()
+                        session.opening_recognizer = OpeningRecognizer(_nollm_book)
                 log.info("New game  human=%s diff=%s vs_human=%s llm=%s tournament=%s",
                          hc, diff, vs_human, use_llm, is_tournament)
                 await _send(websocket, _state(session))
@@ -1352,6 +1421,8 @@ async def ws_endpoint(websocket: WebSocket):
                         session.coordinator.react_to_human_move,
                         board_before, session.engine.board, move,
                     )
+                elif session.opening_recognizer and move.get("from") is None:
+                    session.opening_recognizer.update(move.get("to", ""), session.engine.board)
 
                 await _commentary(websocket, session)
                 await _send(websocket, _state(session))

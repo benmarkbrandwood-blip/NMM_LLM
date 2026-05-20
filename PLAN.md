@@ -1135,7 +1135,7 @@ The following five enhancements were requested after extended play testing. Each
 
 ---
 
-### Bug B-0 — New Openings Not Appearing in Openings Panel ⬜
+### Bug B-0 — New Openings Not Appearing in Openings Panel ✅
 
 **Symptom:** Games played in recent sessions are not generating new entries in the Openings panel. All five games played after the last `learned_openings.json` update have `recognised_opening_id: null` and `opening_recognition_status: null` in their saved game records.
 

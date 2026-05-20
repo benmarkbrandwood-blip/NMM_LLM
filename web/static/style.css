@@ -607,6 +607,40 @@ main {
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
+/* ── Opening name prompt (inline in commentary feed) ─────────────────── */
+.opening-name-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--tan);
+  background: #1e1a12;
+}
+
+.opening-name-input {
+  background: #111;
+  border: 1px solid var(--tan);
+  color: var(--text);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 0.8rem;
+  width: 160px;
+  flex-shrink: 1;
+}
+
+.opening-name-btn {
+  background: transparent;
+  border: 1px solid var(--tan);
+  color: var(--tan);
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.opening-name-btn:hover { background: var(--tan); color: #111; }
+.opening-name-skip { border-color: var(--text-dim); color: var(--text-dim); }
+.opening-name-skip:hover { background: var(--text-dim); color: #111; }
+
 @media (max-width: 860px) {
   main {
     grid-template-columns: 1fr;
