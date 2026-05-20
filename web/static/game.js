@@ -19,6 +19,7 @@ let thinkingInterval  = null; // setInterval handle while AI is thinking
 let thinkingStarted   = 0;    // Date.now() when thinking began
 let thinkingExpected  = 0;    // expected seconds from server
 let canMarkBad        = false; // true only between ai_move and the next human move commit
+let canMarkGoodGame   = false; // true after a draw ends (AI vs human)
 let isVsHuman         = false; // true when current game is human vs human (handoff buttons visible)
 let replayMoves       = [];   // moves with FEN data, populated when game ends
 let replayIdx         = -1;   // -1 = not replaying; 0..n-1 = ply index
@@ -236,6 +237,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!ws || phase === "idle") return;
     ws.send(JSON.stringify({ type: "undo" }));
   });
+  $("copy-moves-btn").addEventListener("click", copyMoveNotation);
   $("btn-hint").addEventListener("click", () => {
     if (!ws || phase === "idle" || phase === "game_over") return;
     if (!gameState || !gameState.is_human_turn || hintsLeft <= 0) return;
@@ -268,6 +270,12 @@ document.addEventListener("DOMContentLoaded", () => {
     canMarkBad = false;
     $("btn-bad-move").hidden = true;
     ws.send(JSON.stringify({ type: "bad_move" }));
+  });
+  $("btn-good-game").addEventListener("click", () => {
+    if (!ws || !canMarkGoodGame) return;
+    canMarkGoodGame = false;
+    $("btn-good-game").hidden = true;
+    ws.send(JSON.stringify({ type: "good_game" }));
   });
   $("player-chat-send").addEventListener("click", sendPlayerMessage);
   $("player-chat-input").addEventListener("keydown", e => {
@@ -380,6 +388,8 @@ function startNewGame() {
   $("btn-force-move").hidden = true;
   $("btn-bad-move").hidden = true;
   canMarkBad = false;
+  $("btn-good-game").hidden = true;
+  canMarkGoodGame = false;
   stopThinkingTimer();
   updateHintButton();
   updateDrawButton();
@@ -566,6 +576,8 @@ function startSetupGame() {
   $("btn-force-move").hidden = true;
   $("btn-bad-move").hidden = true;
   canMarkBad = false;
+  $("btn-good-game").hidden = true;
+  canMarkGoodGame = false;
   stopThinkingTimer();
   updateHintButton();
   updateDrawButton();
@@ -680,6 +692,10 @@ function handleMessage(msg) {
       $("btn-bad-move").hidden = true;
       break;
 
+    case "good_game_ack":
+      addCommentary("[Training]", "Good game noted — AI's moves reinforced as a win in the trajectory.", "ai");
+      break;
+
     case "commentary":
       addCommentary(msg.speaker ?? "MillsAI", msg.text, msg.section);
       break;
@@ -702,6 +718,9 @@ function handleMessage(msg) {
       $("btn-force-move").hidden = true;
       canMarkBad = false;
       $("btn-bad-move").hidden = true;
+      // Show Good Game after a draw in AI vs human (reinforces strong AI play)
+      canMarkGoodGame = !msg.winner && !isVsHuman;
+      $("btn-good-game").hidden = !canMarkGoodGame;
       isVsHuman = false;
       _updateHandoffButtons();
       const isResign = msg.result === "ai_resignation";
@@ -1150,7 +1169,39 @@ function copyMoveNotation() {
       btn.textContent = "Copied!";
       setTimeout(() => { btn.textContent = prev; }, 1500);
     }
-  }).catch(() => {});
+  }).catch(() => _showMoveTextBox(text));
+}
+
+function _showMoveTextBox(text) {
+  let overlay = document.getElementById("move-copy-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "move-copy-overlay";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;display:flex;align-items:center;justify-content:center";
+    overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+    const box = document.createElement("div");
+    box.style.cssText = "background:#1e1a12;border:1px solid var(--border);border-radius:6px;padding:14px;min-width:260px;max-width:420px;width:90%";
+    const lbl = document.createElement("p");
+    lbl.style.cssText = "margin:0 0 8px;font-size:.8rem;color:var(--text-dim)";
+    lbl.textContent = "Select all and copy (Ctrl+A, Ctrl+C):";
+    const ta = document.createElement("textarea");
+    ta.style.cssText = "width:100%;height:220px;background:#0e0c08;border:1px solid var(--border);color:var(--text);font-family:monospace;font-size:.78rem;padding:6px;border-radius:4px;box-sizing:border-box;resize:none";
+    ta.readOnly = true;
+    ta.value = text;
+    const close = document.createElement("button");
+    close.textContent = "Close";
+    close.className = "btn-small";
+    close.style.cssText = "margin-top:8px;width:100%";
+    close.addEventListener("click", () => overlay.remove());
+    box.append(lbl, ta, close);
+    overlay.appendChild(box);
+    // Auto-select all text
+    ta.focus();
+    ta.select();
+  } else {
+    overlay.remove();
+  }
 }
 
 function setTurnBadge(name, winner) {

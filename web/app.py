@@ -388,6 +388,7 @@ class Session:
         self._can_undo_ai: bool = False        # True only right after an AI move
         self.adaptive: Optional[AdaptiveTracker] = None
         self.is_tournament_game: bool = False
+        self._last_game_record: Optional[dict] = None  # stored after game ends for good_game
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -638,6 +639,7 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         # Tag softened games so DB loaders can skip them (Bug 8-A protection).
         if session.adaptive and session.adaptive.extra_blunder > 0:
             record["adaptive_softened"] = True
+        session._last_game_record = record
         await asyncio.to_thread(session.coordinator.on_game_end, record)
         await _commentary(ws, session)
         asyncio.create_task(_maybe_consolidate(ws))
@@ -1097,6 +1099,24 @@ async def ws_endpoint(websocket: WebSocket):
                 await _send(websocket, {"type": "bad_move_ack", "bad_notation": bad_notation})
                 await _send(websocket, _state(session))
                 _maybe_start_ai(force=True)  # force=True so it fires in human vs AI mode too
+
+            # ── good_game — elevate a draw to win-like status in trajectory ────
+            elif kind == "good_game" and session:
+                rec = session._last_game_record
+                if rec is None or rec.get("winner") is not None:
+                    await _send(websocket, {"type": "error",
+                        "message": "Good Game only available after a draw."})
+                else:
+                    ai_color = "B" if session.human_color == "W" else "W"
+                    boosted = dict(rec, winner=ai_color)
+                    if session.coordinator and session.coordinator.trajectory_db is not None:
+                        await asyncio.to_thread(
+                            session.coordinator.trajectory_db.add_game, boosted)
+                    if session.coordinator and session.coordinator.endgame_db is not None:
+                        await asyncio.to_thread(
+                            session.coordinator.endgame_db.add_game, boosted)
+                    session._last_game_record = None  # prevent double-boosting
+                    await _send(websocket, {"type": "good_game_ack"})
 
             # ── handoff_to_ai — hand one side to the AI mid-game ─────────────
             elif kind == "handoff_to_ai" and session and not session.engine.finished:

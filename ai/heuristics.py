@@ -244,7 +244,8 @@ def evaluate(
 
     # 3v4: fly attacker rewards separated opponent groups — disconnected pieces
     # can't defend each other, allowing the fly attacker to threaten one group at a time.
-    if phase == "fly" and opp_pieces == 4:
+    # Suppressed when force_aggressive=True so the AI isn't penalised for giving fly.
+    if phase == "fly" and opp_pieces == 4 and not force_aggressive:
         base += 180 * _piece_separation(board, color)
 
     # Fly fork: when both players are in fly phase, each 2-config is an immediate
@@ -263,7 +264,7 @@ def evaluate(
     # Guard: only fires when 6v3 domination (≥3 own open mills) is not yet
     # available — once that path is open, the zugzwang plan is better.
     w_sac = weights.sacrifice_viable if weights else DEFAULT_WEIGHTS.sacrifice_viable
-    if own_pieces == 6 and opp_pieces == 4 and phase == "move" and our_two < 3:
+    if own_pieces == 6 and opp_pieces == 4 and phase == "move" and our_two < 3 and not force_aggressive:
         sq = _fly_sacrifice_quality(board, color)
         if sq > 0:
             base += w_sac * sq
