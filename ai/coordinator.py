@@ -21,6 +21,7 @@ from ai.opening_recognizer import OpeningRecognizer, RecognitionResult, INACTIVE
 from ai.endgame_recognizer import EndgameRecognizer, INACTIVE_ENDGAME
 from ai.trajectory_db import TrajectoryDB
 from ai.endgame_db import EndgameDB
+from ai.board_symmetry import transform_notation as _transform_book_notation
 from game.rules import get_all_legal_moves, get_game_phase
 
 
@@ -63,6 +64,7 @@ class Coordinator:
         self._game_moves: list[dict] = []
         self._endgame_state = INACTIVE_ENDGAME
         self._target_opening: Opening | None = None
+        self._game_sym_idx: int = 0   # D4 symmetry applied to book moves this game
         self._last_novel_id: str | None = None   # set when an unnamed opening is saved
         self._dominant_turn_streak: int = 0
         self.resignation_offered: bool = False
@@ -113,6 +115,7 @@ class Coordinator:
         # select_opening() already filters by side, but double-check so a stale
         # 'both' entry from an unknown-outcome game is accepted for either colour.
         self._target_opening = None
+        self._game_sym_idx = 0
         self._last_novel_id = None
         if self.opening_recognizer:
             candidate = self.opening_recognizer.book.select_opening(
@@ -120,10 +123,22 @@ class Coordinator:
             )
             if candidate and candidate.side in (self.game_ai.color, "both"):
                 self._target_opening = candidate
+                # When playing White, pick a random D4 symmetry so the opening
+                # plays out as a different rotation or reflection each game.
+                # The trajectory and endgame DBs use canonical D4 forms, so the
+                # AI's mid-game guidance is unaffected by the chosen orientation.
+                if self.game_ai.color == "W" and self._target_opening.line_moves:
+                    self._game_sym_idx = random.randint(0, 7)
+                first_mv = ""
+                if self._target_opening.line_moves:
+                    raw = self._target_opening.line_moves[0]
+                    first_mv = _transform_book_notation(raw, self._game_sym_idx) or raw
+                    first_mv = f" → {first_mv}"
                 self.emit(
                     "GameAI",
                     f"Targeting opening: {self._target_opening.name} "
-                    f"(score {self._target_opening.opening_score(self.game_ai.color):.2f})",
+                    f"(score {self._target_opening.opening_score(self.game_ai.color):.2f})"
+                    f"{first_mv}",
                 )
 
         recent = self.memory.load_recent_games(n=10)
@@ -296,11 +311,17 @@ class Coordinator:
         ):
             ply = len(self._game_moves)
             line = self._target_opening.line_moves
-            # Only synthesise recognition when the book destination is actually
-            # a legal placement in the current position — the book may have been
-            # recorded from a different colour perspective or contain stale data.
+            # Apply the per-game D4 symmetry so the entire opening plays out
+            # in the chosen rotation/reflection.  Falls back to the raw move
+            # if the transform maps to an off-board square (shouldn't happen
+            # on a valid NMM position but keeps things safe).
+            _raw_mv = line[ply] if ply < len(line) else None
+            _book_mv = (
+                (_transform_book_notation(_raw_mv, self._game_sym_idx) or _raw_mv)
+                if _raw_mv else None
+            )
             legal_dests = {m["to"] for m in legal}
-            if ply < len(line) and line[ply] in legal_dests:
+            if _book_mv is not None and _book_mv in legal_dests:
                 recognition = RecognitionResult(
                     opening_id=self._target_opening.opening_id,
                     name=self._target_opening.name,
@@ -310,7 +331,7 @@ class Coordinator:
                     matched_ply=ply,
                     deviation_ply=None,
                     deviation_move=None,
-                    book_move=line[ply],
+                    book_move=_book_mv,
                     branch_name=None,
                     strategic_notes=self._target_opening.strategic_notes,
                     common_blunders=list(self._target_opening.common_blunders),
