@@ -55,6 +55,22 @@ from ai.endgame_db import EndgameDB
 from ai.starting_play import combined_family_summary
 from ai.player_profile import PlayerProfile, load_profile, save_profile, is_valid_name
 
+_GAMES_PATH = _ROOT / "data" / "games"
+_GAMES_PATH.mkdir(parents=True, exist_ok=True)
+
+
+def _persist_game_record(record: dict) -> None:
+    """Write a completed game record to the games JSONL folder (no LLM required)."""
+    import uuid as _uuid
+    from datetime import datetime as _dt
+    session_id = record.get("session_id") or str(_uuid.uuid4())
+    date_str = (record.get("date") or _dt.now().isoformat())[:10]
+    fname = _GAMES_PATH / f"game_{date_str}_{session_id[:8]}.jsonl"
+    with open(fname, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(record) + "\n")
+    log.info("Game saved (no-LLM): %s", fname.name)
+
+
 # Load trajectory DB once at startup — updated incrementally as games complete.
 _trajectory_db    = TrajectoryDB(_ROOT / "data" / "games")
 _BAD_MOVES_PATH   = _ROOT / "data" / "bad_moves.json"
@@ -677,6 +693,23 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
                     "moves":      opening.line_moves[:8],
                 })
             session.coordinator._last_novel_id = None
+
+    elif not session.vs_human and session.game_ai is not None:
+        # No coordinator (LLM disabled) but still an AI-vs-human game — persist
+        # the engine's own game_record so TrajectoryDB and EndgameDB learn from it.
+        record = dict(session.engine.game_record)
+        record["winner"] = winner
+        if draw_reason:
+            record["draw_reason"] = draw_reason
+        if session.adaptive and session.adaptive.extra_blunder > 0:
+            record["adaptive_softened"] = True
+        session._last_game_record = record
+        await asyncio.to_thread(_persist_game_record, record)
+        if _trajectory_db is not None:
+            await asyncio.to_thread(_trajectory_db.add_game, record)
+        if _endgame_db is not None:
+            await asyncio.to_thread(_endgame_db.add_game, record)
+        asyncio.create_task(_maybe_consolidate(ws))
 
 
 def _expected_think_seconds(difficulty: int, total_pieces: int) -> float:
