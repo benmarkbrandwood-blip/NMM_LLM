@@ -63,6 +63,7 @@ class Coordinator:
         self._game_moves: list[dict] = []
         self._endgame_state = INACTIVE_ENDGAME
         self._target_opening: Opening | None = None
+        self._last_novel_id: str | None = None   # set when an unnamed opening is saved
         self._dominant_turn_streak: int = 0
         self.resignation_offered: bool = False
 
@@ -112,6 +113,7 @@ class Coordinator:
         # select_opening() already filters by side, but double-check so a stale
         # 'both' entry from an unknown-outcome game is accepted for either colour.
         self._target_opening = None
+        self._last_novel_id = None
         if self.opening_recognizer:
             candidate = self.opening_recognizer.book.select_opening(
                 ai_color=self.game_ai.color,
@@ -211,6 +213,8 @@ class Coordinator:
                     canonical.needs_llm_name = False
                     self.emit("MillsAI", f"Named this opening family \"{name}\"")
             book.save_opening(canonical)
+            if canonical.needs_llm_name or is_auto_named(canonical.name):
+                self._last_novel_id = canonical.opening_id
             return
 
         # No similar opening — create a new one.
@@ -225,7 +229,9 @@ class Coordinator:
         )
         novel.name = name
         book.save_opening(novel)
-        if not needs_name:
+        if needs_name:
+            self._last_novel_id = novel.opening_id
+        else:
             self.emit("MillsAI", f"I've recorded this opening as \"{name}\"")
 
     # ── Tactical pre-screen ───────────────────────────────────────────────────

@@ -480,22 +480,43 @@ async def list_openings():
     from fastapi.responses import JSONResponse
     book = OpeningBook()
     result = []
-    for op in sorted(book._index.values(), key=lambda o: o.name):
+    for op in sorted(book._index.values(), key=lambda o: (o.family, o.name)):
         stats = op.outcome_stats
         total = stats.get("W", 0) + stats.get("B", 0) + stats.get("D", 0)
+        penalty = book.get_penalty(op.opening_id)
         result.append({
-            "id":       op.opening_id,
-            "name":     op.name,
-            "family":   op.family,
-            "side":     op.side,
-            "moves":    op.line_moves,
-            "n_moves":  len(op.line_moves),
-            "tags":     op.tags,
-            "notes":    op.strategic_notes,
-            "total_games": total,
-            "w_wins":   stats.get("W", 0),
-            "b_wins":   stats.get("B", 0),
-            "draws":    stats.get("D", 0),
+            "id":             op.opening_id,
+            "name":           op.name,
+            "family":         op.family,
+            "side":           op.side,
+            "seed_source":    op.seed_source,
+            "prunable":       book.is_prunable(op.opening_id),
+            "needs_llm_name": op.needs_llm_name,
+            "moves":          op.line_moves,
+            "n_moves":        len(op.line_moves),
+            "tags":           op.tags,
+            "notes":          op.strategic_notes,
+            "total_games":    total,
+            "w_wins":         stats.get("W", 0),
+            "b_wins":         stats.get("B", 0),
+            "draws":          stats.get("D", 0),
+            "score_w":        round(op.opening_score("W", penalty=penalty), 3),
+            "score_b":        round(op.opening_score("B", penalty=penalty), 3),
+            "penalty":        round(penalty, 3),
+            "branches": [
+                {
+                    "id":             b.branch_id,
+                    "name":           b.name,
+                    "deviation_ply":  b.deviation_ply,
+                    "deviation_move": b.deviation_move,
+                    "seed_source":    b.seed_source,
+                    "total_games":    sum(b.outcome_stats.get(k, 0) for k in ("W", "B", "D")),
+                    "w_wins":         b.outcome_stats.get("W", 0),
+                    "b_wins":         b.outcome_stats.get("B", 0),
+                    "draws":          b.outcome_stats.get("D", 0),
+                }
+                for b in op.branch_moves
+            ],
         })
     return JSONResponse(result)
 
@@ -643,6 +664,19 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         await asyncio.to_thread(session.coordinator.on_game_end, record)
         await _commentary(ws, session)
         asyncio.create_task(_maybe_consolidate(ws))
+
+        # Prompt user to name a newly saved unnamed opening
+        novel_id = session.coordinator._last_novel_id
+        if novel_id:
+            opening = session.coordinator.opening_recognizer.book.get_by_id(novel_id)
+            if opening:
+                await _send(ws, {
+                    "type":       "name_opening_prompt",
+                    "opening_id": novel_id,
+                    "auto_name":  opening.name,
+                    "moves":      opening.line_moves[:8],
+                })
+            session.coordinator._last_novel_id = None
 
 
 def _expected_think_seconds(difficulty: int, total_pieces: int) -> float:
@@ -1521,6 +1555,84 @@ async def ws_endpoint(websocket: WebSocket):
                         "type": "commentary", "speaker": "Game",
                         "text": "LLM not available — enable MillsAI commentary.",
                         "section": "human",
+                    })
+
+            # ── prune_opening — remove a learned opening ──────────────────────
+            elif kind == "prune_opening":
+                opening_id = msg.get("opening_id", "")
+                if not opening_id:
+                    await _send(websocket, {"type": "error", "message": "Missing opening_id"})
+                else:
+                    _book = (
+                        session.coordinator.opening_recognizer.book
+                        if session and session.coordinator and session.coordinator.opening_recognizer
+                        else OpeningBook()
+                    )
+                    if _book.prune_opening(opening_id):
+                        await _send(websocket, {
+                            "type": "prune_opening_ack",
+                            "opening_id": opening_id,
+                        })
+                    else:
+                        await _send(websocket, {
+                            "type": "error",
+                            "message": f"Cannot prune '{opening_id}' — not found or protected.",
+                        })
+
+            # ── rename_opening — set a display name on any opening ────────────
+            elif kind == "rename_opening":
+                opening_id = msg.get("opening_id", "")
+                name = str(msg.get("name", "")).strip()
+                if not opening_id or not name:
+                    await _send(websocket, {"type": "error", "message": "Missing opening_id or name"})
+                else:
+                    _book = (
+                        session.coordinator.opening_recognizer.book
+                        if session and session.coordinator and session.coordinator.opening_recognizer
+                        else OpeningBook()
+                    )
+                    if _book.set_name(opening_id, name, needs_llm_name=False):
+                        await _send(websocket, {
+                            "type": "rename_opening_ack",
+                            "opening_id": opening_id,
+                            "name": name,
+                        })
+                    else:
+                        await _send(websocket, {
+                            "type": "error",
+                            "message": f"Opening '{opening_id}' not found.",
+                        })
+
+            # ── suggest_opening_name — ask LLM to propose a name ──────────────
+            elif kind == "suggest_opening_name":
+                opening_id = msg.get("opening_id", "")
+                _book = (
+                    session.coordinator.opening_recognizer.book
+                    if session and session.coordinator and session.coordinator.opening_recognizer
+                    else OpeningBook()
+                )
+                _opening = _book.get_by_id(opening_id) if opening_id else None
+                if _opening is None:
+                    await _send(websocket, {
+                        "type": "error",
+                        "message": f"Opening '{opening_id}' not found.",
+                    })
+                else:
+                    _llm = (
+                        session.coordinator.mills_llm
+                        if session and session.coordinator
+                        else None
+                    )
+                    suggested = None
+                    if _llm and _llm._client:
+                        suggested = await asyncio.to_thread(
+                            _llm.name_novel_opening, _opening.line_moves
+                        )
+                    await _send(websocket, {
+                        "type":       "opening_name_suggestion",
+                        "opening_id": opening_id,
+                        "suggested":  suggested or _opening.name,
+                        "llm_used":   bool(_llm and _llm._client and suggested),
                     })
 
             # ── tournament_start ──────────────────────────────────────────────
