@@ -180,13 +180,17 @@ class OpeningBook:
         book_path: str = "data/openings/book_openings.json",
         openings_path: str = "data/openings/openings.json",
         learned_path: str = "data/openings/learned_openings.json",
+        penalties_path: str = "data/openings/penalties.json",
     ) -> None:
         self._book_path = Path(book_path)
         self._openings_path = Path(openings_path)
         self._learned_path = Path(learned_path)
+        self._penalties_path = Path(penalties_path)
         self._index: dict[str, Opening] = {}   # opening_id -> Opening
         self._book_ids: set[str] = set()       # IDs from the canonical book file
         self._learned_ids: set[str] = set()    # IDs in learned_openings.json
+        # opening_id -> {"penalty": float, "last_updated": str}
+        self._penalties: dict[str, dict] = {}
         self.load()
 
     # ── Load ──────────────────────────────────────────────────────────────────
@@ -251,6 +255,9 @@ class OpeningBook:
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Skipping malformed learned entry: %s", exc)
 
+        # Step 7: load penalties
+        self._penalties = self._load_penalties()
+
         logger.info(
             "OpeningBook loaded: %d opening(s) (%d book, %d learned).",
             len(self._index),
@@ -306,6 +313,60 @@ class OpeningBook:
             )
         except OSError as exc:
             logger.error("Migration: failed to rewrite openings.json: %s", exc)
+
+    # ── Penalty helpers ───────────────────────────────────────────────────────
+
+    def _load_penalties(self) -> dict[str, dict]:
+        if not self._penalties_path.exists():
+            return {}
+        try:
+            with self._penalties_path.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, OSError) as exc:
+            logger.warning("Could not read penalties.json: %s", exc)
+            return {}
+
+    def _write_penalties(self) -> None:
+        self._penalties_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with self._penalties_path.open("w", encoding="utf-8") as fh:
+                json.dump(self._penalties, fh, indent=2, ensure_ascii=False)
+        except OSError as exc:
+            logger.error("Failed to write penalties.json: %s", exc)
+
+    def _apply_outcome_penalty(
+        self, opening_id: str, winner: str, human_color: Optional[str]
+    ) -> None:
+        """Update the decay penalty for an opening after a game outcome.
+
+        Only applies when human_color is known (so we know which side the AI was).
+        AI loss → +0.05 penalty (capped at 0.3).  AI win → −0.02 (floor 0.0).
+        """
+        if human_color not in ("W", "B"):
+            return
+        from datetime import datetime, timezone
+        ai_color = "B" if human_color == "W" else "W"
+        entry = self._penalties.setdefault(
+            opening_id, {"penalty": 0.0, "last_updated": ""}
+        )
+        if winner == ai_color:
+            entry["penalty"] = max(0.0, entry["penalty"] - 0.02)
+        elif winner in ("W", "B"):
+            entry["penalty"] = min(0.3, entry["penalty"] + 0.05)
+        entry["last_updated"] = datetime.now(timezone.utc).isoformat()
+        self._write_penalties()
+
+    def get_penalty(self, opening_id: str) -> float:
+        """Return the current decay penalty for an opening (0.0 if none recorded)."""
+        return self._penalties.get(opening_id, {}).get("penalty", 0.0)
+
+    def get_adjusted_score(self, opening_id: str, ai_color: str = "W") -> float:
+        """Return opening_score with penalty applied — use this for display."""
+        opening = self._index.get(opening_id)
+        if opening is None:
+            return 0.0
+        return opening.opening_score(ai_color, penalty=self.get_penalty(opening_id))
 
     # ── Queries ───────────────────────────────────────────────────────────────
 
@@ -423,6 +484,8 @@ class OpeningBook:
         else:
             self._write_openings_json()
 
+        self._apply_outcome_penalty(opening_id, winner, human_color)
+
     def prune_opening(self, opening_id: str) -> bool:
         """
         Remove a learned opening permanently.
@@ -439,6 +502,9 @@ class OpeningBook:
             return False
         del self._index[opening_id]
         self._learned_ids.discard(opening_id)
+        if opening_id in self._penalties:
+            del self._penalties[opening_id]
+            self._write_penalties()
         self._write_learned_json()
         return True
 
@@ -494,7 +560,8 @@ class OpeningBook:
         log_n = math.log(max(1, global_games) + 1)
 
         def _ucb(op: "Opening") -> float:
-            base = op.opening_score(ai_color)
+            penalty = self._penalties.get(op.opening_id, {}).get("penalty", 0.0)
+            base = op.opening_score(ai_color, penalty=penalty)
             local = (
                 op.outcome_stats.get("W", 0)
                 + op.outcome_stats.get("B", 0)
@@ -656,6 +723,7 @@ class OpeningBook:
                     )
                 del self._index[dup.opening_id]
                 self._learned_ids.discard(dup.opening_id)
+                self._penalties.pop(dup.opening_id, None)
                 removed += 1
 
             self._index[canonical.opening_id] = canonical
@@ -663,6 +731,7 @@ class OpeningBook:
         if removed:
             self._write_openings_json()
             self._write_learned_json()
+            self._write_penalties()
         return removed
 
     # ── Persistence ───────────────────────────────────────────────────────────
