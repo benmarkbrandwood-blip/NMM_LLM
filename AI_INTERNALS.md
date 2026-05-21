@@ -472,3 +472,37 @@ A mill with high cycling freedom (several empty exits) can repeatedly open and r
 **Signal:** A `block_cycling_priority` bonus (default 120) fires when the AI's placement or move occupies the closing square of the highest-effective-cycling-freedom fork arm. The bonus scales with the freedom differential: `block_cycling_priority × (1 + freedom_diff × 0.1)`. Gate: placement and move phase only, not fly phase.
 
 **Example (cardinal exception):** White threatens g7-g4-g1 (1 exit if closed) and g4-f4-e4 (4 exits if closed). Black has a piece at e3, adjacent to e4 (g4-f4-e4's closing square). Black should block g7 (give White the cardinal mill), because e3 already constrains the cardinal mill's most dangerous exit. Without e3, Black would block e4 instead.
+
+### What the LLM sees when it makes a move or commentary
+
+`MillsLLM` receives the following context in each prompt:
+
+- **System prompt** — `_BOARD_RULES` (node list, phase rules, notation format) plus a task-specific system prompt (e.g. `_MOVE_SYSTEM`, `_COMMENT_SYSTEM`).
+- **Board** — raw ASCII grid from `board.to_display_grid()`. This shows which squares are occupied by W or B but gives the LLM no explicit summary of closed mills, 2-config threats, piece counts, or the current phase.
+- **Move history** — the notation sequence so far (e.g. `1. d7 f4 2. d6 d5 …`), passed via `_move_history_block()`.
+- **Legal moves** (deliberation path only) — one per line in notation form.
+- **Engine top choice and score** (deliberation path only) — e.g. `ENGINE TOP CHOICE: d2-d3`, `ENGINE SCORE: +0.42`.
+- **Opening context** (when a recognised opening is active) — name, confidence, book move for this ply, strategic notes, common blunders.
+- **Endgame context** (when `endgame_state.active`) — phase name, pattern notes.
+- **Strategic memory** (deliberation path) — nearest-neighbour positions from ChromaDB, retrieved by `_strategy_context()`.
+
+**What the LLM does NOT receive:**
+
+- Which mills are currently closed, and for whom.
+- Which 2-configs (one-away threats) exist.
+- Explicit piece counts or how many pieces each side has in hand.
+- Current game phase stated in plain text (it must infer from move count or board appearance).
+- Canonical NMM mill line names (e.g. "Outer bottom: g1-d1-a1") — the LLM guesses line names from the ASCII layout and sometimes gets them wrong.
+
+**Known failure mode (Bug B-9):** Because the LLM only has the ASCII grid to work from, it can misidentify which line a mill was formed on (e.g. commenting "mill on the e-line" when the mill was on the outer bottom), or ask about a mill threat on a line that is already occupied and immobile. See Bug B-9 in PLAN.md for the fix plan.
+
+### 1-config approach heuristic (`_one_config_approach`)
+
+Added to fill the assembly gap where no 2-config yet exists. The four existing assembly functions (`_free_piece_assembly`, `_assembly_reach_count`, `_assembly_step3_count`, `_assembly_step4_count`) all measure distance from a free piece to the nearest **2-config piece**. If no 2-config exists — common in the early game — all four return zero and the AI gets no signal about building toward future mills.
+
+`_one_config_approach(board, color)` addresses this by measuring free-piece proximity to the **empty squares of 1-config mills** (mills where the color has exactly 1 piece and 2 empty squares):
+
+- Step-1 (+2): free piece is directly adjacent to an empty square of a 1-config mill.
+- Step-2 (+1): free piece is one hop away from such an empty square (adjacent to the step-1 halo).
+
+Pieces already in a closed mill, a 2-config, or another 1-config are excluded from counting (they are already contributing to a formation). Weight: `×12` in `evaluate()` move-phase assembly block. Does not apply in fly phase.

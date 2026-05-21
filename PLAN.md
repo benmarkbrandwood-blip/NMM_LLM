@@ -1721,6 +1721,63 @@ Any piece 3 or more steps away earns nothing and may stay isolated indefinitely.
 
 ---
 
+### Bug B-9 — Mills LLM Commentary: Wrong Line Names and Factual Errors ⬜
+
+**Symptom:** The LLM makes factually wrong commentary because it cannot read the board correctly. Examples observed:
+
+- *"Are you planning to challenge White's central dominance with a mill on the c-line?"* — when the c-line (c3-c4-c5) is packed with immobile pieces and no mill there is possible.
+- *"Black forms a mill on the e-line and captures White's piece, gaining significant advantage."* — when the mill was actually formed on line 1 (g1-d1-a1), not the e-line.
+
+**Root cause:** `MillsLLM` prompts pass only `board.to_display_grid()` (the raw ASCII board) plus the move-notation history. The LLM receives no structured summary of: which mills are currently closed, which 2-configs (one-away threats) exist, piece counts, current phase, or canonical mill line names. Without this, the LLM must infer all tactical state from the ASCII grid — and it guesses wrong.
+
+**The 16 legal mills in NMM notation:**
+
+| Name | Squares |
+|------|---------|
+| Outer top | a7-d7-g7 |
+| Outer right | g7-g4-g1 |
+| Outer bottom | g1-d1-a1 |
+| Outer left | a1-a4-a7 |
+| Middle top | b6-d6-f6 |
+| Middle right | f6-f4-f2 |
+| Middle bottom | f2-d2-b2 |
+| Middle left | b2-b4-b6 |
+| Inner top | c5-d5-e5 |
+| Inner right | e5-e4-e3 |
+| Inner bottom | e3-d3-c3 |
+| Inner left | c3-c4-c5 |
+| d-column top | d7-d6-d5 |
+| g-row | g4-f4-e4 |
+| d-column bottom | d1-d2-d3 |
+| a-row | a4-b4-c4 |
+
+**Fix:** Add a `_board_summary(board)` helper (in `ai/mills_llm.py` or a shared utility) that computes and formats:
+
+1. **Phase** — `placement / move / fly`
+2. **Piece counts** — `White: N on board (M in hand)`, `Black: N on board (M in hand)`
+3. **Closed mills** — list each closed mill by name and squares, e.g. `White: Outer bottom (g1-d1-a1)`
+4. **Two-piece threats (2-configs)** — list each by name and which square closes it, e.g. `White: d-column bottom (d1-d2 — closes at d3)`
+5. **Mobility** — count of legal moves per side (optional; gives the LLM a quick dominance signal)
+
+Inject this summary into every `MillsLLM` prompt that calls `board.to_display_grid()`, replacing or augmenting it with a `POSITION SUMMARY:` block.
+
+**Affected methods in `ai/mills_llm.py`:**
+- `ask_for_move_opinion()` — primary deliberation prompt; most important
+- `evaluate_human_move()` — poor-move commentary
+- `comment_on_mill()` — mill formation commentary
+- `ask_strategic_question()` — strategic position question
+- `comment_on_good_move()` — positive commentary
+- `generate_question_for_human()` — question generation
+- `player_chat()` — in-game chat
+
+**Also check `deliberate()` in `ai/coordinator.py`:** The `react_to_human_move()` call chain is where mill commentary fires — confirm it also passes the enriched board summary.
+
+**Deliverables:**
+- `ai/mills_llm.py` — `_board_summary(board)` helper; inject into all prompt-building sites
+- (optional) `game/board.py` or `ai/mills_llm.py` — `MILL_NAMES` dict mapping each mill tuple to a human-readable name
+
+---
+
 ## Planned Stages
 
 ### Stage 5.9 — Move Replay Viewer ⬜
