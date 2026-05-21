@@ -495,9 +495,87 @@ The two groups need **not** share any piece. The threat resilience comes entirel
 
 3. Evaluate at every search depth, not only at root, so the gradient pulls the AI toward cross-feeding configurations several moves before they become decisive.
 
+**Status — partially implemented (2026-05-22):**
+- `_cross_feed_mobility_pairs(board, color)` added to `ai/heuristics.py`
+- `own_convergence` (250) and `cross_feed_mobility` (180) added to `HeuristicWeights`
+- Both injected into `evaluate()` for move and fly phases
+- Verified: position after Black places c3 correctly scores +250 for Black's shared-d3 pair
+- 236 tests pass
+
+**Remaining:** surface this signal in `tactical_move_bonus()` so the delta between the pre-move and post-move cross-feed score contributes to move ordering (not just positional evaluation).
+
+---
+
+### Bug B-17 — Capture Selection: Prefer Captures That Create Own Cross-Feeding Pairs ⬜
+
+**Symptom:** After closing a mill, the AI chooses which opponent piece to capture based on disruption value (breaking opponent feeders, diamonds, etc.) but does not consider whether a specific capture *creates* a cross-feeding 2-config pair for itself by vacating a key square.
+
+**Example from a recorded game (move 10, White to move):**
+
+```
+10. a4-a7×d5   ← White closes outer-top mill (a7-d7-g7), captures Black's d5
+```
+
+White has pieces at `d7`, `d6` (d-column-top, `d7-d6-d5`, needs `d5`) and `c5`, `e5` (inner-top, `c5-d5-e5`, also needs `d5`). Both 2-config groups need the **same square — `d5`** — which is currently occupied by a Black piece.
+
+By capturing `d5` specifically, White simultaneously:
+1. Removes the one piece blocking BOTH of its own 2-configs from reaching their closing square
+2. Creates a cross-feeding pair (both groups now need the vacated `d5`)
+
+After the capture, regardless of Black's response:
+- If Black closes the mill at d1-d2-d3 or plays b4→a4, White places at `d5` to close **two mills at once** (fork) or at minimum close one mill immediately while the other remains a threat
+- White is no longer blocked and can close a mill within 1–2 moves no matter what Black does
+
+The existing `own_convergence` bonus in `evaluate()` correctly scores the resulting position after `×d5` higher than other captures. However, the AI may still prefer a different capture (e.g. removing a piece from an opponent 2-config) if the disruption bonus outweighs the position gain. The issue is that **creating own convergence by unblocking a shared closing square** deserves an explicit bonus in `tactical_move_bonus()`, not just an implicit positional gain.
+
+**Root cause:** `tactical_move_bonus()` already scores capture choices by: `capture_disrupt_feeder` (breaks opponent cycling mill), `capture_disrupt_diamond` (breaks opponent fork). There is no corresponding term for captures that *create* an own cross-feeding pair by removing a blocker from a shared closing square.
+
+**Three distinct unblocking patterns (all addressed by the same fix):**
+
+---
+
+**Pattern A — Shared-closing-square unblock (diamond creation)**
+
+The captured square is currently occupied by an opponent piece that sits on the shared closing square of two or more of our own 2-configs. Removing it opens a diamond for us.
+
+*Example:* We have `d3` + `d1` (d-column-bottom `d1-d2-d3`, needs `d2`) AND `b2` + `f2` (middle-bottom `f2-d2-b2`, also needs `d2`). Opponent has a piece at `d2`. Capturing `d2` instantly creates a diamond (two 2-configs both needing `d2`) — one move from a fork that closes two mills simultaneously.
+
+---
+
+**Pattern B — Pivot-piece unblock (feeder/cycling mill activation)**
+
+The captured square is the only thing preventing one of our 2-configs from receiving its closing move from an adjacent piece that is *already part of a closed mill*. After the capture, that closed-mill piece becomes a feeder: it can slide to the now-empty closing square, simultaneously cycling the closed mill and completing a new mill on a different line.
+
+*Example:* We have the closed outer-right mill `g1-g4-g7` and pieces at `d5`, `d6` (d-column-top `d7-d6-d5`, needs `d7`). Opponent has a piece at `d7`. Capturing `d7` makes `d7` empty. `g7` is adjacent to `d7` (outer-top / d-column junction), so `g7` can now slide to `d7`, closing `d7-d6-d5` while opening the outer-right mill for cycling. This creates a linked cycling structure: `g7` oscillates between `g7` (outer-right) and `d7` (d-column-top), threatening a capture from either mill on alternate turns.
+
+The key signal: after the capture, `_double_mill_convergence(board, color)` increases AND at least one of our closed-mill pieces is adjacent to the newly opened closing square.
+
+---
+
+**Pattern C — Cross-mobility unblock (general case)**
+
+The captured square is the closing square of one of our 2-configs, and a piece from a *different* independent 2-config is adjacent to it (cross-feed as defined in B-16). After the capture both groups now form a cross-feeding pair via the vacated square.
+
+---
+
+**Fix:**
+
+In `tactical_move_bonus()`, after applying the mill-closure capture, evaluate all three patterns against the resulting board:
+
+1. **Pattern A:** If `len(detect_diamonds(board_after, color)) > len(detect_diamonds(board_before, color))` → add `capture_creates_diamond` bonus (highest, ~320).
+2. **Pattern B:** If the captured square is adjacent to a piece already in one of our closed mills AND that piece's other mill line now has a 2-config → add `capture_activates_feeder` bonus (~280).
+3. **Pattern C / general:** If `_double_mill_convergence(board_after, color) > _double_mill_convergence(board_before, color)` OR `_cross_feed_mobility_pairs(board_after, color) > _cross_feed_mobility_pairs(board_before, color)` → add `capture_creates_convergence` bonus (~250).
+
+Bonuses are applied additively (a single capture can score all three if it simultaneously unblocks a diamond, activates a feeder, and creates cross-mobility).
+
+Add to `HeuristicWeights`:
+- `capture_creates_diamond: int = 320`
+- `capture_activates_feeder: int = 280`
+- `capture_creates_convergence: int = 250`
+
 **Affected files:**
-- `ai/heuristics.py` — `_cross_feed_bonus()` helper; inject into `evaluate()`
-- `ai/heuristics.py` — `HeuristicWeights` — new `cross_feed_mill` field
+- `ai/heuristics.py` — `tactical_move_bonus()`: three new capture-selection terms after mill closure
+- `ai/heuristics.py` — `HeuristicWeights`: three new fields
 
 ---
 
