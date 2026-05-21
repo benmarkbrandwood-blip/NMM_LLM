@@ -1778,6 +1778,209 @@ Inject this summary into every `MillsLLM` prompt that calls `board.to_display_gr
 
 ---
 
+### Bug B-10 — AI Allows Opponent to Consolidate Three Scattered Pieces into a Line ⬜
+
+**Symptom:** The AI makes a move that frees a square the opponent needs to complete a line of three pieces that were previously unconnected. Example from a recorded game:
+
+```
+18.a4-a7   b4-a4
+```
+
+White moves `a4-a7`, vacating `a4`. Black immediately plays `b4-a4`, consolidating three pieces on line 1 (`a1-a4-a7`... eventually) while White cannot contest `g4`. The AI should have foreseen that vacating `a4` gifted Black exactly the landing square needed to form a three-piece alignment.
+
+**Root cause:** The heuristic `evaluate()` does not check, for each candidate move, whether the resulting empty square(s) allow the opponent to unite two previously disconnected groups into a contiguous line of three. The danger is invisible to the search unless look-ahead depth happens to reach the opponent's consolidating reply.
+
+**Fix:**
+
+1. Add a helper `_opponent_line_consolidation_threat(board, move, side)` in `ai/heuristics.py`:
+   - After applying `move`, enumerate all groups of opponent pieces that share a mill line with an empty square adjacent to both groups.
+   - If any such empty square is the one just vacated (or any other square newly freed by the move), return a penalty proportional to how many mill lines that consolidation would enable.
+2. Subtract the penalty from `evaluate()` for the moving side, making the AI less likely to expose consolidation squares when the opponent has pieces waiting on both sides of that square.
+3. This check is distinct from the existing 2-config threat detection: it fires when the opponent has *two separate pieces on a line with one empty square between/at the end*, not when they already have two in a mill triplet.
+
+**Affected files:**
+- `ai/heuristics.py` — new helper + penalty injected into `evaluate()`
+- `ai/game_ai.py` — no changes needed (penalty surfaces naturally through `evaluate()`)
+
+---
+
+### Bug B-11 — AI Session Summary Contains Fabricated Move Numbers and Piece Counts ⬜
+
+**Symptom:** The LLM session summary invents events that did not occur. Observed examples from a recorded game:
+
+- References to "move 23" when the game ended at move 20.
+- Claims "the AI had 2 pieces left" when it resigned with many pieces on the board.
+- The summary gives no indication of *why* the GameAI chose its moves (the LLM does not know what the classical engine was calculating).
+
+**Root cause (two separate issues):**
+
+1. **Fabricated summary facts** — The LLM receives only the move-notation list and the ASCII board; it has no reliable anchor for the game length, resignation trigger, or final piece counts, so it hallucinates plausible-sounding endings.
+2. **GameAI "thinking" is invisible to the LLM** — The classical engine's best-score line, the dominant heuristic term that drove its decision, and its tactical intent are never reported, so the LLM cannot accurately narrate *why* a move was made.
+
+**Fix — Part A: Ground the session summary**
+
+In `ai/coordinator.py` `generate_session_summary()`, inject a structured `GAME FACTS` block into the prompt:
+
+```
+GAME FACTS (authoritative — do not contradict):
+  Total half-moves: {N}
+  Termination: {resignation | piece-loss | no-legal-moves}
+  Final piece counts: White {W}, Black {B}
+  Winner: {White | Black | Draw}
+```
+
+This block must be derived from `game_record`, not inferred from the board ASCII.
+
+**Fix — Part B: AI "thinking" trace**
+
+Add a `thinking` field to the dict returned by `GameAI.choose_move()`:
+
+```python
+{
+  "move": <move>,
+  "thinking": "Blocked opponent mill threat on outer-bottom; mobility +2"
+}
+```
+
+`thinking` is a one- or two-phrase plain-English label identifying the 1–2 dominant heuristic contributions to the chosen move's score (e.g. *"closed mill on d-column bottom"*, *"blocked 2-config on inner-left"*, *"improved mobility +3"*).
+
+Surface `thinking` in the UI:
+- In the **AI Discussion** panel, add a **"Show AI reasoning"** toggle (checkbox, off by default).
+- When toggled on, each AI move in the discussion feed is annotated with the thinking string below the move notation line.
+
+**Affected files:**
+- `ai/game_ai.py` — populate `thinking` in `choose_move()` return value; identify top-1 or top-2 heuristic terms from the score breakdown
+- `ai/heuristics.py` — `evaluate()` should optionally return a score-breakdown dict so `game_ai.py` can label the dominant term
+- `ai/coordinator.py` — inject GAME FACTS block into session summary prompt
+- `web/app.py` — pass `thinking` string in the WS `ai_move` message
+- `web/static/game.js` — "Show AI reasoning" toggle; render thinking string in AI Discussion feed
+- `web/templates/index.html` — toggle checkbox in AI Discussion panel
+
+---
+
+### Bug B-12 — Opening Replay Fails with Illegal Move Error; Bad Moves in Opening DB ⬜
+
+**Symptom (four related issues):**
+
+1. Both "Novel — d7-d6-g4 (18 moves)" openings fail to replay, printing:
+   - `Opening replay stopped: move d3 is not legal at this point.`
+   - `Opening replay stopped: move d6 is not legal at this point.`
+2. After the error, play continues and the message `Game: Opening complete — now playing AI vs AI.` appears, followed by `Error: 'NoneType' object has no attribute 'choose_move'`.
+3. The **Bad Move** button was pressed during a game that then continued, inserting illegal moves into the recorded opening sequence and corrupting the DB entry.
+4. The **Watch — AI continues from opening** option on the openings panel does not result in an AI vs AI game being played.
+
+**Root cause:**
+- Bad-move records in `learned_openings.json` contain moves that were flagged during a game but the game continued anyway, so the flagged move appears in the sequence even though it may not be legal for any board state reached from the standard opening position.
+- The AI-vs-AI continuation path after an opening replay does not wire up both `Coordinator` instances correctly — one is `None`.
+- The "Watch" button handler may not trigger the `start_ai_vs_ai` flow at all.
+
+**Fix:**
+
+**A — Purge corrupt opening entries:**
+1. Write a one-off script `tools/fix_openings.py` that replays each opening from the standard start position move-by-move and removes any entry that produces an illegal-move error.
+2. For entries that partially replay, truncate the move list to the last legal move (preserving as much opening data as possible).
+3. Run the script before committing and include the cleaned `learned_openings.json` in the fix commit.
+
+**B — Disable the Bad Move button during opening replay (and remove its effect on DB openings):**
+1. In `web/static/game.js`, hide or disable the Bad Move button whenever `state.opening_active === true`.
+2. In `web/app.py`, when a bad-move report is filed, do *not* record it against any move that is part of an active opening replay sequence.
+
+**C — Fix AI-vs-AI NoneType error after opening replay:**
+1. In `web/app.py`, after `opening_replay_complete` fires, ensure both sides have a fully initialised `Coordinator` (or `GameAI` if LLM is off) before handing off to `ai_vs_ai_loop`.
+2. Add a null check and a descriptive error log if either coordinator is still `None`.
+
+**D — Fix "Watch" button:**
+1. Trace the WS message path from the Watch button click → server handler; verify it calls `start_ai_vs_ai` with the correct `session_id`.
+2. Add an option to start AI-vs-AI from the end of the **placement phase** (not just from the end of an opening).
+
+**E — Opening rename/delete from GUI:**
+1. Add a kebab menu (⋮) or inline icon buttons on each opening row in the Openings panel: **Rename** and **Delete**.
+2. Rename: opens an inline text field pre-filled with the current name; saves on Enter/blur.
+3. Delete: shows a one-click confirmation ("Delete this opening?") then removes the entry from `learned_openings.json` and refreshes the list.
+
+**F — LLM opening name is a suggestion, not final:**
+1. When a novel opening is saved and the LLM proposes a name, display a modal with the LLM suggestion pre-filled in a text input.
+2. The player edits or accepts the name and clicks **Save**; the player's version is written to `learned_openings.json`, not the raw LLM output.
+
+**Affected files:**
+- `tools/fix_openings.py` — new validation/repair script
+- `data/openings/learned_openings.json` — cleaned by the script
+- `web/app.py` — null-check coordinator before AI-vs-AI handoff; Watch button handler; bad-move guard during opening replay
+- `web/static/game.js` — disable Bad Move during opening replay; Watch button fix; rename/delete handlers; LLM name modal
+- `web/templates/index.html` — rename/delete controls in Openings panel; LLM name suggestion modal
+
+---
+
+### Bug B-13 — AI-vs-AI Game Not Available on GUI; No Option to Save ⬜
+
+**Symptom:** There is no way to watch two AI personalities play a full game against each other in the browser GUI. The "Watch" button after an opening either does nothing or errors (see B-12). Even if it worked, there is no way to opt-in to saving the AI-vs-AI game to the database.
+
+**Goal:**
+
+1. Add a persistent **"AI vs AI"** button (in the header or Settings panel) that starts a fresh AI-vs-AI game from the initial position, with selectable personalities for each side.
+2. The game plays out automatically in the browser, with the board updating move-by-move and the AI Discussion panel showing commentary.
+3. **By default, AI-vs-AI games do NOT contribute to the trajectory/endgame DB and are NOT saved to `data/games/`.** A prominent checkbox labelled "Save this game to library" (off by default) can be ticked at any point; if ticked before the game ends, the game record is saved on completion.
+4. At game end, display an end-of-game modal with the result and the Save toggle (if not already saved).
+
+**Affected files:**
+- `web/app.py` — `start_ai_vs_ai` endpoint / WS handler; `is_training_game` flag on `GameSession`; conditional save logic
+- `web/static/game.js` — AI-vs-AI start flow; save checkbox; end-of-game modal
+- `web/templates/index.html` — AI vs AI button; personality selectors for each side; Save checkbox
+
+---
+
+### Bug B-14 — AI Herding: Moving Two Groups Apart and Restricting Opponent Mobility ⬜
+
+**Goal:** Improve the AI's ability to herd the opponent's pieces — specifically to recognise when moving two of its own groups in opposite directions forces the opponent into a smaller effective board area, reducing their mobility.
+
+**Observed weakness:** The AI sometimes moves two clusters further apart from each other without any tactical justification, effectively splitting its own force. Conversely, it fails to recognise positions where moving a piece outward from one cluster "pins" an opponent piece by reducing the escape squares adjacent to an opponent's cluster.
+
+**Proposed heuristic enhancement:**
+
+1. Add a `_herding_score(board, side)` term in `ai/heuristics.py`:
+   - For each pair of opponent pieces that share a mill line with only one or two empty squares between them, count how many of those empty squares are directly adjacent to one of our own pieces (i.e. we "cover" the escape square).
+   - A higher coverage count → higher herding score (we restrict their mobility).
+2. Weight the herding term against the existing mobility delta so the AI prefers moves that reduce opponent escape squares, especially in the movement and fly phases.
+3. Add a `herding` weight to `HeuristicWeights` so it can be tuned via the Settings UI and the evolution driver.
+
+**Affected files:**
+- `ai/heuristics.py` — `_herding_score()` helper; inject into `evaluate()`
+- `ai/heuristics.py` — `HeuristicWeights` — new `herding` field
+- `web/app.py` / Settings panel — expose `herding` weight in the tuning UI
+
+---
+
+### Bug B-15 — AI Does Not Anticipate Opponent Moves That Will Trap a Mill ⬜
+
+**Symptom:** In the placement phase the AI places a piece to form or extend a mill, but does not look ahead to an opponent move that will block the only exit square of that mill, leaving the mill permanently trapped. Observed example:
+
+```
+8.a1   c4        ← Black places c4 (possibly chasing diamond reward or impulse score)
+9.g1×c4  c4
+10.a1-a4  d3-e3  ← White immediately plays a1-a4, trapping the Black mill
+```
+
+Had Black placed at `e4` instead of `c4`, it would have threatened a mill on the e-line (`e3-e4-e5`), forcing White to close their own mill defensively, and Black could then open the `b`-line mill and continue cycling.
+
+**Root cause:** The heuristic scores the immediate value of the placement without scanning whether the opponent's *best reply* will seal the only exit of the resulting mill. A trapped mill is often worse than no mill at all.
+
+**Fix:**
+
+1. Add a `_trapped_mill_penalty(board, move, side)` helper in `ai/heuristics.py`:
+   - After applying `move`, enumerate all closed mills for `side`.
+   - For each closed mill, find its "exit squares" — the squares adjacent to a mill piece that are *not* part of the mill and that the mill piece could slide to on a future turn.
+   - If the opponent has a piece that is one move away from occupying every exit square of a mill, apply a penalty proportional to the number of mills that would become trapped.
+2. Also add a `_potential_mill_threat(board, side)` reward term:
+   - Award a smaller bonus for any configuration where `side` has two pieces on a mill line with one empty square, *and* at least one exit square of that future mill is not currently covered by an opponent piece.
+   - This nudges the AI toward forming escapable mill threats rather than static mills.
+3. Both terms interact with the existing 2-config and mobility scores; tune weights to keep tactical priorities correct.
+
+**Affected files:**
+- `ai/heuristics.py` — `_trapped_mill_penalty()`, `_potential_mill_threat()`, injected into `evaluate()`
+- `ai/heuristics.py` — `HeuristicWeights` — new `trapped_mill` and `potential_mill` fields
+
+---
+
 ## Planned Stages
 
 ### Stage 5.9 — Move Replay Viewer ⬜
