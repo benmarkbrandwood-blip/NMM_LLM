@@ -4,6 +4,132 @@
 
 ## New Bug & Enhancement Items
 
+### Enhancement B-23 — Endgame position database builder ⬜
+
+**Goal:** A new script `tools/build_endgame_db.py` that builds a focused, high-coverage SQLite position database for the movement and fly phases (≤ 12 pieces on the board). It reuses the existing `ai/fullgame_db.py` query interface so `GameAI` can consult it without any additional wiring.
+
+**Rationale:** The full-game DB (`build_fullgame_db.py`) targets the entire game tree (~10¹⁰ positions) and must be heavily bounded. The endgame space is far smaller and can be solved completely for the most critical piece counts:
+
+| Total pieces | Positions (with D4 reduction) | Feasibility |
+|---|---|---|
+| ≤ 6 | ~330 K | trivially complete |
+| ≤ 8 | ~13 M | completely solvable in minutes |
+| ≤ 10 | ~124 M | solvable with patience (hours) |
+| ≤ 12 | ~575 M | feasible bounded, near-complete |
+
+Only movement and fly phase positions are stored (no placement); this makes the database immediately useful for the endgame recogniser and the AI's deepened endgame search.
+
+**Key differences from `build_fullgame_db.py`:**
+
+- Constrained to positions where `pieces_on_board["W"] + pieces_on_board["B"] <= max_pieces` (default 12; flag `--max-pieces N`)
+- Retrograde analysis from terminal positions outward (works backwards from wins/losses) rather than forward BFS — produces complete, exact solutions for the covered range
+- Separate output file: `data/endgame_solved.sqlite` (distinct from `data/fullgame.sqlite`)
+- `ai/fullgame_db.py` extended (or a thin `ai/endgame_solved_db.py` wrapper added) so `GameAI` can query both DBs; endgame DB takes priority when piece count is in its solved range
+
+**Flags:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output PATH` | `data/endgame_solved.sqlite` | Output database path |
+| `--max-pieces N` | 12 | Only store positions with ≤ N pieces total |
+| `--dry-run` | — | Validate pipeline without writing |
+| `--resume` | — | Continue an interrupted build |
+
+**Files:**
+
+- `tools/build_endgame_db.py` (new)
+- `ai/fullgame_db.py` or new `ai/endgame_solved_db.py` (query interface extension)
+- `ai/game_ai.py` (consult endgame DB when piece count ≤ threshold)
+
+---
+
+### Enhancement B-24 — GUI settings for position DB usage ⬜
+
+**Goal:** Add controls to the Settings and AI Tuning panels so the player can see which position databases are active and tune how strongly they influence the AI's play.
+
+**Rationale:** The fullgame DB and endgame DB change AI behaviour in ways that aren't currently visible or configurable in the GUI. A player should be able to turn DB lookup on/off and understand what is affecting the AI's moves.
+
+**Proposed controls (Settings panel or AI Tuning panel):**
+
+| Control | Type | Description |
+|---|---|---|
+| Use FullGame DB | Checkbox | Enable/disable `data/fullgame.sqlite` lookup (greyed out if file absent) |
+| Use Endgame DB | Checkbox | Enable/disable `data/endgame_solved.sqlite` lookup (greyed out if absent) |
+| DB influence | Slider 0–100 % | How much a DB result overrides the heuristic score (0 = heuristic only, 100 = DB always wins) |
+| DB status line | Read-only | Shows e.g. "FullGame: 500K positions · Endgame: 13M positions (complete ≤8)" or "No DBs found" |
+
+**Behaviour:**
+
+- If both DBs are enabled and a position exists in both, the endgame DB takes priority (it is exact)
+- DB influence slider feeds into `ai/fullgame_db.py`'s `score_delta()` blend factor
+- Checkbox state is persisted to `data/settings.json` alongside other AI settings
+- DB file presence is checked at server start; the UI greys out absent DBs automatically
+
+**Files:**
+
+- `web/templates/index.html` — new controls in Settings or AI Tuning panel
+- `web/static/game.js` — load/save DB toggle state; send with game start message
+- `web/static/style.css` — DB status line styling
+- `web/app.py` — expose `/api/db_status` endpoint; pass DB toggle flags to `GameAI`
+- `ai/game_ai.py` / `ai/fullgame_db.py` — honour the toggle and blend factor at runtime
+
+---
+
+### Enhancement B-25 — Tools management page ⬜
+
+**Goal:** A new web page (`/tools`) that lets the user inspect the state of all AI knowledge bases and trigger training tools from the browser, without needing a terminal.
+
+**Access:** A **Tools** button added to the NMM game page header bar opens `/tools` in a new browser tab.
+
+**Page sections:**
+
+**1. Database Status**
+
+A summary card per database showing:
+- File size and last-modified date
+- Position count (queried from the DB)
+- Coverage note (e.g. "complete ≤ 8 pieces", "bounded at 500K", "not built")
+- **Rebuild** button (runs the builder script as a background subprocess; streams output to the page via WebSocket or SSE)
+
+**2. Heuristic Weight Evolution**
+
+- Current `best.json` — lists all weight values vs defaults, highlights changed fields
+- Per-personality summary — shows which personalities have been evolved and when
+- **Run evolve_weights.py** and **Run evolve_weights_v2.py** buttons with configurable `--generations` and `--parallel` inputs
+- Live log output streamed to the page while running
+
+**3. Self-Play & Training**
+
+- Game count and date range from `data/games/`
+- Trajectory DB size and top-N most-played opening prefixes
+- Endgame DB position count
+- **Run self-play** button (`--games`, `--parallel`, `--difficulty` inputs)
+- **Train value net** button (`--epochs` input); shows current `data/value_net.npz` metadata if present
+
+**4. Opening Book**
+
+- Total named openings, un-named openings, total play count
+- **Name openings** button (runs `tools/name_openings.py`; requires Ollama)
+- **Purge AI learning** button (with confirmation dialog; runs `tools/purge_ai_learning.py`)
+
+**Implementation notes:**
+
+- FastAPI route `GET /tools` serves a new `tools.html` template (standalone page, not the game SPA)
+- A `/ws/tools` WebSocket (or `/tools/stream` SSE endpoint) streams subprocess stdout line-by-line to the browser
+- Only one tool subprocess runs at a time; the UI disables all run buttons while a task is active
+- All destructive actions (purge, rebuild DB) show a confirmation dialog before running
+- The page is read-only safe to leave open — status cards auto-refresh every 30 s
+
+**Files:**
+
+- `web/templates/tools.html` (new)
+- `web/static/tools.js` (new)
+- `web/static/tools.css` (new, or extend `style.css`)
+- `web/app.py` — `/tools` route, `/api/tool_status`, `/ws/tools` WebSocket
+- `web/templates/index.html` — add **Tools** button to header bar
+
+---
+
 ### Bug B-21 — Windows installer: improve model pull failure guidance ⬜
 
 **Symptom:** After Ollama installs and the service starts, the installer attempts to pull the default model (`llama3.1:8b`, ~5 GB). If the pull fails or the user cancels, the only feedback is a terse warning: *"Model pull failed. Run manually later: ollama pull \<model\>"*. The user is not told about smaller alternatives, how to change the model, or what config file to update.
