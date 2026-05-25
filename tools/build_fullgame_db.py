@@ -104,6 +104,8 @@ from game.rules import get_all_legal_moves, is_terminal
 # (which depends on chromadb / fastapi).  This script is intentionally
 # stdlib-only so it can run during DB builds without the full web stack.
 import importlib.util as _ilu
+import types as _types
+
 _spec = _ilu.spec_from_file_location(
     "ai_board_symmetry",
     str(_ROOT / "ai" / "board_symmetry.py"),
@@ -115,6 +117,24 @@ canonical_board_str = _bs.canonical_board_str
 transform_notation = _bs.transform_notation
 
 logger = logging.getLogger("fullgame_db.build")
+
+
+def _load_fullgame_db_module():
+    """Load ai.fullgame_db via importlib (avoids pulling in ai/__init__.py)."""
+    if "ai" not in sys.modules:
+        pkg = _types.ModuleType("ai")
+        pkg.__path__ = [str(_ROOT / "ai")]
+        sys.modules["ai"] = pkg
+    # Register the already-loaded board_symmetry module under its canonical name
+    # so that fullgame_db.py's relative import resolves correctly.
+    sys.modules.setdefault("ai.board_symmetry", _bs)
+    spec = _ilu.spec_from_file_location(
+        "ai.fullgame_db", str(_ROOT / "ai" / "fullgame_db.py")
+    )
+    mod = _ilu.module_from_spec(spec)
+    sys.modules["ai.fullgame_db"] = mod
+    spec.loader.exec_module(mod)
+    return mod
 
 
 # ── Canonical key encoding ────────────────────────────────────────────────────
@@ -546,6 +566,14 @@ def main() -> int:
         help="Pip-install project requirements before building.",
     )
     parser.add_argument(
+        "--format", choices=["sqlite", "binary"], default="sqlite",
+        help=(
+            "Output format.  'sqlite' (default) writes the SQLite DB only.  "
+            "'binary' writes the SQLite DB first (as build intermediate), then "
+            "exports it to a sorted binary file alongside the SQLite output."
+        ),
+    )
+    parser.add_argument(
         "--quiet", "-q", action="store_true",
         help="Suppress per-progress logging.",
     )
@@ -651,6 +679,14 @@ def main() -> int:
         )
     finally:
         builder.close()
+
+    if args.format == "binary":
+        binary_path = output_path.with_suffix(".bin")
+        logger.info("Exporting binary format → %s", binary_path)
+        fgdb_mod = _load_fullgame_db_module()
+        n = fgdb_mod.export_to_binary(output_path, binary_path)
+        size_mb = os.path.getsize(binary_path) / (1024 * 1024)
+        print(f"Binary export: {n} records, {size_mb:.1f} MB → {binary_path}")
 
     return 0
 

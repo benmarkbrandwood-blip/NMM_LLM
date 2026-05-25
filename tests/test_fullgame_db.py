@@ -39,6 +39,10 @@ _load_leaf("board_symmetry", _ROOT / "ai" / "board_symmetry.py")
 _fgdb = _load_leaf("fullgame_db", _ROOT / "ai" / "fullgame_db.py")
 FullGameDB = _fgdb.FullGameDB
 FullGameResult = _fgdb.FullGameResult
+export_to_binary = _fgdb.export_to_binary
+_pack_move = _fgdb._pack_move
+_unpack_move = _fgdb._unpack_move
+_EMPTY_MOVE = _fgdb._EMPTY_MOVE
 
 from game.board import BoardState
 
@@ -124,6 +128,108 @@ class TestMissingDBFallback(unittest.TestCase):
         self.assertFalse(db.is_available())
         self.assertIsNone(db.query(BoardState.new_game()))
         self.assertEqual(db.score_delta(BoardState.new_game(), "W"), {})
+
+
+class TestBinaryPackingHelpers(unittest.TestCase):
+    def test_struct_record_size(self):
+        import struct
+        self.assertEqual(struct.calcsize("<9sBHIIIII"), 32)
+
+    def test_empty_move_sentinel(self):
+        self.assertEqual(_pack_move(None), _EMPTY_MOVE)
+        notation, flag = _unpack_move(_EMPTY_MOVE)
+        self.assertIsNone(notation)
+        self.assertEqual(flag, "N")
+
+    def test_placement_roundtrip(self):
+        packed = _pack_move("a4", "W")
+        notation, flag = _unpack_move(packed)
+        self.assertEqual(notation, "a4")
+        self.assertEqual(flag, "W")
+
+    def test_movement_roundtrip(self):
+        packed = _pack_move("a7-a4", "L")
+        notation, flag = _unpack_move(packed)
+        self.assertEqual(notation, "a7-a4")
+        self.assertEqual(flag, "L")
+
+    def test_capture_roundtrip(self):
+        packed = _pack_move("a7-a4xb4", "N")
+        notation, flag = _unpack_move(packed)
+        self.assertEqual(notation, "a7-a4xb4")
+        self.assertEqual(flag, "N")
+
+    def test_placement_capture_roundtrip(self):
+        packed = _pack_move("d2xa4", "W")
+        notation, flag = _unpack_move(packed)
+        self.assertEqual(notation, "d2xa4")
+        self.assertEqual(flag, "W")
+
+    def test_all_positions_roundtrip(self):
+        from game.board import POSITIONS
+        for pos in POSITIONS:
+            packed = _pack_move(pos)
+            notation, _ = _unpack_move(packed)
+            self.assertEqual(notation, pos, f"Roundtrip failed for placement {pos!r}")
+
+
+class TestBinaryRoundtrip(unittest.TestCase):
+    def _build_tiny(self, path: Path, cap: int = 300) -> None:
+        builder = build_mod.FullGameDBBuilder(
+            db_path=path, max_positions=cap, commit_every=50,
+        )
+        builder.enumerate_forward(BoardState.new_game())
+        builder.backpropagate(passes=2)
+        builder.close()
+
+    def test_binary_export_and_query(self):
+        with tempfile.TemporaryDirectory() as td:
+            sqlite_path = Path(td) / "tiny.sqlite"
+            bin_path = Path(td) / "tiny.bin"
+
+            self._build_tiny(sqlite_path)
+            n = export_to_binary(sqlite_path, bin_path)
+            self.assertGreater(n, 0)
+            self.assertTrue(bin_path.exists())
+
+            # File size must be header + n × 32 bytes.
+            expected = 32 + n * 32
+            self.assertEqual(bin_path.stat().st_size, expected)
+
+            # Open via FullGameDB — must detect binary format.
+            db = FullGameDB(bin_path)
+            self.assertTrue(db.is_available())
+            stats = db.stats()
+            self.assertEqual(stats["positions"], n)
+
+            # Opening board must hit.
+            result = db.query(BoardState.new_game())
+            self.assertIsNotNone(result)
+
+            # Results from binary must be consistent with SQLite.
+            db_sql = FullGameDB(sqlite_path)
+            result_sql = db_sql.query(BoardState.new_game())
+            self.assertIsNotNone(result_sql)
+            self.assertEqual(result.outcome, result_sql.outcome)
+            self.assertEqual(result.best_move_canonical, result_sql.best_move_canonical)
+
+            db.close()
+            db_sql.close()
+
+    def test_binary_score_delta_shape(self):
+        with tempfile.TemporaryDirectory() as td:
+            sqlite_path = Path(td) / "tiny.sqlite"
+            bin_path = Path(td) / "tiny.bin"
+            self._build_tiny(sqlite_path, cap=200)
+            export_to_binary(sqlite_path, bin_path)
+            db = FullGameDB(bin_path)
+            hints = db.score_delta(BoardState.new_game(), "W")
+            self.assertIsInstance(hints, dict)
+            for k, v in hints.items():
+                self.assertIsInstance(k, str)
+                self.assertGreaterEqual(v, -0.5)
+                self.assertLessEqual(v, 0.5)
+            db.close()
 
 
 if __name__ == "__main__":
