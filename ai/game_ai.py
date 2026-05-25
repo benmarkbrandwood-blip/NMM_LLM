@@ -216,11 +216,15 @@ class GameAI:
         weights: HeuristicWeights | None = None,
         use_mcts: bool = False,
         value_net=None,
+        fullgame_db=None,           # ai.fullgame_db.FullGameDB | None
+        endgame_solved_db=None,     # ai.endgame_solved_db.EndgameSolvedDB | None
     ) -> None:
         self.color = color
         self.difficulty = max(1, min(10, difficulty))
         self.blunder_probability = max(0.0, min(1.0, blunder_probability))
         self._weights: HeuristicWeights = weights if weights is not None else DEFAULT_WEIGHTS
+        self._fullgame_db = fullgame_db
+        self._endgame_solved_db = endgame_solved_db
         self._nodes = 0
         self._deadline: float = math.inf   # set by _iterative_deepen; checked in _negamax
         self.use_mcts = use_mcts
@@ -278,15 +282,14 @@ class GameAI:
         top_n: int = 1,             # if >1, pick randomly from top-N moves (self-play noise)
         fast_early_game: bool = False,  # skip the 4s early-game budget (self-play mode)
         force_book_early: bool = False, # force book move for first 2 AI placements
-        fullgame_db=None,           # ai.fullgame_db.FullGameDB | None — optional DB lookup
+        fullgame_db=None,           # ai.fullgame_db.FullGameDB | None — overrides self._fullgame_db
     ) -> dict:
         """Return the best (or deliberately bad) legal move dict for self.color.
 
-        When ``fullgame_db`` is provided and the current position is present in
-        the database, the AI may return the DB's best move directly (resolved
-        outcomes) or blend the DB's per-move score delta into the existing
-        ``trajectory_hints`` pipeline (unresolved / neutral edges).  Misses
-        fall back transparently to the normal negamax search.
+        When a fullgame_db is available (via constructor or parameter), resolved
+        positions return the DB best move directly; unresolved positions blend DB
+        score deltas into trajectory_hints before the normal search.  Misses fall
+        back transparently.
         """
         self._force_stop = False
         self._deadline   = math.inf  # reset any prior force_stop() effect
@@ -298,14 +301,40 @@ class GameAI:
             self.last_was_blunder = False
             return moves[0]
 
+        # ── Optional retrograde endgame DB consultation ───────────────────
+        # Consulted first (before fullgame_db) because WDL is exact.
+        # Guard: both sides must have placed all 9 pieces AND each has ≤3 on board.
+        _esdb = self._endgame_solved_db
+        if _esdb is not None and _esdb.is_available():
+            _w_on = board.pieces_on_board.get("W", 0)
+            _b_on = board.pieces_on_board.get("B", 0)
+            if (board.pieces_placed.get("W", 0) >= 9
+                    and board.pieces_placed.get("B", 0) >= 9
+                    and _w_on <= 3 and _b_on <= 3
+                    and _w_on + _b_on <= 6):
+                try:
+                    _wdl = _esdb.query(board)
+                except Exception:
+                    _wdl = None
+                if _wdl == "W":
+                    # Current player wins — pick any move that keeps win (first legal for now)
+                    self.last_was_blunder = False
+                    self.last_thinking = "endgame DB (win)"
+                    return moves[0]
+                elif _wdl == "L":
+                    # Current player loses all lines — still return best move (don't resign)
+                    self.last_was_blunder = False
+                    self.last_thinking = "endgame DB (loss)"
+                    return moves[0]
+                elif _wdl == "D":
+                    self.last_thinking = "endgame DB (draw)"
+
         # ── Optional full-game DB consultation ────────────────────────────
-        # Only consulted when the caller passes a live DB.  A DB hit with a
-        # resolved best_move shortcuts the whole search; otherwise the DB's
-        # per-move score delta merges into trajectory_hints and the regular
-        # search runs.
-        if fullgame_db is not None and fullgame_db.is_available():
+        # Falls back to self._fullgame_db when no explicit parameter passed.
+        _fgdb = fullgame_db if fullgame_db is not None else self._fullgame_db
+        if _fgdb is not None and _fgdb.is_available():
             try:
-                result = fullgame_db.query(board)
+                result = _fgdb.query(board)
             except Exception as exc:    # never let DB errors kill the AI
                 logger_msg = f"fullgame_db query failed: {exc}"
                 try:
@@ -317,7 +346,7 @@ class GameAI:
             if result is not None:
                 # Resolved exact hit — return DB best move when legal.
                 if result.outcome is not None and result.best_move_canonical:
-                    best_notation = fullgame_db.best_move(board)
+                    best_notation = _fgdb.best_move(board)
                     if best_notation:
                         match = next(
                             (m for m in moves if self._move_notation(m) == best_notation),
@@ -328,7 +357,7 @@ class GameAI:
                             self.last_thinking = "fullgame DB"
                             return match
                 # Unresolved row — merge DB deltas into trajectory hints.
-                db_hints = fullgame_db.score_delta(board, self.color)
+                db_hints = _fgdb.score_delta(board, self.color)
                 if db_hints:
                     merged = dict(trajectory_hints or {})
                     for k, v in db_hints.items():
