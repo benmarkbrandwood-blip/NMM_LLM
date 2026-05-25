@@ -365,6 +365,16 @@ def evaluate(
         base -= w_trap * _trapped_mill_count(board, color)
         base += w_pot * (_free_two_config_count(board, color) - _free_two_config_count(board, opp))
 
+    # B-36: Unguarded cardinal mill alert — placement phase only.
+    # Penalise positions where the opponent has 2 pieces in a cardinal mill (containing
+    # b4/d2/d6/f4) and no own piece is adjacent to any of the three mill squares.
+    # Each such unguarded skeleton is a structural emergency: one opponent placement
+    # closes it with no defense available.
+    if phase == "place":
+        _uca_count = len(_unguarded_cardinal_mill_alert(board, opp, color))
+        if _uca_count:
+            base -= 300 * _uca_count
+
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
         base = int(base * weights.long_term_position / 100)
@@ -1378,6 +1388,28 @@ def _closeable_mills(board: BoardState, color: str) -> int:
     return count
 
 
+def _unguarded_cardinal_mill_alert(board: BoardState, opp: str, own: str) -> list[str]:
+    """Return closing squares for opponent cardinal mills (containing b4/d2/d6/f4) where
+    the opponent has two pieces in the mill and no own piece is adjacent to any mill square.
+    These are structural emergencies: completeable in one move with no current defense."""
+    result = []
+    for mill in MILLS:
+        if not any(p in _CARDINAL_NODES for p in mill):
+            continue
+        vals = [board.positions[p] for p in mill]
+        if vals.count(opp) == 2 and vals.count("") == 1:
+            closing = next(p for p in mill if board.positions[p] == "")
+            guarded = any(
+                board.positions[nb] == own
+                for p in mill
+                for nb in ADJACENCY[p]
+                if nb not in mill
+            )
+            if not guarded:
+                result.append(closing)
+    return result
+
+
 def _cycling_mill_setup(board: BoardState, color: str) -> int:
     """Count cycling opportunities — two types:
 
@@ -1752,6 +1784,16 @@ def tactical_move_bonus(
         weights = DEFAULT_WEIGHTS
     opp = "B" if color == "W" else "W"
 
+    before_phase    = get_game_phase(before, color)
+    placement_index = before.pieces_placed.get(color, 0)  # 0–8; piece (N+1) is being placed
+    _is_placement   = (before_phase == "place")
+    # Taper speculative setup bonuses in late placement. Urgency bonuses (close_mill,
+    # block_opponent_mill, convergence_block, etc.) are intentionally excluded.
+    if _is_placement and placement_index >= 6:
+        _late_mult = 0.8 if placement_index == 6 else (0.5 if placement_index == 7 else 0.25)
+    else:
+        _late_mult = 1.0
+
     # Mills closed this move
     mills_delta = max(0, _closed_mills(after, color) - _closed_mills(before, color))
 
@@ -1782,8 +1824,7 @@ def tactical_move_bonus(
 
     # Early-game scatter: bonus for placing non-adjacent in first 6 placements
     scatter = 0
-    if (get_game_phase(before, color) == "place"
-            and before.pieces_placed.get(color, 0) < 6):
+    if _is_placement and placement_index < 6:
         for pos in POSITIONS:
             if after.positions[pos] == color and before.positions[pos] != color:
                 if not any(before.positions[nb] == color for nb in ADJACENCY[pos]):
@@ -1795,10 +1836,9 @@ def tactical_move_bonus(
     # In movement phase: also reward — gaining a new 2-config in move phase is
     # equally important since mills can no longer be created by placement alone.
     setup_mill_bonus = 0
-    before_phase = get_game_phase(before, color)
-    if before_phase == "place" and before.pieces_placed.get(color, 0) < 9:
+    if _is_placement:
         two_cfg_gained = max(0, own_two_after - own_two_before)
-        setup_mill_bonus = weights.setup_mill * two_cfg_gained
+        setup_mill_bonus = int(weights.setup_mill * _late_mult) * two_cfg_gained
     elif before_phase == "move":
         two_cfg_gained = max(0, own_two_after - own_two_before)
         # Slightly higher weight in move phase — gaining a 2-config is now a
@@ -1926,8 +1966,8 @@ def tactical_move_bonus(
     # Scale modulated by exit count: fewer exits → harder to un-freeze → steeper cut.
     close_mill_contribution = weights.close_mill * mills_delta
     if (mills_delta > 0
-            and get_game_phase(before, color) == "place"
-            and before.pieces_placed.get(color, 0) < 6
+            and _is_placement
+            and placement_index < 6
             and not capture_this_move
             and _two_configs(after, color) == 0):
         newly_closed = next(
@@ -1945,6 +1985,10 @@ def tactical_move_bonus(
             scale = 0.60
         close_mill_contribution = int(close_mill_contribution * scale)
 
+    # B-28: final placement — a mill closure is maximally decisive
+    if _is_placement and placement_index == 8 and mills_delta > 0:
+        close_mill_contribution = int(close_mill_contribution * 1.5)
+
     # Outer-ring mill penalty during early placement (pieces 1–6).
     # Each outer-ring side mill (a7-d7-g7, g7-g4-g1, g1-d1-a1, a1-a4-a7)
     # contains two corner squares with only 2 connections each.  Completing
@@ -1955,8 +1999,7 @@ def tactical_move_bonus(
     # Does NOT fire at pieces 7-9 (late_mill_bonus below handles those).
     outer_mill_penalty = 0
     if (mills_delta > 0 and not capture_this_move
-            and get_game_phase(before, color) == "place"
-            and before.pieces_placed.get(color, 0) < 6):
+            and _is_placement and placement_index < 6):
         for mill in MILLS:
             if (all(after.positions[p] == color for p in mill)
                     and not all(before.positions[p] == color for p in mill)):
@@ -1970,8 +2013,7 @@ def tactical_move_bonus(
     # Inner-ring mills are excluded: they confine pieces to the smallest square
     # and reduce long-term mobility more than they gain from the mill itself.
     late_mill_bonus = 0
-    if (mills_delta > 0 and get_game_phase(before, color) == "place"
-            and before.pieces_placed.get(color, 0) >= 6):
+    if (mills_delta > 0 and _is_placement and placement_index >= 6):
         for mill in MILLS:
             if (all(after.positions[p] == color for p in mill)
                     and not all(before.positions[p] == color for p in mill)):
@@ -2019,7 +2061,7 @@ def tactical_move_bonus(
     # movement-phase mobility severely — those pieces share few exit squares and can
     # be blocked by opponent cardinal-point control.  Max one penalty per move.
     ring_crowd_penalty = 0
-    if get_game_phase(before, color) == "place":
+    if _is_placement:
         new_sq = next(
             (p for p in POSITIONS
              if after.positions[p] == color and before.positions[p] != color),
@@ -2040,9 +2082,8 @@ def tactical_move_bonus(
     # Level 1 (single threat) gets modest credit; levels 2–4 scale up with chain
     # length and quality. Amplified when opponent's last move was structurally weak.
     busy_chain_bonus = 0
-    _before_phase = get_game_phase(before, color)
     _had_mill_available = _closeable_mills(before, color) > 0
-    if _before_phase == "place" and mills_delta == 0:
+    if _is_placement and mills_delta == 0:
         if not _had_mill_available:
             # Normal path: no mill available, run full scan.
             chain = _placement_chain_scan(after, color)
@@ -2052,8 +2093,7 @@ def tactical_move_bonus(
             # and the chain qualifies as level-4. Earlier in the game an
             # immediate mill + capture is categorically stronger than a
             # two-move deferred mill because capture happens sooner.
-            _late_placement = before.pieces_placed.get(color, 0) >= 6
-            if not _late_placement:
+            if placement_index < 6:
                 chain = 0
             else:
                 our_rem_check = 9 - after.pieces_placed.get(color, 0)
@@ -2071,9 +2111,19 @@ def tactical_move_bonus(
             # Only applies in the late-placement window (pieces 7-9): the plan examples
             # show 9-piece chains, not early-game forks where the immediate mill + capture
             # is strictly more forcing than a 2-move-deferred mill.
-            if chain == 4 and _had_mill_available and before.pieces_placed.get(color, 0) >= 6:
+            if chain == 4 and _had_mill_available and placement_index >= 6:
                 _base_chain += weights.defer_for_chain
             busy_chain_bonus = _base_chain
+
+    # B-29: Hard-suppress close_mill_contribution when a level-4 chain existed
+    # before this move but we chose to close a different mill instead.
+    # The confirmed forcing chain is categorically stronger; taking an opportunistic
+    # mill sacrifices the chain's compounding advantage. Only fires in late placement
+    # (index >= 6) where the chain is meaningful; earlier mills are strictly correct.
+    if (_is_placement and mills_delta > 0 and _had_mill_available
+            and placement_index >= 6
+            and _placement_chain_scan(before, color) >= 4):
+        close_mill_contribution = 0
 
     # PAT-2: Dual-Threat Placement Endgame Reward — bonus for ending placement with two or
     # more independent 2-configs (different mill lines, different closing squares) when the
@@ -2081,9 +2131,9 @@ def tactical_move_bonus(
     # placement are as decisive as a deferred mill when the opponent's last piece can't
     # block both lines simultaneously.
     pat2_bonus = 0
-    if (_before_phase == "place"
+    if (_is_placement
             and mills_delta == 0
-            and before.pieces_placed.get(color, 0) >= 4
+            and placement_index >= 4
             and _two_configs(after, color) >= 2):
         _scan_lv = _placement_chain_scan(after, color)
         if _scan_lv < 4:
@@ -2112,7 +2162,7 @@ def tactical_move_bonus(
     # in the same mill within 2 adjacency moves along unblocked paths.
     # Only fires in placement phase (movement phase already has evaluate() for this).
     conv_bonus = 0
-    if get_game_phase(before, color) == "place":
+    if _is_placement:
         conv_before = _convergence_cluster_count(before, opp)
         if conv_before > 0:
             conv_after = _convergence_cluster_count(after, opp)
@@ -2165,7 +2215,7 @@ def tactical_move_bonus(
     # Outer ring concentrated → prefer middle-ring cardinals (d6/f4/d2/b4).
     # Middle ring concentrated → prefer outer cardinals (d7/g4/d1/a4) or inner (d5/e4/d3/c4).
     ring_cardinal_bonus = 0
-    if get_game_phase(before, color) == "place":
+    if _is_placement:
         _placed_sq = next(
             (p for p in POSITIONS if after.positions[p] == color and before.positions[p] != color),
             None,
@@ -2202,7 +2252,7 @@ def tactical_move_bonus(
                     None,
                 )
             if _moved_to in _fork_sqs:
-                fork_anticip_bonus = weights.fork_anticipation
+                fork_anticip_bonus = int(weights.fork_anticipation * _late_mult)
 
     # B-7 — Locked mill escape and redirected-pin creation.
     # Neither fires in placement or fly phase.
@@ -2336,13 +2386,65 @@ def tactical_move_bonus(
                     freedom_diff = best_f - worst_f
                     cycling_block_bonus = int(weights.block_cycling_priority * (1 + freedom_diff * 0.1))
 
+    diamond_contribution = int(weights.feeder_diamond * diamond_gain * _late_mult)
+
+    # B-28: urgency scaling for blocking in late placement
+    _block_opp_mult = 1.5 if (_is_placement and placement_index >= 7) else 1.0
+    block_opp_mill_contribution = int(weights.block_opponent_mill * blocked * _block_opp_mult)
+
+    # B-28 / B-35: dual-purpose final placement — blocks opponent AND builds own structure.
+    # Fires on placements 8–9 when the same move neutralises an opponent threat
+    # and simultaneously creates a new own 2-config.
+    dual_purpose_final_bonus = 0
+    if (_is_placement and placement_index >= 7
+            and (blocked > 0 or two_cfg_broken > 0)
+            and own_two_after > own_two_before):
+        dual_purpose_final_bonus = weights.dual_threat_placement
+        if placement_index < 8:
+            dual_purpose_final_bonus = int(dual_purpose_final_bonus * 0.65)
+
+    # B-36: Reward blocking the closing square of an unguarded cardinal mill.
+    # Higher priority than speculative setup on any placement turn.
+    cardinal_alert_bonus = 0
+    if _is_placement:
+        _uca_before = _unguarded_cardinal_mill_alert(before, opp, color)
+        if _uca_before:
+            _placed_sq_b36 = next(
+                (p for p in POSITIONS if after.positions[p] == color and before.positions[p] != color),
+                None,
+            )
+            if _placed_sq_b36 in _uca_before:
+                cardinal_alert_bonus = int(weights.block_opponent_mill * 0.75)
+
+    # B-37: Opponent placement chain detection.
+    # Reward moves that reduce the opponent's forcing-chain level; penalise moves
+    # that leave a high opponent chain intact. Level-4 opponent chain is treated
+    # as equivalent urgency to a direct mill threat.
+    opp_chain_disrupt_bonus = 0
+    opp_chain_nondisrupt_penalty = 0
+    if _is_placement:
+        _opp_chain_before = _placement_chain_scan(before, opp)
+        if _opp_chain_before >= 2:
+            _opp_chain_after = _placement_chain_scan(after, opp)
+            if _opp_chain_after < _opp_chain_before:
+                opp_chain_disrupt_bonus = (
+                    weights.placement_busy_scan * (_opp_chain_before - _opp_chain_after)
+                )
+            else:
+                if _opp_chain_before >= 4:
+                    opp_chain_nondisrupt_penalty = weights.block_opponent_mill
+                elif _opp_chain_before >= 3:
+                    opp_chain_nondisrupt_penalty = weights.placement_busy_scan * 2
+                else:
+                    opp_chain_nondisrupt_penalty = int(weights.placement_busy_scan * 0.5)
+
     _contributions = [
         ("Closed mill",                    close_mill_contribution),
         ("Cycling mill setup",             weights.cycling_mill * (cycling_gain + opp_cycle_lost)),
         ("Cycling close",                  cycling_close_bonus),
-        ("Blocked opponent mill",          weights.block_opponent_mill * blocked),
+        ("Blocked opponent mill",          block_opp_mill_contribution),
         ("Stopped opponent 2-config",      weights.stop_opponent_mills * two_cfg_broken),
-        ("Gained diamond/fork",            weights.feeder_diamond * diamond_gain),
+        ("Gained diamond/fork",            diamond_contribution),
         ("Mill wrap pressure",             weights.mill_wrapping * wrap_gain),
         ("Cardinal/cross control",         weights.cardinal_block * (our_cross_gained + opp_cross_lost)),
         ("Early scatter placement",        scatter),
@@ -2359,13 +2461,16 @@ def tactical_move_bonus(
         ("Capture activates feeder (B-17B)", capture_activates_feeder_bonus),
         ("Capture creates convergence (B-17C)", capture_creates_convergence_bonus),
         ("Busy chain placement",           busy_chain_bonus),
+        ("Dual-purpose final (B-28)",      dual_purpose_final_bonus),
         ("Dual-threat placement (PAT-2)",  pat2_bonus),
         ("Convergence cluster disruption", conv_bonus),
+        ("Opp chain disrupted (B-37)",     opp_chain_disrupt_bonus),
         ("Disrupted opponent fork (DMC)",  dmc_bonus),
         ("Cross-feed delta (B-16)",        cross_feed_delta_bonus),
         ("Safe capture (all threats gone)", safe_capture_bonus),
         ("Fly free-close bonus",           fly_free_close_bonus),
         ("Ring cardinal placement",        ring_cardinal_bonus),
+        ("Cardinal mill alert block (B-36)", cardinal_alert_bonus),
         ("Fork anticipation (B-4)",        fork_anticip_bonus),
         ("Locked mill escape (B-7)",       locked_escape_bonus),
         ("Redirected pin (B-7)",           redirected_pin_bonus),
@@ -2373,6 +2478,7 @@ def tactical_move_bonus(
         ("Outer-ring mill penalty",        -outer_mill_penalty),
         ("Ring crowding penalty",          -ring_crowd_penalty),
         ("Consolidation penalty (B-10)",   -consolidation_penalty_val),
+        ("Opp chain non-disrupt (B-37)",   -opp_chain_nondisrupt_penalty),
     ]
     _total = sum(v for _, v in _contributions)
 
