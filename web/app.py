@@ -52,6 +52,7 @@ from ai.opening_recognizer import OpeningRecognizer
 from ai.endgame_recognizer import EndgameRecognizer
 from ai.trajectory_db import TrajectoryDB
 from ai.endgame_db import EndgameDB
+from ai.fullgame_db import FullGameDB
 from ai.starting_play import combined_family_summary
 from ai.player_profile import PlayerProfile, load_profile, save_profile, is_valid_name
 
@@ -116,6 +117,26 @@ def _load_settings() -> dict:
         return json.loads((_ROOT / "data" / "settings.json").read_text())
     except Exception:
         return {}
+
+
+# Load fullgame DB at startup — path configurable via settings.json "fullgame_db_path".
+_fgdb_path = Path(
+    _load_settings().get("fullgame_db_path") or (_ROOT / "data" / "fullgame.sqlite")
+)
+_fullgame_db: "FullGameDB | None" = None
+if _fgdb_path.exists():
+    _fullgame_db = FullGameDB(_fgdb_path)
+    if _fullgame_db.is_available():
+        _fgdb_stats = _fullgame_db.stats()
+        log.info(
+            "FullGameDB: %d positions (%d resolved) from %s",
+            _fgdb_stats.get("positions", 0), _fgdb_stats.get("resolved", 0), _fgdb_path,
+        )
+    else:
+        _fullgame_db = None
+        log.warning("FullGameDB: file found but could not open — %s", _fgdb_path)
+else:
+    log.info("FullGameDB: not found at %s", _fgdb_path)
 
 
 # ── Library consolidation (Stage 5.27) ───────────────────────────────────────
@@ -845,6 +866,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
     return GameAI(
         color=color, difficulty=difficulty, weights=hw,
         blunder_probability=hw.make_mistakes / 100.0,
+        fullgame_db=_fullgame_db,
     )
 
 
@@ -1233,6 +1255,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai  = GameAI(
                         color=ai_color, difficulty=eff_diff, weights=_hw,
                         blunder_probability=min(1.0, base_blunder + adaptive.extra_blunder),
+                        fullgame_db=_fullgame_db,
                     )
                     log.info(
                         "Adaptive: requested diff=%d effective diff=%d extra_blunder=%.2f",
@@ -1327,6 +1350,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai = GameAI(
                         color=ai_color, difficulty=diff, weights=_hw,
                         blunder_probability=_hw.make_mistakes / 100.0,
+                        fullgame_db=_fullgame_db,
                     )
 
                     if use_llm:
@@ -1479,7 +1503,7 @@ async def ws_endpoint(websocket: WebSocket):
                     make_mistakes=_w("make_mistakes", 0),
                     opening_adherence=_w("opening_adherence", 50),
                 )
-                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw)
+                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db)
 
                 new_coord = None
                 if use_llm:
@@ -1831,8 +1855,8 @@ async def ws_endpoint(websocket: WebSocket):
                     # _run_ai_vs_ai_loop safely handles None coordinators.
                     _ava_diff = 3
                     _ava_hw = HeuristicWeights()
-                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw)
-                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw)
+                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db)
+                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db)
                     session.ai_vs_ai = True
                     session.vs_human = False
                     session.game_ai_white = _ai_w
