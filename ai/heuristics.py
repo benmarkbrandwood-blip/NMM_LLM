@@ -75,6 +75,15 @@ class HeuristicWeights:
     herding_coverage: int      = 40    # bonus per opp 2-config closing sq covered by own adjacent piece
     trapped_mill: int          = 160   # penalty per own closed mill where opp can block all exits
     potential_mill: int        = 25    # bonus per own 2-config whose future mill would have a free exit
+    # ── B-47: Side-specific placement emphasis ───────────────────────────────
+    # White and Black have different strategic goals in placement (White: proactive
+    # cardinal claim; Black: reactive disruption + last-move advantage).
+    # These replace the shared weights when the relevant side/index window is active.
+    white_cardinal_early: int       = 260  # cardinal_block for White at placement_index 0–4
+    black_convergence_early: int    = 325  # convergence_block for Black at placement_index 0–4
+    black_fork_anticipation_early: int = 117  # fork_anticipation for Black at placement_index 0–4
+    black_dual_threat_late: int     = 240  # dual_threat_placement for Black at placement_index 6–7
+    white_independent_mills: int    = 280  # dual_threat_placement for White at placement_index 7–8
     # ── Behaviour (consumed by GameAI, not heuristics) ───────────────────
     make_mistakes: int        = 0     # blunder probability 0-100 %
     opening_adherence: int    = 50    # how strongly to follow the opening book (0-100)
@@ -1794,6 +1803,24 @@ def tactical_move_bonus(
     else:
         _late_mult = 1.0
 
+    # B-47: side-specific weight selectors for placement phase.
+    # White claims cardinals proactively; Black disrupts reactively.
+    _cardinal_w = (
+        weights.white_cardinal_early
+        if (color == "W" and _is_placement and placement_index < 5)
+        else weights.cardinal_block
+    )
+    _conv_w = (
+        weights.black_convergence_early
+        if (color == "B" and _is_placement and placement_index < 5)
+        else weights.convergence_block
+    )
+    _fork_anticip_w = (
+        weights.black_fork_anticipation_early
+        if (color == "B" and _is_placement and placement_index < 5)
+        else weights.fork_anticipation
+    )
+
     # Mills closed this move
     mills_delta = max(0, _closed_mills(after, color) - _closed_mills(before, color))
 
@@ -2143,7 +2170,15 @@ def tactical_move_bonus(
                 if _mv.count(color) == 2 and _mv.count("") == 1:
                     _cfg_closing.add(_m[_mv.index("")])
             if len(_cfg_closing) >= 2:
-                _pat2 = weights.dual_threat_placement
+                # B-47: White needs 2 independent mills at end of placement; use a
+                # stronger reward. Black has last-move advantage (1 mill suffices);
+                # use a dedicated late-placement bonus.
+                if color == "W" and placement_index >= 7:
+                    _pat2 = weights.white_independent_mills
+                elif color == "B" and placement_index >= 6:
+                    _pat2 = weights.black_dual_threat_late
+                else:
+                    _pat2 = weights.dual_threat_placement
                 if len(_cfg_closing) >= 3:
                     _pat2 = int(_pat2 * 1.4)
                 _closing_list = list(_cfg_closing)
@@ -2167,7 +2202,7 @@ def tactical_move_bonus(
         if conv_before > 0:
             conv_after = _convergence_cluster_count(after, opp)
             disrupted = max(0, conv_before - conv_after)
-            conv_bonus = disrupted * weights.convergence_block
+            conv_bonus = disrupted * _conv_w
 
     # Double-mill convergence disruption: bonus for move-phase moves that reduce the
     # number of opponent fork precursor pairs (shared closing square or shared pivot).
@@ -2231,7 +2266,7 @@ def tactical_move_bonus(
             for ring_idx, ring_count in enumerate(opp_conc):
                 if ring_count >= 3 and _placed_sq in _ring_adjacency[ring_idx]:
                     ring_cardinal_bonus = max(ring_cardinal_bonus,
-                                              int(weights.cardinal_block * 0.5))
+                                              int(_cardinal_w * 0.5))
                     break
 
     # B-4 — Fork anticipation: bonus for blocking a square that (within 2 moves)
@@ -2252,7 +2287,7 @@ def tactical_move_bonus(
                     None,
                 )
             if _moved_to in _fork_sqs:
-                fork_anticip_bonus = int(weights.fork_anticipation * _late_mult)
+                fork_anticip_bonus = int(_fork_anticip_w * _late_mult)
 
     # B-7 — Locked mill escape and redirected-pin creation.
     # Neither fires in placement or fly phase.
@@ -2446,7 +2481,7 @@ def tactical_move_bonus(
         ("Stopped opponent 2-config",      weights.stop_opponent_mills * two_cfg_broken),
         ("Gained diamond/fork",            diamond_contribution),
         ("Mill wrap pressure",             weights.mill_wrapping * wrap_gain),
-        ("Cardinal/cross control",         weights.cardinal_block * (our_cross_gained + opp_cross_lost)),
+        ("Cardinal/cross control",         _cardinal_w * (our_cross_gained + opp_cross_lost)),
         ("Early scatter placement",        scatter),
         ("Setup mill (2-config gained)",   setup_mill_bonus),
         ("Mill opening bonus",             mill_open_bonus),
