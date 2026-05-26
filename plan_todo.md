@@ -1322,7 +1322,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 
 
-### Tactic B-39 — Avoid creating disrupted 2-configs next to an opponent blocker ⬜
+### Tactic B-39 — Avoid creating disrupted 2-configs next to an opponent blocker ✅ 2026-05-26
 
 **Symptom:** the AI sometimes places a piece beside its own piece when that adjacent pair is already pinned or spoiled by an opponent piece on the far side, creating a disrupted 2-config that looks like structure but is usually strategically bad.
 
@@ -1348,7 +1348,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Tactic B-40 — Preserve and cycle shared-piece dual mills until endgame ⬜
+### Tactic B-40 — Preserve and cycle shared-piece dual mills until endgame ✅ 2026-05-26
 
 **Goal:** when the AI has a true dual-mill configuration (two 2-configs or mill closures sharing a pivot piece), it should preserve and use that structure repeatedly instead of abandoning it for random reshuffling, at least until the endgame transition or until a clearly superior tactical conversion exists.
 
@@ -1372,7 +1372,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Tactic B-41 — When opening a mill, move the safest re-closing piece ⬜
+### Tactic B-41 — When opening a mill, move the safest re-closing piece ✅ 2026-05-26
 
 **Symptom:** when the AI opens one of its own mills to keep mobility, it may move the wrong piece and leave itself unable to close the mill again next turn because the re-closing route is blocked or immediately contestable.
 
@@ -1424,7 +1424,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Tactic B-43 — If both sides threaten immediate mills, prefer the mill closure that removes the opponent threat ⬜
+### Tactic B-43 — If both sides threaten immediate mills, prefer the mill closure that removes the opponent threat ✅ 2026-05-26
 
 **Scenario:** the opponent has a ready-to-close mill (an open 2-config plus an adjacent feeder piece that can close next move), and the AI also has a ready-to-close mill.
 
@@ -1446,7 +1446,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Tactic B-44 — Mill captures should preferentially remove the piece the opponent most needs to replace ⬜
+### Tactic B-44 — Mill captures should preferentially remove the piece the opponent most needs to replace ✅ 2026-05-26
 
 **Goal:** when making a mill, the AI should not capture randomly or merely by static value. It should preferentially remove the opponent piece whose loss forces the opponent to spend a move or placement replacing a critical blocker, feeder, or anti-mill piece.
 

@@ -75,6 +75,10 @@ class HeuristicWeights:
     herding_coverage: int      = 40    # bonus per opp 2-config closing sq covered by own adjacent piece
     trapped_mill: int          = 160   # penalty per own closed mill where opp can block all exits
     potential_mill: int        = 25    # bonus per own 2-config whose future mill would have a free exit
+    # ── B-39: Disrupted 2-config (dead-mill) penalty ─────────────────────────
+    disrupted_two_config: int = 200  # penalty for creating a (own,own,opp) blocked mill pattern
+    # ── B-40: Self-cycle-lost penalty ────────────────────────────────────────
+    # Uses cycling_mill weight — no separate field needed (mirrors cycling_gain).
     # ── B-33: Forcing placement quality ──────────────────────────────────────
     dead_block_bonus: int = 60   # bonus per new own 2-config whose closing sq is a corner
                                  # node (2 connections) — opponent is forced to a passive sq
@@ -1856,6 +1860,8 @@ def tactical_move_bonus(
     # and dominate the close_mill bonus, causing the AI to build structure over winning.
     cycling_gain   = min(1, max(0, _cycling_mill_setup(after, color) - _cycling_mill_setup(before, color)))
     opp_cycle_lost = min(1, max(0, _cycling_mill_setup(before, opp)  - _cycling_mill_setup(after,  opp)))
+    # B-40: penalise breaking own cycling setup (mirror of cycling_gain).
+    self_cycle_lost = min(1, max(0, _cycling_mill_setup(before, color) - _cycling_mill_setup(after, color)))
 
     # Opponent immediate closeable threats neutralised
     blocked = max(0, _closeable_mills(before, opp) - _closeable_mills(after, opp))
@@ -1897,6 +1903,18 @@ def tactical_move_bonus(
         # Slightly higher weight in move phase — gaining a 2-config is now a
         # concrete mill threat, not just a structural seed.
         setup_mill_bonus = int(weights.setup_mill * 1.3) * two_cfg_gained
+
+    # B-39: penalise creating a (own, own, opp) dead-mill pattern in move phase.
+    # Two own pieces in a mill already blocked by an opponent piece can never close
+    # — moving into such a pattern wastes structural potential.
+    disrupted_two_config_penalty = 0
+    if not _is_placement:
+        for _mill in MILLS:
+            _vb = [before.positions[p] for p in _mill]
+            _va = [after.positions[p]  for p in _mill]
+            if (_va.count(color) == 2 and _va.count(opp) == 1
+                    and not (_vb.count(color) == 2 and _vb.count(opp) == 1)):
+                disrupted_two_config_penalty += weights.disrupted_two_config
 
     # Mill-opening bonus: reward sliding out of a closed mill when the position
     # still has a cycling-ready mill (i.e. the move enables a future recapture).
@@ -2518,6 +2536,7 @@ def tactical_move_bonus(
     _contributions = [
         ("Closed mill",                    close_mill_contribution),
         ("Cycling mill setup",             weights.cycling_mill * (cycling_gain + opp_cycle_lost)),
+        ("Own cycle lost (B-40)",          -weights.cycling_mill * self_cycle_lost),
         ("Cycling close",                  cycling_close_bonus),
         ("Blocked opponent mill",          block_opp_mill_contribution),
         ("Stopped opponent 2-config",      weights.stop_opponent_mills * two_cfg_broken),
@@ -2557,6 +2576,7 @@ def tactical_move_bonus(
         ("Ring crowding penalty",          -ring_crowd_penalty),
         ("Consolidation penalty (B-10)",   -consolidation_penalty_val),
         ("Opp chain non-disrupt (B-37)",   -opp_chain_nondisrupt_penalty),
+        ("Disrupted 2-config (B-39)",      -disrupted_two_config_penalty),
     ]
     _total = sum(v for _, v in _contributions)
 
