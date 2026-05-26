@@ -1619,3 +1619,58 @@ if opp_placed < 9:
 - Board with opponent having one 2-config during placement → returns empty set
 - Board with opponent having two 2-configs but one closing square is occupied → only unoccupied closing square returned (or empty, depending on actual count)
 
+### B-51 — Early-Endgame DB: expand retrograde solver beyond 3v3 ⬜ ★ High Impact
+
+**Goal:** Build a family of WDL tables covering piece counts from 4v3 through 7v4 (and symmetric reverses). These cover the critical **early endgame transition** — positions where one or both sides have just lost pieces but haven't reached fly phase yet.
+
+**Table sizes (2 bits/position, white_rank × black_rank × turn encoding):**
+
+| nW | nB | Positions | MB |
+|----|----|-----------|----|
+| 4 | 3 | 24,227,280 | 6.1 |
+| 3 | 4 | 24,227,280 | 6.1 |
+| 5 | 3 | 82,372,752 | 20.6 |
+| 3 | 5 | 82,372,752 | 20.6 |
+| 4 | 4 | 102,965,940 | 25.7 |
+| 5 | 4 | 329,491,008 | 82.4 |
+| 4 | 5 | 329,491,008 | 82.4 |
+| 6 | 3 | 219,660,672 | 54.9 |
+| 3 | 6 | 219,660,672 | 54.9 |
+| 7 | 3 | 470,701,440 | 117.7 |
+| 3 | 7 | 470,701,440 | 117.7 |
+| 6 | 4 | 823,727,520 | 205.9 |
+| 4 | 6 | 823,727,520 | 205.9 |
+| 7 | 4 | 1,647,455,040 | 411.9 |
+| 4 | 7 | 1,647,455,040 | 411.9 |
+| **All** | | | **~1,825 MB** |
+
+**Practical tiers:**
+- **Tier 1 — Recommended:** 4v3, 3v4, 5v3, 3v5, 4v4 → ~79 MB total. Covers the most common early-endgame transitions.
+- **Tier 2 — Optional:** add 5v4, 4v5 → ~244 MB total. Significant, but fits comfortably on an external drive.
+- **Tier 3 — Large/optional:** 6v3, 3v6, 7v3, 3v7 (118–220 MB each pair); 6v4, 7v4 (200–412 MB each). Only worthwhile if Tier 1+2 improve play measurably.
+
+**Key algorithm changes vs the existing 3v3 builder:**
+
+1. **Mixed fly/move successor generation:** a side with exactly 3 pieces flies (any empty square); a side with ≥4 pieces moves along adjacency edges. The successor generator must branch on `len(mover) == 3` per turn.
+
+2. **Cross-table captures:** a capture in an nW v nB position leaves (nW) v (nB-1) or (nW-1) v nB. These successor positions live in a *different* (smaller) table. The retrograde solver must load the relevant already-solved tables as read-only references. A capture that reduces a side to 2 pieces is an immediate WIN (game over rule).
+
+3. **Build order (dependency chain):** each table depends on both smaller tables from captures:
+   ```
+   3v3 (done) ──┬── 4v3 ──┬── 5v3, 4v4
+                └── 3v4 ──┘   │
+                               └── 5v4, 6v3, 4v4 ...
+   ```
+   Concretely: solve in order of (nW + nB) ascending; within the same total, order doesn't matter.
+
+4. **File naming:** `endgame_{nW}_{nB}.wdl` alongside the existing `endgame_3_3.wdl`. Same 2-bit-packed format with the existing `get_wdl`/`set_wdl` helpers.
+
+5. **Query integration:** extend `EndgameSolvedDB` to load all available `endgame_{nW}_{nB}.wdl` files at startup; `query()` dispatches to the correct table by `(len(w_pieces), len(b_pieces))` — no API change for callers.
+
+**Feasibility:** Yes, up to Tier 2. The algorithm rework (adjacency vs fly per side, cross-table lookups) is non-trivial — estimate 1–2 days of implementation. The retrograde passes for Tier 1 should complete in minutes; Tier 2 in under an hour on modern hardware.
+
+**Files:**
+
+- `tools/build_endgame_db.py` — rewrite to accept `--nW` and `--nB` args; mixed fly/move successor generator; cross-table reference loading; output `endgame_{nW}_{nB}.wdl`
+- `ai/endgame_solved_db.py` — extend `EndgameSolvedDB.__init__` to load all available tables; extend `query()` to dispatch by piece count; remove hardcoded 3v3 guard
+
