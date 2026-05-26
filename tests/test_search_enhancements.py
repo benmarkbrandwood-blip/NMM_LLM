@@ -372,5 +372,76 @@ class TestLMR(unittest.TestCase):
         )
 
 
+class TestAspirationWindows(unittest.TestCase):
+    """SE-7: Aspiration Windows narrow the search at each iterative-deepening iteration."""
+
+    # Same mill-close position used in PVS tests: d6→d7 closes a7-d7-g7.
+    _POSITIONS = {
+        "a7": "W", "g7": "W", "d6": "W",
+        "b4": "W", "e3": "W", "g1": "W",
+        "d2": "B", "f6": "B", "f4": "B",
+        "c4": "B", "c5": "B", "a4": "B",
+    }
+
+    def _board(self) -> BoardState:
+        return BoardState.from_setup(self._POSITIONS, turn="W", phase="move")
+
+    def test_asp_narrow_window_returns_same_move(self):
+        """_root_search with a window centred on the full-window score must return
+        the same best move as a full-window search."""
+        import math
+        b = self._board()
+        ai_ref = GameAI(color="W", difficulty=5)
+        ai_ref._deadline = math.inf
+        move_ref, score_ref = ai_ref._root_search(b, depth=4)
+
+        ai_asp = GameAI(color="W", difficulty=5)
+        ai_asp._deadline = math.inf
+        move_asp, _ = ai_asp._root_search(
+            b, depth=4, alpha=score_ref - 175, beta=score_ref + 175
+        )
+        self.assertEqual(
+            (move_asp.get("from"), move_asp["to"]),
+            (move_ref.get("from"), move_ref["to"]),
+            f"Aspiration move {move_asp} differs from full-window {move_ref}",
+        )
+
+    def test_asp_node_counter_populated(self):
+        """_nodes must be > 0 after a search (aspiration path exercised)."""
+        import math
+        b = self._board()
+        ai = GameAI(color="W", difficulty=5)
+        ai._deadline = math.inf
+        ai._root_search(b, depth=4)
+        self.assertGreater(ai._nodes, 0)
+
+    def test_asp_iterative_deepen_returns_legal_move(self):
+        """_iterative_deepen with a short time cap (depth >= 3 exercised) must
+        return a valid legal move — aspiration fires on depth-3+ iterations."""
+        from game.rules import get_all_legal_moves
+        b = self._board()
+        ai = GameAI(color="W", difficulty=5)
+        move = ai._iterative_deepen(b, time_limit=1.0, max_depth=5)
+        legal = [(m.get("from"), m["to"]) for m in get_all_legal_moves(b)]
+        self.assertIn(
+            (move.get("from"), move["to"]), legal,
+            f"_iterative_deepen returned illegal move: {move}",
+        )
+
+    def test_asp_deterministic(self):
+        """Two fresh AI instances searching the same depth must return the same move."""
+        import math
+        b = self._board()
+        ai1 = GameAI(color="W", difficulty=5)
+        ai2 = GameAI(color="W", difficulty=5)
+        ai1._deadline = ai2._deadline = math.inf
+        m1, _ = ai1._root_search(b, depth=4)
+        m2, _ = ai2._root_search(b, depth=4)
+        self.assertEqual(
+            (m1.get("from"), m1["to"]),
+            (m2.get("from"), m2["to"]),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

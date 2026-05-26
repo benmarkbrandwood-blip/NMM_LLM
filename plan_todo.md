@@ -1242,7 +1242,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `ai/game\\\_ai.py` — LMR applied after priority-0/1/killer ordering in `\\\_negamax`; conditional re-search on fail-high
 
-### SE-7 — Aspiration Windows in Iterative Deepening ⬜ ★ Medium Impact
+### SE-7 — Aspiration Windows in Iterative Deepening ✅ 2026-05-26
 
 **Why:** Currently each iterative-deepening iteration restarts with `alpha = −INF, beta = +INF`. Using `\\\[prev\\\_score − 175, prev\\\_score + 175\\\]` for depth `d+1` produces more early cutoffs since most moves are outside the window. Fail-high or fail-low triggers a re-search at full window — rare in the positionally stable mid-game common in NMM.
 

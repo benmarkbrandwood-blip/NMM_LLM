@@ -705,13 +705,15 @@ class GameAI:
     # ── Internals ─────────────────────────────────────────────────────────────
 
     def _root_search(self, board: BoardState, depth: int,
-                     top_n: int = 1, moves: list | None = None) -> Tuple[dict, int]:
+                     top_n: int = 1, moves: list | None = None,
+                     alpha: int = -INF, beta: int = INF) -> Tuple[dict, int]:
         """Search all root moves and return (best_move, best_score).
         When top_n > 1, pick randomly from the top-N scoring moves.
         If _SearchAbort fires (force_stop called mid-search), returns the
         best move found so far rather than propagating the exception.
         `moves` may be pre-filtered (e.g. mandatory-block constraint); if None
-        all legal moves are used."""
+        all legal moves are used.
+        alpha/beta: aspiration window bounds (default full window)."""
         if moves is None:
             moves = get_all_legal_moves(board)
         killers = self._killers[depth] if depth < 32 else None
@@ -719,14 +721,13 @@ class GameAI:
         self._nodes = 0
         best_move = moves[0]
         best_score = -INF
-        alpha = -INF
         all_scored: list[Tuple[dict, int]] = []
 
         scored_any = False
         for move in moves:
             nb = board.apply_move(move)
             try:
-                score = -self._negamax(nb, depth - 1, -INF, -alpha)
+                score = -self._negamax(nb, depth - 1, -beta, -alpha)
             except _SearchAbort:
                 if not scored_any:
                     raise  # no moves fully evaluated — propagate so _iterative_deepen keeps previous depth
@@ -740,6 +741,8 @@ class GameAI:
                 best_move = move
             if best_score > alpha:
                 alpha = best_score
+            if alpha >= beta:
+                break
 
         if top_n > 1 and all_scored:
             top = sorted(all_scored, key=lambda x: x[1], reverse=True)[:top_n]
@@ -952,6 +955,7 @@ class GameAI:
         `moves` may be pre-filtered (e.g. mandatory-block constraint); if None
         all legal moves are used.
         """
+        _ASP_MARGIN = 175
         self._deadline = time.time() + time_limit
         if moves is None:
             moves = get_all_legal_moves(board)
@@ -966,6 +970,7 @@ class GameAI:
             ) or (bool(trajectory_hints) and self._weights.opening_adherence > 0)
         ) or _has_hard_bans
 
+        prev_score: int | None = None
         for depth in range(2, max_depth + 1):
             if time.time() >= self._deadline:
                 break
@@ -982,8 +987,34 @@ class GameAI:
                     else:
                         best_move = max(scored, key=lambda x: x[1])[0]
                 else:
-                    move, _ = self._root_search(board, depth, top_n=top_n, moves=moves)
-                    best_move = move      # only update if depth completed cleanly
+                    # SE-7: aspiration windows — narrow the window around the previous score.
+                    if prev_score is not None and depth >= 3 and top_n == 1:
+                        asp_lo = prev_score - _ASP_MARGIN
+                        asp_hi = prev_score + _ASP_MARGIN
+                        move, score = self._root_search(
+                            board, depth, top_n=1, moves=moves,
+                            alpha=asp_lo, beta=asp_hi,
+                        )
+                        if score <= asp_lo:
+                            try:
+                                move, score = self._root_search(
+                                    board, depth, top_n=1, moves=moves, beta=asp_hi,
+                                )
+                            except _SearchAbort:
+                                pass  # keep aspiration result; deadline fires next iteration
+                        elif score >= asp_hi:
+                            try:
+                                move, score = self._root_search(
+                                    board, depth, top_n=1, moves=moves, alpha=asp_lo,
+                                )
+                            except _SearchAbort:
+                                pass
+                        best_move = move
+                        prev_score = score
+                    else:
+                        move, score = self._root_search(board, depth, top_n=top_n, moves=moves)
+                        best_move = move      # only update if depth completed cleanly
+                        prev_score = score
             except _SearchAbort:
                 break                     # deadline hit mid-depth; keep previous best
         self._deadline = math.inf
