@@ -554,7 +554,7 @@ At turn 9, Black places at `e5` creating a 2-piece. This ignores White's mill st
 
 - `ai/heuristics.py`
 
-### Bug B-36 — Increase imperative to block unguarded cardinal mill lines during placement ⬜
+### Bug B-36 — Increase imperative to block unguarded cardinal mill lines during placement ✅ 2026-05-26
 
 **Symptom:** The AI fails to block opponent cardinal mill lines (e.g. `a4-b4-c4`) when they are completely unguarded by any own piece and about to become a permanent structural threat.
 
@@ -1394,7 +1394,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Bug B-42 — Endgame move choice is drifting instead of closing available mills ⬜
+### Bug B-42 — Endgame move choice is drifting instead of closing available mills ✅ 2026-05-26
 
 **Symptom:** in endgame positions the AI is sometimes moving pieces around the board seemingly at random instead of closing an available mill.
 
@@ -1476,7 +1476,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
-### Bug B-48 — Endgame DB WIN lookup returns `moves[0]` instead of the best winning move ⬜
+### Bug B-48 — Endgame DB WIN lookup returns `moves[0]` instead of the best winning move ✅ 2026-05-26
 
 **Symptom:** when `choose_move()` gets `WDL_WIN` back from the retrograde endgame DB, it returns `moves[0]` — the first legal move in generation order — rather than the specific move that leads to a position labelled `WDL_LOSS` for the opponent.
 

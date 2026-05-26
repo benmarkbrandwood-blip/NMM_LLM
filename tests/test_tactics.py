@@ -575,5 +575,40 @@ class TestB22EmergencyBlock(unittest.TestCase):
             f"AI should fly to b6 to block Black's mill; chose {move} instead")
 
 
+class TestB36CardinalMillBlock(unittest.TestCase):
+    """B-36: AI must block an unguarded opponent cardinal mill during placement."""
+
+    def _b36_board(self) -> BoardState:
+        # Game sequence: 1.f4 b4  2.d2 d6  3.d5 d3  4.d7 c4 — White to play.
+        # Black has b4+c4 → closing a4 in mill a4-b4-c4 (cardinal node b4).
+        # No White piece is adjacent to any mill member outside the mill → unguarded.
+        pos = {p: "" for p in POSITIONS}
+        for p in ("f4", "d2", "d5", "d7"):
+            pos[p] = "W"
+        for p in ("b4", "d6", "d3", "c4"):
+            pos[p] = "B"
+        return BoardState(
+            positions=pos,
+            turn="W",
+            pieces_on_board={"W": 4, "B": 4},
+            pieces_placed={"W": 4, "B": 4},
+            pieces_captured={"W": 0, "B": 0},
+        )
+
+    def test_unguarded_cardinal_alert_fires_a4(self):
+        b = self._b36_board()
+        alert = _unguarded_cardinal_mill_alert(b, "B", "W")
+        self.assertIn("a4", alert,
+            "a4 must be detected as closing square for Black's unguarded cardinal mill a4-b4-c4")
+
+    def test_ai_blocks_cardinal_mill_a4(self):
+        from ai.game_ai import GameAI
+        b = self._b36_board()
+        ai = GameAI(difficulty=4, color="W")
+        move = ai.choose_move(b)
+        self.assertEqual(move.get("to"), "a4",
+            f"AI should place at a4 to block Black's cardinal mill; chose {move} instead")
+
+
 if __name__ == "__main__":
     unittest.main()

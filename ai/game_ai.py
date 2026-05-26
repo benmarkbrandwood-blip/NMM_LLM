@@ -355,15 +355,25 @@ class GameAI:
                 except Exception:
                     _wdl = None
                 if _wdl == "W":
-                    # Current player wins — pick any move that keeps win (first legal for now)
                     self.last_was_blunder = False
-                    self.last_thinking = "endgame DB (win)"
-                    return moves[0]
+                    for _move in moves:
+                        _succ = board.apply_move(_move)
+                        _succ_terminal, _ = is_terminal(_succ)
+                        if _succ_terminal:
+                            # Capture reduces opponent to 2 pieces → instant win
+                            self.last_thinking = "endgame DB (win)"
+                            return _move
+                        try:
+                            _succ_wdl = _esdb.query(_succ)
+                        except Exception:
+                            _succ_wdl = None
+                        if _succ_wdl == "L":
+                            self.last_thinking = "endgame DB (win)"
+                            return _move
+                    # fall through to heuristic if no winning continuation found
                 elif _wdl == "L":
-                    # Current player loses all lines — still return best move (don't resign)
-                    self.last_was_blunder = False
-                    self.last_thinking = "endgame DB (loss)"
-                    return moves[0]
+                    self.last_thinking = "endgame DB (loss/search)"
+                    # fall through to heuristic search for most stubborn defence
                 elif _wdl == "D":
                     self.last_thinking = "endgame DB (draw)"
 
