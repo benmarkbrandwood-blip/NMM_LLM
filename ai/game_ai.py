@@ -179,21 +179,29 @@ def _order_moves(board: BoardState, moves: list, killers=None, history=None) -> 
 # Fixed-depth table for quick levels (1–4): search completes fast so no time cap needed.
 _DEPTH_TABLE = {1: 2, 2: 3, 3: 4, 4: 5}
 
-# Iterative-deepening time budgets for levels 5–10.
-# Levels 6–8 are promoted from fixed-depth so force_move never fires mid-search.
+# Iterative-deepening time budgets.
+# Difficulties 1–4 previously used fixed depth.  SE-8 search extensions and SE-9
+# quiescence can push effective depth 2–4 plies deeper than the nominal depth,
+# turning fixed-depth levels into unbounded searches.  Adding them to _TIME_LIMIT
+# caps the wall-clock cost while letting later iterations go deeper when time allows.
 _TIME_LIMIT = {
-    5: 15.0,   # was 10 s
-    6: 24.0,   # was fixed depth-7 (no time cap)
-    7: 36.0,   # was fixed depth-8
-    8: 60.0,   # was fixed depth-9
-    9: 60.0,   # was 20 s
-    10: 90.0,  # was 45 s
+    1: 0.3,    # ~depth 2–3; very fast
+    2: 0.8,    # ~depth 3–4; fast
+    3: 2.5,    # ~depth 4–5; moderate
+    4: 6.0,    # ~depth 5–6; standard
+    5: 15.0,
+    6: 24.0,
+    7: 36.0,
+    8: 60.0,
+    9: 60.0,
+    10: 90.0,
 }
 
 # While fewer than this many pieces are on the board in total, use a short
 # time budget regardless of difficulty — the tree is tiny and deep search wastes time.
 _EARLY_GAME_PIECE_THRESHOLD = 10  # covers roughly the first 5 placements per side
-_EARLY_GAME_TIME            = 4.0  # seconds
+_EARLY_GAME_TIME            = 2.0  # seconds — SE-8 extensions can push effective depth 2–4 plies
+                                   # deeper than nominal, so the budget must be tighter
 
 
 def _parse_book_move(book_move_str: str, legal_moves: list) -> dict | None:
