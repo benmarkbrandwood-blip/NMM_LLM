@@ -30,7 +30,9 @@ def _immediate_mill_threats(board: BoardState) -> set[str]:
 
     In fly phase the opponent can reach any empty square, so every 2-config is
     an immediate threat.  In move phase only 2-configs where an opponent piece is
-    adjacent to the empty closing square count.
+    adjacent to the empty closing square count.  In placement phase, a fork
+    (≥2 simultaneous opponent 2-configs) makes all closing squares mandatory
+    blocking targets — a single response cannot stop both.
     """
     opp = "B" if board.turn == "W" else "W"
     opp_placed = board.pieces_placed.get(opp, 0)
@@ -46,6 +48,19 @@ def _immediate_mill_threats(board: BoardState) -> set[str]:
             elif opp_placed >= 9:  # move phase: need adjacent opp piece
                 if any(board.positions[nb] == opp for nb in ADJACENCY[empty]):
                     threats.add(empty)
+
+    # Placement phase fork: when the opponent holds ≥2 simultaneous 2-configs,
+    # restrict the current player to the closing squares of those mills.
+    if opp_placed < 9:
+        closing = [
+            next(p for p in mill if board.positions[p] == "")
+            for mill in MILLS
+            if ([board.positions[p] for p in mill].count(opp) == 2
+                and [board.positions[p] for p in mill].count("") == 1)
+        ]
+        if len(closing) >= 2:
+            threats.update(closing)
+
     return threats
 
 
