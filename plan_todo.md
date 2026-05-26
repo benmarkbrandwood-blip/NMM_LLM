@@ -43,7 +43,94 @@ Feed the relevant phase section(s) to MillsLLM at each game stage.
 
 ## New Bug & Enhancement Items
 
-### Bug B-26 — FullGameDB is never loaded by the server ⬜
+### Bug B-53 — ChromaDB embedding dimension mismatch when ollama_model changes ⬜
+
+**Symptom:** `Error: Collection expecting embedding with dimension of 4096, got 2048`. Occurs when `ollama_model` in settings.json is changed (e.g. from `llama3.1:8b` → `gemma:2b`). The existing ChromaDB collections were created with the previous model's embedding dimensions; the new model produces a different size.
+
+**Root cause:** `MemoryManager` uses the main LLM model (configured via `ollama_model`) as the embedding model. When the user switches models, the embedding dimensionality changes but the existing ChromaDB collections still expect the old dimensions.
+
+**Fix options (implement one):**
+1. **Dedicated embedding model:** Add `ollama_embed_model` to settings.json (default `nomic-embed-text`). `MemoryManager` always uses this fixed model for embeddings, independent of the main LLM. Embedding dimensions become stable.
+2. **Graceful rebuild:** On dimension mismatch at collection creation, catch the error, delete and recreate the collection, and log a warning that embeddings were reset.
+
+**Recommended:** Option 1 — a dedicated embed model (`nomic-embed-text` is small, fast, and purpose-built for this). The main LLM and embed model should be decoupled.
+
+**Files:**
+- `data/settings.json` — add `ollama_embed_model` key (optional, default `nomic-embed-text`)
+- `ai/memory_manager.py` — use `ollama_embed_model` for embeddings instead of `ollama_model`
+- `web/app.py` — pass `ollama_embed_model` setting to `MemoryManager`
+
+---
+
+### Bug B-54 — LLM phase strategy guide never fed to MillsLLM ⬜
+
+**Symptom:** `data/phase_strategy.md` exists (179 lines, phase-segmented NMM tactics guide) but is never injected into the LLM prompt. The LLM provides commentary without access to phase-appropriate tactical context.
+
+**Root cause:** The file was created as a planned context injection source but the wiring in `MillsLLM`/`Coordinator` was never implemented.
+
+**Fix:** In `Coordinator` (or `MillsLLM`), at each commentary call, detect the current game phase (placement / move / fly) and inject the relevant section(s) from `phase_strategy.md` into the system prompt or context window. The file is already segmented by phase (Phase A = placement 1–6, Phase B = placement 7–9, Phase C = movement, Phase D = fly).
+
+**Implementation sketch:**
+- `ai/coordinator.py` — load `phase_strategy.md` once at init; add `_get_phase_context(board)` helper that extracts the 1–2 relevant phase sections
+- `ai/mills_llm.py` — accept optional `phase_context: str` parameter and prepend it to the system prompt
+- `Coordinator.comment_on_move()` — call `_get_phase_context(board)` and pass to `MillsLLM`
+
+**Files:**
+- `ai/coordinator.py`
+- `ai/mills_llm.py`
+- `data/phase_strategy.md` (no change — exists and is ready)
+
+---
+
+### Bug B-55 — AI allows opponent to build two interconnected cardinal ring mills ⬜ ★ High Priority
+
+**Symptom:** The AI (Black) fails to block White from establishing two cardinal mills through the middle ring in the same game. Once White has two such mills, Black is in a near-losing position because White can oscillate both independently.
+
+**Game example 1:**
+```
+1.d6 d2
+2.f4 b4
+3.f6 d7
+4.f2xd7 d7
+```
+At turn 4, White plays f2xd7 (closes f2-f4-f6 mill, captures d7). Black re-places at d7 instead of b6. White already has d6-b6-... is set up for b6-d6-f6. Black must place at b6 to block the second cardinal mill.
+
+**Game example 2:**
+```
+1.d6 d2
+2.f4 b4
+3.f6 f2
+4.b6xf2 g7
+```
+White plays b6xf2 (closes b6-d6-f6 mill, captures Black's f2). Black plays g7 instead of f2 (reclaiming the blocking square). White can now set up f2-f4-f6 since f2 is vacant and White has f4, f6.
+
+**Pattern:** In both games, White gains two middle-ring cardinal mills (one horizontal top: b6-d6-f6; one vertical right: f2-f4-f6 or similar). These share the f6 corner, giving White a highly mobile dual-mill oscillation structure that is very hard to defend.
+
+**Fix:**
+- Add a heuristic that heavily penalises any position where the opponent has, or is one move away from completing, two middle-ring mills that share a pivot square.
+- Urgency level: equivalent to blocking a direct mill closure (P1 priority in `_order_moves`).
+- Add `_dual_cardinal_mill_alert(board, opp_color)` in `ai/heuristics.py`: returns True if opponent has 1 closed mill AND a 2-config in a second mill sharing a square with the first.
+- Apply a block-bonus (~400) to any move that prevents the second such mill from forming.
+
+**Files:**
+- `ai/heuristics.py` — `_dual_cardinal_mill_alert()`, apply in `tactical_move_bonus()`
+- `tests/` — regression tests for both game sequences above
+
+---
+
+### Bug B-56 — Copy button omits placement moves for setup-position games ⬜
+
+**Symptom:** When using the "Copy" button on the game UI to export a game position (e.g. for analysis or to recreate a specific setup), the copied output only includes move-phase moves, not the placement moves that led to the current position. Setup-position games therefore cannot be fully recreated from the copied text.
+
+**Fix:** Ensure the copy/export function includes all placement moves in the notation output, in the same format as the move phase notation (e.g. `1.d6 d2\n2.f4 b4\n...`), followed by the movement phase moves. The full game record from the first placement to the current position should be reproducible from the copied text.
+
+**Files:**
+- `web/static/game.js` — copy button handler: include placement moves in exported notation
+- `web/app.py` — `/api/copy_game` or equivalent endpoint: return full game history including placement phase
+
+---
+
+### Bug B-26 — FullGameDB is never loaded by the server ✅ 2026-05-26
 
 **Symptom:** Even if `data/fullgame.sqlite` exists (built via `tools/build_fullgame_db.py`), the web server ignores it entirely. The game plays as if the DB were absent regardless of its size or content.
 
@@ -210,6 +297,43 @@ Query = binary search on the key field: ~23 comparisons for 10M records, ~27 for
 
 ---
 
+### Enhancement B-52 — FullGameDB: Frequency-Weighted Build from Human-Played Games ⬜ ★ High Impact
+
+**Goal:** Update `tools/build_fullgame_db.py` so the DB reflects positions that actually occur in human play, not the full synthetic game tree. This enables frequency-based pruning: uncommon positions are dropped, making the DB smaller and denser in strategically important territory so deeper analysis is practical along those lines.
+
+**Why:** The current build does a bounded BFS/DFS over the full NMM game tree (synthetic positions). Many reachable positions are never played in practice — symmetry-equivalent placements, blunder-induced transpositions, AI-AI self-play lines. Including them wastes DB space and dilutes the signal from positions that actually recur. A DB built from real human games is:
+- Smaller and fits in RAM more easily
+- Automatically weighted toward opening and midgame structures humans actually create
+- Self-improving: more games → better frequency signal → tighter pruning → deeper coverage per MB
+
+**Game source filtering:**
+- Include only `human-human` and `human-AI` games from `data/games/` JSONL records
+- Exclude AI-AI self-play (detected by: `human_color` is null AND at least one move has a non-null `game_ai_score` for both colors)
+- Field detection: `human_color` non-null → human-AI; `human_color` null and all `game_ai_score` null → human-human; otherwise exclude
+
+**Frequency tracking per position:**
+- For every position (by canonical key) in included games, record how many games reached it
+- Store `frequency` (integer count) in the DB record alongside existing `outcome`, `depth`, `best_move`
+- Binary format record gains a `frequency` field (replace one pad byte or expand to 36 bytes)
+
+**Pruning rules:**
+- `--min-frequency N`: drop any position reached in fewer than N games (default 1 = keep all)
+- `--min-frequency-placement P`: stricter threshold during placement phase (positions covered by many games → keep; rare variants → prune)
+- A position is always kept if its `outcome` is known (WIN/LOSS/DRAW) regardless of frequency — don't throw away solved positions
+
+**Incremental update mode:**
+- `--update-from-games DIR`: scan new JSONL files since last build, increment frequencies, re-apply pruning threshold
+- Tracked via a `last_updated` timestamp in the DB header
+- Allows weekly rebuilds as games accumulate without full re-enumeration
+
+**Deliverables:**
+
+- `tools/build_fullgame_db.py` — add `--source-games DIR` flag (replaces BFS enumeration with JSONL game scan); `--min-frequency N`; `--update-from-games DIR`; game-type filtering logic
+- `ai/fullgame_db.py` — `frequency` field in `FullGameResult`; `query_min_frequency()` helper to allow caller to filter by confidence
+- `tools/build_fullgame_db.py` — frequency-based pruning pass after initial build
+
+---
+
 ### Enhancement B-24 — GUI settings for position DB usage ⬜
 
 **Goal:** Add controls to the Settings and AI Tuning panels so the player can see which position databases are active and tune how strongly they influence the AI's play.
@@ -356,9 +480,33 @@ A summary card per database showing:
 
 - `web/static/board.js` if board coordinate text is rendered separately
 
-### Bug B-18 — Clarify and document Bad Move button policy ⬜
+### Enhancement B-18 — Remove Bad Move button; add Force Move button for AI ⬜
 
-**Symptom:** Get rid of the bad move button and the illegal moves it stored. Replace with force blunder button that makes the ai take a different move.
+**Goal:** Completely remove the Bad Move button, all `data/bad_moves.json` storage, and every code path that reads/writes it. Replace with a **Force Move** button that lets the human player specify the next AI move on the current board, without affecting human player turns.
+
+**Why:** The Bad Move button is broken — it stores illegal moves that corrupt the AI decision process. The Force Move concept is more useful: it lets the player explore "what if the AI plays X here?" scenarios during analysis without the AI having any say.
+
+**Bad Move removal scope:**
+- `web/static/game.js` — remove Bad Move button UI and all click handlers
+- `web/app.py` — remove `/api/bad_move` endpoint and any bad_move loading at startup
+- `web/templates/index.html` — remove Bad Move button element
+- `web/static/style.css` — remove Bad Move button styles
+- `ai/game_ai.py` — remove any bad_moves avoidance logic in `choose_move`
+- `data/bad_moves.json` — delete file; remove from .gitignore if tracked
+- Remove all plan items referencing bad_moves
+
+**Force Move button spec:**
+- Visible only when it is the AI's turn (human is not currently moving)
+- Opens a modal/input: "Enter square to move to (and from, if move phase): e.g. d6 or a7→d7"
+- Validates the entered move against `get_all_legal_moves(board)` — rejects illegal moves with an error message
+- If valid, sends the move to the server as an override (not routed through `choose_move`)
+- Server applies the move exactly as if the AI had chosen it, then continues the game normally
+- Works only for the AI player; has no effect on human player turns
+
+**Files:**
+- `web/app.py` — new `/api/force_ai_move` endpoint
+- `web/static/game.js` — Force Move button + modal
+- `web/templates/index.html` — Force Move button element (hidden when human is moving)
 
 ### Enhancement B-20 — Reward long-game trajectory lines in opening + midgame ⬜
 
@@ -1252,7 +1400,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 ### TIER 3 — Solid, Secondary Priority
 
-### SE-8 — Search Extensions for Critical Positions ⬜ ★ Medium Impact
+### SE-8 — Search Extensions for Critical Positions ✅ 2026-05-26
 
 **Why:** +1 depth at nodes containing: forced mill closure (own or opponent); opponent has 2+ immediate mill threats (fork); position is 4v4 fly-phase; EndgameDB confirms a critical pattern. Root-level depth bonuses already exist in `choose\\\_move` — extend the same logic into internal `\\\_negamax` nodes. Cap total extensions at `depth / 2` per line to prevent blowup.
 
@@ -1260,7 +1408,7 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `ai/game\\\_ai.py` — extension check at top of `\\\_negamax` using existing tactical detection helpers; max-extension cap per line
 
-### SE-9 — Quiescence Search (Capture Extension at Depth 0) ⬜ ★ Medium Impact
+### SE-9 — Quiescence Search (Capture Extension at Depth 0) ✅ 2026-05-26
 
 **Why:** Eliminates the horizon effect in 4v4 endgame and fly-phase transitions. At `depth == 0`, if a mill closure (capture) is immediately available, extend 1–2 plies searching only capture sequences before returning static evaluation. Cap at 2–3 extra plies to avoid cycling in repetitive mill positions.
 
@@ -1303,6 +1451,27 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 **Deliverables:**
 
 - `ai/ngram\\\_opponent\\\_model.py` — new `NGramOpponentModel` class; `update()` called after each game; `predict()` returns probability dict; trained incrementally from `data/games/` JSONL records
+
+### SE-14 — DB-Guided Horizon Search (FullGameDB + Negamax Hybrid) ⬜ ★ High Impact
+
+**Why:** Currently `_negamax` rebuilds the full search tree from scratch on every move decision — even for positions that are already exactly solved in `FullGameDB`. Moving the DB lookup inside `_negamax` lets the search consume DB coverage as perfect depth-∞ oracle calls (identical to how SE-4 uses the endgame DB). Crucially, when the DB covers the first K plies of the game tree, the AI only spends its time budget searching from the *frontier* of known territory, gaining effective depth for free. "No need to look at the same possibilities twice."
+
+**How it works:**
+1. At every internal `_negamax` node (not just root), query `FullGameDB` for the current position.
+2. If an exact outcome is found (`outcome ∈ {WIN, LOSS, DRAW}`) → return `±(INF − depth)` immediately; no recursive search required.
+3. If the DB knows a best move but no definitive outcome → promote that move to the front of the move list (same as TT-best-move promotion already done for SE-1), then continue normal search from here. The DB hint guides the search without cutting it off early.
+4. If the DB returns no match → continue normal negamax from this node.
+
+**Legal-move safety:** The DB records a canonical best move. Before promoting it, validate it against `get_all_legal_moves(board)` to guard against stale or symmetry-mapping errors; fall through silently on mismatch.
+
+**Interaction with SE-7 (aspiration) and SE-4 (endgame DB):** SE-4 already short-circuits fly-phase positions — SE-14 handles the broader game. SE-7 aspiration windows are unaffected since they operate at root level only. Evaluation order inside `_negamax`: terminal check → SE-4 endgame probe → SE-14 FullGameDB probe → SE-8 extension → depth-0 / SE-9 quiescence → TT probe → search loop.
+
+**Build prerequisite:** B-52 (frequency-weighted build from human games) ensures the DB is dense in positions that actually occur, maximising SE-14's hit rate. SE-14 degrades gracefully to full negamax when the DB is absent or the position is not covered.
+
+**Deliverables:**
+
+- `ai/game_ai.py` — DB probe at top of `_negamax`, after SE-4, before SE-8; exact outcomes short-circuit search; best-move hints promote front-of-list (with legality check); guarded by `self._fullgame_db is not None`
+- `ai/fullgame_db.py` — `best_move_validated(board)` helper that maps canonical move back to actual orientation AND verifies against legal moves
 
 ## Architecture Principles
 

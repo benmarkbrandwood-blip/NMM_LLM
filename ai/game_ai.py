@@ -722,26 +722,32 @@ class GameAI:
         best_move = moves[0]
         best_score = -INF
         all_scored: list[Tuple[dict, int]] = []
+        # Track raw alpha separately from the total (raw + tactical_bonus) score.
+        # The tactical_move_bonus is a root-only adjustment that must NOT inflate
+        # the alpha-beta window passed down to _negamax — doing so causes fail-hard
+        # clipping to return the alpha bound rather than the true score, making
+        # later moves with small bonuses appear spuriously competitive.
+        alpha_raw = -INF
 
         scored_any = False
         for move in moves:
             nb = board.apply_move(move)
             try:
-                score = -self._negamax(nb, depth - 1, -beta, -alpha)
+                score_raw = -self._negamax(nb, depth - 1, -beta, -alpha_raw, None, depth // 2)
             except _SearchAbort:
                 if not scored_any:
                     raise  # no moves fully evaluated — propagate so _iterative_deepen keeps previous depth
                 break
             scored_any = True
-            score += tactical_move_bonus(board, nb, self.color, self._weights, self._opp_last_weak)
+            score = score_raw + tactical_move_bonus(board, nb, self.color, self._weights, self._opp_last_weak)
             if top_n > 1:
                 all_scored.append((move, score))
             if score > best_score:
                 best_score = score
                 best_move = move
-            if best_score > alpha:
-                alpha = best_score
-            if alpha >= beta:
+            if score_raw > alpha_raw:
+                alpha_raw = score_raw
+            if alpha_raw >= beta:
                 break
 
         if top_n > 1 and all_scored:
@@ -756,6 +762,7 @@ class GameAI:
         alpha: int,
         beta: int,
         endgame_state=None,
+        ext_budget: int = 0,
     ) -> int:
         """
         Negamax with alpha-beta pruning and transposition table.
@@ -787,7 +794,26 @@ class GameAI:
                 return -(INF - depth)
             # "D" or None → fall through to normal search
 
+        # SE-8: search extension for critical positions.
+        if ext_budget > 0:
+            _color = board.turn
+            _opp8 = "B" if _color == "W" else "W"
+            _own_threat = False
+            _opp_forks = 0
+            for _mill in MILLS:
+                _mv = [board.positions[p] for p in _mill]
+                if _mv.count(_color) == 2 and _mv.count("") == 1:
+                    _own_threat = True
+                if _mv.count(_opp8) == 2 and _mv.count("") == 1:
+                    _opp_forks += 1
+            if _own_threat or _opp_forks >= 2:
+                depth += 1
+                ext_budget -= 1
+
         if depth == 0:
+            _q_moves = get_all_legal_moves(board)
+            if any(m.get("capture") for m in _q_moves):
+                return self._qsearch(board, self._Q_DEPTH, alpha, beta, endgame_state, _q_moves)
             return evaluate(board, board.turn, endgame_state, self.force_aggressive, self._weights)
 
         # ── Transposition table probe ─────────────────────────────────────────
@@ -852,22 +878,22 @@ class GameAI:
             )
 
             if is_first:
-                score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state)
+                score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state, ext_budget)
                 is_first = False
             elif use_lmr:
                 # LMR: reduced-depth zero-window scout
-                score = -self._negamax(nb, depth - 2, -alpha - 1, -alpha, endgame_state)
+                score = -self._negamax(nb, depth - 2, -alpha - 1, -alpha, endgame_state, ext_budget)
                 if score > alpha:
                     # Failed high — re-search at full depth with PVS zero-window
-                    score = -self._negamax(nb, depth - 1, -alpha - 1, -alpha, endgame_state)
+                    score = -self._negamax(nb, depth - 1, -alpha - 1, -alpha, endgame_state, ext_budget)
                     if alpha < score < beta:
                         # PVS also failed high — full window re-search
-                        score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state)
+                        score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state, ext_budget)
             else:
                 # Standard PVS zero-window scout
-                score = -self._negamax(nb, depth - 1, -alpha - 1, -alpha, endgame_state)
+                score = -self._negamax(nb, depth - 1, -alpha - 1, -alpha, endgame_state, ext_budget)
                 if alpha < score < beta:
-                    score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state)
+                    score = -self._negamax(nb, depth - 1, -beta, -alpha, endgame_state, ext_budget)
 
             if score > value:
                 value = score
@@ -896,6 +922,38 @@ class GameAI:
 
         return value
 
+    def _qsearch(self, board: BoardState, q_depth: int, alpha: int, beta: int,
+                 endgame_state=None, moves: list | None = None) -> int:
+        """SE-9: Quiescence search — extend only capturing moves to resolve tactical noise."""
+        self._nodes += 1
+        if self._nodes & 0xFFF == 0 and time.time() >= self._deadline:
+            raise _SearchAbort()
+
+        terminal, _ = is_terminal(board)
+        if terminal:
+            return -(INF - q_depth)
+
+        stand_pat = evaluate(board, board.turn, endgame_state, self.force_aggressive, self._weights)
+        if stand_pat >= beta:
+            return stand_pat
+        if stand_pat > alpha:
+            alpha = stand_pat
+        if q_depth <= 0:
+            return alpha
+
+        if moves is None:
+            moves = get_all_legal_moves(board)
+        for move in moves:
+            if not move.get("capture"):
+                continue
+            nb = board.apply_move(move)
+            score = -self._qsearch(nb, q_depth - 1, -beta, -alpha, endgame_state)
+            if score >= beta:
+                return score
+            if score > alpha:
+                alpha = score
+        return alpha
+
     def _score_all(
         self, board: BoardState, moves: list, depth: int, endgame_state=None
     ) -> list[tuple[dict, int]]:
@@ -909,7 +967,7 @@ class GameAI:
         for i, move in enumerate(moves):
             nb = board.apply_move(move)
             try:
-                score = -self._negamax(nb, depth - 1, -INF, INF, endgame_state)
+                score = -self._negamax(nb, depth - 1, -INF, INF, endgame_state, depth // 2)
                 score += tactical_move_bonus(board, nb, self.color, self._weights, self._opp_last_weak)
                 results.append((move, score))
             except _SearchAbort:
@@ -921,6 +979,7 @@ class GameAI:
 
     _BLUNDER_TIME = 2.0   # hard cap for blunder scoring — ranking doesn't need deep search
     _BLUNDER_DEPTH = 3    # shallow depth is enough to distinguish good/bad moves
+    _Q_DEPTH = 2          # SE-9: extra plies in quiescence search (cap on capture chain depth)
 
     def _pick_blunder(self, board: BoardState, moves: list) -> dict:
         """
