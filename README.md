@@ -415,6 +415,7 @@ The `tools/` directory contains scripts for building and improving the AI's know
 | `evolve\_weights\_v2.py` | Per-personality era-aware (1+1)-ES; evolves each personality’s weight overrides and saves back to `data/personalities/*.json` |
 | `build\_fullgame\_db.py` | Build a bounded SQLite position database with win/loss/draw outcomes via D4-symmetric enumeration |
 | `fullgame\_db.py` | Read-only query interface for the full-game position DB (used by `GameAI` at move-selection time) |
+| `build\_endgame\_db.py` | Offline retrograde solver: builds an exact WDL table for all 3v3 fly-phase positions and writes `data/endgame/endgame_3_3.wdl` |
 | `train\_value\_net.py` | Train a small MLP value estimator from saved game records |
 | `import\_openings.py` | Validate and import curated opening lines from a JSON book file |
 | `import\_book\_games.py` | Seed opening win/loss statistics from annotated book game records |
@@ -697,6 +698,8 @@ Edit `data/settings.json` to change the Ollama model, URL, and LLM behaviour thr
 | `max\_poor\_move\_comments\_per\_game` | `5` | Cap on poor-move LLM comments per game |
 | `endgame\_active\_threshold` | `11` | Total pieces on board to enter endgame mode |
 | `endgame\_deep\_threshold` | `8` | Total pieces to enter deep-endgame mode |
+| `endgame\_solved\_dir` | `data/endgame` | Directory containing the retrograde WDL file (`endgame_3_3.wdl`); set to empty string to disable |
+| `fullgame\_db\_path` | *(unset)* | Path to the built SQLite fullgame position DB; leave unset to skip |
 
 
 ### Changing the LLM model
@@ -776,6 +779,7 @@ NMM\_ollama/
 │   ├── endgame\_db.py            \# Endgame position database (learned from games)  
 │   ├── trajectory\_db.py         \# Move-prefix win-rate index (learned from games)  
 │   ├── fullgame\_db.py           \# Read-only query interface for the full-game position DB  
+│   ├── endgame\_solved\_db.py     \# Exact WDL table for 3v3 fly-phase positions (retrograde, ~1.3 MB)  
 │   ├── starting\_play.py         \# Opening family detection (Outer Square, Diamond, etc.)  
 │   ├── memory\_manager.py        \# Game record persistence and pattern analysis  
 │   └── debriefer.py             \# Post-game session summary  
@@ -792,6 +796,7 @@ NMM\_ollama/
 │   ├── evolve\_weights.py        \# Era-aware (1+1)-ES to tune global heuristic weights  
 │   ├── evolve\_weights\_v2.py     \# Per-personality era-aware (1+1)-ES  
 │   ├── build\_fullgame\_db.py     \# Build bounded SQLite position DB with win/loss outcomes  
+│   ├── build\_endgame\_db.py      \# Retrograde solver: exact WDL for all 3v3 fly-phase positions  
 │   ├── fullgame\_db.py           \# Query interface for the full-game position DB  
 │   ├── import\_openings.py       \# Import openings from strategy book text file  
 │   ├── import\_book\_games.py     \# Import games into opening book  

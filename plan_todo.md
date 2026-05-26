@@ -24,15 +24,15 @@ Active implementation order agreed 2026-05-25. Two parallel tracks:
 
 ### Track 2 — DB / Infrastructure (independent; can run in parallel)
 
-| # | Item | Key outcome |
-|---|------|-------------|
-| A | **B-26** (DB) | Wire FullGameDB into server startup |
-| B | **B-23** (DB) | Syzygy-style endgame DB builder |
-| C | **B-27** (DB) | Binary format for fullgame DB |
+| # | Item | Key outcome | Status |
+|---|------|-------------|--------|
+| A | **B-26** (DB) | Wire FullGameDB into server startup | ✅ 2026-05-26 |
+| B | **B-27** (DB) | Binary format for fullgame DB | ✅ 2026-05-26 |
+| C | **B-23** (DB) | Syzygy-style endgame DB builder | ✅ 2026-05-26 |
 
 ### Track 3 — Search Stack (independent; implement after Track 1 is stable)
 
-SE-1 → SE-2 → SE-3 (transposition table, killer heuristic, history heuristic)
+~~SE-1~~ ✅ → SE-2 → SE-3 (transposition table, killer heuristic, history heuristic)
 
 ### Phase strategy guide
 
@@ -1170,7 +1170,7 @@ A shared weight tuned for one side is wrong for the other.
 
 ### TIER 1 — Core Search Stack (implement together)
 
-### SE-1 — Transposition Table + Zobrist Hashing ⬜ ★ Highest Impact
+### SE-1 — Transposition Table + Zobrist Hashing ✅ 2026-05-26
 
 **Why:** The same board position is reached via many different move sequences (transpositions). Without a TT, `\\\_negamax` re-evaluates every transposed position from scratch. A TT keyed by a Zobrist hash stores `(depth, score, flag, best\\\_move)` per position, allowing the search to skip re-evaluation and use the stored best move for immediate ordering at that node. Expected gain: ~2× effective search depth in endgame; very large node savings throughout the move phase.
 
@@ -1184,7 +1184,7 @@ A shared weight tuned for one side is wrong for the other.
 
 - `ai/game\\\_ai.py` — probe TT at top of `\\\_negamax`; store on exit; use hash-move as first candidate in ordering; reset between `choose\\\_move` calls
 
-### SE-2 — Killer Heuristic (2 killers per depth) ⬜ ★ High Impact
+### SE-2 — Killer Heuristic (2 killers per depth) ✅ 2026-05-26
 
 **Why:** A move that causes a beta cutoff at depth `d` in one branch is statistically likely to cause a cutoff in sibling branches at the same depth. Storing two such "killer" moves per depth and trying them before the unsorted remainder (but after captures/mill-closures) reduces node count by 20–30%. Zero change to evaluation quality; the implementation is ~15 lines.
 
@@ -1476,6 +1476,37 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 
 - `AI_INTERNALS.md`
 
+### Bug B-48 — Endgame DB WIN lookup returns `moves[0]` instead of the best winning move ⬜
+
+**Symptom:** when `choose_move()` gets `WDL_WIN` back from the retrograde endgame DB, it returns `moves[0]` — the first legal move in generation order — rather than the specific move that leads to a position labelled `WDL_LOSS` for the opponent.
+
+**Why this matters:** in a won 3v3 fly endgame the AI knows it is winning but may still take dozens of extra moves to convert, or even accidentally step into a drawn line, if `moves[0]` happens to move to an opponent WIN or DRAW position.
+
+**Correct fix:** iterate over all legal fly moves from the current position; for each, compute the successor position and query `EndgameSolvedDB` with the side-to-move flipped; return the first move whose successor decodes to `WDL_LOSS` for the opponent. Fall through to the existing heuristic search only if no such move is found (should not happen in a correctly solved DB).
+
+**Sketch:**
+
+```python
+# In choose_move(), replace the WDL_WIN early-return block:
+for move in moves:
+    succ_board = apply_move(board, move)
+    succ_wdl = _esdb.query(succ_board)   # now queried from opponent's perspective
+    if succ_wdl == "L":                  # opponent is in a LOSS → this is our best move
+        self.last_thinking = "endgame DB (win)"
+        return move
+# no exact winner found — fall through to heuristic
+```
+
+Note: `EndgameSolvedDB.query()` already reads the `turn` field from `board.current_turn`, so after `apply_move` the successor board has the opponent's turn set automatically.
+
+**Files:**
+
+- `ai/game_ai.py` — `choose_move()` endgame DB WIN block
+
+- `ai/endgame_solved_db.py` — may need `query()` to accept an optional explicit turn override
+
+- `tests/test_game_ai.py` — add test: construct a known-won 3v3 position, assert `choose_move` picks the converting move
+
 ### Enhancement B-45 — Replace automatic AI resignation with an offer of defeat ⬜
 
 **Goal:** change the current automatic AI resignation into an offer of defeat that the human player can accept or decline, allowing lost positions to be played out when desired.
@@ -1511,4 +1542,27 @@ Gains compound with SE-1: the TT provides a hash-move to try first at each node,
 - `web/templates/index.html`
 
 - `AI_INTERNALS.md`
+
+### Bug B-49 — `endgame_solved_dir` relative path not resolved from project root ⬜
+
+**Symptom:** Server logs `EndgameSolvedDB: not found at data/endgame` even though the setting `"endgame_solved_dir": "data/endgame"` is present in `data/settings.json`. The DB file lives at `/mnt/windows/NMM_DB/endgame_3_3.wdl` (external drive).
+
+**Root cause:** `web/app.py` does `Path(_load_settings().get("endgame_solved_dir") or ...)`. When the value is the relative string `"data/endgame"`, Python resolves it from the process working directory, not from `_ROOT` (the project root). If the server is launched from a different directory the path silently misses.
+
+**Fix:**
+
+```python
+raw = _load_settings().get("endgame_solved_dir") or ""
+_esdb_dir = Path(raw) if (raw and Path(raw).is_absolute()) else (_ROOT / (raw or "data/endgame"))
+```
+
+Apply the same pattern to `fullgame_db_path` for consistency.
+
+**Immediate workaround:** set `"endgame_solved_dir": "/mnt/windows/NMM_DB"` in `data/settings.json` (absolute path bypasses the resolution issue).
+
+**Files:**
+
+- `web/app.py` — path resolution for `endgame_solved_dir` and `fullgame_db_path`
+
+- `data/settings.json` — update default/example to absolute path or document that relative paths are relative to project root
 

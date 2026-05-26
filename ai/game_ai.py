@@ -90,7 +90,7 @@ def _squeeze_targets(board: BoardState) -> set[str]:
     return targets
 
 
-def _order_moves(board: BoardState, moves: list, killers=None) -> list:
+def _order_moves(board: BoardState, moves: list, killers=None, history=None) -> list:
     """Sort moves so the most urgent are tried first (better alpha-beta pruning).
 
     Priority 0 — close own mill (immediate win/capture) OR create a fork
@@ -99,7 +99,7 @@ def _order_moves(board: BoardState, moves: list, killers=None) -> list:
                  OR occupy the last escape square of an opponent piece (herding).
     Priority K — killer moves: quiet moves that caused beta cutoffs at this depth
                  in sibling branches (SE-2).
-    Priority 2 — all other moves.
+    Priority 2 — all other moves, sorted descending by history score (SE-3).
 
     In fly phase with ~54 legal moves per side, this ensures blocking/closing
     moves are evaluated before the search deadline, so force_move returns a
@@ -143,7 +143,7 @@ def _order_moves(board: BoardState, moves: list, killers=None) -> list:
     squeeze = _squeeze_targets(board)
     block |= squeeze
 
-    if not close and not block and not killer_set:
+    if not close and not block and not killer_set and not history:
         return moves  # nothing to prioritize — skip the pass
 
     p0, p1, pk, p2 = [], [], [], []
@@ -157,6 +157,8 @@ def _order_moves(board: BoardState, moves: list, killers=None) -> list:
             pk.append(m)
         else:
             p2.append(m)
+    if history and p2:
+        p2.sort(key=lambda m: history.get((m.get("from"), m["to"]), 0), reverse=True)
     return p0 + p1 + pk + p2
 
 # Fixed-depth table for quick levels (1–4): search completes fast so no time cap needed.
@@ -255,6 +257,8 @@ class GameAI:
         # SE-2: 2 killer moves per remaining-depth level (up to depth 32).
         # Each slot is (from_sq, to_sq) or None.
         self._killers: list[list] = [[None, None] for _ in range(32)]
+        # SE-3: global history table keyed by (from_sq, to_sq); value = Σ depth².
+        self._history: dict = {}
         self._force_stop: bool = False     # set by force_stop(); cleared by choose_move()
         self.last_was_blunder: bool = False   # flag readable by Coordinator / MillsLLM
         self.last_thinking: str = ""          # short plain-English label for the chosen move
@@ -312,6 +316,7 @@ class GameAI:
         self.last_thinking = ""       # reset thinking trace
         self._tt.clear()
         self._killers = [[None, None] for _ in range(32)]
+        self._history = {}
         moves = get_all_legal_moves(board)
         if not moves:
             return {}
@@ -685,7 +690,7 @@ class GameAI:
         if moves is None:
             moves = get_all_legal_moves(board)
         killers = self._killers[depth] if depth < 32 else None
-        moves = _order_moves(board, moves, killers)
+        moves = _order_moves(board, moves, killers, self._history)
         self._nodes = 0
         best_move = moves[0]
         best_score = -INF
@@ -762,7 +767,7 @@ class GameAI:
         # Sort at upper levels only — biggest benefit to alpha-beta, negligible overhead
         if depth >= 2:
             killers = self._killers[depth] if depth < 32 else None
-            moves = _order_moves(board, moves, killers)
+            moves = _order_moves(board, moves, killers, self._history)
 
         # Promote the TT best-move to the front of the list regardless of its
         # priority bucket — it was the best move last time we searched this position.
@@ -785,10 +790,12 @@ class GameAI:
             if value > alpha:
                 alpha = value
             if alpha >= beta:
-                # Beta cutoff: store as killer if it's a quiet move (no capture).
-                # Captures are already in priority-0 and don't benefit from killer ordering.
+                # Beta cutoff: update killer and history tables for quiet moves.
+                # Captures are already in priority-0 and don't need these signals.
                 if not move.get("capture"):
                     self._store_killer(depth, move.get("from"), move["to"])
+                    key = (move.get("from"), move["to"])
+                    self._history[key] = self._history.get(key, 0) + depth * depth
                 break
 
         # ── Transposition table store ─────────────────────────────────────────

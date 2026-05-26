@@ -407,7 +407,35 @@ If the position is already won or lost, `evaluate()` returns `±INF` immediately
 
 ---
 
-## 4. Advanced Tactical Enhancements (B-Series)
+## 4. Search Stack (SE-Series)
+
+### SE-1 — Transposition Table + Zobrist Hashing
+
+The same board position can be reached via many different move sequences (transpositions). Without a TT, `_negamax` re-evaluates every transposed position from scratch.
+
+**Zobrist keys** (`game/zobrist.py`): 51 random 64-bit integers generated once at import time with a fixed seed:
+
+- `PIECE_KEYS[color_idx][sq_idx]` — XOR in when a piece of that colour occupies a square (48 keys: 2 colours × 24 squares).
+- `PLACED_DONE_KEYS[color_idx]` — XOR in when `pieces_placed[color] >= 9` (i.e., that side has finished the placement phase). Two keys, one per side.
+- `SIDE_KEY` — XOR in when it is Black's turn to move.
+
+`BoardState.hash_key` is maintained **incrementally** inside `apply_move()`: each move XORs out removed pieces, XORs in placed/moved pieces, toggles the done-placing bit if it crosses 9, and flips `SIDE_KEY`. `from_setup()` and `new_game()` compute the hash from scratch via `hash_board()`. This ensures hashes are consistent across all transposition paths without a full O(24) scan per node.
+
+**TranspositionTable** (`ai/transposition_table.py`): fixed-size 2^18 = 262 144-slot list, indexed by `hash_key & MASK`. Each occupied slot stores `(hash_key, depth, score, flag, from_sq, to_sq)`. Replacement policy: **depth-preferred** — a new entry only evicts the existing one if `new_depth >= stored_depth`, ensuring shallow searches never throw away work from deeper ones.
+
+Flag meanings:
+
+| Flag | Meaning |
+| --- | --- |
+| `EXACT` | Stored score is the true minimax value |
+| `LOWER_BOUND` | Search failed high (beta cutoff); score is a lower bound |
+| `UPPER_BOUND` | Search failed low (no move improved alpha); score is an upper bound |
+
+**Integration in `_negamax`**: the TT is probed after the terminal and depth=0 checks, before generating moves. If the entry depth is sufficient: `EXACT` → return immediately; `LOWER_BOUND` + score ≥ beta → return; `UPPER_BOUND` + score ≤ alpha → return. The stored best-move `(from_sq, to_sq)` is promoted to the front of the move list before `_order_moves` runs — this is the primary ordering gain. On exit, the result is stored (computing the flag from `alpha_orig`/`beta`). The TT is cleared at the start of each `choose_move()` call so context-dependent evaluation values (endgame_state, weights, etc.) never leak across turns.
+
+---
+
+## 4b. Advanced Tactical Enhancements (B-Series)
 
 ### B-2 — Placement chain deferral
 
@@ -495,6 +523,59 @@ A mill with high cycling freedom (several empty exits) can repeatedly open and r
 - Canonical NMM mill line names (e.g. "Outer bottom: g1-d1-a1") — the LLM guesses line names from the ASCII layout and sometimes gets them wrong.
 
 **Known failure mode (Bug B-9):** Because the LLM only has the ASCII grid to work from, it can misidentify which line a mill was formed on (e.g. commenting "mill on the e-line" when the mill was on the outer bottom), or ask about a mill threat on a line that is already occupied and immobile. See Bug B-9 in PLAN.md for the fix plan.
+
+## 5. Retrograde Endgame Database (B-23)
+
+### What it is
+
+`ai/endgame_solved_db.py` provides a fully solved, compact Win/Draw/Loss (WDL) table for every legal 3v3 fly-phase position. Unlike `EndgameDB` (which learns from self-play games), this table is computed offline by retrograde analysis and is mathematically exact.
+
+The table is built once with `tools/build_endgame_db.py` and saved as `data/endgame/endgame_3_3.wdl`.
+
+### Position encoding
+
+All 3v3 fly positions are encoded as a single integer in `[0, 5_383_840)` using the **combinatorial number system**:
+
+```
+pos_id = combo_rank(white_squares) * C(21,3) * 2
+       + combo_rank(black_squares_excluding_white) * 2
+       + turn_bit           # 0 = White to move, 1 = Black to move
+```
+
+- `combo_rank([c₀, c₁, …, c_{k-1}]) = Σ C(cᵢ, i+1)` — a bijective mapping from any sorted k-subset to an integer in `[0, C(n, k))`. This is the standard combinatorial number system and is NOT lexicographic order.
+- White occupies 3 of the 24 squares → `C(24,3) = 2024` values.
+- Black occupies 3 of the remaining 21 → `C(21,3) = 1330` values.
+- `TABLE_SIZE_3_3 = 2024 × 1330 × 2 = 5_383_840`.
+
+WDL values are packed 2 bits per slot (4 slots per byte): `UNKNOWN=0`, `WIN=1`, `LOSS=2`, `DRAW=3`. Total table size: 1_345_960 bytes (~1.3 MB).
+
+### Offline solver (`tools/build_endgame_db.py`)
+
+1. **Pass 0 — terminal wins.** For every 3v3 position where the side to move can close a mill (fly move to any empty square that completes 3-in-a-row) and then capture any opponent piece, that position is marked `WIN` — the mover can immediately reduce the opponent to 2 pieces.
+2. **Propagation passes.** Repeated passes apply:
+   - A position is `LOSS` if **all** successors are `WIN` (the mover is forced into a lost position no matter what they play).
+   - A position is `WIN` if **any** successor is `LOSS` (the mover can force the opponent into a `LOSS`).
+3. **DRAW assignment.** All positions still `UNKNOWN` after propagation converges are marked `DRAW`.
+
+Mill detection uses bitmasks: `_MILL_MASKS_FOR[i]` stores each mill mask that covers square `i`. `_closes_mill(piece_mask, to_idx)` runs in O(mills_per_square) time with no memory allocation.
+
+### Runtime usage
+
+At server startup, `web/app.py` loads the `EndgameSolvedDB` object from `endgame_solved_dir` (default `data/endgame`). This is passed to every `GameAI` constructor. If the file is absent the object silently reports `is_available() == False` and is ignored.
+
+In `choose_move()`, the endgame DB is consulted **before** the fullgame DB when all of these guards are true:
+
+- Both sides have placed all 9 pieces (`pieces_placed >= 9`).
+- Each side has exactly 3 pieces on the board (`pieces_on_board == 3`).
+- Total pieces on board ≤ 6.
+
+`query(board)` returns `"W"` (AI wins), `"L"` (AI loses), `"D"` (draw), or `None` (out of range / file not loaded).
+
+### Known limitation (B-48)
+
+When the DB returns `"W"`, `choose_move()` currently returns `moves[0]` rather than the specific move that leads to a `LOSS`-labelled successor. In a won position this means the AI always converts eventually, but may take extra moves. The fix (iterate successors, pick the first that decodes to `WDL_LOSS` from the opponent's perspective) is tracked as Bug B-48.
+
+---
 
 ### 1-config approach heuristic (`_one_config_approach`)
 

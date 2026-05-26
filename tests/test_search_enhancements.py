@@ -1,5 +1,5 @@
 """
-tests/test_search_enhancements.py — Unit tests for SE-2 (killers) and future SE-series.
+tests/test_search_enhancements.py — Unit tests for SE-2 (killers) and SE-3 (history).
 
 Tests focus on the pure data-structure logic (_store_killer, _order_moves with killers)
 rather than full-search integration, which is validated by the existing AI tests.
@@ -158,6 +158,94 @@ class TestOrderMovesWithKillers(unittest.TestCase):
             self.assertLessEqual(result_keys.index(k1), plain_keys.index(k1))
         if k2 and k2 in result_keys and k2 in plain_keys:
             self.assertLessEqual(result_keys.index(k2), plain_keys.index(k2))
+
+
+class TestHistoryHeuristic(unittest.TestCase):
+    """SE-3: history table incremented on quiet beta cutoffs; sorts p2 by score."""
+
+    def setUp(self):
+        self.ai = GameAI(color="W", difficulty=3)
+
+    # ── history accumulation ─────────────────────────────────────────────────
+
+    def test_history_empty_on_init(self):
+        self.assertEqual(self.ai._history, {})
+
+    def test_history_reset_each_choose_move(self):
+        self.ai._history[("a7", "d7")] = 999
+        b = BoardState.new_game()
+        self.ai.choose_move(b)
+        self.assertEqual(self.ai._history.get(("a7", "d7"), 0), 0)
+
+    def test_history_incremented_by_depth_squared(self):
+        key = ("a7", "d7")
+        self.ai._history[key] = self.ai._history.get(key, 0) + 4 * 4
+        self.assertEqual(self.ai._history[key], 16)
+        self.ai._history[key] = self.ai._history.get(key, 0) + 3 * 3
+        self.assertEqual(self.ai._history[key], 16 + 9)
+
+    def test_history_accumulates_across_depths(self):
+        key = (None, "d5")
+        for d in [5, 3, 5, 2]:
+            self.ai._history[key] = self.ai._history.get(key, 0) + d * d
+        self.assertEqual(self.ai._history[key], 25 + 9 + 25 + 4)
+
+    # ── _order_moves p2 sorting — tested with explicit move lists ────────────
+
+    def _p2_moves(self):
+        """Return three synthetic p2 moves (no mill-closing or blocking context)."""
+        # Use a completely empty board so there are no close/block squares.
+        b = BoardState.new_game()
+        # Placement moves: the entire board is empty, so nothing is close/block.
+        return b, [
+            {"from": None, "to": "a7", "capture": None},
+            {"from": None, "to": "d7", "capture": None},
+            {"from": None, "to": "g7", "capture": None},
+        ]
+
+    def test_history_sorts_p2_descending(self):
+        b, moves = self._p2_moves()
+        # Give d7 a high history score — it should sort to the front of p2.
+        hist = {(None, "d7"): 500, (None, "a7"): 100, (None, "g7"): 0}
+        result = _order_moves(b, moves, history=hist)
+        result_tos = [m["to"] for m in result]
+        self.assertEqual(result_tos[0], "d7")
+        self.assertEqual(result_tos[1], "a7")
+
+    def test_history_zero_scores_no_reorder(self):
+        b, moves = self._p2_moves()
+        without    = _order_moves(b, moves)
+        with_empty = _order_moves(b, moves, history={})
+        self.assertEqual([m["to"] for m in without], [m["to"] for m in with_empty])
+
+    def test_history_does_not_promote_into_p0_p1(self):
+        """History never moves a p2 move ahead of a p0/p1 move."""
+        b = _make_board()
+        from game.rules import get_all_legal_moves
+        moves = get_all_legal_moves(b)
+        if not moves:
+            self.skipTest("empty move list")
+        plain = _order_moves(b, moves)
+        first_key = (plain[0].get("from"), plain[0]["to"])
+
+        # Assign tiny history to the top-priority move, huge to the last.
+        last_key = (plain[-1].get("from"), plain[-1]["to"])
+        hist = {first_key: 1, last_key: 99999}
+        result = _order_moves(b, moves, history=hist)
+        # Top-priority move must still be first.
+        self.assertEqual((result[0].get("from"), result[0]["to"]), first_key)
+
+    def test_killers_before_history_sorted_p2(self):
+        """Killer tier comes before history-sorted p2, never after."""
+        b, moves = self._p2_moves()   # all three moves are p2 on empty board
+        # Make "a7" a killer and give "g7" a high history score.
+        killer = (None, "a7")
+        hist   = {(None, "g7"): 9999, (None, "d7"): 100, (None, "a7"): 0}
+        result = _order_moves(b, moves, killers=[killer, None], history=hist)
+        tos = [m["to"] for m in result]
+        # a7 is killer → first; then p2 sorted by history: g7 (9999), d7 (100).
+        self.assertEqual(tos[0], "a7")
+        self.assertEqual(tos[1], "g7")
 
 
 if __name__ == "__main__":
