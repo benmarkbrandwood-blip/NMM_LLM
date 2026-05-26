@@ -192,8 +192,9 @@ class TestBinaryRoundtrip(unittest.TestCase):
             self.assertGreater(n, 0)
             self.assertTrue(bin_path.exists())
 
-            # File size must be header + n × 32 bytes.
-            expected = 32 + n * 32
+            # File size must be header + n × RECORD_SIZE bytes (v2 = 36 bytes/record).
+            from ai.fullgame_db import HEADER_SIZE, RECORD_SIZE
+            expected = HEADER_SIZE + n * RECORD_SIZE
             self.assertEqual(bin_path.stat().st_size, expected)
 
             # Open via FullGameDB — must detect binary format.

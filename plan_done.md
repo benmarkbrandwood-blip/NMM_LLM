@@ -2134,3 +2134,146 @@ python tools/endgame\_play.py --seed-from-games --positions 200 --parallel 4
 
 - `README.md`: Added Personality Profiles table, Position Setup editor walkthrough, Named Openings expanded section, Training Tools section with tool index and workflow, AI Slider Weights Reference section with grouped weight tables.
 
+---
+
+## Archived 2026-05-25 — Track 1: Heuristic / Phase-Control
+
+### B-46 — Add `placement_index` parameter ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `tactical_move_bonus()` gains `placement_index = before.pieces_placed.get(color, 0)` (0–8). `late_placement_multiplier` curve: 0–5→1.0, 6→0.8, 7→0.5, 8→0.25. Applied to `setup_mill`, `scatter_placement`, `feeder_diamond`, `fork_anticipation`. Prerequisite for B-28/B-47.
+
+### B-28 — Late-placement capitalisation scaling ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — setup-building bonuses tapered by `late_placement_multiplier` from B-46. `close_mill` bonus ×1.5 on placement 9; `block_opponent_mill` ×1.5 on placements 8–9. Validates B-34/B-35 game examples.
+
+### B-29 — Busy-chain priority: suppress `close_mill` when level-4 chain confirmed ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — when `_placement_chain_scan()` returns level 4, `close_mill_contribution` is suppressed for non-chain moves. Added `busy_chain_priority` weight (default 400). Extended `placement_busy_scan` depth to 5 plies when chain remains forcing.
+
+### B-37 — Opponent chain detection: mirror `_placement_chain_scan` ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `_opp_chain_level = _placement_chain_scan(board, opp)` evaluated alongside own chain. Emergency disruption mode when `opp_chain_level >= 3`; level-4 treated equivalent to direct mill threat. Commentary flag added to Coordinator.
+
+### B-36 — Unguarded cardinal mill alert ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `_unguarded_cardinal_mill_alert(board, opp)`: detects opponent cardinal mills where both other squares are opponent-occupied and no own piece is adjacent. Penalty ~300 per skeleton in `evaluate()`; bonus ~300 for placing on the closing square. Regression tests added for the `1.f4 b4 2.d2 d6 3.d5 d3 4.d7 c4` failure.
+
+### B-22 — Emergency block fix + regression test ✅ *(2026-05-25)*
+
+- Investigated FEN at move 32. `_immediate_mill_threats` detection confirmed. Added `forced_block_priority` flag that gates speculative setup bonuses when immediate mill threat exists. Regression test added for the exact FEN.
+
+### B-47 — White / Black asymmetric placement weights ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `HeuristicWeights` gains `white_cardinal_early` (260), `black_convergence_early` (325), `black_fork_anticipation_early` (117), `black_dual_threat_late` (240), `white_independent_mills` (280). `tactical_move_bonus()` uses asymmetric fields when `placement_index` is in relevant window.
+
+### B-33 — Dead-block quality / forcing response value ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `_placement_chain_scan()` extended to score opponent's forced response square utility (corner node = high forcing quality → higher bonus; cardinal/cross = no extra). Added `dead_block_bonus` weight (~60) per forcing step where opponent lands on low-mobility square.
+
+### B-30 — Dual-mill oscillation preservation ✅ *(2026-05-25)*
+
+- `ai/heuristics.py` — `search_ahead_busy` / `_placement_chain_scan` terminal reward recognises dual open mills, shared-pivot oscillating mill closures, two 2-configs sharing a pivot piece. `defer_for_chain` raised so these beat local mill closure. Regression test from supplied move sequence added.
+
+---
+
+## Archived 2026-05-26 — Track 2: DB / Infrastructure
+
+### B-26 — Wire FullGameDB into server ✅ *(2026-05-26)*
+
+- `web/app.py` — loads `FullGameDB` at startup from `fullgame_db_path` setting (absolute or relative to `_ROOT`). Passed to every `GameAI` constructor. Added to `/api/settings` GET response.
+- `data/settings.json` — `fullgame_db_path` key added.
+
+### B-23 — Syzygy-style endgame DB builder ✅ *(2026-05-26)*
+
+- `tools/build_endgame_db.py` (new) — retrograde solver for ≤10 pieces, 2-bit WDL array + 1-byte DTZ array, direct combinatorial indexing (O(1) query). Flags: `--max-pieces`, `--db-dir`, `--dry-run`, `--wdl-only`.
+- `ai/endgame_solved_db.py` (new) — O(1) query via combinatorial index. `EndgameSolvedDB(dir)` loads `endgame_wdl.bin` / `endgame_dtz.bin`.
+- `web/app.py` — loads at startup from `endgame_solved_dir` setting; passed to `GameAI`.
+
+---
+
+## Archived 2026-05-26 — Track 3: Search Stack (SE-1 through SE-9)
+
+### SE-1 — Transposition Table + Zobrist Hashing ✅ *(2026-05-26)*
+
+- `ai/transposition_table.py` — fixed-size list, depth-preferred replacement, Zobrist hash (73 keys: 24 squares × 3 states + side-to-move).
+- `ai/game_ai.py` — TT probe at top of `_negamax`; store on exit; hash-move as first candidate; reset between `choose_move` calls.
+
+### SE-2 — Killer Heuristic ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `self._killers` (2 per depth, 32 depths); `_store_killer()`; killer-match tier inserted between P1 and P2 in `_order_moves`.
+
+### SE-3 — History Heuristic ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `self._history` dict; incremented by `depth²` on beta cutoff; used as tiebreaker in P2 bucket of `_order_moves`.
+
+### SE-4 — Endgame Tablebase Query Inside Search ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `EndgameDB` lookup at top of `_negamax` when `total_pieces <= 8`; returns `outcome * (INF - depth)` for fastest-win ordering.
+
+### SE-5 — Principal Variation Search (PVS) ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — first move searched at full window; siblings at zero-window `(alpha, alpha+1)` with re-search on fail-high.
+
+### SE-6 — Late Move Reductions (LMR) ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — last 60% of sorted moves reduced by 1 ply at depth ≥ 4; re-search at full depth on fail-high. Guards: mill-closing moves (P0), opponent-mill-blocking (P1), depth < 3, root level.
+
+### SE-7 — Aspiration Windows ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `[prev_score − 175, prev_score + 175]` window per iterative-deepening iteration; widen and re-search on fail-high or fail-low.
+
+### SE-8 — Search Extensions ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `_negamax` gains `ext_budget: int = 0`; extends +1 for own 2-config threats or ≥2 opponent 2-config forks; budget = `depth // 2` seeded from root; threaded through all recursive calls.
+
+### SE-9 — Quiescence Search ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `_qsearch()` called at depth 0 when capture moves exist; stand-pat pruning; searches only captures; depth cap `_Q_DEPTH=2`; terminal score uses `q_depth` not `depth`.
+
+### Root alpha-beta bug fix ✅ *(2026-05-26)*
+
+- `_root_search` was passing `alpha = best_score` (total = raw + tactical_bonus) as negamax window, causing fail-hard clipping for later moves. Fix: `alpha_raw` tracked separately; window uses `alpha_raw` only; `score_total` used for best-move selection only.
+
+---
+
+## Archived 2026-05-26 — Tactical / Heuristic Enhancements
+
+### B-39 — Penalise disrupted 2-configs next to opponent blocker ✅ *(2026-05-26)*
+
+- `ai/heuristics.py` — `_is_disrupted_two_config()` helper; `disrupted_two_config_penalty` applied when `(own, own, opp)` adjacency makes 2-config non-convertible. Overridden by emergency block / immediate mill / busy-chain.
+
+### B-40 — Preserve and cycle shared-piece dual mills ✅ *(2026-05-26)*
+
+- `ai/heuristics.py` — increased `shared_pivot_detection` and `mobile_mill_value` for legal, repeatable oscillation structures.
+- `ai/game_ai.py` — persistence bonus for maintaining a working dual-mill cycle.
+
+### B-41 — Move safest re-closing piece when opening a mill ✅ *(2026-05-26)*
+
+- `ai/heuristics.py` — `safe_mill_open_bonus` / `unsafe_mill_open_penalty`.
+- `ai/game_ai.py` — when candidate moves open an existing mill, evaluate which departure square preserves the highest probability of immediate legal re-closure.
+
+### B-42 — Endgame move choice drifting instead of closing mills ✅ *(2026-05-26)*
+
+- Diagnosed: exact endgame DB hits now dominate fly-phase; `_move_closes_mill()` confirmed active; phase-specific fallback re-weighted with raised `mill_closure_rate` and `immediate_mill_bonus` in endgame.
+
+### B-43 — Prefer mill closure that removes opponent threat ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — tactical ladder Priority 5 extended: "close own mill and remove opponent immediate mill threat" recognised as premium class.
+- `ai/heuristics.py` — `dual_purpose_bonus` raised for captures that remove opponent's feeder/blocking piece needed for next-turn mill closure.
+
+### B-44 — Mill captures should remove piece opponent most needs ✅ *(2026-05-26)*
+
+- `ai/heuristics.py` — `capture_replacement_pressure_bonus` and `capture_feeder_removal_bonus` added. Capture selection ranks removable pieces by replacement burden and threat interruption.
+
+### B-48 — Endgame DB WIN: return best winning move, not `moves[0]` ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `choose_move()` WDL_WIN block iterates all legal moves; for each computes successor and queries `EndgameSolvedDB` from opponent's perspective; returns first move whose successor decodes to WDL_LOSS for opponent.
+
+### B-49 — `endgame_solved_dir` relative path not resolved from project root ✅ *(2026-05-26)*
+
+- `web/app.py` — path resolution: absolute paths used as-is; relative paths resolved from `_ROOT`. Same pattern applied to `fullgame_db_path`.
+
+### B-50 — AI does not block opponent double 2-config (fork) during placement ✅ *(2026-05-26)*
+
+- `ai/game_ai.py` — `_immediate_mill_threats()` extended for placement phase: when opponent has ≥2 simultaneous 2-configs, both closing squares added to threats set, triggering mandatory-block filter.
+

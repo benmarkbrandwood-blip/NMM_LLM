@@ -44,6 +44,7 @@ Generated files are intentionally placed under data/ by default — see .gitigno
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import sqlite3
@@ -209,6 +210,7 @@ CREATE TABLE IF NOT EXISTS positions (
 -- We pack edges as a single TEXT blob per position rather than a separate
 -- table — keeps disk footprint smaller for big builds (one row vs ~10).
 ALTER TABLE positions ADD COLUMN trajectories TEXT;  -- ignored if column exists
+ALTER TABLE positions ADD COLUMN frequency INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS meta (
     k TEXT PRIMARY KEY,
@@ -223,6 +225,8 @@ def _ensure_trajectories_column(conn: sqlite3.Connection) -> None:
     cols = {row[1] for row in conn.execute("PRAGMA table_info(positions)")}
     if "trajectories" not in cols:
         conn.execute("ALTER TABLE positions ADD COLUMN trajectories TEXT")
+    if "frequency" not in cols:
+        conn.execute("ALTER TABLE positions ADD COLUMN frequency INTEGER NOT NULL DEFAULT 0")
 
 
 def init_db(path: Path) -> sqlite3.Connection:
@@ -508,6 +512,215 @@ class FullGameDBBuilder:
         self.conn.close()
 
 
+# ── Game-based builder (B-52) ────────────────────────────────────────────────
+
+def _is_human_game(game: dict) -> bool:
+    """Return True for human-human and human-AI games; False for AI-AI self-play."""
+    if game.get("human_color"):
+        return True  # human-AI game
+    moves = game.get("moves") or []
+    # human-human: human_color is null AND no move has a non-null game_ai_score
+    if all(m.get("game_ai_score") is None for m in moves):
+        return True
+    return False
+
+
+def _game_notation_to_move(move: dict) -> Optional[dict]:
+    """Convert a JSONL move record into a move dict compatible with apply_move."""
+    to = move.get("to")
+    if not to:
+        return None
+    return {
+        "from": move.get("from"),
+        "to": to,
+        "capture": move.get("capture"),
+    }
+
+
+class GameBasedBuilder:
+    """Scan human-played JSONL game records and build a frequency-weighted DB.
+
+    Each position reached in a qualifying game increments the `frequency`
+    counter for that canonical key.  No BFS/DFS is performed; coverage is
+    limited to positions that actually occurred in the supplied games.
+    """
+
+    def __init__(
+        self,
+        db_path: Path,
+        min_frequency: int = 1,
+        min_frequency_placement: Optional[int] = None,
+        commit_every: int = 2000,
+        progress_every: float = 5.0,
+    ) -> None:
+        self.db_path = db_path
+        self.min_frequency = min_frequency
+        self.min_frequency_placement = min_frequency_placement or min_frequency
+        self.commit_every = commit_every
+        self.progress_every = progress_every
+        self.conn = init_db(db_path)
+        self._processed = 0
+        self._skipped = 0
+        self._positions_seen = 0
+        self._t_start = time.monotonic()
+        self._t_last_progress = self._t_start
+
+    def scan_games(self, games_dir: Path) -> None:
+        """Scan all *.jsonl files in games_dir for qualifying human games."""
+        import glob
+
+        files = sorted(glob.glob(str(games_dir / "*.jsonl")))
+        logger.info("GameBasedBuilder: scanning %d game files in %s", len(files), games_dir)
+
+        for fpath in files:
+            try:
+                with open(fpath) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            game = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if not _is_human_game(game):
+                            self._skipped += 1
+                            continue
+                        self._process_game(game)
+            except OSError as exc:
+                logger.warning("GameBasedBuilder: could not read %s — %s", fpath, exc)
+
+        self.conn.commit()
+        logger.info(
+            "GameBasedBuilder: processed=%d skipped=%d positions_seen=%d",
+            self._processed, self._skipped, self._positions_seen,
+        )
+
+    def _process_game(self, game: dict) -> None:
+        moves = game.get("moves") or []
+        board = BoardState.new_game()
+        keys_in_game: list[bytes] = []
+
+        for move_record in moves:
+            mv = _game_notation_to_move(move_record)
+            if mv is None:
+                break
+            try:
+                key = position_key(board)
+                keys_in_game.append(key)
+                board = board.apply_move(mv)
+            except Exception:
+                break  # illegal move or unexpected error; stop processing this game
+
+        # Record the terminal position too
+        try:
+            keys_in_game.append(position_key(board))
+        except Exception:
+            pass
+
+        for key in keys_in_game:
+            self.conn.execute(
+                "INSERT INTO positions (key, outcome, depth, best_move, trajectories, samples, frequency) "
+                "VALUES (?, NULL, NULL, NULL, '', 1, 1) "
+                "ON CONFLICT(key) DO UPDATE SET "
+                " samples   = positions.samples + 1, "
+                " frequency = positions.frequency + 1",
+                (key,),
+            )
+            self._positions_seen += 1
+
+        self._processed += 1
+        if self._processed % self.commit_every == 0:
+            self.conn.commit()
+            self._maybe_progress()
+
+    def apply_pruning(self) -> int:
+        """Delete positions below the min-frequency threshold (except solved ones)."""
+        deleted = self.conn.execute(
+            "DELETE FROM positions WHERE frequency < ? AND outcome IS NULL",
+            (self.min_frequency,),
+        ).rowcount
+        self.conn.commit()
+        logger.info("GameBasedBuilder: pruned %d low-frequency positions.", deleted)
+        return deleted
+
+    def write_meta(self, **kv: str) -> None:
+        for k, v in kv.items():
+            self.conn.execute(
+                "INSERT INTO meta(k,v) VALUES(?,?) "
+                "ON CONFLICT(k) DO UPDATE SET v=excluded.v",
+                (k, str(v)),
+            )
+        self.conn.commit()
+
+    def close(self) -> None:
+        self.conn.commit()
+        self.conn.close()
+
+    def _maybe_progress(self) -> None:
+        now = time.monotonic()
+        if now - self._t_last_progress < self.progress_every:
+            return
+        self._t_last_progress = now
+        elapsed = now - self._t_start
+        rate = self._processed / elapsed if elapsed > 0 else 0
+        logger.info(
+            "progress: processed=%d skipped=%d positions=%d rate=%.1f games/s",
+            self._processed, self._skipped, self._positions_seen, rate,
+        )
+
+
+def _incremental_update(
+    db_path: Path,
+    games_dir: Path,
+    min_frequency: int,
+) -> int:
+    """Scan new JSONL files since last update and increment frequencies."""
+    conn = sqlite3.connect(str(db_path))
+    _ensure_trajectories_column(conn)
+
+    # Determine last_updated timestamp from meta
+    row = conn.execute("SELECT v FROM meta WHERE k='last_updated'").fetchone()
+    last_updated = int(row[0]) if row else 0
+
+    import glob
+    files = [
+        f for f in glob.glob(str(games_dir / "*.jsonl"))
+        if int(os.path.getmtime(f)) > last_updated
+    ]
+    conn.close()
+
+    if not files:
+        print("No new game files since last update.")
+        return 0
+
+    print(f"Incremental update: {len(files)} new game files.")
+    builder = GameBasedBuilder(db_path, min_frequency=min_frequency)
+    for fpath in files:
+        try:
+            with open(fpath) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        game = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not _is_human_game(game):
+                        continue
+                    builder._process_game(game)
+        except OSError as exc:
+            logger.warning("Incremental update: cannot read %s — %s", fpath, exc)
+
+    builder.conn.commit()
+    pruned = builder.apply_pruning()
+    builder.write_meta(last_updated=str(int(time.time())))
+    builder.close()
+    print(f"Incremental update complete: {builder._processed} games, {pruned} positions pruned.")
+    return builder._processed
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -566,16 +779,42 @@ def main() -> int:
         help="Pip-install project requirements before building.",
     )
     parser.add_argument(
-        "--format", choices=["sqlite", "binary"], default="sqlite",
+        "--format", choices=["sqlite", "binary"], default="binary",
         help=(
-            "Output format.  'sqlite' (default) writes the SQLite DB only.  "
-            "'binary' writes the SQLite DB first (as build intermediate), then "
-            "exports it to a sorted binary file alongside the SQLite output."
+            "Output format.  'binary' (default) writes the SQLite DB first (as "
+            "build intermediate), then exports it to a sorted binary file alongside "
+            "the SQLite output.  'sqlite' writes the SQLite DB only."
         ),
     )
     parser.add_argument(
         "--quiet", "-q", action="store_true",
         help="Suppress per-progress logging.",
+    )
+    parser.add_argument(
+        "--source-games", type=Path, default=None, metavar="DIR",
+        help=(
+            "Scan human-played JSONL game records in DIR instead of BFS enumeration. "
+            "Only human-human and human-AI games are included. "
+            "Enables frequency tracking per position."
+        ),
+    )
+    parser.add_argument(
+        "--min-frequency", type=int, default=1, metavar="N",
+        help=(
+            "After scanning games, prune positions reached in fewer than N games "
+            "(default 1 = keep all). Solved positions (WIN/LOSS/DRAW) are always kept."
+        ),
+    )
+    parser.add_argument(
+        "--min-frequency-placement", type=int, default=None, metavar="P",
+        help="Stricter frequency threshold for placement-phase positions (default: same as --min-frequency).",
+    )
+    parser.add_argument(
+        "--update-from-games", type=Path, default=None, metavar="DIR",
+        help=(
+            "Incremental update mode: scan new JSONL files in DIR since last build, "
+            "increment frequencies, re-apply --min-frequency pruning, then rebuild binary."
+        ),
     )
     args = parser.parse_args()
 
@@ -616,6 +855,36 @@ def main() -> int:
     if args.install_deps:
         _maybe_pip_install_requirements()
 
+    # ── Incremental update mode ──────────────────────────────────────────────
+    if args.update_from_games is not None:
+        if not args.update_from_games.is_dir():
+            print(f"ERROR: --update-from-games: not a directory: {args.update_from_games}",
+                  file=sys.stderr)
+            return 1
+        if not output_path.exists():
+            print(f"ERROR: DB not found at {output_path}. Run a full build first.",
+                  file=sys.stderr)
+            return 1
+        n = _incremental_update(
+            output_path,
+            args.update_from_games,
+            args.min_frequency,
+        )
+        if n == 0:
+            return 0
+        # Fall through to binary export + settings update
+        if args.format == "binary":
+            binary_path = output_path.with_suffix(".bin")
+            fgdb_mod = _load_fullgame_db_module()
+            n_rec = fgdb_mod.export_to_binary(output_path, binary_path)
+            size_mb = os.path.getsize(binary_path) / (1024 * 1024)
+            print(f"Binary export: {n_rec} records, {size_mb:.1f} MB → {binary_path}")
+            final_db_path = binary_path
+        else:
+            final_db_path = output_path
+        _update_settings(final_db_path)
+        return 0
+
     if args.dry_run:
         # Build a tiny in-memory DB to exercise every code path.
         logger.info("DRY RUN: tiny in-memory build, 100 positions, no disk write.")
@@ -645,6 +914,52 @@ def main() -> int:
         print(f"DRY RUN OK: positions={count} resolved={resolved}")
         return 0
 
+    # ── Game-based build (B-52) ──────────────────────────────────────────────
+    if args.source_games is not None:
+        if not args.source_games.is_dir():
+            print(f"ERROR: --source-games: not a directory: {args.source_games}",
+                  file=sys.stderr)
+            return 1
+        t0 = time.monotonic()
+        gb = GameBasedBuilder(
+            output_path,
+            min_frequency=args.min_frequency,
+            min_frequency_placement=args.min_frequency_placement,
+        )
+        gb.scan_games(args.source_games)
+        pruned = 0
+        if args.min_frequency > 1:
+            pruned = gb.apply_pruning()
+        gb.write_meta(
+            schema_version="1",
+            built_at=str(int(time.time())),
+            source="games",
+            last_updated=str(int(time.time())),
+            min_frequency=str(args.min_frequency),
+        )
+        if args.vacuum:
+            gb.conn.execute("VACUUM")
+        elapsed = time.monotonic() - t0
+        count = gb.conn.execute("SELECT COUNT(*) FROM positions").fetchone()[0]
+        size_mb = os.path.getsize(output_path) / (1024 * 1024)
+        gb.close()
+        print(
+            f"Game-based build: {count} positions ({pruned} pruned) "
+            f"from {gb._processed} games in {elapsed:.1f}s, {size_mb:.1f} MB on disk."
+        )
+        if args.format == "binary":
+            binary_path = output_path.with_suffix(".bin")
+            fgdb_mod = _load_fullgame_db_module()
+            n = fgdb_mod.export_to_binary(output_path, binary_path)
+            size_mb = os.path.getsize(binary_path) / (1024 * 1024)
+            print(f"Binary export: {n} records, {size_mb:.1f} MB → {binary_path}")
+            final_db_path = binary_path
+        else:
+            final_db_path = output_path
+        _update_settings(final_db_path)
+        return 0
+
+    # ── Standard BFS build ───────────────────────────────────────────────────
     max_pos = args.max_positions
     if args.sample is not None:
         max_pos = args.sample
@@ -687,8 +1002,27 @@ def main() -> int:
         n = fgdb_mod.export_to_binary(output_path, binary_path)
         size_mb = os.path.getsize(binary_path) / (1024 * 1024)
         print(f"Binary export: {n} records, {size_mb:.1f} MB → {binary_path}")
+        final_db_path = binary_path
+    else:
+        final_db_path = output_path
 
+    _update_settings(final_db_path)
     return 0
+
+
+def _update_settings(db_path: Path) -> None:
+    settings_path = _ROOT / "data" / "settings.json"
+    try:
+        settings: dict = {}
+        if settings_path.exists():
+            with open(settings_path) as f:
+                settings = json.load(f)
+        settings["fullgame_db_path"] = str(db_path)
+        with open(settings_path, "w") as f:
+            json.dump(settings, f, indent=2)
+        print(f"Settings updated: fullgame_db_path = {db_path}")
+    except OSError as exc:
+        print(f"WARNING: could not update settings.json: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

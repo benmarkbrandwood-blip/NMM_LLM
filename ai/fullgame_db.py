@@ -59,15 +59,19 @@ logger = logging.getLogger(__name__)
 # ── Binary format constants ──────────────────────────────────────────────────
 
 HEADER_MAGIC = b"NMM_FGDB"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 1      # legacy: 32-byte records, no frequency
+FORMAT_VERSION_2 = 2    # current: 36-byte records, includes frequency
 HEADER_SIZE = 32    # bytes
-RECORD_SIZE = 32    # bytes
+RECORD_SIZE_V1 = 32  # bytes (version 1)
+RECORD_SIZE = 36    # bytes (version 2, default for new builds)
 KEY_SIZE = 9        # bytes
 
 _HEADER_FMT = "<8sHI18x"    # magic(8) + version(2) + record_count(4) + pad(18)
-_RECORD_FMT = "<9sBHIIIII"  # key(9) + outcome(1) + depth(2) + best_move(4) + 4×child(4)
+_RECORD_FMT_V1 = "<9sBHIIIII"   # key(9) + outcome(1) + depth(2) + best_move(4) + 4×child(4)
+_RECORD_FMT = "<9sBHIIIIII"     # v2: same + frequency(4)
 
 assert struct.calcsize(_HEADER_FMT) == HEADER_SIZE
+assert struct.calcsize(_RECORD_FMT_V1) == RECORD_SIZE_V1
 assert struct.calcsize(_RECORD_FMT) == RECORD_SIZE
 
 # Position index tables for move packing
@@ -182,30 +186,46 @@ def _unpack_trajectories(blob: str) -> list[tuple[str, bytes, str]]:
 
 
 def export_to_binary(sqlite_path: str | Path, binary_path: str | Path) -> int:
-    """Export a fullgame SQLite DB to the sorted binary format.
+    """Export a fullgame SQLite DB to the sorted binary format (version 2).
 
     Reads *sqlite_path* (must exist) in key-ascending order and writes
     *binary_path*.  The SQLite file is not modified.  Returns the number of
     records written.
 
-    This is the only place the binary format is *written*; reading is done
-    through ``FullGameDB``.
+    Version 2 records are 36 bytes: key(9) + outcome(1) + depth(2) +
+    best_move(4) + 4×child(4) + frequency(4).
     """
     sqlite_path = Path(sqlite_path)
     binary_path = Path(binary_path)
 
     conn = sqlite3.connect(f"file:{sqlite_path}?mode=ro", uri=True)
-    rows = conn.execute(
-        "SELECT key, outcome, depth, best_move, trajectories "
-        "FROM positions ORDER BY key ASC"
-    ).fetchall()
+    # Check whether a frequency column exists (added by B-52 builder)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(positions)")}
+    has_freq = "frequency" in cols
+    if has_freq:
+        rows = conn.execute(
+            "SELECT key, outcome, depth, best_move, trajectories, frequency "
+            "FROM positions ORDER BY key ASC"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT key, outcome, depth, best_move, trajectories "
+            "FROM positions ORDER BY key ASC"
+        ).fetchall()
     conn.close()
 
     records: list[bytes] = []
-    for key, outcome, depth, best_move, traj_blob in rows:
+    for row in rows:
+        if has_freq:
+            key, outcome, depth, best_move, traj_blob, freq = row
+        else:
+            key, outcome, depth, best_move, traj_blob = row
+            freq = 1
+
         outcome_byte = _OUTCOME_ENCODE.get(outcome, 0)
         depth_val = 0xFFFF if depth is None else min(int(depth), 0xFFFE)
         bm_packed = _pack_move(best_move, "N")
+        freq_val = max(0, int(freq or 1))
 
         edges = _unpack_trajectories(traj_blob or "")
         informative = [e for e in edges if e[2] in ("W", "L")]
@@ -220,10 +240,11 @@ def export_to_binary(sqlite_path: str | Path, binary_path: str | Path) -> int:
             _RECORD_FMT,
             key, outcome_byte, depth_val, bm_packed,
             children[0], children[1], children[2], children[3],
+            freq_val,
         ))
 
     record_count = len(records)
-    header = struct.pack(_HEADER_FMT, HEADER_MAGIC, FORMAT_VERSION, record_count)
+    header = struct.pack(_HEADER_FMT, HEADER_MAGIC, FORMAT_VERSION_2, record_count)
 
     with open(binary_path, "wb") as fh:
         fh.write(header)
@@ -245,6 +266,7 @@ class FullGameResult:
     best_move_canonical: Optional[str]
     sym_idx: int                    # transform that maps actual board → canonical
     trajectories: list[tuple[str, bytes, str]]  # (canonical_notation, child_key, flag)
+    frequency: int = 0              # number of human games that reached this position
 
 
 class FullGameDB:
@@ -257,6 +279,8 @@ class FullGameDB:
         self._mmap: Optional[mmap.mmap] = None
         self._file_handle = None
         self._record_count: int = 0
+        self._record_size: int = RECORD_SIZE   # set by _open_binary
+        self._record_fmt: str = _RECORD_FMT    # set by _open_binary
 
         if not self.path.exists():
             return
@@ -282,7 +306,13 @@ class FullGameDB:
             magic, version, record_count = struct.unpack(_HEADER_FMT, raw)
             if magic != HEADER_MAGIC:
                 raise ValueError(f"bad magic: {magic!r}")
-            if version != FORMAT_VERSION:
+            if version == FORMAT_VERSION:
+                self._record_size = RECORD_SIZE_V1
+                self._record_fmt = _RECORD_FMT_V1
+            elif version == FORMAT_VERSION_2:
+                self._record_size = RECORD_SIZE
+                self._record_fmt = _RECORD_FMT
+            else:
                 raise ValueError(f"unsupported version: {version}")
             self._record_count = record_count
             self._binary = True
@@ -293,7 +323,8 @@ class FullGameDB:
                 self._file_handle.fileno(), 0, access=mmap.ACCESS_READ
             )
             logger.info(
-                "FullGameDB: opened binary %s — %d records.", self.path, record_count
+                "FullGameDB: opened binary %s — %d records (v%d).",
+                self.path, record_count, version,
             )
         except Exception as exc:
             logger.warning("FullGameDB: could not open binary %s — %s", self.path, exc)
@@ -338,7 +369,7 @@ class FullGameDB:
         lo, hi = 0, self._record_count - 1
         while lo <= hi:
             mid = (lo + hi) // 2
-            offset = HEADER_SIZE + mid * RECORD_SIZE
+            offset = HEADER_SIZE + mid * self._record_size
             rec_key = self._mmap[offset : offset + KEY_SIZE]
             if rec_key == key:
                 return self._decode_record(offset)
@@ -349,10 +380,11 @@ class FullGameDB:
         return None
 
     def _decode_record(self, offset: int) -> FullGameResult:
-        raw = self._mmap[offset : offset + RECORD_SIZE]
-        _key, outcome_byte, depth_val, bm_packed, c0, c1, c2, c3 = struct.unpack(
-            _RECORD_FMT, raw
-        )
+        raw = self._mmap[offset : offset + self._record_size]
+        unpacked = struct.unpack(self._record_fmt, raw)
+        _key, outcome_byte, depth_val, bm_packed = unpacked[0], unpacked[1], unpacked[2], unpacked[3]
+        c0, c1, c2, c3 = unpacked[4], unpacked[5], unpacked[6], unpacked[7]
+        frequency = int(unpacked[8]) if len(unpacked) > 8 else 0
 
         outcome = _OUTCOME_DECODE.get(outcome_byte)
         depth = None if depth_val == 0xFFFF else depth_val
@@ -370,6 +402,7 @@ class FullGameDB:
             best_move_canonical=bm_notation,
             sym_idx=0,  # caller fills in the real sym_idx after binary search
             trajectories=trajectories,
+            frequency=frequency,
         )
 
     # ── Query ────────────────────────────────────────────────────────────────
@@ -390,19 +423,33 @@ class FullGameDB:
         if self._conn is None:
             return None
 
-        row = self._conn.execute(
-            "SELECT outcome, depth, best_move, trajectories FROM positions WHERE key = ?",
-            (key,),
-        ).fetchone()
-        if row is None:
-            return None
-        outcome, depth, best_move, traj_blob = row
+        # Try to fetch frequency if the column exists; fall back gracefully.
+        try:
+            row = self._conn.execute(
+                "SELECT outcome, depth, best_move, trajectories, frequency "
+                "FROM positions WHERE key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                return None
+            outcome, depth, best_move, traj_blob, freq = row
+        except sqlite3.OperationalError:
+            row = self._conn.execute(
+                "SELECT outcome, depth, best_move, trajectories FROM positions WHERE key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                return None
+            outcome, depth, best_move, traj_blob = row
+            freq = 0
+
         return FullGameResult(
             outcome=outcome,
             depth=depth,
             best_move_canonical=best_move,
             sym_idx=sym,
             trajectories=_unpack_trajectories(traj_blob or ""),
+            frequency=int(freq or 0),
         )
 
     # ── Convenience helpers used by GameAI ──────────────────────────────────
@@ -414,6 +461,47 @@ class FullGameDB:
             return None
         inv = SYM_INVERSE[result.sym_idx]
         return transform_notation(result.best_move_canonical, inv)
+
+    def best_move_validated(self, board: BoardState) -> Optional[str]:
+        """Return the best move in actual-board notation, verified against legal moves.
+
+        Used by SE-14 to promote the DB hint to front of the negamax move list
+        without risking an illegal move from a stale or symmetry-mapping error.
+        Returns None if the DB has no hit, no best move, or the move is illegal.
+        """
+        from game.rules import get_all_legal_moves
+
+        result = self.query(board)
+        if result is None or not result.best_move_canonical:
+            return None
+        inv = SYM_INVERSE[result.sym_idx]
+        actual = transform_notation(result.best_move_canonical, inv)
+        if actual is None:
+            return None
+
+        # Build a set of legal move notations for fast membership check.
+        legal = set()
+        for mv in get_all_legal_moves(board):
+            frm = mv.get("from")
+            to = mv.get("to", "")
+            cap = mv.get("capture")
+            notation = f"{frm}-{to}" if frm else to
+            if cap:
+                notation += f"x{cap}"
+            legal.add(notation)
+
+        return actual if actual in legal else None
+
+    def query_min_frequency(
+        self, board: BoardState, min_frequency: int
+    ) -> Optional[FullGameResult]:
+        """Like query(), but returns None if the position's frequency is below threshold."""
+        result = self.query(board)
+        if result is None:
+            return None
+        if result.frequency < min_frequency and result.outcome is None:
+            return None
+        return result
 
     def score_delta(self, board: BoardState, current_color: str) -> dict[str, float]:
         """Return a per-move score delta in [-0.5, +0.5] compatible with the

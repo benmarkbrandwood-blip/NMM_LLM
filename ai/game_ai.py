@@ -23,6 +23,7 @@ from game.board import ADJACENCY, MILLS, POSITIONS, BoardState
 from game.rules import get_all_legal_moves, is_terminal
 from .heuristics import INF, evaluate, HeuristicWeights, DEFAULT_WEIGHTS, tactical_move_bonus
 from .transposition_table import TranspositionTable, EXACT, LOWER_BOUND, UPPER_BOUND
+from .board_symmetry import SYM_INVERSE, transform_notation as _transform_notation
 
 
 def _immediate_mill_threats(board: BoardState) -> set[str]:
@@ -802,6 +803,27 @@ class GameAI:
                 return -(INF - depth)
             # "D" or None → fall through to normal search
 
+        # SE-14: FullGameDB probe — exact outcomes short-circuit; best-move hints
+        # are stored for promotion after the move list is generated.
+        _db14_best_move: Optional[str] = None
+        if self._fullgame_db is not None:
+            try:
+                _db14 = self._fullgame_db.query(board)
+                if _db14 is not None:
+                    if _db14.outcome is not None:
+                        _stm = board.turn
+                        if _db14.outcome == 1:
+                            return INF - depth if _stm == "W" else -(INF - depth)
+                        elif _db14.outcome == -1:
+                            return INF - depth if _stm == "B" else -(INF - depth)
+                        else:  # draw
+                            return 0
+                    elif _db14.best_move_canonical:
+                        _inv = SYM_INVERSE[_db14.sym_idx]
+                        _db14_best_move = _transform_notation(_db14.best_move_canonical, _inv)
+            except Exception:
+                pass
+
         # SE-8: search extension for critical positions.
         if ext_budget > 0:
             _color = board.turn
@@ -846,6 +868,17 @@ class GameAI:
         if depth >= 2:
             killers = self._killers[depth] if depth < 32 else None
             moves = _order_moves(board, moves, killers, self._history)
+
+        # SE-14: Promote DB hint to front (done before TT so TT gets final priority).
+        if _db14_best_move is not None:
+            for i, m in enumerate(moves):
+                _mv_str = (f"{m['from']}-{m['to']}" if m.get("from") else m.get("to", ""))
+                if m.get("capture"):
+                    _mv_str += f"x{m['capture']}"
+                if _mv_str == _db14_best_move:
+                    if i > 0:
+                        moves.insert(0, moves.pop(i))
+                    break
 
         # Promote the TT best-move to the front of the list regardless of its
         # priority bucket — it was the best move last time we searched this position.
