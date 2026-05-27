@@ -332,6 +332,9 @@ class ExpandFromGamesBuilder:
         else:
             import tempfile
             self._db_path = Path(tempfile.mktemp(suffix=".tmp.db", prefix="nmm_fgdb_"))
+        # If user passed a directory, append a default filename.
+        if self._db_path.is_dir():
+            self._db_path = self._db_path / "fullgame.tmp.db"
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         logger.info("Temp DB: %s (limit %.1f GB)", self._db_path, self.max_db_gb)
         self._conn = sqlite3.connect(str(self._db_path))
@@ -873,6 +876,8 @@ def main() -> int:
         return 1
 
     temp_db = args.temp_db.resolve() if args.temp_db else None
+    if temp_db is not None and temp_db.is_dir():
+        temp_db = temp_db / "fullgame.tmp.db"
     print(f"Games dir:  {games_dir}")
     print(f"Output:     {output_path}")
     print(f"Temp DB:    {temp_db or str(output_path.with_suffix('.tmp.db'))} (max {args.max_db_gb:.1f} GB)")
