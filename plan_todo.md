@@ -14,7 +14,7 @@ Track 1 (heuristic/phase-control) and SE-1 through SE-9 complete. Active priorit
 | ★★ | **B-62** | own_convergence suppresses cycling mill closure (pivot piece leaves 2-config when mill closes) ✅ 2026-05-28 |
 | ★★ | **B-59** | Sealed 2-config detection in move phase (forced mills, all rings) ✅ 2026-05-28 |
 | ★★ | **B-60** | Cycling-capture unblock awareness (avoid enabling opponent mill on vacated square) ✅ 2026-05-28 |
-| ★★ | **B-55** | Block opponent dual cardinal mill (placement phase) |
+| ★★ | **B-55** | Block opponent dual cardinal mill (placement phase) ✅ 2026-05-28 |
 | ★ | **B-63** | Fly-entry position undervalued: opponent mobility inflated after entering fly phase ✅ 2026-05-28 |
 | ★★ | **SE-10** | Proactive fly-fork anticipation (move phase) |
 | ★★ | **B-58** | Multiple LLM provider support (Claude, OpenAI, Perplexity, Null) |
@@ -107,7 +107,7 @@ Track 1 (heuristic/phase-control) and SE-1 through SE-9 complete. Active priorit
 
 ---
 
-### Bug B-55 — AI allows opponent to build two interconnected cardinal ring mills ⬜ ★ High Priority
+### Bug B-55 — AI allows opponent to build two interconnected cardinal ring mills ✅ 2026-05-28 ★
 
 **Symptom:** The AI (Black) fails to block White from establishing two cardinal mills through the middle ring in the same game. Once White has two such mills, Black is in a near-losing position because White can oscillate both independently.
 

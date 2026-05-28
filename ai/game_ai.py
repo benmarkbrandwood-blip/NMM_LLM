@@ -21,7 +21,7 @@ class _SearchAbort(Exception):
 
 from game.board import ADJACENCY, MILLS, POSITIONS, BoardState
 from game.rules import get_all_legal_moves, is_terminal
-from .heuristics import INF, evaluate, HeuristicWeights, DEFAULT_WEIGHTS, tactical_move_bonus, _sealed_two_configs
+from .heuristics import INF, evaluate, HeuristicWeights, DEFAULT_WEIGHTS, tactical_move_bonus, _sealed_two_configs, _dual_connected_mill_alert
 from .transposition_table import TranspositionTable, EXACT, LOWER_BOUND, UPPER_BOUND
 from .board_symmetry import SYM_INVERSE, transform_notation as _transform_notation
 
@@ -169,6 +169,13 @@ def _order_moves(board: BoardState, moves: list, killers=None, history=None) -> 
     # Searched with the same urgency as blocking a mill threat.
     squeeze = _squeeze_targets(board)
     block |= squeeze
+
+    # B-55: in placement phase, add the closing squares of opponent 2-configs that would
+    # complete a second mill sharing a square with an already-closed opponent mill.
+    # Two interconnected cycling mills are nearly unbeatable; block the second formation
+    # with the same urgency as blocking any direct mill threat.
+    if get_game_phase(board, color) == "place":
+        block |= set(_dual_connected_mill_alert(board, opp))
 
     if not close and not block and not killer_set and not history:
         return moves  # nothing to prioritize — skip the pass

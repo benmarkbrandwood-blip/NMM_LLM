@@ -1405,6 +1405,31 @@ def detect_diamonds(board: BoardState, color: str) -> list[str]:
     return [pos for pos, count in closing.items() if count >= 2]
 
 
+def _dual_connected_mill_alert(board: BoardState, opp: str) -> list[str]:
+    """Return closing squares of opponent 2-configs that would form a second mill
+    sharing at least one square with an already-closed opponent mill (B-55).
+
+    A dual-connected structure (e.g. f2-f4-f6 closed + d6-f6 2-config where b6 is
+    the closing sq) gives the opponent two independent oscillation mills from a single
+    placement.  Blocking the closing square prevents the combination.
+    """
+    closed_squares: set[str] = set()
+    for mill in MILLS:
+        if all(board.positions[p] == opp for p in mill):
+            closed_squares.update(mill)
+    if not closed_squares:
+        return []
+    result = []
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(opp) == 2 and vals.count("") == 1:
+            closing = next(p for p in mill if board.positions[p] == "")
+            # 2-config shares a non-closing square with any closed mill
+            if any(p in closed_squares for p in mill if p != closing):
+                result.append(closing)
+    return result
+
+
 def opponent_mills_in_n_moves(board: BoardState, color: str, n: int = 2) -> int:
     """Count mills `color` can form within `n` moves (1 or 2).
 
@@ -2571,6 +2596,21 @@ def tactical_move_bonus(
     _block_opp_mult = 1.5 if (_is_placement and placement_index >= 7) else 1.0
     block_opp_mill_contribution = int(weights.block_opponent_mill * blocked * _block_opp_mult)
 
+    # B-55: dual-connected mill block — extra urgency when our placement prevents the
+    # opponent from completing a second mill that shares a square with their closed mill.
+    # Two interconnected cycling mills make an opponent nearly unbeatable; blocking the
+    # second formation is worth an extra block-equivalent bonus on top of the standard one.
+    dual_connected_block_bonus = 0
+    if _is_placement:
+        _dual_alert = _dual_connected_mill_alert(before, opp)
+        if _dual_alert:
+            # Check if our piece was placed at (or occupies) one of the alert squares
+            for sq in POSITIONS:
+                if after.positions[sq] == color and before.positions[sq] != color:
+                    if sq in _dual_alert:
+                        dual_connected_block_bonus = weights.block_opponent_mill
+                    break
+
     # B-28 / B-35: dual-purpose final placement — blocks opponent AND builds own structure.
     # Fires on placements 8–9 when the same move neutralises an opponent threat
     # and simultaneously creates a new own 2-config.
@@ -2640,6 +2680,7 @@ def tactical_move_bonus(
         ("Own cycle lost (B-40)",          -weights.cycling_mill * self_cycle_lost),
         ("Cycling close",                  cycling_close_bonus),
         ("Blocked opponent mill",          block_opp_mill_contribution),
+        ("Dual-connected mill block (B-55)", dual_connected_block_bonus),
         ("Stopped opponent 2-config",      weights.stop_opponent_mills * two_cfg_broken),
         ("Gained diamond/fork",            diamond_contribution),
         ("Mill wrap pressure",             weights.mill_wrapping * wrap_gain),
