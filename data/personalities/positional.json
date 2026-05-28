@@ -20,5 +20,6 @@
   "block_cycling_priority": 60,
   "make_mistakes": 0,
   "opening_adherence": 70,
-  "loss_exploit": 210
+  "loss_exploit": 210,
+  "cycling_capture_unblock": 180
 }

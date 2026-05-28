@@ -77,6 +77,8 @@ class HeuristicWeights:
     potential_mill: int        = 25    # bonus per own 2-config whose future mill would have a free exit
     # ── B-39: Disrupted 2-config (dead-mill) penalty ─────────────────────────
     disrupted_two_config: int = 200  # penalty for creating a (own,own,opp) blocked mill pattern
+    # ── B-60: Cycling-capture unblock ────────────────────────────────────────
+    cycling_capture_unblock: int = 180  # penalty when capture leaves own piece blocking opp pending mill
     # ── B-40: Self-cycle-lost penalty ────────────────────────────────────────
     # Uses cycling_mill weight — no separate field needed (mirrors cycling_gain).
     # ── B-33: Forcing placement quality ──────────────────────────────────────
@@ -2092,6 +2094,37 @@ def tactical_move_bonus(
                     or _cross_feed_mobility_pairs(after, color) > _cross_feed_mobility_pairs(before, color)):
                 capture_creates_convergence_bonus = weights.capture_creates_convergence
 
+    # B-60: Cycling-capture unblock penalty — fires when a capture leaves any own
+    # cycling-ready piece blocking an opponent pending mill ([opp, opp, own] in a mill).
+    # When that own piece oscillates on a future turn, the opponent immediately closes.
+    # Capture-dependent: capturing the opponent piece FROM the blocked mill removes the
+    # threat (opp_count drops to 1), so that capture does NOT trigger the penalty.
+    cycling_unblock_penalty = 0
+    if capture_this_move and before_phase == "move":
+        for sq in POSITIONS:
+            if after.positions[sq] != color:
+                continue
+            # Must be in a closed own mill (piece is actively cycling)
+            if not any(
+                all(after.positions[p] == color for p in mill)
+                for mill in MILLS if sq in mill
+            ):
+                continue
+            # Must be cycling-ready (adjacent empty square to oscillate into)
+            if not any(after.positions[nb] == "" for nb in ADJACENCY[sq]):
+                continue
+            # Would vacating sq complete an opponent mill?
+            for mill in MILLS:
+                if sq not in mill:
+                    continue
+                opp_count   = sum(1 for p in mill if p != sq and after.positions[p] == opp)
+                empty_count = sum(1 for p in mill if p != sq and after.positions[p] == "")
+                if opp_count == 2 and empty_count == 0:
+                    cycling_unblock_penalty = weights.cycling_capture_unblock
+                    break
+            if cycling_unblock_penalty:
+                break
+
     # PAT-1: Isolated Mill Suppressor — scale the close_mill contribution in early placement
     # (pieces 1–5) when the closed mill leaves zero own 2-configs anywhere on the board.
     # An isolated mill is easy to freeze (4 opponent pieces suffice); suppression ensures
@@ -2620,6 +2653,7 @@ def tactical_move_bonus(
         ("Mill trap builder",              trap_build_bonus),
         ("Fly-phase fork creation",        fly_fork_bonus),
         ("Mobility reduction",             mob_reduction_bonus),
+        ("Cycling-capture unblock (B-60)", -cycling_unblock_penalty),
         ("Captured feeder piece",          capture_feeder_bonus),
         ("Captured diamond piece",         capture_diamond_bonus),
         ("Capture creates diamond (B-17A)", capture_creates_diamond_bonus),
