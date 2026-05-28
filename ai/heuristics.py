@@ -448,12 +448,18 @@ def _win_config(board: BoardState, opp: str) -> int:
     return int(board.pieces_placed[opp] == 9 and board.pieces_on_board[opp] <= 3)
 
 
+_FLY_MOBILITY_CAP = 5  # B-63: cap fly-phase mobility to prevent fly-entry from looking bad
+
 def _mobility(board: BoardState, color: str) -> int:
     """Count available destination squares for color (adjacency-based, phase-aware)."""
     phase = get_game_phase(board, color)
     if phase == "fly":
+        # Raw empty-square count (~13-15) makes fly-entry look like high opponent
+        # mobility, swinging (own_mob - opp_mob) heavily negative on the exact ply
+        # where White makes its best capture.  Cap to a value matching normal
+        # move-phase mobility so the differential stays meaningful.
         empty = sum(1 for p in POSITIONS if board.positions[p] == "")
-        return empty  # each piece can go anywhere empty; return empty count as proxy
+        return min(_FLY_MOBILITY_CAP, empty)
     count = 0
     for pos in POSITIONS:
         if board.positions[pos] == color:

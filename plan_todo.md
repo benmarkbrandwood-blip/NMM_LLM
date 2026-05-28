@@ -15,7 +15,7 @@ Track 1 (heuristic/phase-control) and SE-1 through SE-9 complete. Active priorit
 | ★★ | **B-59** | Sealed 2-config detection in move phase (forced inner-ring mills) |
 | ★★ | **B-60** | Cycling-capture unblock awareness (avoid enabling opponent mill on vacated square) |
 | ★★ | **B-55** | Block opponent dual cardinal mill (placement phase) |
-| ★ | **B-63** | Fly-entry position undervalued: opponent mobility inflated after entering fly phase |
+| ★ | **B-63** | Fly-entry position undervalued: opponent mobility inflated after entering fly phase ✅ 2026-05-28 |
 | ★★ | **SE-10** | Proactive fly-fork anticipation (move phase) |
 | ★★ | **B-58** | Multiple LLM provider support (Claude, OpenAI, Perplexity, Null) |
 | ★ | **B-51** | Expand retrograde solver beyond 3v3 |
