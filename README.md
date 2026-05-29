@@ -92,13 +92,17 @@ The launcher (`run\_nmm.sh` / `run\_nmm.bat`) will:
 
   - Closed mills, blocked pieces, piece count, two-configurations, double-mill pivots
 
-  - Mobility and immediate mill threats (phase-weighted)
+  - Mobility and immediate mill threats (phase-weighted); fly-phase mobility capped at 5 to prevent fly-entry from looking artificially bad (B-63)
 
   - Mill-cycle readiness (feeder mills), fork threats, herding and encirclement
+
+  - Cycling mill and fork threat weights increase sharply in fly phase (×80/×55) to reflect the urgency of dual-threat structures
 
   - Cross/cardinal node positional bonus (3-neighbour midpoint nodes score higher than 2-neighbour corners)
 
   - Fly-phase asymmetry bonus (prefer reaching 3 pieces before opponent in 4v4 endgame)
+
+  - **Sealed 2-config detection** (B-59): 2-configs the opponent cannot contest score ~4× higher and receive elevated move-ordering priority, propagating forced-mill sequences through negamax
 
 - **Tactical urgency layer** — delta-based bonuses applied at move-selection level (outside negamax to avoid sign-inversion):
 
@@ -106,11 +110,17 @@ The launcher (`run\_nmm.sh` / `run\_nmm.bat`) will:
 
   - Blocking an opponent's immediately closeable mill; dismantling opponent two-configurations
 
+  - **Dual-connected mill block** (B-55): extra urgency when blocking the closing square of a 2-config that would share a square with an already-closed opponent mill — two interconnected cycling mills are nearly unbeatable
+
   - Creating feeder diamond structures (four pieces adjacent to one key square, forming two simultaneous mill threats)
 
   - Mill wrapping — occupying exit squares of opponent closed mills so their pivot has nowhere useful to slide
 
   - Controlling cardinal squares; early-game scatter placement
+
+  - **Cycling-capture unblock penalty** (B-60): penalises captures that leave an own cycling piece about to unblock an opponent mill on its next oscillation
+
+  - **Dead/near-dead placement penalty** (B-64): penalises placing a piece with 0 or 1 free adjacent neighbours (permanently immobile or easily trapped), suppressed when the placement closes a mill
 
 - **Deadline-aware search** — checks the clock every 4 096 nodes; always returns the best partial result on timeout
 

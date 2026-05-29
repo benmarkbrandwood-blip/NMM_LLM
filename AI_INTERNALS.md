@@ -137,23 +137,28 @@ The weights change by game phase ("place", "move", "fly"):
 
 | Feature | Place | Move | Fly | Description |
 |---------|-------|------|-----|-------------|
-| Closed mills (own − opp) | 14 | 14 | 16 | Each completed line of three |
-| Blocked opponent pieces | 10 | 43 | 350 | Pieces with no legal move adjacent |
-| Piece count difference | 11 | 10 | 1 | Net piece advantage |
-| Two-configurations (own − opp) | 8 | 7 | 0 | Lines with 2 own pieces and 1 empty slot |
-| Double-mill pivots (own − opp) | 0 | 42 | 0 | Pieces simultaneously in 2+ closed mills |
+| Closed mills (own − opp) | 30 | 30 | 32 | Each completed line of three |
+| Blocked opponent pieces | 12 | 48 | 350 | Pieces with no legal move adjacent |
+| Piece count difference | 12 | 12 | 2 | Net piece advantage |
+| Two-configurations (own − opp) | 5 | 5 | 0 | Lines with 2 own pieces and 1 empty slot |
+| Double-mill pivots (own − opp) | 0 | 50 | 90 | Pieces simultaneously in 2+ closed mills |
 | Win configuration | 0 | 0 | 1190 | Opponent reduced to 3 pieces (fly phase) |
 
 Additional terms added on top:
 
 | Term | Place | Move | Fly | Description |
 |------|-------|------|-----|-------------|
-| Mobility (own − opp) | ×3 | ×8 | ×20 | Number of available move destinations |
-| Mill threats (own − opp) | ×8 | ×12 | ×18 | Same as two-configurations but treated separately as an immediate-threat signal |
-| Position value (own − opp) | ×2 | ×2 | ×2 | Cross/cardinal nodes score 3; corner nodes score 2 |
+| Mobility (own − opp) | ×3 | ×8 | ×20 | Available move destinations; fly-phase raw count capped at 5 (B-63) to prevent fly-entry from swinging the differential negative |
+| Mill threats (own − opp) | ×15 | ×18 | ×80 | Immediately closeable mills only (phase-aware reachability: move phase requires an adjacent own piece outside the mill) |
+| Position value (own − opp) | ×4 | ×4 | ×4 | Cardinal (4-conn) nodes = 5; cross (3-conn) = 3; corner (2-conn) = 2 |
 | Herding / encirclement | ×6 | ×18 | 0 | Own pieces adjacent to each opponent piece; rewards surrounding opponent pieces to shrink their escape space |
 | Near-blocked pressure (opp − own) | 0 | ×30 | 0 | Opponent pieces with **exactly 1 legal move** remaining — one step from total blockade |
 | Mill-wrapping pressure (own − opp) | 0 | ×40 | ×60 | Own pieces occupying exit squares of opponent closed mills; surrounded mills cannot easily cycle. Returns 0 when the opponent is in fly phase (adjacency confinement irrelevant). |
+| Cycling mill setup (own − opp) | ×8 | ×22 | ×80 | Two 2-configs whose closing squares are adjacent; the pivot piece can oscillate to force repeated captures |
+| Fork threats (own − opp) | ×6 | ×14 | ×55 | Positions with 2+ simultaneously closeable mills (opponent can block at most one) |
+| Fly asymmetry | 0 | ×80 | 0 | Penalty when own piece count is 4 and capturing would grant the opponent fly-phase freedom |
+| Open-mill domination (own − opp) | 0 | ×150 | ×80 | Own 2-configs exceeding opponent's defensive capacity; in a 6v4 scenario with 3 open mills, one mills closes regardless of opponent play |
+| Sealed 2-configs (own − opp) | 0 | ×20 | 0 | Own 2-configs the opponent cannot contest in one move AND the opponent has no immediate mill of their own (B-59); ~4× the regular two_cfg weight |
 
 Cross/cardinal nodes (`d7`, `a4`, `g4`, `d1`, and the equivalent middle and inner ring nodes) connect three lines instead of two, making them more tactically flexible.
 
@@ -184,6 +189,11 @@ Cross/cardinal nodes (`d7`, `a4`, `g4`, `d1`, and the equivalent middle and inne
 | `locked_mill_escape` | Bonus for moving a piece out of a locked mill toward a new 2-config (move phase) |
 | `redirected_pin` | Bonus when a move causes an opponent piece to simultaneously guard two distinct own 2-configs |
 | `block_cycling_priority` | Bonus for blocking the fork arm with higher cycling freedom (placement + move phase, not fly) |
+| `dual_connected_mill_block` (B-55) | Bonus for blocking the closing square of a 2-config that would share a square with an already-closed opponent mill — adds a second `block_opponent_mill`-sized penalty on top of the standard block bonus |
+| `sealed_setup_bonus` (B-59) | Bonus per new sealed 2-config created this move (opponent has no adjacent blocker AND no immediate mill); raises the signal through negamax for forced-mill sequences |
+| `cycling_capture_unblock` (B-60) | Penalty when a capture leaves any own cycling piece blocking an opponent pending mill — detecting captures that create a ticking-time-bomb threat the AI itself introduced |
+| `dead_placement_penalty` (B-64) | Penalty (600) for placing a piece with 0 free adjacent neighbours — the piece is permanently immobile from birth; suppressed when mills_delta > 0 |
+| `near_dead_placement_penalty` (B-64) | Penalty (up to 150, scales with placement index) for placing a piece with exactly 1 free adjacent neighbour — easily trapped next turn; suppressed when mills_delta > 0 |
 
 ### Placement busy-opponent scan-ahead
 
@@ -500,6 +510,52 @@ A mill with high cycling freedom (several empty exits) can repeatedly open and r
 **Signal:** A `block_cycling_priority` bonus (default 120) fires when the AI's placement or move occupies the closing square of the highest-effective-cycling-freedom fork arm. The bonus scales with the freedom differential: `block_cycling_priority × (1 + freedom_diff × 0.1)`. Gate: placement and move phase only, not fly phase.
 
 **Example (cardinal exception):** White threatens g7-g4-g1 (1 exit if closed) and g4-f4-e4 (4 exits if closed). Black has a piece at e3, adjacent to e4 (g4-f4-e4's closing square). Black should block g7 (give White the cardinal mill), because e3 already constrains the cardinal mill's most dangerous exit. Without e3, Black would block e4 instead.
+
+### B-55 — Dual-connected mill block
+
+`_dual_connected_mill_alert(board, opp)` returns the closing squares of opponent 2-configs that, if completed, would form a **second closed mill sharing at least one square with an already-closed opponent mill**. Two interconnected cycling mills are nearly unbeatable because the opponent can oscillate between them independently, forcing two captures before the AI can react.
+
+The closing squares of these dangerous formations are elevated to **priority 1 in `_order_moves`** during placement phase (same level as blocking a direct mill threat) and receive an extra `block_opponent_mill`-sized bonus in `tactical_move_bonus()` when the placement lands on one of the alert squares.
+
+**Example:** Opponent has `f2-f4-f6` closed. A 2-config of `d6-f6` with `b6` empty means placing at `b6` would give the opponent a second mill sharing `f6`. The AI blocks `b6` with the same urgency as blocking any direct mill threat.
+
+### B-59 — Sealed 2-config detection (move phase)
+
+`_sealed_two_configs(board, color)` counts own 2-configs that the opponent **cannot contest in one move**. A 2-config is sealed when:
+
+1. No opponent piece is adjacent to the closing square (the opponent cannot block by sliding there).
+2. Guard: the opponent has no immediate mill of their own available (an opponent mill closure could capture a sealing piece, breaking the seal).
+
+The weight is `_SEALED_TWO_CFG_WEIGHT = 20` — approximately 4× the regular `two_cfg` base weight (5). This amplification is intentional: a sealed 2-config represents a **forced mill within the search horizon**, not merely a structural presence. The signal propagates through negamax so the AI discovers forced-mill sequences 2–3 plies deep even when static evaluation alone would miss them.
+
+In `_order_moves()`, moves that create a new sealed 2-config are promoted to **priority 0.5** (between closing own mill P0 and blocking opponent mill P1) during move phase. This ensures the search explores forced-mill-building moves early and finds the conversion at lower depths.
+
+### B-60 — Cycling-capture unblock penalty
+
+`cycling_capture_unblock` penalty fires in `tactical_move_bonus()` during move phase when a capture leaves an own **cycling-ready** piece blocking an opponent pending mill:
+
+- The own piece must be inside a closed mill (actively cycling).
+- The own piece must have at least one adjacent empty square (it can oscillate on the next turn).
+- Vacating that piece's square would complete an opponent mill (2 opponent pieces on the same mill line, no other empty square).
+
+This detects the **ticking-time-bomb** pattern: the AI closes a mill and captures, but the piece it left cycling now unblocks an opponent mill on its very next oscillation. The penalty (default 180) discourages captures that create this self-undermining situation.
+
+The guard `capture_this_move and before_phase == "move"` ensures the penalty only fires when a capture just happened and the position is structurally vulnerable. Captures that remove the threatening opponent piece from that mill line are exempt (opp_count drops to 1, no longer a pending mill).
+
+### B-63 — Fly-phase mobility cap
+
+`_FLY_MOBILITY_CAP = 5` is applied inside `_mobility()` when the requesting colour is in fly phase. Without this cap, a fly-phase player's raw mobility is the total number of empty squares on the board (~13–15), which is far higher than any move-phase mobility score. This makes the exact ply on which the AI's best capture grants the opponent fly phase appear as a large negative swing in `(own_mob - opp_mob)`, artificially discouraging the capture.
+
+Capping at 5 keeps fly-phase mobility on the same scale as normal move-phase mobility so the differential remains meaningful. The cap is an upper bound — positions with fewer than 5 empty squares return the actual count.
+
+### B-64 — Dead/near-dead placement penalty
+
+Applied in `tactical_move_bonus()` during placement phase when `mills_delta == 0` (the placement does not close a mill):
+
+- **Dead placement** (0 free adjacent neighbours): `dead_placement_penalty = 600`. The piece is permanently immobile from birth — it can never slide anywhere in the movement phase, consuming a piece worth without contributing long-term mobility.
+- **Near-dead placement** (exactly 1 free adjacent neighbour): `near_dead_placement_penalty` up to 150, scaled by `placement_index / 8`. Later in placement, the board is more congested and a 1-exit piece is far more likely to be trapped on the next opponent move.
+
+The mill-closure guard (`mills_delta == 0`) is essential: a piece placed in a closing mill gains immediate material value (a capture) that justifies any local mobility cost. The penalty suppresses structurally harmful placements only when the immediate tactical reward is absent.
 
 ### What the LLM sees when it makes a move or commentary
 
