@@ -566,13 +566,21 @@ class TestB22EmergencyBlock(unittest.TestCase):
         self.assertGreater(evaluate(b_guarded, "W"), score,
             "guarded position must score higher than unguarded position")
 
-    def test_ai_blocks_b6_not_speculative_move(self):
+    def test_ai_counters_b2_b4_b6_mill_threat(self):
+        # B-22 regression: AI must counter Black's b2-b4-b6 mill threat.
+        # Accepted responses:
+        #   • fly to b6 (pure block)
+        #   • fly to g7 closing a7-d7-g7 mill and capture b4 (removes mill member,
+        #     strictly better: White gains a mill AND Black enters fly phase) — B-66
         from ai.game_ai import GameAI
         b = self._b22_board()
         ai = GameAI(difficulty=5, color="W")
         move = ai.choose_move(b)
-        self.assertEqual(move.get("to"), "b6",
-            f"AI should fly to b6 to block Black's mill; chose {move} instead")
+        dest    = move.get("to")
+        capture = move.get("capture")
+        counters_threat = dest == "b6" or capture == "b4"
+        self.assertTrue(counters_threat,
+            f"AI must block b6 or capture b4 to counter Black's mill; chose {move}")
 
 
 class TestB36CardinalMillBlock(unittest.TestCase):
