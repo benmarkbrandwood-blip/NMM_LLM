@@ -70,20 +70,34 @@ class LearnedAgent:
         self.last_was_blunder = False
         self.last_thinking = "learned"
 
-        if model is None:
-            model = NMMNet(
-                backbone_hidden=backbone_hidden,
-                head_hidden=head_hidden,
-                dropout=dropout,
+        ckpt = None
+        if checkpoint_path:
+            ckpt = torch.load(
+                checkpoint_path, map_location=self.device, weights_only=False
             )
+
+        # When no explicit model is given, prefer the architecture embedded in
+        # the checkpoint so a small (smoke) net loads into a small net and a
+        # full net loads into a full net — avoids state_dict shape mismatches.
+        if model is None:
+            if isinstance(ckpt, dict) and ckpt.get("model_config"):
+                mc = ckpt["model_config"]
+                model = NMMNet(
+                    backbone_hidden=tuple(mc.get("backbone_hidden", backbone_hidden)),
+                    head_hidden=tuple(mc.get("head_hidden", head_hidden)),
+                    dropout=float(mc.get("dropout", dropout)),
+                )
+            else:
+                model = NMMNet(
+                    backbone_hidden=backbone_hidden,
+                    head_hidden=head_hidden,
+                    dropout=dropout,
+                )
         self.model = model.to(self.device)
 
-        if checkpoint_path:
-            state = torch.load(checkpoint_path, map_location=self.device)
-            if isinstance(state, dict) and "model" in state:
-                self.model.load_state_dict(state["model"])
-            else:
-                self.model.load_state_dict(state)
+        if ckpt is not None:
+            state_dict = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
+            self.model.load_state_dict(state_dict)
 
         self._gen = torch.Generator(device="cpu")
         if seed is not None:

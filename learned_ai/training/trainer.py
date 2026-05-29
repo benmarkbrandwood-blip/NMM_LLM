@@ -299,18 +299,23 @@ class Trainer:
     def save_checkpoint(self, path: Optional[str] = None) -> str:
         out_path = Path(path) if path else self.checkpoint_dir / f"ckpt-{self.stats.episodes:06d}.pt"
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        torch.save(
-            {
-                "model": self.model.state_dict(),
-                "optimizer": self.optimizer.state_dict(),
-                "stats": self.stats.__dict__,
-                "temperature": self.temperature,
-                "config": self.config,
-            },
-            str(out_path),
-        )
+        model_config = dict(self.config.get("model", {}))
+        payload = {
+            "model": self.model.state_dict(),
+            "model_config": model_config,
+            "optimizer": self.optimizer.state_dict(),
+            "stats": self.stats.__dict__,
+            "temperature": self.temperature,
+            "config": self.config,
+        }
+        torch.save(payload, str(out_path))
+        # latest.pt embeds the architecture too so LearnedAgent can rebuild the
+        # correctly-sized net without being told the hidden dims.
         latest = self.checkpoint_dir / "latest.pt"
-        torch.save(self.model.state_dict(), str(latest))
+        torch.save(
+            {"model": self.model.state_dict(), "model_config": model_config},
+            str(latest),
+        )
         return str(out_path)
 
     def load_checkpoint(self, path: str) -> None:
