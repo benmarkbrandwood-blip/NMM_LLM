@@ -66,8 +66,9 @@ fn py_legal_moves(
         .collect()
 }
 
-/// True if placing/moving `color` (0=W,1=B) to `square` forms a mill on the
-/// CURRENT board (square assumed occupied by color for the static check).
+/// True if a mill line through `square` is fully owned by `color` (0=W,1=B) in
+/// the CURRENT bitboard. Static check over existing bits — `square` is NOT added
+/// to `color`; callers wanting a hypothetical placement should set the bit first.
 #[pyfunction]
 fn py_forms_mill(white: u32, black: u32, square: u8, color: u8) -> bool {
     let board = mk_board(white, black, 0, 0, 0);
