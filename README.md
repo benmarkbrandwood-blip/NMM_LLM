@@ -86,6 +86,66 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 - **Windows only — if `chromadb` fails to install**, install the free [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (check "Desktop development with C++") and re-run `install.bat`.
 
 
+## Rust Acceleration (optional)
+
+The game ships with an **optional** Rust acceleration core (`native/nmm_core`,
+built via [PyO3](https://pyo3.rs) + [maturin](https://www.maturin.rs)). It is
+**not required** — the pure-Python engine is fully functional on its own, and
+the app transparently falls back to it whenever the Rust extension is absent.
+Building the extension speeds up the hot-path engine primitives and search.
+
+### What it accelerates
+
+- **Search** — a self-contained negamax + alpha-beta + iterative-deepening
+  engine with its own transposition table (Zobrist hashing). ~4–5× the
+  nodes/sec of an equivalent Python negamax on a typical host.
+- **Key generation** — byte-identical FullGame DB keys (~3×) and opening /
+  trajectory canonical-sequence keys (~6×).
+- **Primitives** — legal-move generation, mill / phase detection, and D4
+  symmetry canonicalization.
+
+All of the above are covered by parity tests that assert the Rust output is
+**identical** to the Python reference across thousands of randomized positions
+(`tests/test_rust_parity.py`, `tests/test_symmetry_parity.py`,
+`tests/test_heuristics_parity.py`, `tests/test_opening_key_parity.py`). Tests
+auto-skip when the extension is not built, so they never break the Python-only
+suite.
+
+> The Rust search uses an integer base evaluation and is **not** guaranteed to
+> pick the exact same move as the full Python heuristic AI — it produces legal,
+> sane play only. The Python AI remains the default decision engine. The
+> byte-identical primitives (keys, symmetry, movegen) *are* drop-in equivalent.
+
+### Building it
+
+Requires a [Rust toolchain](https://rustup.rs) (`rustc` / `cargo`). After the
+normal install:
+
+```bash
+# Linux / macOS
+./scripts/build_rust.sh
+
+# Windows (PowerShell)
+./scripts/build_rust.ps1
+```
+
+These scripts are **non-fatal**: if Rust isn't installed they print
+instructions and exit cleanly, leaving the Python-only path intact. Once built,
+`python -c "import nmm_core"` succeeds and the engine uses it automatically via
+`ai/native_core.py` (`native_core.is_available()` reports the active backend).
+
+### Benchmarks
+
+```bash
+python bench/bench_search.py     # search nodes/sec: Rust vs Python
+python bench/bench_db.py         # key generation keys/sec: Rust vs Python
+python bench/smoke_rust_game.py  # full AI-vs-AI game driven by the Rust search
+```
+
+Design notes and the full board-index / D4 / mill / DB-key contract live in
+[`docs/RUST_INTEGRATION_PLAN.md`](docs/RUST_INTEGRATION_PLAN.md).
+
+
 ## Features
 
 ### Game engine
