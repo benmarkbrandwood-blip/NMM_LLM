@@ -1,0 +1,211 @@
+//! PyO3 module entry for `nmm_core`. Exposes the Rust-accelerated NMM engine
+//! primitives + coarse-grained search + DB/opening key generation.
+//! See `docs/RUST_INTEGRATION_PLAN.md` §12 for the surface contract.
+
+use pyo3::prelude::*;
+
+mod board;
+mod db_probe;
+mod heuristics;
+mod hash;
+mod mills;
+mod movegen;
+mod opening_probe;
+mod phases;
+mod search;
+mod symmetry;
+mod tactics;
+mod types;
+
+use crate::types::{Board, Color};
+
+fn mk_board(white: u32, black: u32, wp: u8, bp: u8, stm: u8) -> Board {
+    Board {
+        white,
+        black,
+        white_placed: wp,
+        black_placed: bp,
+        side_to_move: Color::from_u8(stm),
+    }
+}
+
+/// Apply D4 transform `idx` (0..8) to a 24-bit board mask.
+#[pyfunction]
+fn py_apply_transform(bits: u32, idx: usize) -> PyResult<u32> {
+    if idx >= 8 {
+        return Err(pyo3::exceptions::PyValueError::new_err("transform idx must be 0..8"));
+    }
+    Ok(symmetry::apply_transform(bits, idx))
+}
+
+/// Canonical (white, black) bitboard pair under D4 (lex-min). For search/TT.
+#[pyfunction]
+fn py_canonical_key(white: u32, black: u32) -> (u32, u32) {
+    symmetry::canonical_key(white, black)
+}
+
+/// Canonical 24-char board string + sym_idx (matches `canonical_board_str`).
+#[pyfunction]
+fn py_canonical_board_str(board24: &str) -> (String, usize) {
+    symmetry::canonical_board_str(board24)
+}
+
+/// Legal moves as a list of (from|None, to, capture|None) tuples.
+#[pyfunction]
+fn py_legal_moves(
+    white: u32,
+    black: u32,
+    wp: u8,
+    bp: u8,
+    stm: u8,
+) -> Vec<(Option<u8>, u8, Option<u8>)> {
+    let board = mk_board(white, black, wp, bp, stm);
+    movegen::legal_moves(&board)
+        .into_iter()
+        .map(|m| (m.from, m.to, m.capture))
+        .collect()
+}
+
+/// True if a mill line through `square` is fully owned by `color` (0=W,1=B) in
+/// the CURRENT bitboard. Static check over existing bits — `square` is NOT added
+/// to `color`; callers wanting a hypothetical placement should set the bit first.
+#[pyfunction]
+fn py_forms_mill(white: u32, black: u32, square: u8, color: u8) -> bool {
+    let board = mk_board(white, black, 0, 0, 0);
+    mills::forms_mill(&board, square, Color::from_u8(color))
+}
+
+#[pyfunction]
+fn py_count_mills(white: u32, black: u32, color: u8) -> u32 {
+    let board = mk_board(white, black, 0, 0, 0);
+    mills::count_mills(&board, Color::from_u8(color))
+}
+
+/// Phase for `color` (0=W,1=B): 0=place, 1=move, 2=fly.
+#[pyfunction]
+fn py_detect_phase(wp: u8, bp: u8, won: u32, bon: u32, color: u8) -> u8 {
+    // Build a board with the given on-board counts on arbitrary squares.
+    let white = if won >= 32 { u32::MAX } else { (1u32 << won) - 1 };
+    let black_full = if bon >= 32 { 0 } else { ((1u32 << bon) - 1) << 12 };
+    let board = mk_board(white, black_full, wp, bp, 0);
+    phases::detect_phase_u8(&board, Color::from_u8(color))
+}
+
+/// Integer base evaluation from `stm`'s perspective.
+#[pyfunction]
+fn py_evaluate(white: u32, black: u32, wp: u8, bp: u8, stm: u8) -> i64 {
+    let board = mk_board(white, black, wp, bp, stm);
+    heuristics::evaluate_base(&board, Color::from_u8(stm))
+}
+
+/// Immediate mill-threat closing squares (as a 24-bit mask) the opponent of stm
+/// can close next move.
+#[pyfunction]
+fn py_immediate_threats(white: u32, black: u32, wp: u8, bp: u8, stm: u8) -> u32 {
+    let board = mk_board(white, black, wp, bp, stm);
+    tactics::immediate_mill_threats(&board)
+}
+
+/// Coarse-grained best move: (from|None, to, capture|None).
+#[pyfunction]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000))]
+fn py_get_best_move(
+    white: u32,
+    black: u32,
+    white_placed: u8,
+    black_placed: u8,
+    side_to_move: u8,
+    max_depth: u8,
+    time_limit_ms: u64,
+) -> (Option<u8>, Option<u8>, Option<u8>) {
+    let r = search::get_best_move(
+        white,
+        black,
+        white_placed,
+        black_placed,
+        Color::from_u8(side_to_move),
+        max_depth,
+        time_limit_ms,
+    );
+    match r.best_move {
+        Some(m) => (m.from, Some(m.to), m.capture),
+        None => (None, None, None),
+    }
+}
+
+/// Like `py_get_best_move` but also returns search stats for benchmarking:
+/// (from|None, to|None, capture|None, nodes, depth_reached).
+#[pyfunction]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000))]
+fn py_search_stats(
+    white: u32,
+    black: u32,
+    white_placed: u8,
+    black_placed: u8,
+    side_to_move: u8,
+    max_depth: u8,
+    time_limit_ms: u64,
+) -> (Option<u8>, Option<u8>, Option<u8>, u64, u8) {
+    let r = search::get_best_move(
+        white,
+        black,
+        white_placed,
+        black_placed,
+        Color::from_u8(side_to_move),
+        max_depth,
+        time_limit_ms,
+    );
+    match r.best_move {
+        Some(m) => (m.from, Some(m.to), m.capture, r.nodes, r.depth_reached),
+        None => (None, None, None, r.nodes, r.depth_reached),
+    }
+}
+
+/// FullGame DB 9-byte key (byte-identical to Python `_encode_canonical`).
+#[pyfunction]
+fn py_db_key(white: u32, black: u32, turn: u8, placed_w: u8, placed_b: u8) -> Vec<u8> {
+    db_probe::fullgame_key(white, black, turn, placed_w, placed_b)
+}
+
+/// Endgame DB string key "<canonical board24>|<turn>".
+#[pyfunction]
+fn py_endgame_key(white: u32, black: u32, turn: u8) -> String {
+    db_probe::endgame_key(white, black, turn)
+}
+
+/// Opening/trajectory key: (pipe-joined canonical sequence, sym_idx).
+#[pyfunction]
+#[pyo3(signature = (notations, depth=None))]
+fn py_opening_key(notations: Vec<String>, depth: Option<usize>) -> (String, usize) {
+    let d = depth.unwrap_or(notations.len());
+    opening_probe::opening_key(&notations, d)
+}
+
+/// Transform a move notation by D4 sym_idx; None if unmapped.
+#[pyfunction]
+fn py_transform_notation(notation: &str, sym_idx: usize) -> Option<String> {
+    if sym_idx >= 8 {
+        return None;
+    }
+    opening_probe::transform_notation(notation, sym_idx)
+}
+
+#[pymodule]
+fn nmm_core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(py_apply_transform, m)?)?;
+    m.add_function(wrap_pyfunction!(py_canonical_key, m)?)?;
+    m.add_function(wrap_pyfunction!(py_canonical_board_str, m)?)?;
+    m.add_function(wrap_pyfunction!(py_legal_moves, m)?)?;
+    m.add_function(wrap_pyfunction!(py_forms_mill, m)?)?;
+    m.add_function(wrap_pyfunction!(py_count_mills, m)?)?;
+    m.add_function(wrap_pyfunction!(py_detect_phase, m)?)?;
+    m.add_function(wrap_pyfunction!(py_evaluate, m)?)?;
+    m.add_function(wrap_pyfunction!(py_immediate_threats, m)?)?;
+    m.add_function(wrap_pyfunction!(py_get_best_move, m)?)?;
+    m.add_function(wrap_pyfunction!(py_search_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(py_db_key, m)?)?;
+    m.add_function(wrap_pyfunction!(py_endgame_key, m)?)?;
+    m.add_function(wrap_pyfunction!(py_opening_key, m)?)?;
+    m.add_function(wrap_pyfunction!(py_transform_notation, m)?)?;
+    Ok(())
+}

@@ -1,0 +1,17 @@
+[package]
+name = "nmm_core"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-accelerated NMM (Nine Men's Morris) game engine core"
+
+[lib]
+name = "nmm_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21", features = ["extension-module"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

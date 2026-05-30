@@ -48,6 +48,12 @@ def main() -> int:
         default=None,
         help="Stage 3 sub-level to start at, e.g. b80 b60 b40 b20 d1 d3 d10 (implies --stage 3)",
     )
+    p.add_argument(
+        "--temperature",
+        type=float,
+        default=None,
+        help="Override starting temperature (and initial_temperature used for resets)",
+    )
     args = p.parse_args()
 
     cfg = load_config(args.config)
@@ -85,6 +91,10 @@ def main() -> int:
         print(f"Start stage  : {effective_stage} (overridden by --stage/--level)")
     if args.level is not None:
         print(f"Start level  : {args.level} (idx {trainer.curriculum.state.heuristic_level_idx})")
+    if args.temperature is not None:
+        trainer.temperature = args.temperature
+        trainer._initial_temperature = args.temperature
+        print(f"Temperature  : {args.temperature} (overridden by --temperature)")
     print(f"Stage budgets: {trainer.curriculum.state.stage_budgets}")
 
     trainer.train(max_episodes=args.max_episodes, verbose=True)
