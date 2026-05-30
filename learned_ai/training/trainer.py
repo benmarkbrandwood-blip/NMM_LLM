@@ -13,7 +13,6 @@ Logging is plain JSON-Lines so we don't need tensorboard at runtime.
 
 from __future__ import annotations
 
-import concurrent.futures
 import json
 import math
 import random
@@ -77,7 +76,6 @@ class Trainer:
         self.entropy_coef = float(train_cfg.get("entropy_coef", 0.01))
         self.ppo_clip = float(train_cfg.get("ppo_clip", 0.2))
         self.ppo_epochs = int(train_cfg.get("ppo_epochs", 4))
-        self.n_workers = int(train_cfg.get("n_workers", 4))
         self.seed = int(train_cfg.get("seed", 42))
         random.seed(self.seed)
         torch.manual_seed(self.seed)
@@ -131,62 +129,24 @@ class Trainer:
         )
         return agent
 
-    def _play_game_worker(
-        self,
-        opp_kind: str,
-        heuristic_diff: int,
-        heuristic_blunder: float,
-        cpu_weights: dict,
-    ) -> Tuple[List[Transition], dict]:
-        """Play one complete game in a worker thread.
+    def _make_opponent(self, color: str, kind: str):
+        if kind == "random":
+            return RandomAgent(color=color, seed=random.randint(0, 1 << 31))
+        if kind == "heuristic":
+            diff, blunder = self.curriculum.heuristic_params()
+            return HeuristicAgent(color=color, difficulty=diff, blunder_probability=blunder)
+        # default: a fresh self-play opponent that shares the same model.
+        return self._make_learned_agent(color=color, sample=True)
 
-        Each worker receives a pre-snapshotted CPU weight dict and builds its
-        own NMMNet instance — fully thread-safe, no CUDA context sharing.
-        All stats/curriculum updates happen on the main thread after the batch.
-        """
-        model_cfg = self.config.get("model", {})
-        worker_model = NMMNet(
-            backbone_hidden=tuple(model_cfg.get("backbone_hidden", (256, 256, 128))),
-            head_hidden=tuple(model_cfg.get("head_hidden", (64,))),
-            dropout=float(model_cfg.get("dropout", 0.0)),
-        ).cpu()
-        worker_model.load_state_dict(cpu_weights)
-        worker_model.eval()
+    # ------------------------------------------------------------------
 
+    def play_episode(self) -> Tuple[List[Transition], dict]:
+        opp_kind = self.curriculum.opponent_kind()
+        # Random side assignment so the model sees both colours.
         learned_color = "W" if random.random() < 0.5 else "B"
         opp_color = "B" if learned_color == "W" else "W"
-        learned = LearnedAgent(
-            color=learned_color,
-            model=worker_model,
-            mode="sample",
-            temperature=self.temperature,
-            device="cpu",
-        )
-
-        if opp_kind == "random":
-            opponent = RandomAgent(color=opp_color, seed=random.randint(0, 1 << 31))
-        elif opp_kind == "heuristic":
-            opponent = HeuristicAgent(
-                color=opp_color,
-                difficulty=heuristic_diff,
-                blunder_probability=heuristic_blunder,
-            )
-        else:
-            # self-play: fresh agent on CPU with the same snapshotted weights
-            opp_model = NMMNet(
-                backbone_hidden=tuple(model_cfg.get("backbone_hidden", (256, 256, 128))),
-                head_hidden=tuple(model_cfg.get("head_hidden", (64,))),
-                dropout=float(model_cfg.get("dropout", 0.0)),
-            ).cpu()
-            opp_model.load_state_dict(cpu_weights)
-            opp_model.eval()
-            opponent = LearnedAgent(
-                color=opp_color,
-                model=opp_model,
-                mode="sample",
-                temperature=self.temperature,
-                device="cpu",
-            )
+        learned = self._make_learned_agent(color=learned_color, sample=True)
+        opponent = self._make_opponent(color=opp_color, kind=opp_kind)
 
         if learned_color == "W":
             result = play_game(learned, opponent)
@@ -195,20 +155,39 @@ class Trainer:
 
         all_transitions = assign_rewards(result, gamma=self.gamma)
         learned_transitions = [
-            t for t in all_transitions
-            if t.side_to_move == learned_color and t.primary_index >= 0
+            t for t in all_transitions if t.side_to_move == learned_color and t.primary_index >= 0
         ]
 
-        won = result.winner == learned_color
         meta = {
             "winner": result.winner,
             "draw_reason": result.draw_reason,
             "plies": result.plies,
             "learned_color": learned_color,
             "opponent": opp_kind,
-            "won": won,
-            "move_log": result.move_log,
         }
+        self.stats.episodes += 1
+        self.stats.total_plies += result.plies
+        won = result.winner == learned_color
+        if result.winner is None:
+            self.stats.draws += 1
+        elif won:
+            self.stats.wins += 1
+            if learned_color == "W":
+                self.stats.white_wins += 1
+            else:
+                self.stats.black_wins += 1
+        else:
+            self.stats.losses += 1
+        self.curriculum.record_outcome(won)
+
+        for tr in learned_transitions:
+            name = PHASE_NAMES[tr.phase_id]
+            self.stats.phase_move_counts[name] = self.stats.phase_move_counts.get(name, 0) + 1
+
+        self.game_logger.log_game(
+            winner=result.winner, moves=result.move_log, meta=meta
+        )
+
         return learned_transitions, meta
 
     # ------------------------------------------------------------------
@@ -290,10 +269,6 @@ class Trainer:
         )
 
         if self.algorithm == "ppo":
-            # Treat the baseline log_probs as the "old" policy. With a fresh
-            # batch each update the importance ratio collapses to 1 — keep
-            # this branch for forward compatibility once we add multiple
-            # epochs of replay-based PPO.
             old_log_probs = log_probs.detach()
             ratio = torch.exp(log_probs - old_log_probs)
             unclipped = ratio * advantages
@@ -338,8 +313,6 @@ class Trainer:
             "config": self.config,
         }
         torch.save(payload, str(out_path))
-        # latest.pt embeds the architecture too so LearnedAgent can rebuild the
-        # correctly-sized net without being told the hidden dims.
         latest = self.checkpoint_dir / "latest.pt"
         torch.save(
             {"model": self.model.state_dict(), "model_config": model_config},
@@ -368,10 +341,11 @@ class Trainer:
         if max_episodes is None:
             max_episodes = self.max_episodes
 
+        batch: List[Transition] = []
         start_time = time.time()
         episode = 0
         last_stage = self.curriculum.state.current_stage
-        last_checkpoint_ep = 0
+        last_print_ep = 0
 
         if verbose:
             n_params = sum(p.numel() for p in self.model.parameters())
@@ -384,7 +358,7 @@ class Trainer:
             print(f"  Device      : {dev_str}")
             print(f"  Algorithm   : {self.algorithm.upper()}")
             print(f"  Max episodes: {max_episodes:,}")
-            print(f"  Batch size  : {self.episodes_per_batch}  Workers: {self.n_workers}")
+            print(f"  Batch size  : {self.episodes_per_batch}")
             print(f"  LR          : {self.lr}  γ={self.gamma}")
             print(f"  Temperature : {self.temperature:.3f} → {self.min_temperature} (decay {self.temperature_decay})")
             print(f"  Model params: {n_params:,}")
@@ -398,177 +372,96 @@ class Trainer:
             print(f"  {'─'*7}  {'─'*12}  {'─'*13}  {'─'*11}  {'─'*5}  "
                   f"{'─'*5}  {'─'*8}  {'─'*7}  {'─'*5}")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=self.n_workers) as executor:
-            while episode < max_episodes and not self.curriculum.finished():
-                # Snapshot curriculum params for this batch so all parallel
-                # games use the same opponent regardless of when they finish.
-                opp_kind = self.curriculum.opponent_kind()
-                heuristic_diff, heuristic_blunder = self.curriculum.heuristic_params()
+        while episode < max_episodes and not self.curriculum.finished():
+            transitions, meta = self.play_episode()
+            self.replay.extend(transitions)
+            batch.extend(transitions)
+            episode += 1
+            self.curriculum.step()
 
-                # Snapshot weights to CPU once per batch — workers each get their
-                # own NMMNet instance built from this dict, no CUDA sharing.
-                cpu_weights = {
-                    k: v.detach().cpu() for k, v in self.model.state_dict().items()
-                }
-
-                # Submit the full batch of games in parallel.
-                futures = [
-                    executor.submit(
-                        self._play_game_worker,
-                        opp_kind, heuristic_diff, heuristic_blunder, cpu_weights,
-                    )
-                    for _ in range(self.episodes_per_batch)
-                ]
-
-                # Collect results as they complete.
-                batch: List[Transition] = []
-                game_results = []
-                for future in concurrent.futures.as_completed(futures):
-                    transitions, meta = future.result()
-                    batch.extend(transitions)
-                    self.replay.extend(transitions)
-                    game_results.append((transitions, meta))
-
-                # --- All games done: update stats and curriculum on main thread ---
-
-                for transitions, meta in game_results:
-                    won = meta["won"]
-                    self.stats.episodes += 1
-                    self.stats.total_plies += meta["plies"]
-                    if meta["winner"] is None:
-                        self.stats.draws += 1
-                    elif won:
-                        self.stats.wins += 1
-                        if meta["learned_color"] == "W":
-                            self.stats.white_wins += 1
-                        else:
-                            self.stats.black_wins += 1
-                    else:
-                        self.stats.losses += 1
-                    for tr in transitions:
-                        name = PHASE_NAMES[tr.phase_id]
-                        self.stats.phase_move_counts[name] = (
-                            self.stats.phase_move_counts.get(name, 0) + 1
-                        )
-                    self.curriculum.record_outcome(won)
-                    log_meta = {k: v for k, v in meta.items() if k != "move_log"}
-                    self.game_logger.log_game(
-                        winner=meta["winner"], moves=meta["move_log"], meta=log_meta
-                    )
-
-                episode += self.episodes_per_batch
-
-                # Step the curriculum once per completed game, collect events.
-                events: List[str] = []
-                for _ in range(self.episodes_per_batch):
-                    self.curriculum.step()
-                    ev = self.curriculum.state.last_event
-                    if ev:
-                        events.append(ev)
-
-                # Handle curriculum events: reset temperature and print banners.
-                new_stage = self.curriculum.state.current_stage
-                for event in events:
-                    if event.startswith("stage_advance") or event.startswith("difficulty_bump"):
-                        self.temperature = self._initial_temperature
-                if verbose:
-                    for event in events:
-                        if event.startswith("stage_advance") and new_stage != last_stage:
-                            reason_str = ""
-                            if "budget" in event:
-                                reason_str = " [safety cap]"
-                            elif "threshold" in event:
-                                wr = float(event.split(":")[-1])
-                                reason_str = f" [win rate {wr:.1%}]"
-                            print(
-                                f"\n  ── Stage {new_stage}: "
-                                f"{self.curriculum.state.stage_name()} "
-                                f"(ep {self.stats.episodes:,}){reason_str}"
-                                f"  [temp reset → {self._initial_temperature}]\n"
-                            )
-                            last_stage = new_stage
-                        elif event.startswith("difficulty_bump:"):
-                            parts = event.split(":")
-                            new_label = parts[1]
-                            wr = float(parts[2])
-                            print(
-                                f"\n  ── Level → {new_label}  "
-                                f"(win rate {wr:.1%} over last "
-                                f"{self.curriculum._eval_window} games, "
-                                f"ep {self.stats.episodes:,})"
-                                f"  [temp reset → {self._initial_temperature}]\n"
-                            )
+            new_stage = self.curriculum.state.current_stage
+            event = self.curriculum.state.last_event or ""
+            if new_stage != last_stage or event.startswith("difficulty_bump:"):
+                self.temperature = self._initial_temperature
+            if verbose:
                 if new_stage != last_stage:
+                    reason_str = ""
+                    if "budget" in event:
+                        reason_str = " [safety cap]"
+                    elif "threshold" in event:
+                        wr = event.split(":")[-1]
+                        reason_str = f" [win rate {float(wr):.1%}]"
+                    print(f"\n  ── Stage {new_stage}: {self.curriculum.state.stage_name()} "
+                          f"(episode {self.stats.episodes:,}){reason_str}  [temp reset → {self._initial_temperature}]\n")
                     last_stage = new_stage
+                elif event.startswith("difficulty_bump:"):
+                    parts = event.split(":")
+                    new_label = parts[1]
+                    wr = float(parts[2])
+                    print(f"\n  ── Level → {new_label}  (win rate {wr:.1%} over last "
+                          f"{self.curriculum._eval_window} games, ep {self.stats.episodes:,})"
+                          f"  [temp reset → {self._initial_temperature}]\n")
 
-                # --- Gradient update ---
-                update_metrics: dict = {}
-                if batch and len(self.replay) >= self.min_fill_before_train:
-                    update_metrics = self.update(batch)
-                    wall = time.time() - start_time
-                    last_meta = game_results[-1][1] if game_results else {}
-                    self._log_metrics(
-                        {
-                            "episode": self.stats.episodes,
-                            "stage": self.curriculum.state.current_stage,
-                            "stage_name": self.curriculum.state.stage_name(),
-                            "heuristic_level": self.curriculum.level_label(),
-                            "wall_seconds": round(wall, 2),
-                            "mean_plies": round(
-                                self.stats.total_plies / max(1, self.stats.episodes), 2
-                            ),
-                            "wins": self.stats.wins,
-                            "losses": self.stats.losses,
-                            "draws": self.stats.draws,
-                            "white_wins": self.stats.white_wins,
-                            "black_wins": self.stats.black_wins,
-                            "phase_move_counts": dict(self.stats.phase_move_counts),
-                            "rolling_win_rate": round(self.curriculum.rolling_win_rate(), 4),
-                            "temperature": self.temperature,
-                            **update_metrics,
-                            "last_meta": last_meta,
-                        }
-                    )
-
-                    if verbose:
-                        ep = self.stats.episodes
-                        total = self.stats.wins + self.stats.losses + self.stats.draws
-                        win_pct = 100.0 * self.stats.wins / max(1, total)
-                        rolling_wr = self.curriculum.rolling_win_rate()
-                        mean_plies = self.stats.total_plies / max(1, ep)
-                        wall = time.time() - start_time
-                        eps_s = ep / max(0.001, wall)
-                        stage = self.curriculum.state.current_stage
-                        if stage == 3:
-                            stage_label = f"s3/{self.curriculum.level_label()}"
-                        else:
-                            stage_label = self.curriculum.state.stage_name()[:12]
-                        wld = f"{self.stats.wins}/{self.stats.losses}/{self.stats.draws}"
-                        loss_val = update_metrics.get("loss", 0.0)
-                        entropy = update_metrics.get("entropy", 0.0)
-                        print(
-                            f"  {ep:>7,}  {stage_label:<12}  {wld:>13}  {win_pct:>4.1f}%"
-                            f"({rolling_wr:>4.1%})  "
-                            f"{mean_plies:>5.1f}  {self.temperature:>5.3f}  "
-                            f"{loss_val:>8.4f}  {entropy:>7.4f}  {eps_s:>5.1f}"
-                        )
-
-                # Decay temperature for every episode in this batch.
-                self.temperature = max(
-                    self.min_temperature,
-                    self.temperature * (self.temperature_decay ** self.episodes_per_batch),
+            update_metrics: dict = {}
+            if len(batch) >= self.episodes_per_batch and len(self.replay) >= self.min_fill_before_train:
+                update_metrics = self.update(batch)
+                wall = time.time() - start_time
+                self._log_metrics(
+                    {
+                        "episode": self.stats.episodes,
+                        "stage": self.curriculum.state.current_stage,
+                        "stage_name": self.curriculum.state.stage_name(),
+                        "heuristic_level": self.curriculum.level_label(),
+                        "wall_seconds": round(wall, 2),
+                        "mean_plies": round(
+                            self.stats.total_plies / max(1, self.stats.episodes), 2
+                        ),
+                        "wins": self.stats.wins,
+                        "losses": self.stats.losses,
+                        "draws": self.stats.draws,
+                        "white_wins": self.stats.white_wins,
+                        "black_wins": self.stats.black_wins,
+                        "phase_move_counts": dict(self.stats.phase_move_counts),
+                        "rolling_win_rate": round(self.curriculum.rolling_win_rate(), 4),
+                        "temperature": self.temperature,
+                        **update_metrics,
+                        "last_meta": meta,
+                    }
                 )
+                batch.clear()
 
-                # Checkpoint on approximate boundary.
-                if self.checkpoint_every and (
-                    self.stats.episodes - last_checkpoint_ep >= self.checkpoint_every
-                ):
-                    last_checkpoint_ep = self.stats.episodes
-                    ckpt = self.save_checkpoint()
-                    if verbose:
-                        print(f"  → checkpoint saved: {ckpt}")
+                if verbose:
+                    ep = self.stats.episodes
+                    total = self.stats.wins + self.stats.losses + self.stats.draws
+                    win_pct = 100.0 * self.stats.wins / max(1, total)
+                    rolling_wr = self.curriculum.rolling_win_rate()
+                    mean_plies = self.stats.total_plies / max(1, ep)
+                    wall = time.time() - start_time
+                    eps_s = ep / max(0.001, wall)
+                    stage = self.curriculum.state.current_stage
+                    if stage == 3:
+                        stage_label = f"s3/{self.curriculum.level_label()}"
+                    else:
+                        stage_label = self.curriculum.state.stage_name()[:12]
+                    wld = f"{self.stats.wins}/{self.stats.losses}/{self.stats.draws}"
+                    loss_val = update_metrics.get("loss", 0.0)
+                    entropy  = update_metrics.get("entropy", 0.0)
+                    print(f"  {ep:>7,}  {stage_label:<12}  {wld:>13}  {win_pct:>4.1f}%"
+                          f"({rolling_wr:>4.1%})  "
+                          f"{mean_plies:>5.1f}  {self.temperature:>5.3f}  "
+                          f"{loss_val:>8.4f}  {entropy:>7.4f}  {eps_s:>5.1f}")
+                    last_print_ep = ep
 
-        # Final save.
+            self.temperature = max(self.min_temperature, self.temperature * self.temperature_decay)
+
+            if self.checkpoint_every and self.stats.episodes % self.checkpoint_every == 0:
+                ckpt = self.save_checkpoint()
+                if verbose:
+                    print(f"  → checkpoint saved: {ckpt}")
+
+        # Final flush.
+        if batch and len(self.replay) >= self.min_fill_before_train:
+            self.update(batch)
         ckpt = self.save_checkpoint(str(self.checkpoint_dir / "final.pt"))
         if verbose:
             wall = time.time() - start_time

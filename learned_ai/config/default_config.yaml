@@ -8,7 +8,6 @@ training:
   lr: 0.0003
   gamma: 0.99
   episodes_per_batch: 32
-  n_workers: 4               # parallel games per batch (tune up if GPU is underutilised)
   max_episodes: 220010        # must be >= sum of all stage budgets
   checkpoint_every: 1000
   eval_every: 500
