@@ -69,6 +69,7 @@ class Trainer:
         self.eval_every = int(train_cfg.get("eval_every", 500))
         self.eval_games = int(train_cfg.get("eval_games", 50))
         self.temperature = float(train_cfg.get("temperature", 1.0))
+        self._initial_temperature = self.temperature  # restored at each stage/difficulty boundary
         self.temperature_decay = float(train_cfg.get("temperature_decay", 0.9995))
         self.min_temperature = float(train_cfg.get("min_temperature", 0.1))
         self.value_coef = float(train_cfg.get("value_coef", 0.5))
@@ -132,7 +133,7 @@ class Trainer:
         if kind == "random":
             return RandomAgent(color=color, seed=random.randint(0, 1 << 31))
         if kind == "heuristic":
-            return HeuristicAgent(color=color, difficulty=1)
+            return HeuristicAgent(color=color, difficulty=self.curriculum.heuristic_difficulty())
         # default: a fresh self-play opponent that shares the same model.
         return self._make_learned_agent(color=color, sample=True)
 
@@ -170,9 +171,10 @@ class Trainer:
         }
         self.stats.episodes += 1
         self.stats.total_plies += result.plies
+        won = result.winner == learned_color
         if result.winner is None:
             self.stats.draws += 1
-        elif result.winner == learned_color:
+        elif won:
             self.stats.wins += 1
             if learned_color == "W":
                 self.stats.white_wins += 1
@@ -180,6 +182,7 @@ class Trainer:
                 self.stats.black_wins += 1
         else:
             self.stats.losses += 1
+        self.curriculum.record_outcome(won)
 
         for tr in learned_transitions:
             name = PHASE_NAMES[tr.phase_id]
@@ -374,9 +377,9 @@ class Trainer:
             print(f"{'─'*60}")
             print(f"  Stage {self.curriculum.state.current_stage}: {self.curriculum.state.stage_name()}")
             print(f"{'─'*60}\n")
-            print(f"  {'ep':>7}  {'stage':<12}  {'W/L/D':>13}  {'win%':>5}  {'plies':>5}  "
+            print(f"  {'ep':>7}  {'stage':<12}  {'W/L/D':>13}  {'win%(roll)':>11}  {'plies':>5}  "
                   f"{'temp':>5}  {'loss':>8}  {'entropy':>7}  {'eps/s':>5}")
-            print(f"  {'─'*7}  {'─'*12}  {'─'*13}  {'─'*5}  {'─'*5}  "
+            print(f"  {'─'*7}  {'─'*12}  {'─'*13}  {'─'*11}  {'─'*5}  "
                   f"{'─'*5}  {'─'*8}  {'─'*7}  {'─'*5}")
 
         while episode < max_episodes and not self.curriculum.finished():
@@ -386,12 +389,30 @@ class Trainer:
             episode += 1
             self.curriculum.step()
 
-            # Announce stage transitions
+            # Announce curriculum events (stage advances and difficulty bumps)
+            # and reset temperature so the model explores freely on the new challenge.
             new_stage = self.curriculum.state.current_stage
-            if verbose and new_stage != last_stage:
-                print(f"\n  ── Stage {new_stage}: {self.curriculum.state.stage_name()} "
-                      f"(episode {self.stats.episodes:,})\n")
-                last_stage = new_stage
+            event = self.curriculum.state.last_event or ""
+            if new_stage != last_stage or event.startswith("difficulty_bump:"):
+                self.temperature = self._initial_temperature
+            if verbose:
+                if new_stage != last_stage:
+                    reason_str = ""
+                    if "budget" in event:
+                        reason_str = " [safety cap — threshold not reached]"
+                    elif "threshold" in event:
+                        wr = event.split(":")[-1]
+                        reason_str = f" [win rate {float(wr):.1%}]"
+                    print(f"\n  ── Stage {new_stage}: {self.curriculum.state.stage_name()} "
+                          f"(episode {self.stats.episodes:,}){reason_str}  [temp reset → {self._initial_temperature}]\n")
+                    last_stage = new_stage
+                elif event.startswith("difficulty_bump:"):
+                    parts = event.split(":")
+                    new_diff = parts[1]
+                    wr = float(parts[2])
+                    print(f"\n  ── Difficulty → {new_diff}  (win rate {wr:.1%} over last "
+                          f"{self.curriculum._eval_window} games, ep {self.stats.episodes:,})"
+                          f"  [temp reset → {self._initial_temperature}]\n")
 
             update_metrics: dict = {}
             if len(batch) >= self.episodes_per_batch and len(self.replay) >= self.min_fill_before_train:
@@ -402,6 +423,7 @@ class Trainer:
                         "episode": self.stats.episodes,
                         "stage": self.curriculum.state.current_stage,
                         "stage_name": self.curriculum.state.stage_name(),
+                        "heuristic_difficulty": self.curriculum.heuristic_difficulty(),
                         "wall_seconds": round(wall, 2),
                         "mean_plies": round(
                             self.stats.total_plies / max(1, self.stats.episodes), 2
@@ -412,6 +434,7 @@ class Trainer:
                         "white_wins": self.stats.white_wins,
                         "black_wins": self.stats.black_wins,
                         "phase_move_counts": dict(self.stats.phase_move_counts),
+                        "rolling_win_rate": round(self.curriculum.rolling_win_rate(), 4),
                         "temperature": self.temperature,
                         **update_metrics,
                         "last_meta": meta,
@@ -423,14 +446,20 @@ class Trainer:
                     ep = self.stats.episodes
                     total = self.stats.wins + self.stats.losses + self.stats.draws
                     win_pct = 100.0 * self.stats.wins / max(1, total)
+                    rolling_wr = self.curriculum.rolling_win_rate()
                     mean_plies = self.stats.total_plies / max(1, ep)
-                    eps_s = (ep - last_print_ep) / max(0.001, time.time() - start_time - (wall - (ep - last_print_ep) / max(1, ep) * wall))
+                    wall = time.time() - start_time
                     eps_s = ep / max(0.001, wall)
-                    stage_name = self.curriculum.state.stage_name()[:12]
+                    stage = self.curriculum.state.current_stage
+                    if stage == 3:
+                        stage_label = f"s3/d{self.curriculum.heuristic_difficulty()}"
+                    else:
+                        stage_label = self.curriculum.state.stage_name()[:12]
                     wld = f"{self.stats.wins}/{self.stats.losses}/{self.stats.draws}"
                     loss_val = update_metrics.get("loss", 0.0)
                     entropy  = update_metrics.get("entropy", 0.0)
-                    print(f"  {ep:>7,}  {stage_name:<12}  {wld:>13}  {win_pct:>4.1f}%  "
+                    print(f"  {ep:>7,}  {stage_label:<12}  {wld:>13}  {win_pct:>4.1f}%"
+                          f"({rolling_wr:>4.1%})  "
                           f"{mean_plies:>5.1f}  {self.temperature:>5.3f}  "
                           f"{loss_val:>8.4f}  {entropy:>7.4f}  {eps_s:>5.1f}")
                     last_print_ep = ep

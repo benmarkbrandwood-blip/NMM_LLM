@@ -8,7 +8,7 @@ training:
   lr: 0.0003
   gamma: 0.99
   episodes_per_batch: 32
-  max_episodes: 160010        # must be >= sum of all stage budgets
+  max_episodes: 220010        # must be >= sum of all stage budgets
   checkpoint_every: 1000
   eval_every: 500
   eval_games: 50
@@ -23,10 +23,21 @@ training:
 
 curriculum:
   stage1_episodes: 10
-  stage2_episodes: 30000      # was 5000 — needs to reliably beat random (70%+) first
-  stage3_episodes: 60000      # was 15000 — difficulty-1 heuristic needs sustained effort
-  stage4_episodes: 70000      # was 30000 — self-play strength development
+  stage2_episodes: 30000      # safety cap; actual exit is win-rate gated
+  stage3_episodes: 120000     # safety cap across all difficulty levels (10 levels × ~12k each)
+  stage4_episodes: 70000      # self-play strength development
   stage5_episodes: 0
+
+  # Stage 2: graduate to stage 3 only after hitting this rolling win rate vs random
+  stage2_win_threshold: 0.60
+
+  # Stage 3: start at difficulty 1, require this win rate at each level before bumping
+  stage3_difficulty_start: 1
+  stage3_difficulty_max: 10   # must hold threshold at difficulty 10 to graduate to stage 4
+  stage3_difficulty_threshold: 0.55
+
+  # Rolling window size (episodes) used for all win-rate checks
+  eval_window: 200
 
 replay_buffer:
   capacity: 50000
