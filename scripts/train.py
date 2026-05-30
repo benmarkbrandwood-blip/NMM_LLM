@@ -52,13 +52,14 @@ def main() -> int:
 
         trainer.curriculum = Curriculum.from_config(cfg.get("curriculum", {}), start_stage=args.stage)
 
-    print(f"Loaded config {args.config}")
+    print(f"Config       : {args.config}")
+    if args.resume:
+        print(f"Resuming from: {args.resume}")
+    if args.stage is not None:
+        print(f"Start stage  : {args.stage} (overridden by --stage)")
     print(f"Stage budgets: {trainer.curriculum.state.stage_budgets}")
-    print(f"Starting at stage {trainer.curriculum.state.current_stage}")
 
-    trainer.train(max_episodes=args.max_episodes)
-    print("Training finished.")
-    print(f"Final stats: {trainer.stats.__dict__}")
+    trainer.train(max_episodes=args.max_episodes, verbose=True)
     return 0
 
 

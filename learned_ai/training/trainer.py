@@ -334,13 +334,37 @@ class Trainer:
 
     # ------------------------------------------------------------------
 
-    def train(self, max_episodes: Optional[int] = None) -> None:
+    def train(self, max_episodes: Optional[int] = None, verbose: bool = True) -> None:
         if max_episodes is None:
             max_episodes = self.max_episodes
 
         batch: List[Transition] = []
         start_time = time.time()
         episode = 0
+        last_stage = self.curriculum.state.current_stage
+        last_print_ep = 0
+
+        if verbose:
+            n_params = sum(p.numel() for p in self.model.parameters())
+            print(f"\n{'─'*60}")
+            print(f"  NMM Learned AI — Training")
+            print(f"{'─'*60}")
+            print(f"  Algorithm   : {self.algorithm.upper()}")
+            print(f"  Max episodes: {max_episodes:,}")
+            print(f"  Batch size  : {self.episodes_per_batch}")
+            print(f"  LR          : {self.lr}  γ={self.gamma}")
+            print(f"  Temperature : {self.temperature:.3f} → {self.min_temperature} (decay {self.temperature_decay})")
+            print(f"  Model params: {n_params:,}")
+            print(f"  Checkpoints : every {self.checkpoint_every} episodes → {self.checkpoint_dir}")
+            print(f"  Metrics log : {self.metrics_path}")
+            print(f"{'─'*60}")
+            print(f"  Stage {self.curriculum.state.current_stage}: {self.curriculum.state.stage_name()}")
+            print(f"{'─'*60}\n")
+            print(f"  {'ep':>7}  {'stage':<12}  {'W/L/D':>13}  {'win%':>5}  {'plies':>5}  "
+                  f"{'temp':>5}  {'loss':>8}  {'entropy':>7}  {'eps/s':>5}")
+            print(f"  {'─'*7}  {'─'*12}  {'─'*13}  {'─'*5}  {'─'*5}  "
+                  f"{'─'*5}  {'─'*8}  {'─'*7}  {'─'*5}")
+
         while episode < max_episodes and not self.curriculum.finished():
             transitions, meta = self.play_episode()
             self.replay.extend(transitions)
@@ -348,14 +372,23 @@ class Trainer:
             episode += 1
             self.curriculum.step()
 
+            # Announce stage transitions
+            new_stage = self.curriculum.state.current_stage
+            if verbose and new_stage != last_stage:
+                print(f"\n  ── Stage {new_stage}: {self.curriculum.state.stage_name()} "
+                      f"(episode {self.stats.episodes:,})\n")
+                last_stage = new_stage
+
+            update_metrics: dict = {}
             if len(batch) >= self.episodes_per_batch and len(self.replay) >= self.min_fill_before_train:
                 update_metrics = self.update(batch)
+                wall = time.time() - start_time
                 self._log_metrics(
                     {
                         "episode": self.stats.episodes,
                         "stage": self.curriculum.state.current_stage,
                         "stage_name": self.curriculum.state.stage_name(),
-                        "wall_seconds": round(time.time() - start_time, 2),
+                        "wall_seconds": round(wall, 2),
                         "mean_plies": round(
                             self.stats.total_plies / max(1, self.stats.episodes), 2
                         ),
@@ -372,12 +405,40 @@ class Trainer:
                 )
                 batch.clear()
 
+                if verbose:
+                    ep = self.stats.episodes
+                    total = self.stats.wins + self.stats.losses + self.stats.draws
+                    win_pct = 100.0 * self.stats.wins / max(1, total)
+                    mean_plies = self.stats.total_plies / max(1, ep)
+                    eps_s = (ep - last_print_ep) / max(0.001, time.time() - start_time - (wall - (ep - last_print_ep) / max(1, ep) * wall))
+                    eps_s = ep / max(0.001, wall)
+                    stage_name = self.curriculum.state.stage_name()[:12]
+                    wld = f"{self.stats.wins}/{self.stats.losses}/{self.stats.draws}"
+                    loss_val = update_metrics.get("loss", 0.0)
+                    entropy  = update_metrics.get("entropy", 0.0)
+                    print(f"  {ep:>7,}  {stage_name:<12}  {wld:>13}  {win_pct:>4.1f}%  "
+                          f"{mean_plies:>5.1f}  {self.temperature:>5.3f}  "
+                          f"{loss_val:>8.4f}  {entropy:>7.4f}  {eps_s:>5.1f}")
+                    last_print_ep = ep
+
             self.temperature = max(self.min_temperature, self.temperature * self.temperature_decay)
 
             if self.checkpoint_every and self.stats.episodes % self.checkpoint_every == 0:
-                self.save_checkpoint()
+                ckpt = self.save_checkpoint()
+                if verbose:
+                    print(f"  → checkpoint saved: {ckpt}")
 
         # Final flush.
         if batch and len(self.replay) >= self.min_fill_before_train:
             self.update(batch)
-        self.save_checkpoint(str(self.checkpoint_dir / "final.pt"))
+        ckpt = self.save_checkpoint(str(self.checkpoint_dir / "final.pt"))
+        if verbose:
+            wall = time.time() - start_time
+            total = self.stats.wins + self.stats.losses + self.stats.draws
+            win_pct = 100.0 * self.stats.wins / max(1, total)
+            print(f"\n{'─'*60}")
+            print(f"  Training complete — {self.stats.episodes:,} episodes in {wall:.0f}s")
+            print(f"  Win/Loss/Draw: {self.stats.wins}/{self.stats.losses}/{self.stats.draws}  "
+                  f"({win_pct:.1f}% win rate)")
+            print(f"  Final checkpoint: {ckpt}")
+            print(f"{'─'*60}\n")
