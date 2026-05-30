@@ -133,6 +133,34 @@ fn py_get_best_move(
     }
 }
 
+/// Like `py_get_best_move` but also returns search stats for benchmarking:
+/// (from|None, to|None, capture|None, nodes, depth_reached).
+#[pyfunction]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000))]
+fn py_search_stats(
+    white: u32,
+    black: u32,
+    white_placed: u8,
+    black_placed: u8,
+    side_to_move: u8,
+    max_depth: u8,
+    time_limit_ms: u64,
+) -> (Option<u8>, Option<u8>, Option<u8>, u64, u8) {
+    let r = search::get_best_move(
+        white,
+        black,
+        white_placed,
+        black_placed,
+        Color::from_u8(side_to_move),
+        max_depth,
+        time_limit_ms,
+    );
+    match r.best_move {
+        Some(m) => (m.from, Some(m.to), m.capture, r.nodes, r.depth_reached),
+        None => (None, None, None, r.nodes, r.depth_reached),
+    }
+}
+
 /// FullGame DB 9-byte key (byte-identical to Python `_encode_canonical`).
 #[pyfunction]
 fn py_db_key(white: u32, black: u32, turn: u8, placed_w: u8, placed_b: u8) -> Vec<u8> {
@@ -174,6 +202,7 @@ fn nmm_core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_evaluate, m)?)?;
     m.add_function(wrap_pyfunction!(py_immediate_threats, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_best_move, m)?)?;
+    m.add_function(wrap_pyfunction!(py_search_stats, m)?)?;
     m.add_function(wrap_pyfunction!(py_db_key, m)?)?;
     m.add_function(wrap_pyfunction!(py_endgame_key, m)?)?;
     m.add_function(wrap_pyfunction!(py_opening_key, m)?)?;
