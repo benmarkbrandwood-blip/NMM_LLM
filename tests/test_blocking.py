@@ -135,5 +135,110 @@ class TestImmediateMillThreatsPlacement(unittest.TestCase):
         self.assertIn("to", move)
 
 
+class TestPlacementForkSurplus(unittest.TestCase):
+    """B-81 — _placement_fork_surplus correctly counts extra unblockable threats."""
+
+    def setUp(self):
+        from ai.heuristics import _placement_fork_surplus
+        self._pfs = _placement_fork_surplus
+
+    def _board(self, white, black, turn="W", w_placed=None, b_placed=None):
+        pos = {p: "" for p in __import__("game.board", fromlist=["POSITIONS"]).POSITIONS}
+        for p in white:
+            pos[p] = "W"
+        for p in black:
+            pos[p] = "B"
+        return BoardState.from_setup(pos, turn=turn, phase="place")
+
+    def test_zero_when_no_two_configs(self):
+        b = self._board(["d6"], ["f4"])
+        self.assertEqual(self._pfs(b, "W"), 0)
+        self.assertEqual(self._pfs(b, "B"), 0)
+
+    def test_zero_when_one_two_config(self):
+        # Black has (f6,f4,f2) → only f6 closing → surplus 0
+        b = self._board(["d6", "g4"], ["f4", "f2"])
+        self.assertEqual(self._pfs(b, "B"), 0)
+
+    def test_one_when_two_distinct_closing_squares(self):
+        # Black's 6th move f2 position: (f6,f4,f2) closing f6; (f2,d2,b2) closing b2
+        # White cannot block both.
+        from game.board import POSITIONS
+        pos = {p: "" for p in POSITIONS}
+        for p in ["b4", "d6", "d3", "a1", "g4", "e4"]:
+            pos[p] = "W"
+        for p in ["f4", "d2", "d5", "a4", "c4", "f2"]:
+            pos[p] = "B"
+        b = BoardState.from_setup(pos, turn="W", phase="place")
+        self.assertEqual(self._pfs(b, "B"), 1)  # 2 distinct closing → surplus 1
+        self.assertEqual(self._pfs(b, "W"), 0)  # White has no 2-configs here
+
+    def test_two_when_three_distinct_closing_squares(self):
+        # Construct Black with 3 independent 2-configs: f6, b2, and g7 as closing squares.
+        # f6: (f6,f4,f2) — f4=B, f2=B
+        # b2: (f2,d2,b2) — f2=B, d2=B (shares f2 piece but different closing sq)
+        # g7: (a7,d7,g7) — a7=B, d7=B
+        from game.board import POSITIONS
+        pos = {p: "" for p in POSITIONS}
+        for p in ["g4", "e4", "c5"]:
+            pos[p] = "W"
+        for p in ["f4", "f2", "d2", "a7", "d7"]:
+            pos[p] = "B"
+        b = BoardState.from_setup(pos, turn="W", phase="place")
+        self.assertGreaterEqual(self._pfs(b, "B"), 2)
+
+    def test_zero_when_all_placed(self):
+        # After all 9 pieces placed, function returns 0 (placement phase over).
+        from game.board import POSITIONS
+        pos = {p: "" for p in POSITIONS}
+        white = ["a7", "d7", "g7", "g4", "g1", "d1", "a1", "a4", "b4"]
+        black = ["b6", "d6", "f6", "f4", "f2", "d2", "b2", "c5", "e5"]
+        for p in white:
+            pos[p] = "W"
+        for p in black:
+            pos[p] = "B"
+        b = BoardState(
+            positions=pos, turn="W",
+            pieces_on_board={"W": 9, "B": 9},
+            pieces_placed={"W": 9, "B": 9},
+            pieces_captured={"W": 0, "B": 0},
+            hash_key=0,
+        )
+        self.assertEqual(self._pfs(b, "B"), 0)
+
+
+class TestB81PlacementForkHeuristic(unittest.TestCase):
+    """Integration: the evaluate() term penalises positions where the opponent
+    has an independent dual 2-config fork in placement phase (B-81)."""
+
+    def test_fork_scores_worse_than_single_threat(self):
+        """After Black's fork move, evaluate(board, 'W') must score lower
+        (more negative from White's perspective) than the same position with
+        only one of Black's two 2-configs present."""
+        from game.board import POSITIONS
+        from ai.heuristics import evaluate
+
+        # Two-threat fork: Black has (f6,f4,f2) and (f2,d2,b2)
+        pos_fork = {p: "" for p in POSITIONS}
+        for p in ["b4", "d6", "d3", "a1", "g4", "e4"]:
+            pos_fork[p] = "W"
+        for p in ["f4", "d2", "d5", "a4", "c4", "f2"]:
+            pos_fork[p] = "B"
+        board_fork = BoardState.from_setup(pos_fork, turn="W", phase="place")
+
+        # Single threat: remove d2 (breaks (f2,d2,b2)); only (f6,f4,f2) remains
+        pos_single = dict(pos_fork)
+        pos_single["d2"] = ""
+        board_single = BoardState.from_setup(pos_single, turn="W", phase="place")
+
+        score_fork   = evaluate(board_fork,   "W")
+        score_single = evaluate(board_single, "W")
+        self.assertLess(
+            score_fork, score_single,
+            f"Fork position must score worse for White than single-threat: "
+            f"fork={score_fork}, single={score_single}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -79,6 +79,8 @@ class HeuristicWeights:
     disrupted_two_config: int = 200  # penalty for creating a (own,own,opp) blocked mill pattern
     # ── B-60: Cycling-capture unblock ────────────────────────────────────────
     cycling_capture_unblock: int = 180  # penalty when capture leaves own piece blocking opp pending mill
+    # ── B-71: Capture reform difficulty ──────────────────────────────────────
+    capture_reform_difficulty: int = 300  # bonus when opp cannot immediately re-occupy captured sq to reform a 2-config
     # ── B-64: Dead/near-dead placement penalty ───────────────────────────────
     dead_placement_penalty: int = 1500  # penalty for placing a piece with 0 free adjacent squares
     near_dead_placement_penalty: int = 400  # penalty for 1 free adjacent square
@@ -87,6 +89,12 @@ class HeuristicWeights:
     # ── B-33: Forcing placement quality ──────────────────────────────────────
     dead_block_bonus: int = 60   # bonus per new own 2-config whose closing sq is a corner
                                  # node (2 connections) — opponent is forced to a passive sq
+    # ── B-73: Value network blend ────────────────────────────────────────────
+    value_net_blend: int = 0     # % of value-network score blended into leaf eval (0 = off)
+    # ── B-74: Cross-mill cycling fork ────────────────────────────────────────
+    cross_mill_cycling: int = 300  # static bonus per two-mill fork (closed mill + adjacent near-mill closing sq)
+    # ── B-81: Placement independent fork ("keep-busy") ───────────────────────
+    placement_fork_penalty: int = 50  # penalty per extra unblockable closing sq in opp placement fork
     # ── B-47: Side-specific placement emphasis ───────────────────────────────
     # White and Black have different strategic goals in placement (White: proactive
     # cardinal claim; Black: reactive disruption + last-move advantage).
@@ -342,6 +350,17 @@ def evaluate(
         base += w_own_conv * (_double_mill_convergence(board, color) - _double_mill_convergence(board, opp))
         base += w_cfm * (_cross_feed_mobility_pairs(board, color) - _cross_feed_mobility_pairs(board, opp))
 
+    # B-74: cross-mill cycling fork — static bonus for positions where a closed mill
+    # can immediately pivot into a different near-complete mill (two-mill cycling fork).
+    # This upgrades leaf eval beyond the generic _mill_cycle_ready term so the search
+    # correctly identifies forced-win trajectories built around the double-mill pattern.
+    if phase in ("move", "fly"):
+        w_cross_cycle = weights.cross_mill_cycling if weights else DEFAULT_WEIGHTS.cross_mill_cycling
+        if w_cross_cycle:
+            base += w_cross_cycle * (
+                _cross_mill_cycling(board, color) - _cross_mill_cycling(board, opp)
+            )
+
     # Move-phase: reward non-contributing pieces assembling toward a 2-config.
     # Gradient: step-1 (×65), step-2 (×22), step-3 (×10), step-4 (×4).
     # Also reward free pieces approaching empty squares of 1-config mills (×12 weighted
@@ -400,6 +419,18 @@ def evaluate(
         _uca_count = len(_unguarded_cardinal_mill_alert(board, opp, color))
         if _uca_count:
             base -= 300 * _uca_count
+
+    # B-81: Placement independent-fork penalty ("keep-busy fork").
+    # When opponent has ≥2 distinct closing squares simultaneously in placement phase,
+    # one mill will close regardless of what we do (we can block at most 1 per turn).
+    # The existing two_cfg and threat terms only add ~-40 for this; the correct value
+    # is ~-42 per unblockable extra threat (worth one free mill close + capture).
+    # Score symmetrically: reward own fork surplus, penalise opponent's.
+    if board.phase == "place":
+        w_pfp = weights.placement_fork_penalty if weights else DEFAULT_WEIGHTS.placement_fork_penalty
+        own_fork_surplus = _placement_fork_surplus(board, color)
+        opp_fork_surplus = _placement_fork_surplus(board, opp)
+        base += w_pfp * (own_fork_surplus - opp_fork_surplus)
 
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
@@ -712,6 +743,28 @@ def _sealed_two_configs(board: BoardState, color: str) -> int:
 
 
 _SEALED_TWO_CFG_WEIGHT = 20  # ~4× the regular two_cfg weight (5); propagates through negamax
+
+
+def _placement_fork_surplus(board: BoardState, color: str) -> int:
+    """Placement-phase "keep-busy fork": count extra unblockable mill threats.
+
+    During placement, a side with N distinct 2-config closing squares has N
+    simultaneous threats.  The opponent can cover at most 1 per turn (place on
+    one closing square), leaving N-1 mills to close for free.
+
+    Returns max(0, N_distinct_closing - 1) so the score is 0 for ≤1 threat
+    (blockable), 1 for an unblockable fork (2 distinct), 2 for a triple fork, etc.
+
+    Only meaningful during placement (can_place == True); returns 0 otherwise.
+    """
+    if board.pieces_placed.get(color, 0) >= 9:
+        return 0
+    closing: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            closing.add(next(p for p in mill if board.positions[p] == ""))
+    return max(0, len(closing) - 1)
 
 
 def _open_mill_domination(board: BoardState, color: str) -> int:
@@ -1503,6 +1556,48 @@ def _unguarded_cardinal_mill_alert(board: BoardState, opp: str, own: str) -> lis
     return result
 
 
+def _cross_mill_cycling(board: BoardState, color: str) -> int:
+    """Count two-mill cycling forks.
+
+    A fork exists when a completed own mill contains at least one piece
+    that is adjacent to an empty square that would close a DIFFERENT
+    near-complete own mill (2 own pieces + 1 empty).
+
+    Moving that pivot piece closes the second mill (forcing a capture) while
+    opening the first.  On the next turn it can return, closing the first mill
+    again.  The opponent cannot simultaneously block both closing squares
+    because the pivot piece itself occupies one of them — this guarantees one
+    capture every two moves regardless of opponent play.
+
+    In fly phase any piece can reach any empty square, so every closed mill
+    paired with any near-complete own mill qualifies.
+    """
+    near_closings: set[str] = set()
+    for mill in MILLS:
+        vals = [board.positions[p] for p in mill]
+        if vals.count(color) == 2 and vals.count("") == 1:
+            near_closings.add(next(p for p in mill if board.positions[p] == ""))
+
+    if not near_closings:
+        return 0
+
+    phase = get_game_phase(board, color)
+    count = 0
+    for mill in MILLS:
+        if not all(board.positions[p] == color for p in mill):
+            continue
+        if phase == "fly":
+            count += 1  # any piece can reach any empty square
+        else:
+            mill_set = set(mill)
+            for p in mill:
+                if any(nb not in mill_set and nb in near_closings
+                       for nb in ADJACENCY[p]):
+                    count += 1
+                    break
+    return count
+
+
 def _cycling_mill_setup(board: BoardState, color: str) -> int:
     """Count cycling opportunities — two types:
 
@@ -2153,6 +2248,36 @@ def tactical_move_bonus(
             if cycling_unblock_penalty:
                 break
 
+    # B-71: Capture reform difficulty — reward captures where the opponent cannot immediately
+    # re-occupy the captured square and recreate a 2-config.  In move phase, check every
+    # adjacent opponent piece: simulate it sliding into the captured square and test whether
+    # any mill containing that square would then have (opp, opp, empty).  If no such slide
+    # exists, the capture is "hard to reform" and earns the bonus.
+    capture_reform_bonus = 0
+    if capture_this_move and captured_pos is not None and before_phase == "move":
+        can_reform = False
+        for nb in ADJACENCY.get(captured_pos, []):
+            if after.positions[nb] != opp:
+                continue
+            for mill in MILLS:
+                if captured_pos not in mill:
+                    continue
+                sim_vals = []
+                for p in mill:
+                    if p == captured_pos:
+                        sim_vals.append(opp)   # sliding piece arrives
+                    elif p == nb:
+                        sim_vals.append("")    # sliding piece departs
+                    else:
+                        sim_vals.append(after.positions[p])
+                if sim_vals.count(opp) == 2 and sim_vals.count("") == 1:
+                    can_reform = True
+                    break
+            if can_reform:
+                break
+        if not can_reform:
+            capture_reform_bonus = weights.capture_reform_difficulty
+
     # PAT-1: Isolated Mill Suppressor — scale the close_mill contribution in early placement
     # (pieces 1–5) when the closed mill leaves zero own 2-configs anywhere on the board.
     # An isolated mill is easy to freeze (4 opponent pieces suffice); suppression ensures
@@ -2717,6 +2842,7 @@ def tactical_move_bonus(
         ("Fly-phase fork creation",        fly_fork_bonus),
         ("Mobility reduction",             mob_reduction_bonus),
         ("Cycling-capture unblock (B-60)", -cycling_unblock_penalty),
+        ("Capture reform difficulty (B-71)", capture_reform_bonus),
         ("Captured feeder piece",          capture_feeder_bonus),
         ("Captured diamond piece",         capture_diamond_bonus),
         ("Capture creates diamond (B-17A)", capture_creates_diamond_bonus),

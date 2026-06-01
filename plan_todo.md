@@ -1257,6 +1257,24 @@ When `key_present` is false, the badge is amber with text "Set `ANTHROPIC_API_KE
 
 ---
 
+### B-81 — Independent dual 2-config threat detection ("keep-busy fork") ✅ 2026-06-01 ★★★
+
+**Problem:** The AI doesn't penalise (or value) positions where one side has two 2-configs whose closing squares are **non-adjacent**. A standard fork where one move can block both threats (closing squares are adjacent or identical) is less dangerous than an independent fork where no single move defends both. The AI treats them identically, so it plays passively during placement while the opponent constructs a structural advantage that becomes a cycling win in move phase.
+
+**Observed pattern (multiple games, 2026-06-01):**
+- Turn 6 Black plays f2 → creates (f6,f4,f2) close at f6 AND (f2,d2,b2) close at b2 simultaneously.  
+- f6 and b2 are non-adjacent; one White placement cannot block both.
+- After White blocks one, Black closes the other, captures, and cycles.
+
+**Goal:**
+1. New heuristic term `_independent_threat_pairs(board, color)`: count pairs of 2-configs where the two empty (closing) squares are **not adjacent and not the same**. Each such pair is a "free" threat — one move blocks at most one.
+2. Weight this term heavily in `evaluate()` (e.g. 2–3× the base 2-config weight). This makes the search avoid letting the opponent build independent forks, and seek to build them for itself.
+3. Write tests: verify the term scores correctly on the example positions.
+
+**Files:**
+- `ai/heuristics.py` — new `_independent_threat_pairs()`, wired into `evaluate()`
+- `tests/test_blocking.py` or new test file
+
 ### B-80 — Mill abandonment and non-closure detection ⬜ ★★
 
 **Problem:** In a difficulty-6 AI vs AI game (2026-06-01), Black played f4→f6, abandoning an open mill threat at f4. White then failed to capitalise by playing f2→f4 to take the vacated mill square. Both failures suggest that:
