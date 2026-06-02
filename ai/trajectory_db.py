@@ -53,6 +53,20 @@ def make_board_state_key(board: "BoardState") -> tuple[str, int]:
     sym_idx must be retained by callers: stored notations are in canonical
     space; query results are mapped back to actual-game notation via
     _SYM_INVERSE[sym_idx].
+
+    Key components — all are necessary to distinguish game states:
+      canon      — D4-canonical 24-char board layout
+      turn       — side to move
+      phase      — STM's individual phase (place/move/fly)
+      placed_w   — cumulative W placements (encodes pieces still to place)
+      placed_b   — cumulative B placements
+      on_w       — W pieces currently on board (explicit: determines fly eligibility)
+      on_b       — B pieces currently on board (explicit: determines fly eligibility)
+
+    on_w / on_b are derivable from the canon string (count W's and B's), but
+    making them explicit avoids relying on that derivation for correctness.
+    Together with placed counts they fully encode pieces captured and flying
+    eligibility for both sides without ambiguity.
     """
     from game.rules import get_game_phase
     board24 = "".join(board.positions.get(p, "") or "." for p in POSITIONS)
@@ -60,7 +74,95 @@ def make_board_state_key(board: "BoardState") -> tuple[str, int]:
     phase = get_game_phase(board, board.turn)
     placed_w = board.pieces_placed.get("W", 0)
     placed_b = board.pieces_placed.get("B", 0)
-    return f"{canon}|{board.turn}|{phase}|{placed_w}|{placed_b}", sym_idx
+    on_w = board.pieces_on_board.get("W", 0)
+    on_b = board.pieces_on_board.get("B", 0)
+    return f"{canon}|{board.turn}|{phase}|{placed_w}|{placed_b}|{on_w}|{on_b}", sym_idx
+
+
+def _smooth(values: list[float], window: int = 2) -> list[float]:
+    """Causal moving average over a list of floats."""
+    result = []
+    for i in range(len(values)):
+        start = max(0, i - window + 1)
+        chunk = values[start : i + 1]
+        result.append(sum(chunk) / len(chunk))
+    return result
+
+
+def _compute_blame_reward(
+    boards: list[tuple],   # [(BoardState, color_who_moved), ...]
+    winner: str | None,
+) -> tuple[list[float], list[float]]:
+    """Compute per-ply blame and reward weights for one game.
+
+    Returns (blame_weights, reward_weights) both indexed by move position.
+    blame  — how much this move contributed to the loser's defeat [0, 1]
+    reward — how much this move contributed to the winner's victory [0, 1]
+    Draws and games with < 10 moves get zeros throughout.
+    """
+    n = len(boards)
+    blame  = [0.0] * n
+    reward = [0.0] * n
+
+    if winner not in ("W", "B") or n < 10:
+        return blame, reward
+
+    from ai.heuristics import evaluate
+
+    loser = "B" if winner == "W" else "W"
+
+    # Build raw strength-from-loser's-perspective for every ply.
+    raw_loser = [evaluate(b, loser, strength_mode=True) for b, _ in boards]
+    smooth_loser = _smooth(raw_loser, window=2)
+
+    # Build raw strength-from-winner's-perspective for every ply.
+    raw_winner = [evaluate(b, winner, strength_mode=True) for b, _ in boards]
+    smooth_winner = _smooth(raw_winner, window=2)
+
+    # ── Find turning point: loser's first ply where strength was ≥ -0.15
+    #    and dropped ≥ 0.12 within the next 2 loser-plies, without recovery. ──
+    loser_plies = [i for i, (_, c) in enumerate(boards) if c == loser]
+    turning_idx: int | None = None
+
+    for pos, ply in enumerate(loser_plies):
+        s = smooth_loser[ply]
+        if s < -0.20:
+            continue   # already losing — not the turning point
+        future = loser_plies[pos + 1 : pos + 4]
+        if not future:
+            continue
+        if min(smooth_loser[p] for p in future) < s - 0.12:
+            # Verify it doesn't recover above -0.10 afterwards
+            rest = loser_plies[pos + 1:]
+            if rest and max(smooth_loser[p] for p in rest) < -0.10:
+                turning_idx = ply
+                break
+            elif not rest:
+                turning_idx = ply
+                break
+
+    # ── Assign blame around the turning point ────────────────────────────────
+    if turning_idx is not None:
+        tp_pos = loser_plies.index(turning_idx)
+        for delta, weight in ((0, 1.0), (-1, 0.6), (-2, 0.3), (1, 0.2)):
+            target_pos = tp_pos + delta
+            if 0 <= target_pos < len(loser_plies):
+                idx = loser_plies[target_pos]
+                blame[idx] = max(blame[idx], weight)
+
+    # ── Assign reward to winner moves with meaningful strength gain ───────────
+    winner_plies = [i for i, (_, c) in enumerate(boards) if c == winner]
+    for i, ply in enumerate(winner_plies):
+        if ply == 0:
+            continue
+        delta = smooth_winner[ply] - smooth_winner[ply - 1]
+        if delta > 0.05:
+            reward[ply] = min(1.0, delta * 4.0)
+        # Late-game converting moves always earn a minimum reward
+        if ply >= n - 8:
+            reward[ply] = max(reward[ply], 0.4)
+
+    return blame, reward
 
 
 class TrajectoryDB:
@@ -106,9 +208,9 @@ class TrajectoryDB:
     def _index_game(self, record: dict) -> None:
         """Index a single game record by board-state key.
 
-        All moves in the game are indexed; each board position (board_fen_before)
-        is keyed canonically under D4 symmetry. The played notation is transformed
-        by the same symmetry so transpositions share one bucket.
+        Two-pass approach:
+          Pass 1 — parse FENs, compute per-ply strength, derive blame/reward.
+          Pass 2 — update the index with win/loss counts and blame/reward sums.
         """
         if record.get("adaptive_softened"):
             return
@@ -117,7 +219,6 @@ class TrajectoryDB:
         if not moves:
             return
 
-        # Derive source type from game record fields.
         source_type = record.get("source_type")
         if source_type is None:
             if record.get("self_play") or (
@@ -131,6 +232,10 @@ class TrajectoryDB:
 
         self._game_count += 1
 
+        # ── Pass 1: parse boards, resolve keys ───────────────────────────────
+        parsed: list[tuple] = []   # (board, state_key, sym_idx, canon_notation, color)
+        boards: list          = []  # BoardState per parsed move (for strength computation)
+
         for move in moves:
             notation = _norm(move.get("notation", ""))
             fen = move.get("board_fen_before", "")
@@ -143,22 +248,32 @@ class TrajectoryDB:
                 continue
 
             state_key, sym_idx = make_board_state_key(board)
-
-            # Transform notation into canonical D4 space (same transform as the key).
             canon_notation = _transform_notation(notation, sym_idx)
             if canon_notation is None:
                 continue
 
             color = move.get("color", "W")
+            parsed.append((board, state_key, sym_idx, canon_notation, color))
+            boards.append((board, color))
+
+        if not parsed:
+            return
+
+        # ── Compute blame/reward via inline position-strength evaluation ──────
+        blame_wts, reward_wts = _compute_blame_reward(boards, winner)
+
+        # ── Pass 2: update index ──────────────────────────────────────────────
+        for i, (board, state_key, sym_idx, canon_notation, color) in enumerate(parsed):
             bucket = self._index.setdefault(state_key, {})
             entry = bucket.setdefault(canon_notation, {
                 "wins_ai": 0, "losses_ai": 0, "draws_ai": 0,
                 "wins_human": 0, "losses_human": 0, "draws_human": 0,
                 "total": 0,
-                # blame_sum / reward_sum always 0 until Phase 3 adds inline enrichment.
                 "reward_sum": 0.0, "blame_sum": 0.0,
             })
             entry["total"] += 1
+            entry["blame_sum"]  += blame_wts[i]
+            entry["reward_sum"] += reward_wts[i]
 
             if winner == color:
                 entry["wins_ai" if is_ai else "wins_human"] += 1

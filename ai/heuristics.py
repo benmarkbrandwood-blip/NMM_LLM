@@ -211,16 +211,28 @@ _FLY_ASYM_WEIGHTS = {"place": 0, "move": 80, "fly": 0}
 _DOMINATION_WEIGHTS = {"place": 0, "move": 150, "fly": 80}
 
 
+# tanh normalisation scales for strength_mode — calibrated to typical raw scores per phase.
+_STRENGTH_SCALE: dict[str, float] = {"place": 800.0, "move": 1500.0, "fly": 3000.0}
+
+
 def evaluate(
     board: BoardState,
     color: str,
     endgame_state=None,
     force_aggressive: bool = False,
     weights: HeuristicWeights | None = None,
-) -> int:
-    """Evaluate board from `color`'s perspective. Higher is better for color."""
+    strength_mode: bool = False,
+) -> float:
+    """Evaluate board from `color`'s perspective. Higher is better for color.
+
+    Normal mode: returns a large integer heuristic score used by negamax search.
+    strength_mode=True: returns tanh-normalised float in [-1.0, +1.0] for DB
+      annotation and the GUI strength graph; intentionally NOT used in search.
+    """
     terminal, winner = is_terminal(board)
     if terminal:
+        if strength_mode:
+            return 1.0 if winner == color else -1.0
         return INF if winner == color else -INF
 
     opp   = "B" if color == "W" else "W"
@@ -456,7 +468,11 @@ def evaluate(
     if weights and weights.long_term_position != 100:
         base = int(base * weights.long_term_position / 100)
 
-    return base + _late_game_danger(board, color) + endgame_score(board, color, endgame_state)
+    total = base + _late_game_danger(board, color) + endgame_score(board, color, endgame_state)
+    if strength_mode:
+        scale = _STRENGTH_SCALE.get(phase, 1500.0)
+        return math.tanh(total / scale)
+    return total
 
 
 # ── Feature helpers ───────────────────────────────────────────────────────────
