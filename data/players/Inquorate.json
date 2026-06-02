@@ -1,15 +1,15 @@
 {
   "name": "Inquorate",
-  "elo": 1638,
-  "wins": 90,
+  "elo": 1722,
+  "wins": 95,
   "losses": 3,
   "draws": 4,
-  "games_played": 97,
-  "win_rate": 0.9278350515463918,
-  "current_difficulty": 7,
+  "games_played": 102,
+  "win_rate": 0.9313725490196079,
+  "current_difficulty": 10,
   "win_streak": 1,
   "loss_streak": 0,
   "extra_blunder": 0.0,
   "created_at": "2026-05-19",
-  "last_played": "2026-06-01"
+  "last_played": "2026-06-02"
 }

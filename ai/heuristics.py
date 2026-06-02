@@ -95,6 +95,8 @@ class HeuristicWeights:
     cross_mill_cycling: int = 300  # static bonus per two-mill fork (closed mill + adjacent near-mill closing sq)
     # ── B-81: Placement independent fork ("keep-busy") ───────────────────────
     placement_fork_penalty: int = 50  # penalty per extra unblockable closing sq in opp placement fork
+    # ── B-83: Cross-block (pivot-blocker) bonus ────────────────────────────────
+    cross_block_bonus: int = 250  # bonus per own piece in ≥2 opp 1-config mill lines (blocks multiple setups)
     # ── B-47: Side-specific placement emphasis ───────────────────────────────
     # White and Black have different strategic goals in placement (White: proactive
     # cardinal claim; Black: reactive disruption + last-move advantage).
@@ -431,6 +433,24 @@ def evaluate(
         own_fork_surplus = _placement_fork_surplus(board, color)
         opp_fork_surplus = _placement_fork_surplus(board, opp)
         base += w_pfp * (own_fork_surplus - opp_fork_surplus)
+
+    # B-83: Cross-block (pivot-blocker) bonus — placement phase.
+    # Own pieces sitting inside ≥2 opponent 1-config mill lines simultaneously
+    # block multiple mill setups; penalise the opponent holding such positions.
+    if board.phase == "place":
+        w_cb = weights.cross_block_bonus if weights else DEFAULT_WEIGHTS.cross_block_bonus
+        def _cross_block_count(c: str, opp_c: str) -> int:
+            return sum(
+                1 for sq in POSITIONS
+                if board.positions.get(sq) == c
+                and sum(
+                    1 for mill in MILLS
+                    if sq in mill
+                    and sum(1 for p in mill if board.positions.get(p) == opp_c) == 1
+                    and sum(1 for p in mill if p != sq and board.positions.get(p) == c) == 0
+                ) >= 2
+            )
+        base += w_cb * (_cross_block_count(color, opp) - _cross_block_count(opp, color))
 
     # Apply overall positional scale (long_term_position=100 means no change)
     if weights and weights.long_term_position != 100:
@@ -2413,10 +2433,20 @@ def tactical_move_bonus(
         )
         if _placed_sq_b64 is not None:
             free_nb = sum(1 for nb in ADJACENCY[_placed_sq_b64] if after.positions[nb] == "")
+            # B-83: exempt near-dead/dead penalty when this square sits in ≥2 opponent
+            # mill lines that already have 1 opponent piece — placing here simultaneously
+            # blocks multiple opponent mill-building paths ("pivot blocker").
+            _opp_b64 = "B" if color == "W" else "W"
+            _opp_one_configs = sum(
+                1 for mill in MILLS
+                if _placed_sq_b64 in mill
+                and sum(1 for p in mill if after.positions.get(p) == _opp_b64) == 1
+            )
+            _is_pivot_blocker = _opp_one_configs >= 2
             if free_nb == 0:
-                placement_mobility_penalty = weights.dead_placement_penalty
+                placement_mobility_penalty = 0 if _is_pivot_blocker else weights.dead_placement_penalty
             elif free_nb == 1:
-                placement_mobility_penalty = weights.near_dead_placement_penalty
+                placement_mobility_penalty = 0 if _is_pivot_blocker else weights.near_dead_placement_penalty
 
     # Placement busy-opponent chain scan.
     # Rewards forcing sequences where every placement compels an opp response
@@ -2820,6 +2850,30 @@ def tactical_move_bonus(
                 else:
                     opp_chain_nondisrupt_penalty = int(weights.placement_busy_scan * 0.5)
 
+    # Junction-block bonus: own piece placed at a square where ALL neighbours are
+    # opponent pieces — a latent junction that the opponent could claim to create a
+    # two-sided fork (two 2-configs simultaneously).  Blocking it now pre-empts the
+    # fork before it materialises.
+    # Suppressed when opponent already has 2-configs (more urgent defence exists)
+    # or when own player already has a closeable mill (that takes absolute priority).
+    junction_block_bonus = 0
+    if _is_placement and not _had_mill_available:
+        _junc_sq = next(
+            (p for p in POSITIONS if after.positions[p] == color and before.positions[p] != color),
+            None,
+        )
+        if _junc_sq is not None:
+            _junc_nbs = ADJACENCY.get(_junc_sq, [])
+            if _junc_nbs and all(before.positions[n] == opp for n in _junc_nbs):
+                _junc_mill_count = sum(
+                    1 for _jm in MILLS
+                    if _junc_sq in _jm
+                    and any(before.positions[p] == opp for p in _jm if p != _junc_sq)
+                    and not any(before.positions[p] == color for p in _jm if p != _junc_sq)
+                )
+                if _junc_mill_count >= 2 and _two_configs(before, opp) == 0:
+                    junction_block_bonus = 600
+
     _contributions = [
         ("Closed mill",                    close_mill_contribution),
         ("Convergence restoration (B-62)", convergence_restoration),
@@ -2870,6 +2924,7 @@ def tactical_move_bonus(
         ("Opp chain non-disrupt (B-37)",   -opp_chain_nondisrupt_penalty),
         ("Disrupted 2-config (B-39)",      -disrupted_two_config_penalty),
         ("Dead/near-dead placement (B-64)", -placement_mobility_penalty),
+        ("Junction-block bonus",           junction_block_bonus),
     ]
     _total = sum(v for _, v in _contributions)
 

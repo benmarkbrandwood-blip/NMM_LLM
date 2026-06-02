@@ -16,12 +16,9 @@
   "fork_anticipation": 30,
   "locked_mill_escape": 140,
   "redirected_pin": 200,
-  "defer_for_chain": 325,
+  "defer_for_chain": 375,
   "block_cycling_priority": 100,
   "make_mistakes": 0,
   "opening_adherence": 50,
-  "loss_exploit": 240,
-  "cycling_capture_unblock": 180,
-  "dead_placement_penalty": 1500,
-  "near_dead_placement_penalty": 400
+  "loss_exploit": 240
 }

@@ -86,7 +86,10 @@ class TestDeadPlacementHardFilter(unittest.TestCase):
     def test_a4_game_position(self):
         """
         Regression: after W:a7,b4,g7,d6,d1 / B:d7,a1,g4,g1 (Black's 5th move)
-        the AI must not place on a4 or b6 (both dead in this position).
+        the AI must not place on a4 (dead, has own-piece neighbour — useless).
+        b6 is also dead by free-neighbour count but is a valid junction block
+        (all neighbours are White pieces; blocking ≥2 White developing mills),
+        so it is intentionally allowed via the junction-rescue path.
         """
         board = BoardState.from_setup(
             {"a7": "W", "b4": "W", "g7": "W", "d6": "W", "d1": "W",
@@ -98,14 +101,15 @@ class TestDeadPlacementHardFilter(unittest.TestCase):
         self.assertIn("a4", dead, "Test setup: a4 should be dead here")
         self.assertIn("b6", dead, "Test setup: b6 should be dead here")
 
+        # a4 must never be chosen (neighbour a1=B → own-piece neighbour, not all-opponent)
         for diff in (1, 2, 3):
             ai = GameAI(color="B", difficulty=diff)
             move = ai.choose_move(board)
             self.assertIsNotNone(move)
             to = move["to"]
-            self.assertNotIn(
-                to, dead,
-                f"difficulty={diff}: AI chose dead square {to}; dead={dead}",
+            self.assertNotEqual(
+                to, "a4",
+                f"difficulty={diff}: AI chose useless dead square a4",
             )
 
     def test_b6_last_piece_position(self):

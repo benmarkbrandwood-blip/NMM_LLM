@@ -126,7 +126,13 @@ def _pinned_move_squares(board: BoardState, color: str) -> frozenset:
         vals = [board.positions[p] for p in mill]
         if vals.count(opp) == 2 and vals.count(color) == 1:
             our_sq = next(p for p in mill if board.positions[p] == color)
-            if any(board.positions.get(nb, "") == opp for nb in ADJACENCY.get(our_sq, [])):
+            mill_set = set(mill)
+            # Require the adjacent opp piece to be EXTERNAL to the mill: a piece
+            # already inside the mill cannot slide to the vacated square and close it.
+            if any(
+                board.positions.get(nb, "") == opp and nb not in mill_set
+                for nb in ADJACENCY.get(our_sq, [])
+            ):
                 pinned.add(our_sq)
     return frozenset(pinned)
 
@@ -585,6 +591,19 @@ class GameAI:
         threats = _immediate_mill_threats(board)
         if threats:
             blocking = [m for m in moves if m["to"] in threats]
+            # B-66 extended: when in move phase and own player can close a mill this
+            # turn, also include mill-closing moves even if there are multiple threats.
+            # Closing + capturing may eliminate one of the opponent's threats; the
+            # search ranks closing vs blocking correctly.  Conservative: we still
+            # restrict to {block-threats ∪ close-own-mill} rather than all moves.
+            if board.phase == "move" and _stm_can_close_mill(board, board.turn):
+                _close_sq: set[str] = {
+                    next(p for p in _ml if board.positions[p] == "")
+                    for _ml in MILLS
+                    if ([board.positions[p] for p in _ml].count(board.turn) == 2
+                        and [board.positions[p] for p in _ml].count("") == 1)
+                }
+                blocking = [m for m in moves if m["to"] in threats or m["to"] in _close_sq]
             if blocking:
                 moves = blocking
 
@@ -596,7 +615,31 @@ class GameAI:
         if board.phase == "place":
             non_dead = [m for m in moves if not _is_dead_placement(board, m)]
             if non_dead:
-                moves = non_dead
+                # Junction-rescue: when live alternatives exist, also allow dead
+                # placements whose square is the junction of ≥2 opponent developing
+                # mills (all neighbours are opponent pieces).  Placing here blocks
+                # the opponent's fork even though the piece gains no own mobility.
+                # Deliberately excluded from the all-dead path below so the
+                # mill-potential secondary filter is not disrupted.
+                _opp_junc = "B" if board.turn == "W" else "W"
+                _rescued = [
+                    m for m in moves
+                    if m.get("from") is None and _is_dead_placement(board, m)
+                    and ADJACENCY.get(m["to"])
+                    and all(
+                        board.positions.get(nb) == _opp_junc
+                        for nb in ADJACENCY[m["to"]]
+                    )
+                    and sum(
+                        1 for _ml in MILLS
+                        if m["to"] in _ml
+                        and any(board.positions.get(p) == _opp_junc for p in _ml if p != m["to"])
+                        and not any(board.positions.get(p) == board.turn for p in _ml if p != m["to"])
+                    ) >= 2
+                ]
+                # Junction-rescue moves go to the FRONT of the list so they are
+                # always evaluated before the search deadline fires mid-depth.
+                moves = _rescued + non_dead
             else:
                 # All placements are dead (late placement phase, board is packed).
                 # Secondary filter: prefer squares with surviving mill potential —
@@ -637,13 +680,33 @@ class GameAI:
         if get_game_phase(board, self.color) == "move":
             pinned = _pinned_move_squares(board, self.color)
             if pinned:
-                unpinned = [m for m in moves if m.get("from") not in pinned]
+                # Mill-closing exemption: allow departure from a pinned square when
+                # the destination immediately closes an own mill (tactical gain outweighs pin).
+                _mill_close_dests1: set[str] = set()
+                for _ml in MILLS:
+                    _vals1 = [board.positions.get(p, "") for p in _ml]
+                    if _vals1.count(self.color) == 2 and _vals1.count("") == 1:
+                        _mill_close_dests1.add(next(p for p in _ml if board.positions.get(p) == ""))
+                unpinned = [
+                    m for m in moves
+                    if m.get("from") not in pinned or m["to"] in _mill_close_dests1
+                ]
                 if unpinned:
                     moves = unpinned
             # 2-ply pin: vacating this square lets opp build a 2-config in two moves.
             pinned2 = _pinned_move_squares_2ply(board, self.color)
             if pinned2:
-                unpinned2 = [m for m in moves if m.get("from") not in pinned2]
+                # Mill-closing exemption: allow a pinned-square departure when the
+                # destination closes an own mill immediately — tactical gain outweighs pin.
+                _mill_close_dests: set[str] = set()
+                for _ml in MILLS:
+                    _vals = [board.positions.get(p, "") for p in _ml]
+                    if _vals.count(self.color) == 2 and _vals.count("") == 1:
+                        _mill_close_dests.add(next(p for p in _ml if board.positions.get(p) == ""))
+                unpinned2 = [
+                    m for m in moves
+                    if m.get("from") not in pinned2 or m["to"] in _mill_close_dests
+                ]
                 if unpinned2:
                     moves = unpinned2
 
@@ -1089,6 +1152,24 @@ class GameAI:
             except Exception:
                 pass
 
+        # SE-4: endgame tablebase probe at all depths — ply-based scoring so faster
+        # wins score higher than slower ones (INF - ply decreases as ply increases).
+        # Moved before SE-8 extension so extensions don't bypass the DB hit.
+        if (self._endgame_solved_db is not None
+                and board.pieces_placed.get("W", 0) >= 9
+                and board.pieces_placed.get("B", 0) >= 9
+                and board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0) <= 6):
+            try:
+                _wdl = self._endgame_solved_db.query(board)
+            except Exception:
+                _wdl = None
+            if _wdl == "W":
+                return INF - ply
+            elif _wdl == "L":
+                return -(INF - ply)
+            elif _wdl == "D":
+                return 0
+
         # SE-8: search extension for critical positions.
         if ext_budget > 0:
             _color = board.turn
@@ -1106,21 +1187,6 @@ class GameAI:
                 ext_budget -= 1
 
         if depth == 0:
-            # SE-4: endgame tablebase probe at leaves — ply-based scoring so faster
-            # wins score higher than slower ones (INF - ply decreases as ply increases).
-            if (self._endgame_solved_db is not None
-                    and board.pieces_placed.get("W", 0) >= 9
-                    and board.pieces_placed.get("B", 0) >= 9):
-                try:
-                    _wdl = self._endgame_solved_db.query(board)
-                except Exception:
-                    _wdl = None
-                if _wdl == "W":
-                    return INF - ply
-                elif _wdl == "L":
-                    return -(INF - ply)
-                elif _wdl == "D":
-                    return 0
             if self._neural_evaluator is not None:
                 return self._neural_evaluator.evaluate(board)
             _q_moves = get_all_legal_moves(board)

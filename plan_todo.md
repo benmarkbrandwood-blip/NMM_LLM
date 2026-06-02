@@ -10,6 +10,9 @@ Track 1 (heuristic/phase-control), SE-1 through SE-9, SE-14, and the B-55–B-64
 
 | Priority | Item | Key outcome |
 |----------|------|-------------|
+| ★★★ | **B-82** ✅ | Mill-close suppressed by multi-threat filter (two bugs) |
+| ★★ | **B-83** | Fly-phase forked 2-config: AI should prefer d1→f6 style fork over d1→d7 |
+| ★★ | **B-84** | Mill assembly from 3 separate same-colour pieces on same ring |
 | ★★ | **B-58** | Multiple LLM provider support (Claude, OpenAI, Perplexity, Null) |
 | ★★ | **SE-10** | Proactive fly-fork anticipation (move phase) |
 | ★ | **B-53** | ChromaDB embedding dimension mismatch when `ollama_model` changes |
@@ -26,6 +29,50 @@ Track 1 (heuristic/phase-control), SE-1 through SE-9, SE-14, and the B-55–B-64
 ### Recently completed (2026-05-28)
 
 B-55, B-59, B-60, B-61, B-62, B-63, B-64, B-56 (D4 endgame symmetry), B-57 (mmap DB writes), SE-14 (FullGameDB inside `_negamax`). Detailed specs remain below for reference; implementations are in `ai/heuristics.py`, `ai/game_ai.py`, `tools/build_endgame_db.py`.
+
+---
+
+## Active Bug Fixes
+
+### Bug B-82 — Mill-close suppressed by multi-threat filter ✅ 2026-06-02
+
+**Observed**: Level-10 AI plays `a7→a4` (a blocking move) at move 11 in the game below instead of `g4→g7` (closes mill `a7-d7-g7` and captures a Black piece).
+
+```
+1.b2 f4 / 2.b6 b4 / 3.d6 f6 / 4.f2 d2 / 5.d7 d5 / 6.d3 e4
+7.g4 c5 / 8.e5 c4 / 9.a4 c3xd3 / 10.a4-a7 c3-d3 / 11.a7-a4 ← WRONG
+```
+
+**Root cause — two co-located bugs**:
+
+1. **`_immediate_mill_threats` returns 3 threats** (`{a4, c3, d1}`), which triggers the mandatory-block filter in `choose_move`. The B-66 carveout (`threats.clear()` when White can close a mill) fires only when `len(threats) == 1`. With 3 threats, the carveout is skipped and `moves` is hard-restricted to blocking moves (`a7→a4`, `b6→a4`, etc.), excluding `g4→g7`.
+
+2. **`_pinned_move_squares` false positive for g4**: Mill `(g4-f4-e4)` has Black at f4 and e4, White at g4. The function pins g4 because "Black piece f4 is adjacent to g4". But f4 is **inside the mill** — it cannot slide to g4 and close the mill (moving f4 to g4 empties f4, leaving `(g4-f4-e4) = B-empty-B` — not a closed mill). No external Black piece is adjacent to g4. Even if Bug 1 is fixed (all moves allowed), Bug 2 would filter out `g4→g7` via the pin rule.
+
+**Fix — implemented**:
+- `_pinned_move_squares`: add `mill_set = set(mill)` and require adjacent Black piece `nb not in mill_set` — so only external pieces (capable of sliding in and completing the mill) trigger the pin.
+- Blocking filter in `choose_move`: when `threats` is non-empty and own player is in move phase and can close a mill, add own mill-closing destinations to the `blocking` set (conservative: still forces AI to either block a threat or close own mill; search ranks which is best).
+- Added 1-ply pin exemption for mill-closing moves (parallel to existing 2-ply exemption).
+
+**Regression test**: `tests/test_b82.py` — move-11 board asserts AI chooses a mill-closing move.
+
+---
+
+### Enhancement B-83 — Fly-phase forked 2-config preference
+
+**Observed**: In fly-vs-fly position (White: d6, f4, d1 / Black: c3, d2, a7, White to move), the AI plays `d1→d7` (one 2-config) instead of `d1→f6` (two 2-configs: closing at b6 AND f2 — an unblockable fork). Static eval correctly scores `d1→f6` at +2527 vs `d1→d7` at +1286. Bug may appear at specific search depths due to alpha-beta cutoff or ordering.
+
+**Suggested investigation**: Run `_root_search` on this position at depth 3–7 and print per-depth best move. If the fork is only missed at certain depths, the issue is aspiration-window or cutoff related. If missed at all depths, there may be a fly-phase surplus calculation bug interacting with Black's responses.
+
+**Note**: Static eval already includes `900 * (own_surplus - opp_surplus)` for fly-vs-fly, which correctly flags d1→f6 as superior. The issue is search-depth dependent.
+
+---
+
+### Enhancement B-84 — Mill assembly from 3 separate same-colour pieces
+
+**Observed**: The AI sometimes fails to converge 3 separate pieces (especially on the same ring) toward a mill, even when the path is straightforward and no tactical urgency exists. The existing `_free_piece_assembly` / `_assembly_reach_count` heuristics reward APPROACH but may under-reward direct ring-completion moves.
+
+**Investigation needed**: Profile a specific game position where this occurs. Check whether the assembly heuristic weights are outbid by tactical bonuses or convergence-penalty terms. May require increasing move-phase `assembly_reach_count` weights or adding a "ring completion" bonus for owning 2 of 3 squares on any ring with the third reachable in 1 move.
 
 ---
 

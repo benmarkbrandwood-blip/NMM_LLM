@@ -86,7 +86,7 @@
     },
     "outcome_stats": {
       "W": 1,
-      "B": 2,
+      "B": 3,
       "D": 0
     },
     "confidence": 0.8,
@@ -5167,7 +5167,7 @@
   },
   {
     "opening_id": "novel-ba1f7236",
-    "name": "Black scan ahead busy",
+    "name": "Black scan ahead busy v2",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -5219,7 +5219,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 2,
+      "B": 3,
       "D": 0
     },
     "confidence": 0.3,
@@ -5339,6 +5339,201 @@
       {
         "ply": 10,
         "fen": ".B.W..WB.W.B.B.W.B...W..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-d1624efa",
+    "name": "White 2 configs, B busy scan",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "f4",
+      "d6",
+      "d2",
+      "b4",
+      "d1",
+      "d3",
+      "d5",
+      "g4",
+      "a7",
+      "e4",
+      "d7",
+      "g7",
+      "g1",
+      "a1",
+      "c5",
+      "e5",
+      "e3",
+      "f6"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B.W.W.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....W...B.W.W.B.....B..|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...B.W...B.W.W.B.W...B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W..B.W...B.W.W.B.W.B.B..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-9ae57f57",
+    "name": "White column loss variant 3",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d7",
+      "d2",
+      "g7",
+      "a7",
+      "f4",
+      "e4",
+      "d1",
+      "b4",
+      "c4",
+      "g4",
+      "d5",
+      "d6",
+      "a1",
+      "a4",
+      "g1",
+      "b2",
+      "f2",
+      "b4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "BWW..........B..........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "BWW........W.B.....B....|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "BWW..W.....W.B.B...B....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "BWWB.W.....W.B.B...B...W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-e34cdaca",
+    "name": "White central corner start",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b6",
+      "f6",
+      "b2",
+      "b4",
+      "d1",
+      "d3",
+      "g4",
+      "e4",
+      "d7",
+      "a7",
+      "e3",
+      "c4",
+      "a4",
+      "f2",
+      "f4",
+      "c5",
+      "c3",
+      "g1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........W.B...WB........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....W..W.B...WB.....B..|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...W.W..W.B...WB...B.B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "BW.W.W..W.B...WB...B.B..|W|5|5"
       }
     ],
     "strategic_notes": "",
