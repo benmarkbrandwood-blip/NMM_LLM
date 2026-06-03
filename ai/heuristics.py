@@ -2209,15 +2209,18 @@ def tactical_move_bonus(
         if captured_pos is not None:
             # Feeder disruption: captured piece was adjacent to (but not in) a closed opponent mill.
             # Removing it breaks the cycling potential of that mill.
-            for mill in MILLS:
-                mill_set = set(mill)
-                if all(before.positions[p] == opp for p in mill):
-                    adj_non_mill = {
-                        nb for mp in mill for nb in ADJACENCY[mp] if nb not in mill_set
-                    }
-                    if captured_pos in adj_non_mill and before.positions[captured_pos] == opp:
-                        capture_feeder_bonus = weights.capture_disrupt_feeder
-                        break
+            # Guard: a piece with no free neighbours is locked and cannot feed anything.
+            _cap_free_nb = sum(1 for nb in ADJACENCY[captured_pos] if before.positions[nb] == "")
+            if _cap_free_nb > 0:
+                for mill in MILLS:
+                    mill_set = set(mill)
+                    if all(before.positions[p] == opp for p in mill):
+                        adj_non_mill = {
+                            nb for mp in mill for nb in ADJACENCY[mp] if nb not in mill_set
+                        }
+                        if captured_pos in adj_non_mill and before.positions[captured_pos] == opp:
+                            capture_feeder_bonus = weights.capture_disrupt_feeder
+                            break
 
             # Diamond disruption: captured piece was part of an opponent 2-config
             # that contributed to a fork (two 2-configs sharing a closing square).
@@ -2239,6 +2242,34 @@ def tactical_move_bonus(
     safe_capture_bonus = 0
     if capture_this_move and _closeable_mills(before, opp) > 0 and _closeable_mills(after, opp) == 0:
         safe_capture_bonus = 180
+
+    # B-90: Cascade mill bonus — capture was blocking a closeable own 2-config.
+    # When closing a mill and capturing, if the captured piece was the sole opponent
+    # piece in a mill where we had two pieces (it was the blocker), removing it
+    # converts that mill from "dead" to a live closeable 2-config for the next move.
+    # This cascade (close → capture → close again one move later) is extremely strong
+    # and should outweigh captures of higher-value but non-cascading pieces.
+    cascade_mill_bonus = 0
+    if capture_this_move and mills_delta > 0 and captured_pos is not None:
+        opp_phase = get_game_phase(after, color)
+        for mill in MILLS:
+            if captured_pos not in mill:
+                continue
+            after_vals = [after.positions[p] for p in mill]
+            if after_vals.count(color) == 2 and after_vals.count("") == 1:
+                empty = next(p for p in mill if after.positions[p] == "")
+                mill_set = set(mill)
+                if opp_phase == "move":
+                    reachable = any(
+                        after.positions[nb] == color
+                        for nb in ADJACENCY[empty]
+                        if nb not in mill_set
+                    )
+                else:
+                    reachable = True
+                if reachable:
+                    cascade_mill_bonus = weights.close_mill // 2
+                    break
 
     # B-17: Capture-unblocking bonuses — reward captures that create own structural convergence.
     # Three complementary patterns (can all fire on the same capture, applied additively):
@@ -3016,6 +3047,7 @@ def tactical_move_bonus(
         ("Disrupted opponent fork (DMC)",  dmc_bonus),
         ("Cross-feed delta (B-16)",        cross_feed_delta_bonus),
         ("Safe capture (all threats gone)", safe_capture_bonus),
+        ("Cascade mill (B-90)",             cascade_mill_bonus),
         ("Fly free-close bonus",           fly_free_close_bonus),
         ("Ring cardinal placement",        ring_cardinal_bonus),
         ("Cardinal mill alert block (B-36)", cardinal_alert_bonus),

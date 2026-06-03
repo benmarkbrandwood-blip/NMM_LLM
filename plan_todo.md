@@ -14,6 +14,7 @@ Track 1 (heuristic/phase-control), SE-1 through SE-9, SE-14, and the B-55–B-64
 | ★★★ | **B-87** ✅ | `setup_mill_bonus` fires for non-closeable 2-configs → `d2→d1` style blunders |
 | ★★ | **B-88** ✅ | Vacate-threat penalty: 1-step lookahead for opponent stepping onto vacated square |
 | ★★★ | **B-89** ✅ | Dead-placement B-64 fires on valid mill-contributor pieces (immobile but closeable 2-config) |
+| ★★ | **B-90** ✅ | Feeder bonus fires for locked pieces; no cascade mill signal — spurious xe4 over xd5/xg7 |
 | ★★★ | **B-82** ✅ | Mill-close suppressed by multi-threat filter (two bugs) |
 | | **B-83** ✅ | Fly-phase forked 2-config: AI should prefer d1→f6 style fork over d1→d7 |
 | | **B-84** ✅ | Mill assembly from 3 separate same-colour pieces on same ring |
@@ -191,6 +192,42 @@ After White places c5, Black placing g1 would create closeable 2-config g7-g4-g1
 **Effect for `d2→d1`:** d3 is adjacent to d2; simulating d3→d2 creates closeable b2-d2-f2; penalty fires ~–300. Combined with B-87 dropping setup_mill_bonus to 0, net score for `d2→d1` becomes ≈ –341 vs. +20 for `c4→c3` — unambiguous.
 
 **Files:** `ai/heuristics.py` — `tactical_move_bonus()`, near `consolidation_penalty_val`.
+
+---
+
+### Enhancement B-90 — Cascade mill perception: feeder guard + cascade bonus ✅ 2026-06-03
+
+**Symptom:** In the game below, Black AI (post-B-82 position) closes g1-d1-a1 and captures e4 instead of the better xd5 or xg7 which enable cascade mills.
+
+```
+[Black: f6, g1, d1, a1 closed on this turn / White: c5, e4, f4 with mills e4-f4-g4 and f2-f4-f6]
+Cascade plan: xd5 → Black can close d3-d2-d1 immediately (d5 was the only blocker)
+              xg7 → Black can close g1-g4-g7 immediately (d7→g7 gives 2-config g1-g4-g7)
+              xe4 (wrong): e4 is LOCKED (all neighbors occupied) — feeder bonus was spuriously applied
+```
+
+**Root cause — two issues:**
+
+1. **Spurious `capture_feeder_bonus` for locked pieces:** `capture_feeder_bonus` (+300) fired for xe4 because e4 is adjacent to the closed mill f6-f4-f2 (via f4). But e4 was LOCKED — all neighbors occupied (e5=Black, e3=Black, f4=White), so it could never have "fed" f4 into a mill. A locked piece cannot move, so it has no feeder value. This inflated xe4's tactical score by +300.
+
+2. **No cascade mill signal:** xd5 and xg7 each enable an immediate own-mill closure on the very next move (the capture removes the sole blocker of a closeable own 2-config). This was worth +0 tactically — the cascade value only appears at depth ≥2 in negamax, and may be cut by alpha-beta before being counted.
+
+**Fix — two-part:**
+
+1. **Feeder guard:** Before the feeder detection loop, compute `_cap_free_nb = sum(1 for nb in ADJACENCY[captured_pos] if before.positions[nb] == "")`. If `_cap_free_nb == 0` (piece was locked), skip feeder bonus entirely.
+
+2. **Cascade mill bonus** (`+weights.close_mill // 2 ≈ +250`): After a mill-closing capture, check each mill containing `captured_pos`. If the post-capture board has own 2 + 1 empty in that mill AND the empty square is reachable (phase-aware), award the cascade bonus.
+
+**Diagnostic results (after fix):**
+```
+xd5: combined = +1606  ← WINS (cascade bonus fires, d3-d2-d1 closeable)
+xg7: combined = +1308  (cascade bonus fires, g1-g4-g7 closeable)
+xe4: combined = +1123  (feeder bonus removed — was +1423)
+```
+
+**Status:** Fixed 2026-06-03.
+
+**Files:** `ai/heuristics.py` — `tactical_move_bonus()`: `capture_feeder_bonus` block (locked guard), new `cascade_mill_bonus` block after `safe_capture_bonus`.
 
 ---
 
