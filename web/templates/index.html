@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nine Men's Morris</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}">
 </head>
 <body>
 <div id="app">
@@ -26,6 +26,7 @@
       <option value="chaos">Chaos</option>
       <option value="current">Custom</option>
     </select>
+    <button id="toggle-scores" title="Toggle diagnostic score overlay">Scores</button>
     <button id="toggle-settings" style="margin-left:auto">Settings</button>
     <button id="toggle-ai-tuning">AI Tuning</button>
     <a href="/tools" target="_blank" id="btn-tools" style="text-decoration:none"><button>&#x1F6E0; Tools</button></a>
@@ -122,6 +123,31 @@
 
     <!-- Centre column: board + status -->
     <div id="board-col">
+
+      <!-- Diagnostic eval bar (hidden until toggle is on) -->
+      <div id="eval-bar" hidden>
+        <span class="eval-label">W: <span id="eval-w" class="eval-w">—</span></span>
+        <span class="eval-sep">|</span>
+        <span class="eval-label">B: <span id="eval-b" class="eval-b">—</span></span>
+        <span class="eval-spacer"></span>
+        <span id="diag-mode-label" class="diag-mode-label">static</span>
+      </div>
+
+      <!-- Diagnostic controls (hidden until Scores toggle is on) -->
+      <div id="diag-controls" hidden>
+        <span class="diag-section-label">Scores:</span>
+        <button id="diag-btn-static"  class="diag-chip diag-chip-active" title="Static: tactic bonus + position eval (fast)">Static</button>
+        <button id="diag-btn-negamax" class="diag-chip" title="Negamax: deep search scores (slow)">Negamax d3</button>
+        <span class="diag-depth-wrap">
+          <label for="diag-depth" class="diag-section-label">d</label>
+          <input id="diag-depth" type="number" min="1" max="5" value="3" class="diag-depth-input">
+        </span>
+        <span class="diag-sep">|</span>
+        <span class="diag-section-label">DB:</span>
+        <button id="diag-btn-traj"  class="diag-chip" title="Trajectory DB: move frequency from game history">Traj</button>
+        <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB: WIN (green) / LOSS (red) arrows">DB Lines</button>
+      </div>
+
       <div id="board-wrap">
         <svg id="board-svg"></svg>
       </div>
@@ -461,6 +487,6 @@
   </div>
 </div>
 
-<script type="module" src="/static/game.js"></script>
+<script type="module" src="/static/game.js?v={{ v }}"></script>
 </body>
 </html>

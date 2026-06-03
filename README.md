@@ -118,6 +118,12 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 
   - **Sealed 2-config detection** (B-59): 2-configs the opponent cannot contest score ~4× higher and receive elevated move-ordering priority, propagating forced-mill sequences through negamax
 
+  - **Own fork setup** (SE-10): move-phase bonus for landing on a square that would create two simultaneous own 2-configs within 2 moves — proactive fork planning, complementing the existing opponent-fork-block bonus (B-4)
+
+  - **Fly-phase fork creation** (B-83): bonus when a fly move transitions from fewer than 2 own 2-configs to 2+ simultaneously — an unblockable double threat in fly phase
+
+  - **Cold-piece convergence** (B-84): assembly gradient for positions where all pieces are isolated (no 2-config); rewards two or more pieces converging on the same empty mill target, filling the signal gap where other assembly heuristics return zero
+
 - **Tactical urgency layer** — delta-based bonuses applied at move-selection level (outside negamax to avoid sign-inversion):
 
   - Closing a mill; building or disrupting cycling mill setups
@@ -296,7 +302,7 @@ Key differences to look for in play:
 
 - Dark wood theme; three-column layout: MillsAI Chat | Board | Side panel
 
-- Real-time eval graph (bottom bar) showing White/Black position strength across all moves
+- Real-time eval graph (bottom bar) showing White/Black position strength (tanh-normalised, phase-calibrated) across all moves; **click** anywhere on the graph to jump to that ply, **hover** for a tooltip showing the evaluation at each move
 
 - **Countdown timer** in the status bar counts down remaining expected think time; fires Force Move automatically at zero
 
@@ -310,7 +316,7 @@ Key differences to look for in play:
 
 - **AI resignation overlay** — distinct result screen when the AI concedes
 
-- Move Replay viewer — step through the completed game forward and backward after it ends
+- Move Replay viewer — step through the completed game forward and backward; click anywhere on the position strength graph to jump to that move, or hover for a per-ply evaluation tooltip
 
 
 ## Controls
@@ -371,7 +377,7 @@ The position editor is useful for practising specific endgames, reproducing puzz
 
 ### Replay controls (post-game)
 
-After a game ends the Replay panel activates. Use ⏮ / ◀ / ▶ / ⏭ to step through all moves, or **↩ Back to Live** to return to the live board view.
+After a game ends the Replay panel activates. Use ⏮ / ◀ / ▶ / ⏭ to step through all moves, or **↩ Back to Live** to return to the live board view. You can also **click directly on the position strength graph** to jump to any ply, or **hover** over the graph to see the evaluation at each move via a floating tooltip. A cursor line and score readout on the graph tracks the current replay position.
 
 ### Opening Explorer
 

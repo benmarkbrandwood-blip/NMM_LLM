@@ -542,6 +542,8 @@ class Session:
         self._ava_task: Optional[asyncio.Task] = None
         # B-75: pondering during the opponent's turn (None when not applicable)
         self.ponder_manager: Optional[PonderManager] = None
+        # Diagnostic overlay: board after move-but-before-capture, used by get_diagnostic
+        self._proj_board: Optional[BoardState] = None
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -554,9 +556,20 @@ templates = Jinja2Templates(directory=str(_WEB / "templates"))
 _SETTINGS_PATH = _ROOT / "data" / "settings.json"
 
 
+def _static_ver() -> str:
+    """Short content hash used as a cache-busting query string for JS/CSS."""
+    import hashlib
+    h = hashlib.md5()
+    for name in ("game.js", "style.css", "board.js", "tools.js", "tools.css"):
+        p = _WEB / "static" / name
+        if p.exists():
+            h.update(p.read_bytes())
+    return h.hexdigest()[:8]
+
+
 @app.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse(request, "index.html")
+    return templates.TemplateResponse(request, "index.html", {"v": _static_ver()})
 
 
 @app.get("/api/weights")
@@ -695,7 +708,7 @@ _tools_log: "_collections.deque[str]" = _collections.deque(maxlen=500)
 
 @app.get("/tools")
 async def tools_page(request: Request):
-    return templates.TemplateResponse(request, "tools.html")
+    return templates.TemplateResponse(request, "tools.html", {"v": _static_ver()})
 
 
 def _db_file_info(path: "Path | None") -> dict:
@@ -1869,6 +1882,171 @@ async def ws_endpoint(websocket: WebSocket):
                     session.coordinator._dominant_turn_streak = 0
                 log.info("Resignation declined — game continues.")
 
+            # ── get_diagnostic — score all legal moves for the overlay ──────────
+            elif kind == "get_diagnostic" and session:
+                from fastapi.responses import JSONResponse as _JR
+                from ai.heuristics import (
+                    tactical_move_bonus as _tac_bonus,
+                    evaluate as _heval,
+                    DEFAULT_WEIGHTS as _DW,
+                )
+                diag_mode   = msg.get("mode", "static")  # "static" | "negamax" | "capture"
+                diag_depth  = max(1, min(5, int(msg.get("depth", 3))))
+                diag_seq    = msg.get("seq", 0)
+                fen_override = msg.get("fen")             # replay positions
+
+                # Server-side guard: skip negamax diagnostics while AI search is running
+                # to prevent race conditions on shared GameAI state (TT, killers, history)
+                if ai_thinking and diag_mode == "negamax":
+                    continue
+
+                # Determine board to analyse
+                if diag_mode == "capture" and session._proj_board is not None:
+                    diag_board = session._proj_board
+                elif fen_override:
+                    try:
+                        diag_board = BoardState.from_fen_string(fen_override)
+                    except Exception:
+                        diag_board = session.engine.board
+                else:
+                    diag_board = session.engine.board
+
+                color   = diag_board.turn
+                weights = session.game_ai._weights if session.game_ai else _DW
+
+                eval_w = int(_heval(diag_board, "W"))
+                eval_b = int(_heval(diag_board, "B"))
+
+                if diag_mode == "capture":
+                    # Score each legal capture from the perspective of the player who just moved.
+                    # The just-moved player's color = opponent of diag_board.turn.
+                    mover = "B" if diag_board.turn == "W" else "W"
+                    caps = diag_board.legal_captures(mover)
+                    moves_out = []
+                    for cap_pos in caps:
+                        after_cap = diag_board.apply_move({"from": None, "to": None, "capture": cap_pos})
+                        moves_out.append({
+                            "from": None, "to": cap_pos, "capture": None,
+                            "score": int(_heval(after_cap, mover)),
+                        })
+                    moves_out.sort(key=lambda x: x["score"], reverse=True)
+
+                elif diag_mode == "negamax" and session.game_ai:
+                    game_notations = [
+                        m.get("notation", "")
+                        for m in session.engine.game_record.get("moves", [])
+                    ]
+                    if fen_override:
+                        prefix_json = msg.get("prefix", [])
+                        game_notations = list(prefix_json) if prefix_json else []
+                    moves_out = await asyncio.to_thread(
+                        session.game_ai.diagnostic_scores,
+                        diag_board, diag_depth, game_notations,
+                    )
+
+                else:
+                    # Static: tac_bonus + evaluate for each legal move
+                    legal = get_all_legal_moves(diag_board)
+                    moves_out = []
+                    for mv in legal:
+                        after = diag_board.apply_move(mv)
+                        tac   = _tac_bonus(diag_board, after, color, weights,
+                                           return_breakdown=True)
+                        ev    = int(_heval(after, color))
+                        moves_out.append({
+                            "from":      mv.get("from"),
+                            "to":        mv["to"],
+                            "capture":   mv.get("capture"),
+                            "tac_total": int(tac["total"]),
+                            "tac_terms": [[lbl, val] for lbl, val in tac.get("top_terms", [])],
+                            "eval_score": ev,
+                            "score":     int(tac["total"]) + ev,
+                        })
+                    moves_out.sort(key=lambda x: x["score"], reverse=True)
+
+                # ── Merge DB data into every move entry ─────────────────────
+                def _diag_ntn(mv_entry):
+                    frm = mv_entry.get("from")
+                    to  = mv_entry.get("to") or ""
+                    cap = mv_entry.get("capture")
+                    s = f"{frm}-{to}" if frm else to
+                    if cap:
+                        s += f"x{cap}"
+                    return s
+
+                # Trajectory DB: per-move relative frequency at this board state
+                traj_freqs: dict = {}
+                if _trajectory_db:
+                    try:
+                        traj_freqs = _trajectory_db.query_all_frequencies(diag_board)
+                    except Exception:
+                        pass
+
+                # FullGame DB: per-move WIN/LOSS/NEUTRAL delta
+                db_deltas: dict = {}
+                if _fullgame_db and _fullgame_db.is_available():
+                    try:
+                        db_deltas = _fullgame_db.score_delta(diag_board, color)
+                    except Exception:
+                        pass
+
+                # Endgame DB: probe each resulting position for WDL
+                eg_flags: dict = {}
+                if _endgame_solved_db:
+                    total_pc = sum(diag_board.pieces_on_board.values())
+                    all_placed = (diag_board.pieces_placed.get("W", 0) >= 9
+                                  and diag_board.pieces_placed.get("B", 0) >= 9)
+                    if all_placed and total_pc <= 8:
+                        if diag_mode == "capture":
+                            mover_eg = "B" if diag_board.turn == "W" else "W"
+                            for mv_e in moves_out:
+                                cap_pos = mv_e.get("to")
+                                if cap_pos:
+                                    after_eg = diag_board.apply_move(
+                                        {"from": None, "to": None, "capture": cap_pos})
+                                    res = _endgame_solved_db.query(after_eg)
+                                    if res:
+                                        # res is from after_eg.turn (opponent) POV; flip for us
+                                        eg_flags[cap_pos] = (
+                                            "W" if res == "L" else
+                                            "L" if res == "W" else "D"
+                                        )
+                        else:
+                            try:
+                                legal_eg = get_all_legal_moves(diag_board)
+                            except Exception:
+                                legal_eg = []
+                            for mv_eg in legal_eg:
+                                try:
+                                    after_eg = diag_board.apply_move(mv_eg)
+                                    res = _endgame_solved_db.query(after_eg)
+                                    if res:
+                                        ntn_eg = _diag_ntn(mv_eg)
+                                        eg_flags[ntn_eg] = (
+                                            "W" if res == "L" else
+                                            "L" if res == "W" else "D"
+                                        )
+                                except Exception:
+                                    pass
+
+                for mv_e in moves_out:
+                    ntn = _diag_ntn(mv_e)
+                    mv_e["traj_freq"] = round(traj_freqs.get(ntn, 0.0), 3)
+                    mv_e["db_delta"]  = db_deltas.get(ntn)   # float or None
+                    # Capture mode eg_flags keyed by captured square
+                    cap_pos = mv_e.get("to") if diag_mode == "capture" else None
+                    mv_e["eg_flag"] = eg_flags.get(cap_pos or ntn)  # "W"/"L"/"D"/None
+
+                await _send(websocket, {
+                    "type":    "diagnostic",
+                    "seq":     diag_seq,
+                    "mode":    diag_mode,
+                    "color":   color,
+                    "eval_w":  eval_w,
+                    "eval_b":  eval_b,
+                    "moves":   moves_out,
+                })
+
             # ── good_game — elevate a draw to win-like status in trajectory ────
             elif kind == "good_game" and session:
                 rec = session._last_game_record
@@ -2010,10 +2188,12 @@ async def ws_endpoint(websocket: WebSocket):
                     caps = sorted(board.legal_captures(board.turn))
                     # Show the piece at its new position before waiting for capture choice
                     projected = board.apply_move({**move, "capture": None})
+                    session._proj_board = projected
                     await _send(websocket, {
                         "type":            "capture_required",
                         "legal_captures":  caps,
                         "projected_board": dict(projected.positions),
+                        "projected_fen":   projected.to_fen_string(),
                     })
                     continue
 

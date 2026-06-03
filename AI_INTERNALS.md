@@ -185,6 +185,8 @@ Cross/cardinal nodes (`d7`, `a4`, `g4`, `d1`, and the equivalent middle and inne
 | `ring_crowding_penalty` | Penalty for placing the 6th+ own piece on a single ring (placement phase) |
 | `ring_cardinal_bonus` | Bonus for placing on a cardinal connector when opponent has 3+ pieces on one ring (placement phase) |
 | `fork_anticipation` | Bonus for blocking a square the opponent could use within 2 placements to create a double mill threat |
+| `fork_anticipation × 0.80` (SE-10) | Move-phase own-fork setup: bonus when the AI lands on a square that would create two simultaneous own 2-configs within 2 moves (`_fork_in_n(before, color, 2)`) — move phase only; fly uses `fly_fork_bonus` |
+| `fly_fork_bonus` (B-83) | Fly-phase fork creation: bonus when a fly move transitions the AI from <2 own 2-configs to ≥2 (an unblockable double threat) |
 | `locked_mill_penalty` | Penalty per own closed mill that has zero exit squares (all neighbours opponent-occupied) — applied in `evaluate()` move phase |
 | `locked_mill_escape` | Bonus for moving a piece out of a locked mill toward a new 2-config (move phase) |
 | `redirected_pin` | Bonus when a move causes an opponent piece to simultaneously guard two distinct own 2-configs |
@@ -289,6 +291,8 @@ Four terms create a distance-graduated incentive:
 
 The gradient (65 / 22 / 10 / 4) creates a smooth pull inward: the closer a free piece gets to a formation, the more valuable its position becomes. A piece 5+ steps from any 2-config earns nothing. Neither term fires in fly phase, where adjacency constraints do not limit assembly. A piece more than 4 hops away provides no positional benefit and the AI should not sacrifice other priorities to drag it across the board.
 
+**Cold-piece convergence (B-84):** When all own pieces are "cold" (no 2-config exists) the four distance-graduated assembly terms all return 0. `_cold_convergence_count(board, color)` fills this gap by counting empty mill squares targeted by 2+ distinct own 1-config mills — pieces that are each in a different 1-config but share a common empty target square. Weight: ×12 in `evaluate()` move-phase assembly block. This provides a gradient signal even when no 2-config exists, steering pieces toward convergence on a shared empty target.
+
 ### Fly-phase pin rule
 
 When the AI enters fly phase (3 pieces remaining), each piece can jump to any empty square. This freedom introduces a trap: if an own piece occupies the **closing square** of an opponent 2-config (opponent has the other two squares in that mill), moving that piece away gives the opponent an immediate mill closure and a capture.
@@ -308,15 +312,24 @@ When the EndgameRecognizer marks the game active (≤ 11 pieces total on the boa
 
 ### Normalisation for the graph
 
-The raw integer score is unbounded. To produce the −1…+1 value shown in the position strength graph, `position_eval()` computes:
+`position_eval()` delegates to `evaluate(board, "W", strength_mode=True)`, which returns a tanh-normalised float in `[−1.0, +1.0]`. The formula is:
 
 ```
 graph_value = tanh(raw_score / scale)
 ```
 
-where `scale` is phase-dependent: 120 during placement, 180 during movement, 280 during fly. The larger scale in the fly phase prevents the graph from pinning to ±1 on small material swings when so few pieces remain.
+where `scale` (`_STRENGTH_SCALE` in `ai/heuristics.py`) is phase-calibrated: **800** during placement, **1500** during movement, **3000** during fly. The larger scale in the fly phase prevents the graph from pinning to ±1 on small material swings when so few pieces remain. Terminal positions (game over) return exactly ±1.0.
 
 A positive value (top half of the graph) means White is ahead; negative (bottom half) means Black is ahead. The dot colour follows the leading side: white circle when White leads, dark circle when Black leads.
+
+### Interactive graph seek
+
+The position strength graph is interactive once a game ends:
+
+- **Click** anywhere on the graph to jump the board to the ply nearest the clicked position.
+- **Hover** to see a floating tooltip with the move number and evaluation percentage (e.g. `Move 12: +63% W`).
+- A **cursor line + dot** tracks the current replay position; a score readout (e.g. `+63 W`) appears alongside the dot.
+- The graph's `graph-seekable` CSS class is toggled on when replay data is available, changing the cursor to a crosshair.
 
 ---
 
@@ -407,7 +420,7 @@ This flag is session-local (resets on new game) and is not recorded in training 
 |------------|--------|------------|
 | Pin-rule filter can leave obvious winning moves unexplored | In rare positions where all 3 fly pieces are simultaneously pinned, all moves are re-enabled (safety guard). The AI may then choose a suboptimal move. | The safety guard is correct; the position is usually already losing. |
 | 3v3 search tree depth at difficulty < 5 | AI may miss a 2-move forced fork at depth 2. | Increase difficulty or use Force Move to get a deeper search result. |
-| Fly-fork detection requires 2+ own 2-configs to exist at once | The bonus fires reactively (after moving into the fork), not proactively. The AI does not pre-plan the move sequence that will *create* the fork. | Enhancement B-4 (fork anticipation) addresses the pre-planning gap for the placement phase; a similar anticipation bonus for the fly phase is a future enhancement. |
+| Fly-fork detection requires 2+ own 2-configs to exist at once | The bonus fires reactively (after moving into the fork), not proactively. The AI does not pre-plan the move sequence that will *create* the fork. | B-4 (placement) and SE-10 (move phase) address the pre-planning gap in their respective phases. Fly-phase proactive fork setup remains a future enhancement. |
 | `_mill_wrapping` returns 0 in 3v3 | Mill wrapping is disabled in 3v3 since the wrapped pieces can fly away. | Correct by design. Mill wrapping is only useful when opponent pieces are adjacency-constrained. |
 | Assembly signals (`_free_piece_assembly`, `_assembly_reach_count`) are off in fly phase | Fly pieces can jump anywhere so step-counting is meaningless. These signals are correctly disabled. | No workaround needed — by fly phase pieces should already be assembled. Enhancement B-5 addresses assembly before reaching fly phase. |
 
@@ -638,9 +651,11 @@ In `choose_move()`, the endgame DB is consulted **before** the fullgame DB when 
 
 `query(board)` returns `"W"` (AI wins), `"L"` (AI loses), `"D"` (draw), or `None` (out of range / file not loaded).
 
-### Known limitation (B-48)
+### Known limitations
 
-When the DB returns `"W"`, `choose_move()` currently returns `moves[0]` rather than the specific move that leads to a `LOSS`-labelled successor. In a won position this means the AI always converts eventually, but may take extra moves. The fix (iterate successors, pick the first that decodes to `WDL_LOSS` from the opponent's perspective) is tracked as Bug B-48.
+**B-48 — Best-move selection:** When the DB returns `"W"`, `choose_move()` currently returns `moves[0]` rather than the specific move that leads to a `LOSS`-labelled successor. In a won position this means the AI always converts eventually, but may take extra moves. The fix (iterate successors, pick the first that decodes to `WDL_LOSS` from the opponent's perspective) is tracked as Bug B-48.
+
+**B-85 — WIN/LOSS symmetry violation:** `test_win_equals_loss_by_symmetry` fails: 4,464,320 WIN entries vs 911,296 LOSS entries (expected equal counts by NMM colour-swap symmetry). DRAW entries: 8,224. The ~5:1 ratio indicates a systematic error in the offline retrograde solver — likely in how the D4 canonical fill pass interacts with colour-swap symmetry, or in the propagation of LOSS entries. Tracked as Bug B-85 in `plan_todo.md`. The table is still usable (it always returns a result) but some 3v3 positions may have incorrect WDL labels.
 
 ---
 

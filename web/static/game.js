@@ -40,6 +40,21 @@ const QUALIFY_GAMES = 0;      // no qualification required — tournament always
 let playerName = localStorage.getItem("nmm_player_name") || "";
 let _pureAiMode = false;
 
+// ── Diagnostic overlay state ──────────────────────────────────────────────────
+let diagEnabled     = false;        // master toggle
+let diagStatic      = true;         // show static (tac+eval) scores
+let diagNegamax     = false;        // show negamax scores
+let diagTraj        = false;        // show trajectory DB frequencies
+let diagDB          = false;        // show fullgame/endgame DB arrows
+let diagDepth       = 3;            // negamax depth
+let _diagStaticData  = null;        // last received static diagnostic response
+let _diagNegamaxData = null;        // last received negamax diagnostic response
+let _diagSeq        = 0;            // sequence counter for in-flight requests
+let _diagPending    = 0;            // expected seq for current request pair
+let _diagDebounce   = null;         // debounce timer handle
+let _diagCaptureFen = null;         // FEN of projected board in capture mode
+let _aiThinking     = false;        // true while AI is computing — block diagnostics
+
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
 
 const WEIGHT_DEFAULTS = [
@@ -276,6 +291,56 @@ document.addEventListener("DOMContentLoaded", () => {
     p.hidden = !p.hidden;
     $("toggle-openings").classList.toggle("btn-active", !p.hidden);
   });
+
+  // ── Diagnostic toggle ─────────────────────────────────────────────────
+  $("toggle-scores").addEventListener("click", () => {
+    diagEnabled = !diagEnabled;
+    $("toggle-scores").classList.toggle("btn-active", diagEnabled);
+    $("eval-bar").hidden     = !diagEnabled;
+    $("diag-controls").hidden = !diagEnabled;
+    if (!diagEnabled) {
+      board && board.clearDiag();
+      _diagStaticData = null;
+      _diagNegamaxData = null;
+    } else {
+      _diagRequestAll();
+    }
+  });
+
+  $("diag-btn-static").addEventListener("click", () => {
+    diagStatic = !diagStatic;
+    $("diag-btn-static").classList.toggle("diag-chip-active", diagStatic);
+    if (!diagStatic) { _diagStaticData = null; }
+    _diagRender();
+    if (diagStatic) _diagRequestStatic();
+  });
+
+  $("diag-btn-negamax").addEventListener("click", () => {
+    diagNegamax = !diagNegamax;
+    $("diag-btn-negamax").classList.toggle("diag-chip-active", diagNegamax);
+    if (!diagNegamax) { _diagNegamaxData = null; }
+    _diagRender();
+    if (diagNegamax) _diagRequestNegamax();
+  });
+
+  $("diag-depth").addEventListener("change", () => {
+    diagDepth = Math.max(1, Math.min(5, parseInt($("diag-depth").value) || 3));
+    $("diag-depth").value = diagDepth;
+    if (diagNegamax) { _diagNegamaxData = null; _diagRequestNegamax(); }
+  });
+
+  $("diag-btn-traj").addEventListener("click", () => {
+    diagTraj = !diagTraj;
+    $("diag-btn-traj").classList.toggle("diag-chip-active", diagTraj);
+    _diagRender();
+  });
+
+  $("diag-btn-db").addEventListener("click", () => {
+    diagDB = !diagDB;
+    $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
+    _diagRender();
+  });
+
   $("rng-replay-speed").addEventListener("input", () => {
     const ms = parseInt($("rng-replay-speed").value);
     $("lbl-replay-speed").textContent = (ms / 1000).toFixed(1) + "s";
@@ -866,6 +931,12 @@ function handleMessage(msg) {
             : "Your turn — select a piece, then its destination."
         );
       }
+      // Diagnostic: refresh scores for this position
+      if (diagEnabled) {
+        _diagStaticData  = null;
+        _diagNegamaxData = null;
+        _diagRequestAll();
+      }
       break;
 
     case "capture_required":
@@ -876,9 +947,18 @@ function handleMessage(msg) {
       board._drawPieces();
       board.enterCapture(msg.legal_captures);
       setStatus("Mill! Click an opponent piece to capture.");
+      // Store projected FEN for diagnostic capture scoring
+      _diagCaptureFen = msg.projected_fen || null;
+      if (diagEnabled) _diagRequestCapture();
+      break;
+
+    case "diagnostic":
+      _diagOnReceive(msg);
       break;
 
     case "thinking":
+      _aiThinking = true;       // block diagnostics while AI computes
+      board && board.clearDiag();
       startThinkingTimer(msg.color, msg.expected_seconds ?? 0, ws);
       $("btn-force-move").hidden = false;
       canOverride = false;
@@ -889,6 +969,7 @@ function handleMessage(msg) {
       break;
 
     case "ai_move": {
+      _aiThinking = false;      // AI done — diagnostics can fire again
       const from    = msg.from ? msg.from : "—";
       const to      = msg.to;
       const cap     = msg.capture ? ` × ${msg.capture}` : "";
@@ -1207,6 +1288,7 @@ function onNodeClick(name) {
     if (gameState.legal_sources.includes(name) &&
         gameState.board[name] === gameState.turn) {
       board.selectSource(name);
+      if (diagEnabled) _diagRender();
     }
   } else {
     const src = board.selected;
@@ -1214,6 +1296,7 @@ function onNodeClick(name) {
       board.selected = null;
       board._drawPieces();
       board._drawHints();
+      if (diagEnabled) _diagRender();
       return;
     }
     const pairs = board._movePairs || [];
@@ -1231,11 +1314,13 @@ function onNodeClick(name) {
       board.legalSrcs  = new Set();
       board._drawPieces();
       board._drawHints();
+      if (diagEnabled) board.clearDiag();
       setStatus("Move sent — AI calculating…");
       ws.send(JSON.stringify({ type: "move", from: src, to: name }));
     } else if (gameState.legal_sources.includes(name) &&
                gameState.board[name] === gameState.turn) {
       board.selectSource(name);
+      if (diagEnabled) _diagRender();
     }
   }
 }
@@ -1450,12 +1535,25 @@ function drawEvalGraph() {
     const cx = replayIdx === 0 ? 1 : pts[evalIdx].x;
     svg.appendChild(mk("line", {
       x1: cx, y1: 0, x2: cx, y2: H,
-      stroke: "#ffffff", "stroke-width": 1, opacity: "0.35",
+      stroke: "#ffffff", "stroke-width": 1.5, opacity: "0.7",
     }));
     if (replayIdx > 0) {
       const cy = pts[evalIdx].y;
       svg.appendChild(mk("circle", { cx, cy, r: 4,
-        fill: "#ffffff", opacity: "0.7", stroke: "#c8a96e", "stroke-width": 1 }));
+        fill: "#ffffff", opacity: "0.9", stroke: "#c8a96e", "stroke-width": 1.5 }));
+      // Score readout at cursor
+      const s = evalHistory[evalIdx];
+      const pct = Math.round(Math.abs(s) * 100);
+      const who = s > 0.05 ? `+${pct} W` : s < -0.05 ? `+${pct} B` : "=";
+      const lx  = cx + 4 > W - 36 ? cx - 4 : cx + 4;
+      const anchor = cx + 4 > W - 36 ? "end" : "start";
+      const lbl = mk("text", {
+        x: lx, y: Math.max(cy - 5, 10),
+        fill: "#ffffff", "font-size": "9", "font-family": "monospace",
+        "text-anchor": anchor, opacity: "0.85",
+      });
+      lbl.textContent = who;
+      svg.appendChild(lbl);
     }
   }
 
@@ -1698,6 +1796,7 @@ function replayGo(idx) {
   _updateReplayLabel();
   _highlightReplayMove(idx);
   drawEvalGraph();
+  _diagRefreshForReplay(idx);
 }
 
 function exitReplay() {
@@ -1709,6 +1808,10 @@ function exitReplay() {
   _updateReplayLabel();
   _highlightReplayMove(-1);
   drawEvalGraph();
+  if (diagEnabled) {
+    _diagStaticData = null; _diagNegamaxData = null;
+    _diagRequestAll();
+  }
 }
 
 function _setReplayButtonsDisabled(disabled) {
@@ -2126,4 +2229,131 @@ function _renderProfile(p) {
   $("profile-difficulty").textContent = p.current_difficulty ?? 3;
   $("profile-last-played").textContent = p.last_played ?? "—";
   $("profile-created").textContent     = p.created_at ?? "—";
+}
+
+// ── Diagnostic overlay ────────────────────────────────────────────────────────
+
+function _diagSend(mode, extraOpts = {}) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  _diagSeq++;
+  ws.send(JSON.stringify({
+    type:  "get_diagnostic",
+    mode,
+    depth: diagDepth,
+    seq:   _diagSeq,
+    ...extraOpts,
+  }));
+}
+
+function _diagRequestStatic(fen, prefix) {
+  if (!diagStatic) return;
+  _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
+}
+
+function _diagRequestNegamax(fen, prefix) {
+  if (!diagNegamax) return;
+  _diagSend("negamax", fen ? { fen, prefix: prefix || [] } : {});
+}
+
+function _diagRequestCapture() {
+  _diagSend("capture");
+}
+
+function _diagRequestAll(fen, prefix) {
+  if (!diagEnabled || _aiThinking) return;
+  clearTimeout(_diagDebounce);
+  _diagDebounce = setTimeout(() => {
+    if (_aiThinking) return;    // re-check after debounce fires
+    _diagStaticData  = null;
+    _diagNegamaxData = null;
+    _diagPending = _diagSeq + (diagStatic ? 1 : 0) + (diagNegamax ? 1 : 0);
+    _diagRequestStatic(fen, prefix);
+    _diagRequestNegamax(fen, prefix);
+  }, 300);  // 300ms debounce — longer to absorb rapid replay + prevent flood
+}
+
+function _diagOnReceive(msg) {
+  if (!diagEnabled) return;
+  // Update eval bar always
+  if (msg.eval_w !== undefined) {
+    const fmt = n => (n >= 0 ? `+${n}` : `${n}`);
+    $("eval-w").textContent = fmt(msg.eval_w);
+    $("eval-b").textContent = fmt(msg.eval_b);
+    // Color the evals
+    $("eval-w").style.color = msg.eval_w > 50 ? "#4caf50" : msg.eval_w < -50 ? "#e05050" : "#ddd";
+    $("eval-b").style.color = msg.eval_b > 50 ? "#4caf50" : msg.eval_b < -50 ? "#e05050" : "#aaa";
+  }
+  if (msg.mode === "static")  { _diagStaticData  = msg; }
+  if (msg.mode === "negamax") { _diagNegamaxData = msg; }
+  if (msg.mode === "capture") { _diagStaticData  = msg; }
+  _diagRender();
+}
+
+function _diagRender() {
+  if (!diagEnabled || !board) { board && board.clearDiag(); return; }
+
+  const staticD  = diagStatic  ? _diagStaticData  : null;
+  const negamaxD = diagNegamax ? _diagNegamaxData : null;
+  const anyScore = staticD || negamaxD;
+
+  if (!anyScore && !diagTraj && !diagDB) { board.clearDiag(); return; }
+
+  // Pick primary data source (static preferred for phase/color info)
+  const primary   = staticD || negamaxD;
+  const secondary = (staticD && negamaxD) ? negamaxD : null;
+
+  // Determine phase and selected source for movement phase
+  const curPhase = (phase === "capture") ? "capture"
+    : (gameState ? gameState.phase : (primary && primary.phase) || "move");
+
+  const modeLabel = [];
+  if (staticD) modeLabel.push("static");
+  if (negamaxD) modeLabel.push(`negamax d${diagDepth}`);
+  if (diagTraj) modeLabel.push("traj");
+  if (diagDB)   modeLabel.push("DB");
+  $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
+
+  // Score label overlay (heuristic / negamax numbers)
+  if (anyScore) {
+    board.renderDiag(primary, {
+      phase:       curPhase,
+      selectedSrc: board.selected,
+      mode2:       secondary,
+    });
+  } else {
+    board._diagGroup.innerHTML = "";
+  }
+
+  // DB overlay (traj frequencies + fullgame/endgame arrows)
+  const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
+  if ((diagTraj || diagDB) && dbSource && dbSource.moves) {
+    board.renderDiagDB(dbSource.moves, {
+      phase:       curPhase,
+      selectedSrc: board.selected,
+      showTraj:    diagTraj,
+      showDB:      diagDB,
+    });
+  } else {
+    board._dbGroup.innerHTML = "";
+  }
+}
+
+// Called from replayGo() to refresh diag for the replayed position
+function _diagRefreshForReplay(idx) {
+  if (!diagEnabled || !replayMoves.length) return;
+  let fen = null;
+  let prefix = [];
+  if (idx === 0) {
+    fen = replayMoves[0] && replayMoves[0].fen;
+    prefix = [];
+  } else if (idx < replayMoves.length) {
+    fen = replayMoves[idx] && replayMoves[idx].fen;
+    prefix = replayMoves.slice(0, idx).map(m => m.notation).filter(Boolean);
+  } else {
+    // After last move: use live board (no FEN override)
+    fen = null; prefix = null;
+  }
+  _diagStaticData  = null;
+  _diagNegamaxData = null;
+  _diagRequestAll(fen || undefined, prefix || undefined);
 }

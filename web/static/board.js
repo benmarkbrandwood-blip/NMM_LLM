@@ -68,6 +68,16 @@ export class Board {
     // Extra space at left (30px) and bottom (30px) for coordinate labels
     svg.setAttribute("viewBox", "-30 0 630 630");
 
+    // Arrow-marker defs for DB overlay
+    const defs = _el("defs");
+    for (const [id, col] of [["arr-green","#4caf50"],["arr-red","#e05050"],["arr-grey","#666"],["arr-blue","#7bbfff"]]) {
+      const mk = _el("marker", { id, markerWidth:"7", markerHeight:"5", refX:"5", refY:"2.5", orient:"auto" });
+      const poly = _el("polygon", { points:"0 0,7 2.5,0 5", fill:col });
+      mk.appendChild(poly);
+      defs.appendChild(mk);
+    }
+    svg.appendChild(defs);
+
     // Board background
     const bg = _el("rect", { x:20, y:20, width:560, height:560, rx:8,
       fill:"#c8a96e", stroke:"#7a5230", "stroke-width":2 });
@@ -134,6 +144,15 @@ export class Board {
     this._hintOverlay = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._hintOverlay);
     this._hintTimer = null;
+
+    // DB overlay — trajectory/fullgame/endgame arrows and halos; below score labels
+    this._dbGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._dbGroup);
+
+    // Diagnostic overlay — score labels; topmost, never intercepts clicks
+    this._diagGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._diagGroup);
+    this._diagSelected = null;  // source square selected for movement diag
   }
 
   render(state) {
@@ -342,6 +361,261 @@ export class Board {
       this._millNodes = new Set();
       this._drawPieces();
     }, 800);
+  }
+
+  clearDiag() {
+    this._diagGroup.innerHTML = "";
+    this._dbGroup.innerHTML   = "";
+    this._diagSelected = null;
+  }
+
+  // ── DB overlay (trajectory / fullgame / endgame) ──────────────────────────
+  // moves: [{from, to, capture, traj_freq, db_delta, eg_flag}, ...]
+  // opts: {phase, selectedSrc, showTraj, showDB}
+  renderDiagDB(moves, opts = {}) {
+    this._dbGroup.innerHTML = "";
+    if (!moves || !moves.length) return;
+
+    const phase   = opts.phase || "move";
+    const selSrc  = opts.selectedSrc || null;
+    const showTraj = opts.showTraj !== false;
+    const showDB   = opts.showDB  !== false;
+
+    // Helper: arrow color from db_delta or eg_flag
+    const dbColor = (delta, egFlag) => {
+      if (egFlag === "W") return "#4caf50";
+      if (egFlag === "L") return "#e05050";
+      if (egFlag === "D") return "#888";    // endgame draw — keep grey
+      if (delta == null)  return null;
+      if (delta > 0.1)    return "#4caf50";
+      if (delta < -0.1)   return "#e05050";
+      return null;   // neutral FullGame delta — no display (not enough info)
+    };
+    const markerId = col =>
+      col === "#4caf50" ? "arr-green" : col === "#e05050" ? "arr-red" : col === "#888" || col === "#666" ? "arr-grey" : "arr-grey";
+
+    if (phase === "place" || phase === "capture") {
+      // Halos on destination squares — no arrows needed (no source)
+      for (const mv of moves) {
+        const pos = mv.to;
+        if (!pos) continue;
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
+        const freq = showTraj ? (mv.traj_freq || 0) : 0;
+
+        if (col) {
+          const [x, y] = nodeXY(pos);
+          this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 9,
+            fill: "none", stroke: col, "stroke-width": 2.5, opacity: 0.7 }));
+        }
+        if (freq > 0) {
+          const [x, y] = nodeXY(pos);
+          const hasPiece = !!this.grid[pos];
+          const ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
+          const t = _el("text", { x, y: ty, "font-size":"9", fill:"#5a10c0",
+            "text-anchor":"middle", "font-family":"monospace",
+            stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+            "paint-order":"stroke" });
+          t.textContent = `T:${Math.round(freq * 100)}%`;
+          this._dbGroup.appendChild(t);
+        }
+      }
+    } else {
+      // Movement / fly phase
+      const toRender = selSrc
+        ? moves.filter(m => m.from === selSrc)
+        : moves;
+
+      for (const mv of toRender) {
+        if (!mv.from || !mv.to) continue;
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
+        const freq = showTraj ? (mv.traj_freq || 0) : 0;
+        if (!col && freq === 0) continue;
+
+        const [x1, y1] = nodeXY(mv.from);
+        const [x2, y2] = nodeXY(mv.to);
+
+        if (col) {
+          // Shorten line so arrowhead doesn't overlap pieces
+          const dx = x2 - x1, dy = y2 - y1;
+          const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+          const shrink = 28;
+          const sx = x1 + dx/dist * PIECE_R;
+          const ex = x2 - dx/dist * shrink;
+          const sy = y1 + dy/dist * PIECE_R;
+          const ey = y2 - dy/dist * shrink;
+          if (dist > PIECE_R * 2) {
+            this._dbGroup.appendChild(_el("line", {
+              x1: sx, y1: sy, x2: ex, y2: ey,
+              stroke: col, "stroke-width": 2,
+              "marker-end": `url(#${markerId(col)})`,
+              opacity: 0.75,
+            }));
+          }
+        }
+        if (freq > 0 && (!selSrc || mv.from === selSrc)) {
+          const [x, y] = nodeXY(mv.to);
+          const t = _el("text", { x: x + 1, y: y - PIECE_R - 4,
+            "font-size":"8", fill:"#5a10c0",
+            "text-anchor":"middle", "font-family":"monospace",
+            stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+            "paint-order":"stroke" });
+          t.textContent = `T:${Math.round(freq * 100)}%`;
+          this._dbGroup.appendChild(t);
+        }
+      }
+
+      // If no source selected, show best-DB-flagged sources with a ring
+      if (!selSrc && showDB) {
+        const srcDB = new Map();  // source → best db color
+        for (const mv of moves) {
+          const col = dbColor(mv.db_delta, mv.eg_flag);
+          if (col && col !== "#888" && mv.from) {
+            if (!srcDB.has(mv.from) || col === "#4caf50")
+              srcDB.set(mv.from, col);
+          }
+        }
+        for (const [src, col] of srcDB) {
+          const [x, y] = nodeXY(src);
+          this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 7,
+            fill:"none", stroke: col, "stroke-width":2, opacity:0.55, "stroke-dasharray":"4 3" }));
+        }
+      }
+    }
+  }
+
+  // ── Diagnostic overlay ────────────────────────────────────────────────────
+  // diagData: {mode, color, eval_w, eval_b, moves: [{from, to, capture, score, tac_total?, tac_terms?, eval_score?}]}
+  // opts: {mode2?: {moves: [...]}, selectedSrc?: string, phase: "place"|"move"|"fly"|"capture"}
+  renderDiag(diagData, opts = {}) {
+    this._diagGroup.innerHTML = "";
+    if (!diagData || !diagData.moves || !diagData.moves.length) return;
+
+    const { moves, mode } = diagData;
+    const phase   = opts.phase || diagData.phase || "move";
+    const selSrc  = opts.selectedSrc || null;
+    const moves2  = (opts.mode2 && opts.mode2.moves) ? opts.mode2.moves : null;
+
+    // Build score lookup: pos → best score for that square (or source piece)
+    // For movement phase (no selection): per-source aggregation = best outgoing score
+    // For movement phase (selection active): per-destination scores
+    // For placement / capture: per-destination (= to) scores
+
+    // Score normalisation helpers
+    const scores = moves.map(m => m.score);
+    const minS = Math.min(...scores), maxS = Math.max(...scores);
+    const scoreColor = s => {
+      if (maxS === minS) return "#aaa";
+      const t = (s - minS) / (maxS - minS);  // 0=worst, 1=best
+      if (t > 0.65) return "#4caf50";          // green
+      if (t < 0.35) return "#e05050";          // red
+      return "#aaa";
+    };
+
+    const scores2 = moves2 ? moves2.map(m => m.score) : null;
+    const min2 = scores2 ? Math.min(...scores2) : 0;
+    const max2 = scores2 ? Math.max(...scores2) : 0;
+    const scoreColor2 = s => {
+      if (!scores2 || max2 === min2) return "#7bbfff";
+      const t = (s - min2) / (max2 - min2);
+      if (t > 0.65) return "#5bc8f5";
+      if (t < 0.35) return "#f59b5b";
+      return "#7bbfff";
+    };
+
+    const fmt = n => (n >= 0 ? `+${n}` : `${n}`);
+
+    const renderLabel = (pos, label1, col1, label2, col2) => {
+      const [x, y] = nodeXY(pos);
+      const hasPiece = !!this.grid[pos];
+      const ly = hasPiece ? y + PIECE_R + 11 : y + NODE_R + 11;
+
+      const g = _el("g");
+      // Background rect — width depends on whether we have two numbers
+      const tw = label2 ? 74 : 44;
+      g.appendChild(_el("rect", {
+        x: x - tw/2, y: ly - 8, width: tw, height: 14, rx: 3,
+        fill: "rgba(10,8,4,0.82)",
+      }));
+      if (label2) {
+        const t1 = _el("text", { x: x - 4, y: ly + 3,
+          "font-size": "9", fill: col1,
+          "text-anchor": "end", "font-family": "monospace" });
+        t1.textContent = label1;
+        g.appendChild(t1);
+        // separator
+        const sep = _el("text", { x: x, y: ly + 3, "font-size": "9", fill: "#555",
+          "text-anchor": "middle", "font-family": "monospace" });
+        sep.textContent = "|";
+        g.appendChild(sep);
+        const t2 = _el("text", { x: x + 4, y: ly + 3,
+          "font-size": "9", fill: col2,
+          "text-anchor": "start", "font-family": "monospace" });
+        t2.textContent = label2;
+        g.appendChild(t2);
+      } else {
+        const t = _el("text", { x, y: ly + 3,
+          "font-size": "9.5", fill: col1,
+          "text-anchor": "middle", "font-family": "monospace" });
+        t.textContent = label1;
+        g.appendChild(t);
+      }
+      this._diagGroup.appendChild(g);
+    };
+
+    // Build lookup for mode2 scores keyed by "from|to"
+    const mk2 = m => `${m.from||''}|${m.to||''}`;
+    const map2 = moves2 ? new Map(moves2.map(m => [mk2(m), m])) : null;
+
+    if (phase === "place" || phase === "capture") {
+      // One label per destination square
+      for (const mv of moves) {
+        const pos = mv.to || mv.capture;
+        if (!pos) continue;
+        const col1 = scoreColor(mv.score);
+        const s2 = map2 ? map2.get(mk2(mv)) : null;
+        renderLabel(pos, fmt(mv.score), col1,
+          s2 ? fmt(s2.score) : null,
+          s2 ? scoreColor2(s2.score) : null);
+      }
+    } else {
+      // Movement / fly phase
+      if (selSrc) {
+        // Selected: show destination scores for moves FROM selSrc
+        const destMoves = moves.filter(m => m.from === selSrc);
+        for (const mv of destMoves) {
+          const col1 = scoreColor(mv.score);
+          const s2 = map2 ? map2.get(mk2(mv)) : null;
+          renderLabel(mv.to, fmt(mv.score), col1,
+            s2 ? fmt(s2.score) : null,
+            s2 ? scoreColor2(s2.score) : null);
+        }
+      } else {
+        // No selection: aggregate best score per source piece
+        const srcBest = new Map();    // pos → {score, mv}
+        const srcBest2 = new Map();   // pos → {score}
+        for (const mv of moves) {
+          const src = mv.from;
+          if (!src) continue;
+          if (!srcBest.has(src) || mv.score > srcBest.get(src).score)
+            srcBest.set(src, mv);
+        }
+        if (moves2) {
+          for (const mv of moves2) {
+            const src = mv.from;
+            if (!src) continue;
+            if (!srcBest2.has(src) || mv.score > srcBest2.get(src).score)
+              srcBest2.set(src, mv);
+          }
+        }
+        for (const [src, {score}] of srcBest) {
+          const col1 = scoreColor(score);
+          const s2 = srcBest2.get(src);
+          renderLabel(src, fmt(score), col1,
+            s2 ? fmt(s2.score) : null,
+            s2 ? scoreColor2(s2.score) : null);
+        }
+      }
+    }
   }
 }
 

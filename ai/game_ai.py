@@ -1452,6 +1452,47 @@ class GameAI:
         worst = scored[:cutoff]
         return random.choice(worst)[0]
 
+    def diagnostic_scores(
+        self,
+        board: "BoardState",
+        depth: int = 3,
+        game_notations: list | None = None,
+    ) -> list[dict]:
+        """Score all legal moves at *depth* for the diagnostic overlay.
+
+        Returns [{from, to, capture, score}, ...] sorted best-first.
+        Safe to call between human turns — resets and restores search state.
+        """
+        from game.rules import get_all_legal_moves
+        moves = get_all_legal_moves(board)
+        if not moves:
+            return []
+        # Mirror choose_move preamble so _negamax has all state it needs.
+        self._force_stop = False
+        self._deadline   = time.time() + 20.0
+        self._tt.clear()
+        self._killers        = [[None, None] for _ in range(32)]
+        self._history        = {}
+        self._trajectory_db  = None          # skip trajectory during diagnostics
+        self._trajectory_line = []
+        self._game_notations = list(game_notations) if game_notations else []
+        self._opp_last_weak  = False
+        # Score from the perspective of whoever is to move — may differ from self.color
+        # (e.g. scoring the human player's options). Temporarily override self.color so
+        # _score_all's tactical_move_bonus and is_opp_node classification are correct.
+        orig_color = self.color
+        self.color = board.turn
+        try:
+            results = self._score_all(board, moves, depth)
+        finally:
+            self.color = orig_color
+            self._deadline = math.inf
+        results.sort(key=lambda x: x[1], reverse=True)
+        return [
+            {"from": m.get("from"), "to": m["to"], "capture": m.get("capture"), "score": int(s)}
+            for m, s in results
+        ]
+
     def _iterative_deepen(
         self,
         board: BoardState,

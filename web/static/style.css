@@ -280,6 +280,70 @@ main {
   min-height: 1.4em;
 }
 
+/* ── Diagnostic eval bar ─────────────────────────────────────────────── */
+#eval-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: rgba(0,0,0,.35);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .82rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.eval-label { color: var(--text-dim); }
+.eval-w     { color: #ddd; font-weight: 700; font-family: monospace; }
+.eval-b     { color: #aaa; font-weight: 700; font-family: monospace; }
+.eval-sep   { color: var(--border); }
+.eval-spacer{ flex: 1; }
+.diag-mode-label { font-size: .72rem; color: var(--text-dim); font-style: italic; }
+
+/* ── Diagnostic controls bar ─────────────────────────────────────────── */
+#diag-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: rgba(0,0,0,.25);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: .78rem;
+  width: 100%;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+.diag-section-label { color: var(--text-dim); font-size: .72rem; }
+.diag-sep { color: var(--border); }
+.diag-chip {
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: .72rem;
+  cursor: pointer;
+  transition: border-color .1s, color .1s, background .1s;
+}
+.diag-chip:hover { border-color: var(--accent); color: var(--accent); }
+.diag-chip-active {
+  background: rgba(212,131,74,.18);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.diag-depth-wrap { display: flex; align-items: center; gap: 2px; }
+.diag-depth-input {
+  width: 32px;
+  background: rgba(0,0,0,.4);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text);
+  font-size: .72rem;
+  text-align: center;
+  padding: 1px 3px;
+}
+
 /* ── Side panel (right) ──────────────────────────────────────────────── */
 #side-panel {
   display: flex;
