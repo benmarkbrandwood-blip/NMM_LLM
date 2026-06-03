@@ -100,16 +100,25 @@ class TestB68BookBonusSuppression(unittest.TestCase):
         self.assertEqual(score_map["g7"], 0 + expected_bonus,
                          "Mill-closing placement should still get the book bonus")
 
-    def test_movement_phase_book_bonus_unchanged(self):
-        """Movement-phase book moves (have 'from') are never suppressed."""
+    def test_movement_phase_book_bonus_not_dead_suppressed(self):
+        """Movement-phase book bonus is applied when the move is non-losing (dead-sq rule skipped)."""
         recognition = _make_recognition(book_move="g7")
-        # Movement move: from=g4 to=g7 (dead square, but movement phase)
-        scored = [({"from": "g4", "to": "g7"}, -200)]
+        # Movement move: from=g4 to=g7 (dead square, but movement phase) — score neutral
+        scored = [({"from": "g4", "to": "g7"}, 0)]
         adjusted = self.ai._apply_opening_adjustments(scored, recognition, self.board)
         score_map = {(m.get("from"), m["to"]): s for m, s in adjusted}
         expected_bonus = int(3000 * 75 / 100)
-        self.assertEqual(score_map[("g4", "g7")], -200 + expected_bonus,
-                         "Movement-phase book bonus must not be suppressed")
+        self.assertEqual(score_map[("g4", "g7")], 0 + expected_bonus,
+                         "Movement-phase book bonus must not be dead-square suppressed")
+
+    def test_movement_phase_losing_book_bonus_suppressed(self):
+        """Book bonus is suppressed when the book move's raw negamax score is negative."""
+        recognition = _make_recognition(book_move="g7")
+        scored = [({"from": "g4", "to": "g7"}, -200)]
+        adjusted = self.ai._apply_opening_adjustments(scored, recognition, self.board)
+        score_map = {(m.get("from"), m["to"]): s for m, s in adjusted}
+        self.assertEqual(score_map[("g4", "g7")], -200,
+                         "Book bonus must be suppressed when book move is already losing")
 
 
 class TestB68ForcedBlockLabel(unittest.TestCase):

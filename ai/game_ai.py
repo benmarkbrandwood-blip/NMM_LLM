@@ -999,14 +999,23 @@ class GameAI:
                 )
                 _book_dest_dead = not _closes_mill
 
+        # Suppress book bonus when the book move's raw negamax score is negative
+        # (AI already losing in that line — don't force a bad opening move).
+        _book_dest_losing = False
+        if book_dest and scored:
+            book_raws = [raw for mv, raw in scored if mv.get("to", "") == book_dest]
+            if book_raws and max(book_raws) < 0:
+                _book_dest_losing = True
+
         adjusted = []
         for move, raw in scored:
             dest = move.get("to", "")
             delta = 0
             if book_dest and dest == book_dest:
-                # Suppress bonus when landing on a dead square during placement.
+                # Suppress bonus when landing on a dead square during placement,
+                # or when the book move is already evaluated as losing.
                 is_placement = not move.get("from")
-                if not (is_placement and _book_dest_dead):
+                if not (is_placement and _book_dest_dead) and not _book_dest_losing:
                     delta += book_bonus_abs
             if dest in blunder_dests:
                 delta -= blunder_penalty_abs
