@@ -527,6 +527,7 @@ class Session:
         self.opening_recognizer: Optional["OpeningRecognizer"] = None  # no-LLM recognition
         self.target_opening: Optional[Opening] = None
         self.game_sym_idx: int = 0
+        self.game_ply_offset: int = 0
         self.opening_active: bool = False  # True while an opening replay is streaming
         # ── AI-vs-AI fields ──────────────────────────────────────────────────────
         self.ai_vs_ai: bool = False
@@ -1306,8 +1307,30 @@ def _nollm_choose_move(session: Session, board: BoardState) -> dict:
         opening_recognizer=session.opening_recognizer,
         target_opening=session.target_opening,
         game_sym_idx=session.game_sym_idx,
+        ply_offset=session.game_ply_offset,
         trajectory_db=_trajectory_db,
     )
+
+    # Re-target when the recognizer has found a FEN transposition to a different opening.
+    # The current ply is handled correctly by the recognition book_move; the retarget
+    # ensures the new opening guides subsequent plies if recognition drops to "novel".
+    _rec = kwargs.get("recognition")
+    if (
+        _rec is not None
+        and _rec.status == "transposition"
+        and session.opening_recognizer is not None
+        and _rec.opening_id != (session.target_opening.opening_id if session.target_opening else None)
+    ):
+        new_opening = session.opening_recognizer.book.get_by_id(_rec.opening_id)
+        if new_opening is not None:
+            session.target_opening = new_opening
+            session.game_sym_idx = 0
+            session.game_ply_offset = _rec.matched_ply
+            log.info(
+                "Re-targeted opening on transposition: %s (ply_offset=%d)",
+                new_opening.name, _rec.matched_ply,
+            )
+
     trajectory_context = kwargs.pop("trajectory_context", "")
     if trajectory_context:
         log.info("No-LLM trajectory: %s", trajectory_context)
@@ -1659,6 +1682,7 @@ async def ws_endpoint(websocket: WebSocket):
                         target, sym_idx = pick_target_opening(_nollm_book, game_ai.color)
                         session.target_opening = target
                         session.game_sym_idx = sym_idx
+                        session.game_ply_offset = 0
                         if target:
                             log.info(
                                 "No-LLM targeting opening: %s sym=%d score=%.2f",
@@ -1760,6 +1784,7 @@ async def ws_endpoint(websocket: WebSocket):
                     target, sym_idx = pick_target_opening(_nollm_book, game_ai.color)
                     session.target_opening = target
                     session.game_sym_idx = sym_idx
+                    session.game_ply_offset = 0
                 log.info(
                     "Setup game  human=%s diff=%s phase=%s turn=%s W=%d B=%d",
                     hc, diff, setup_phase, setup_turn,

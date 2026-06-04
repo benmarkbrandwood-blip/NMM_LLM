@@ -39,6 +39,7 @@ def synthesize_opening_recognition(
     board: BoardState,
     game_moves: list[dict],
     game_sym_idx: int = 0,
+    ply_offset: int = 0,
 ) -> RecognitionResult:
     """When still inactive/novel in placement, steer from the targeted opening."""
     phase = get_game_phase(board, board.turn)
@@ -64,9 +65,12 @@ def synthesize_opening_recognition(
         return recognition
 
     # Guard: only steer if the game moves so far actually follow this opening's
-    # line.  If the actual game has diverged (different moves played), applying
-    # the opening's Nth move to an unrelated board position is harmful.
+    # line.  Moves before ply_offset are skipped — they predate a transposition
+    # that confirmed the board position matches, so move-order differences there
+    # are expected and harmless.
     for i, gm in enumerate(game_moves):
+        if i < ply_offset:
+            continue
         if i >= len(line):
             break
         expected_raw = line[i]
@@ -176,6 +180,7 @@ def build_choose_move_kwargs(
     opening_recognizer: OpeningRecognizer | None = None,
     target_opening: Opening | None = None,
     game_sym_idx: int = 0,
+    ply_offset: int = 0,
     trajectory_db: TrajectoryDB | None = None,
     endgame_db: EndgameDB | None = None,
     endgame_state: EndgameState | None = None,
@@ -186,7 +191,7 @@ def build_choose_move_kwargs(
         if opening_recognizer else INACTIVE_RESULT
     )
     recognition = synthesize_opening_recognition(
-        recognition, target_opening, board, game_moves, game_sym_idx,
+        recognition, target_opening, board, game_moves, game_sym_idx, ply_offset,
     )
     notations = [m.get("notation", "") for m in game_moves if m.get("notation")]
     trajectory_hints = build_trajectory_hints(
