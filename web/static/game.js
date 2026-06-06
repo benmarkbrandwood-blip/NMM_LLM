@@ -611,10 +611,11 @@ function startNewGame() {
 let isAiVsAi = false;  // true during an AI-vs-AI game
 
 function startAiVsAi() {
-  const whiteP = $("ava-white-personality").value;
-  const blackP = $("ava-black-personality").value;
-  const diff   = parseInt($("ava-difficulty").value);
-  const save   = $("ava-save-library").checked;
+  const whiteP     = $("ava-white-personality").value;
+  const blackP     = $("ava-black-personality").value;
+  const diffWhite  = parseInt($("ava-white-difficulty").value);
+  const diffBlack  = parseInt($("ava-black-difficulty").value);
+  const save       = $("ava-save-library").checked;
 
   $("ava-modal").style.display = "none";
 
@@ -658,8 +659,8 @@ function startAiVsAi() {
       type:               "start_ai_vs_ai",
       white_personality:  whiteP,
       black_personality:  blackP,
-      difficulty_white:   diff,
-      difficulty_black:   diff,
+      difficulty_white:   diffWhite,
+      difficulty_black:   diffBlack,
       save_to_library:    save,
       use_llm:            $("chk-llm").checked,
     }));

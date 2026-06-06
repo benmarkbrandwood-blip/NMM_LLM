@@ -49,15 +49,13 @@ def test_disabled_forces_unavailable(tmp_path):
 
 
 def test_probe_records_format_metadata(tmp_path):
-    # When files exist, the adapter records probe metadata for future decoding,
-    # but still returns None (format undecoded) and never crashes.
+    # A directory with no .sec2 files: adapter probes but stays unavailable.
     (tmp_path / "database.dat").write_bytes(b"\x00" * 1024)
     (tmp_path / "preCalculatedVars.dat").write_bytes(b"ABCD" * 8)
     db = ExternalSolvedDB(str(tmp_path), enabled=True)
     assert db.is_available() is False
-    assert "vars_size_bytes" in db.format_probe
-    assert db.format_probe["vars_size_bytes"] == 32
-    assert db.format_probe.get("database_size_bytes") == 1024
+    assert "db_dir" in db.format_probe
+    assert db.format_probe["available"] is False
     assert db.query_state(_board()) is None
 
 

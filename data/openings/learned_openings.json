@@ -47,7 +47,7 @@
   },
   {
     "opening_id": "book-01-a3fa19",
-    "name": "Inner mill trap - black",
+    "name": "Scattered start",
     "aliases": [],
     "family": "Early Game",
     "side": "W",
@@ -86,7 +86,7 @@
     },
     "outcome_stats": {
       "W": 1,
-      "B": 3,
+      "B": 4,
       "D": 0
     },
     "confidence": 0.8,
@@ -279,7 +279,7 @@
   },
   {
     "opening_id": "book-06-2971b5",
-    "name": "White diagonal fail -keep busy",
+    "name": "White diagonal draw",
     "aliases": [],
     "family": "Early Game",
     "side": "B",
@@ -331,7 +331,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 5,
+      "B": 7,
       "D": 0
     },
     "confidence": 0.8,
@@ -344,7 +344,7 @@
   },
   {
     "opening_id": "book-07-a33845",
-    "name": "Z mill c4 e3 variant",
+    "name": "Z mill c4 e3 variant 2",
     "aliases": [],
     "family": "Early Game",
     "side": "W",
@@ -395,8 +395,8 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 22,
-      "B": 0,
+      "W": 32,
+      "B": 1,
       "D": 0
     },
     "confidence": 0.8,
@@ -591,7 +591,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 8,
+      "B": 9,
       "D": 0
     },
     "confidence": 0.8,
@@ -4322,7 +4322,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 5,
+      "W": 7,
       "B": 0,
       "D": 0
     },
@@ -4336,7 +4336,7 @@
   },
   {
     "opening_id": "novel-de906242",
-    "name": "Early spread w B column",
+    "name": "Around the inside",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -4387,7 +4387,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 2,
+      "W": 4,
       "B": 1,
       "D": 0
     },
@@ -4658,7 +4658,7 @@
   },
   {
     "opening_id": "novel-e375a1d7",
-    "name": "The Serpent's Coil",
+    "name": "The Serpent’s Dance",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -4709,7 +4709,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 1,
+      "W": 3,
       "B": 0,
       "D": 0
     },
@@ -4719,7 +4719,7 @@
       "learned"
     ],
     "source_reference": "",
-    "needs_llm_name": true
+    "needs_llm_name": false
   },
   {
     "opening_id": "novel-003932a3",
@@ -5554,5 +5554,395 @@
     ],
     "source_reference": "",
     "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-2d9a1245",
+    "name": "white side column loss",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d7",
+      "d6",
+      "a4",
+      "b4",
+      "a7",
+      "g7",
+      "e4",
+      "d1",
+      "a1",
+      "d5",
+      "d2",
+      "f4",
+      "d6",
+      "c5",
+      "e5",
+      "e3",
+      "g4",
+      "d3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".W.....W.B.....B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "WWB....W.B.....B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WWB..B.W.B.....B...W....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WWB..BWW.B.....B.B.W....|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-17e922b1",
+    "name": "The Storm’s Rise",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d7",
+      "d6",
+      "g4",
+      "f4",
+      "f6",
+      "a4",
+      "g1",
+      "g7",
+      "d1",
+      "a1",
+      "a7",
+      "c4",
+      "b4",
+      "d2",
+      "b6",
+      "b2",
+      "f2",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".W.W.....B.B............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".W.W...B.BWB............|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".WBWW..B.BWB............|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".WBWWWBB.BWB............|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-81badf8f",
+    "name": "The Path Ascends",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d7",
+      "d6",
+      "g7",
+      "g4",
+      "a7",
+      "g4",
+      "b4",
+      "a4",
+      "d2",
+      "f2",
+      "f6",
+      "e4",
+      "f4",
+      "d5",
+      "d1",
+      "d3",
+      "g1",
+      "a1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".WWB.....B..............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "WWWB.....B..............|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WWWB...B.B.....W........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WWWB...B.B..BW.W........|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true
+  },
+  {
+    "opening_id": "novel-8ae3cee3",
+    "name": "White side column loss",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "c5",
+      "f4",
+      "e3",
+      "c4",
+      "g4",
+      "d7",
+      "g1",
+      "d1",
+      "g7",
+      "d1",
+      "b4",
+      "b6",
+      "d6",
+      "d3",
+      "d2",
+      "f2",
+      "f6",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "...........B....W...W..B|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.W.......B....W...W..B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.WWB.....B....W...W..B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BWWWB.....B....W...W..B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-98450726",
+    "name": "Scattered start",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a4",
+      "f4",
+      "b2",
+      "b4",
+      "g4",
+      "d1",
+      "d2",
+      "f2",
+      "f6",
+      "d7",
+      "d5",
+      "d3",
+      "c4",
+      "e5",
+      "e4",
+      "c3",
+      "e3",
+      "d6"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".......W...B..WB........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "...W.B.W...B..WB........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...W.B.W...BBWWB........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.W.B.W..WBBWWB........|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-5cd9726a",
+    "name": "Novel — a7-d6-g7",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "d6",
+      "g7",
+      "d7",
+      "d5",
+      "f4",
+      "f6",
+      "b2",
+      "a4",
+      "a1",
+      "d1",
+      "g4",
+      "e4",
+      "d2",
+      "f2",
+      "b4",
+      "b6",
+      "e3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "WBW......B..............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "WBW......B.B.....W......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WBW......BWB..B..W......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WBW...BW.BWB..B..W......|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true
   }
 ]

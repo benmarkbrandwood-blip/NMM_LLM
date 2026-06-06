@@ -141,7 +141,11 @@ def _game_source(record: Dict[str, Any]) -> str:
     src = record.get("game_source")
     if src in ("human_vs_ai", "ai_vs_ai"):
         return src
-    return "human_vs_ai" if record.get("human_color") else "ai_vs_ai"
+    hc = record.get("human_color")
+    # "self_play" is a sentinel value written by the Pure-AI game mode, not a real color
+    if hc in ("W", "B"):
+        return "human_vs_ai"
+    return "ai_vs_ai"
 
 
 def examples_from_game(record: Dict[str, Any], db=None,
@@ -207,15 +211,16 @@ class SentinelDataset(_TorchDataset):
         db=None,
         config=None,
         limit: Optional[int] = None,
+        paths: Optional[List[str]] = None,
     ) -> "SentinelDataset":
-        """Build a dataset by replaying every ``*.jsonl`` in ``game_dir``.
+        """Build a dataset by replaying ``*.jsonl`` files in ``game_dir``.
 
-        Each file is expected to contain a single JSON game object (one object
-        per file, as in data/games). Files with one-object-per-line are also
-        supported. Malformed files are skipped with a warning.
+        Pass ``paths`` directly to use a pre-filtered file list (e.g. for a
+        game-level train/val split). Recurses into subdirectories automatically.
         """
         backward_decay = getattr(config, "backward_decay", None) if config else None
-        paths = sorted(glob.glob(os.path.join(game_dir, "*.jsonl")))
+        if paths is None:
+            paths = sorted(glob.glob(os.path.join(game_dir, "**", "*.jsonl"), recursive=True))
         if limit is not None:
             paths = paths[:limit]
         all_examples: List[LabelledExample] = []
@@ -228,10 +233,44 @@ class SentinelDataset(_TorchDataset):
                 except Exception as exc:
                     logger.warning("[SentinelDataset] failed on %s: %s", path, exc)
         logger.info(
-            "[SentinelDataset] loaded %d examples from %d files in %s",
-            len(all_examples), len(paths), game_dir,
+            "[SentinelDataset] loaded %d examples from %d files",
+            len(all_examples), len(paths),
         )
         return cls(all_examples)
+
+    @classmethod
+    def game_level_split(
+        cls,
+        game_dir: str,
+        val_fraction: float = 0.15,
+        db=None,
+        config=None,
+        seed: int = 42,
+        limit: Optional[int] = None,
+    ) -> "Tuple[SentinelDataset, SentinelDataset]":
+        """Return (train_dataset, val_dataset) split at the game-file level.
+
+        Whole game files go to either train or val — no ply from the same game
+        appears in both splits. This avoids the data leakage that occurs when
+        individual examples from the same game end up in both sets.
+        """
+        import random as _random
+        rng = _random.Random(seed)
+        all_paths = sorted(glob.glob(os.path.join(game_dir, "**", "*.jsonl"), recursive=True))
+        if limit is not None:
+            all_paths = all_paths[:limit]
+        shuffled = list(all_paths)
+        rng.shuffle(shuffled)
+        n_val = max(1, int(len(shuffled) * val_fraction))
+        val_paths = shuffled[:n_val]
+        train_paths = shuffled[n_val:]
+        train_ds = cls.load_from_games(game_dir, db=db, config=config, paths=train_paths)
+        val_ds = cls.load_from_games(game_dir, db=db, config=config, paths=val_paths)
+        logger.info(
+            "[SentinelDataset] game-level split: %d train games / %d val games → %d / %d examples",
+            len(train_paths), len(val_paths), len(train_ds), len(val_ds),
+        )
+        return train_ds, val_ds
 
     # ----- Dataset protocol ----------------------------------------------------
 

@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import sys
@@ -38,11 +39,7 @@ def main() -> int:
                           enabled=bool(args.db_path) or config.external_db_enabled)
     print(f"External DB available: {db.is_available()}  ({db!r})")
 
-    paths = sorted(
-        os.path.join(args.game_dir, f)
-        for f in os.listdir(args.game_dir)
-        if f.endswith(".jsonl")
-    )
+    paths = sorted(glob.glob(os.path.join(args.game_dir, "**", "*.jsonl"), recursive=True))
     if args.limit is not None:
         paths = paths[: args.limit]
 

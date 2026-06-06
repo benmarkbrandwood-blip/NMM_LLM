@@ -80,31 +80,44 @@ def main() -> int:
     if args.dataset and os.path.exists(args.dataset):
         print(f"Loading preprocessed dataset from {args.dataset}")
         dataset = SentinelDataset.load_from_disk(args.dataset)
+        n = len(dataset)
+        if n == 0:
+            print("No training examples found — nothing to train.")
+            return 1
+        print(f"Dataset: {n} examples. Classes: {dataset.class_distribution()}")
+        print(f"Supervision sources: {dataset.source_distribution()}")
+        n_val = max(1, int(n * config.val_fraction)) if n > 1 else 0
+        n_train = n - n_val
+        if n_val > 0:
+            train_ds, val_ds = random_split(
+                dataset, [n_train, n_val],
+                generator=torch.Generator().manual_seed(config.seed),
+            )
+        else:
+            train_ds, val_ds = dataset, None
     else:
         db = ExternalSolvedDB(
             db_path=args.db_path or config.external_db_path,
             enabled=bool(args.db_path) or config.external_db_enabled,
         )
         print(f"External DB available: {db.is_available()}")
-        dataset = SentinelDataset.load_from_games(
-            args.game_dir, db=db, config=config, limit=args.limit
+        # Game-level split: whole game files go to either train or val,
+        # so no ply from the same game leaks across the split boundary.
+        train_ds, val_ds = SentinelDataset.game_level_split(
+            args.game_dir,
+            val_fraction=config.val_fraction,
+            db=db,
+            config=config,
+            seed=config.seed,
+            limit=args.limit,
         )
-    n = len(dataset)
-    if n == 0:
-        print("No training examples found — nothing to train.")
-        return 1
-    print(f"Dataset: {n} examples. Classes: {dataset.class_distribution()}")
-    print(f"Supervision sources: {dataset.source_distribution()}")
-
-    n_val = max(1, int(n * config.val_fraction)) if n > 1 else 0
-    n_train = n - n_val
-    if n_val > 0:
-        train_ds, val_ds = random_split(
-            dataset, [n_train, n_val],
-            generator=torch.Generator().manual_seed(config.seed),
-        )
-    else:
-        train_ds, val_ds = dataset, None
+        n = len(train_ds)
+        if n == 0:
+            print("No training examples found — nothing to train.")
+            return 1
+        print(f"Train: {len(train_ds)} examples, Val: {len(val_ds)} examples")
+        print(f"Train classes: {train_ds.class_distribution()}")
+        print(f"Train sources: {train_ds.source_distribution()}")
 
     train_loader = DataLoader(
         train_ds, batch_size=config.batch_size, shuffle=True,

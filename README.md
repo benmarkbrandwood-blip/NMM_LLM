@@ -4,31 +4,30 @@ A browser-based Nine Men's Morris game with a classical minimax engine, an Ollam
 
 ![board](https://img.shields.io/badge/game-Nine%20Men's%20Morris-c8a96e?style=flat-square) ![python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square) ![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-
 ## Quick Start
 
 ### Linux / macOS
 
 ```
-git clone \<repo-url\>  
-cd NMM\_LLM  
-./install.sh      \# one-time setup: venv + Ollama + model  
-./run\_nmm.sh      \# starts server and opens browser
+git clone \\\<repo-url\\\>    
+cd NMM\\\_LLM    
+./install.sh      \\\# one-time setup: venv + Ollama + model    
+./run\\\_nmm.sh      \\\# starts server and opens browser
 ```
 
 ### Windows
 
 ```
-git clone \<repo-url\>  
-cd NMM\_LLM  
-install.bat       :: one-time setup: venv + Ollama + model  
-run\_nmm.bat       :: starts server and opens browser
+git clone \\\<repo-url\\\>    
+cd NMM\\\_LLM    
+install.bat       :: one-time setup: venv + Ollama + model    
+run\\\_nmm.bat       :: starts server and opens browser
 ```
 
 `install.bat` is the recommended entry point on Windows — you can also double-click it from Explorer. It just launches `install.ps1` with `-ExecutionPolicy Bypass` so PowerShell's default execution policy doesn't block the script. If you'd rather call PowerShell directly:
 
 ```
-powershell -ExecutionPolicy Bypass -File .\\install.ps1
+powershell -ExecutionPolicy Bypass -File .\\\\install.ps1
 ```
 
 Optional flags (work on either `install.bat` or `install.ps1`):
@@ -50,7 +49,7 @@ The installer will:
 
 - Pull the configured LLM model (`llama3.1:8b` by default)
 
-The launcher (`run\_nmm.sh` / `run\_nmm.bat`) will:
+The launcher (`run\\\_nmm.sh` / `run\\\_nmm.bat`) will:
 
 - Start Ollama if it isn't running
 
@@ -60,18 +59,17 @@ The launcher (`run\_nmm.sh` / `run\_nmm.bat`) will:
 
 **Optional — neural AI training** (PyTorch, only needed if you want to train the learned engine):
 
-```bash
-# Linux / macOS
-source .venv/bin/activate
-pip install -r requirements_learned_ai.txt
-
-# Windows
-.venv\Scripts\activate
-pip install -r requirements_learned_ai.txt
+```
+\# Linux / macOS  
+source .venv/bin/activate  
+pip install -r requirements\_learned\_ai.txt  
+  
+\# Windows  
+.venv\\Scripts\\activate  
+pip install -r requirements\_learned\_ai.txt
 ```
 
 See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
-
 
 ## Requirements
 
@@ -84,7 +82,6 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 - ~5 GB disk for the default LLM model
 
 - **Windows only — if `chromadb` fails to install**, install the free [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (check "Desktop development with C++") and re-run `install.bat`.
-
 
 ## Features
 
@@ -144,7 +141,7 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 
 - **Deadline-aware search** — checks the clock every 4 096 nodes; always returns the best partial result on timeout
 
-- **Auto-force-move** — when the AI exceeds its expected thinking time the browser countdown fires `force\_move` automatically; a server-side safety net fires 5 s later if the client message is lost
+- **Auto-force-move** — when the AI exceeds its expected thinking time the browser countdown fires `force\\\_move` automatically; a server-side safety net fires 5 s later if the client message is lost
 
 - **AI resignation** — if the human's position strength exceeds 0.95 (tanh-normalised) for 3 consecutive AI turns, the AI concedes with a farewell message
 
@@ -156,7 +153,7 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 
 - **Opening Recogniser** — detects rotated and mirrored variants via full D4 dihedral symmetry (4 rotations × 4 reflections)
 
-- Novel openings discovered during play are saved with `needs\_llm\_name=True` and named on the next LLM-enabled run
+- Novel openings discovered during play are saved with `needs\\\_llm\\\_name=True` and named on the next LLM-enabled run
 
 - Opening Explorer panel (header → **Openings**) — browse and step-replay any named opening line
 
@@ -277,11 +274,11 @@ Each preset ships with a distinct weight configuration saved to `data/personalit
 | Personality | Style | Notable weights | Blunder rate |
 | - | - | - | - |
 | **Balanced** | All-round; follows the opening book closely | All weights near default | 0 % |
-| **Aggressive — The Crusher** | Mill hunter; closes mills at any cost and seizes cardinal squares | `close\_mill` 900, `cardinal\_block` 500, `mill\_count\_scale` 180 %; low `mill\_wrapping` (50) | 0 % |
-| **Defensive — The Blocker** | Prioritises neutralising every opponent threat over building its own | `block\_opponent\_mill` 850, `stop\_opponent\_mills` 825, `mill\_wrapping` 450, `blocked\_scale` 355 % | 0 % |
-| **Positional — The Strategist** | Spreads across cross nodes, plans long cycling chains, anticipates forks | `cardinal\_block` 475, `defer\_for\_chain` 475, `redirected\_pin` 230, `mobility\_scale` 250 % | 0 % |
-| **Scholar — The Bookworm** | Methodical opening adherence; balanced diamond and wrapping awareness | `close\_mill` 775, `opening\_adherence` 100, `long\_term\_position` 175 % | 0 % |
-| **Chaos — The Trickster** | Scatters randomly, ignores cardinal squares entirely, exploits losing lines opportunistically | `scatter\_placement` 325, `cardinal\_block` 0, `make\_mistakes` 30 % | 30 % |
+| **Aggressive — The Crusher** | Mill hunter; closes mills at any cost and seizes cardinal squares | `close\\\_mill` 900, `cardinal\\\_block` 500, `mill\\\_count\\\_scale` 180 %; low `mill\\\_wrapping` (50) | 0 % |
+| **Defensive — The Blocker** | Prioritises neutralising every opponent threat over building its own | `block\\\_opponent\\\_mill` 850, `stop\\\_opponent\\\_mills` 825, `mill\\\_wrapping` 450, `blocked\\\_scale` 355 % | 0 % |
+| **Positional — The Strategist** | Spreads across cross nodes, plans long cycling chains, anticipates forks | `cardinal\\\_block` 475, `defer\\\_for\\\_chain` 475, `redirected\\\_pin` 230, `mobility\\\_scale` 250 % | 0 % |
+| **Scholar — The Bookworm** | Methodical opening adherence; balanced diamond and wrapping awareness | `close\\\_mill` 775, `opening\\\_adherence` 100, `long\\\_term\\\_position` 175 % | 0 % |
+| **Chaos — The Trickster** | Scatters randomly, ignores cardinal squares entirely, exploits losing lines opportunistically | `scatter\\\_placement` 325, `cardinal\\\_block` 0, `make\\\_mistakes` 30 % | 30 % |
 
 
 Key differences to look for in play:
@@ -292,9 +289,9 @@ Key differences to look for in play:
 
 - **Positional** is the strongest long-term planner: it defers immediate mill closures when a deeper chain is available and redirects pins to double-block the opponent.
 
-- **Scholar** follows the opening book most faithfully (`opening\_adherence` 100) and transitions smoothly into the midgame.
+- **Scholar** follows the opening book most faithfully (`opening\\\_adherence` 100) and transitions smoothly into the midgame.
 
-- **Chaos** plays almost randomly with a 30 % deliberate blunder rate — good for experimenting and debugging; starts every game without any opening book guidance (`opening\_adherence` 0).
+- **Chaos** plays almost randomly with a 30 % deliberate blunder rate — good for experimenting and debugging; starts every game without any opening book guidance (`opening\\\_adherence` 0).
 
 ### Web interface
 
@@ -317,7 +314,6 @@ Key differences to look for in play:
 - **AI resignation overlay** — distinct result screen when the AI concedes
 
 - Move Replay viewer — step through the completed game forward and backward; click anywhere on the position strength graph to jump to that move, or hover for a per-ply evaluation tooltip
-
 
 ## Controls
 
@@ -385,18 +381,18 @@ Select any named opening from the dropdown to see its win/loss/draw record, then
 
 ### Named Openings
 
-When the AI plays a placement sequence it hasn't seen before, the opening is saved automatically with `needs\_llm\_name=True`. Names are assigned in two ways:
+When the AI plays a placement sequence it hasn't seen before, the opening is saved automatically with `needs\\\_llm\\\_name=True`. Names are assigned in two ways:
 
-- **During self-play** — pass `--name-openings` to `self\_play.py` and MillsAI names each novel opening at the end of the run.
+- **During self-play** — pass `--name-openings` to `self\\\_play.py` and MillsAI names each novel opening at the end of the run.
 
-- **On demand** — run `python tools/name\_openings.py` to batch-name all un-named openings in one pass (requires Ollama).
+- **On demand** — run `python tools/name\\\_openings.py` to batch-name all un-named openings in one pass (requires Ollama).
 
-After a game where a novel opening was played, MillsAI proposes a name for it. You can confirm or edit that name directly in the GUI's naming prompt before it is written to `data/openings/learned\_openings.json`.
+After a game where a novel opening was played, MillsAI proposes a name for it. You can confirm or edit that name directly in the GUI's naming prompt before it is written to `data/openings/learned\\\_openings.json`.
 
 The opening book uses **UCB1 selection** to balance exploration and exploitation when choosing an opening at game start:
 
 ```
-score = win\_rate + C × √(ln(total\_plays) / (plays\_this\_opening + 1))   C = 0.25
+score = win\\\_rate + C × √(ln(total\\\_plays) / (plays\\\_this\\\_opening + 1))   C = 0.25
 ```
 
 Openings are filtered to the AI's side: White-winning lines are only offered when the AI plays White, and vice versa.
@@ -408,31 +404,30 @@ Click **Openings** in the header to open the Opening Explorer panel. Each named 
 **Importing openings from a strategy book**
 
 ```
-\# Validate and import opening lines from a JSON-formatted book file  
-python tools/import\_openings.py --input raw\_openings.json --validate \\  
-    --output data/openings/book\_openings.json  
-  
-\# Dry-run (shows what would be imported, no changes written)  
-python tools/import\_openings.py --input raw\_openings.json --dry-run  
-  
-\# Merge new lines into an existing book file  
-python tools/import\_openings.py --input raw\_openings.json --merge \\  
-    --output data/openings/book\_openings.json
+\\\# Validate and import opening lines from a JSON-formatted book file    
+python tools/import\\\_openings.py --input raw\\\_openings.json --validate \\\\    
+    --output data/openings/book\\\_openings.json    
+    
+\\\# Dry-run (shows what would be imported, no changes written)    
+python tools/import\\\_openings.py --input raw\\\_openings.json --dry-run    
+    
+\\\# Merge new lines into an existing book file    
+python tools/import\\\_openings.py --input raw\\\_openings.json --merge \\\\    
+    --output data/openings/book\\\_openings.json
 ```
 
 **Other useful commands:**
 
 ```
-\# List all openings with win/loss/draw stats, sorted by win rate  
-python tools/list\_openings.py  
-  
-\# Import curated game records from the strategy book (seeds win/loss stats)  
-python tools/import\_book\_games.py  
-  
-\# Name all un-named openings via LLM  
-python tools/name\_openings.py
+\\\# List all openings with win/loss/draw stats, sorted by win rate    
+python tools/list\\\_openings.py    
+    
+\\\# Import curated game records from the strategy book (seeds win/loss stats)    
+python tools/import\\\_book\\\_games.py    
+    
+\\\# Name all un-named openings via LLM    
+python tools/name\\\_openings.py
 ```
-
 
 ## Training Tools
 
@@ -442,41 +437,40 @@ All tools can also be run from the browser at `http://127.0.0.1:8000/tools`. The
 
 | Tool | Purpose |
 | - | - |
-| `self\_play.py` | AI vs AI full games — populates TrajectoryDB, EndgameDB, and opening book win rates |
-| `endgame\_play.py` | Endgame-only self-play — generates positions near game-end and plays them out; much faster than full games for building EndgameDB |
-| `evolve\_weights\_v2.py` | **Recommended weight evolver.** Per-personality and gauntlet-mode (1+1)-ES; saves results to `data/personalities/` and `data/weights/best.json` |
-| `evolve\_weights.py` | Legacy single-pass evolver; only tunes the global baseline. Prefer `evolve_weights_v2.py` |
-| `build\_fullgame\_db.py` | Frequency-seeded BFS builder: scans human JSONL games, expands around common positions, writes a sorted binary `.bin` for O(log N) position lookup at move time |
-| `build\_endgame\_db.py` | Retrograde solver: exact Win/Draw/Loss tables for fly-phase positions up to any piece count; outputs `endgame_<nW>_<nB>.wdl` files in `data/endgame/` |
-| `train\_value\_net.py` | Train a tiny MLP (79→128→64→1) on game outcome labels — infrastructure for future MCTS integration; see notes below |
-| `import\_openings.py` | Validate and import curated opening lines from a JSON book file |
-| `import\_book\_games.py` | Seed opening win/loss statistics from annotated book game records |
-| `name\_openings.py` | Batch-name all un-named openings via the local Ollama LLM |
-| `list\_openings.py` | Print the opening book sorted by win rate |
-| `purge\_ai\_learning.py` | Remove AI self-play data while preserving book-imported content |
+| `self\\\_play.py` | AI vs AI full games — populates TrajectoryDB, EndgameDB, and opening book win rates |
+| `endgame\\\_play.py` | Endgame-only self-play — generates positions near game-end and plays them out; much faster than full games for building EndgameDB |
+| `evolve\\\_weights\\\_v2.py` | **Recommended weight evolver.** Per-personality and gauntlet-mode (1+1)-ES; saves results to `data/personalities/` and `data/weights/best.json` |
+| `evolve\\\_weights.py` | Legacy single-pass evolver; only tunes the global baseline. Prefer `evolve\_weights\_v2.py` |
+| `build\\\_fullgame\\\_db.py` | Frequency-seeded BFS builder: scans human JSONL games, expands around common positions, writes a sorted binary `.bin` for O(log N) position lookup at move time |
+| `build\\\_endgame\\\_db.py` | Retrograde solver: exact Win/Draw/Loss tables for fly-phase positions up to any piece count; outputs `endgame\_\<nW\>\_\<nB\>.wdl` files in `data/endgame/` |
+| `train\\\_value\\\_net.py` | Train a tiny MLP (79→128→64→1) on game outcome labels — infrastructure for future MCTS integration; see notes below |
+| `import\\\_openings.py` | Validate and import curated opening lines from a JSON book file |
+| `import\\\_book\\\_games.py` | Seed opening win/loss statistics from annotated book game records |
+| `name\\\_openings.py` | Batch-name all un-named openings via the local Ollama LLM |
+| `list\\\_openings.py` | Print the opening book sorted by win rate |
+| `purge\\\_ai\\\_learning.py` | Remove AI self-play data while preserving book-imported content |
 
 
 **Recommended workflow for a fresh install:**
 
 ```
-\# 1. Import book openings to seed the opening book  
-python tools/import\_book\_games.py  
-  
-\# 2. Run self-play to build trajectory and endgame databases  
-python tools/self\_play.py --games 100 --no-llm --parallel 4  
-  
-\# 3. (Optional) Evolve per-personality weights  
-python tools/evolve\_weights\_v2.py --generations 30 --parallel 4  
-  
-\# 3b. (Optional) Tune the global best.json against all personalities (gauntlet)  
-python tools/evolve\_weights\_v2.py --gauntlet --generations 30 --parallel 4
+\\\# 1. Import book openings to seed the opening book    
+python tools/import\\\_book\\\_games.py    
+    
+\\\# 2. Run self-play to build trajectory and endgame databases    
+python tools/self\\\_play.py --games 100 --no-llm --parallel 4    
+    
+\\\# 3. (Optional) Evolve per-personality weights    
+python tools/evolve\\\_weights\\\_v2.py --generations 30 --parallel 4    
+    
+\\\# 3b. (Optional) Tune the global best.json against all personalities (gauntlet)    
+python tools/evolve\\\_weights\\\_v2.py --gauntlet --generations 30 --parallel 4
 ```
-
 
 ## Self-Play Training
 
 ```
-python tools/self\_play.py --no-llm --games 100 --white 6 --black 6 --swap --parallel 4
+python tools/self\\\_play.py --no-llm --games 100 --white 6 --black 6 --swap --parallel 4
 ```
 
 Self-play games are saved to `data/games/` and are read by the AI before each future web game, enriching its opening book win rates and LLM context.
@@ -500,14 +494,14 @@ Self-play games are saved to `data/games/` and are read by the AI before each fu
 **Examples:**
 
 ```
-\# Fast parallel run at equal strength  
-python tools/self\_play.py --games 40 --no-llm --parallel 4  
-  
-\# Mixed personalities to reduce draws  
-python tools/self\_play.py --games 20 --no-llm --personalities aggressive,defensive,positional  
-  
-\# One game with verbose board output and LLM commentary  
-python tools/self\_play.py --games 1 --white 5 --black 1 -v --white-personality scholar
+\\\# Fast parallel run at equal strength    
+python tools/self\\\_play.py --games 40 --no-llm --parallel 4    
+    
+\\\# Mixed personalities to reduce draws    
+python tools/self\\\_play.py --games 20 --no-llm --personalities aggressive,defensive,positional    
+    
+\\\# One game with verbose board output and LLM commentary    
+python tools/self\\\_play.py --games 1 --white 5 --black 1 -v --white-personality scholar
 ```
 
 ### Endgame Self-Play
@@ -531,14 +525,14 @@ Full-game self-play produces only a handful of endgame positions per game. This 
 **Examples:**
 
 ```
-\# 500 random endgame positions, 4 parallel workers, difficulty 5  
-python tools/endgame\_play.py --positions 500 --parallel 4 --difficulty 5  
-  
-\# Replay real endgame positions from existing game records  
-python tools/endgame\_play.py --seed-from-games --positions 300 --parallel 4  
-  
-\# Narrow to 6–8 piece positions with mixed personalities  
-python tools/endgame\_play.py --positions 100 --min-pieces 6 --max-pieces 8 --personalities balanced,positional,defensive
+\\\# 500 random endgame positions, 4 parallel workers, difficulty 5    
+python tools/endgame\\\_play.py --positions 500 --parallel 4 --difficulty 5    
+    
+\\\# Replay real endgame positions from existing game records    
+python tools/endgame\\\_play.py --seed-from-games --positions 300 --parallel 4    
+    
+\\\# Narrow to 6–8 piece positions with mixed personalities    
+python tools/endgame\\\_play.py --positions 100 --min-pieces 6 --max-pieces 8 --personalities balanced,positional,defensive
 ```
 
 ### Purging AI-Generated Learning Data
@@ -546,42 +540,41 @@ python tools/endgame\_play.py --positions 100 --min-pieces 6 --max-pieces 8 --pe
 If the AI accumulates bad self-play data that degrades its play, you can revert to only the clean, book-imported data while keeping the capability for future AI learning:
 
 ```
-\# Preview what would be removed (no changes made)  
-python tools/purge\_ai\_learning.py --dry-run  
-  
-\# Run the purge (prompts for confirmation, backs up everything first)  
-python tools/purge\_ai\_learning.py  
-  
-\# Skip the confirmation prompt  
-python tools/purge\_ai\_learning.py --yes
+\\\# Preview what would be removed (no changes made)    
+python tools/purge\\\_ai\\\_learning.py --dry-run    
+    
+\\\# Run the purge (prompts for confirmation, backs up everything first)    
+python tools/purge\\\_ai\\\_learning.py    
+    
+\\\# Skip the confirmation prompt    
+python tools/purge\\\_ai\\\_learning.py --yes
 ```
 
 **What is removed:**
 
-- Openings with `seed\_source='learned'` and no `source\_reference` (AI self-generated openings)
+- Openings with `seed\\\_source='learned'` and no `source\\\_reference` (AI self-generated openings)
 
-- All self-play JSONL game files (`human\_color == 'self\_play'`)
+- All self-play JSONL game files (`human\\\_color == 'self\\\_play'`)
 
 **What is kept:**
 
-- Openings imported from the strategy book (`seed\_source='book'`)
+- Openings imported from the strategy book (`seed\\\_source='book'`)
 
-- Openings imported from book games (`seed\_source='learned'` with a `source\_reference`)
+- Openings imported from book games (`seed\\\_source='learned'` with a `source\\\_reference`)
 
 - Human vs AI game records
 
-- `bad\_moves.json`, ChromaDB vector memory, player profiles, settings
+- `bad\\\_moves.json`, ChromaDB vector memory, player profiles, settings
 
-A full backup is written to `data/backups/\<timestamp\>/` before any changes. The TrajectoryDB and EndgameDB rebuild automatically from the remaining human game records on the next server start.
-
+A full backup is written to `data/backups/\\\<timestamp\\\>/` before any changes. The TrajectoryDB and EndgameDB rebuild automatically from the remaining human game records on the next server start.
 
 ### Weight Evolution (legacy)
 
 ```
-python tools/evolve\_weights.py --generations 20 --parallel 4
+python tools/evolve\\\_weights.py --generations 20 --parallel 4
 ```
 
-> **Prefer `evolve_weights_v2.py`** for new runs — it tunes per-personality weights and supports gauntlet mode (competing against all personalities at once). Use `evolve_weights.py` only if you want a simple single-pass tune of the global baseline without personality awareness.
+> **Prefer `evolve\_weights\_v2.py`** for new runs — it tunes per-personality weights and supports gauntlet mode (competing against all personalities at once). Use `evolve\_weights.py` only if you want a simple single-pass tune of the global baseline without personality awareness.
 
 Runs a (1+1) evolution strategy: each generation mutates the current best heuristic weights by Gaussian noise, plays the candidate against the baseline, and promotes the candidate if its win rate reaches ≥ 55 %. Best weights are saved to `data/weights/best.json` and loaded automatically on the next server restart.
 
@@ -597,22 +590,22 @@ Runs a (1+1) evolution strategy: each generation mutates the current best heuris
 **Examples:**
 
 ```
-\# Quick 20-generation run with 4 parallel games  
-python tools/evolve\_weights.py --generations 20 --parallel 4  
-  
-\# Longer run continuing from the current best weights  
-python tools/evolve\_weights.py --generations 50 --from-best --parallel 4
+\\\# Quick 20-generation run with 4 parallel games    
+python tools/evolve\\\_weights.py --generations 20 --parallel 4    
+    
+\\\# Longer run continuing from the current best weights    
+python tools/evolve\\\_weights.py --generations 50 --from-best --parallel 4
 ```
 
 ### Per-Personality Weight Evolution
 
 ```
-python tools/evolve\_weights\_v2.py --generations 30 --parallel 4
+python tools/evolve\\\_weights\\\_v2.py --generations 30 --parallel 4
 ```
 
 This is the recommended weight evolver. It has two modes:
 
-**Per-personality mode** (default): evolves each personality's weight overrides independently. Personalities are thin override files layered on top of `best.json` — only the fields already in each personality file are mutated, so each personality stays stylistically distinct. `make_mistakes` and `opening_adherence` are never mutated. Results are saved to `data/personalities/{name}.json` on every promotion. Logs and checkpoints go to `data/weights/personalities/`.
+**Per-personality mode** (default): evolves each personality's weight overrides independently. Personalities are thin override files layered on top of `best.json` — only the fields already in each personality file are mutated, so each personality stays stylistically distinct. `make\_mistakes` and `opening\_adherence` are never mutated. Results are saved to `data/personalities/\{name\}.json` on every promotion. Logs and checkpoints go to `data/weights/personalities/`.
 
 **Gauntlet mode** (`--gauntlet`): evolves `best.json` directly, but evaluates each candidate against *all* personalities rather than a single opponent. This is the broadest possible test — a weight set that beats the whole roster is stronger than one tuned against one opponent. The promotion threshold is lower (0.52 instead of 0.55) because the opponent pool is much harder. Results are saved to `data/weights/best.json`. Use this to improve the global foundation that all personalities build on.
 
@@ -637,20 +630,21 @@ This is the recommended weight evolver. It has two modes:
 | `--subset-size N` | 0 (all) | Number of weight fields to mutate per era (0 = all ~53) |
 | `--seed N` | random | RNG seed for reproducibility |
 
+
 **Examples:**
 
 ```
-\# Train all personalities, 30 gens each  
-python tools/evolve\_weights\_v2.py --generations 30 --parallel 4  
-  
-\# Gauntlet: tune best.json vs all personalities  
-python tools/evolve\_weights\_v2.py --gauntlet --generations 50 --parallel 4  
-  
-\# Train only specific personalities  
-python tools/evolve\_weights\_v2.py --personalities aggressive,defensive --generations 50  
-  
-\# Long high-quality run  
-python tools/evolve\_weights\_v2.py --generations 100 --parallel 8 --games-per-gen 32 \  
+\\\# Train all personalities, 30 gens each    
+python tools/evolve\\\_weights\\\_v2.py --generations 30 --parallel 4    
+    
+\\\# Gauntlet: tune best.json vs all personalities    
+python tools/evolve\\\_weights\\\_v2.py --gauntlet --generations 50 --parallel 4    
+    
+\\\# Train only specific personalities    
+python tools/evolve\\\_weights\\\_v2.py --personalities aggressive,defensive --generations 50    
+    
+\\\# Long high-quality run    
+python tools/evolve\\\_weights\\\_v2.py --generations 100 --parallel 8 --games-per-gen 32 \\    
     --difficulty 7 --era-size 10 --bias-strength 0.3 --era-top-k 3
 ```
 
@@ -661,35 +655,32 @@ Restart the web server after the run to pick up updated personality and weights 
 The server can trigger a gauntlet evolution run automatically after every N human games — useful for keeping `best.json` improving passively as you play. Configure it from the **Tools** web page (Auto-Evolve After N Games section), or directly via the API:
 
 ```
-\# Enable: trigger after every 20 games  
-curl -X POST http://127.0.0.1:8000/api/auto\_evolve \  
-     -H "Content-Type: application/json" -d '{"after\_games": 20}'  
-  
-\# Disable  
-curl -X POST http://127.0.0.1:8000/api/auto\_evolve \  
-     -H "Content-Type: application/json" -d '{"after\_games": 0}'
+\\\# Enable: trigger after every 20 games    
+curl -X POST http://127.0.0.1:8000/api/auto\\\_evolve \\    
+     -H "Content-Type: application/json" -d '\{"after\\\_games": 20\}'    
+    
+\\\# Disable    
+curl -X POST http://127.0.0.1:8000/api/auto\\\_evolve \\    
+     -H "Content-Type: application/json" -d '\{"after\\\_games": 0\}'
 ```
 
-The auto-evolve run uses gauntlet mode at the last manually-set evolution parameters. Progress is logged to `data/weights/auto_evolve.log`. Set to 0 to disable.
+The auto-evolve run uses gauntlet mode at the last manually-set evolution parameters. Progress is logged to `data/weights/auto\_evolve.log`. Set to 0 to disable.
 
 ### Full-Game Position Database
 
 ```
-python tools/build\_fullgame\_db.py
+python tools/build\\\_fullgame\\\_db.py
 ```
 
-Scans human-played JSONL game records, BFS-expands around frequently-visited positions, back-propagates win/loss/draw outcomes, and writes a sorted binary `.bin` file. Uses D4 board symmetry so each equivalence class is stored once. Output is consulted at move-selection time via `ai/fullgame_db.py` using O(log N) binary search.
+Scans human-played JSONL game records, BFS-expands around frequently-visited positions, back-propagates win/loss/draw outcomes, and writes a sorted binary `.bin` file. Uses D4 board symmetry so each equivalence class is stored once. Output is consulted at move-selection time via `ai/fullgame\_db.py` using O(log N) binary search.
 
-Positions are stored in a temporary SQLite file during the build so that large
-expansions never require holding all data in RAM simultaneously. Only a small
-key-set (~9 bytes per position) is kept in memory. The temp DB is deleted
-automatically once the binary output is written.
+Positions are stored in a temporary SQLite file during the build so that large expansions never require holding all data in RAM simultaneously. Only a small key-set (~9 bytes per position) is kept in memory. The temp DB is deleted automatically once the binary output is written.
 
 | Flag | Default | Description |
 | - | - | - |
 | `--expand-from-games DIR` | `data/games` | Directory of human JSONL game records |
 | `--output PATH` | `data/fullgame.bin` | Output binary file |
-| `--temp-db PATH` | `<output>.tmp.db` | Path for the temporary SQLite build DB — point at a large/fast drive for big builds |
+| `--temp-db PATH` | `\<output\>.tmp.db` | Path for the temporary SQLite build DB — point at a large/fast drive for big builds |
 | `--max-db-gb GB` | `10.0` | Stop BFS and write partial results if the temp DB grows beyond this. Raise to e.g. `100` or `1000` for very large builds on a big drive |
 | `--min-seed-frequency N` | `2` | Only positions seen ≥ N times in human games seed the BFS |
 | `--expand-depth D` | `4` | BFS depth for late-game / end-of-placement seeds |
@@ -699,31 +690,32 @@ automatically once the binary output is written.
 | `--passes N` | `6` | Backpropagation passes for win/loss labelling |
 | `--dry-run` | — | Build from a tiny synthetic game set; no disk write |
 
+
 ```
-\# Default build (scan data/games, write data/fullgame.bin):  
-python tools/build\_fullgame\_db.py  
-  
-\# Smaller DB — higher seed threshold, shallower expansion:  
-python tools/build\_fullgame\_db.py --min-seed-frequency 5 --expand-depth 2  
-  
-\# Very large build on a 2 TB drive, temp DB allowed up to 500 GB:  
-python tools/build\_fullgame\_db.py \\  
-    --temp-db /mnt/bigdrive/nmm_build.tmp.db \\  
-    --max-db-gb 500 --expand-depth 10  
-  
-\# Dry run to verify the pipeline:  
-python tools/build\_fullgame\_db.py --dry-run
+\\\# Default build (scan data/games, write data/fullgame.bin):    
+python tools/build\\\_fullgame\\\_db.py    
+    
+\\\# Smaller DB — higher seed threshold, shallower expansion:    
+python tools/build\\\_fullgame\\\_db.py --min-seed-frequency 5 --expand-depth 2    
+    
+\\\# Very large build on a 2 TB drive, temp DB allowed up to 500 GB:    
+python tools/build\\\_fullgame\\\_db.py \\\\    
+    --temp-db /mnt/bigdrive/nmm\_build.tmp.db \\\\    
+    --max-db-gb 500 --expand-depth 10    
+    
+\\\# Dry run to verify the pipeline:    
+python tools/build\\\_fullgame\\\_db.py --dry-run
 ```
 
 ### Retrograde Endgame Database
 
 ```
-python tools/build\_endgame\_db.py --nW 3 --nB 3
+python tools/build\\\_endgame\\\_db.py --nW 3 --nB 3
 ```
 
 Retrograde solver that produces exact WDL (Win/Draw/Loss from side-to-move) tables for fly-phase positions. Starts from all terminal positions (one side has fewer than 3 pieces or is fully blocked) and propagates backward through the game graph — so every entry is provably correct, not heuristic. Uses D4 board symmetry (~8× speedup) and writes directly to memory-mapped binary files so large tables never require full RAM allocation.
 
-Each table is output to `data/endgame/endgame_<nW>_<nB>.wdl`. `GameAI` probes all available `.wdl` files at search time — the more tables exist, the more endgame positions get exact WDL values instead of heuristic estimates. Tables are independent: you can build just 3v3 and add 4v3, 5v3, etc. later without rebuilding. The 3v3 table alone covers nearly all practical endgames.
+Each table is output to `data/endgame/endgame\_\<nW\>\_\<nB\>.wdl`. `GameAI` probes all available `.wdl` files at search time — the more tables exist, the more endgame positions get exact WDL values instead of heuristic estimates. Tables are independent: you can build just 3v3 and add 4v3, 5v3, etc. later without rebuilding. The 3v3 table alone covers nearly all practical endgames.
 
 Use `--build-all` to let the solver determine dependency order automatically (a table for nW pieces and nB pieces requires the (nW−1)×nB and nW×(nB−1) tables to exist first).
 
@@ -736,133 +728,128 @@ Use `--build-all` to let the solver determine dependency order automatically (a 
 | `--out-dir PATH` | `data/endgame` | Output directory |
 | `--quiet` | — | Suppress per-pass logging |
 
+
 **Table sizes by `--max-sum`:**
 
 | `--max-sum` | Tables | Largest single table | Total disk |
-| - | - | - | - |
+| :-: | - | - | - |
 | 6 | 3v3 only | 1.3 MB | ~1.3 MB |
 | 7 | + 4v3, 3v4 | ~5 MB each | ~11 MB |
 | 8 | + 5v3, 4v4, 3v5 | ~20–70 MB | ~200 MB |
 | 9 | + 6v3, 5v4, 4v5, 3v6 | ~82–330 MB | ~1.5 GB |
 
+
 ```
-\# Build just the 3v3 base table (~30 min):  
-python tools/build\_endgame\_db.py --nW 3 --nB 3  
-  
-\# Build all tables up to 7-piece total, skipping existing:  
-python tools/build\_endgame\_db.py --build-all --max-sum 7 --skip-existing  
-  
-\# Build to a custom location:  
-python tools/build\_endgame\_db.py --build-all --max-sum 8 --out-dir /mnt/fast/endgame
+\\\# Build just the 3v3 base table (~30 min):    
+python tools/build\\\_endgame\\\_db.py --nW 3 --nB 3    
+    
+\\\# Build all tables up to 7-piece total, skipping existing:    
+python tools/build\\\_endgame\\\_db.py --build-all --max-sum 7 --skip-existing    
+    
+\\\# Build to a custom location:    
+python tools/build\\\_endgame\\\_db.py --build-all --max-sum 8 --out-dir /mnt/fast/endgame
 ```
 
 ### Value Network Training
 
 ```
-python tools/train\_value\_net.py
+python tools/train\\\_value\\\_net.py
 ```
 
 Trains a tiny 3-layer MLP (79 inputs → 128 → 64 → 1 tanh output) as a position evaluator. Every board position in every saved game is labelled +1 (the player to move won), −1 (lost), or 0 (draw/unknown) and used as a training sample. The network is side-invariant: features are encoded from the moving player's perspective so the same weights handle both White and Black.
 
 - **Input (79 values)**: 24 board positions × 3 one-hot channels (own / opponent / empty) = 72, plus 7 scalar metadata values (turn, pieces placed and on board for both sides).
+
 - **Output**: `tanh` scalar in (−1, 1) — positive means the current player is expected to win.
+
 - **Training**: mini-batch SGD with MSE loss; pure numpy, no GPU, no PyTorch needed. ~33 KB on disk.
 
-**Current status: dormant infrastructure.** The network trains and saves fine, but the production game path (negamax, difficulty 1–10) does not currently load or query it — gameplay is unaffected whether or not `data/value_net.npz` exists. The hook exists in `ai/mcts.py` and `ai/game_ai.py` (`value_net` parameter) but the web app does not pass the loaded network to `GameAI`. Training the network now builds up data for when this wiring is completed.
+**Current status: dormant infrastructure.** The network trains and saves fine, but the production game path (negamax, difficulty 1–10) does not currently load or query it — gameplay is unaffected whether or not `data/value\_net.npz` exists. The hook exists in `ai/mcts.py` and `ai/game\_ai.py` (`value\_net` parameter) but the web app does not pass the loaded network to `GameAI`. Training the network now builds up data for when this wiring is completed.
 
 - Quality is limited by game count: with fewer than ~200 games the network learns noise. With 1000+ varied games it begins to provide meaningful signal.
+
 - Inference is ~0.1 ms per position; no GPU required.
+
 - The model is small enough that retraining from scratch is fast — no need to checkpoint.
 
 | Flag | Default | Description |
 | - | - | - |
 | `--games-dir PATH` | `data/games` | Source directory for JSONL game files |
-| `--output PATH` | `data/value\_net.npz` | Where to write the trained weights |
+| `--output PATH` | `data/value\\\_net.npz` | Where to write the trained weights |
 | `--epochs N` | 30 | Training epochs |
 | `--lr F` | 0.001 | Learning rate |
 | `--batch-size N` | 256 | Mini-batch size |
 
-Recommended: accumulate at least 200 self-play games before training for useful signal. Retrain after each major batch of new games — the whole run takes under a minute.
 
+Recommended: accumulate at least 200 self-play games before training for useful signal. Retrain after each major batch of new games — the whole run takes under a minute.
 
 ## Learned (Neural) AI
 
-In addition to the classical minimax engine, the repo ships an **opt-in** neural
-AI under `learned_ai/` — a PyTorch policy/value network trained by self-play
-reinforcement learning. It plugs into the game through the same
-`choose_move(board)` contract as the heuristic engine, so it is a drop-in
-replacement selectable by an environment variable. The default run path is
-unchanged and needs no PyTorch.
+In addition to the classical minimax engine, the repo ships an **opt-in** neural AI under `learned\_ai/` — a PyTorch policy/value network trained by self-play reinforcement learning. It plugs into the game through the same `choose\_move(board)` contract as the heuristic engine, so it is a drop-in replacement selectable by an environment variable. The default run path is unchanged and needs no PyTorch.
 
 ```
-# Default: heuristic engine (unchanged behaviour)
-python main.py
-
-# Use the trained neural engine instead
-NMM_AI_ENGINE=learned python main.py
+\# Default: heuristic engine (unchanged behaviour)  
+python main.py  
+  
+\# Use the trained neural engine instead  
+NMM\_AI\_ENGINE=learned python main.py
 ```
 
-If `NMM_AI_ENGINE=learned` but the checkpoint is missing or PyTorch is not
-installed, the game prints a warning and falls back to the heuristic engine so
-play is never blocked.
+If `NMM\_AI\_ENGINE=learned` but the checkpoint is missing or PyTorch is not installed, the game prints a warning and falls back to the heuristic engine so play is never blocked.
 
 ### Step 1 — Install learning dependencies
 
-These are only needed for training or running the neural engine. The base game
-does not require them.
+These are only needed for training or running the neural engine. The base game does not require them.
 
 **Linux / macOS** (run inside the activated venv):
 
-```bash
-source .venv/bin/activate          # activate venv created by install.sh
-pip install -r requirements_learned_ai.txt
+```
+source .venv/bin/activate          \# activate venv created by install.sh  
+pip install -r requirements\_learned\_ai.txt
 ```
 
 **Windows** (run inside the activated venv):
 
-```bat
-.venv\Scripts\activate             :: activate venv created by install.bat
-pip install -r requirements_learned_ai.txt
+```
+.venv\\Scripts\\activate             :: activate venv created by install.bat  
+pip install -r requirements\_learned\_ai.txt
 ```
 
 CPU-only PyTorch (smaller download, sufficient for smoke tests and light training):
 
-```bash
-pip install torch --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements_learned_ai.txt
+```
+pip install torch --index-url https://download.pytorch.org/whl/cpu  
+pip install -r requirements\_learned\_ai.txt
 ```
 
-`requirements_learned_ai.txt` adds: `torch>=2.0`, `numpy`, `pyyaml`,
-`jsonlines`, `tqdm`.
+`requirements\_learned\_ai.txt` adds: `torch\>=2.0`, `numpy`, `pyyaml`, `jsonlines`, `tqdm`.
 
 ### Step 2 — Smoke test
 
-Verifies encoders, model routing, self-play loop, and checkpoint round-trips.
-All 37 tests should pass in under a minute.
+Verifies encoders, model routing, self-play loop, and checkpoint round-trips. All 37 tests should pass in under a minute.
 
-```bash
-python scripts/smoke_test.py
+```
+python scripts/smoke\_test.py
 ```
 
-Then run a tiny end-to-end training pass (no useful model produced — just proves
-the pipeline runs without crashing):
+Then run a tiny end-to-end training pass (no useful model produced — just proves the pipeline runs without crashing):
 
-```bash
-python scripts/train.py --config learned_ai/config/smoke_test_config.yaml
+```
+python scripts/train.py --config learned\_ai/config/smoke\_test\_config.yaml
 ```
 
 ### Step 3 — Train stage by stage
 
 The curriculum advances automatically through four active stages. Stages 2 and 3 are **win-rate gated** — the model must hold a threshold win rate over a rolling 200-game window before advancing; episode budgets are safety caps only.
 
-```bash
-# Full run from stage 1 (slow — may take hours/days depending on hardware)
-python scripts/train.py --config learned_ai/config/default_config.yaml
-
-# Jump directly to a stage
-python scripts/train.py --config learned_ai/config/default_config.yaml --stage 2
-python scripts/train.py --config learned_ai/config/default_config.yaml --stage 3
-python scripts/train.py --config learned_ai/config/default_config.yaml --stage 4
+```
+\# Full run from stage 1 (slow — may take hours/days depending on hardware)  
+python scripts/train.py --config learned\_ai/config/default\_config.yaml  
+  
+\# Jump directly to a stage  
+python scripts/train.py --config learned\_ai/config/default\_config.yaml --stage 2  
+python scripts/train.py --config learned\_ai/config/default\_config.yaml --stage 3  
+python scripts/train.py --config learned\_ai/config/default\_config.yaml --stage 4
 ```
 
 | Stage | Opponent | Exit condition |
@@ -872,148 +859,202 @@ python scripts/train.py --config learned_ai/config/default_config.yaml --stage 4
 | 3 | heuristic difficulty 1 → 10 | ≥ 55 % at each difficulty level; graduates when threshold held at difficulty 10 (120 k safety cap) |
 | 4 | self-play | 70 k episode budget |
 
+
 Temperature resets to 1.0 at each stage advance and difficulty bump so the model explores freely on the new challenge.
 
 ### Step 4 — Resume from a checkpoint
 
-Checkpoints embed their architecture, so you do not need to re-specify hidden
-sizes:
+Checkpoints embed their architecture, so you do not need to re-specify hidden sizes:
 
-```bash
-# Resume from the latest checkpoint
-python scripts/train.py --resume learned_ai/checkpoints/latest.pt
-
-# Resume from a specific checkpoint
-python scripts/train.py \
-  --config learned_ai/config/default_config.yaml \
-  --resume learned_ai/checkpoints/ckpt-010000.pt
+```
+\# Resume from the latest checkpoint  
+python scripts/train.py --resume learned\_ai/checkpoints/latest.pt  
+  
+\# Resume from a specific checkpoint  
+python scripts/train.py \\  
+  --config learned\_ai/config/default\_config.yaml \\  
+  --resume learned\_ai/checkpoints/ckpt-010000.pt
 ```
 
 ### Step 5 — Benchmark vs heuristic
 
-```bash
-python scripts/benchmark_vs_heuristic.py \
-  --checkpoint learned_ai/checkpoints/latest.pt --games 100
+```
+python scripts/benchmark\_vs\_heuristic.py \\  
+  --checkpoint learned\_ai/checkpoints/latest.pt --games 100
 ```
 
 Arbitrary head-to-head (e.g. learned vs random):
 
-```bash
-python scripts/evaluate.py --agent1 learned --agent2 random \
-  --games 100 --agent1-checkpoint learned_ai/checkpoints/latest.pt
+```
+python scripts/evaluate.py --agent1 learned --agent2 random \\  
+  --games 100 --agent1-checkpoint learned\_ai/checkpoints/latest.pt
 ```
 
 ### Step 6 — Play against the trained AI
 
-```bash
-# Play as Black against the learned engine
-python scripts/human_vs_learned.py \
-  --checkpoint learned_ai/checkpoints/latest.pt --side black
-
-# Play as White
-python scripts/human_vs_learned.py \
-  --checkpoint learned_ai/checkpoints/latest.pt --side white
+```
+\# Play as Black against the learned engine  
+python scripts/human\_vs\_learned.py \\  
+  --checkpoint learned\_ai/checkpoints/latest.pt --side black  
+  
+\# Play as White  
+python scripts/human\_vs\_learned.py \\  
+  --checkpoint learned\_ai/checkpoints/latest.pt --side white
 ```
 
 ### Monitor training
 
 Metrics are JSON-Lines, one object per policy update:
 
-```bash
-tail -f learned_ai/logs/metrics.jsonl
+```
+tail -f learned\_ai/logs/metrics.jsonl
 ```
 
-Each line includes episode count, stage name, `heuristic_difficulty` (stage 3 only), win/loss/draw totals, `rolling_win_rate` (over the last 200 games), temperature, `policy_loss`, `value_loss`, `entropy`, and `mean_reward`. The live output also prints a banner when difficulty increases or a stage advances, including the measured win rate and confirming the temperature reset.
+Each line includes episode count, stage name, `heuristic\_difficulty` (stage 3 only), win/loss/draw totals, `rolling\_win\_rate` (over the last 200 games), temperature, `policy\_loss`, `value\_loss`, `entropy`, and `mean\_reward`. The live output also prints a banner when difficulty increases or a stage advances, including the measured win rate and confirming the temperature reset.
 
 ### Full documentation
 
-- [`docs/LEARNED_AI_ARCHITECTURE.md`](docs/LEARNED_AI_ARCHITECTURE.md) — state/action
-  encoding, the shared-backbone + 5-phase-head network, training algorithm.
-- [`docs/TRAINING_GUIDE.md`](docs/TRAINING_GUIDE.md) — detailed training reference with
-  expected win rates per stage, hyperparameter guide, and troubleshooting.
-- [`docs/MIGRATION_GUIDE.md`](docs/MIGRATION_GUIDE.md) — switching engines, A/B
-  testing, and instant rollback to the heuristic engine.
-- [`docs/AI_INTERFACE_MAPPING.md`](docs/AI_INTERFACE_MAPPING.md) — the exact engine
-  interface the learned AI implements.
+- [`docs/LEARNED\_AI\_ARCHITECTURE.md`](file:///home/benbrandwood/Documents/dev/NMM_ollama/docs/LEARNED_AI_ARCHITECTURE.md) — state/action encoding, the shared-backbone + 5-phase-head network, training algorithm.
+
+- [`docs/TRAINING\_GUIDE.md`](file:///home/benbrandwood/Documents/dev/NMM_ollama/docs/TRAINING_GUIDE.md) — detailed training reference with expected win rates per stage, hyperparameter guide, and troubleshooting.
+
+- [`docs/MIGRATION\_GUIDE.md`](file:///home/benbrandwood/Documents/dev/NMM_ollama/docs/MIGRATION_GUIDE.md) — switching engines, A/B testing, and instant rollback to the heuristic engine.
+
+- [`docs/AI\_INTERFACE\_MAPPING.md`](file:///home/benbrandwood/Documents/dev/NMM_ollama/docs/AI_INTERFACE_MAPPING.md) — the exact engine interface the learned AI implements.
 
 ## Strategic Sentinel Overlay (advisory)
 
-The **sentinel** (`learned_ai/sentinel/`) is an opt-in learned overlay that
-watches game trajectories and flags strategic turning points — moments where a
-single choice swings the outcome. It is **advisory only**: it never replaces or
-changes the move the heuristic `GameAI` selects. With no checkpoint attached the
-game plays exactly as before.
+The **sentinel** (`learned\_ai/sentinel/`) is an opt-in learned overlay that watches game trajectories and flags strategic turning points — moments where a single choice swings the outcome. It is **advisory only**: it never replaces or changes the move the heuristic `GameAI` selects. With no checkpoint attached the game plays exactly as before.
 
-A small multi-head MLP (reusing the `learned_ai/models/backbone.py` pattern)
-predicts four signals per position — mistake risk, missed-opportunity score,
-trajectory value delta, and turning-point confidence — from a 120-float feature
-vector (84 base features from `encode_state()` + 36 move-context features).
-Training is trajectory-supervised: labels are propagated backward from confirmed
-turning points, optionally taught by an external solved database when available
-(`db_teacher.py`), and otherwise by game-outcome proxy supervision.
+A small multi-head MLP predicts four signals per position — mistake risk, missed-opportunity score, trajectory value delta, and turning-point confidence — from a 120-float feature vector (84 board features + 36 move-context features). Training is trajectory-supervised: labels are propagated backward from confirmed turning points, optionally taught by the Malom perfect-play database for ground-truth WDL supervision, or by game-outcome proxy when the DB is absent.
 
-```bash
-# Train from game logs (proxy supervision — works without the external DB)
-python scripts/train_sentinel.py --config configs/sentinel_default.yaml \
-  --game-dir data/games
+### Training guide
 
-# Train with the Malom solved DB as ground-truth teacher (once hash is implemented)
-python scripts/train_sentinel.py --config configs/sentinel_default.yaml \
-  --game-dir data/games \
-  --db-path "/mnt/windows/NMM_DB/strong"
+**Prerequisites**
 
-# Evaluate turning-point precision/recall and calibration
-python scripts/evaluate_sentinel.py \
-  --checkpoint learned_ai/sentinel/checkpoints/best.pt
+- Python venv activated (`.venv/bin/python`) and `data/games/` populated with played games (human vs AI or AI vs AI — any `.jsonl` files work).
 
-# Attach the overlay at play time (advisory — never changes AI moves, no checkpoint = no-op)
-python main.py --sentinel-checkpoint learned_ai/sentinel/checkpoints/best.pt
+- Optional but strongly recommended: the Malom Ultra-Strong database (see below).
+
+**Step 1 — Train**
+
+```
+\# With Malom DB (ground-truth WDL supervision — best results)  
+python scripts/train\_sentinel.py \\  
+  --config configs/sentinel\_default.yaml \\  
+  --game-dir data/games  
+  
+\# Without DB (game-outcome proxy supervision — still useful)  
+python scripts/train\_sentinel.py \\  
+  --config configs/sentinel\_default.yaml \\  
+  --game-dir data/games \\  
+  --db-path ""
+```
+
+Checkpoints are written to `learned\_ai/sentinel/checkpoints/` (`best.pt` = lowest validation loss, `latest.pt` = most recent epoch). Training 350 games for 50 epochs takes ~2–5 minutes on CPU.
+
+**Step 2 — Evaluate**
+
+```
+python scripts/evaluate\_sentinel.py \\  
+  --checkpoint learned\_ai/sentinel/checkpoints/best.pt
+```
+
+Reports turning-point precision/recall and per-class accuracy on the held-out validation split.
+
+**Step 3 — Attach at play time**
+
+Add `--sentinel-checkpoint` to any game launch:
+
+```
+python main.py --sentinel-checkpoint learned\_ai/sentinel/checkpoints/best.pt
+```
+
+Or set `sentinel\_mode` in `configs/sentinel\_default.yaml`:
+
+| Mode | Effect |
+| - | - |
+| `advisory` | Logs flags only — never changes moves (default, safe) |
+| `score\_adjust` | Nudges heuristic scores by ±`score\_adjust\_scale` (≤5%) |
+| `reconsider` | Triggers a deeper search when `turning\_point\_confidence ≥ reconsider\_threshold` |
+
+
+**Continuing training / re-training**
+
+```
+\# Resume from a checkpoint  
+python scripts/train\_sentinel.py \\  
+  --config configs/sentinel\_default.yaml \\  
+  --game-dir data/games \\  
+  --resume learned\_ai/sentinel/checkpoints/latest.pt \\  
+  --epochs 20  
+  
+\# Save preprocessed dataset to skip replay next time  
+python scripts/replay\_watch\_games.py \\  
+  --game-dir data/games \\  
+  --output supervised\_dataset.jsonl  
+python scripts/train\_sentinel.py \\  
+  --config configs/sentinel\_default.yaml \\  
+  --dataset supervised\_dataset.jsonl
+```
+
+**Tuning the config** (`configs/sentinel\_default.yaml`)
+
+```
+epochs: 50          \# increase to 100+ when DB supervision is available  
+batch\_size: 64  
+lr: 0.001  
+backward\_decay: \[1.0, 0.8, 0.6, 0.4, 0.2\]   \# label decay per ply before turning point  
+class\_weights:  
+  critical\_turning\_point: 3.0   \# upweight rare turning-point labels  
+  mistake\_start: 2.0  
+  missed\_opportunity: 2.0  
+  safe\_continuation: 0.5  
+  neutral\_state: 0.3
 ```
 
 ### External solved database (Malom)
 
-The sentinel can use the Gévay–Danner Malom perfect-play database as ground-truth
-supervision during training. The adapter (`ai/malom_db.py`) reads `.sec2` sector files:
+The sentinel uses the Gévay–Danner **Malom Ultra-Strong** perfect-play database as ground-truth supervision during training. The adapter (`ai/malom\_db.py`) reads the `.sec2` sector files and returns exact WDL (`W`/`L`/`D`) for any queried position, replacing game-outcome proxy labels with per-position ground truth.
+
+**Current status:** fully working. The board→index hash (D4 × ring-swap 16-symmetry canonical form + combinadic ranking) is ported from [Sanmill](https://github.com/calcitem/Sanmill). Hash count validated: 210,140 entries in `std\_3\_3\_0\_0.sec2` ✓. All 498 sectors in the full database are queryable. Supervision source is `direct\_solved` (not proxy) for every position the DB covers.
+
+**Database location**
+
+Download the Malom Standard Ultra-strong v1.1.0 database from the Malom project (ggevay/malom, GPL-3) and extract the `Std\_DD\_89adjusted/` directory.
 
 ```
-/mnt/windows/NMM_DB/strong/   ← partial database (~200 sectors, 49 MB)
-  std_3_3_0_0.sec2
-  std_3_4_0_0.sec2
-  std.secval
-  ...
+Std\_DD\_89adjusted/  
+  std\_3\_3\_0\_0.sec2   ← one file per (W, B, WF, BF) sector  
+  std\_3\_4\_0\_0.sec2  
+  std.secval          ← virtual win/loss thresholds  
+  ...                 (498 sector files total)
 ```
 
-Configure in `configs/sentinel_default.yaml`:
-```yaml
-external_db_path: "/mnt/windows/NMM_DB/strong"
-external_db_enabled: true
+Update `configs/sentinel\_default.yaml` to point at the extracted directory:
+
+```
+external\_db\_path: "/mnt/windows/NMM\_DB/Malom\_Standard\_Ultra-strong\_1.1.0/Std\_DD\_89adjusted"  
+external\_db\_enabled: true
 ```
 
-**Current status:** file format fully parsed (header, entries, em_set, sym-redirects,
-`std.secval`). The **board→index hash function** is not yet ported from the Malom C++
-source (`hash.cpp`), so `MalomDB.query()` returns `None` for all positions and training
-falls back to game-outcome proxy supervision. Once the hash is implemented the adapter
-becomes a fully functional per-position teacher. The full 77.8 GB database (all sectors)
-is the complete version — update the path when it arrives.
+With the DB enabled, every position in the training set that appears in any sector is labelled with exact WDL from perfect play rather than inferred from the game outcome. This dramatically improves label quality for positions that were decided long before the game ended.
 
-See [`docs/SENTINEL_ARCHITECTURE.md`](docs/SENTINEL_ARCHITECTURE.md) and
-[`sentinel_overlay_plan.md`](sentinel_overlay_plan.md) for full design, feature layout,
-label scheme, and next steps.
-
+See [`sentinel\_overlay\_plan.md`](file:///home/benbrandwood/Documents/dev/NMM_ollama/sentinel_overlay_plan.md) for full design, feature layout, label scheme, and training pipeline details.
 
 ## Board Coordinate System
 
 ```
-a7 ——— d7 ——— g7  
-|       |       |  
-|  b6 — d6 — f6  |  
-|  |    |    |  |  
-|  |  c5-d5-e5  |  
-a4-b4-c4    e4-f4-g4  
-|  |  c3-d3-e3  |  
-|  |    |    |  |  
-|  b2 — d2 — f2  |  
-|       |       |  
+a7 ——— d7 ——— g7    
+|       |       |    
+|  b6 — d6 — f6  |    
+|  |    |    |  |    
+|  |  c5-d5-e5  |    
+a4-b4-c4    e4-f4-g4    
+|  |  c3-d3-e3  |    
+|  |    |    |  |    
+|  b2 — d2 — f2  |    
+|       |       |    
 a1 ——— d1 ——— g1
 ```
 
@@ -1021,37 +1062,35 @@ a1 ——— d1 ——— g1
 **Cross/cardinal nodes** (midpoints of each side, 3 neighbours): `a4 d7 g4 d1 b4 d6 f4 d2 c4 d5 e4 d3`  
 **Corner nodes** (corners of squares, 2 neighbours): all remaining 12 positions.
 
-
 ## Configuration
 
 Edit `data/settings.json` to change the Ollama model, URL, and LLM behaviour thresholds.
 
 | Key | Default | Description |
 | - | - | - |
-| `ollama\_model` | `llama3.1:8b` | Ollama model to use |
-| `ollama\_url` | `http://localhost:11434` | Ollama server address |
-| `poor\_move\_threshold` | `0.3` | Score drop that triggers an LLM comment on a human move |
-| `max\_poor\_move\_comments\_per\_game` | `5` | Cap on poor-move LLM comments per game |
-| `endgame\_active\_threshold` | `11` | Total pieces on board to enter endgame mode |
-| `endgame\_deep\_threshold` | `8` | Total pieces to enter deep-endgame mode |
-| `endgame\_solved\_dir` | `data/endgame` | Directory containing the retrograde WDL file (`endgame_3_3.wdl`); set to empty string to disable |
-| `fullgame\_db\_path` | *(unset)* | Path to the built SQLite fullgame position DB; leave unset to skip |
+| `ollama\\\_model` | `llama3.1:8b` | Ollama model to use |
+| `ollama\\\_url` | `http://localhost:11434` | Ollama server address |
+| `poor\\\_move\\\_threshold` | `0.3` | Score drop that triggers an LLM comment on a human move |
+| `max\\\_poor\\\_move\\\_comments\\\_per\\\_game` | `5` | Cap on poor-move LLM comments per game |
+| `endgame\\\_active\\\_threshold` | `11` | Total pieces on board to enter endgame mode |
+| `endgame\\\_deep\\\_threshold` | `8` | Total pieces to enter deep-endgame mode |
+| `endgame\\\_solved\\\_dir` | `data/endgame` | Directory containing the retrograde WDL file (`endgame\_3\_3.wdl`); set to empty string to disable |
+| `fullgame\\\_db\\\_path` | *(unset)* | Path to the built SQLite fullgame position DB; leave unset to skip |
 
 
 ### Changing the LLM model
 
 ```
-ollama pull mistral        \# or any other Ollama model
+ollama pull mistral        \\\# or any other Ollama model
 ```
 
 Then update `data/settings.json`:
 
 ```
-\{ "ollama\_model": "mistral" \}
+\\\{ "ollama\\\_model": "mistral" \\\}
 ```
 
 The game uses the new model from the next game start.
-
 
 ## AI Slider Weights Reference
 
@@ -1061,112 +1100,109 @@ The **AI Tuning** panel exposes the most user-visible weights. All fields corres
 
 | Field | Default | What it controls |
 | - | - | - |
-| `close\_mill` | 500 | Delta bonus per mill the AI closes this move |
-| `cycling\_mill` | 300 | Bonus for building a cycling-mill setup (two 2-configs whose closing squares are adjacent; capped at 1 per move) |
-| `block\_opponent\_mill` | 400 | Bonus per opponent 2-config that is closeable next turn and gets neutralised |
-| `stop\_opponent\_mills` | 450 | Bonus per opponent two-piece setup (any 2-config) dismantled this move |
-| `mill\_wrapping` | 150 | Bonus per own piece that surrounds an opponent closed mill, cutting off the pivot's useful slides |
+| `close\\\_mill` | 500 | Delta bonus per mill the AI closes this move |
+| `cycling\\\_mill` | 300 | Bonus for building a cycling-mill setup (two 2-configs whose closing squares are adjacent; capped at 1 per move) |
+| `block\\\_opponent\\\_mill` | 400 | Bonus per opponent 2-config that is closeable next turn and gets neutralised |
+| `stop\\\_opponent\\\_mills` | 450 | Bonus per opponent two-piece setup (any 2-config) dismantled this move |
+| `mill\\\_wrapping` | 150 | Bonus per own piece that surrounds an opponent closed mill, cutting off the pivot's useful slides |
 
 
 ### Mobility and space
 
 | Field | Default | What it controls |
 | - | - | - |
-| `cardinal\_block` | 200 | Bonus for occupying or evicting pieces from cross-node (midpoint) squares that have 3 neighbours |
-| `feeder\_diamond` | 200 | Bonus for creating a fork structure: four pieces adjacent to one key square, threatening two mills at once |
-| `scatter\_placement` | 75 | Bonus for placing away from own existing pieces in the first 6 placements (prevents clustering) |
-| `mobility\_scale` | 100 | % multiplier on the mobility component of the static evaluator (how much having more legal moves than the opponent is worth) |
-| `blocked\_scale` | 100 | % multiplier on the blocked-pieces component (bonus for leaving opponent pieces with no legal moves) |
+| `cardinal\\\_block` | 200 | Bonus for occupying or evicting pieces from cross-node (midpoint) squares that have 3 neighbours |
+| `feeder\\\_diamond` | 200 | Bonus for creating a fork structure: four pieces adjacent to one key square, threatening two mills at once |
+| `scatter\\\_placement` | 75 | Bonus for placing away from own existing pieces in the first 6 placements (prevents clustering) |
+| `mobility\\\_scale` | 100 | % multiplier on the mobility component of the static evaluator (how much having more legal moves than the opponent is worth) |
+| `blocked\\\_scale` | 100 | % multiplier on the blocked-pieces component (bonus for leaving opponent pieces with no legal moves) |
 
 
 ### Placement and structure
 
 | Field | Default | What it controls |
 | - | - | - |
-| `setup\_mill` | 100 | Bonus per new two-config gained in a single placement move |
-| `mill\_count\_scale` | 100 | % multiplier on the mill-count component of the static evaluator |
-| `long\_term\_position` | 100 | Overall % multiplier on the entire positional base score (all non-tactical terms) |
+| `setup\\\_mill` | 100 | Bonus per new two-config gained in a single placement move |
+| `mill\\\_count\\\_scale` | 100 | % multiplier on the mill-count component of the static evaluator |
+| `long\\\_term\\\_position` | 100 | Overall % multiplier on the entire positional base score (all non-tactical terms) |
 
 
 ### Endgame and behaviour
 
 | Field | Default | What it controls |
 | - | - | - |
-| `mill\_opening` | 200 | Bonus for opening a cycling-ready mill (sliding out of a closed mill to enable the next capture cycle) |
-| `make\_mistakes` | 0 | Probability (%) that the AI plays a deliberately bad move on any given turn |
+| `mill\\\_opening` | 200 | Bonus for opening a cycling-ready mill (sliding out of a closed mill to enable the next capture cycle) |
+| `make\\\_mistakes` | 0 | Probability (%) that the AI plays a deliberately bad move on any given turn |
 
 
-> **Tip:** Increasing `cycling\_mill` and `mill\_wrapping` together produces a slow, suffocating style. Maximising `close\_mill` and `cardinal\_block` produces an aggressive attacking style. Setting `make\_mistakes` to 10–20 % creates a forgiving training partner.
-
+> **Tip:** Increasing `cycling\\\_mill` and `mill\\\_wrapping` together produces a slow, suffocating style. Maximising `close\\\_mill` and `cardinal\\\_block` produces an aggressive attacking style. Setting `make\\\_mistakes` to 10–20 % creates a forgiving training partner.
 
 ## Project Structure
 
 ```
-NMM\_ollama/  
-├── game/                        \# Core engine: board, rules, game engine  
-├── ai/  
-│   ├── game\_ai.py               \# Negamax + alpha-beta, blunder mode, weights  
-│   ├── heuristics.py            \# Phase-aware evaluation + HeuristicWeights dataclass  
-│   ├── mills\_llm.py             \# Ollama LLM interface  
-│   ├── coordinator.py           \# AI deliberation, commentary, resignation tracking  
-│   ├── opening\_book.py          \# Opening library + UCB1 selection  
-│   ├── opening\_recognizer.py    \# D4 symmetry-aware opening recognition  
-│   ├── endgame\_recognizer.py    \# Phase detection, zugzwang, mill-cycle patterns  
-│   ├── endgame\_db.py            \# Endgame position database (learned from games)  
-│   ├── trajectory\_db.py         \# Move-prefix win-rate index (learned from games)  
-│   ├── fullgame\_db.py           \# Read-only query interface for the full-game position DB  
-│   ├── endgame\_solved\_db.py     \# Exact WDL table for 3v3 fly-phase positions (retrograde, ~1.3 MB)  
-│   ├── starting\_play.py         \# Opening family detection (Outer Square, Diamond, etc.)  
-│   ├── memory\_manager.py        \# Game record persistence and pattern analysis  
-│   └── debriefer.py             \# Post-game session summary  
-├── web/  
-│   ├── app.py                   \# FastAPI + WebSocket server, session management, adaptive difficulty, tournament  
-│   ├── static/  
-│   │   ├── game.js              \# Game controller, personality presets, weight sliders, replay, tournament  
-│   │   ├── board.js             \# SVG board renderer  
-│   │   └── style.css            \# Dark wood theme  
-│   └── templates/index.html  
-├── tools/  
-│   ├── self\_play.py             \# AI vs AI training loop (full games)  
-│   ├── endgame\_play.py          \# Endgame self-play for rapid EndgameDB enrichment  
-│   ├── evolve\_weights.py        \# Era-aware (1+1)-ES to tune global heuristic weights  
-│   ├── evolve\_weights\_v2.py     \# Per-personality era-aware (1+1)-ES  
-│   ├── build\_fullgame\_db.py     \# Build bounded SQLite position DB with win/loss outcomes  
-│   ├── build\_endgame\_db.py      \# Retrograde solver: exact WDL for all 3v3 fly-phase positions (D4 sym, ~8× faster)  
-│   ├── fullgame\_db.py           \# Query interface for the full-game position DB  
-│   ├── import\_openings.py       \# Import openings from strategy book text file  
-│   ├── import\_book\_games.py     \# Import games into opening book  
-│   ├── name\_openings.py         \# LLM-name novel openings  
-│   ├── list\_openings.py         \# Print opening book summary  
-│   ├── teach\_opening.py         \# Interactively teach a new opening line  
-│   ├── debrief.py               \# Run post-session debrief manually  
-│   └── purge\_ai\_learning.py     \# Remove AI self-play data; revert to book-only openings  
-├── data/  
-│   ├── settings.json            \# Runtime configuration  
-│   ├── openings/                \# Opening book JSON (openings.json, book\_openings.json)  
-│   ├── personalities/           \# Saved per-personality weight files  
-│   ├── games/                   \# Game records (JSONL, one file per game)  
-│   ├── weights/                 \# Evolved heuristic weights (best.json + checkpoints)  
-│   ├── chroma/                  \# ChromaDB vector store (LLM memory)  
-│   └── session\_memory/          \# LLM session narrative files  
-├── tests/                       \# unittest test suite (160+ tests)  
-├── main.py                      \# CLI harness for quick engine testing  
-├── install.sh                   \# One-time installer (Linux/macOS)  
-├── run\_nmm.sh                   \# Launch script (Linux/macOS)  
-├── install.bat                  \# One-time installer (Windows — calls install.ps1)  
-├── install.ps1                  \# PowerShell installer with optional Ollama choice  
-├── run\_nmm.bat                  \# Launch script (Windows)  
+NMM\\\_ollama/    
+├── game/                        \\\# Core engine: board, rules, game engine    
+├── ai/    
+│   ├── game\\\_ai.py               \\\# Negamax + alpha-beta, blunder mode, weights    
+│   ├── heuristics.py            \\\# Phase-aware evaluation + HeuristicWeights dataclass    
+│   ├── mills\\\_llm.py             \\\# Ollama LLM interface    
+│   ├── coordinator.py           \\\# AI deliberation, commentary, resignation tracking    
+│   ├── opening\\\_book.py          \\\# Opening library + UCB1 selection    
+│   ├── opening\\\_recognizer.py    \\\# D4 symmetry-aware opening recognition    
+│   ├── endgame\\\_recognizer.py    \\\# Phase detection, zugzwang, mill-cycle patterns    
+│   ├── endgame\\\_db.py            \\\# Endgame position database (learned from games)    
+│   ├── trajectory\\\_db.py         \\\# Move-prefix win-rate index (learned from games)    
+│   ├── fullgame\\\_db.py           \\\# Read-only query interface for the full-game position DB    
+│   ├── endgame\\\_solved\\\_db.py     \\\# Exact WDL table for 3v3 fly-phase positions (retrograde, ~1.3 MB)    
+│   ├── starting\\\_play.py         \\\# Opening family detection (Outer Square, Diamond, etc.)    
+│   ├── memory\\\_manager.py        \\\# Game record persistence and pattern analysis    
+│   └── debriefer.py             \\\# Post-game session summary    
+├── web/    
+│   ├── app.py                   \\\# FastAPI + WebSocket server, session management, adaptive difficulty, tournament    
+│   ├── static/    
+│   │   ├── game.js              \\\# Game controller, personality presets, weight sliders, replay, tournament    
+│   │   ├── board.js             \\\# SVG board renderer    
+│   │   └── style.css            \\\# Dark wood theme    
+│   └── templates/index.html    
+├── tools/    
+│   ├── self\\\_play.py             \\\# AI vs AI training loop (full games)    
+│   ├── endgame\\\_play.py          \\\# Endgame self-play for rapid EndgameDB enrichment    
+│   ├── evolve\\\_weights.py        \\\# Era-aware (1+1)-ES to tune global heuristic weights    
+│   ├── evolve\\\_weights\\\_v2.py     \\\# Per-personality era-aware (1+1)-ES    
+│   ├── build\\\_fullgame\\\_db.py     \\\# Build bounded SQLite position DB with win/loss outcomes    
+│   ├── build\\\_endgame\\\_db.py      \\\# Retrograde solver: exact WDL for all 3v3 fly-phase positions (D4 sym, ~8× faster)    
+│   ├── fullgame\\\_db.py           \\\# Query interface for the full-game position DB    
+│   ├── import\\\_openings.py       \\\# Import openings from strategy book text file    
+│   ├── import\\\_book\\\_games.py     \\\# Import games into opening book    
+│   ├── name\\\_openings.py         \\\# LLM-name novel openings    
+│   ├── list\\\_openings.py         \\\# Print opening book summary    
+│   ├── teach\\\_opening.py         \\\# Interactively teach a new opening line    
+│   ├── debrief.py               \\\# Run post-session debrief manually    
+│   └── purge\\\_ai\\\_learning.py     \\\# Remove AI self-play data; revert to book-only openings    
+├── data/    
+│   ├── settings.json            \\\# Runtime configuration    
+│   ├── openings/                \\\# Opening book JSON (openings.json, book\\\_openings.json)    
+│   ├── personalities/           \\\# Saved per-personality weight files    
+│   ├── games/                   \\\# Game records (JSONL, one file per game)    
+│   ├── weights/                 \\\# Evolved heuristic weights (best.json + checkpoints)    
+│   ├── chroma/                  \\\# ChromaDB vector store (LLM memory)    
+│   └── session\\\_memory/          \\\# LLM session narrative files    
+├── tests/                       \\\# unittest test suite (160+ tests)    
+├── main.py                      \\\# CLI harness for quick engine testing    
+├── install.sh                   \\\# One-time installer (Linux/macOS)    
+├── run\\\_nmm.sh                   \\\# Launch script (Linux/macOS)    
+├── install.bat                  \\\# One-time installer (Windows — calls install.ps1)    
+├── install.ps1                  \\\# PowerShell installer with optional Ollama choice    
+├── run\\\_nmm.bat                  \\\# Launch script (Windows)    
 └── requirements.txt
 ```
-
 
 ## Running Tests
 
 ```
-source .venv/bin/activate  
+source .venv/bin/activate    
 python -m unittest discover tests/ -v
 ```
-
 
 ## License
 

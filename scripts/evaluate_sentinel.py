@@ -94,8 +94,13 @@ def main() -> int:
     if args.dataset and os.path.exists(args.dataset):
         dataset = SentinelDataset.load_from_disk(args.dataset)
     else:
+        db = ExternalSolvedDB(
+            db_path=config.external_db_path,
+            enabled=config.external_db_enabled,
+        )
+        print(f"External DB available: {db.is_available()} (ground-truth labels)")
         dataset = SentinelDataset.load_from_games(
-            args.game_dir, db=ExternalSolvedDB(""), config=config, limit=args.limit
+            args.game_dir, db=db, config=config, limit=args.limit
         )
     if len(dataset) == 0:
         print("No examples to evaluate.")

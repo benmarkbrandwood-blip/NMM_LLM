@@ -399,29 +399,38 @@ def board_to_wbf(board) -> tuple[int, int, int, int]:
 def read_sector(path: str | Path,
                 virt_win: int = 299,
                 virt_loss: int = -299
-                ) -> tuple[bytes, int, dict[int, int], int, int]:
+                ) -> tuple[memoryview, int, dict[int, int], int, int]:
     """Open and validate a .sec2 file.
 
     Returns
     -------
-    data       : raw entry bytes (N × 3 bytes)
+    data       : memoryview of the entry region (N × 3 bytes, zero-copy mmap)
     hash_count : number of entries N
     em_set     : overflow dict {index → key2_value}
     virt_win   : from header validation (passed through)
     virt_loss  : from header validation (passed through)
 
+    The returned memoryview keeps the underlying mmap alive, so the caller does
+    not need to hold a separate reference to the file or mmap object. The OS
+    pages data on demand and can evict cold pages under memory pressure,
+    keeping resident memory bounded even for 1.8 GB sectors.
+
     Raises ValueError if the header is invalid.
     """
+    import mmap as _mmap
+
     path = Path(path)
+    file_size = path.stat().st_size
+
     with open(path, "rb") as f:
         header = f.read(_HEADER_SIZE)
         if len(header) < _HEADER_SIZE:
             raise ValueError(f"Header too short in {path}")
 
-        version    = struct.unpack_from("<i", header, 0)[0]
-        esize      = struct.unpack_from("<i", header, 4)[0]
-        f2off      = struct.unpack_from("<i", header, 8)[0]
-        sdflag     = struct.unpack_from("<i", header, 12)[0]
+        version = struct.unpack_from("<i", header, 0)[0]
+        esize   = struct.unpack_from("<i", header, 4)[0]
+        f2off   = struct.unpack_from("<i", header, 8)[0]
+        sdflag  = struct.unpack_from("<i", header, 12)[0]
 
         if version != 2:
             raise ValueError(f"Unexpected version {version} in {path}")
@@ -432,62 +441,52 @@ def read_sector(path: str | Path,
         if sdflag != 0:
             raise ValueError(f"stone_diff_flag={sdflag} not supported (expected 0)")
 
-        # Read entry data
-        file_size = path.stat().st_size
-        # em_set footer: 4-byte count + count*8 bytes of (int32,int32) pairs
-        # Read the last 4 bytes to get em_set_size first
-        f.seek(-4, 2)
-        raw_tail = f.read(4)
-        # Can't determine em_set_size from tail alone; read from after data.
-        # Compute: data_size = file_size - header_size - 4 - em_set_size*8
-        # Try em_set_size = 0 first, then scan if size doesn't work out
+        # Determine layout (data_size, em_set) via small seeks — no bulk read yet.
+        # Layout: [header 64B][data N×3B][em_set_size 4B][em_set N×8B]
         data_size_candidate = file_size - _HEADER_SIZE - 4
-        if data_size_candidate % 3 == 0:
-            # em_set_size = 0 case: data runs from header to (file_size - 4)
-            f.seek(_HEADER_SIZE)
-            data = f.read(data_size_candidate)
-            hash_count = data_size_candidate // 3
-            em_set_size = struct.unpack_from("<i", f.read(4))[0]
-            if em_set_size != 0:
-                # There are overflow entries; re-read with proper layout
-                # data_size = file_size - header - 4 - em_set_size*8
-                data_size = file_size - _HEADER_SIZE - 4 - em_set_size * 8
-                if data_size % 3 != 0:
-                    raise ValueError(f"Cannot determine layout in {path}: data_size={data_size}")
-                f.seek(_HEADER_SIZE)
-                data = f.read(data_size)
-                hash_count = data_size // 3
-                raw_em_size = f.read(4)
-                em_set_size = struct.unpack_from("<i", raw_em_size)[0]
-                em_set: dict[int, int] = {}
-                for _ in range(em_set_size):
-                    kv = f.read(8)
-                    k, v = struct.unpack_from("<ii", kv)
-                    em_set[k] = v
+        em_set: dict[int, int] = {}
+
+        if data_size_candidate >= 0 and data_size_candidate % 3 == 0:
+            f.seek(_HEADER_SIZE + data_size_candidate)
+            em_set_size = struct.unpack("<i", f.read(4))[0]
+            if em_set_size == 0:
+                data_size = data_size_candidate
             else:
-                em_set = {}
+                data_size = file_size - _HEADER_SIZE - 4 - em_set_size * 8
+                if data_size < 0 or data_size % 3 != 0:
+                    raise ValueError(
+                        f"Cannot determine layout in {path}: data_size={data_size}")
+                f.seek(_HEADER_SIZE + data_size + 4)  # skip past data + em_set_size int
+                for _ in range(em_set_size):
+                    k, v = struct.unpack("<ii", f.read(8))
+                    em_set[k] = v
         else:
-            # Try to find a valid layout with em_set_size > 0
             found = False
+            data_size = 0
             for em_sz in range(1, 1000):
                 ds = file_size - _HEADER_SIZE - 4 - em_sz * 8
                 if ds >= 0 and ds % 3 == 0:
-                    f.seek(_HEADER_SIZE)
-                    data = f.read(ds)
-                    hash_count = ds // 3
-                    raw_em_size = f.read(4)
-                    em_set_size = struct.unpack_from("<i", raw_em_size)[0]
-                    if em_set_size == em_sz:
-                        em_set = {}
-                        for _ in range(em_set_size):
-                            kv = f.read(8)
-                            k, v = struct.unpack_from("<ii", kv)
+                    f.seek(_HEADER_SIZE + ds)
+                    actual = struct.unpack("<i", f.read(4))[0]
+                    if actual == em_sz:
+                        data_size = ds
+                        for _ in range(actual):
+                            k, v = struct.unpack("<ii", f.read(8))
                             em_set[k] = v
                         found = True
                         break
             if not found:
                 raise ValueError(f"Cannot determine layout in {path}")
 
+        hash_count = data_size // 3
+
+        # Memory-map the whole file; slice a zero-copy view of the entry region.
+        # The memoryview holds a reference to the mmap, keeping it alive after
+        # the file is closed. The OS pages entries in on demand.
+        _mm = _mmap.mmap(f.fileno(), 0, access=_mmap.ACCESS_READ)
+        data = memoryview(_mm)[_HEADER_SIZE:_HEADER_SIZE + data_size]
+
+    # f is now closed; _mm stays alive via the memoryview reference in data.
     return data, hash_count, em_set, virt_win, virt_loss
 
 
@@ -499,7 +498,7 @@ def _sign_extend_12(val: int) -> int:
     return val
 
 
-def decode_entry(data: bytes,
+def decode_entry(data: "bytes | memoryview",
                  idx: int,
                  em_set: dict[int, int],
                  virt_win: int,
@@ -591,7 +590,8 @@ class MalomDB:
         self._virt_loss = -299
         self._secvals: dict[tuple[int,int,int,int], int] = {}
         # Cache: sector key → (data, hash_count, em_set)
-        self._cache: dict[tuple[int,int,int,int], tuple[bytes,int,dict[int,int]]] = {}
+        # data is a memoryview of a mmap — zero resident memory until pages are touched.
+        self._cache: dict[tuple[int,int,int,int], tuple[memoryview,int,dict[int,int]]] = {}
         self._available = False
         self._warned = False
         self._load_secval()
