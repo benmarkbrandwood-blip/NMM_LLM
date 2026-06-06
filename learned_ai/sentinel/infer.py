@@ -44,6 +44,8 @@ class SentinelAdvice:
     turning_point_confidence: float
     is_turning_point: bool
     advisory_message: str   # "safe" | "possible_mistake" | "missed_opportunity" | "critical"
+    intervention_applied: Optional[str] = None   # "llm_override" | "deepened_search" | "rank1_fallback" | None
+    intervention_detail: Optional[str] = None    # human-readable string
 
     @classmethod
     def neutral(cls) -> "SentinelAdvice":

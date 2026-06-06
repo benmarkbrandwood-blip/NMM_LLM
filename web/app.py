@@ -1280,6 +1280,8 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
                     "turning_point_confidence": round(adv.turning_point_confidence, 3),
                     "is_turning_point":         adv.is_turning_point,
                     "advisory_message":         adv.advisory_message,
+                    "intervention":             getattr(adv, "intervention_applied", None),
+                    "intervention_detail":      getattr(adv, "intervention_detail", None),
                 }
                 game_ai.last_sentinel_advice = None  # consume after sending
             await _send(ws, _avai_move_msg)
@@ -1459,6 +1461,8 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
             "turning_point_confidence": round(adv.turning_point_confidence, 3),
             "is_turning_point":         adv.is_turning_point,
             "advisory_message":         adv.advisory_message,
+            "intervention":             getattr(adv, "intervention_applied", None),
+            "intervention_detail":      getattr(adv, "intervention_detail", None),
         }
         session.game_ai.last_sentinel_advice = None  # consume after sending
     await _send(ws, _ai_move_msg)

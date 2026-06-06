@@ -1024,6 +1024,15 @@ function handleMessage(msg) {
           }
         }
       }
+      if (msg.sentinel && msg.sentinel.intervention) {
+        const detail = msg.sentinel.intervention_detail || msg.sentinel.intervention;
+        addCommentary("Sentinel", `Intervention: ${detail}`, "ai");
+        const txt   = $("sentinel-text");
+        const badge = $("sentinel-advisory");
+        if (txt && badge && badge.style.display !== "none") {
+          txt.textContent += ` — ${detail}`;
+        }
+      }
       if (msg.thinking) {
         const showReasoning = $("showReasoning");
         if (showReasoning && showReasoning.checked) {

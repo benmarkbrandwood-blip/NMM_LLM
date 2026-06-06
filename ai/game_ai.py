@@ -455,6 +455,15 @@ class GameAI:
         # game plays identically. Set via set_sentinel(). See ai/../learned_ai/sentinel.
         self.sentinel = None                 # SentinelAdvisor | None
         self.sentinel_mode: str = "advisory"  # "advisory" | "score_adjust" | "reconsider"
+        # score_adjust scale + reconsider threshold: read from the advisor's config
+        # when present (set in set_sentinel), else fall back to documented defaults.
+        self._sentinel_score_scale: float = 0.05
+        self._sentinel_reconsider_threshold: float = 0.8
+        # Optional LLM move recommender for reconsider mode. The LLM lives in the
+        # Coordinator, not in GameAI, so it is injected as a callback to avoid
+        # duplicating any LLM logic here. Signature: fn(board, legal_moves) -> move|None.
+        # When None, the reconsider LLM path is skipped (falls through to deepened search).
+        self._llm_move_fn = None
         # Rolling trajectory of recent chosen-move scores, for sentinel context.
         self._sentinel_trajectory: list[float] = []
         self.last_sentinel_advice = None     # last SentinelAdvice (debug/logging)
@@ -468,10 +477,31 @@ class GameAI:
         """
         self.sentinel = sentinel
         self.sentinel_mode = mode or "advisory"
+        # Pull tunables from the advisor's config when available.
+        try:
+            cfg = getattr(sentinel, "config", None)
+            if cfg is not None:
+                self._sentinel_score_scale = float(
+                    getattr(cfg, "score_adjust_scale", self._sentinel_score_scale)
+                )
+                self._sentinel_reconsider_threshold = float(
+                    getattr(cfg, "reconsider_threshold", self._sentinel_reconsider_threshold)
+                )
+        except Exception:
+            pass
         try:
             _logger.info("[GameAI] Sentinel overlay loaded in %s mode.", self.sentinel_mode)
         except Exception:
             pass
+
+    def set_llm_move_fn(self, fn) -> None:
+        """Inject an LLM move recommender for reconsider mode.
+
+        ``fn(board, legal_moves) -> move_dict | None``. The LLM itself lives in the
+        Coordinator; this callback lets reconsider mode reuse it without GameAI
+        duplicating any LLM logic. Optional — when unset the LLM path is skipped.
+        """
+        self._llm_move_fn = fn
 
     def _build_sentinel_context(self, board: BoardState, moves: list) -> dict:
         """Package board + candidate moves into the dict feature_builder expects.
@@ -525,6 +555,146 @@ class GameAI:
                 _logger.debug("[Sentinel] advise() failed: %s", exc)
             except Exception:
                 pass
+
+    def _sentinel_scored_candidates(
+        self, board: BoardState, moves: list, chosen: dict
+    ) -> list[tuple[dict, int]]:
+        """Return [(move, score), ...] for `moves`, sorted best-first.
+
+        Uses the shallow score_move depth so the active-intervention re-ranking is
+        cheap relative to the main search. The chosen move is guaranteed present.
+        Never raises — returns a single-entry list on failure.
+        """
+        try:
+            from game.rules import get_game_phase
+            total_on_board = sum(board.pieces_on_board.values())
+            if (total_on_board < _EARLY_GAME_PIECE_THRESHOLD
+                    and get_game_phase(board, board.turn) == "place"):
+                depth = 3
+            else:
+                depth = max(2, _DEPTH_TABLE.get(self.difficulty, 9) - 1)
+            self._deadline = time.time() + self._SCORE_TIME
+            scored = self._score_all(board, list(moves), depth)
+            self._deadline = math.inf
+            scored.sort(key=lambda x: x[1], reverse=True)
+            if scored:
+                return scored
+        except Exception:
+            self._deadline = math.inf
+        return [(chosen, 0)]
+
+    def _apply_sentinel_intervention(
+        self, board: BoardState, move: dict, moves: list
+    ) -> dict:
+        """Actively change the chosen move per sentinel_mode. Fully guarded.
+
+        Reuses the SentinelAdvice already stored by _consult_sentinel this turn
+        (no second forward pass). On ANY error the original heuristic move is
+        returned unchanged. Only moves from `moves` (the legal candidate list)
+        are ever returned. The final advice (with intervention fields) is stored
+        in self.last_sentinel_advice.
+        """
+        if self.sentinel is None or self.sentinel_mode == "advisory":
+            return move
+        advice = self.last_sentinel_advice
+        if advice is None:
+            return move
+        try:
+            if self.sentinel_mode == "score_adjust":
+                return self._sentinel_score_adjust(board, move, moves, advice)
+            if self.sentinel_mode == "reconsider":
+                return self._sentinel_reconsider(board, move, moves, advice)
+        except Exception as exc:
+            try:
+                _logger.debug("[Sentinel] intervention failed, keeping heuristic move: %s", exc)
+            except Exception:
+                pass
+        return move
+
+    def _sentinel_score_adjust(
+        self, board: BoardState, move: dict, moves: list, advice
+    ) -> dict:
+        """score_adjust mode: penalise/boost the top candidate and re-sort."""
+        mistake = float(getattr(advice, "mistake_risk", 0.0))
+        opportunity = float(getattr(advice, "opportunity_score", 0.0))
+        if mistake <= 0.6 and opportunity <= 0.6:
+            return move
+        scored = self._sentinel_scored_candidates(board, moves, move)
+        if len(scored) < 2:
+            return move
+        scores = [s for _, s in scored]
+        span = max(scores) - min(scores)
+        # Scale the delta to be meaningful relative to the heuristic score range.
+        # Floor on a minimum magnitude so a flat ranking still re-orders.
+        magnitude = max(abs(span), float(self._weights.close_mill)) * self._sentinel_score_scale
+        adjusted = list(scored)
+        if mistake > 0.6:
+            top_mv, top_sc = adjusted[0]
+            adjusted[0] = (top_mv, top_sc - magnitude)
+        if opportunity > 0.6:
+            top_mv, top_sc = adjusted[0]
+            adjusted[0] = (top_mv, top_sc + magnitude)
+        adjusted.sort(key=lambda x: x[1], reverse=True)
+        new_move = adjusted[0][0]
+        if new_move != move:
+            advice.intervention_applied = "score_adjust"
+            advice.intervention_detail = (
+                f"Score adjust — re-ranked (risk={mistake:.0%}, opp={opportunity:.0%})"
+            )
+        return new_move
+
+    def _sentinel_reconsider(
+        self, board: BoardState, move: dict, moves: list, advice
+    ) -> dict:
+        """reconsider mode: LLM override → deepened search → rank-1 fallback."""
+        tp_conf = float(getattr(advice, "turning_point_confidence", 0.0))
+        if tp_conf <= self._sentinel_reconsider_threshold:
+            return move
+
+        # 1. Try the LLM first (reuses the Coordinator's recommender via callback).
+        if self._llm_move_fn is not None:
+            try:
+                llm_move = self._llm_move_fn(board, list(moves))
+            except Exception:
+                llm_move = None
+            if llm_move is not None and llm_move in moves:
+                advice.intervention_applied = "llm_override"
+                advice.intervention_detail = (
+                    f"LLM override — {advice.advisory_message} (conf={tp_conf:.0%})"
+                )
+                return llm_move
+
+        # 2. LLM unavailable / None → re-run the search 1 ply deeper.
+        try:
+            base_depth = _DEPTH_TABLE.get(self.difficulty, 5)
+            deeper = min(base_depth + 1, base_depth + 2)
+            self._tt.clear()
+            self._deadline = time.time() + max(self._SCORE_TIME, _TIME_LIMIT.get(self.difficulty, 6.0))
+            deep_move, _ = self._root_search(board, deeper, top_n=1, moves=list(moves))
+            self._deadline = math.inf
+        except Exception:
+            self._deadline = math.inf
+            deep_move = move
+        if deep_move is not None and deep_move in moves and deep_move != move:
+            advice.intervention_applied = "deepened_search"
+            advice.intervention_detail = (
+                f"Deepened search — changed move ({advice.advisory_message}, conf={tp_conf:.0%})"
+            )
+            return deep_move
+
+        # 3. Deeper search returned the same move AND message is concerning →
+        #    take the rank-1 (second-best) candidate.
+        if advice.advisory_message in ("critical", "possible_mistake"):
+            scored = self._sentinel_scored_candidates(board, moves, move)
+            if len(scored) >= 2:
+                rank1 = scored[1][0]
+                if rank1 != move:
+                    advice.intervention_applied = "rank1_fallback"
+                    advice.intervention_detail = (
+                        f"Rank-1 fallback — {advice.advisory_message} (conf={tp_conf:.0%})"
+                    )
+                    return rank1
+        return move
 
     def ban_move(self, notation: str, board_fen: str) -> None:
         """Ban `notation` from this exact board position only.
@@ -867,6 +1037,7 @@ class GameAI:
                 top_n=top_n, moves=moves,
                 max_depth=early_max,
             )
+            move = self._apply_sentinel_intervention(board, move, moves)
             self._populate_thinking(board, move, _forced_block=bool(threats))
             return move
 
@@ -882,6 +1053,7 @@ class GameAI:
                 recognition=recognition, trajectory_hints=trajectory_hints,
                 top_n=top_n, moves=moves,
             )
+            move = self._apply_sentinel_intervention(board, move, moves)
             self._populate_thinking(board, move, _forced_block=bool(threats))
             return move
 
@@ -907,10 +1079,12 @@ class GameAI:
                 move = random.choice(scored_sorted[:top_n])[0]
             else:
                 move = max(scored, key=lambda x: x[1])[0]
+            move = self._apply_sentinel_intervention(board, move, moves)
             self._populate_thinking(board, move, _forced_block=bool(threats))
             return move
 
         move, _ = self._root_search(board, depth, top_n=top_n, moves=moves)
+        move = self._apply_sentinel_intervention(board, move, moves)
         self._populate_thinking(board, move, _forced_block=bool(threats))
         return move
 
