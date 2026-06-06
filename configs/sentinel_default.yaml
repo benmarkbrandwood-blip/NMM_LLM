@@ -1,5 +1,5 @@
 # Sentinel overlay — default training/runtime configuration.
-input_dim: 120
+input_dim: 129
 hidden_dims: [256, 128, 64]
 dropout: 0.1
 lr: 0.001

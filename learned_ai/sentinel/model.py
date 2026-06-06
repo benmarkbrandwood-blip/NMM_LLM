@@ -5,8 +5,8 @@ Reuses the small-MLP construction pattern from learned_ai/models/backbone.py
 
 Architecture
 ------------
-  Input: 120-float feature vector (84 base + 36 context)
-  Shared trunk: Linear(120, h0) -> ReLU [-> Dropout] -> ... -> Linear(h_{k-1}, h_k) -> ReLU
+  Input: 129-float feature vector (84 base + 36 context + 9 counterfactual)
+  Shared trunk: Linear(129, h0) -> ReLU [-> Dropout] -> ... -> Linear(h_{k-1}, h_k) -> ReLU
                 (hidden_dims default [256,128,64]; smoke [64,32])
   Heads (each from the trunk output dim T = hidden_dims[-1]):
     mistake_risk_head:           Linear(T,32) -> ReLU -> Linear(32,1) -> Sigmoid

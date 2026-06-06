@@ -176,6 +176,74 @@ class ExternalSolvedDB:
         after_mover_v = -after_opp_v
         return after_mover_v - before_v
 
+    # Outcome from the mover's perspective after applying a move flips to the
+    # opponent's perspective (it becomes their turn). Negate to score the move
+    # for the player who made it.
+    _NEGATE_WDL = {"W": "loss", "L": "win", "D": "draw"}
+
+    def _enumerate_legal_moves(self, board, player) -> List[Dict[str, Any]]:
+        """All legal apply-move dicts {from,to,capture} for ``player`` on ``board``.
+
+        Mill-closing moves are expanded into one entry per legal capture target.
+        Uses only BoardState's own move generation — no game-logic changes here.
+        """
+        moves: List[Dict[str, Any]] = []
+        if board.phase == "place":
+            base = [{"from": None, "to": tgt} for tgt in board.legal_placements(player)]
+        else:
+            base = [{"from": src, "to": tgt} for src, tgt in board.legal_moves(player)]
+
+        for mv in base:
+            mv = {"from": mv.get("from"), "to": mv.get("to"), "capture": None}
+            try:
+                after = board.apply_move(mv)
+                closes = mv["to"] is not None and after.is_mill(mv["to"], player)
+            except Exception:
+                closes = False
+            if closes:
+                caps = board.legal_captures(player)
+                if caps:
+                    for cap in caps:
+                        moves.append({"from": mv["from"], "to": mv["to"], "capture": cap})
+                    continue
+            moves.append(mv)
+        return moves
+
+    def query_all_moves(self, board, player) -> List[Dict[str, Any]]:
+        """All legal moves at ``board`` for ``player`` with their Malom WDL.
+
+        Returns a list of dicts, one per legal move::
+
+            {"move": {"from","to","capture"}, "wdl": "win"|"draw"|"loss"|"unknown",
+             "dtm": int | None}
+
+        WDL is from ``player``'s perspective. Returns an empty list when the DB
+        is unavailable (never raises).
+        """
+        if not self._available:
+            self._warn_unavailable_once()
+            return []
+        out: List[Dict[str, Any]] = []
+        try:
+            legal = self._enumerate_legal_moves(board, player)
+        except Exception as exc:
+            logger.debug("[ExternalSolvedDB] move enumeration error: %s", exc)
+            return []
+        for mv in legal:
+            wdl = "unknown"
+            dtm: Optional[int] = None
+            try:
+                after = board.apply_move(mv)
+                result = self._malom.query(after) if self._malom is not None else None
+            except Exception:
+                result = None
+            if result:
+                wdl = self._NEGATE_WDL.get(result.get("outcome"), "unknown")
+                d = result.get("dtw")
+                dtm = int(d) if isinstance(d, (int, float)) else None
+            out.append({"move": mv, "wdl": wdl, "dtm": dtm})
+        return out
+
     def query_trajectory(self, states: List[Any]) -> List[Optional[str]]:
         """Return a WDL (or None) for each state in a trajectory.
 

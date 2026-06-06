@@ -4,7 +4,7 @@ Reads played-game logs (``data/games/*.jsonl``), replays each game by applying
 moves to a BoardState (reconstructed from ``board_fen_before``), builds a
 per-ply decision context, attaches supervision via
 ``labels.backward_label_trajectory``, and exposes the result as a PyTorch
-Dataset of ``(feature_tensor[120], label_dict)``.
+Dataset of ``(feature_tensor[129], label_dict)``.
 
 A processed dataset can be saved to / loaded from a single ``.npz`` file for
 reproducible runs without re-replaying every game.
@@ -30,7 +30,14 @@ except Exception:  # pragma: no cover - torch is a declared dependency
         pass
 
 from game.board import MILLS, BoardState
-from learned_ai.sentinel.feature_builder import FEATURE_DIM, build_features
+from learned_ai.sentinel.feature_builder import (
+    BASE_DIM,
+    CONTEXT_DIM,
+    COUNTERFACTUAL_DIM,
+    FEATURE_DIM,
+    build_features,
+    counterfactual_features,
+)
 from learned_ai.sentinel.labels import LabelledExample, backward_label_trajectory
 
 logger = logging.getLogger(__name__)
@@ -175,6 +182,21 @@ def examples_from_game(record: Dict[str, Any], db=None,
             feat = build_features(board, ctx)
         except Exception:
             continue
+        # Counterfactual enrichment (training-time only): query the Malom DB for
+        # all legal moves' WDL and append the 9 derived features in place of the
+        # zero-pad written by build_features. Falls back to zeros when the DB is
+        # unavailable (query_all_moves returns []), so this never crashes.
+        if db is not None and getattr(db, "is_available", lambda: False)():
+            color = log_move.get("color", board.turn)
+            try:
+                all_moves = db.query_all_moves(board, color)
+            except Exception:
+                all_moves = []
+            cf = counterfactual_features(all_moves, mv)
+            feat = np.asarray(feat, dtype=np.float32).copy()
+            feat[BASE_DIM + CONTEXT_DIM:FEATURE_DIM] = np.asarray(cf, dtype=np.float32)
+            # missed_win is feature index [7] of the counterfactual block.
+            ctx["missed_win"] = bool(cf[7] >= 1.0)
         states.append(board)
         features.append(feat)
         contexts.append(ctx)
@@ -194,7 +216,7 @@ def examples_from_game(record: Dict[str, Any], db=None,
 class SentinelDataset(_TorchDataset):
     """PyTorch Dataset over labelled sentinel examples.
 
-    Each item is ``(feature_tensor[120], label_dict)`` where ``label_dict`` has
+    Each item is ``(feature_tensor[129], label_dict)`` where ``label_dict`` has
     the keys in :data:`TARGET_KEYS`. Also stores the categorical label and
     supervision source per example for diagnostics.
     """

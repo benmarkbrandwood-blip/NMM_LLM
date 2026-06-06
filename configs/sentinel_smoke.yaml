@@ -1,5 +1,5 @@
 # Sentinel overlay — smoke configuration. Tiny arch + 3 epochs for CI/quick runs.
-input_dim: 120
+input_dim: 129
 hidden_dims: [64, 32]
 dropout: 0.0
 lr: 0.001

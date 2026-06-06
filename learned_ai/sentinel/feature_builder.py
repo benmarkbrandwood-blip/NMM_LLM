@@ -1,10 +1,13 @@
 """learned_ai/sentinel/feature_builder.py — extended sentinel feature vector.
 
-The sentinel input is a 120-float vector:
+The sentinel input is a 129-float vector:
 
-  [0:84)   base board-state encoding from learned_ai.models.state_encoder.encode_state
-           (REUSED — never duplicated here).
-  [84:120) 36 context features describing the *decision* at this ply.
+  [0:84)    base board-state encoding from learned_ai.models.state_encoder.encode_state
+            (REUSED — never duplicated here).
+  [84:120)  36 context features describing the *decision* at this ply.
+  [120:129) 9 counterfactual features from the Malom DB (all-legal-move WDL).
+            Computed at trajectory-build time only; zero-padded at inference
+            time because the DB is not queried during play.
 
 Context layout (36 floats):
   [0:5)   top-5 heuristic scores (normalised to [0,1], 0-padded)
@@ -19,8 +22,9 @@ Context layout (36 floats):
   [35]    reserved padding   (0.0) — keeps the block exactly 36 wide.
 
 Public API:
-  build_features(board_state, move_context: dict) -> np.ndarray (120,)
-  CONTEXT_DIM, BASE_DIM, FEATURE_DIM constants.
+  build_features(board_state, move_context: dict) -> np.ndarray (129,)
+  counterfactual_features(all_moves, played_move) -> list[float] (9,)
+  CONTEXT_DIM, BASE_DIM, COUNTERFACTUAL_DIM, FEATURE_DIM constants.
 """
 
 from __future__ import annotations
@@ -34,7 +38,8 @@ from learned_ai.models.state_encoder import encode_state
 
 BASE_DIM = 84
 CONTEXT_DIM = 36
-FEATURE_DIM = BASE_DIM + CONTEXT_DIM  # 120
+COUNTERFACTUAL_DIM = 9
+FEATURE_DIM = BASE_DIM + CONTEXT_DIM + COUNTERFACTUAL_DIM  # 129
 
 _MOVE_TYPES = ("place", "move", "fly", "capture")
 _MOVE_TYPE_IDX = {t: i for i, t in enumerate(_MOVE_TYPES)}
@@ -141,13 +146,69 @@ def _build_context(ctx: Dict[str, Any]) -> np.ndarray:
     return out
 
 
-def build_features(board_state, move_context: Optional[Dict[str, Any]] = None) -> np.ndarray:
-    """Return the 120-float sentinel feature vector for a board + decision context.
+def counterfactual_features(all_moves: List[Dict[str, Any]], played_move) -> List[float]:
+    """Derive the 9 counterfactual features from all legal moves' WDL.
 
-    The first 84 values come from the shared state encoder; the last 36 encode
-    the move-decision context. Robust to a missing/empty context dict.
+    ``all_moves`` is the list returned by ``ExternalSolvedDB.query_all_moves``:
+    dicts with keys ``move`` and ``wdl`` ("win"|"draw"|"loss"|"unknown").
+    ``played_move`` is the apply-move dict actually played, compared against
+    each ``all_moves[i]["move"]`` to find the played move's WDL.
+
+    Returns 9 floats in [0, 1]. Returns 9 zeros when ``all_moves`` is empty
+    (DB unavailable), so old examples still work with no counterfactual signal.
+    """
+    n_legal = len(all_moves)
+    if n_legal == 0:
+        return [0.0] * COUNTERFACTUAL_DIM
+
+    wdl_counts = {"win": 0, "draw": 0, "loss": 0, "unknown": 0}
+    for m in all_moves:
+        wdl_counts[m.get("wdl", "unknown")] = wdl_counts.get(m.get("wdl", "unknown"), 0) + 1
+
+    n_win = wdl_counts["win"]
+    n_loss = wdl_counts["loss"]
+    n_draw = wdl_counts["draw"]
+
+    winning_move_available = float(n_win > 0)
+    losing_move_available = float(n_loss > 0)
+    frac_winning = n_win / n_legal
+    frac_losing = n_loss / n_legal
+
+    played_wdl = next(
+        (m["wdl"] for m in all_moves if m.get("move") == played_move), "unknown"
+    )
+    played_is_win = float(played_wdl == "win")
+    played_is_loss = float(played_wdl == "loss")
+    played_is_draw = float(played_wdl == "draw")
+
+    missed_win = float(n_win > 0 and played_wdl != "win")
+    missed_safety = float((n_win + n_draw) > 0 and played_wdl == "loss")
+
+    return [
+        winning_move_available,   # [0] win move existed
+        losing_move_available,    # [1] loss move existed
+        frac_winning,             # [2] proportion of moves that win
+        frac_losing,              # [3] proportion of moves that lose
+        played_is_win,            # [4] played move was a win
+        played_is_loss,           # [5] played move was a loss
+        played_is_draw,           # [6] played move was a draw
+        missed_win,               # [7] better move existed, not taken
+        missed_safety,            # [8] safer move existed, not taken
+    ]
+
+
+def build_features(board_state, move_context: Optional[Dict[str, Any]] = None) -> np.ndarray:
+    """Return the 129-float sentinel feature vector for a board + decision context.
+
+    The first 84 values come from the shared state encoder; the next 36 encode
+    the move-decision context; the final 9 are counterfactual features. At
+    inference time the DB is not queried, so the counterfactual block is
+    zero-padded here. Training enriches it via ``counterfactual_features`` and
+    appends the real values (see the trajectory builder). Robust to a missing
+    or empty context dict.
     """
     base_t = encode_state(board_state)            # torch.Tensor (84,)
     base = np.asarray(base_t.detach().cpu().numpy(), dtype=np.float32)
     ctx = _build_context(move_context or {})
-    return np.concatenate([base, ctx]).astype(np.float32)
+    cf = np.zeros(COUNTERFACTUAL_DIM, dtype=np.float32)
+    return np.concatenate([base, ctx, cf]).astype(np.float32)

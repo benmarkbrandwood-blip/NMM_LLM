@@ -20,7 +20,7 @@ except Exception:  # pragma: no cover - yaml is a declared dependency
 @dataclass
 class SentinelConfig:
     # ── Model ────────────────────────────────────────────────────────────────
-    input_dim: int = 120                       # 84 base + 36 context features
+    input_dim: int = 129                       # 84 base + 36 context + 9 counterfactual
     hidden_dims: List[int] = field(default_factory=lambda: [256, 128, 64])
     dropout: float = 0.1
 

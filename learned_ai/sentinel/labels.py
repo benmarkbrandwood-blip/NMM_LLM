@@ -45,7 +45,7 @@ _WDL_VALUE = {"W": 1.0, "D": 0.0, "L": -1.0}
 class LabelledExample:
     """One supervised sentinel training example."""
 
-    state_features: np.ndarray              # (120,) float32
+    state_features: np.ndarray              # (129,) float32
     label: str                              # one of LABEL_TYPES
     turning_point_confidence: float         # [0,1]
     value_delta: float                      # estimated strategic shift [-1,1]
@@ -128,7 +128,7 @@ def backward_label_trajectory(
     ----------
     game_record   : parsed game dict (uses ``winner`` for proxy supervision).
     states        : BoardState before each labelled ply (len N).
-    features      : precomputed 120-float feature vectors, aligned to ``states``.
+    features      : precomputed 129-float feature vectors, aligned to ``states``.
     move_contexts : per-ply context dicts (provide ``color``, ``was_blunder``,
                     ``chosen_rank``, ``game_ai_score`` when available).
     db            : ExternalSolvedDB-like teacher (or None / unavailable).
@@ -253,6 +253,12 @@ def backward_label_trajectory(
                 opportunity *= 0.5  # already losing — less of a "missed" chance
         elif was_blunder and value > -0.5:
             opportunity = 0.7
+
+        # Counterfactual ground truth from the solved DB: if a winning move was
+        # available but the played move was not winning, this is a confirmed
+        # missed opportunity — strongest possible positive for the opportunity head.
+        if ctx.get("missed_win"):
+            opportunity = 1.0
 
         label = _classify(value, mistake_risk, opportunity, tp_conf)
         # weak proxies should not over-train the categorical extremes.
