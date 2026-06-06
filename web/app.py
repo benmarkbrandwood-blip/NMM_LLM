@@ -177,7 +177,10 @@ try:
     _sentinel_ckpt = Path(_ROOT) / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"
     if _sentinel_ckpt.exists():
         _sentinel_advisor = load_advisor(str(_sentinel_ckpt), _sentinel_cfg)
-        log.info("Sentinel overlay loaded from %s", _sentinel_ckpt)
+        if _sentinel_advisor is not None:
+            log.info("Sentinel overlay loaded from %s", _sentinel_ckpt)
+        else:
+            log.warning("Sentinel checkpoint found but failed to load: %s", _sentinel_ckpt)
     else:
         log.info("Sentinel checkpoint not found at %s — overlay disabled", _sentinel_ckpt)
 except Exception as _e:

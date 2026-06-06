@@ -87,7 +87,7 @@ class SentinelAdvisor:
         self.model = SentinelNet(
             input_dim=self.config.input_dim,
             hidden_dims=self.config.hidden_dims,
-            dropout=0.0,  # eval: no dropout
+            dropout=self.config.dropout,  # match training arch; eval() disables dropout
         ).to(self.device)
         self.model.load_state_dict(state_dict)
         self.model.eval()
