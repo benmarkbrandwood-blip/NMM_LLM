@@ -157,3 +157,28 @@ DB layout is known.
   logged at debug level and the heuristic move is used unchanged.
 - The external DB adapter is non-fatal when the DB is unavailable.
 - `ai/endgame_solved_db.py` is never modified.
+
+## 9. Runtime integration
+
+The overlay attaches to the heuristic engine through three `GameAI` members:
+
+- `set_sentinel(advisor, mode="advisory")` — attach a loaded `SentinelAdvisor`.
+- `_build_sentinel_context(board, moves)` — package the finalized candidate set
+  into the dict `feature_builder.build_features()` consumes.
+- `_consult_sentinel(board, moves)` — run the advisory pass; fully `try/except`
+  guarded.
+
+`choose_move()` calls `_consult_sentinel()` once, after all candidate filtering
+(pins, bans) and before the search/return paths. In **advisory** mode this only
+records `last_sentinel_advice` and logs a warning when a turning point is
+flagged — it never changes the move. The `score_adjust` and `reconsider` modes
+are reserved for later work; advisory is the only mode wired today.
+
+Loading at runtime (advisory only):
+
+```
+python main.py --sentinel-checkpoint learned_ai/sentinel/checkpoints/best.pt
+```
+
+If the checkpoint is missing or fails to load, the game prints a notice and
+continues with no overlay — play is unchanged.
