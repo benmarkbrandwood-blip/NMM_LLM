@@ -186,6 +186,11 @@ try:
 except Exception as _e:
     log.warning("Sentinel overlay unavailable: %s", _e)
 
+# Probability that sentinel (or DB fallback) intervenes, by difficulty level.
+SENTINEL_PROB_BY_DIFF: dict[int, float] = {
+    1: 0.0, 2: 0.0, 3: 0.10, 4: 0.22, 5: 0.33,
+    6: 0.50, 7: 0.65, 8: 0.80, 9: 0.90, 10: 1.0,
+}
 
 # ── Library consolidation (Stage 5.27) ───────────────────────────────────────
 
@@ -1694,6 +1699,17 @@ async def ws_endpoint(websocket: WebSocket):
                         diff, eff_diff, adaptive.extra_blunder,
                     )
 
+                    _sent_prob = SENTINEL_PROB_BY_DIFF.get(eff_diff, 0.0)
+                    if (_sent_prob > 0.0 or use_sentinel) and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                        _sent_mode = sentinel_mode if use_sentinel else "score_adjust"
+                        game_ai.set_sentinel(_sentinel_advisor, mode=_sent_mode)
+                        game_ai._sentinel_activation_prob = _sent_prob if not use_sentinel else 1.0
+                        log.info("Sentinel attached (diff=%d, prob=%.0f%%, mode=%s)", eff_diff, game_ai._sentinel_activation_prob * 100, _sent_mode)
+                    elif _sent_prob > 0.0 and _sentinel_advisor is None:
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob
+                        log.info("Sentinel unavailable — DB fallback (diff=%d, prob=%.0f%%)", eff_diff, _sent_prob * 100)
+
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
                         model = settings.get("ollama_model", "llama3.1:8b")
@@ -1803,9 +1819,16 @@ async def ws_endpoint(websocket: WebSocket):
                         value_net=_value_net,
                     )
 
-                    if use_sentinel and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
-                        game_ai.set_sentinel(_sentinel_advisor, mode=sentinel_mode)
-                        log.info("Sentinel overlay attached to GameAI (mode=%s)", sentinel_mode)
+                    _sent_prob_s = SENTINEL_PROB_BY_DIFF.get(diff, 0.0)
+                    if (_sent_prob_s > 0.0 or use_sentinel) and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                        _sent_mode_s = sentinel_mode if use_sentinel else "score_adjust"
+                        game_ai.set_sentinel(_sentinel_advisor, mode=_sent_mode_s)
+                        game_ai._sentinel_activation_prob = _sent_prob_s if not use_sentinel else 1.0
+                        log.info("Sentinel attached (diff=%d, prob=%.0f%%, mode=%s)", diff, game_ai._sentinel_activation_prob * 100, _sent_mode_s)
+                    elif _sent_prob_s > 0.0 and _sentinel_advisor is None:
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob_s
+                        log.info("Sentinel unavailable — DB fallback (diff=%d, prob=%.0f%%)", diff, _sent_prob_s * 100)
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -2115,6 +2138,29 @@ async def ws_endpoint(websocket: WebSocket):
                     # Capture mode eg_flags keyed by captured square
                     cap_pos = mv_e.get("to") if diag_mode == "capture" else None
                     mv_e["eg_flag"] = eg_flags.get(cap_pos or ntn)  # "W"/"L"/"D"/None
+
+                # ── Sentinel overlay: score each legal move ───────────────────
+                if _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                    try:
+                        candidates = [
+                            {"from": mv_e.get("from"), "to": mv_e.get("to"),
+                             "capture": mv_e.get("capture")}
+                            for mv_e in moves_out
+                        ]
+                        if candidates:
+                            sent_advice = await asyncio.to_thread(
+                                _sentinel_advisor.advise,
+                                diag_board, candidates, color, 0,
+                            )
+                            if sent_advice is not None:
+                                for i, mv_e in enumerate(moves_out):
+                                    if i < len(sent_advice.move_scores):
+                                        mv_e["sentinel_score"] = round(sent_advice.move_scores[i], 3)
+                    except Exception as _se:
+                        log.debug("Sentinel diagnostic scoring failed: %s", _se)
+                for mv_e in moves_out:
+                    if "sentinel_score" not in mv_e:
+                        mv_e["sentinel_score"] = None
 
                 await _send(websocket, {
                     "type":    "diagnostic",

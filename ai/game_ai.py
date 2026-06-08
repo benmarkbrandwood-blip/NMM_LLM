@@ -467,6 +467,9 @@ class GameAI:
         # Rolling trajectory of recent chosen-move scores, for sentinel context.
         self._sentinel_trajectory: list[float] = []
         self.last_sentinel_advice = None     # last SentinelAdvice (debug/logging)
+        # Probability gate: fraction of moves where sentinel (or DB fallback) fires.
+        # 1.0 = always (default, preserves existing use_sentinel=True behaviour).
+        self._sentinel_activation_prob: float = 1.0
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -552,6 +555,16 @@ class GameAI:
         from ``moves`` are ever returned.
         """
         if self.sentinel is None:
+            # DB fallback when sentinel unavailable but probability gate would fire
+            if (self._sentinel_activation_prob > 0.0
+                    and self.sentinel_mode == "score_adjust"):
+                import random as _random
+                if _random.random() <= self._sentinel_activation_prob:
+                    return self._db_score_adjust(board, move, moves)
+            return move
+        # Probability gate: skip intervention some fraction of the time at lower difficulties
+        import random as _random
+        if _random.random() > self._sentinel_activation_prob:
             return move
         advice = self._sentinel_advise(board, move, moves)
         self.last_sentinel_advice = advice
@@ -653,6 +666,37 @@ class GameAI:
                 )
                 return best_move
         return move
+
+    def _db_score_adjust(self, board: BoardState, move: dict, moves: list) -> dict:
+        """Fallback: use Malom/endgame DB WDL to pick the best move when sentinel is unavailable."""
+        esdb = self._endgame_solved_db
+        fgdb = self._fullgame_db
+        if not esdb and not (fgdb and fgdb.is_available()):
+            return move
+        try:
+            wdl_map = {"W": 2, "D": 1, "L": 0}
+            best_move = move
+            best_score = -1
+            for m in moves:
+                try:
+                    after = board.apply_move(m)
+                except Exception:
+                    continue
+                # Query from opponent's POV (after move it's their turn), then flip
+                res = None
+                if esdb:
+                    res = esdb.query(after)
+                if res is None and fgdb and fgdb.is_available():
+                    res = fgdb.query(after)
+                if res:
+                    flipped = {"W": "L", "L": "W", "D": "D"}.get(res)
+                    score = wdl_map.get(flipped, -1) if flipped else -1
+                    if score > best_score:
+                        best_score = score
+                        best_move = m
+            return best_move
+        except Exception:
+            return move
 
     def ban_move(self, notation: str, board_fen: str) -> None:
         """Ban `notation` from this exact board position only.

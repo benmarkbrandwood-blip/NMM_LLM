@@ -376,13 +376,28 @@ export class Board {
     this._dbGroup.innerHTML = "";
     if (!moves || !moves.length) return;
 
-    const phase   = opts.phase || "move";
-    const selSrc  = opts.selectedSrc || null;
-    const showTraj = opts.showTraj !== false;
-    const showDB   = opts.showDB  !== false;
+    const phase        = opts.phase || "move";
+    const selSrc       = opts.selectedSrc || null;
+    const showTraj     = opts.showTraj !== false;
+    const showDB       = opts.showDB  !== false;
+    const showSentinel = opts.showSentinel || false;
+    const visFrac      = opts.visibilityFraction != null ? opts.visibilityFraction : 1.0;
 
-    // Helper: arrow color from db_delta or eg_flag
-    const dbColor = (delta, egFlag) => {
+    // Deterministic per-move hash for stable visibility thinning (no flicker on redraws)
+    const _mvHash = mv => {
+      const s = (mv.from || "") + (mv.to || "");
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+      return Math.abs(h);
+    };
+
+    // Helper: arrow/halo color from db_delta, eg_flag, or sentinel_score
+    const dbColor = (delta, egFlag, sentinelScore) => {
+      if (showSentinel && sentinelScore != null) {
+        if (sentinelScore >= 0.65) return "#4caf50";   // good move
+        if (sentinelScore <= 0.35) return "#e05050";   // bad move
+        return null;  // neutral — don't draw
+      }
       if (egFlag === "W") return "#4caf50";
       if (egFlag === "L") return "#e05050";
       if (egFlag === "D") return "#888";    // endgame draw — keep grey
@@ -397,9 +412,11 @@ export class Board {
     if (phase === "place" || phase === "capture") {
       // Halos on destination squares — no arrows needed (no source)
       for (const mv of moves) {
+        if (visFrac < 1.0 && (_mvHash(mv) % 100) >= Math.round(visFrac * 100)) continue;
         const pos = mv.to;
         if (!pos) continue;
-        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
+                            showSentinel ? mv.sentinel_score : null);
         const freq = showTraj ? (mv.traj_freq || 0) : 0;
 
         if (col) {
@@ -426,8 +443,10 @@ export class Board {
         : moves;
 
       for (const mv of toRender) {
+        if (visFrac < 1.0 && (_mvHash(mv) % 100) >= Math.round(visFrac * 100)) continue;
         if (!mv.from || !mv.to) continue;
-        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
+                            showSentinel ? mv.sentinel_score : null);
         const freq = showTraj ? (mv.traj_freq || 0) : 0;
         if (!col && freq === 0) continue;
 
@@ -464,11 +483,12 @@ export class Board {
         }
       }
 
-      // If no source selected, show best-DB-flagged sources with a ring
-      if (!selSrc && showDB) {
+      // If no source selected, show best-DB/sentinel-flagged sources with a ring
+      if (!selSrc && (showDB || showSentinel)) {
         const srcDB = new Map();  // source → best db color
         for (const mv of moves) {
-          const col = dbColor(mv.db_delta, mv.eg_flag);
+          const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
+                              showSentinel ? mv.sentinel_score : null);
           if (col && col !== "#888" && mv.from) {
             if (!srcDB.has(mv.from) || col === "#4caf50")
               srcDB.set(mv.from, col);

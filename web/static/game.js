@@ -46,7 +46,9 @@ let diagStatic      = true;         // show static (tac+eval) scores
 let diagNegamax     = false;        // show negamax scores
 let diagTraj        = false;        // show trajectory DB frequencies
 let diagDB          = false;        // show fullgame/endgame DB arrows
+let diagSentinel    = false;        // show Sentinel AI move quality overlay
 let diagDepth       = 3;            // negamax depth
+let currentDifficulty = 3;          // updated from state messages; gates overlay visibility
 let _diagStaticData  = null;        // last received static diagnostic response
 let _diagNegamaxData = null;        // last received negamax diagnostic response
 let _diagSeq        = 0;            // sequence counter for in-flight requests
@@ -193,6 +195,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const personality = (saved && _matchPersonality(saved)) ?? "balanced";
     _loadPersonality(personality);
   }).catch(() => _loadPersonality("balanced"));
+
+  // Sentinel chip availability check
+  fetch("/api/sentinel_status").then(r => r.json()).then(s => {
+    const chip   = $("diag-btn-sentinel");
+    const status = $("diag-sentinel-status");
+    if (!s.available) {
+      if (chip)   { chip.disabled = true; chip.title = "Sentinel model not loaded"; }
+      if (status) status.style.display = "inline";
+    }
+  }).catch(() => {});
 
   // VN status line in AI Tuning panel
   fetch("/api/vn_status").then(r => r.json()).then(d => {
@@ -345,7 +357,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
+    if (diagDB) {
+      diagSentinel = false;
+      $("diag-btn-sentinel") && $("diag-btn-sentinel").classList.remove("diag-chip-active");
+    }
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
+    _diagRender();
+  });
+
+  $("diag-btn-sentinel") && $("diag-btn-sentinel").addEventListener("click", () => {
+    diagSentinel = !diagSentinel;
+    if (diagSentinel) {
+      diagDB = false;
+      $("diag-btn-db").classList.remove("diag-chip-active");
+      _diagRequestStatic();  // ensure server has computed sentinel_score
+    }
+    $("diag-btn-sentinel").classList.toggle("diag-chip-active", diagSentinel);
     _diagRender();
   });
 
@@ -887,6 +914,7 @@ function handleMessage(msg) {
 
     case "state":
       gameState = msg;
+      if (msg.difficulty != null) { currentDifficulty = msg.difficulty; _updateSentinelUI(currentDifficulty); }
       phase = msg.finished ? "game_over" : "playing";
       stopThinkingTimer();
       $("btn-force-move").hidden = true;
@@ -2350,6 +2378,30 @@ function _diagOnReceive(msg) {
   _diagRender();
 }
 
+function _overlayVisibilityFraction(diff) {
+  if (diff <= 5) return 1.0;
+  if (diff === 6) return 0.75;
+  if (diff === 7) return 0.5;
+  if (diff === 8) return 0.25;
+  return 0.0;  // 9, 10
+}
+
+function _updateSentinelUI(diff) {
+  const row = $("row-sentinel");
+  if (!row) return;
+  const PROBS = [0, 0, 0, 10, 22, 33, 50, 65, 80, 90, 100];
+  if (diff >= 9) {
+    row.style.display = "none";
+  } else if (diff >= 3) {
+    row.style.display = "";
+    const prob = PROBS[diff] || 0;
+    const lbl = row.querySelector("label");
+    if (lbl) lbl.title = `Auto-activates on ${prob}% of moves at difficulty ${diff}`;
+  } else {
+    row.style.display = "none";
+  }
+}
+
 function _diagRender() {
   if (!diagEnabled || !board) { board && board.clearDiag(); return; }
 
@@ -2357,7 +2409,7 @@ function _diagRender() {
   const negamaxD = diagNegamax ? _diagNegamaxData : null;
   const anyScore = staticD || negamaxD;
 
-  if (!anyScore && !diagTraj && !diagDB) { board.clearDiag(); return; }
+  if (!anyScore && !diagTraj && !diagDB && !diagSentinel) { board.clearDiag(); return; }
 
   // Pick primary data source (static preferred for phase/color info)
   const primary   = staticD || negamaxD;
@@ -2372,6 +2424,7 @@ function _diagRender() {
   if (negamaxD) modeLabel.push(`negamax d${diagDepth}`);
   if (diagTraj) modeLabel.push("traj");
   if (diagDB)   modeLabel.push("DB");
+  if (diagSentinel) modeLabel.push("Sentinel");
   $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
 
   // Score label overlay (heuristic / negamax numbers)
@@ -2385,17 +2438,24 @@ function _diagRender() {
     board._diagGroup.innerHTML = "";
   }
 
-  // DB overlay (traj frequencies + fullgame/endgame arrows)
-  const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
-  if ((diagTraj || diagDB) && dbSource && dbSource.moves) {
-    board.renderDiagDB(dbSource.moves, {
-      phase:       curPhase,
-      selectedSrc: board.selected,
-      showTraj:    diagTraj,
-      showDB:      diagDB,
-    });
-  } else {
+  // DB / Sentinel overlay — gated by difficulty
+  const visFrac = _overlayVisibilityFraction(currentDifficulty);
+  if (visFrac === 0.0) {
     board._dbGroup.innerHTML = "";
+  } else {
+    const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
+    if ((diagTraj || diagDB || diagSentinel) && dbSource && dbSource.moves) {
+      board.renderDiagDB(dbSource.moves, {
+        phase:              curPhase,
+        selectedSrc:        board.selected,
+        showTraj:           diagTraj,
+        showDB:             diagDB,
+        showSentinel:       diagSentinel,
+        visibilityFraction: visFrac,
+      });
+    } else {
+      board._dbGroup.innerHTML = "";
+    }
   }
 }
 
