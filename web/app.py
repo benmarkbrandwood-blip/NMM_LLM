@@ -186,6 +186,34 @@ try:
 except Exception as _e:
     log.warning("Sentinel overlay unavailable: %s", _e)
 
+# ── Malom perfect DB (ExternalSolvedDB) — used for DB Lines overlay and DB fallback ──
+# Path is read from settings.json "malom_db_path" (user-configurable via Tools page);
+# falls back to the sentinel config's external_db_path when the setting is absent.
+_malom_db = None
+try:
+    from learned_ai.sentinel.db_teacher import ExternalSolvedDB as _ExternalSolvedDB
+    _malom_path = _load_settings().get("malom_db_path") or ""
+    if not _malom_path:
+        from learned_ai.sentinel.config import load_config as _load_sentinel_config_malom
+        _mcfg = _load_sentinel_config_malom()
+        _malom_path = getattr(_mcfg, "external_db_path", "") or ""
+    if _malom_path:
+        _malom_db = _ExternalSolvedDB(_malom_path)
+        if _malom_db.is_available():
+            log.info("Malom perfect DB loaded from %s", _malom_path)
+        else:
+            log.warning("Malom DB path configured but unavailable: %s", _malom_path)
+            _malom_db = None
+    else:
+        log.info("Malom DB not configured (no malom_db_path in settings)")
+except Exception as _e:
+    log.warning("Malom DB load failed (non-fatal): %s", _e)
+
+# Probability that sentinel (or DB fallback) intervenes, by difficulty level.
+SENTINEL_PROB_BY_DIFF: dict[int, float] = {
+    1: 0.0, 2: 0.0, 3: 0.10, 4: 0.22, 5: 0.33,
+    6: 0.50, 7: 0.65, 8: 0.80, 9: 0.90, 10: 1.0,
+}
 
 # ── Library consolidation (Stage 5.27) ───────────────────────────────────────
 
@@ -624,8 +652,9 @@ async def get_vn_status():
 @app.get("/api/sentinel_status")
 async def sentinel_status():
     return {
-        "available": _sentinel_advisor is not None and _sentinel_advisor.is_loaded(),
-        "checkpoint": str(_sentinel_ckpt) if _sentinel_advisor else "",
+        "available":    _sentinel_advisor is not None and _sentinel_advisor.is_loaded(),
+        "checkpoint":   str(_sentinel_ckpt) if _sentinel_advisor else "",
+        "malom_db":     _malom_db is not None and _malom_db.is_available(),
     }
 
 
@@ -817,6 +846,11 @@ async def tool_status():
 
     busy = _TOOLS_LOCK.locked()
 
+    # Malom perfect DB
+    malom_info = {"status": "not loaded", "path": str(_load_settings().get("malom_db_path", ""))}
+    if _malom_db is not None and _malom_db.is_available():
+        malom_info["status"] = "loaded"
+
     return _JSONResponse({
         "fullgame_db":    fgdb_info,
         "endgame_solved": esdb_info,
@@ -831,6 +865,7 @@ async def tool_status():
             "after_games": _load_settings().get("auto_evolve_after_games", 0),
             "games_since": _games_since_evolve,
         },
+        "malom_db":       malom_info,
     })
 
 
@@ -851,6 +886,30 @@ async def set_auto_evolve(request: Request):
     settings["auto_evolve_after_games"] = after
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
     return _JSONResponse({"ok": True, "after_games": after})
+
+
+@app.get("/api/db_settings")
+async def get_db_settings():
+    settings = _load_settings()
+    return _JSONResponse({
+        "fullgame_db_path":   settings.get("fullgame_db_path", ""),
+        "endgame_solved_dir": settings.get("endgame_solved_dir", ""),
+        "malom_db_path":      settings.get("malom_db_path", ""),
+    })
+
+
+@app.post("/api/db_settings")
+async def set_db_settings(request: Request):
+    body = await request.json()
+    settings = _load_settings()
+    changed = False
+    for key in ("fullgame_db_path", "endgame_solved_dir", "malom_db_path"):
+        if key in body:
+            settings[key] = str(body[key]).strip()
+            changed = True
+    if changed:
+        _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
+    return _JSONResponse({"ok": True})
 
 
 @app.websocket("/ws/tools")
@@ -1001,6 +1060,19 @@ def _state(session: Session) -> dict:
 
 async def _send(ws: WebSocket, obj: dict) -> None:
     await ws.send_text(json.dumps(obj))
+
+
+def _sentinel_payload(adv) -> dict:
+    """Serialise a move-level SentinelAdvice into the ai_move 'sentinel' dict."""
+    return {
+        "player":                 adv.player,
+        "played_move_quality":    round(adv.played_move_quality, 3),
+        "best_available_quality": round(adv.best_available_quality, 3),
+        "opportunity_gap":        round(adv.opportunity_gap, 3),
+        "advisory_message":       adv.advisory_message,
+        "intervention":           getattr(adv, "intervention_applied", None),
+        "intervention_detail":    getattr(adv, "intervention_detail", None),
+    }
 
 
 def _classify_commentary(line: str) -> tuple[str, str, str]:
@@ -1215,6 +1287,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         blunder_probability=hw.make_mistakes / 100.0,
         fullgame_db=_fullgame_db,
         endgame_solved_db=_endgame_solved_db,
+        malom_db=_malom_db,
         value_net=_value_net,
     )
 
@@ -1276,16 +1349,7 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
                 "can_mark_bad": False,
             }
             if game_ai and game_ai.last_sentinel_advice is not None:
-                adv = game_ai.last_sentinel_advice
-                _avai_move_msg["sentinel"] = {
-                    "mistake_risk":             round(adv.mistake_risk, 3),
-                    "opportunity_score":        round(adv.opportunity_score, 3),
-                    "turning_point_confidence": round(adv.turning_point_confidence, 3),
-                    "is_turning_point":         adv.is_turning_point,
-                    "advisory_message":         adv.advisory_message,
-                    "intervention":             getattr(adv, "intervention_applied", None),
-                    "intervention_detail":      getattr(adv, "intervention_detail", None),
-                }
+                _avai_move_msg["sentinel"] = _sentinel_payload(game_ai.last_sentinel_advice)
                 game_ai.last_sentinel_advice = None  # consume after sending
             await _send(ws, _avai_move_msg)
 
@@ -1457,16 +1521,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
     if session.coordinator and session.coordinator.last_thinking:
         _ai_move_msg["thinking"] = session.coordinator.last_thinking
     if session.game_ai and session.game_ai.last_sentinel_advice is not None:
-        adv = session.game_ai.last_sentinel_advice
-        _ai_move_msg["sentinel"] = {
-            "mistake_risk":             round(adv.mistake_risk, 3),
-            "opportunity_score":        round(adv.opportunity_score, 3),
-            "turning_point_confidence": round(adv.turning_point_confidence, 3),
-            "is_turning_point":         adv.is_turning_point,
-            "advisory_message":         adv.advisory_message,
-            "intervention":             getattr(adv, "intervention_applied", None),
-            "intervention_detail":      getattr(adv, "intervention_detail", None),
-        }
+        _ai_move_msg["sentinel"] = _sentinel_payload(session.game_ai.last_sentinel_advice)
         session.game_ai.last_sentinel_advice = None  # consume after sending
     await _send(ws, _ai_move_msg)
     await _commentary(ws, session)
@@ -1646,8 +1701,9 @@ async def ws_endpoint(websocket: WebSocket):
                     _t_pers = ""
                 vs_human  = bool(msg.get("vs_human", False))
                 use_llm   = bool(msg.get("use_llm", True))
-                use_sentinel  = bool(msg.get("use_sentinel", False))
-                sentinel_mode = msg.get("sentinel_mode", "advisory")  # "advisory"|"score_adjust"|"reconsider"
+                use_sentinel   = bool(msg.get("use_sentinel", False))
+                sentinel_mode  = msg.get("sentinel_mode", "advisory")  # "advisory"|"score_adjust"|"reconsider"
+                use_perfect_db = bool(msg.get("use_perfect_db", False))
                 settings  = _load_settings()
 
                 engine   = GameEngine(human_color=hc)
@@ -1692,12 +1748,29 @@ async def ws_endpoint(websocket: WebSocket):
                         blunder_probability=min(1.0, base_blunder + adaptive.extra_blunder),
                         fullgame_db=_fullgame_db,
                         endgame_solved_db=_endgame_solved_db,
+                        malom_db=_malom_db,
                         value_net=_value_net,
                     )
                     log.info(
                         "Adaptive: requested diff=%d effective diff=%d extra_blunder=%.2f",
                         diff, eff_diff, adaptive.extra_blunder,
                     )
+
+                    _sent_prob = SENTINEL_PROB_BY_DIFF.get(eff_diff, 0.0)
+                    if use_perfect_db:
+                        game_ai.use_perfect_db = True
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob
+                        log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", eff_diff, _sent_prob * 100)
+                    elif (_sent_prob > 0.0 or use_sentinel) and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                        _sent_mode = sentinel_mode if use_sentinel else "score_adjust"
+                        game_ai.set_sentinel(_sentinel_advisor, mode=_sent_mode)
+                        game_ai._sentinel_activation_prob = _sent_prob if not use_sentinel else 1.0
+                        log.info("Sentinel attached (diff=%d, prob=%.0f%%, mode=%s)", eff_diff, game_ai._sentinel_activation_prob * 100, _sent_mode)
+                    elif _sent_prob > 0.0 and _sentinel_advisor is None:
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob
+                        log.info("Sentinel unavailable — DB fallback (diff=%d, prob=%.0f%%)", eff_diff, _sent_prob * 100)
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -1761,7 +1834,10 @@ async def ws_endpoint(websocket: WebSocket):
                 hc       = _random.choice(["W", "B"]) if hc_raw == "R" else hc_raw
                 diff     = max(1, min(10, int(msg.get("difficulty", 3))))
                 vs_human = bool(msg.get("vs_human", False))
-                use_llm  = bool(msg.get("use_llm", True))
+                use_llm        = bool(msg.get("use_llm", True))
+                use_sentinel   = bool(msg.get("use_sentinel", False))
+                sentinel_mode  = msg.get("sentinel_mode", "advisory")
+                use_perfect_db = bool(msg.get("use_perfect_db", False))
                 setup_phase = msg.get("phase", "move")   # "place" | "move"
                 setup_turn  = msg.get("turn", "W")        # "W" | "B"
                 setup_pos   = msg.get("positions", {})    # {pos: "W"|"B"|""}
@@ -1805,12 +1881,25 @@ async def ws_endpoint(websocket: WebSocket):
                         blunder_probability=_hw.make_mistakes / 100.0,
                         fullgame_db=_fullgame_db,
                         endgame_solved_db=_endgame_solved_db,
+                        malom_db=_malom_db,
                         value_net=_value_net,
                     )
 
-                    if use_sentinel and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
-                        game_ai.set_sentinel(_sentinel_advisor, mode=sentinel_mode)
-                        log.info("Sentinel overlay attached to GameAI (mode=%s)", sentinel_mode)
+                    _sent_prob_s = SENTINEL_PROB_BY_DIFF.get(diff, 0.0)
+                    if use_perfect_db:
+                        game_ai.use_perfect_db = True
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob_s
+                        log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", diff, _sent_prob_s * 100)
+                    elif (_sent_prob_s > 0.0 or use_sentinel) and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                        _sent_mode_s = sentinel_mode if use_sentinel else "score_adjust"
+                        game_ai.set_sentinel(_sentinel_advisor, mode=_sent_mode_s)
+                        game_ai._sentinel_activation_prob = _sent_prob_s if not use_sentinel else 1.0
+                        log.info("Sentinel attached (diff=%d, prob=%.0f%%, mode=%s)", diff, game_ai._sentinel_activation_prob * 100, _sent_mode_s)
+                    elif _sent_prob_s > 0.0 and _sentinel_advisor is None:
+                        game_ai.sentinel_mode = "score_adjust"
+                        game_ai._sentinel_activation_prob = _sent_prob_s
+                        log.info("Sentinel unavailable — DB fallback (diff=%d, prob=%.0f%%)", diff, _sent_prob_s * 100)
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -2113,6 +2202,38 @@ async def ws_endpoint(websocket: WebSocket):
                                 except Exception:
                                     pass
 
+                # Malom perfect DB: fill eg_flags for any move not covered above
+                if _malom_db is not None and _malom_db.is_available():
+                    _flip = {"W": "L", "L": "W", "D": "D"}
+                    if diag_mode == "capture":
+                        for mv_e in moves_out:
+                            cap_pos = mv_e.get("to")
+                            if cap_pos and not eg_flags.get(cap_pos):
+                                try:
+                                    after_ml = diag_board.apply_move(
+                                        {"from": None, "to": None, "capture": cap_pos})
+                                    res_ml = _malom_db.query(after_ml)
+                                    if res_ml:
+                                        eg_flags[cap_pos] = _flip.get(res_ml)
+                                except Exception:
+                                    pass
+                    else:
+                        try:
+                            legal_ml = get_all_legal_moves(diag_board)
+                        except Exception:
+                            legal_ml = []
+                        for mv_ml in legal_ml:
+                            ntn_ml = _diag_ntn(mv_ml)
+                            if eg_flags.get(ntn_ml):
+                                continue  # already set by endgame_solved_db
+                            try:
+                                after_ml = diag_board.apply_move(mv_ml)
+                                res_ml = _malom_db.query(after_ml)
+                                if res_ml:
+                                    eg_flags[ntn_ml] = _flip.get(res_ml)
+                            except Exception:
+                                pass
+
                 for mv_e in moves_out:
                     ntn = _diag_ntn(mv_e)
                     mv_e["traj_freq"] = round(traj_freqs.get(ntn, 0.0), 3)
@@ -2120,6 +2241,29 @@ async def ws_endpoint(websocket: WebSocket):
                     # Capture mode eg_flags keyed by captured square
                     cap_pos = mv_e.get("to") if diag_mode == "capture" else None
                     mv_e["eg_flag"] = eg_flags.get(cap_pos or ntn)  # "W"/"L"/"D"/None
+
+                # ── Sentinel overlay: score each legal move ───────────────────
+                if _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                    try:
+                        candidates = [
+                            {"from": mv_e.get("from"), "to": mv_e.get("to"),
+                             "capture": mv_e.get("capture")}
+                            for mv_e in moves_out
+                        ]
+                        if candidates:
+                            sent_advice = await asyncio.to_thread(
+                                _sentinel_advisor.advise,
+                                diag_board, candidates, color, 0,
+                            )
+                            if sent_advice is not None:
+                                for i, mv_e in enumerate(moves_out):
+                                    if i < len(sent_advice.move_scores):
+                                        mv_e["sentinel_score"] = round(sent_advice.move_scores[i], 3)
+                    except Exception as _se:
+                        log.debug("Sentinel diagnostic scoring failed: %s", _se)
+                for mv_e in moves_out:
+                    if "sentinel_score" not in mv_e:
+                        mv_e["sentinel_score"] = None
 
                 await _send(websocket, {
                     "type":    "diagnostic",
@@ -2129,6 +2273,7 @@ async def ws_endpoint(websocket: WebSocket):
                     "eval_w":  eval_w,
                     "eval_b":  eval_b,
                     "moves":   moves_out,
+                    "fen":     fen_override or diag_board.to_fen_string(),
                 })
 
             # ── good_game — elevate a draw to win-like status in trajectory ────
@@ -2182,7 +2327,7 @@ async def ws_endpoint(websocket: WebSocket):
                     value_net_blend=_w("value_net_blend", 0),
                     cross_mill_cycling=_w("cross_mill_cycling", 300),
                 )
-                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, value_net=_value_net)
+                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
 
                 new_coord = None
                 if use_llm:
@@ -2544,8 +2689,8 @@ async def ws_endpoint(websocket: WebSocket):
                     # _run_ai_vs_ai_loop safely handles None coordinators.
                     _ava_diff = 3
                     _ava_hw = HeuristicWeights()
-                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, value_net=_value_net)
-                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, value_net=_value_net)
+                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
+                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
                     session.ai_vs_ai = True
                     session.vs_human = False
                     session.game_ai_white = _ai_w

@@ -46,10 +46,13 @@ let diagStatic      = true;         // show static (tac+eval) scores
 let diagNegamax     = false;        // show negamax scores
 let diagTraj        = false;        // show trajectory DB frequencies
 let diagDB          = false;        // show fullgame/endgame DB arrows
+let diagSentinel    = false;        // show Sentinel AI move quality overlay
 let diagDepth       = 3;            // negamax depth
+let currentDifficulty = 3;          // updated from state messages; gates overlay visibility
 let _diagStaticData  = null;        // last received static diagnostic response
 let _diagNegamaxData = null;        // last received negamax diagnostic response
 let _diagSeq        = 0;            // sequence counter for in-flight requests
+let _diagFenCache   = new Map();    // fen → {static?: msg, negamax?: msg} — reset on new game
 let _diagPending    = 0;            // expected seq for current request pair
 let _diagDebounce   = null;         // debounce timer handle
 let _diagCaptureFen = null;         // FEN of projected board in capture mode
@@ -194,6 +197,24 @@ document.addEventListener("DOMContentLoaded", () => {
     _loadPersonality(personality);
   }).catch(() => _loadPersonality("balanced"));
 
+  // Sentinel chip availability check + perfect DB checkbox availability
+  fetch("/api/sentinel_status").then(r => r.json()).then(s => {
+    const chip   = $("diag-btn-sentinel");
+    const status = $("diag-sentinel-status");
+    if (!s.available) {
+      if (chip)   { chip.disabled = true; chip.title = "Sentinel model not loaded"; }
+      if (status) status.style.display = "inline";
+    }
+    const chkPerfect = $("chk-perfect-db");
+    const rowPerfect = $("row-perfect-db");
+    if (!s.malom_db) {
+      if (chkPerfect) { chkPerfect.disabled = true; chkPerfect.checked = false; }
+      if (rowPerfect) rowPerfect.style.opacity = "0.45";
+      const hint = $("perfect-db-hint");
+      if (hint) hint.textContent = "(Malom DB not loaded)";
+    }
+  }).catch(() => {});
+
   // VN status line in AI Tuning panel
   fetch("/api/vn_status").then(r => r.json()).then(d => {
     const el = $("vn-status-line");
@@ -207,6 +228,23 @@ document.addEventListener("DOMContentLoaded", () => {
     chkSentinel.addEventListener("change", () => {
       const modeRow = $("row-sentinel-mode");
       if (modeRow) modeRow.style.display = chkSentinel.checked ? "" : "none";
+    });
+  }
+
+  const chkPerfectDB = $("chk-perfect-db");
+  if (chkPerfectDB) {
+    chkPerfectDB.addEventListener("change", () => {
+      const sentinelRow = $("row-sentinel");
+      const modeRow     = $("row-sentinel-mode");
+      if (chkPerfectDB.checked) {
+        // Malom DB overrides sentinel — dim sentinel controls
+        if (sentinelRow) sentinelRow.style.opacity = "0.45";
+        if (modeRow)     modeRow.style.display = "none";
+      } else {
+        if (sentinelRow) sentinelRow.style.opacity = "";
+        if (modeRow && chkSentinel && chkSentinel.checked)
+          modeRow.style.display = "";
+      }
     });
   }
 
@@ -345,7 +383,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
+    if (diagDB) {
+      diagSentinel = false;
+      $("diag-btn-sentinel") && $("diag-btn-sentinel").classList.remove("diag-chip-active");
+    }
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
+    _diagRender();
+  });
+
+  $("diag-btn-sentinel") && $("diag-btn-sentinel").addEventListener("click", () => {
+    diagSentinel = !diagSentinel;
+    if (diagSentinel) {
+      diagDB = false;
+      $("diag-btn-db").classList.remove("diag-chip-active");
+      _diagRequestStatic();  // ensure server has computed sentinel_score
+    }
+    $("diag-btn-sentinel").classList.toggle("diag-chip-active", diagSentinel);
     _diagRender();
   });
 
@@ -567,6 +620,7 @@ function startNewGame() {
   forceAggressive = false;
   replayMoves = [];
   replayIdx   = -1;
+  _diagFenCache = new Map();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").classList.remove("btn-active");
@@ -603,6 +657,7 @@ function startNewGame() {
       use_llm:      useLlm,
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
+      use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
       ai_weights:   _getWeights(),
       player_name:  playerName,
     }));
@@ -639,6 +694,7 @@ function startAiVsAi() {
   forceAggressive = false;
   replayMoves = [];
   replayIdx   = -1;
+  _diagFenCache = new Map();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").disabled = true;
@@ -829,6 +885,7 @@ function startSetupGame() {
   forceAggressive = false;
   replayMoves = [];
   replayIdx   = -1;
+  _diagFenCache = new Map();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").classList.remove("btn-active");
@@ -863,6 +920,9 @@ function startSetupGame() {
       difficulty:   diff,
       vs_human:     vs,
       use_llm:      useLlm,
+      use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
+      sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
+      use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
       ai_weights:   _getWeights(),
       positions:    positions,
       phase:        $("sel-setup-phase").value,
@@ -887,6 +947,7 @@ function handleMessage(msg) {
 
     case "state":
       gameState = msg;
+      if (msg.difficulty != null) { currentDifficulty = msg.difficulty; _updateSentinelUI(currentDifficulty); }
       phase = msg.finished ? "game_over" : "playing";
       stopThinkingTimer();
       $("btn-force-move").hidden = true;
@@ -986,39 +1047,40 @@ function handleMessage(msg) {
       const cap     = msg.capture ? ` × ${msg.capture}` : "";
       const blunder = msg.was_blunder ? " ← deliberate mistake!" : "";
       addCommentary("GameAI", `Played ${from === "—" ? to : from + "→" + to}${cap}${blunder}`, "ai");
-      // Sentinel advisory
+      // Sentinel advisory (move-level scorer)
       if (msg.sentinel) {
         const s = msg.sentinel;
         const badge = $("sentinel-advisory");
         const txt   = $("sentinel-text");
         const icon  = $("sentinel-icon");
 
+        const qualityPct = Math.round((s.played_move_quality || 0) * 100);
+        const gapPct     = Math.round((s.opportunity_gap || 0) * 100);
+        const player     = s.player || "?";
+
         if (badge && txt) {
-          if (s.is_turning_point) {
-            // Show the badge prominently
-            const msgMap = {
-              "critical":             { icon: "🔴", label: "Critical position",       bg: "rgba(220,50,50,.15)" },
-              "possible_mistake":     { icon: "🟡", label: "Possible mistake here",   bg: "rgba(220,180,50,.15)" },
-              "missed_opportunity":   { icon: "🔵", label: "Missed opportunity",      bg: "rgba(50,120,220,.15)" },
-              "safe":                 { icon: "🟢", label: "Position looks safe",     bg: "rgba(50,180,80,.1)"  },
-            };
-            const style = msgMap[s.advisory_message] || msgMap["safe"];
-            icon.textContent  = style.icon;
-            txt.textContent   = `${style.label} (confidence: ${Math.round(s.turning_point_confidence * 100)}%)`;
+          const msgMap = {
+            "critical":           { icon: "🔴", label: "Critical — much better move available", bg: "rgba(220,50,50,.15)" },
+            "possible_mistake":   { icon: "🟡", label: "Possible mistake",                      bg: "rgba(220,180,50,.15)" },
+            "missed_opportunity": { icon: "🔵", label: "Missed opportunity",                    bg: "rgba(50,120,220,.15)" },
+            "safe":               { icon: "🟢", label: "Move looks sound",                      bg: "rgba(50,180,80,.1)"  },
+          };
+          const style = msgMap[s.advisory_message] || msgMap["safe"];
+
+          if (s.advisory_message && s.advisory_message !== "safe") {
+            icon.textContent = style.icon;
+            txt.textContent  = `${player}: ${style.label} (move quality ${qualityPct}%, gap ${gapPct}%)`;
             badge.style.background = style.bg;
             badge.style.display = "";
           } else {
-            // Not a turning point — hide the badge
             badge.style.display = "none";
           }
 
-          // Always add a subtle commentary line if sentinel is active
-          const riskPct = Math.round(s.mistake_risk * 100);
-          const oppPct  = Math.round(s.opportunity_score * 100);
-          if (s.is_turning_point || riskPct > 40 || oppPct > 40) {
+          // Commentary line whenever there's a non-trivial opportunity gap.
+          if (s.advisory_message !== "safe" || gapPct > 15) {
             addCommentary(
               "Sentinel",
-              `${s.advisory_message.replace(/_/g, " ")} · risk ${riskPct}% · opp ${oppPct}%`,
+              `${player} · ${(s.advisory_message || "safe").replace(/_/g, " ")} · move quality ${qualityPct}% · gap ${gapPct}%`,
               "ai"
             );
           }
@@ -2218,6 +2280,7 @@ function _handleTournamentNext(msg) {
       use_llm:        $("chk-llm").checked,
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
+      use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
     }));
   }
 }
@@ -2346,7 +2409,38 @@ function _diagOnReceive(msg) {
   if (msg.mode === "static")  { _diagStaticData  = msg; }
   if (msg.mode === "negamax") { _diagNegamaxData = msg; }
   if (msg.mode === "capture") { _diagStaticData  = msg; }
+  // Cache by FEN (skip capture mode — live-board only, not replay-addressable)
+  if (msg.fen && msg.mode !== "capture") {
+    const entry = _diagFenCache.get(msg.fen) || {};
+    if (msg.mode === "static")  entry.static  = msg;
+    if (msg.mode === "negamax") entry.negamax = msg;
+    _diagFenCache.set(msg.fen, entry);
+  }
   _diagRender();
+}
+
+function _overlayVisibilityFraction(diff) {
+  if (diff <= 5) return 1.0;
+  if (diff === 6) return 0.75;
+  if (diff === 7) return 0.5;
+  if (diff === 8) return 0.25;
+  return 0.0;  // 9, 10
+}
+
+function _updateSentinelUI(diff) {
+  const row = $("row-sentinel");
+  if (!row) return;
+  const PROBS = [0, 0, 0, 10, 22, 33, 50, 65, 80, 90, 100];
+  if (diff >= 9) {
+    row.style.display = "none";
+  } else if (diff >= 3) {
+    row.style.display = "";
+    const prob = PROBS[diff] || 0;
+    const lbl = row.querySelector("label");
+    if (lbl) lbl.title = `Auto-activates on ${prob}% of moves at difficulty ${diff}`;
+  } else {
+    row.style.display = "none";
+  }
 }
 
 function _diagRender() {
@@ -2356,7 +2450,7 @@ function _diagRender() {
   const negamaxD = diagNegamax ? _diagNegamaxData : null;
   const anyScore = staticD || negamaxD;
 
-  if (!anyScore && !diagTraj && !diagDB) { board.clearDiag(); return; }
+  if (!anyScore && !diagTraj && !diagDB && !diagSentinel) { board.clearDiag(); return; }
 
   // Pick primary data source (static preferred for phase/color info)
   const primary   = staticD || negamaxD;
@@ -2371,6 +2465,7 @@ function _diagRender() {
   if (negamaxD) modeLabel.push(`negamax d${diagDepth}`);
   if (diagTraj) modeLabel.push("traj");
   if (diagDB)   modeLabel.push("DB");
+  if (diagSentinel) modeLabel.push("Sentinel");
   $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
 
   // Score label overlay (heuristic / negamax numbers)
@@ -2384,17 +2479,24 @@ function _diagRender() {
     board._diagGroup.innerHTML = "";
   }
 
-  // DB overlay (traj frequencies + fullgame/endgame arrows)
-  const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
-  if ((diagTraj || diagDB) && dbSource && dbSource.moves) {
-    board.renderDiagDB(dbSource.moves, {
-      phase:       curPhase,
-      selectedSrc: board.selected,
-      showTraj:    diagTraj,
-      showDB:      diagDB,
-    });
-  } else {
+  // DB / Sentinel overlay — gated by difficulty
+  const visFrac = _overlayVisibilityFraction(currentDifficulty);
+  if (visFrac === 0.0) {
     board._dbGroup.innerHTML = "";
+  } else {
+    const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
+    if ((diagTraj || diagDB || diagSentinel) && dbSource && dbSource.moves) {
+      board.renderDiagDB(dbSource.moves, {
+        phase:              curPhase,
+        selectedSrc:        board.selected,
+        showTraj:           diagTraj,
+        showDB:             diagDB,
+        showSentinel:       diagSentinel,
+        visibilityFraction: visFrac,
+      });
+    } else {
+      board._dbGroup.innerHTML = "";
+    }
   }
 }
 
@@ -2410,9 +2512,25 @@ function _diagRefreshForReplay(idx) {
     fen = replayMoves[idx] && replayMoves[idx].fen;
     prefix = replayMoves.slice(0, idx).map(m => m.notation).filter(Boolean);
   } else {
-    // After last move: use live board (no FEN override)
+    // After last move: use live board — always request fresh (no cached key)
     fen = null; prefix = null;
   }
+
+  // Cache-first: serve from cache when all needed data is available
+  if (fen) {
+    const cached = _diagFenCache.get(fen);
+    if (cached) {
+      const haveStatic  = !diagStatic  || !!cached.static;
+      const haveNegamax = !diagNegamax || !!cached.negamax;
+      if (haveStatic && haveNegamax) {
+        if (cached.static)  _diagStaticData  = cached.static;
+        if (cached.negamax) _diagNegamaxData = cached.negamax;
+        _diagRender();
+        return;  // skip server round-trip
+      }
+    }
+  }
+
   _diagStaticData  = null;
   _diagNegamaxData = null;
   _diagRequestAll(fen || undefined, prefix || undefined);
