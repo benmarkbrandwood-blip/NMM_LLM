@@ -459,8 +459,8 @@ class Coordinator:
                     move = llm_move
                     self.emit(
                         "GameAI",
-                        f"MillsLLM recommends {llm_notation} "
-                        f"(score {llm_score:.2f} vs engine {ai_score:.2f}) — adopting",
+                        f"Engine intended {_move_str(ai_move)} (score {ai_score:.2f}); "
+                        f"MillsLLM recommends {llm_notation} (score {llm_score:.2f}) — adopting",
                     )
                 else:
                     self.emit(

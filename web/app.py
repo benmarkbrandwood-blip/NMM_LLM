@@ -1100,6 +1100,7 @@ def _sentinel_payload(adv) -> dict:
         "advisory_message":       adv.advisory_message,
         "intervention":           getattr(adv, "intervention_applied", None),
         "intervention_detail":    getattr(adv, "intervention_detail", None),
+        "original_move_notation": getattr(adv, "original_move_notation", None),
     }
 
 

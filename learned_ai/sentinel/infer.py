@@ -45,8 +45,9 @@ class SentinelAdvice:
     opportunity_gap: float          # best_available_quality - played_move_quality
     player: str
     advisory_message: str           # "safe"|"possible_mistake"|"missed_opportunity"|"critical"
-    intervention_applied: Optional[str] = None   # "llm_override"|"score_adjust"|"rank1_fallback"|None
-    intervention_detail: Optional[str] = None     # human-readable string
+    intervention_applied: Optional[str] = None        # "llm_override"|"score_adjust"|"rank1_fallback"|None
+    intervention_detail: Optional[str] = None          # human-readable string
+    original_move_notation: Optional[str] = None       # engine's intended move before intervention
     meta: Dict[str, Any] = field(default_factory=dict)
 
 

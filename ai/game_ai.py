@@ -632,6 +632,7 @@ class GameAI:
         best_i = max(range(n), key=lambda i: blended[i])
         new_move = moves[best_i]
         if new_move != move:
+            advice.original_move_notation = self._move_notation(move)
             advice.intervention_applied = "score_adjust"
             advice.intervention_detail = (
                 f"Score adjust — blended re-rank "
@@ -661,6 +662,7 @@ class GameAI:
             except Exception:
                 llm_move = None
             if llm_move is not None and llm_move in moves:
+                advice.original_move_notation = self._move_notation(move)
                 advice.intervention_applied = "llm_override"
                 advice.intervention_detail = (
                     f"LLM override — {advice.advisory_message} (gap={gap:.0%})"
@@ -672,6 +674,7 @@ class GameAI:
         if 0 <= best_idx < len(moves):
             best_move = moves[best_idx]
             if best_move != move:
+                advice.original_move_notation = self._move_notation(move)
                 advice.intervention_applied = "sentinel_best"
                 advice.intervention_detail = (
                     f"Sentinel best move — {advice.advisory_message} (gap={gap:.0%})"

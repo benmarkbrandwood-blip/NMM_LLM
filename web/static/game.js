@@ -1048,7 +1048,14 @@ function handleMessage(msg) {
       const to      = msg.to;
       const cap     = msg.capture ? ` × ${msg.capture}` : "";
       const blunder = msg.was_blunder ? " ← deliberate mistake!" : "";
-      addCommentary("GameAI", `Played ${from === "—" ? to : from + "→" + to}${cap}${blunder}`, "ai");
+      // If sentinel/LLM redirected the engine's move, show both the intended and played moves
+      const origNotation = msg.sentinel && msg.sentinel.original_move_notation;
+      if (origNotation) {
+        addCommentary("GameAI", `Engine intended: ${origNotation}`, "ai");
+      }
+      const playedStr = from === "—" ? to : `${from}→${to}`;
+      const playedLabel = origNotation ? "Redirected to" : "Played";
+      addCommentary("GameAI", `${playedLabel}: ${playedStr}${cap}${blunder}`, "ai");
       // Sentinel advisory (move-level scorer)
       if (msg.sentinel) {
         const s = msg.sentinel;
