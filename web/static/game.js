@@ -385,10 +385,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
-    if (diagDB) {
-      diagSentinel = false;
-      $("diag-btn-sentinel") && $("diag-btn-sentinel").classList.remove("diag-chip-active");
-    }
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
     _diagRender();
   });
@@ -396,8 +392,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("diag-btn-sentinel") && $("diag-btn-sentinel").addEventListener("click", () => {
     diagSentinel = !diagSentinel;
     if (diagSentinel) {
-      diagDB = false;
-      $("diag-btn-db").classList.remove("diag-chip-active");
       _diagRequestStatic();  // ensure server has computed sentinel_score
     }
     $("diag-btn-sentinel").classList.toggle("diag-chip-active", diagSentinel);

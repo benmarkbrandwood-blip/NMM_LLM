@@ -391,13 +391,10 @@ export class Board {
       return Math.abs(h);
     };
 
-    // Helper: arrow/halo color from db_delta, eg_flag, or sentinel_score
-    const dbColor = (delta, egFlag, sentinelScore) => {
-      if (showSentinel && sentinelScore != null) {
-        if (sentinelScore >= 0.55) return "#4caf50";   // good move
-        if (sentinelScore <= 0.45) return "#e05050";   // bad move
-        return "#999";  // neutral — faint grey to show coverage
-      }
+    // Helper: arrow/halo color from db_delta or eg_flag only.
+    // Sentinel scores no longer drive circle/arrow colours — they appear as
+    // S:XX% text labels only, and can co-exist with the DB/Malom overlay.
+    const dbColor = (delta, egFlag) => {
       if (egFlag === "W") return "#4caf50";
       if (egFlag === "L") return "#e05050";
       if (egFlag === "D") return "#888";    // endgame draw — keep grey
@@ -421,8 +418,7 @@ export class Board {
         if (visFrac < 1.0 && (_mvHash(mv) % 100) >= Math.round(visFrac * 100)) continue;
         const pos = mv.to;
         if (!pos) continue;
-        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
-                            showSentinel ? mv.sentinel_score : null);
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
         const freq = showTraj ? (mv.traj_freq || 0) : 0;
         const slbl = sentinelLabel(mv.sentinel_score);
 
@@ -465,8 +461,7 @@ export class Board {
       for (const mv of toRender) {
         if (visFrac < 1.0 && (_mvHash(mv) % 100) >= Math.round(visFrac * 100)) continue;
         if (!mv.from || !mv.to) continue;
-        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
-                            showSentinel ? mv.sentinel_score : null);
+        const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null);
         const freq = showTraj ? (mv.traj_freq || 0) : 0;
         const slbl = selSrc ? sentinelLabel(mv.sentinel_score) : null;
         if (!col && freq === 0 && !slbl) continue;
@@ -488,7 +483,7 @@ export class Board {
               x1: sx, y1: sy, x2: ex, y2: ey,
               stroke: col, "stroke-width": 2,
               "marker-end": `url(#${markerId(col)})`,
-              opacity: col === "#999" ? 0.35 : 0.75,
+              opacity: 0.75,
             }));
           }
         }
@@ -517,13 +512,13 @@ export class Board {
         }
       }
 
-      // If no source selected, show best-DB/sentinel-flagged sources with a ring
-      if (!selSrc && (showDB || showSentinel)) {
+      // If no source selected, ring sources with the best DB/Malom colour.
+      // Sentinel-only mode draws no rings (sentinel appears as labels only).
+      if (!selSrc && showDB) {
         const srcDB = new Map();  // source → best db color
         for (const mv of moves) {
-          const col = dbColor(showDB ? mv.db_delta : null, showDB ? mv.eg_flag : null,
-                              showSentinel ? mv.sentinel_score : null);
-          if (col && col !== "#888" && col !== "#999" && mv.from) {
+          const col = dbColor(mv.db_delta, mv.eg_flag);
+          if (col && col !== "#888" && mv.from) {
             if (!srcDB.has(mv.from) || col === "#4caf50")
               srcDB.set(mv.from, col);
           }
