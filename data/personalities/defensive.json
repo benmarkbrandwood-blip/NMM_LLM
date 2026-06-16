@@ -5,8 +5,8 @@
   "stop_opponent_mills": 425,
   "feeder_diamond": 100,
   "mill_wrapping": 375,
-  "cardinal_block": 225,
-  "scatter_placement": 150,
+  "cardinal_block": 300,
+  "scatter_placement": 275,
   "setup_mill": 125,
   "mill_opening": 150,
   "long_term_position": 115,
@@ -18,9 +18,8 @@
   "redirected_pin": 100,
   "defer_for_chain": 400,
   "block_cycling_priority": 190,
+  "value_net_blend": 0,
   "make_mistakes": 0,
-  "opening_adherence": 55,
-  "loss_exploit": 140,
-  "dead_placement_penalty": 1500,
-  "near_dead_placement_penalty": 400
+  "opening_adherence": 75,
+  "loss_exploit": 140
 }

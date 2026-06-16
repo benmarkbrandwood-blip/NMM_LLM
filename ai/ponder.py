@@ -27,6 +27,7 @@ class PonderManager:
         self._ponder_ai: GameAI | None = None
         self._predicted_hash: int | None = None
         self._cached_move: dict | None = None
+        self._completed_ponder_ai: GameAI | None = None  # B-94: retained after stop()
         self._lock = threading.Lock()
 
     def start(
@@ -37,6 +38,7 @@ class PonderManager:
         trajectory_db=None,
         fullgame_db=None,
         endgame_state=None,
+        ngram_model=None,          # SE-13: NGramOpponentModel | None
     ) -> None:
         """Predict the opponent's best reply and begin searching the response.
 
@@ -52,8 +54,8 @@ class PonderManager:
         if not opp_moves:
             return
 
-        # Predict opponent move: take the highest-priority move, optionally
-        # refined by value network across the top-3 priority candidates.
+        # Predict opponent move: priority order, optionally refined by value
+        # network, trajectory-DB frequency, and fullgame-DB best move (B-93).
         ordered = _order_moves(board, opp_moves, None, None)
         predicted_move = ordered[0]
 
@@ -66,6 +68,45 @@ class PonderManager:
                 if best_vn is None or vn > best_vn:
                     best_vn = vn
                     predicted_move = m
+
+        # B-93/SE-13: blend trajectory-DB frequency, fullgame-DB best move,
+        # and n-gram opponent model into prediction scoring.
+        # Each candidate gets a base score from its priority rank, then receives
+        # additive boosts from whichever sources are available.
+        if trajectory_db is not None or fullgame_db is not None or ngram_model is not None:
+            freq_scores: dict[str, float] = {}
+            if trajectory_db is not None:
+                try:
+                    freq_scores = trajectory_db.query_all_frequencies(board)
+                except Exception:
+                    pass
+
+            fgdb_best: str | None = None
+            if fullgame_db is not None:
+                try:
+                    fgdb_best = fullgame_db.best_move_validated(board)
+                except Exception:
+                    pass
+
+            ngram_scores: dict[str, float] = {}
+            if ngram_model is not None:
+                try:
+                    ngram_scores = ngram_model.predict(board.turn, game_notations)
+                except Exception:
+                    pass
+
+            if freq_scores or fgdb_best or ngram_scores:
+                best_score: float | None = None
+                for i, m in enumerate(ordered):
+                    notation = _move_notation(m)
+                    score = float(-i)
+                    score += freq_scores.get(notation, 0.0) * 5.0
+                    if fgdb_best is not None and notation == fgdb_best:
+                        score += 3.0
+                    score += ngram_scores.get(notation, 0.0) * 4.0  # SE-13
+                    if best_score is None or score > best_score:
+                        best_score = score
+                        predicted_move = m
 
         ponder_board = board.apply_move(predicted_move)
         predicted_hash = ponder_board.hash_key
@@ -86,6 +127,7 @@ class PonderManager:
             self._ponder_ai = ponder_ai
             self._predicted_hash = predicted_hash
             self._cached_move = None
+            self._completed_ponder_ai = None
 
         ponder_notations = list(game_notations) + [pred_notation]
 
@@ -101,6 +143,7 @@ class PonderManager:
                 with self._lock:
                     if self._predicted_hash == predicted_hash:
                         self._cached_move = move
+                        self._completed_ponder_ai = ponder_ai  # B-94: expose for TT reuse
                         log.info(
                             "Ponder complete: opp %s → cached AI reply %s",
                             pred_notation,
@@ -125,9 +168,12 @@ class PonderManager:
         with self._lock:
             self._ponder_ai = None
 
-    def get_result(self, board: BoardState) -> dict | None:
-        """Return the cached move if board matches the predicted position.
+    def get_result(self, board: BoardState) -> tuple[dict, GameAI | None] | None:
+        """Return (cached_move, completed_ponder_ai) if board matches the predicted position.
 
+        B-94: the completed_ponder_ai carries a pre-warmed TT; the caller may
+        reset its _force_stop/_deadline and call _iterative_deepen() to deepen
+        the search cheaply.  Returns None on miss or if ponder is incomplete.
         Must be called AFTER stop() so there is no concurrent write race.
         """
         with self._lock:
@@ -139,8 +185,8 @@ class PonderManager:
                     self._predicted_hash, board.hash_key,
                 )
                 return None
-            log.info("Ponder hit — skipping fresh search")
-            return self._cached_move
+            log.info("Ponder hit — TT pre-warmed for deepening (B-94)")
+            return self._cached_move, self._completed_ponder_ai
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()

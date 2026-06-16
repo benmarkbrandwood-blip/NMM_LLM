@@ -11,17 +11,15 @@
   "mill_opening": 150,
   "long_term_position": 115,
   "mill_count_scale": 100,
-  "mobility_scale": 133,
+  "mobility_scale": 135,
   "blocked_scale": 130,
   "fork_anticipation": 100,
   "locked_mill_escape": 80,
   "redirected_pin": 70,
   "defer_for_chain": 500,
   "block_cycling_priority": 60,
+  "value_net_blend": 50,
   "make_mistakes": 0,
-  "opening_adherence": 70,
-  "loss_exploit": 210,
-  "cycling_capture_unblock": 180,
-  "dead_placement_penalty": 1500,
-  "near_dead_placement_penalty": 400
+  "opening_adherence": 60,
+  "loss_exploit": 250
 }

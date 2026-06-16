@@ -86,7 +86,7 @@
     },
     "outcome_stats": {
       "W": 1,
-      "B": 4,
+      "B": 7,
       "D": 0
     },
     "confidence": 0.8,
@@ -279,7 +279,7 @@
   },
   {
     "opening_id": "book-06-2971b5",
-    "name": "White diagonal draw",
+    "name": "White outer column loss",
     "aliases": [],
     "family": "Early Game",
     "side": "B",
@@ -331,7 +331,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 7,
+      "B": 10,
       "D": 0
     },
     "confidence": 0.8,
@@ -344,7 +344,7 @@
   },
   {
     "opening_id": "book-07-a33845",
-    "name": "Z mill c4 e3 variant 2",
+    "name": "Mill Wrap - W outside",
     "aliases": [],
     "family": "Early Game",
     "side": "W",
@@ -395,7 +395,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 32,
+      "W": 50,
       "B": 1,
       "D": 0
     },
@@ -591,7 +591,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 9,
+      "B": 11,
       "D": 0
     },
     "confidence": 0.8,
@@ -4322,7 +4322,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 7,
+      "W": 9,
       "B": 0,
       "D": 0
     },
@@ -4336,7 +4336,7 @@
   },
   {
     "opening_id": "novel-de906242",
-    "name": "Around the inside",
+    "name": "Battle lines variant 5",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -4387,7 +4387,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 4,
+      "W": 7,
       "B": 1,
       "D": 0
     },
@@ -4709,7 +4709,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 3,
+      "W": 4,
       "B": 0,
       "D": 0
     },
@@ -4959,7 +4959,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 1,
+      "B": 2,
       "D": 0
     },
     "confidence": 0.3,
@@ -5622,7 +5622,7 @@
   },
   {
     "opening_id": "novel-17e922b1",
-    "name": "The Storm’s Rise",
+    "name": "The Storm’s Rise v2",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -5944,5 +5944,198 @@
     ],
     "source_reference": "",
     "needs_llm_name": true
+  },
+  {
+    "opening_id": "novel-c5295bcb",
+    "name": "Scattered rediredt -Black win",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d1",
+      "d6",
+      "d7",
+      "f4",
+      "f6",
+      "a4",
+      "g4",
+      "c3",
+      "c4",
+      "d2",
+      "e3",
+      "a7",
+      "a1",
+      "g1",
+      "b4",
+      "e5",
+      "c5",
+      "b2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".W...W...B.B............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".W...W.B.BWB............|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".W.W.W.B.BWB..........B.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W.W.W.B.BWB.B........BW|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-c4e07f15",
+    "name": "Battle Lines variant 3",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "f6",
+      "b6",
+      "f2",
+      "c4",
+      "e4",
+      "d3",
+      "c3",
+      "d1",
+      "d2",
+      "g1",
+      "a1",
+      "g7",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........WBW.B..........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........WWBWBB..........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWBWBB.....B...W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWBWBB.....B.WBW|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-ccc52161",
+    "name": "Cardinal mill wrap variant - redirect",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d1",
+      "d6",
+      "f2",
+      "f4",
+      "d2",
+      "d3",
+      "b2",
+      "d3",
+      "d5",
+      "a4",
+      "b4",
+      "b6",
+      "f6",
+      "a1",
+      "a7",
+      "e4",
+      "g4",
+      "c3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".....W...B.BW...........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....W...B.BWW.......B..|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".....W...B.BWWW......B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".....W.B.B.BWWW..W...B..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false
   }
 ]

@@ -13,15 +13,12 @@
   "mill_count_scale": 130,
   "mobility_scale": 190,
   "blocked_scale": 95,
-  "fork_anticipation": 100,
-  "locked_mill_escape": 190,
-  "redirected_pin": 40,
-  "defer_for_chain": 350,
+  "fork_anticipation": 40,
+  "locked_mill_escape": 230,
+  "redirected_pin": 100,
+  "defer_for_chain": 475,
   "block_cycling_priority": 160,
   "make_mistakes": 0,
-  "opening_adherence": 75,
-  "loss_exploit": 220,
-  "cycling_capture_unblock": 180,
-  "dead_placement_penalty": 1500,
-  "near_dead_placement_penalty": 400
+  "opening_adherence": 90,
+  "loss_exploit": 270
 }

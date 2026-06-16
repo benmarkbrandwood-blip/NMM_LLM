@@ -35,3 +35,5 @@ learned_ai/self_play_games/*
 # OS
 .DS_Store
 Thumbs.db
+data/human_games/*.jsonl
+data/human_games/imported.json

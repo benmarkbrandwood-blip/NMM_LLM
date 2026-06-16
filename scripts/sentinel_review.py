@@ -40,7 +40,7 @@ from learned_ai.sentinel.dataset import _enumerate_legal_moves
 from learned_ai.sentinel.infer import SentinelAdvisor, load_advisor
 
 # Default opportunity-gap threshold for flagging a ply.
-_DEFAULT_GAP = 0.3
+_DEFAULT_GAP = 0.2
 
 # ANSI colours (disabled when not a tty)
 _TTY = sys.stdout.isatty()
