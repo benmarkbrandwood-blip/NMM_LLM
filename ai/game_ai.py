@@ -468,6 +468,10 @@ class GameAI:
         # when present (set in set_sentinel), else fall back to documented defaults.
         self._sentinel_score_scale: float = 0.05
         self._sentinel_reconsider_threshold: float = 0.15
+        # Minimum opportunity gap required before sentinel overrides in any active mode.
+        # 0.0 = always override when blended score prefers a different move (default).
+        # Higher values (e.g. 0.20) mean sentinel only intercedes on larger mistakes.
+        self._sentinel_min_gap: float = 0.0
         # Optional LLM move recommender for reconsider mode. The LLM lives in the
         # Coordinator, not in GameAI, so it is injected as a callback to avoid
         # duplicating any LLM logic here. Signature: fn(board, legal_moves) -> move|None.
@@ -627,6 +631,15 @@ class GameAI:
         if advice is None:
             return move
 
+        # Always record engine's intended move and sentinel's top recommendation.
+        try:
+            advice.engine_move_notation = self._move_notation(move)
+            best_idx = int(getattr(advice, "best_sentinel_move_idx", 0))
+            if 0 <= best_idx < len(moves):
+                advice.best_sentinel_move_notation = self._move_notation(moves[best_idx])
+        except Exception:
+            pass
+
         # Advisory logging (all modes): record the chosen move's quality.
         try:
             self._sentinel_trajectory.append(advice.played_move_quality)
@@ -658,51 +671,48 @@ class GameAI:
     def _sentinel_score_adjust(
         self, board: BoardState, move: dict, moves: list, advice
     ) -> dict:
-        """score_adjust mode: blend heuristic rank with the sentinel score.
+        """score_adjust mode: override engine when sentinel sees a clear improvement.
 
-        Final score = 0.6 * heuristic_norm + 0.4 * sentinel_quality, per move.
-        The engine's search result (``move``) anchors heuristic_norm=1.0; the
-        sentinel must prefer an alternative by ≥ 1/(n-1) * 1.5 to override it.
-        Only swaps when the blend prefers a different move; otherwise kept.
+        Sentinel's top-ranked move replaces the engine's choice when both guards pass:
+          1. gap >= _sentinel_min_gap  (user-configured threshold)
+          2. best sentinel quality >= 0.65  (sentinel is confident)
+
+        The old blended-rank approach could silently swallow large gaps when the
+        sentinel's recommended move happened to rank low in the engine's move-ordering,
+        making the user-set gap threshold unreliable.  Direct override is predictable:
+        if you set gap=20% and sentinel sees 32%, it intervenes.
         """
         scores = list(getattr(advice, "move_scores", []) or [])
         if len(scores) < 2 or len(scores) != len(moves):
             return move
 
-        # Anchor: the engine's chosen move (result of search) is rank 0.
-        # moves[] is in move-ordering order, not post-search quality order, so
-        # we must find the engine's pick and rotate it to index 0 before
-        # applying the heuristic_norm gradient.
-        try:
-            engine_idx = next(i for i, m in enumerate(moves) if m == move)
-        except StopIteration:
+        gap  = float(getattr(advice, "opportunity_gap", 0.0))
+        best_q = float(getattr(advice, "best_available_quality", 0.0))
+        best_idx = int(getattr(advice, "best_sentinel_move_idx", 0))
+
+        # Gap guard: user-controlled threshold — sole arbiter of intervention.
+        if gap < self._sentinel_min_gap:
             return move
 
-        n = len(moves)
-        order = [engine_idx] + [i for i in range(n) if i != engine_idx]
-        reordered_moves = [moves[i] for i in order]
-        reordered_scores = [scores[i] for i in order]
+        if not (0 <= best_idx < len(moves)):
+            return move
+        new_move = moves[best_idx]
+        if new_move == move:
+            return move
 
-        heuristic_norm = [1.0 - (i / (n - 1)) for i in range(n)]
-        blended = [0.6 * heuristic_norm[i] + 0.4 * reordered_scores[i] for i in range(n)]
-        best_i = max(range(n), key=lambda i: blended[i])
-        new_move = reordered_moves[best_i]
-        if new_move != move:
-            advice.original_move_notation = self._move_notation(move)
-            advice.intervention_applied = "score_adjust"
-            advice.intervention_detail = (
-                f"Score adjust — blended re-rank "
-                f"(played_q={advice.played_move_quality:.0%}, "
-                f"new_q={reordered_scores[best_i]:.0%})"
-            )
-            _logger.info(
-                "[Sentinel] intervened: engine intended %s → redirected to %s "
-                "(type: score_adjust, gap: %.2f)",
-                self._move_notation(move), self._move_notation(new_move),
-                advice.opportunity_gap,
-            )
-            return new_move
-        return move
+        advice.original_move_notation = self._move_notation(move)
+        advice.intervention_applied = "score_adjust"
+        advice.intervention_detail = (
+            f"Score adjust — gap {gap:.0%} ≥ {self._sentinel_min_gap:.0%} threshold "
+            f"(engine {advice.played_move_quality:.0%} → sentinel {best_q:.0%})"
+        )
+        _logger.info(
+            "[Sentinel] intervened: engine intended %s → redirected to %s "
+            "(type: score_adjust, gap: %.2f, threshold: %.2f)",
+            self._move_notation(move), self._move_notation(new_move),
+            gap, self._sentinel_min_gap,
+        )
+        return new_move
 
     def _sentinel_reconsider(
         self, board: BoardState, move: dict, moves: list, advice

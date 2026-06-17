@@ -15,7 +15,7 @@
     <button id="toggle-setup">Setup</button>
     <button id="toggle-tournament" title="Open Tournament Mode">&#127942; Tournament</button>
     <button id="btn-ai-vs-ai" title="Watch two AIs play each other">&#x1F916; AI vs AI</button>
-    <a href="/explorer" id="btn-explorer" title="3D Position Explorer — browse human game data and Malom WDL" style="text-decoration:none">&#127759; Explorer</a>
+    <a href="/explorer" id="btn-explorer" target="_blank" rel="noopener" title="3D Position Explorer — browse human game data and Malom WDL" style="text-decoration:none">&#127759; Explorer</a>
     <button id="btn-new-game-header">&#9658; New Game</button>
     <select id="hdr-personality" title="AI Personality">
       <option value="random" selected>Random</option>
@@ -325,12 +325,28 @@
             <option value="reconsider">Reconsider on critical</option>
           </select>
         </div>
+        <div class="form-row" id="row-sentinel-gap" style="display:none; flex-direction:column; gap:3px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label for="rng-sentinel-gap" style="font-size:.82rem; color:var(--text-dim);">Intervene when gap &ge;</label>
+            <span id="lbl-sentinel-gap" style="font-size:.82rem; font-weight:600; min-width:2.8em; text-align:right;">10%</span>
+          </div>
+          <input type="range" id="rng-sentinel-gap" min="0" max="50" step="5" value="10" style="width:100%">
+          <span style="font-size:.72rem; color:var(--text-dim);">Higher = fewer overrides; 0% = override whenever sentinel prefers a different move</span>
+        </div>
 
         <div class="form-row" id="row-perfect-db" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-perfect-db">
           <label for="chk-perfect-db" style="color:var(--text); font-size:.9rem;">
             Use Malom perfect DB
             <span id="perfect-db-hint" style="font-size:.75rem; color:var(--text-dim);">(overrides sentinel)</span>
+          </label>
+        </div>
+
+        <div class="form-row" id="row-learned-ai" style="flex-direction:row; align-items:center; gap:8px; display:none">
+          <input type="checkbox" id="chk-learned-ai">
+          <label for="chk-learned-ai" style="color:var(--text); font-size:.9rem;">
+            Learned AI <span style="font-size:.75rem; color:#7c9ef8;">(experimental)</span>
+            <span id="learned-ai-hint" style="font-size:.75rem; color:var(--text-dim);">(model not loaded)</span>
           </label>
         </div>
 
@@ -447,9 +463,9 @@
   <div id="bottom-bar">
     <div id="eval-graph-wrap">
       <div class="eval-graph-labels">
-        <span class="piece-w">⬜ White</span>
+        <span id="legend-heuristic" style="color:#c8a96e; font-size:.78rem; font-family:monospace;">&#9472;&#9472; Heuristic</span>
         <span id="eval-graph-title">Position strength</span>
-        <span class="piece-b">Black ⬛</span>
+        <span id="legend-sentinel" style="color:#666; font-size:.78rem; font-family:monospace;">- - Sentinel</span>
       </div>
       <svg id="eval-graph" preserveAspectRatio="none"></svg>
       <div id="graph-tooltip" hidden></div>

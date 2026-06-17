@@ -441,11 +441,11 @@ export class Board {
             ty -= 11;
           }
           if (slbl) {
-            const sentCol = (mv.sentinel_score >= 0.55) ? "#2e7d32"
-                          : (mv.sentinel_score <= 0.45) ? "#b71c1c" : "#666";
-            const t = _el("text", { x, y: ty, "font-size":"9", fill: sentCol,
-              "text-anchor":"middle", "font-family":"monospace",
-              stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+            const sentCol = (mv.sentinel_score >= 0.55) ? "#66bb6a"
+                          : (mv.sentinel_score <= 0.45) ? "#ef5350" : "#bdbdbd";
+            const t = _el("text", { x, y: ty, "font-size":"10", "font-weight":"bold",
+              fill: sentCol, "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = slbl;
             this._dbGroup.appendChild(t);
@@ -500,11 +500,11 @@ export class Board {
             ty -= 10;
           }
           if (slbl) {
-            const sentCol = (mv.sentinel_score >= 0.55) ? "#2e7d32"
-                          : (mv.sentinel_score <= 0.45) ? "#b71c1c" : "#666";
-            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill: sentCol,
-              "text-anchor":"middle", "font-family":"monospace",
-              stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+            const sentCol = (mv.sentinel_score >= 0.55) ? "#66bb6a"
+                          : (mv.sentinel_score <= 0.45) ? "#ef5350" : "#bdbdbd";
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"10", "font-weight":"bold",
+              fill: sentCol, "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = slbl;
             this._dbGroup.appendChild(t);
@@ -527,6 +527,31 @@ export class Board {
           const [x, y] = nodeXY(src);
           this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 7,
             fill:"none", stroke: col, "stroke-width":2, opacity:0.55, "stroke-dasharray":"4 3" }));
+        }
+      }
+
+      // Per-source best sentinel label when no piece is selected.
+      // Shows the highest-quality move available for each piece as S:XX% above it.
+      if (!selSrc && showSentinel) {
+        const srcBest = new Map();  // source → highest sentinel_score across its moves
+        for (const mv of moves) {
+          if (mv.from && mv.sentinel_score != null) {
+            const prev = srcBest.get(mv.from);
+            if (prev == null || mv.sentinel_score > prev)
+              srcBest.set(mv.from, mv.sentinel_score);
+          }
+        }
+        for (const [src, score] of srcBest) {
+          const [x, y] = nodeXY(src);
+          const sentCol = (score >= 0.55) ? "#66bb6a"   // bright green
+                        : (score <= 0.45) ? "#ef5350"   // bright red
+                        : "#bdbdbd";                    // light grey — neutral
+          const t = _el("text", { x, y: y - PIECE_R - 3, "font-size":"10", "font-weight":"bold",
+            fill: sentCol, "text-anchor":"middle", "font-family":"monospace",
+            stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
+            "paint-order":"stroke" });
+          t.textContent = `S:${Math.round(score * 100)}%`;
+          this._dbGroup.appendChild(t);
         }
       }
     }

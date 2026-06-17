@@ -227,6 +227,20 @@ try:
 except Exception as _e:
     log.warning("Sentinel overlay unavailable: %s", _e)
 
+# ── Learned AI sentinel (light-retrained; optional) ───────────────────────────
+_learned_advisor = None
+_learned_ckpt = Path(_ROOT) / "learned_ai" / "sentinel" / "checkpoints" / "light_retrain" / "best.pt"
+try:
+    if _learned_ckpt.exists():
+        from learned_ai.sentinel.infer import load_advisor as _load_adv
+        _learned_advisor = _load_adv(str(_learned_ckpt))
+        if _learned_advisor is not None:
+            log.info("Learned AI sentinel loaded from %s", _learned_ckpt)
+        else:
+            log.warning("Learned AI checkpoint found but failed to load: %s", _learned_ckpt)
+except Exception as _le:
+    log.warning("Learned AI sentinel unavailable: %s", _le)
+
 # ── Malom perfect DB (ExternalSolvedDB) — used for DB Lines overlay and DB fallback ──
 # Path is read from settings.json "malom_db_path" (user-configurable via Tools page);
 # falls back to the sentinel config's external_db_path when the setting is absent.
@@ -701,6 +715,14 @@ async def sentinel_status():
         "available":    _sentinel_advisor is not None and _sentinel_advisor.is_loaded(),
         "checkpoint":   str(_sentinel_ckpt) if _sentinel_advisor else "",
         "malom_db":     _malom_db is not None and _malom_db.is_available(),
+    }
+
+
+@app.get("/api/learned_ai_status")
+async def learned_ai_status():
+    return {
+        "available": _learned_advisor is not None and _learned_advisor.is_loaded(),
+        "checkpoint": str(_learned_ckpt) if _learned_advisor else "",
     }
 
 
@@ -2034,6 +2056,7 @@ async def ws_endpoint(websocket: WebSocket):
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")  # "advisory"|"score_adjust"|"reconsider"
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))  # min opportunity gap to intercede
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
+                use_learned_ai = bool(msg.get("use_learned_ai", False))
                 settings  = _load_settings()
 
                 engine   = GameEngine(human_color=hc)
@@ -2093,6 +2116,11 @@ async def ws_endpoint(websocket: WebSocket):
                         game_ai.sentinel_mode = "score_adjust"
                         game_ai._sentinel_activation_prob = _sent_prob
                         log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", eff_diff, _sent_prob * 100)
+                    elif use_learned_ai and _learned_advisor is not None and _learned_advisor.is_loaded():
+                        game_ai.set_sentinel(_learned_advisor, mode="score_adjust")
+                        game_ai._sentinel_activation_prob = 1.0
+                        game_ai._sentinel_min_gap = 0.10
+                        log.info("Learned AI sentinel attached (diff=%d)", eff_diff)
                     elif use_sentinel and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
                         game_ai.set_sentinel(_sentinel_advisor, mode=sentinel_mode)
                         game_ai._sentinel_activation_prob = 1.0
@@ -2167,6 +2195,7 @@ async def ws_endpoint(websocket: WebSocket):
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
+                use_learned_ai = bool(msg.get("use_learned_ai", False))
                 setup_fen_str = msg.get("setup_fen", "")
                 if setup_fen_str:
                     setup_board = BoardState.from_fen_string(setup_fen_str)
@@ -2227,6 +2256,11 @@ async def ws_endpoint(websocket: WebSocket):
                         game_ai.sentinel_mode = "score_adjust"
                         game_ai._sentinel_activation_prob = _sent_prob_s
                         log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", diff, _sent_prob_s * 100)
+                    elif use_learned_ai and _learned_advisor is not None and _learned_advisor.is_loaded():
+                        game_ai.set_sentinel(_learned_advisor, mode="score_adjust")
+                        game_ai._sentinel_activation_prob = 1.0
+                        game_ai._sentinel_min_gap = 0.10
+                        log.info("Learned AI sentinel attached (diff=%d)", diff)
                     elif use_sentinel and _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
                         game_ai.set_sentinel(_sentinel_advisor, mode=sentinel_mode)
                         game_ai._sentinel_activation_prob = 1.0

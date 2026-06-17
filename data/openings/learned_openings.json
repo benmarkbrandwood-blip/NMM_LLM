@@ -279,7 +279,7 @@
   },
   {
     "opening_id": "book-06-2971b5",
-    "name": "White outer column loss",
+    "name": "Black diagonal succes",
     "aliases": [],
     "family": "Early Game",
     "side": "B",
@@ -330,8 +330,8 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 0,
-      "B": 10,
+      "W": 1,
+      "B": 11,
       "D": 0
     },
     "confidence": 0.8,
@@ -344,7 +344,7 @@
   },
   {
     "opening_id": "book-07-a33845",
-    "name": "Mill Wrap - W outside",
+    "name": "Z mill - e3/c3 B correct",
     "aliases": [],
     "family": "Early Game",
     "side": "W",
@@ -395,7 +395,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 50,
+      "W": 59,
       "B": 1,
       "D": 0
     },
@@ -4387,7 +4387,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 7,
+      "W": 11,
       "B": 1,
       "D": 0
     },
@@ -6137,5 +6137,130 @@
     ],
     "source_reference": "",
     "needs_llm_name": false
+  },
+  {
+    "opening_id": "novel-75bbbaae",
+    "name": "Novel — g4-f4-b6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "g4",
+      "f4",
+      "b6",
+      "d5",
+      "a7",
+      "b4",
+      "d7",
+      "g7",
+      "c4",
+      "d2",
+      "f2",
+      "e5",
+      "c5",
+      "c3",
+      "d3",
+      "e3",
+      "e4",
+      "a4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "...W....W..B.....B......|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W..W....W..B...B.B......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WWBW....W..B...B.B......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WWBW....W..B.B.B.B.....W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true
+  },
+  {
+    "opening_id": "novel-c25d4b08",
+    "name": "The Silent Ascent",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "f2",
+      "b6",
+      "b4",
+      "c4",
+      "a7",
+      "d3",
+      "e5",
+      "c3",
+      "c5",
+      "e3",
+      "g7",
+      "c5",
+      "g7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........B...W..W.......B|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W.......B...W..W.....B.B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W.......B...W..W..W..BBB|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W.......B...W..WW.W.BBBB|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true
   }
 ]

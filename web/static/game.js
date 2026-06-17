@@ -201,6 +201,14 @@ document.addEventListener("DOMContentLoaded", () => {
     _loadPersonality(personality);
   }).catch(() => _loadPersonality("balanced"));
 
+  // Learned AI availability check
+  fetch("/api/learned_ai_status").then(r => r.json()).then(s => {
+    const row  = $("row-learned-ai");
+    const hint = $("learned-ai-hint");
+    if (row) row.style.display = s.available ? "flex" : "none";
+    if (hint) hint.textContent = s.available ? "(retrained sentinel + value net)" : "(model not loaded)";
+  }).catch(() => {});
+
   // Sentinel chip availability check + perfect DB checkbox availability
   fetch("/api/sentinel_status").then(r => r.json()).then(s => {
     const chip   = $("diag-btn-sentinel");
@@ -710,6 +718,7 @@ function startNewGame() {
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
       sentinel_gap:   $("rng-sentinel-gap")  ? parseInt($("rng-sentinel-gap").value, 10) / 100 : 0.10,
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
+      use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       ai_weights:   _getWeights(),
       player_name:  playerName,
     }));
@@ -976,6 +985,7 @@ function startSetupGame() {
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
       sentinel_gap:   $("rng-sentinel-gap")  ? parseInt($("rng-sentinel-gap").value, 10) / 100 : 0.10,
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
+      use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       ai_weights:   _getWeights(),
       positions:    positions,
       phase:        $("sel-setup-phase").value,
@@ -2412,6 +2422,7 @@ function _handleTournamentNext(msg) {
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
       sentinel_gap:   $("rng-sentinel-gap")  ? parseInt($("rng-sentinel-gap").value, 10) / 100 : 0.10,
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
+      use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
     }));
   }
 }

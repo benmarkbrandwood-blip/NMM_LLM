@@ -47,7 +47,9 @@ class SentinelAdvice:
     advisory_message: str           # "safe"|"possible_mistake"|"missed_opportunity"|"critical"
     intervention_applied: Optional[str] = None        # "llm_override"|"score_adjust"|"rank1_fallback"|None
     intervention_detail: Optional[str] = None          # human-readable string
-    original_move_notation: Optional[str] = None       # engine's intended move before intervention
+    original_move_notation: Optional[str] = None       # engine's intended move before intervention (only when redirected)
+    engine_move_notation: Optional[str] = None         # engine's first choice (always set after advise)
+    best_sentinel_move_notation: Optional[str] = None  # sentinel's top-ranked move notation (always set)
     meta: Dict[str, Any] = field(default_factory=dict)
 
 
