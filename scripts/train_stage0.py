@@ -29,6 +29,7 @@ _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from learned_ai.models.backbone import NMMNet
+from learned_ai.models.gnn_backbone import NMMGNNNet
 
 PATIENCE = 3
 DEFAULT_DATA = str(_ROOT / "learned_ai" / "data" / "stage0_positions.npz")
@@ -85,20 +86,28 @@ def _run_epoch(model: NMMNet, loader: DataLoader, criterion: nn.Module,
     return total_loss / n if n else float("inf")
 
 
-def _save_checkpoint(model: NMMNet, out_dir: Path, name: str) -> None:
+def _save_checkpoint(model: nn.Module, out_dir: Path, name: str) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / name
-    cfg = {
-        "backbone_hidden": [l.out_features for l in model.backbone
-                            if isinstance(l, nn.Linear)],
-        "head_hidden": [64],
-        "dropout": 0.0,
-    }
-    torch.save({"model": model.state_dict(), "model_config": cfg}, path)
+    is_gnn = isinstance(model, NMMGNNNet)
+    if is_gnn:
+        cfg = {"head_hidden": [64], "dropout": 0.0}
+    else:
+        cfg = {
+            "backbone_hidden": [l.out_features for l in model.backbone
+                                if isinstance(l, nn.Linear)],
+            "head_hidden": [64],
+            "dropout": 0.0,
+        }
+    torch.save({
+        "model": model.state_dict(),
+        "model_config": cfg,
+        "model_type": "gnn" if is_gnn else "mlp",
+    }, path)
     print(f"  → saved {path}")
 
 
-def train_phase(label: str, model: NMMNet, train_dl: DataLoader, val_dl: DataLoader,
+def train_phase(label: str, model: nn.Module, train_dl: DataLoader, val_dl: DataLoader,
                 lr: float, max_epochs: int, device: torch.device,
                 frozen_backbone: bool, out_dir: Path) -> float:
     criterion = nn.MSELoss()
@@ -155,6 +164,7 @@ def main() -> None:
     ap.add_argument("--batch-size", type=int, default=512,    help="Batch size")
     ap.add_argument("--out-dir",    default=DEFAULT_OUT,      help="Checkpoint output directory")
     ap.add_argument("--device",     default="auto")
+    ap.add_argument("--gnn",        action="store_true", help="Use GNN backbone (NMMGNNNet)")
     args = ap.parse_args()
 
     if args.device == "auto":
@@ -164,19 +174,32 @@ def main() -> None:
     print(f"Device: {device}")
 
     # Load or build model
+    use_gnn = args.gnn
     if args.resume:
         ckpt = torch.load(args.resume, map_location=device, weights_only=False)
         mc = ckpt.get("model_config", {})
-        model = NMMNet(
-            backbone_hidden=tuple(mc.get("backbone_hidden", [256, 256, 128])),
-            head_hidden=tuple(mc.get("head_hidden", [64])),
-            dropout=float(mc.get("dropout", 0.0)),
-        )
+        ckpt_type = ckpt.get("model_type", "mlp") if isinstance(ckpt, dict) else "mlp"
+        if ckpt_type == "gnn" or use_gnn:
+            model: nn.Module = NMMGNNNet(
+                head_hidden=tuple(mc.get("head_hidden", [64])),
+                dropout=float(mc.get("dropout", 0.0)),
+            )
+            use_gnn = True
+        else:
+            model = NMMNet(
+                backbone_hidden=tuple(mc.get("backbone_hidden", [256, 256, 128])),
+                head_hidden=tuple(mc.get("head_hidden", [64])),
+                dropout=float(mc.get("dropout", 0.0)),
+            )
         model.load_state_dict(ckpt["model"] if "model" in ckpt else ckpt)
-        print(f"Resumed from {args.resume}")
+        print(f"Resumed from {args.resume}  (model_type={'gnn' if use_gnn else 'mlp'})")
     else:
-        model = NMMNet()
-        print("Initialised fresh NMMNet (256-256-128 backbone, 64 head)")
+        if use_gnn:
+            model = NMMGNNNet()
+            print("Initialised fresh NMMGNNNet (GCN backbone, 64 head)")
+        else:
+            model = NMMNet()
+            print("Initialised fresh NMMNet (256-256-128 backbone, 64 head)")
     model = model.to(device)
 
     states, values = _load_data(args.data)

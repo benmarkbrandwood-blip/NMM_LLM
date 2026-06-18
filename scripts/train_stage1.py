@@ -23,6 +23,7 @@ _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from learned_ai.models.backbone import NMMNet, PHASE_NAMES
+from learned_ai.models.gnn_backbone import NMMGNNNet
 
 
 # ── Training helpers ─────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ def _run_epoch(
 
 def train_phase(
     label: str,
-    model: NMMNet,
+    model: NMMNet,  # accepts NMMGNNNet too — same interface
     train_dl: DataLoader,
     val_dl: DataLoader,
     lr: float,
@@ -121,7 +122,9 @@ def train_phase(
         if val_acc > best_acc:
             best_acc = val_acc
             no_improve = 0
-            torch.save({"model": model.state_dict()}, out_dir / "best.pt")
+            torch.save({"model": model.state_dict(),
+                        "model_type": "gnn" if isinstance(model, NMMGNNNet) else "mlp"},
+                       out_dir / "best.pt")
             print(f"  → saved {out_dir}/best.pt")
         else:
             no_improve += 1
@@ -129,7 +132,9 @@ def train_phase(
                 print(f"  Early stop — no improvement for {patience} epochs.")
                 break
 
-    torch.save({"model": model.state_dict()}, out_dir / "latest.pt")
+    torch.save({"model": model.state_dict(),
+                "model_type": "gnn" if isinstance(model, NMMGNNNet) else "mlp"},
+               out_dir / "latest.pt")
     print(f"  → saved {out_dir}/latest.pt")
     return best_acc
 
@@ -144,6 +149,7 @@ def main() -> None:
     pa.add_argument("--out-dir", default=str(_ROOT / "learned_ai" / "checkpoints" / "stage1"))
     pa.add_argument("--val-frac", type=float, default=0.1)
     pa.add_argument("--batch",   type=int, default=1024)
+    pa.add_argument("--gnn",     action="store_true", help="Use GNN backbone (NMMGNNNet)")
     args = pa.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -180,15 +186,22 @@ def main() -> None:
     print(f"Train: {n_train:,}  Val: {n_val:,}  batch={args.batch}")
 
     # ── Model ─────────────────────────────────────────────────────────────────
-    model = NMMNet()
     resume = Path(args.resume)
+    use_gnn = args.gnn
     if resume.exists():
-        ckpt = torch.load(str(resume), map_location="cpu")
+        ckpt = torch.load(str(resume), map_location="cpu", weights_only=False)
+        ckpt_type = ckpt.get("model_type", "mlp") if isinstance(ckpt, dict) else "mlp"
+        if ckpt_type == "gnn" or use_gnn:
+            model = NMMGNNNet()
+            use_gnn = True
+        else:
+            model = NMMNet()
         state_dict = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
         model.load_state_dict(state_dict)
-        print(f"Resumed from {resume}")
+        print(f"Resumed from {resume}  (model_type={'gnn' if use_gnn else 'mlp'})")
     else:
         print(f"WARNING: checkpoint not found at {resume} — starting fresh")
+        model = NMMGNNNet() if use_gnn else NMMNet()
     model.to(device)
 
     out_dir = Path(args.out_dir)

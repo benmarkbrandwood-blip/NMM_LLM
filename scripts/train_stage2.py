@@ -1,29 +1,32 @@
-"""scripts/train_stage2.py — Stage 2: REINFORCE self-play vs weak heuristic.
+"""scripts/train_stage2.py — Stage 2: A2C self-play with GNN model.
 
-Improvements over v1:
-  - Sentinel warmup: no filter for the first --warmup-frac of games, so the
-    model accumulates enough transitions to learn from before filtering kicks in.
-  - Malom DB reward shaping (two signals, both Malom-exact):
-      1. Move quality: query_move_quality delta after each learner move — rewards
-         moves that directly improve the learner's own position.
-      2. Trap reward: after each learner move, query the resulting position from
-         the opponent's perspective.  If the opponent is now in a "L" (losing)
-         position the learner gets a bonus on that transition — rewarding moves
-         that constrain or trick the opponent into bad territory, not just moves
-         that improve the learner's own evaluation.
-    Both signals use the same --malom-weight scale and are active for the first
-    --malom-frac of games.
-  - Lower temperature (0.5) — less random, more intentional play.
-  - Larger update batches (UPDATE_EVERY=16) — more stable gradient estimates.
-  - Higher win reward (2.0) — stronger terminal signal on wins.
-  - Lower sentinel threshold (0.1 after warmup) — only clear blunders filtered.
+Replaces the REINFORCE approach (v1/v2/v3) with Actor-Critic (A2C) to solve
+the high-variance gradient problem in long-horizon NMM games.
 
-Curriculum:
-  diff 2 (vn_blend=0) → diff 3 when rolling-200 win rate >= 65%.
-  Exit when rolling-200 win rate >= 65% at diff 3.
+Three root-cause bug fixes vs REINFORCE v3:
+  1. win_reward = 1.0 — matches Stage 0's [-1,+1] value-head training range.
+     (v3 used 2.0, causing the value head to oscillate.)
+  2. temperature_start = 0.2, annealed to 0.6 — preserves the Stage 1
+     imitation prior. (v3 used 0.5 flat, too noisy for a pre-trained model.)
+  3. lr = 5e-6 — safe fine-tuning rate for a Stage 1 checkpoint.
+     (v3 used 1e-4, which destroyed the prior within the first 50 games.)
+
+Algorithm: A2C (default) or PPO (--ppo flag).
+  A2C: per-step TD bootstrapping, advantage = r + γV(s') - V(s).
+  PPO: same collection, clipped surrogate, 4 epochs per batch.
+
+Malom shaping:
+  - Move quality: r += malom_weight * Δ(WDL) for each learner move.
+  - Trap reward:  r += malom_weight when opponent's post-move position = "L".
+  malom_weight=0.1 (down from 0.3 in REINFORCE v3) to prevent accumulated
+  shaping from swamping the ±1.0 terminal signal in A2C's per-step gradients.
+
+Curriculum: diff 2 (no vn_blend) → diff 3 when rolling-200 win rate ≥ 60%.
+Exit: rolling-200 ≥ 60% at diff 3.
 
 Usage:
     .venv/bin/python scripts/train_stage2.py [--resume CKPT] [--out-dir DIR]
+                                             [--ppo] [--no-malom] [--no-gnn]
 """
 
 from __future__ import annotations
@@ -46,83 +49,136 @@ from game.board import BoardState
 from game.rules import get_all_legal_moves, is_terminal
 import learned_ai.agents.heuristic_agent as _ha_mod
 from learned_ai.agents.heuristic_agent import HeuristicAgent
-from learned_ai.agents.learned_agent import LearnedAgent
+from learned_ai.models.action_encoder import (
+    CAPTURE_OFFSET,
+    PLACE_OFFSET,
+    decode_action,
+    get_legal_mask,
+    move_requires_capture,
+    ACTION_DIM,
+)
+from learned_ai.models.gnn_backbone import NMMGNNNet
 from learned_ai.models.backbone import NMMNet
-from learned_ai.models.state_encoder import PHASE_NAMES
-from learned_ai.sentinel.infer import SentinelAdvisor
+from learned_ai.models.state_encoder import encode_state_with_phase, PHASE_NAMES
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
-from learned_ai.training.replay_buffer import Transition
+from learned_ai.training.a2c import A2CStep, a2c_update
+from learned_ai.training.ppo import ppo_update
 
-# ── Defaults ──────────────────────────────────────────────────────────────────
+# ── Defaults (bug-fixed vs REINFORCE v3) ─────────────────────────────────────
 
-LR              = 1e-4
+LR              = 5e-6         # Bug fix 3: safe fine-tune LR (was 1e-4)
 GAMMA           = 0.99
-TEMPERATURE     = 0.5        # lower than v1 (was 1.0) — less random
+TEMP_START      = 0.2          # Bug fix 2: low start temperature (was 0.5)
+TEMP_END        = 0.6          # annealed upward as training progresses
 ENTROPY_COEF    = 0.01
-UPDATE_EVERY    = 16         # larger batches (was 4)
-MIN_BATCH       = 32         # minimum transitions to run an update
+UPDATE_EVERY    = 16
+MIN_BATCH       = 8
 
-WIN_REWARD      = 2.0        # stronger signal on wins (was implicitly 1.0)
+WIN_REWARD      = 1.0          # Bug fix 1: matches Stage 0 [-1,+1] scale (was 2.0)
+MALOM_WEIGHT    = 0.1          # Lower than REINFORCE v3 (0.3) — A2C per-step grads
+                               # amplify shaping; keep budget below ±1 terminal
+MALOM_FRAC      = 0.50         # fraction of max_games with Malom shaping active
 
-SENTINEL_THRESHOLD  = 0.1   # after warmup (was 0.25)
-WARMUP_FRAC         = 0.20  # fraction of max_games with no sentinel filter
-MALOM_FRAC          = 0.30  # fraction of max_games with Malom reward shaping
-MALOM_WEIGHT        = 0.3   # scale for per-move Malom delta (delta ∈ [-2,+2])
-
-ROLLING_WINDOW      = 200
-WIN_RATE_TARGET     = 0.65
-DIFF_START          = 2
-DIFF_TARGET         = 3
-MAX_PLIES           = 400
+ROLLING_WINDOW  = 200
+WIN_RATE_TARGET = 0.60
+DIFF_START      = 2
+DIFF_TARGET     = 3
+MAX_PLIES       = 400
+TIME_BUDGET     = 0.05         # seconds per opponent move
 
 DEFAULT_MALOM_DB = (
     "/mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted"
 )
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-def make_opponent(difficulty: int, time_budget: float) -> HeuristicAgent:
+def make_opponent(difficulty: int) -> HeuristicAgent:
     inner = _ha_mod.GameAI(color="B", difficulty=difficulty,
-                           override_time_budget=time_budget)
+                           override_time_budget=TIME_BUDGET)
     return HeuristicAgent(color="B", difficulty=difficulty, game_ai=inner)
+
+
+def _sample_action(
+    model: torch.nn.Module,
+    state: torch.Tensor,
+    phase_id: int,
+    legal_mask: torch.Tensor,
+    board: BoardState,
+    device: torch.device,
+    temperature: float,
+) -> tuple[int, Optional[int], float, dict]:
+    """Forward the model, sample primary + capture index, return (primary_idx,
+    capture_idx_or_None, log_prob_detached, move_dict)."""
+    state_d  = state.unsqueeze(0).to(device)
+    mask_d   = legal_mask.unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        out     = model.forward(state_d, phase_id, mask_d)
+        logits  = out["logits"].squeeze(0)
+
+    # Primary action
+    pri_logits = logits[PLACE_OFFSET:CAPTURE_OFFSET]
+    pri_mask   = legal_mask[PLACE_OFFSET:CAPTURE_OFFSET]
+    scaled     = pri_logits / max(temperature, 1e-6)
+    scaled     = scaled.masked_fill(~pri_mask, float("-inf"))
+    log_probs  = F.log_softmax(scaled, dim=-1)
+    probs      = log_probs.exp()
+    pri_rel    = int(torch.multinomial(probs, 1).item())
+    pri_idx    = PLACE_OFFSET + pri_rel
+    log_prob   = float(log_probs[pri_rel].item())
+
+    # Capture if needed
+    cap_idx: Optional[int] = None
+    if move_requires_capture(board, pri_idx):
+        cap_logits = logits[CAPTURE_OFFSET:]
+        cap_mask   = legal_mask[CAPTURE_OFFSET:]
+        if cap_mask.any():
+            c_scaled  = cap_logits / max(temperature, 1e-6)
+            c_scaled  = c_scaled.masked_fill(~cap_mask, float("-inf"))
+            c_lp      = F.log_softmax(c_scaled, dim=-1)
+            c_probs   = c_lp.exp()
+            c_rel     = int(torch.multinomial(c_probs, 1).item())
+            cap_idx   = CAPTURE_OFFSET + c_rel
+        else:
+            # Fallback: first legal capture
+            from game.board import POSITIONS
+            from learned_ai.models.action_encoder import POS_INDEX
+            first = board.legal_captures(board.turn)[0]
+            cap_idx = CAPTURE_OFFSET + POS_INDEX[first]
+
+    move = decode_action(pri_idx, board, capture_index=cap_idx)
+    return pri_idx, cap_idx, log_prob, move
 
 
 # ── Episode runner ─────────────────────────────────────────────────────────────
 
 def run_episode(
-    model: NMMNet,
+    model: torch.nn.Module,
     learner_color: str,
     opponent: HeuristicAgent,
-    sentinel: Optional[SentinelAdvisor],
     malom_db: Optional[ExternalSolvedDB],
     device: torch.device,
-    game_idx: int,
-    warmup_games: int,
-    malom_games: int,
-    temperature: float = TEMPERATURE,
-    sentinel_threshold: float = SENTINEL_THRESHOLD,
+    use_malom: bool,
+    temperature: float,
     win_reward: float = WIN_REWARD,
     malom_weight: float = MALOM_WEIGHT,
     gamma: float = GAMMA,
     max_plies: int = MAX_PLIES,
-) -> tuple[Optional[str], list[Transition], int, int]:
-    """Play one game. Returns (winner, transitions, n_kept, n_filtered)."""
-    use_sentinel = sentinel is not None and sentinel.is_loaded() and game_idx >= warmup_games
-    use_malom    = malom_db is not None and malom_db.is_available() and game_idx < malom_games
+) -> tuple[Optional[str], list[A2CStep]]:
+    """Play one game and return (winner, list_of_A2CSteps).
 
-    learner = LearnedAgent(
-        color=learner_color, model=model, device=str(device),
-        mode="sample", temperature=temperature,
-    )
-
+    Each A2CStep corresponds to one learner turn. next_state is the board at the
+    *next learner turn* (after opponent responds), or a dummy tensor when done.
+    """
     board = BoardState.new_game()
-    # (state, phase_id, primary_idx, legal_mask, keep, malom_bonus)
-    steps: list[tuple] = []
-    n_filtered = 0
-    opp_moves = 0
+    steps: list[A2CStep] = []
+    winner: Optional[str] = None
     plies = 0
-    learner_just_moved = False
+    opp_moves = 0
+
+    # Pending info from the most recent learner move (waiting for opponent response)
+    pending: Optional[tuple] = None  # (state, phase_id, pri_idx, legal_mask, malom_r, log_prob)
 
     while plies < max_plies:
         terminal, winner = is_terminal(board)
@@ -134,309 +190,270 @@ def run_episode(
             break
 
         if board.turn == learner_color:
-            move = learner.choose_move(board)
-            if not move:
-                winner = "B" if board.turn == "W" else "W"
-                break
-            d = learner.last_decision
+            # Flush any open pending step: this means the game got to learner's
+            # next turn (previous opponent move didn't end the game).
+            if pending is not None:
+                s, ph, ai, lm, mr, lp = pending
+                ns, nph = encode_state_with_phase(board)
+                nlm     = get_legal_mask(board)
+                steps.append(A2CStep(s, ph, ai, lm, mr, ns, nph, nlm, False, lp))
+                pending = None
 
-            # Sentinel blunder filter (off during warmup)
-            keep = True
-            if use_sentinel:
-                try:
-                    adv = sentinel.advise(board, [move], board.turn, played_move_idx=0)
-                    if adv is not None and adv.played_move_quality < sentinel_threshold:
-                        keep = False
-                        n_filtered += 1
-                except Exception:
-                    pass
+            state, phase_id = encode_state_with_phase(board)
+            legal_mask = get_legal_mask(board)
 
-            # Malom signal 1: move quality (how much did this move improve our position)
-            malom_bonus = 0.0
-            if use_malom:
+            pri_idx, cap_idx, log_prob, move = _sample_action(
+                model, state, phase_id, legal_mask, board, device, temperature
+            )
+
+            # Malom signal 1: move quality
+            malom_r = 0.0
+            if use_malom and malom_db and malom_db.is_available():
                 try:
                     q = malom_db.query_move_quality(board, move)
                     if q is not None:
-                        malom_bonus = malom_weight * float(q)
+                        malom_r += malom_weight * float(q)
                 except Exception:
                     pass
 
-            steps.append((d.state, d.phase_id, d.primary_index, d.legal_mask,
-                          keep, malom_bonus))
-            learner_just_moved = True
+            board = board.apply_move(move)
+            plies += 1
+
+            # Malom signal 2: trap reward
+            if use_malom and malom_db and malom_db.is_available():
+                try:
+                    q_trap = malom_db.query(board)
+                    if q_trap == "L":
+                        malom_r += malom_weight
+                except Exception:
+                    pass
+
+            # Check terminal after learner move
+            terminal, winner = is_terminal(board)
+            if not terminal:
+                post_legal = get_all_legal_moves(board)
+                if not post_legal:
+                    winner = learner_color
+                    terminal = True
+
+            if terminal:
+                r_term = _terminal_r(winner, learner_color, win_reward)
+                dummy = torch.zeros(state.shape)
+                steps.append(A2CStep(state, phase_id, pri_idx, legal_mask,
+                                     malom_r + r_term, dummy, 0, legal_mask, True, log_prob))
+                pending = None
+                break
+
+            # Game continues — save pending (opponent yet to respond)
+            pending = (state, phase_id, pri_idx, legal_mask, malom_r, log_prob)
+
         else:
+            # Opponent's turn
             if opp_moves == 0:
-                move = random.choice(legal)   # random first move for variety
+                move = random.choice(legal)  # random first move for variety
             else:
                 move = opponent.choose_move(board)
             opp_moves += 1
+
             if not move:
                 winner = learner_color
+                if pending is not None:
+                    s, ph, ai, lm, mr, lp = pending
+                    dummy = torch.zeros(s.shape)
+                    steps.append(A2CStep(s, ph, ai, lm, mr + WIN_REWARD,
+                                         dummy, 0, lm, True, lp))
+                    pending = None
                 break
-            learner_just_moved = False
 
-        board = board.apply_move(move)
-        plies += 1
+            board = board.apply_move(move)
+            plies += 1
 
-        # Malom signal 2: trap reward — after the learner's move, opponent is now
-        # to move.  If Malom says the opponent is in a losing ("L") position, the
-        # learner's last move created a trap and earns a bonus.
-        if learner_just_moved and use_malom and steps:
-            try:
-                q_trap = malom_db.query(board)   # from opponent's (current mover's) perspective
-                if q_trap == "L":                # opponent is losing → AI set a trap
-                    s = steps[-1]
-                    steps[-1] = (*s[:-1], s[-1] + malom_weight)
-            except Exception:
-                pass
+            # Check terminal after opponent
+            terminal, winner = is_terminal(board)
+            if not terminal:
+                post_legal = get_all_legal_moves(board)
+                if not post_legal:
+                    if board.turn == learner_color:
+                        winner = "B" if learner_color == "W" else "W"
+                    else:
+                        winner = learner_color
+                    terminal = True
+
+            if terminal and pending is not None:
+                s, ph, ai, lm, mr, lp = pending
+                r_term = _terminal_r(winner, learner_color, win_reward)
+                dummy = torch.zeros(s.shape)
+                steps.append(A2CStep(s, ph, ai, lm, mr + r_term,
+                                     dummy, 0, lm, True, lp))
+                pending = None
+                break
 
     else:
-        winner = None  # ply cap → draw
+        # Ply cap — treat as draw
+        winner = None
+        if pending is not None:
+            s, ph, ai, lm, mr, lp = pending
+            dummy = torch.zeros(s.shape)
+            steps.append(A2CStep(s, ph, ai, lm, mr, dummy, 0, lm, True, lp))
 
-    # Assign discounted terminal reward + Malom shaped reward
-    n = len(steps)
-    transitions: list[Transition] = []
-    for i, (state, phase_id, primary_idx, legal_mask, keep, malom_bonus) in enumerate(steps):
-        if not keep:
-            continue
-        dist = n - 1 - i
-        if winner is None:
-            r_term = 0.0
-        elif winner == learner_color:
-            r_term = win_reward * (gamma ** dist)
-        else:
-            r_term = -win_reward * (gamma ** dist)
-        transitions.append(Transition(
-            state=state,
-            legal_mask=legal_mask,
-            primary_index=primary_idx,
-            capture_index=None,
-            reward=r_term + malom_bonus,
-            phase_id=phase_id,
-            side_to_move=learner_color,
-            done=(i == n - 1),
-        ))
-
-    return winner, transitions, len(transitions), n_filtered
+    return winner, steps
 
 
-# ── REINFORCE update ──────────────────────────────────────────────────────────
-
-def reinforce_update(
-    model: NMMNet,
-    optimizer: torch.optim.Optimizer,
-    transitions: list[Transition],
-    device: torch.device,
-) -> tuple[float, float]:
-    """One REINFORCE step. Returns (policy_loss, value_loss) or (0, 0) if skipped."""
-    if len(transitions) < MIN_BATCH:
-        return 0.0, 0.0
-
-    states        = torch.stack([t.state for t in transitions]).to(device)
-    legal_masks   = torch.stack([t.legal_mask for t in transitions]).to(device)
-    primary_indices = torch.tensor(
-        [t.primary_index for t in transitions], device=device, dtype=torch.long)
-    rewards       = torch.tensor(
-        [t.reward for t in transitions], device=device, dtype=torch.float32)
-    phase_ids     = [t.phase_id for t in transitions]
-
-    model.train()
-    feats = model.backbone(states)
-
-    # Value-head baseline
-    values = model.value_head(feats).squeeze(-1)
-    advantages = rewards - values.detach()
-    # Normalize only when there's real variance
-    if advantages.std() > 1e-3:
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
-    # Policy loss (phase-routed, log_probs recomputed from stored states/actions)
-    pl_sum  = torch.zeros([], device=device)
-    ent_sum = torch.zeros([], device=device)
-    n_total = 0
-
-    for ph in range(model.num_phases):
-        idx = [i for i, p in enumerate(phase_ids) if p == ph]
-        if not idx:
-            continue
-        idx_t    = torch.tensor(idx, device=device)
-        logits_p = model.phase_heads[PHASE_NAMES[ph]](feats[idx_t])
-        logits_p = logits_p.masked_fill(~legal_masks[idx_t], -1e9)
-        log_probs_p = F.log_softmax(logits_p, dim=-1)
-        sel_lp   = log_probs_p.gather(1, primary_indices[idx_t].unsqueeze(1)).squeeze(1)
-        pl_sum   = pl_sum - (sel_lp * advantages[idx_t]).sum()
-        probs_p  = log_probs_p.exp()
-        ent_sum  = ent_sum + (-(probs_p * log_probs_p).sum(dim=-1)).sum()
-        n_total += len(idx)
-
-    policy_loss  = pl_sum  / max(n_total, 1)
-    entropy_loss = ent_sum / max(n_total, 1)
-    value_loss   = F.mse_loss(values, rewards)
-    loss = policy_loss - ENTROPY_COEF * entropy_loss + 0.5 * value_loss
-
-    optimizer.zero_grad()
-    loss.backward()
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-    optimizer.step()
-
-    return float(policy_loss.item()), float(value_loss.item())
+def _terminal_r(winner: Optional[str], learner_color: str, win_reward: float) -> float:
+    if winner is None:
+        return 0.0
+    return win_reward if winner == learner_color else -win_reward
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    pa = argparse.ArgumentParser(description="Stage 2: REINFORCE vs heuristic")
-    pa.add_argument("--resume",   default=str(_ROOT / "learned_ai/checkpoints/stage1/best.pt"))
-    pa.add_argument("--out-dir",  default=str(_ROOT / "learned_ai/checkpoints/stage2"))
-    pa.add_argument("--sentinel", default=str(_ROOT / "learned_ai/sentinel/checkpoints/best.pt"))
-    pa.add_argument("--malom-db", default=DEFAULT_MALOM_DB)
-    pa.add_argument("--max-games",     type=int,   default=5_000)
-    pa.add_argument("--time-budget",   type=float, default=0.05,
-                    help="Seconds per opponent move (default 0.05)")
-    pa.add_argument("--temperature",   type=float, default=TEMPERATURE)
-    pa.add_argument("--win-reward",    type=float, default=WIN_REWARD)
-    pa.add_argument("--warmup-frac",   type=float, default=WARMUP_FRAC,
-                    help="Fraction of games with no sentinel filter (default 0.20)")
-    pa.add_argument("--malom-frac",    type=float, default=MALOM_FRAC,
-                    help="Fraction of games with Malom reward shaping (default 0.30)")
-    pa.add_argument("--malom-weight",  type=float, default=MALOM_WEIGHT,
-                    help="Scale for per-move Malom quality delta (default 0.30)")
-    pa.add_argument("--diff-start",    type=int,   default=DIFF_START)
-    pa.add_argument("--no-sentinel",   action="store_true")
-    pa.add_argument("--no-malom",      action="store_true")
+    pa = argparse.ArgumentParser(description="Stage 2: A2C/PPO self-play (GNN)")
+    pa.add_argument("--resume",     default=str(_ROOT / "learned_ai/checkpoints/stage1/best.pt"))
+    pa.add_argument("--out-dir",    default=str(_ROOT / "learned_ai/checkpoints/stage2"))
+    pa.add_argument("--malom-db",   default=DEFAULT_MALOM_DB)
+    pa.add_argument("--max-games",  type=int,   default=10_000)
+    pa.add_argument("--ppo",        action="store_true", help="Use PPO instead of A2C")
+    pa.add_argument("--no-malom",   action="store_true")
+    pa.add_argument("--no-gnn",     action="store_true", help="Use MLP backbone (NMMNet)")
+    pa.add_argument("--lr",         type=float, default=LR)
+    pa.add_argument("--temp-start", type=float, default=TEMP_START)
+    pa.add_argument("--temp-end",   type=float, default=TEMP_END)
+    pa.add_argument("--win-reward", type=float, default=WIN_REWARD)
+    pa.add_argument("--malom-weight", type=float, default=MALOM_WEIGHT)
+    pa.add_argument("--diff-start", type=int,   default=DIFF_START)
     args = pa.parse_args()
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    # Derived game counts
-    warmup_games = int(args.max_games * args.warmup_frac)
-    malom_games  = int(args.max_games * args.malom_frac)
+    malom_games = int(args.max_games * MALOM_FRAC)
 
     # ── Model ─────────────────────────────────────────────────────────────────
-    model = NMMNet()
+    ModelClass = NMMNet if args.no_gnn else NMMGNNNet
+    model_type = "mlp" if args.no_gnn else "gnn"
+
     resume = Path(args.resume)
     if resume.exists():
         ckpt = torch.load(str(resume), map_location="cpu", weights_only=False)
         sd = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
-        model.load_state_dict(sd)
-        print(f"Resumed from {resume}")
+        # Load into matching architecture
+        ckpt_type = ckpt.get("model_type", "mlp") if isinstance(ckpt, dict) else "mlp"
+        if ckpt_type != model_type:
+            print(f"WARNING: checkpoint model_type={ckpt_type!r} but requested {model_type!r}")
+        model = NMMGNNNet() if model_type == "gnn" else NMMNet()
+        missing, unexpected = model.load_state_dict(sd, strict=False)
+        if missing:
+            print(f"  Missing keys (init from scratch): {len(missing)}")
+        if unexpected:
+            print(f"  Unexpected keys (ignored): {len(unexpected)}")
+        print(f"Resumed from {resume}  (model_type={model_type})")
     else:
         print(f"WARNING: no checkpoint at {resume} — using random weights")
-    model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+        model = NMMGNNNet() if model_type == "gnn" else NMMNet()
 
-    # ── Sentinel ──────────────────────────────────────────────────────────────
-    sentinel: Optional[SentinelAdvisor] = None
-    if not args.no_sentinel:
-        sp = Path(args.sentinel)
-        if sp.exists():
-            sentinel = SentinelAdvisor(checkpoint_path=str(sp), device="cpu")
-            print(f"Sentinel loaded: {sp}  (threshold={SENTINEL_THRESHOLD} after game {warmup_games})")
-        else:
-            print(f"Sentinel not found at {sp} — running without filter")
+    model.to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     # ── Malom DB ──────────────────────────────────────────────────────────────
     malom_db: Optional[ExternalSolvedDB] = None
     if not args.no_malom:
         malom_db = ExternalSolvedDB(db_path=args.malom_db)
         if malom_db.is_available():
-            print(f"Malom DB loaded: {args.malom_db}  (shaping for games 0–{malom_games})")
+            print(f"Malom DB ready  (shaping for games 0–{malom_games})")
         else:
-            print(f"Malom DB unavailable at {args.malom_db} — no reward shaping")
+            print("Malom DB unavailable — no reward shaping")
 
     # ── Curriculum ────────────────────────────────────────────────────────────
+    algo    = "PPO" if args.ppo else "A2C"
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     current_diff = args.diff_start
-    opponent = make_opponent(current_diff, args.time_budget)
-
+    opponent     = make_opponent(current_diff)
     results: deque[str] = deque(maxlen=ROLLING_WINDOW)
-    accumulated: list[Transition] = []
+    accumulated: list[A2CStep] = []
     best_win_rate = 0.0
-    total_filtered = 0
-    total_kept = 0
 
-    print(f"\nStage 2 v2  lr={LR}  γ={GAMMA}  T={args.temperature}"
-          f"  win_reward={args.win_reward}  opp_budget={args.time_budget}s")
-    print(f"  sentinel_thresh={SENTINEL_THRESHOLD} (warmup {warmup_games} games)"
-          f"  malom_weight={args.malom_weight} (first {malom_games} games)")
+    print(f"\nStage 2 {algo}  lr={args.lr}  γ={GAMMA}  "
+          f"T={args.temp_start}→{args.temp_end}  win_reward={args.win_reward}"
+          f"  malom_weight={args.malom_weight}  model={model_type}")
     print(f"  update_every={UPDATE_EVERY}  min_batch={MIN_BATCH}")
-    print(f"  diff {current_diff} → {DIFF_TARGET}  exit: {WIN_RATE_TARGET:.0%} rolling-{ROLLING_WINDOW}\n")
+    print(f"  diff {current_diff}→{DIFF_TARGET}  "
+          f"exit: {WIN_RATE_TARGET:.0%} rolling-{ROLLING_WINDOW}\n")
 
     t0 = time.time()
     for game in range(args.max_games):
         learner_color = "W" if game % 2 == 0 else "B"
 
-        winner, transitions, n_kept, n_filt = run_episode(
-            model, learner_color, opponent, sentinel, malom_db, device,
-            game_idx=game,
-            warmup_games=warmup_games,
-            malom_games=malom_games,
-            temperature=args.temperature,
-            sentinel_threshold=SENTINEL_THRESHOLD,
+        # Anneal temperature linearly over all games
+        frac        = min(1.0, game / max(args.max_games - 1, 1))
+        temperature = args.temp_start + frac * (args.temp_end - args.temp_start)
+
+        use_malom = (malom_db is not None and malom_db.is_available()
+                     and game < malom_games)
+
+        winner, steps = run_episode(
+            model, learner_color, opponent, malom_db, device,
+            use_malom=use_malom,
+            temperature=temperature,
             win_reward=args.win_reward,
             malom_weight=args.malom_weight,
         )
 
-        total_kept     += n_kept
-        total_filtered += n_filt
-        accumulated.extend(transitions)
-
+        accumulated.extend(steps)
         r_str = "D" if winner is None else ("W" if winner == learner_color else "L")
         results.append(r_str)
 
         n_res    = len(results)
         win_rate = results.count("W") / n_res
-        filt_pct = total_filtered / max(total_kept + total_filtered, 1)
-        phase    = ("warmup" if game < warmup_games
-                    else ("malom" if game < malom_games else "rl"))
         elapsed  = time.time() - t0
+        malom_tag = "[M]" if use_malom else "   "
 
         print(f"  game {game+1:5d}  {r_str}  diff={current_diff}  "
               f"wr={win_rate:.1%} ({n_res:3d})  "
-              f"filt={filt_pct:.0%}  "
-              f"trans={n_kept:3d}  "
-              f"[{phase}]  t={elapsed:.0f}s")
+              f"T={temperature:.2f}  steps={len(steps):3d}  "
+              f"{malom_tag}  t={elapsed:.0f}s")
 
-        # ── REINFORCE update ───────────────────────────────────────────────
+        # ── A2C / PPO update ──────────────────────────────────────────────────
         if (game + 1) % UPDATE_EVERY == 0 and accumulated:
             batch_size = len(accumulated)
-            pl, vl = reinforce_update(model, optimizer, accumulated, device)
+            if args.ppo:
+                pl, vl, ent = ppo_update(model, optimizer, accumulated, device)
+            else:
+                pl, vl, ent = a2c_update(model, optimizer, accumulated, device)
             accumulated.clear()
             if pl != 0.0:
                 print(f"    → update  policy_loss={pl:.4f}  value_loss={vl:.4f}"
-                      f"  batch={batch_size}")
+                      f"  entropy={ent:.4f}  batch={batch_size}")
 
         # ── Best checkpoint ────────────────────────────────────────────────
         if n_res >= 50 and win_rate > best_win_rate:
             best_win_rate = win_rate
-            torch.save({"model": model.state_dict()}, out_dir / "best.pt")
+            torch.save({"model": model.state_dict(),
+                        "model_type": model_type}, out_dir / "best.pt")
 
         # ── Curriculum bump ────────────────────────────────────────────────
         if (current_diff < DIFF_TARGET
                 and n_res >= ROLLING_WINDOW
                 and win_rate >= WIN_RATE_TARGET):
             current_diff += 1
-            opponent = make_opponent(current_diff, args.time_budget)
+            opponent = make_opponent(current_diff)
             results.clear()
-            total_filtered = 0
-            total_kept = 0
-            print(f"\n  ★ difficulty → {current_diff}  (win_rate was {win_rate:.1%})\n")
+            print(f"\n  ★ difficulty → {current_diff}\n")
 
         # ── Exit criterion ─────────────────────────────────────────────────
         if (current_diff >= DIFF_TARGET
                 and n_res >= ROLLING_WINDOW
                 and win_rate >= WIN_RATE_TARGET):
-            print(f"\n  ★ EXIT: {win_rate:.1%} win rate at diff {current_diff} (game {game+1})")
+            print(f"\n  ★ EXIT: {win_rate:.1%} at diff {current_diff} (game {game+1})")
             break
 
-    torch.save({"model": model.state_dict()}, out_dir / "latest.pt")
+    torch.save({"model": model.state_dict(), "model_type": model_type},
+               out_dir / "latest.pt")
     n_res    = len(results)
     win_rate = results.count("W") / n_res if n_res else 0.0
-    print(f"\nStage 2 done.  win_rate={win_rate:.1%}  diff={current_diff}"
-          f"  best={best_win_rate:.1%}")
+    print(f"\nStage 2 done.  win_rate={win_rate:.1%}  best={best_win_rate:.1%}")
     print(f"Checkpoints → {out_dir}")
 
 
