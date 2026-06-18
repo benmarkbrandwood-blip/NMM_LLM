@@ -108,6 +108,15 @@
       font-size: 1rem; color: #c8a96e; pointer-events: none; z-index: 50;
     }
 
+    /* Selection status */
+    #selection-status {
+      position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%);
+      background: rgba(42,32,24,0.9); border: 1px solid #5a4a2a;
+      color: #c8a96e; padding: 0.3rem 0.9rem; border-radius: 20px;
+      font-size: 0.82rem; pointer-events: none; z-index: 20; display: none;
+      white-space: nowrap;
+    }
+
     /* CSS2D overlay labels */
     .coord-label {
       color: #8a7a5a; font-size: 0.72rem; font-family: monospace; font-weight: 600;
@@ -146,6 +155,7 @@
     <canvas id="board-canvas"></canvas>
     <div id="tooltip"></div>
     <div id="loading-overlay">Loading…</div>
+    <div id="selection-status"></div>
   </div>
 
   <div id="side-panel">
@@ -176,6 +186,8 @@
       <div class="legend-row"><div class="legend-swatch legend-swatch-db"></div>Win rate (human games)</div>
       <div class="legend-row"><div class="legend-swatch legend-swatch-sentinel"></div>Sentinel quality (no human data)</div>
       <div class="legend-row"><div class="legend-swatch legend-swatch-none"></div>No data</div>
+      <div class="legend-row"><div style="width:16px;height:16px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>HumanDB best move</div>
+      <div class="legend-row"><div style="width:16px;height:16px;border-radius:50%;border:2px solid #4488ff;flex-shrink:0;"></div>Sentinel best move</div>
     </div>
   </div>
 </div>

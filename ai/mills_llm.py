@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pathlib
 import re
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,37 @@ if TYPE_CHECKING:
     from ai.memory_manager import MemoryManager
 
 _MAX_HISTORY = 16
+
+# ── Phase strategy guide ───────────────────────────────────────────────────────
+# Load docs/phase_strategy.md once at import time; injected into LLM prompts.
+_PHASE_STRATEGY: dict[str, str] = {}
+_phase_strategy_path = pathlib.Path(__file__).parent.parent / "docs" / "phase_strategy.md"
+if _phase_strategy_path.exists():
+    _raw = _phase_strategy_path.read_text()
+    for _sec in re.split(r'\n(?=## Phase )', _raw):
+        _m = re.match(r'## Phase ([A-D])', _sec)
+        if _m:
+            _PHASE_STRATEGY[_m.group(1)] = _sec.strip()
+
+
+def _phase_strategy_for(board: "BoardState") -> str:
+    """Return the docs/phase_strategy.md section relevant to the current position."""
+    if not _PHASE_STRATEGY:
+        return ""
+    from game.rules import get_game_phase
+    player = board.turn
+    phase = get_game_phase(board, player)
+    placed = board.pieces_placed[player]
+    on_board_w = board.pieces_on_board["W"]
+    on_board_b = board.pieces_on_board["B"]
+    if phase == "place":
+        key = "A" if placed <= 6 else "B"
+    elif min(on_board_w, on_board_b) <= 4:
+        key = "D"
+    else:
+        key = "C"
+    return _PHASE_STRATEGY.get(key, "")
+
 
 # ── Mill names ─────────────────────────────────────────────────────────────────
 # Keys are the exact 3-tuples from game.board.MILLS, in the same order.
@@ -504,6 +536,10 @@ class MillsLLM:
 
         if strategy:
             user_parts.extend(["", "STRATEGIC MEMORY:", strategy])
+
+        phase_guide = _phase_strategy_for(board)
+        if phase_guide:
+            user_parts.extend(["", "PHASE STRATEGY GUIDE:", phase_guide])
 
         user_parts.extend([
             "",

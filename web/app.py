@@ -885,6 +885,8 @@ async def explorer_position(fen: str = "........................|W|0|0"):
         DEFAULT_WEIGHTS as _DW,
     )
 
+    from game.rules import get_game_phase as _get_phase
+
     try:
         board = BoardState.from_fen_string(fen)
     except Exception as exc:
@@ -932,6 +934,7 @@ async def explorer_position(fen: str = "........................|W|0|0"):
             "notation":          notation,
             "from_sq":           from_sq,
             "to_sq":             to_sq,
+            "capture_sq":        mv.get("capture"),
             "has_db_data":       has_db,
             # DB fields — None when no DB data
             "wins":              ms.wins               if has_db else None,
@@ -974,6 +977,7 @@ async def explorer_position(fen: str = "........................|W|0|0"):
     return {
         "fen":            board.to_fen_string(),
         "turn":           board.turn,
+        "phase":          _get_phase(board, color),
         "board":          board_dict,
         "position_stats": pos_stats,
         "moves":          moves_out,
