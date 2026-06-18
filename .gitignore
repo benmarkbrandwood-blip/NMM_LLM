@@ -24,6 +24,43 @@ env/
 # ChromaDB data (generated at runtime)
 data/chroma/
 
+# Runtime game records — generated as games are played
+data/games/*.jsonl
+data/ai_games/*.jsonl
+data/human_games/*.jsonl
+data/human_games/imported.json
+data/game_count.json
+data/bad_moves.json
+
+# Player profiles — personal data, not shared
+data/players/
+
+# LLM session narratives — personal data
+data/session_memory/
+
+# HumanDB — large SQLite files built locally
+data/human_db.sqlite
+data/human_db.sqlite-shm
+data/human_db.sqlite-wal
+
+# Endgame retrograde tables and fullgame position DB — built locally, can be hundreds of MB
+data/endgame/*.wdl
+data/endgame/*.bin
+data/endgame/fullgame.bin
+
+# Evolution weight checkpoints — only keep best.json
+data/weights/checkpoint_*.json
+data/weights/era_best_*.json
+data/weights/evolution_log.jsonl
+data/weights/personalities/
+
+# Backup snapshots
+data/backups/
+
+# Value net backups / pre-retrain snapshots
+data/value_net*.bak*
+data/value_net-*.npz
+
 # Learned AI artifacts (keep dirs via .gitkeep)
 learned_ai/checkpoints/**
 !learned_ai/checkpoints/
@@ -40,5 +77,13 @@ learned_ai/self_play_games/*
 # OS
 .DS_Store
 Thumbs.db
-data/human_games/*.jsonl
-data/human_games/imported.json
+
+# Keep directory structure for fresh installs (gitkeep files are committed)
+!data/games/.gitkeep
+!data/ai_games/.gitkeep
+!data/human_games/.gitkeep
+!data/session_memory/.gitkeep
+!data/players/.gitkeep
+!data/endgame/.gitkeep
+!data/backups/.gitkeep
+!data/logs/.gitkeep

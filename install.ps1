@@ -306,7 +306,11 @@ if ($installOllama) {
 }
 
 # === 9. Create data directories =============================================
-foreach ($d in @("data\games", "data\session_memory", "data\chroma")) {
+foreach ($d in @(
+    "data\games", "data\ai_games", "data\human_games", "data\session_memory",
+    "data\chroma", "data\players", "data\weights", "data\endgame", "data\backups",
+    "data\logs", "learned_ai\sentinel\checkpoints"
+)) {
     $path = Join-Path $NMM_DIR $d
     if (-not (Test-Path -LiteralPath $path)) {
         New-Item -ItemType Directory -Path $path -Force | Out-Null

@@ -127,31 +127,33 @@ class GameEngine:
             )
 
             # Threefold repetition: the SAME BOARD POSITION occurred 3 times.
-            # This requires BOTH players to oscillate over 6 half-moves (3 per player):
-            #   Player A: A→B  Player B: C→D
-            #   Player A: B→A  Player B: D→C   (position repeats)
-            #   Player A: A→B  Player B: C→D   (position repeats a 3rd time)
-            # A draw where only one player oscillates is NOT threefold repetition —
-            # the other player's different moves change the board state each cycle.
+            # Requires BOTH players to oscillate over 8 half-moves (4 per player):
+            #   A: A→B  B: C→D  A: B→A  B: D→C   (position repeats once)
+            #   A: A→B  B: C→D  A: B→A  B: D→C   (position repeats a 3rd time)
+            # 6-half-move check only catches 2-fold (1 oscillation cycle each).
             log = self._move_log
-            if len(log) >= 6:
-                no_captures = all(log[i][3] is None for i in (-1, -2, -3, -4, -5, -6))
+            if len(log) >= 8:
+                no_captures = all(log[i][3] is None for i in (-1,-2,-3,-4,-5,-6,-7,-8))
                 if no_captures:
                     c1, f1, t1, _ = log[-1]
                     c3, f3, t3, _ = log[-3]
                     c5, f5, t5, _ = log[-5]
+                    c7, f7, t7, _ = log[-7]
                     c2, f2, t2, _ = log[-2]
                     c4, f4, t4, _ = log[-4]
                     c6, f6, t6, _ = log[-6]
+                    c8, f8, t8, _ = log[-8]
                     osc_a = (
-                        c1 == c3 == c5 and f1 is not None
+                        c1 == c3 == c5 == c7 and f1 is not None
                         and f1 == t3 and t1 == f3
                         and f1 == f5 and t1 == t5
+                        and f3 == f7 and t3 == t7
                     )
                     osc_b = (
-                        c2 == c4 == c6 and f2 is not None
+                        c2 == c4 == c6 == c8 and f2 is not None
                         and f2 == t4 and t2 == f4
                         and f2 == f6 and t2 == t6
+                        and f4 == f8 and t4 == t8
                     )
                     if osc_a and osc_b:
                         self.finished = True

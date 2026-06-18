@@ -523,10 +523,10 @@ class TournamentState:
     ]
     _COLORS = ["W", "B", "W", "B", "W", "B"]  # alternate for fairness
 
-    def __init__(self) -> None:
+    def __init__(self, player_elo: int = 1000) -> None:
         self.results: list[dict] = []
         self.current_idx: int   = 0
-        self.player_elo: int    = 1000
+        self.player_elo: int    = player_elo
 
     @property
     def complete(self) -> bool:
@@ -3291,9 +3291,66 @@ async def ws_endpoint(websocket: WebSocket):
                     "save": session.save_to_library,
                 })
 
+            # ── takeover_from_ai — human takes over one side of an AI-vs-AI game ──
+            elif kind == "takeover_from_ai" and session and session.ai_vs_ai and not session.engine.finished:
+                takeover_color = msg.get("color", "W")
+                if takeover_color not in ("W", "B"):
+                    await _send(websocket, {"type": "error", "message": "Invalid color for takeover"})
+                    continue
+
+                # Stop the AI-vs-AI loop
+                if session._ava_task and not session._ava_task.done():
+                    session._ava_task.cancel()
+                    try:
+                        await session._ava_task
+                    except (asyncio.CancelledError, Exception):
+                        pass
+                session._ava_task = None
+
+                # Reconfigure: the taken-over color is now human
+                human_color = takeover_color
+                ai_color    = "B" if human_color == "W" else "W"
+                ai_inst     = session.game_ai_white if ai_color == "W" else session.game_ai_black
+                ai_coord    = (
+                    session.coordinator_white if ai_color == "W" else session.coordinator_black
+                )
+
+                session.game_ai     = ai_inst
+                session.coordinator = ai_coord
+                session.human_color = human_color
+                session.ai_vs_ai    = False
+                session.vs_human    = False
+
+                if ai_coord:
+                    ai_coord.vs_human    = True
+                    ai_coord.human_color = human_color
+
+                session.engine.game_record["human_color"]  = human_color
+                session.engine.game_record["takeover_ply"] = len(
+                    session.engine.game_record.get("moves", [])
+                )
+
+                log.info("Takeover: human takes %s, AI continues as %s", human_color, ai_color)
+                await _send(websocket, {
+                    "type":         "takeover_ack",
+                    "human_color":  human_color,
+                    "ai_color":     ai_color,
+                })
+                await _send(websocket, _state(session))
+                await _commentary(websocket, session)
+                _maybe_start_ai()
+
             # ── tournament_start ──────────────────────────────────────────────
             elif kind == "tournament_start":
-                tournament = TournamentState()
+                _t_player_name = str(msg.get("player_name", "")).strip()[:50]
+                _t_start_elo   = 1000
+                if _t_player_name and is_valid_name(_t_player_name):
+                    try:
+                        _t_profile   = await asyncio.to_thread(load_profile, _t_player_name)
+                        _t_start_elo = _t_profile.elo
+                    except Exception:
+                        pass
+                tournament = TournamentState(player_elo=_t_start_elo)
                 nxt = tournament.current
                 await _send(websocket, {
                     "type":          "tournament_init",

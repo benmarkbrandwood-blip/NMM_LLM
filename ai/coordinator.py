@@ -491,7 +491,7 @@ class Coordinator:
                     self._dominant_turn_streak += 1
                 else:
                     self._dominant_turn_streak = 0
-                if self._dominant_turn_streak >= 3:
+                if self._dominant_turn_streak >= 5:
                     self.resignation_offered = True
                     farewell = random.choice([
                         "Your position is overwhelming — I concede. Well played.",

@@ -309,11 +309,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Show/hide personality row based on opponent type
   function _updatePersonalityRow() {
-    const isHuman = $("sel-opponent").value === "human";
+    const oppVal  = $("sel-opponent").value;
+    const isHuman = oppVal === "human";
+    const isAva   = oppVal === "aivsai";
     const row = $("row-personality");
-    if (row) row.hidden = isHuman;
+    if (row) row.hidden = isHuman || isAva;
     const rowPure = $("row-pure-ai");
-    if (rowPure) rowPure.hidden = isHuman;
+    if (rowPure) rowPure.hidden = isHuman || isAva;
   }
   $("sel-opponent").addEventListener("change", _updatePersonalityRow);
   _updatePersonalityRow();
@@ -579,7 +581,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("toggle-tournament").classList.toggle("btn-active", !p.hidden);
   });
   $("btn-tournament-start").addEventListener("click", () => {
-    if (ws) ws.send(JSON.stringify({ type: "tournament_start" }));
+    if (ws) ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
   });
   $("btn-tournament-restart").addEventListener("click", () => {
     $("tournament-complete-info").hidden = true;
@@ -587,7 +589,7 @@ document.addEventListener("DOMContentLoaded", () => {
     $("tournament-active").hidden = true;
     $("btn-tournament-start").hidden = false;
     $("tournament-intro").hidden = false;
-    if (ws) ws.send(JSON.stringify({ type: "tournament_start" }));
+    if (ws) ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
   });
 
   // ── AI vs AI ──────────────────────────────────────────────────────────
@@ -654,6 +656,12 @@ function renderIdle() {
 // ── New game ──────────────────────────────────────────────────────────────────
 
 function startNewGame() {
+  // "AI vs AI" option in the setup menu opens the ava-modal instead
+  if ($("sel-opponent").value === "aivsai") {
+    $("ava-modal").style.display = "flex";
+    return;
+  }
+
   const hc     = $("sel-human-color").value;
   const diff   = parseInt($("sel-difficulty").value);
   const vs     = $("sel-opponent").value === "human";
@@ -808,6 +816,8 @@ function _updateHandoffButtons() {
   const active = isVsHuman && phase === "playing";
   $("btn-handoff-w").hidden = !active;
   $("btn-handoff-b").hidden = !active;
+  $("btn-handoff-ava").hidden = !active;
+  _updateTakeoverButtons();
 }
 
 function _handoffToAI(color) {
@@ -825,6 +835,26 @@ function _handoffToAI(color) {
 
 $("btn-handoff-w").addEventListener("click", () => _handoffToAI("W"));
 $("btn-handoff-b").addEventListener("click", () => _handoffToAI("B"));
+$("btn-handoff-ava").addEventListener("click", () => {
+  // Hand both sides to AI — open ava-modal so user can configure personalities/difficulty
+  $("ava-modal").style.display = "flex";
+});
+
+// ── Takeover from AI (AI vs AI → human takes one side) ────────────────────────
+
+function _updateTakeoverButtons() {
+  const active = isAiVsAi && phase === "playing";
+  $("btn-takeover-w").hidden = !active;
+  $("btn-takeover-b").hidden = !active;
+}
+
+function _takeoverFromAI(color) {
+  if (!ws || phase !== "playing" || !isAiVsAi) return;
+  ws.send(JSON.stringify({ type: "takeover_from_ai", color }));
+}
+
+$("btn-takeover-w").addEventListener("click", () => _takeoverFromAI("W"));
+$("btn-takeover-b").addEventListener("click", () => _takeoverFromAI("B"));
 
 // ── Position setup ────────────────────────────────────────────────────────────
 
@@ -1313,6 +1343,17 @@ function handleMessage(msg) {
       _updateHandoffButtons();
       addCommentary("Game",
         `${msg.ai_color === "W" ? "White" : "Black"} handed to AI — continuing from current position.`,
+        "ai");
+      break;
+
+    case "takeover_ack":
+      isAiVsAi = false;
+      isVsHuman = false;
+      _humanColor = msg.human_color;
+      _updateTakeoverButtons();
+      _updateHandoffButtons();
+      addCommentary("Game",
+        `You are now playing ${msg.human_color === "W" ? "White" : "Black"} — AI continues as ${msg.ai_color === "W" ? "White" : "Black"}.`,
         "ai");
       break;
 
