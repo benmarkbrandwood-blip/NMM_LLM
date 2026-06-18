@@ -155,6 +155,11 @@ enough to get positive signal).
 Both signals are zero-overhead (Malom DB already loaded) and degrade gracefully if a position
 is outside the DB's coverage.
 
+**Coverage note:** Malom DB coverage drops significantly in the midgame (many pieces placed,
+complex positions) — `query()` returns `None` more often there.  Once training is further
+along, monitor how often each signal fires per phase to confirm the model is still receiving
+useful reward in the midgame and not only in placement/endgame positions.
+
 **Implementation notes:**
 - `override_time_budget=0.05s/move` passed to GameAI so training games run in ~3s not ~27s.
 - Opponent's **first move is forced random** each game to ensure the learner sees varied
@@ -273,6 +278,12 @@ label, and the model is trained supervised on the full game trajectory.
     (uniform over all "W" moves if any exist; otherwise uniform over "D" moves; otherwise "L").
 - Light LR (1e-5); only a few epochs to avoid catastrophic forgetting of generalisation learned
   in Stages 2–4.
+
+**Policy target refinement (future):** "Uniform over W moves" is the baseline target.  If
+Malom has DTM (distance to mate) available, W moves can instead be weighted inversely by DTM
+so faster wins receive higher probability mass.  This is not required for correctness but
+improves the sharpness of the resulting policy.  Treat as a refinement once the supervised
+training is otherwise stable.
 
 **Key distinction from Stages 2–4:** The model now *sees* the Malom W/L/D labels as
 supervised targets, not just as a reward shaping signal.  This is the first time perfect
