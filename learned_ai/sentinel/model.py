@@ -105,3 +105,16 @@ def sentinel_loss(
             result["total"] = bce + lambda_wdl * wdl_loss
 
     return result
+
+
+def contrastive_ranking_loss(
+    scores_good: torch.Tensor,
+    scores_bad: torch.Tensor,
+    margin: float = 0.2,
+) -> torch.Tensor:
+    """Pairwise ranking hinge: good moves must score above bad moves by at least ``margin``.
+
+    ``scores_good`` and ``scores_bad`` are (B,) tensors of quality scores in [0, 1].
+    Loss is zero when score_good >= score_bad + margin for every pair.
+    """
+    return torch.clamp(scores_bad - scores_good + margin, min=0.0).mean()

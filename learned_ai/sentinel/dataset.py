@@ -127,12 +127,18 @@ def examples_from_position(
     db=None,
     played_move_key: Optional[tuple] = None,
     trajectory_boost: float = 1.0,
+    played_malom_wdl: Optional[str] = None,
+    played_malom_dtw: Optional[int] = None,
 ) -> List[MoveExample]:
     """Build one MoveExample per legal move at ``board`` for ``player``.
 
     ``played_move_key`` is ``(from, to, capture)`` of the move actually played.
     When ``trajectory_boost != 1.0`` the training weight of that specific move
     is multiplied by the boost (Stage 3 trajectory supervision).
+
+    ``played_malom_wdl`` / ``played_malom_dtw``: pre-computed Malom label for the
+    played move (from AIDB games).  Used when the live DB is unavailable so AIDB
+    games still provide solved-DB quality labels for the played move.
     """
     moves = _enumerate_legal_moves(board, player)
     if not moves:
@@ -159,6 +165,22 @@ def examples_from_position(
             entry.get("wdl", "unknown"),
             entry.get("dtm"),
         )
+
+    # If the live DB is unavailable but we have a pre-computed Malom label for
+    # the played move (e.g. from an AIDB game), inject it so the played move
+    # gets a solved-DB quality label even without a live DB query.
+    if (played_move_key is not None and played_malom_wdl is not None
+            and played_malom_wdl in ("win", "loss", "draw")):
+        existing = wdl_by_key.get(played_move_key, (None, None))
+        if existing[0] in (None, "unknown"):
+            wdl_by_key[played_move_key] = (played_malom_wdl, played_malom_dtw)
+
+    # Board FEN for contrastive grouping — same for all moves in this position.
+    position_key = ""
+    try:
+        position_key = board.to_fen_string()
+    except Exception:
+        pass
 
     examples: List[MoveExample] = []
     for i, mv in enumerate(moves):
@@ -193,6 +215,7 @@ def examples_from_position(
                 ply=ply,
                 move_notation=f"{mv.get('from') or ''}-{mv.get('to') or ''}",
                 meta={"player": player},
+                position_key=position_key,
             )
         )
     return examples
@@ -231,6 +254,11 @@ def examples_from_game(
         player = log_move.get("color") or getattr(board, "turn", "W")
         played_key = (log_move.get("from"), log_move.get("to"), log_move.get("capture"))
 
+        # Pre-computed Malom labels from AIDB games (None for regular game logs).
+        played_malom_wdl = log_move.get("malom_move_wdl") or None
+        played_malom_dtw_raw = log_move.get("malom_dtw")
+        played_malom_dtw = int(played_malom_dtw_raw) if played_malom_dtw_raw is not None else None
+
         traj_boost = 1.0
         if trajectory_weight and winner is not None:
             if winner == player:
@@ -243,6 +271,8 @@ def examples_from_game(
                 board, player, ply, db=db,
                 played_move_key=played_key,
                 trajectory_boost=traj_boost,
+                played_malom_wdl=played_malom_wdl,
+                played_malom_dtw=played_malom_dtw,
             ))
         except Exception as exc:
             logger.debug("[SentinelDataset] position failed at ply %d: %s", ply, exc)
@@ -408,6 +438,7 @@ class SentinelDataset(_TorchDataset):
             supervision_source=np.array(
                 [e.supervision_source for e in self.examples], dtype=object),
             ply=np.array([e.ply for e in self.examples], np.int64),
+            position_key=np.array([e.position_key for e in self.examples], dtype=object),
         )
 
     @classmethod
@@ -416,6 +447,7 @@ class SentinelDataset(_TorchDataset):
         data = np.load(path, allow_pickle=True)
         feats = data["features"]
         n = feats.shape[0]
+        pos_keys = data["position_key"] if "position_key" in data else np.array([""] * n, dtype=object)
         examples: List[MoveExample] = []
         for i in range(n):
             examples.append(
@@ -425,6 +457,7 @@ class SentinelDataset(_TorchDataset):
                     training_weight=float(data["training_weight"][i]),
                     supervision_source=str(data["supervision_source"][i]),
                     ply=int(data["ply"][i]),
+                    position_key=str(pos_keys[i]),
                 )
             )
         return cls(examples)
@@ -449,6 +482,59 @@ class SentinelDataset(_TorchDataset):
         for e in self.examples:
             dist[e.supervision_source] = dist.get(e.supervision_source, 0) + 1
         return dist
+
+
+class ContrastiveSentinelDataset(_TorchDataset):
+    """Dataset of (good_move_features, bad_move_features) pairs from the same position.
+
+    Pairs are drawn from positions where at least one move scores >= 0.65 (good)
+    and at least one scores <= 0.35 (bad).  Examples are shuffled before grouping
+    to prevent position-key ordering from biasing the 200 K cap.
+    """
+
+    GOOD_THRESHOLD = 0.65
+    BAD_THRESHOLD = 0.35
+
+    def __init__(
+        self,
+        examples: List[MoveExample],
+        max_pairs: int = 200_000,
+        seed: int = 42,
+    ) -> None:
+        import random as _random
+        rng = _random.Random(seed)
+
+        # Shuffle first so the pair cap samples uniformly across positions.
+        shuffled = list(examples)
+        rng.shuffle(shuffled)
+
+        by_pos: Dict[str, List[MoveExample]] = {}
+        for ex in shuffled:
+            if ex.position_key:
+                by_pos.setdefault(ex.position_key, []).append(ex)
+
+        pairs: List[Tuple[np.ndarray, np.ndarray]] = []
+        for exs in by_pos.values():
+            good = [e for e in exs if e.move_quality >= self.GOOD_THRESHOLD]
+            bad  = [e for e in exs if e.move_quality <= self.BAD_THRESHOLD]
+            for g in good:
+                for b in bad:
+                    pairs.append((g.features, b.features))
+
+        rng.shuffle(pairs)
+        self._pairs = pairs[:max_pairs]
+
+    def __len__(self) -> int:
+        return len(self._pairs)
+
+    def __getitem__(self, idx: int):
+        feat_g, feat_b = self._pairs[idx]
+        if torch is not None:
+            return (
+                torch.from_numpy(feat_g.astype(np.float32)),
+                torch.from_numpy(feat_b.astype(np.float32)),
+            )
+        return feat_g.astype(np.float32), feat_b.astype(np.float32)
 
 
 def _iter_game_records(path: str):

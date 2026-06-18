@@ -117,9 +117,10 @@ def _sample_action(
         out     = model.forward(state_d, phase_id, mask_d)
         logits  = out["logits"].squeeze(0)
 
-    # Primary action
+    # Primary action — use mask_d (already on device) for masking
+    mask_1d    = mask_d.squeeze(0)
     pri_logits = logits[PLACE_OFFSET:CAPTURE_OFFSET]
-    pri_mask   = legal_mask[PLACE_OFFSET:CAPTURE_OFFSET]
+    pri_mask   = mask_1d[PLACE_OFFSET:CAPTURE_OFFSET]
     scaled     = pri_logits / max(temperature, 1e-6)
     scaled     = scaled.masked_fill(~pri_mask, float("-inf"))
     log_probs  = F.log_softmax(scaled, dim=-1)
@@ -132,7 +133,7 @@ def _sample_action(
     cap_idx: Optional[int] = None
     if move_requires_capture(board, pri_idx):
         cap_logits = logits[CAPTURE_OFFSET:]
-        cap_mask   = legal_mask[CAPTURE_OFFSET:]
+        cap_mask   = mask_1d[CAPTURE_OFFSET:]
         if cap_mask.any():
             c_scaled  = cap_logits / max(temperature, 1e-6)
             c_scaled  = c_scaled.masked_fill(~cap_mask, float("-inf"))

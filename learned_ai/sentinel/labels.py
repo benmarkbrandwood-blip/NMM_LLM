@@ -56,6 +56,7 @@ class MoveExample:
     ply: int = 0                    # ply within the game (audit)
     move_notation: str = ""         # optional, for diagnostics
     meta: Dict[str, Any] = field(default_factory=dict)
+    position_key: str = ""          # board FEN — used by ContrastiveSentinelDataset to group moves from same position
 
     def target(self) -> float:
         return float(self.move_quality)
