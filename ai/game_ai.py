@@ -407,7 +407,6 @@ class GameAI:
         fullgame_db=None,           # ai.fullgame_db.FullGameDB | None
         endgame_solved_db=None,     # ai.endgame_solved_db.EndgameSolvedDB | None
         malom_db=None,              # learned_ai.sentinel.db_teacher.ExternalSolvedDB | None
-        neural_evaluator=None,      # ai.neural_evaluator.NeuralEvaluator | None
         override_time_budget: float | None = None,  # seconds; overrides _TIME_LIMIT for training
     ) -> None:
         self.color = color
@@ -456,8 +455,6 @@ class GameAI:
         self._trajectory_line: list[tuple[str, float]] = []
         self._game_notations: list = []
         self._move_path_buf: list = []  # SE-11b: shared push/pop path buffer for _negamax recursion
-        # Neural leaf evaluator (replaces heuristic evaluate() at depth-0 leaves).
-        self._neural_evaluator = neural_evaluator
         # Per-instance time-budget override (used during training to keep games fast).
         self._override_time_budget = override_time_budget
         # Sentinel overlay (advisory only by default). None => zero impact; the
@@ -1602,8 +1599,6 @@ class GameAI:
                 ext_budget -= 1
 
         if depth == 0:
-            if self._neural_evaluator is not None:
-                return self._neural_evaluator.evaluate(board)
             _q_moves = get_all_legal_moves(board)
             if any(m.get("capture") for m in _q_moves):
                 heur = self._qsearch(board, self._Q_DEPTH, alpha, beta, endgame_state, _q_moves)

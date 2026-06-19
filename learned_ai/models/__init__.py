@@ -1,1 +1,1 @@
-"""State/action encoders and the NMMNet policy/value network."""
+"""Scaffolded meta-policy models: encoder and network."""

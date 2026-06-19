@@ -120,7 +120,6 @@ class PonderManager:
             value_net=game_ai._value_net,
             fullgame_db=fullgame_db,
             endgame_solved_db=game_ai._endgame_solved_db,
-            neural_evaluator=game_ai._neural_evaluator,
         )
 
         with self._lock:
