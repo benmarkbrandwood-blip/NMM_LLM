@@ -121,8 +121,18 @@ def run(args: argparse.Namespace) -> None:
     n_pos_won = n_pos_draw = 0
     n_deviates = 0
     n_errors = 0
+    n_files = len(game_files)
 
-    for game_file in game_files:
+    for file_i, game_file in enumerate(game_files):
+        if (file_i + 1) % 100 == 0 or file_i == 0:
+            n_pos = len(all_chosen_idxs)
+            elapsed = time.time() - t_start
+            print(
+                f"[hgen] {file_i+1}/{n_files} files | "
+                f"positions {n_pos} | won={n_won} draw={n_draw} | {elapsed:.0f}s",
+                flush=True,
+            )
+
         for game in _load_game_file(game_file):
             human_color = game.get("human_color")
             winner = game.get("winner")

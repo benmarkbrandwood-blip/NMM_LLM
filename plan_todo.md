@@ -1889,6 +1889,35 @@ Additionally, the trajectory DB may not have enough data on this specific 12-mov
 - `ai/heuristics.py` — optional `_will_become_closeable(board, color, mill, horizon=2)` helper
 
 
+### Scaffolded Meta-Policy AI — Training Pipeline ⬜
+
+The scaffolded AI (`learned_ai/`) uses a per-move MLP meta-policy (ScaffoldedPolicyNet) that scores each legal move using 62-float expert features combining sentinel scores, heuristic rankings, and Malom WDL values. Training happens in stages:
+
+| Stage | Script | Status | Notes |
+|-------|--------|--------|-------|
+| Data gen | `scripts/gen_imitation_data.py` | ⬜ | 2000 heuristic self-play games → `imitation_scaffolded.npz` |
+| **Stage 1** | `scripts/train_scaffolded_s1.py` | ⬜ | Imitate heuristic; trains policy+value heads from scratch |
+| **Stage 1.5** | `scripts/train_scaffolded_s1b.py` | ⬜ | Fine-tune on human-game data (see below); run after Stage 1 |
+| Human data gen | `scripts/gen_human_imitation_data.py` | ✅ | Reads `data/games/*.jsonl`; 5,014 positions from 451 human games |
+| **Stage 2** | `scripts/train_scaffolded_s2.py` | ⬜ | A2C self-play reinforcement from s1b checkpoint |
+| **Stage 3** | `scripts/train_scaffolded_s3.py` | ⬜ | A2C against full-stack opponent (sentinel+vn+DB) |
+
+**Stage 1.5 — Human-game fine-tuning:**
+
+`gen_human_imitation_data.py` reads every human vs AI game where the human won (weight=1.0) or drew (weight=0.3); skips losses. For each human move it reconstructs the board from `board_fen_before`, encodes it with `encode_position()`, and records which legal move the human chose. Positions where the human deviated from the heuristic's top-1 pick get a 1.5× bonus weight (these carry the most human-specific signal).
+
+`train_scaffolded_s1b.py` fine-tunes the policy head only (value head frozen) from `s1/best.pt` using weighted cross-entropy, LR=3e-5, 5 epochs. Output: `s1b/best.pt`.
+
+Run order once Stage 1 is complete:
+```bash
+.venv/bin/python scripts/gen_human_imitation_data.py
+.venv/bin/python scripts/train_scaffolded_s1b.py \
+    --base-ckpt learned_ai/checkpoints/scaffolded/s1/best.pt
+```
+
+**Wiring into coordinator/app.py:** On hold — may be re-inserted as an overseer/advisory layer later. Do not wire until user approves.
+
+
 ### Enhancement B-99 — HumanDB Malom DTW overlay on the main game board ⬜ ★
 
 **Description:** The HumanDB already stores `malom_dtw` (Malom depth-to-win for the current position) and `malom_dtw_after` (DTW for the position after each candidate move). Add a GUI toggle near the existing Sentinel/Malom overlay to display these values on the board.

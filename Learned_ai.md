@@ -215,6 +215,48 @@ by checking that policy cross-entropy loss decreases and val accuracy > 20%.
 
 ---
 
+### Stage 1.5 — Human-game fine-tuning
+
+**Goal:** Teach the policy to replicate patterns from human games where the human won,
+giving it knowledge the heuristic doesn't have — human tactical intuition vs AI at
+difficulty 3.
+
+**What it uses:** All `data/games/*.jsonl` game records where `human_color` is set and
+the human won or drew.  For each human move, the board is reconstructed from the
+`board_fen_before` field, encoded with `encode_position()`, and the human's chosen move
+is recorded as the target.
+
+**Weighting:**
+- Won game moves: weight = 1.0
+- Draw game moves: weight = 0.3
+- Lost game moves: skipped entirely
+- Positions where the human deviated from the heuristic's top-1 pick (in won games):
+  extra 1.5× bonus weight — these carry the most human-specific signal
+
+**Numbers (2026-06-19, 451 human games):**
+- 5,014 positions total (4,219 from won games, 795 from draws)
+- Human deviated from heuristic top-1 in 3,658 / 4,219 won-game positions (87%)
+
+**Method:** Fine-tune policy head only from `s1/best.pt`.  Value head is frozen to
+preserve Stage 1's position evaluation.  Weighted cross-entropy loss, LR=3e-5, 5 epochs.
+
+**Commands:**
+```bash
+# Extract human game data (run once, ~45s — re-run after new games are played)
+.venv/bin/python scripts/gen_human_imitation_data.py
+# Output → learned_ai/data/human_imitation.npz
+
+# Fine-tune from Stage 1 checkpoint (~1 min)
+.venv/bin/python scripts/train_scaffolded_s1b.py \
+    --base-ckpt learned_ai/checkpoints/scaffolded/s1/best.pt \
+    --epochs 5
+# Checkpoint → learned_ai/checkpoints/scaffolded/s1b/best.pt
+```
+
+Stage 2 should resume from `s1b/best.pt` instead of `s1/best.pt`.
+
+---
+
 ### Stage 2 — A2C self-play with full scaffolded rewards
 
 **Goal:** Learn to actually win, using dense per-move rewards + retroactive rescoring.
@@ -345,17 +387,10 @@ not trending up, the per-move reward signal is not working.  Check:
 | `learned_ai/training/scaffolded_a2c.py` | `ScaffoldedStep`, `scaffolded_a2c_update()`, `scaffolded_ppo_update()` |
 | `learned_ai/agents/scaffolded_agent.py` | `ScaffoldedAgent` — inference wrapper for gameplay |
 | `scripts/gen_imitation_data.py` | Generate supervised dataset from heuristic self-play |
-| `scripts/train_scaffolded_s1.py` | Stage 1: imitation training |
+| `scripts/train_scaffolded_s1.py` | Stage 1: imitation training (heuristic self-play) |
+| `scripts/gen_human_imitation_data.py` | Extract human-game dataset from `data/games/*.jsonl` |
+| `scripts/train_scaffolded_s1b.py` | Stage 1.5: human-game fine-tune (policy head only, LR=3e-5) |
 | `scripts/train_scaffolded_s2.py` | Stage 2: A2C/PPO with full scaffolded rewards |
 | `scripts/train_scaffolded_s3.py` | Stage 3: Malom supervised fine-tuning |
+| `scripts/bench_scaffolded.py` | Headless benchmark: ScaffoldedAgent vs heuristic configs |
 | `tests/test_scaffolded_policy.py` | 25 unit tests (encoder shapes, net forward, A2C update, agent legality) |
-
-### Previous architecture (kept, not used for scaffolded training)
-
-| File | Status |
-|------|--------|
-| `learned_ai/models/backbone.py` — NMMNet (84→624) | Kept; used by old LearnedAgent |
-| `learned_ai/models/gnn_backbone.py` — NMMGNNNet | Kept, abandoned (Stage 1 accuracy 4.6%) |
-| `learned_ai/training/a2c.py` | Old A2C for NMMNet |
-| `scripts/train_stage2.py` | Old Stage 2 (failed at 2% win rate) |
-| `learned_ai/checkpoints/stage0/`, `stage1/`, `stage2/` | Old checkpoints |

@@ -22,7 +22,7 @@
   "endgame_pattern_bonus": 0.3,
   "endgame_solved_dir": "data/endgame",
   "fullgame_db_path": "data/endgame/fullgame.bin",
-  "malom_db_path": "",
+  "malom_db_path": "/mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted",
   "playok_archive_path": "~/playok_archive/games",
   "annotate_deviations_on_export": true,
   "auto_open_debrief": false,
