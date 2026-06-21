@@ -830,6 +830,7 @@ async def list_openings():
             "score_w":        round(op.opening_score("W", penalty=penalty), 3),
             "score_b":        round(op.opening_score("B", penalty=penalty), 3),
             "penalty":        round(penalty, 3),
+            "favored_side":   op.favored_side,
             "branches": [
                 {
                     "id":             b.branch_id,

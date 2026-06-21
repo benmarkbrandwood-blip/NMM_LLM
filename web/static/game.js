@@ -2286,7 +2286,15 @@ function _showOpeningInfo() {
     ? `W ${op.w_wins} / B ${op.b_wins} / D ${op.draws}  (${total} games)`
     : "No games recorded yet";
   const side = op.side === "W" ? "White" : op.side === "B" ? "Black" : "Both sides";
-  info.innerHTML = `<b>${op.n_moves} moves</b> · ${side} · ${stats}` +
+  const favoredLabel = {
+    W:     '<span style="color:#e8c87a;font-size:0.85em" title="End position structurally favours White">♙ favours White</span>',
+    B:     '<span style="color:#aaa;font-size:0.85em"    title="End position structurally favours Black">♟ favours Black</span>',
+    equal: '<span style="color:#888;font-size:0.85em"    title="End position is structurally balanced">⚖ balanced</span>',
+  }[op.favored_side] || '';
+  info.innerHTML =
+    `<b>${op.n_moves} moves</b> · ${side}` +
+    (favoredLabel ? ` · ${favoredLabel}` : '') +
+    ` · ${stats}` +
     (op.notes ? `<br><em>${op.notes.slice(0, 120)}</em>` : "");
 }
 
