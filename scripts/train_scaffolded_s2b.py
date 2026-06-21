@@ -15,8 +15,8 @@ Extends s2_diagnostic with two additions:
    gradient contamination for shared positions.
 
 GAME-STAGE DIVERSITY: Branch points are bucketed by phase:
-   "opening"  — placement phase, fewer than 10 pieces placed in total
-   "midgame"  — late placement or early movement (10+ placed, 12+ on board)
+   "opening"  — placement phase OR first 3 moves (6 plies) of movement phase
+   "midgame"  — movement phase, > 3 moves past placement, 12+ pieces on board
    "endgame"  — movement phase with fewer than 12 pieces on board
 
 A rolling counter (BUCKET_WINDOW games) caps how many branches can come from any
@@ -100,12 +100,12 @@ TEMP_MAX      = 0.90
 ENTROPY_COEF  = 0.01
 UPDATE_EVERY  = 16
 ROLLING_WIN   = 200
-DIFF_START = 3    # already beating diff 3; begin here
+DIFF_START = 4    # already beating diff 3; begin here
 DIFF_MAX   = 7
 # Rolling win rate needed at each difficulty to advance to the next.
 # Lower thresholds at higher difficulties — beating diff 6 at 40% is strong.
-ADVANCE_THRESHOLDS = {3: 0.75, 4: 0.70, 5: 0.65, 6: 0.60}
-EXIT_THRESHOLD = 0.40   # win rate vs diff 7 considered done
+ADVANCE_THRESHOLDS = {4: 0.70, 5: 0.65, 6: 0.60}
+EXIT_THRESHOLD = 0.70   # win rate vs diff 7 considered done
 MAX_PLY       = 400
 MAX_PLY_BRANCH = 250   # branch games start mid-game; cap shorter
 TIME_BUDGET   = 0.05
@@ -125,6 +125,11 @@ BRANCH_EVERY           = 10    # save branch candidate every N learner moves in 
 MAX_BRANCHES_PER_GAME  = 2     # max branch games spawned per main game
 BUCKET_WINDOW          = 300   # rolling window size for saturation tracking
 MAX_PER_BUCKET         = 80    # max branch games from any single bucket in that window
+
+# Placement ends when both players have placed all 9 pieces (18 total plies).
+# "Opening" extends 3 moves past placement — each move = one turn per player = 2 plies,
+# so OPENING_EXTENSION_PLY = 6 total plies after movement phase begins.
+OPENING_EXTENSION_PLY  = 6
 
 PHASE_BUCKETS = ("opening", "midgame", "endgame")
 
@@ -229,14 +234,21 @@ def _safe_mean(xs: list[float]) -> float:
     return float(sum(xs) / len(xs)) if xs else 0.0
 
 
-def _phase_bucket(board: BoardState) -> str:
-    """Classify board into training phase bucket for saturation tracking."""
-    total_placed = board.pieces_placed["W"] + board.pieces_placed["B"]
+def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) -> str:
+    """Classify board into training phase bucket for saturation tracking.
+
+    moves_into_movement: plies elapsed since movement phase began (None = unknown).
+    Opening extends OPENING_EXTENSION_PLY plies past placement end.
+    """
     total_on_board = board.pieces_on_board["W"] + board.pieces_on_board["B"]
     if board.phase == "place":
-        return "opening" if total_placed < 10 else "midgame"
+        return "opening"
     # movement / fly phase
-    return "endgame" if total_on_board < 12 else "midgame"
+    if total_on_board < 12:
+        return "endgame"
+    if moves_into_movement is not None and moves_into_movement < OPENING_EXTENSION_PLY:
+        return "opening"
+    return "midgame"
 
 
 def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
@@ -410,16 +422,19 @@ def _rollout(
     record_branches — if True, snapshot (ply, board, bucket) every branch_every
     learner turns for later branch-game spawning.
     """
-    board              = start_board
-    ply                = 0
-    game_trajectory:   list[ScaffoldedStep] = []
-    step_diags:        list[StepDiag]       = []
-    branch_candidates: list[tuple[int, BoardState, str]] = []
-    done               = False
-    outcome            = 0.0
-    learner_move_count = 0
+    board                  = start_board
+    ply                    = 0
+    move_phase_start_ply:  Optional[int] = None
+    game_trajectory:       list[ScaffoldedStep] = []
+    step_diags:            list[StepDiag]       = []
+    branch_candidates:     list[tuple[int, BoardState, str]] = []
+    done                   = False
+    outcome                = 0.0
+    learner_move_count     = 0
 
     while ply < max_ply:
+        if board.phase != "place" and move_phase_start_ply is None:
+            move_phase_start_ply = ply
         terminal, winner = is_terminal(board)
         if terminal:
             if winner == learner_color:
@@ -534,7 +549,8 @@ def _rollout(
             # Record branch candidate every branch_every learner moves
             learner_move_count += 1
             if record_branches and branch_every > 0 and (learner_move_count % branch_every == 0):
-                branch_candidates.append((ply, board, _phase_bucket(board)))
+                moves_into_movement = (ply - move_phase_start_ply) if move_phase_start_ply is not None else None
+                branch_candidates.append((ply, board, _phase_bucket(board, moves_into_movement)))
 
             board = board_after
 

@@ -422,8 +422,8 @@ separate trajectory — it never shares a gradient-update batch with the game it
 from, so there is **no gradient contamination for shared positions**.
 
 **Game-stage diversity — phase buckets:** Branch points are classified as:
-- `opening` — placement phase, < 10 pieces placed total
-- `midgame` — late placement or early movement (10+ placed, ≥ 12 on board)
+- `opening` — placement phase, OR first 3 moves (6 plies) of the movement phase
+- `midgame` — movement phase, > 3 moves past placement, ≥ 12 pieces on board
 - `endgame` — movement phase with < 12 pieces on board
 
 A rolling counter (300-game window) caps how many branches can come from any single bucket
