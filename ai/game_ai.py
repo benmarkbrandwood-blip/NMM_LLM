@@ -824,6 +824,63 @@ class GameAI:
         self._force_stop = True
         self._deadline   = 0.0
 
+    def score_root_moves(
+        self,
+        board: BoardState,
+        depth: int = 3,
+        time_budget: float = 2.0,
+    ) -> list:
+        """Score all legal moves with alpha-beta search at `depth`.
+
+        Returns list of (move_dict, score_norm) sorted best-first, where
+        score_norm is normalised to [0, 1] relative to the best/worst score
+        at the root.  Intended as per-move feature input for the Overseer;
+        no book, trajectory, or blunder logic is applied.
+        Returns [] when there are no legal moves.
+        """
+        moves = get_all_legal_moves(board)
+        if not moves:
+            return []
+
+        # Minimal state setup — mirrors choose_move preamble
+        self._force_stop        = False
+        self._deadline          = time.time() + time_budget
+        self._tt.clear()
+        self._killers           = [[None, None] for _ in range(32)]
+        self._history           = {}
+        self._nodes             = 0
+        self._trajectory_db     = None
+        self._game_notations    = []
+        self._trajectory_line   = []
+        self._move_path_buf     = []
+
+        killers = self._killers[depth] if depth < 32 else None
+        ordered = _order_moves(board, moves, killers, self._history,
+                               _is_beginner=self._is_beginner)
+
+        scored: list = []
+        for mv in ordered:
+            try:
+                nb  = board.apply_move(mv)
+                self._move_path_buf = [self._move_notation(mv)]
+                raw = -self._negamax(
+                    nb, depth - 1, -INF, INF, None,
+                    depth // 2, _MAX_OPP_PLIES, 1,
+                )
+            except (_SearchAbort, Exception):
+                raw = 0.0
+            scored.append((mv, float(raw)))
+
+        if not scored:
+            return []
+
+        raws = [s for _, s in scored]
+        lo, hi = min(raws), max(raws)
+        span   = max(hi - lo, 1e-9)
+        result = [(mv, (s - lo) / span) for mv, s in scored]
+        result.sort(key=lambda x: x[1], reverse=True)
+        return result
+
     def choose_move(
         self,
         board: BoardState,

@@ -22,16 +22,24 @@ def _move_key(mv: dict) -> tuple:
     return (mv.get("from"), mv.get("to"), mv.get("capture"))
 
 
+# Stages whose checkpoints were trained with Malom DB features populated in [40:58).
+# Stages 1, 1b, 2, 2b train with db=None (DB slots stay zero); Stage 3+ uses db.
+_DB_FEATURE_STAGES = {"s3"}
+
+
 class OverseerAdvisor:
     """Wraps ScaffoldedPolicyNet for per-move probability scoring."""
 
     def __init__(self, model, ckpt_path: str, sentinel_advisor=None, db=None,
-                 value_net=None) -> None:
+                 value_net=None, stage: str = "unknown") -> None:
         self._model = model
         self._ckpt_path = ckpt_path
         self._sentinel = sentinel_advisor
         self._db = db
         self._value_net = value_net
+        # Only pass DB features to encode_position for stages trained with them.
+        self._use_db_features = stage in _DB_FEATURE_STAGES
+        self._stage = stage
         model.eval()
 
     def is_loaded(self) -> bool:
@@ -61,9 +69,11 @@ class OverseerAdvisor:
         # This is an acceptable silent degradation for v1.
         try:
             from learned_ai.models.scaffolded_encoder import encode_position
+            # DB features [40:58) must match training: zero for Stages 1/2, populated for Stage 3+.
+            db_arg = self._db if self._use_db_features else None
             enc = encode_position(board, color,
                                   sentinel_advisor=self._sentinel,
-                                  db=self._db,
+                                  db=db_arg,
                                   value_net=self._value_net)
             if enc is None or not enc.legal_moves:
                 return None
@@ -105,7 +115,7 @@ def load_overseer(
 ) -> Optional[OverseerAdvisor]:
     """Load OverseerAdvisor from checkpoint.  Returns None on any failure.
 
-    If ckpt_path is None, searches: s1b/best.pt → s1/best.pt under
+    If ckpt_path is None, searches: s2/best.pt → s1b/best.pt → s1/best.pt under
     learned_ai/checkpoints/scaffolded/.
     """
     try:
@@ -122,6 +132,7 @@ def load_overseer(
     else:
         ckpt_dir = _root / "learned_ai" / "checkpoints" / "scaffolded"
         search_paths = [
+            ckpt_dir / "s2"  / "best.pt",
             ckpt_dir / "s1b" / "best.pt",
             ckpt_dir / "s1"  / "best.pt",
         ]
@@ -144,10 +155,12 @@ def load_overseer(
         model.load_state_dict(state)
         model.eval()
         stage = ckpt.get("stage", "unknown")
-        log.info("OverseerAdvisor: loaded %s (stage=%s)", chosen, stage)
+        use_db = stage in _DB_FEATURE_STAGES
+        log.info("OverseerAdvisor: loaded %s (stage=%s, db_features=%s, sentinel=%s, value_net=%s)",
+                 chosen, stage, use_db, sentinel_advisor is not None, value_net is not None)
         return OverseerAdvisor(model, str(chosen),
                                sentinel_advisor=sentinel_advisor, db=db,
-                               value_net=value_net)
+                               value_net=value_net, stage=stage)
     except Exception as e:
         log.warning("OverseerAdvisor: failed to load %s: %s", chosen, e)
         return None

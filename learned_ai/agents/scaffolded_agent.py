@@ -24,7 +24,10 @@ import torch.nn.functional as F
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves
-from learned_ai.models.scaffolded_encoder import encode_position
+from learned_ai.agents.heuristic_agent import get_heuristic_evaluate as _get_heuristic_evaluate
+from learned_ai.models.lookahead_advisor import LookaheadAdvisor
+from learned_ai.models.overseer_extras import build_overseer_extras
+from learned_ai.models.scaffolded_encoder import encode_position_with_lookahead
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 
 
@@ -57,6 +60,15 @@ class ScaffoldedAgent:
         sentinel_advisor=None,
         db=None,
         value_net=None,
+        lookahead_advisor=None,
+        # Overseer-only params (ignored for specialist agents)
+        is_overseer: bool = False,
+        spec_open=None,
+        spec_mid=None,
+        spec_end=None,
+        gameai=None,             # GameAI for overseer alpha-beta features (depth=5 at gameplay)
+        human_db=None,           # HumanDB for overseer human-game features
+        gameai_depth: int = 5,   # depth for GameAI search at inference
         device: str = "auto",
         mode: str = "sample",
         temperature: float = 1.0,
@@ -70,6 +82,15 @@ class ScaffoldedAgent:
         self.temperature = max(float(temperature), 1e-6)
         self.last_was_blunder = False
         self.last_thinking = "scaffolded"
+
+        # Overseer mode: applies build_overseer_extras at inference
+        self._is_overseer = is_overseer
+        self._spec_open   = spec_open
+        self._spec_mid    = spec_mid
+        self._spec_end    = spec_end
+        self._gameai      = gameai
+        self._human_db    = human_db
+        self._gameai_depth = gameai_depth
 
         if device == "auto":
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -88,6 +109,17 @@ class ScaffoldedAgent:
             self._gen.manual_seed(seed)
         else:
             self._gen.seed()
+
+        if lookahead_advisor is not None:
+            self.lookahead_advisor = lookahead_advisor
+        else:
+            _evaluate_fn = _get_heuristic_evaluate()
+            self.lookahead_advisor = LookaheadAdvisor(
+                sentinel=sentinel_advisor,
+                value_net=value_net,
+                evaluate_fn=_evaluate_fn,
+                use_sentinel=True,
+            )
 
         self.last_decision: Optional[ScaffoldedDecision] = None
 
@@ -116,17 +148,28 @@ class ScaffoldedAgent:
     def choose_move(self, board: BoardState, **_) -> dict:
         player = board.turn
 
-        enc = encode_position(
+        enc = encode_position_with_lookahead(
             board,
             player,
             sentinel_advisor=self.sentinel_advisor,
             db=self.db,
             value_net=self.value_net,
+            lookahead_advisor=self.lookahead_advisor,
         )
         if enc is None or len(enc.legal_moves) == 0:
             return {}
 
-        feat_t = torch.tensor(enc.feat_matrix, dtype=torch.float32).to(self.device)
+        if self._is_overseer:
+            feat_matrix = build_overseer_extras(
+                enc.feat_matrix, board, enc, player,
+                self._spec_open, self._spec_mid, self._spec_end,
+                self._gameai, self._human_db, self._gameai_depth,
+                self.device,
+            )
+        else:
+            feat_matrix = enc.feat_matrix
+
+        feat_t = torch.tensor(feat_matrix, dtype=torch.float32).to(self.device)
         vi_t   = torch.tensor(enc.value_input,  dtype=torch.float32).to(self.device)
 
         with torch.no_grad():

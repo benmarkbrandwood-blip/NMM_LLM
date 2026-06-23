@@ -1,225 +1,371 @@
-# Learned AI — Training Plan
+# Learned AI — Architecture & Training Plan
 
-This document tracks every attempt to train a learned NMM agent, why each one failed,
-and the current plan.  The history matters: each failure narrowed the diagnosis.
-
----
-
-## Failure History
-
-### Attempt 1–3: REINFORCE (v1/v2/v3)
-
-Three REINFORCE attempts all ended in **policy collapse** within 500 games.
-
-| Version | What changed | Killed at | Final win rate | Root cause |
-|---------|--------------|-----------|----------------|------------|
-| v1 | baseline REINFORCE | game 4372 | 7.5% | sentinel over-filtered, value collapse, T=1.0 |
-| v2 | + Malom move quality reward | game ~200 | 2.3% | too early to judge; restarted |
-| v3 | + Malom trap reward, T=0.2→0.6, reward=1.0 | game 500 | 2.0% (declining) | three compounded bugs |
-
-**Root cause of all three:** Terminal-only reward in a 40-ply game means one gradient
-signal per game.  With 95% loss rate, every log_prob in every game got pushed down
-uniformly.  The model collapsed to near-random before it could discover any winning moves.
+This document defines the complete architecture, reward structure, training pipeline, and
+implementation strategy for the NMM learned AI system.  The history of failures is kept because
+each attempt narrowed the diagnosis.
 
 ---
 
-### Attempt 4: A2C with raw board state
+## Failure History (Summary)
 
-Switched from REINFORCE to **A2C** (actor-critic, per-step TD bootstrapping) to solve the
-variance problem.  Three concrete bug fixes: win_reward 2.0→1.0, lr 1e-4→5e-6, temperature
-0.5→0.2 annealed to 0.6.
+| Attempt | Algorithm | Root cause of failure |
+|-|-|-|
+| REINFORCE v1–v3 | Terminal-only reward | 95% loss rate; every log_prob uniformly pushed down; collapse |
+| A2C raw board | TD per-step | 84-float one-hot gives no strategic context; model can't discover NMM strategy from 10k games of losing |
+| Scaffolded A2C s2b | RL on full game | Model learns difficulty-specific exploits; cannot transfer to the next level |
 
-**Model:** `NMMNet` — 84-float raw board one-hot → MLP backbone (256→256→128) → 5 phase
-heads → 624 fixed action logits.
-
-**Result after 10,000 games vs heuristic difficulty 2:** **2% win rate peak, 2% final.**
-Many games hit the 200-step draw cap.  Loss never meaningfully decreased.
-
-**Why this also failed — the real root cause, finally identified:**
-
-The 84-float raw board encoding gives the model no strategic context.  It receives 24
-positions × 3-way one-hot, side-to-move, phase, and piece counts — nothing about
-which moves are good, which pieces are in danger, what the heuristic thinks, or
-what Malom says.  To win from this starting point, the model would have to independently
-rediscover all of NMM strategy through trial and error against a competent heuristic.
-
-After 10,000 games it had still not managed this.  The signal-to-noise ratio is simply
-too low: the heuristic consistently outplays a confused random-ish policy, so almost
-every game is a loss, and the per-move TD signal only helps if the model can already
-produce occasionally good moves to learn from.
-
-This is not an algorithm problem.  A2C is correct.  The problem is the **input
-representation**.
+**The core insight from all failures:** A model learning NMM must start with meaningful signal — not
+raw board pixels.  The scaffolded feature vector (sentinel + heuristic quality per move)
+solves the cold-start problem.  The remaining challenge is **generalisation across difficulty levels**
+and **phase-appropriate strategy**.
 
 ---
 
-## The Real Problem: No Scaffold
+## Best Results — Specialist Training
 
-The pattern across all four attempts is the same:
+### Opening Specialist (2026-06-23)
 
-> A model learning NMM from raw board encodings must discover the entire strategy of the
-> game before it can produce a single positive gradient signal in a game against a
-> competent opponent.  It can't do this from 10,000 games of repeated losing.
+The Opening Specialist (`train_scaffolded_opening.py`) reached **difficulty 6 of 7** in 1,149 games,
+with a perfect **100% win rate at difficulty 5** (recorded at advancement game 521).
 
-The sentinel does not have this problem.  It was trained with 58 rich per-move features:
-resulting piece counts, mobility, mill threats, heuristic rank, DB win rates, DTM quality.
-It knew, from day one, that closing a mill is good and walking into a trap is bad.
+| Difficulty | Best hwr | Advancement game |
+|-|-|-|
+| 1 | 0.480 | 52 |
+| 2 | 0.375 | 226 |
+| 3 | 0.389 | 338 |
+| 4 | 0.440 | 521 |
+| 5 | **1.000** | 690 |
+| 6 | 0.220 (peak) | — (stalled ~12–14%) |
 
-The learned policy needs the same scaffold.
+Difficulty 5 was beaten with a perfect sweep — every heuristic game in the rolling window was a win.
+Difficulty 6 is proving substantially harder; the model plateaus around 12–14% win rate.
+The opening specialist checkpoint (`s_open/best.pt`) is production-ready for the Overseer.
+
+**Why it stalled at difficulty 6 — and what this reveals about midgame/endgame play:**
+
+The opening specialist has **no midgame or endgame reward signal**.  All reward fires during
+placement and the first 6 movement turns only.  After that, the only gradient is the retroactive
+outcome score spread thinly across all plies.
+
+Its wins at difficulties 1–5 were carried almost entirely by **opening position quality** — it
+places pieces so well that the heuristic opponent at those levels makes enough midgame errors to
+lose from a disadvantaged position.  The opening AI does not understand midgame tactics or
+endgame conversion; it just arrives at a structurally strong position and benefits from opponent
+mistakes.
+
+At difficulty 6 the opponent is strong enough that a good opening is no longer sufficient —
+real midgame and endgame play is required to convert the advantage.  The opening specialist has
+none of that, so it stalls.  This is the expected and correct behaviour.
+
+**Option B GameAI Handoff (2026-06-24):**
+
+To score opening quality fairly without requiring the specialist to play midgame/endgame well,
+after the placement phase + `OPENING_EXTENSION_PLY=6` movement turns, two `GameAI` instances
+at the current training difficulty (`handoff_difficulty`) take over both sides and play the game
+to completion.  No trajectory steps are recorded from the handoff point.  The game outcome then
+reflects whether the opening produced a genuinely strong position, not whether the specialist
+could convert it unassisted.
+
+### Endgame Specialist (2026-06-24)
+
+The Endgame Specialist (`train_scaffolded_endgame.py`) reached **difficulty 6** and stalled,
+with best win rate 0.54.  Checkpoint `s_end/best.pt` is production-ready for endgame play.
+
+| Difficulty | Best wr | Advancement game |
+|-|-|-|
+| 3 | 0.778 | start |
+| 4 | 0.400 | 772 |
+| 5 | 0.500 | 1013 |
+| 6 | **0.54** (peak, stalled) | 1223 |
+
+Advanced through difficulties 3–5 quickly (~100–120 games each).  At difficulty 6, the model
+accumulated 694 training games and achieved a rolling peak of 0.54 win rate.  Could not reach
+the 60% heuristic win threshold for difficulty 7 advancement.
 
 ---
 
-## New Approach: Scaffolded Meta-Policy
+## Architecture: Three Specialists + Overseer
 
-**Core idea:** Instead of learning NMM from scratch, teach the model to learn *when to
-agree or disagree with the experts* (sentinel, heuristic engine, Malom DB).
+Four separate networks are trained: one for each phase of the game, and an Overseer that
+consults all three and makes the final decision.
 
-The model is not given the raw board.  It is given, for every legal move:
-- What the sentinel thinks of this move (quality score)
-- What the heuristic engine thinks (rank, absolute evaluation, delta from current position)
-- What Malom says (WDL, distance-to-win)
-- The structural move properties (mill closing, piece counts, mobility, etc.)
+```
+                   ┌──────────────────────────────────────────┐
+                   │             Overseer Net                   │
+                   │   Input: 85 floats per move                │
+                   │   [0:62)   62 scaffold base features       │
+                   │   [62:77)  15 lookahead features (5-ply)   │
+                   │   [77:80)  specialist probs (open/mid/end) │
+                   │   [80:82)  GameAI alpha-beta (score, best) │
+                   │   [82:85)  HumanDB (win_rate, freq, seen)  │
+                   │                                            │
+                   │   Reward: Malom DTM + mill creation        │
+                   │   Penalty: Malom losing move DTM           │
+                   └──────────────────────────────────────────┘
+                          ↑          ↑          ↑
+               ┌──────────┘   ┌──────┘   └──────────┐
+               │              │                      │
+    ┌──────────────┐ ┌──────────────┐     ┌──────────────┐
+    │  Opening Net │ │  Midgame Net │     │  Endgame Net │
+    │  77 floats   │ │  77 floats   │     │  77 floats   │
+    │  Reward:     │ │  Reward:     │     │  Reward:     │
+    │  sentinel +  │ │  sentinel +  │     │  Malom DTM   │
+    │  heuristic   │ │  heuristic + │     │  + endgame   │
+    │  advantage   │ │  Malom R/P   │     │  DB WDL      │
+    └──────────────┘ └──────────────┘     └──────────────┘
+```
 
-The task becomes: "given everything the experts know about this move, should I play it?"
-This is learnable in far fewer games because the model starts with meaningful signal.
-
-It is fine if the model remains dependent on the sentinel and heuristic at deployment — it
-has them available anyway.  The goal is to *improve on top of that baseline*, not to
-replace it.
+All four networks use the same `ScaffoldedPolicyNet` architecture.
+Specialists: `move_feat_dim=77`.  Overseer: `move_feat_dim=85`.
 
 ---
 
-## Architecture: ScaffoldedPolicyNet
+## Malom Database — Scope Clarification
 
-### Per-move input (62 floats)
+**The Malom DB covers ALL positions in the game** — every legal position at every piece count
+has a win/draw/loss label and a distance-to-mate (DTM) value.  It is not restricted to endgame.
+
+This means Malom is the ground-truth training signal for all four specialists and the Overseer.
+It is used as a reward/penalty signal (not as input features at inference) wherever it fires.
+
+The user's own **retrograde endgame databases** (7v3, 4v3, 3v3, 4v4, etc.) are a separate
+concept and cover endgame positions only.  These are distinct from Malom.
+
+| Stage | Malom role |
+|-|-|
+| Opening specialist | No Malom reward (GAMMA=DELTA=0). Reward is sentinel + heuristic only. |
+| Midgame specialist | Per-move reward (+0.15) when opponent enters losing state; penalty (−0.15) when opponent enters winning state |
+| Endgame specialist | DTM-quality reward + trap bonus; plus EndgameSolvedDB WDL reward (+0.20 win / −0.10 loss) |
+| Overseer | Full DTM-scaled reward and penalty |
+
+---
+
+## Feature Vectors
+
+### Specialist input (77 floats per candidate move)
+
+**Base 62 floats** (indices 0–61):
 
 | Slice | Source | Content |
-|-------|--------|---------|
-| [0:20) | `feature_builder.board_context_features()` | Phase, piece counts, mobility, mills — same for all moves in this position |
-| [20:40) | `feature_builder.move_features()` | From/to/capture indices, mill flags, resulting state |
-| [40:58) | `feature_builder.counterfactual_features()` | Heuristic rank, normalised score, **DB win/loss fracs, DTM quality** — the DB slots are **zero at inference and in Stages 1 & 2**; first populated in Stage 3 when `encode_position(db=db)` is called |
-| [58] | `SentinelAdvisor.advise().move_scores[i]` | Sentinel's quality score for this move, [0,1] |
-| [59] | `0.5 * h_abs_norm + 0.5 * vn_abs_norm` | Blended absolute eval of resulting position (heuristic + value-net, each mapped [0,1]) |
-| [60] | `is_top1` | 1.0 if this is the heuristic engine's #1 ranked move |
-| [61] | `tanh(0.5 * h_delta + 0.5 * vn_delta)` | Blended signed improvement (heuristic + value-net delta, then tanh) |
+|-|-|-|
+| [0:20) | `board_context_features()` | Phase, piece counts, mobility, mills — same for all moves |
+| [20:40) | `move_features()` | From/to/capture indices, mill flags, resulting state |
+| [40:58) | `counterfactual_features()` | Heuristic rank, score; DB WDL/DTM slots (zero at inference) |
+| [58] | Sentinel score | Quality score for this move [0,1] (0.5 when no sentinel loaded) |
+| [59] | Blended absolute eval | 0.5×h_abs + 0.5×vn_abs, mapped [0,1] |
+| [60] | is_top1 | 1.0 if heuristic #1 ranked move |
+| [61] | Blended signed delta | tanh(0.5×h_delta + 0.5×vn_delta) |
 
-> **Option B blend** — features 59 and 61 blend the value net (VN_BLEND=0.5) into
-> the existing heuristic slots to preserve the 62-dim checkpoint format.  When
-> `value_net=None`, they fall back to pure heuristic values (backward-compatible
-> with `s1b/best.pt` at inference).
->
-> **Future — Option A** (implement when next checkpoint is trained from scratch):
-> Extend to 64 floats — add `vn_score_abs` as feature [62] and `vn_delta_tanh` as
-> feature [63], keeping heuristic features [59] and [61] pure.  This gives the model
-> a clean, separable view of both evaluators.  Changes required:
-> - `scaffolded_encoder.py`: `MOVE_FEAT_DIM = 64`; add vn features as independent
->   entries instead of blending; remove `VN_BLEND`
-> - `scaffolded_net.py`: no change (reads `move_feat_dim` from config)
-> - All training/gen scripts: no change (they already pass `value_net`)
-> - Old 62-dim checkpoints will be incompatible — start a fresh Stage 1 run
+Malom DB slots [40:58) are **zero at inference**.  Malom is reward-only for specialists.
+
+**Lookahead 15 floats** (indices 62–76, `LookaheadAdvisor`, all 3 specialists + Overseer):
+
+5 half-plies; each ply records 3 signals from the learner's perspective:
+
+| Signal | Meaning |
+|-|-|
+| `h_norm` | `(evaluate(board, learner) + 1) / 2` — heuristic strength [0,1] |
+| `vn_norm` | `(value_net.predict(board, learner) + 1) / 2` — value net [0,1] |
+| `sent_mean` | Mean sentinel score for the side to move; flipped when opponent to move [0,1] |
+
+Both sides play the static-heuristic-best move at plies 2–5.  The trajectory terminates early
+if a terminal position or an exact Endgame-DB WDL is hit.
+`use_sentinel=True` in all specialists and the Overseer — real sentinel scores in all plies.
+
+### Overseer input (85 floats per candidate move)
+
+The first 77 floats are identical to the specialist input.  Eight extra floats are appended:
+
+| Index | Source | Content |
+|-|-|-|
+| [77] | Opening specialist | Softmax probability this move gets from Opening Net |
+| [78] | Midgame specialist | Softmax probability this move gets from Midgame Net |
+| [79] | Endgame specialist | Softmax probability this move gets from Endgame Net |
+| [80] | GameAI score_norm | Alpha-beta search score for this move, normalised to [0,1] |
+| [81] | GameAI is_best | 1.0 if this is the move GameAI's search selects, else 0.0 |
+| [82] | HumanDB win_rate | Win rate when humans played this move (0.5 if not in DB) |
+| [83] | HumanDB freq_norm | Relative frequency humans played this move (0 if not in DB) |
+| [84] | HumanDB seen_flag | 1.0 if this position+move appears in the human game database |
+
+**GameAI depth:** 3 during training, 5 at gameplay inference.  The GameAI instance runs
+`score_root_moves(board, depth=D)` which performs a full alpha-beta search to depth D and
+returns per-move normalised scores.  This gives the Overseer insight into what the classical
+engine would do from the current position.
+
+**HumanDB:** `data/human_db.sqlite` — 22,895 games, 642,703 positions.  Per-move win rates
+and frequencies are looked up by board state key (with symmetry canonicalisation).
 
 ### Value head input (23 floats)
 
 | Slice | Content |
-|-------|---------|
-| [0:20) | Board context features (same as above) |
-| [20] | `evaluate(board, player, strength_mode=True)` — absolute position strength |
+|-|-|
+| [0:20) | Board context features |
+| [20] | `evaluate(board, player)` — absolute position strength |
 | [21] | `max(sentinel_scores)` across legal moves |
 | [22] | `mean(sentinel_scores)` across legal moves |
 
-### Network structure
+### Network structure (all four nets)
 
 ```
-Policy: shared MLP applied independently to each move's 62-float row
-  62 → 128 → 64 → 1  (scalar logit per move)
+Policy: shared MLP applied independently to each move's feature row
+  dim → 128 → 64 → 1  (scalar logit per move)
   softmax over k legal moves → policy distribution
 
 Value: board-level MLP
   23 → 64 → 32 → tanh → 1  (scalar in [-1, 1])
 ```
 
-Variable move count handled naturally: k varies by position, no padding or masking needed.
-
-**Parameter count:** ~20K total (policy 16K + value 4K).  Deliberately small — the heavy
-lifting is done by the feature computation, not the network.
-
-Files:
-- `learned_ai/models/scaffolded_encoder.py` — `encode_position()` → `EncodedPosition`
-- `learned_ai/models/scaffolded_net.py` — `ScaffoldedPolicyNet`
-- `learned_ai/agents/scaffolded_agent.py` — `ScaffoldedAgent` (inference)
-- `learned_ai/training/scaffolded_a2c.py` — `ScaffoldedStep` + `scaffolded_a2c_update()` + PPO variant
+Specialists: `move_feat_dim=77`, ~20K parameters.
+Overseer: `move_feat_dim=85`, ~21K parameters.
 
 ---
 
-## Malom: Training Signal vs Feature Visibility
+## Reward Structures
 
-Malom (the ultra-strong external solver) plays two separate roles in the pipeline:
+### Opening Specialist rewards
 
-| Role | Stage 1 | Stage 2 | Stage 3 | Inference |
-|------|---------|---------|---------|-----------|
-| **Soft label targets** (KL loss) | ✓ queried separately | — | — | — |
-| **Per-move reward shaping** | — | ✓ queried separately | ✓ queried separately | — |
-| **Malom slots in feature vector [40:58)** | **zero** | **zero** | **non-zero** | **zero** |
+Phase gate: placement phase only, plus OPENING_EXTENSION_PLY (6) moves into movement.
 
-The invariant is: **the model never sees Malom WDL/DTM in its input features at inference**.
-Stages 1 and 2 call `encode_position(db=None)`, which zeros the DB slots in [40:58).
-Malom data is queried independently by the training scripts and used only to:
-- Shape the soft label distribution (Stage 1)
-- Compute `r_malom_win` and `r_malom_trap` rewards (Stages 2 & 3)
+```
+r_sentinel  = 0.20 × (sentinel_score_played − mean_sentinel_score)
+r_heuristic = 0.15 × tanh(h_after − h_before)
+r_mill      = 0.20 × mills_closed_this_move
+r_retro     = 0.50 × outcome × 0.98^(plies_remaining)   [retroactive, game end]
+```
 
-Stage 3 is the only exception: it calls `encode_position(db=db)`, so the model begins
-to see Malom WDL/DTM as live input features — simultaneously with the supervised KL loss.
-At inference, `db=None` is always passed (Malom unavailable), so the model generalises
-using what it learned from heuristics, value net, sentinel, and board structure.
+No Malom reward (GAMMA=DELTA=0.0) — reward is purely sentinel + heuristic quality.
+This was the reward structure that achieved difficulty 6 with 100% win rate at difficulty 5.
+
+### Midgame Specialist rewards
+
+Phase gate: movement phase only.
+Rollouts start from real-game positions at movement turn 10 (±2) — 70% pool, 30% new_game().
+
+```
+r_sentinel   = 0.20 × (sentinel_score_played − mean_sentinel_score)
+r_heuristic  = 0.15 × tanh(h_after − h_before)
+r_mill       = 0.25 × mills_closed_this_move          [un-gated, fires always]
+r_malom_win  = +0.15  if opponent enters Malom losing state
+r_malom_loss = −0.15  if opponent enters Malom winning state
+r_retro      =  0.50 × outcome × 0.98^(plies_remaining)
+```
+
+### Endgame Specialist rewards
+
+Phase gate: total pieces < 12 or fly phase.
+Rollouts start from real-game positions with < 12 pieces — 70% pool, 30% new_game().
+
+```
+r_malom_win  = 0.40 × dtm_quality(move)    if Malom says this move wins
+               dtm_quality = 1 − dtm/100   (win-in-1 ≈ 0.99, win-in-50 ≈ 0.50)
+r_malom_trap = 0.25                         if resulting opponent position is Malom "loss"
+r_endgame_db = +0.20   if opponent is now in EndgameSolvedDB losing position
+r_endgame_db = −0.10   if opponent is now in EndgameSolvedDB winning position
+r_mill       = 0.15 × mills_closed
+r_retro      = 0.50 × outcome × 0.98^(plies_remaining)
+```
+
+### Overseer rewards
+
+```
+r_malom_win  = +0.40 × dtm_quality(move)   if Malom winning trajectory
+r_mill_open  = +0.20 × mills_closed        if mill is unblocked (opponent can't capture next)
+r_malom_loss = −0.30 × dtm_quality(move)   if Malom losing trajectory
+r_retro      =  0.60 × outcome × 0.98^(plies_remaining)
+```
 
 ---
 
-## Reward Structure
+## Lookahead Advisor (all four models)
 
-### Per-move shaped rewards (dense — every learner turn)
+The 5-ply lookahead is used by **all three specialists and the Overseer** — not just the Overseer.
+`use_sentinel=True` everywhere: real sentinel scores computed at every ply.
 
-```
-r_sentinel   = 0.15 × (sentinel_score_played − mean_sentinel_score)
-               Did we play above the average quality sentinel sees for this position?
-
-r_heuristic  = 0.10 × tanh(h_after − h_before)
-               Did the heuristic evaluation improve after our move?
-
-r_value_net  = 0.10 × tanh(vn_after − vn_before)
-               Did the value-net evaluation improve after our move?
-               (fires only when --value-net is provided; zero otherwise)
-
-r_malom_win  = 0.25 × dtm_quality(move)    if Malom says this move wins
-               dtm_quality = 1 − dtm/100, so win-in-1 ≈ 0.99, win-in-50 ≈ 0.50
-               Winning moves rewarded more for faster wins.
-
-r_malom_trap = 0.15                        if resulting opponent position is Malom "loss"
-               Opponent is now provably losing — clearest possible signal.
-```
-
-These fire every turn, giving dense gradient signal regardless of whether the game is won
-or lost.  The model learns to improve positions incrementally.
-
-### Game-level retroactive rescoring (after game ends)
+### Algorithm
 
 ```
-outcome = +1.0 (win) | −1.0 (loss) | +0.15 (draw < 100 plies) | −0.05 (draw ≥ 100 plies)
+For each legal move m at the current position:
+    board_1 = board.apply_move(m)                  # learner move (candidate being scored)
+    board_2 = heuristic_best(board_1)              # opponent responds (static heuristic best)
+    board_3 = heuristic_best(board_2)              # learner responds (static heuristic best)
+    board_4 = heuristic_best(board_3)              # opponent responds
+    board_5 = heuristic_best(board_4)              # learner responds
 
-for each move t in trajectory (from end):
-    r_t += 0.50 × outcome × 0.98^(plies_remaining)
+    At each ply depth d (1–5), record 3 signals from learner's perspective:
+      h_norm[d]    = (evaluate(board_d, learner) + 1) / 2
+      vn_norm[d]   = (value_net.predict(board_d, learner) + 1) / 2
+      sent_mean[d] = mean sentinel score for side to move; flipped when opponent
+
+    Early-terminate trajectory if:
+      - Terminal position (winner known)
+      - EndgameSolvedDB returns exact WDL (→ fill remaining plies with WDL value)
 ```
 
-This retroactively credits early moves in a winning game and penalises early moves in
-a losing game, decayed so recent moves get more credit.  It prevents the per-move
-signals from drowning out the ultimate game result.
+This produces a (k, 15) block appended to the (k, 62) base → (k, 77) total specialist input.
 
-### Why this is better than the previous reward structure
+---
 
-| Old (A2C, raw board) | New (Scaffolded) |
-|----------------------|------------------|
-| r_malom = 0.1 × Δ(WDL) — small, infrequent (endgame only) | r_sentinel fires every move, calibrated to quality delta |
-| Terminal outcome dominates | Per-move + retroactive are balanced |
-| Model needs to form strategic understanding to get any reward | Model gets reward for playing sentinel/heuristic-aligned moves from game 1 |
+## Position Pool Sampling
+
+Specialists need diverse starting positions from the phase they are training on.
+
+### Midgame pool
+
+`load_position_pool(root, phase="midgame", movement_turn=10, window=2)`
+
+Walks every JSONL game file in `data/games`, `data/human_games`, `data/ai_games`.
+For each game, finds the first movement-phase move, counts 10 more, and records boards
+at movement turns 8–12 (turn 10 ± window=2).  Stops scanning that game once past the window.
+
+70% of training games start from a pool position; 30% start from `new_game()`.
+Learner colour is set to `board.turn` for pool starts.
+
+### Endgame pool
+
+`load_position_pool(root, phase="endgame", min_pieces=4, max_pieces=11)`
+
+Reads every `board_fen_before` entry from the same JSONL directories.
+Keeps positions where total pieces ∈ [4, 11].  Deduplicates by FEN.
+
+70% of training games start from a pool position; 30% start from `new_game()`.
+
+---
+
+## Opening Book Enforcement
+
+100% of opening specialist training games follow a randomly chosen line from the combined pool
+(`book_openings.json` + `learned_openings.json`, ~120 lines).
+The learner's first 4 placement moves are forced to match the line's positions for the learner's
+colour.  If the matching position is not in the legal moves list, the learner plays freely from
+that point.
+
+---
+
+## Anti-Overfitting: Difficulty Diversity
+
+**1. Mixed-difficulty batches**
+
+15% of heuristic games at each difficulty level are played against a randomly chosen
+lower difficulty.  These games count toward `mixed_win_history` but not toward the
+advancement check, so they cannot artificially inflate the advancement win rate.
+
+**2. s1b Refresher on every difficulty advance**
+
+Re-anchors the model to human-game positions before each new difficulty.
+Prevents the model from specialising entirely on how the heuristic engine moves.
+
+**3. Opponent time-budget variation**
+
+Heuristic opponent time budget varied ±40% each game.
+
+**4. Opening-line diversity**
+
+120 opening lines from two sources; 50% of games follow a random line.
+
+**5. Advancement threshold includes draws**
+
+Wins ≥ 30% AND draws ≥ 30%, OR wins ≥ 50% (opening/midgame) / ≥ 60% (endgame/overseer) —
+encourages solid all-round play, not narrow exploits.
 
 ---
 
@@ -227,432 +373,231 @@ signals from drowning out the ultimate game result.
 
 ### Stage 1 — Imitation warmup
 
-**Goal:** Give the model a solid starting policy before RL begins.  Without this, the
-model is near-random and the per-move rewards are noisy.
-
-**Method:** Play heuristic (diff 3) vs heuristic self-play with book-guided White
-openings and `top_n=2` move diversity.  At each position, `encode_position(db=None)` is
-called — **Malom slots [40:58) are zero in the feature matrix**.  The Malom DB is then
-queried *separately* to compute a **soft label distribution** over all legal moves
-(DTM-graded per move):
-
-```
-weight[move] = _WDL_SCALE[wdl] × dtm_quality(wdl, dtm)
-    where _WDL_SCALE = {"win": 1.0, "draw": 0.4, "loss": 0.1}
-    and   dtm_quality = 1 − dtm/100   (win-in-1 ≈ 0.99, win-in-50 ≈ 0.50)
-```
-
-When the Malom DB has no entry for a move, the sentinel score is used instead.
-The resulting (k,) distribution is normalised to sum to 1.
-
-Training loss: **cross-entropy with soft labels** (equivalent to KL divergence) for
-policy, **MSE against heuristic h_eval** for value.  This teaches the model to prefer
-Malom-winning moves proportional to how quickly they win — but from features that match
-inference time (no Malom in the vector).
-
-**Balance fix (2026-06-21):** Without intervention, heuristic self-play with a tight
-time budget produced heavily Black-biased outcomes (0/76/24 W/B/D over 100 test games).
-Root cause: B-47 intentional asymmetry in `tactical_move_bonus` rates Black's early
-placements higher, compounded by NMM second-player advantage at shallow search depth.
-Fixes applied in `gen_imitation_data.py`:
-- White's 1st and 2nd placements are forced to a randomly selected book opening line
-  (`data/openings/book_openings.json`), giving White sound structural starts.
-- `top_n=2` for all non-book moves — picks randomly from the top-2 scored moves,
-  breaking deterministic Black-wins-every-game spirals.
-
-**Expected outcome:** Model learns to prefer Malom-winning moves from day one.  Confirmed
-by checking that policy loss (cross-entropy with soft label) decreases each epoch.
-
-**Commands:**
 ```bash
-# Stage 1 data — pass --malom so you get DTM-graded labels (not just sentinel fallback)
 .venv/bin/python scripts/gen_imitation_data.py \
     --games 2000 --diff 3 \
     --sentinel learned_ai/sentinel/checkpoints/best.pt \
     --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
 
-# Stage 1 train (soft cross-entropy against Malom distributions)
 .venv/bin/python scripts/train_scaffolded_s1.py \
-    --data learned_ai/data/imitation_scaffolded.npz \
-    --epochs 10
-
-# Checkpoint → learned_ai/checkpoints/scaffolded/s1/best.pt
+    --data learned_ai/data/imitation_scaffolded.npz --epochs 10
+# → learned_ai/checkpoints/scaffolded/s1/best.pt
 ```
 
----
+### Stage 1b — Human-game fine-tuning
 
-### Stage 1.5 — Human-game fine-tuning
-
-**Goal:** Teach the policy to replicate patterns from human games where the human won,
-giving it knowledge the heuristic doesn't have — human tactical intuition vs AI at
-difficulty 3.
-
-**What it uses:** All `data/games/*.jsonl` game records where `human_color` is set and
-the human won or drew.  For each human move, the board is reconstructed from the
-`board_fen_before` field, encoded with `encode_position()`, and the human's chosen move
-is recorded as the target.
-
-**Weighting:**
-- Won game moves: weight = 1.0
-- Draw game moves: weight = 0.3
-- Lost game moves: skipped entirely
-- Positions where the human deviated from the heuristic's top-1 pick (in won games):
-  extra 1.5× bonus weight — these carry the most human-specific signal
-
-**Numbers (2026-06-19, 451 human games):**
-- 5,014 positions total (4,219 from won games, 795 from draws)
-- Human deviated from heuristic top-1 in 3,658 / 4,219 won-game positions (87%)
-
-**Method:** Fine-tune policy head only from `s1/best.pt`.  Value head is frozen to
-preserve Stage 1's position evaluation.  Weighted cross-entropy loss, LR=0.009, 10 epochs.
-
-**Commands:**
 ```bash
-# Stage 1.5 data — also pass --malom (re-run after new games are played)
 .venv/bin/python scripts/gen_human_imitation_data.py \
     --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
-# Output → learned_ai/data/human_imitation.npz
 
-# Stage 1.5 train (after Stage 1)
 .venv/bin/python scripts/train_scaffolded_s1b.py \
-    --base-ckpt learned_ai/checkpoints/scaffolded/s1/best.pt \
-    --epochs 10 --lr 0.009
-# Checkpoint → learned_ai/checkpoints/scaffolded/s1b/best.pt
+    --base-ckpt learned_ai/checkpoints/scaffolded/s1/best.pt --epochs 10 --lr 0.009
+# → learned_ai/checkpoints/scaffolded/s1b/best.pt
 ```
 
-Stage 2 should resume from `s1b/best.pt` instead of `s1/best.pt`.
+### Stage 2 — Opening Specialist ✓ TRAINED
 
----
+**Result:** Reached difficulty 6/7.  Perfect 100% win rate at difficulty 5.
+Checkpoint `s_open/best.pt` is production-ready for opening play.
+Training uses `use_sentinel=True` in the 5-ply lookahead, and Option B GameAI handoff
+(after placement + 6 movement plies, two GameAI at current difficulty play out the rest).
 
-### Stage 2 — A2C self-play with full scaffolded rewards
-
-**Goal:** Learn to actually win, using dense per-move rewards + retroactive rescoring.
-
-**Opponent:** Heuristic engine, difficulty 2 → 3.
-**Algorithm:** A2C (or `--ppo` for PPO).
-**Temperature:** 0.5 annealed to 0.9 (model starts near imitation prior; explore more as training progresses).
-**LR:** 1e-4 (model is new, not fine-tuning a pre-trained checkpoint — we can use a higher rate).
-
-**Malom separation:** `encode_position(db=None)` is called on every position — **Malom
-slots [40:58) remain zero**, matching inference time.  Malom is queried separately:
-`db.query_all_moves()` drives `r_malom_win`; `db.query_state()` drives `r_malom_trap`.
-The model learns what winning moves look like from rewards, not from seeing Malom answers
-in its inputs.
-
-**Curriculum:**
-- Start vs diff 2.
-- Advance to diff 3 when rolling-200 win rate ≥ 60%.
-- Exit when rolling-200 win rate ≥ 60% at diff 3.
-
-**Why higher LR than old Stage 2:** Old Stage 2 used 5e-6 to protect a pre-trained
-checkpoint.  ScaffoldedNet starts from Stage 1 imitation, not a pre-trained NMMNet
-backbone — a fresh model that needs to learn.  1e-4 is appropriate.
-
-**Current script:** `train_scaffolded_s2_diagnostic.py` — same algorithm as `train_scaffolded_s2.py`
-but with richer JSONL logging (per-component reward breakdown, chosen-move probability,
-policy sharpness, Malom hit rate) and self-adjusting temperature/LR-backoff.
-
-**Commands:**
 ```bash
-# Start from best checkpoint from current Stage 2 run if present, else s1b/s1
-.venv/bin/python scripts/train_scaffolded_s2_diagnostic.py \
-    --auto-resume-best \
-    --sentinel learned_ai/sentinel/checkpoints/best.pt \
-    --value-net data/value_net.npz \
-    --max-games 10000
-
-# Explicitly resume from a known checkpoint
-.venv/bin/python scripts/train_scaffolded_s2_diagnostic.py \
-    --resume learned_ai/checkpoints/scaffolded/s2/best.pt \
-    --sentinel learned_ai/sentinel/checkpoints/best.pt \
-    --value-net data/value_net.npz \
-    --max-games 10000
-
-# Start fresh from s1b if you do not want to resume Stage 2
-.venv/bin/python scripts/train_scaffolded_s2_diagnostic.py \
-    --resume learned_ai/checkpoints/scaffolded/s1b/best.pt \
-    --sentinel learned_ai/sentinel/checkpoints/best.pt \
-    --value-net data/value_net.npz \
-    --max-games 10000
-
-# Checkpoint → learned_ai/checkpoints/scaffolded/s2/best.pt
-# Logs → learned_ai/checkpoints/scaffolded/s2/train_log.jsonl
-#         learned_ai/checkpoints/scaffolded/s2/update_log.jsonl
-```
-
-**Training performance (Stage 2 — three runs, 128 log entries total):**
-
-Three separate runs are recorded in `s2/train_log.jsonl`:
-
-| Run | Games | Difficulty | Peak win-200 | Outcome |
-|-----|-------|------------|-------------|---------|
-| Run 1 | 50–300 | 2 | 0.22 | Abandoned early |
-| Run 2 | 50–5800 | 2 | 0.37 (~game 2500) | Stagnated; never advanced |
-| Run 3 | 2850–3100 | 2 → **3** | 0.455 → advanced | Beat diff 3 at 91% |
-
-Key observations:
-- **Run 2 stagnation:** Win rate peaked at ~0.37 around game 2500 then declined as
-  temperature annealed past 0.90 toward 1.0, making play increasingly stochastic.  By
-  game 5800 the win rate had dropped to ~0.14.  The 60% advance threshold was never
-  crossed; this run was abandoned.
-- **Run 3 breakthrough:** Resuming from the best checkpoint, the model reached 0.455 at
-  game 3000 — crossing the internal threshold — and advanced to difficulty 3 at game 3050.
-  The first difficulty-3 reading showed 100% (window artefact: only a handful of games
-  played), settling at 91% by game 3100.
-- **Difficulty 3 already mastered:** 91% win rate immediately on arrival at diff 3
-  confirms the model had already internalised difficulty-3 strategy during diff-2 training.
-  This is why Stage 2b starts directly at difficulty 4.
-
----
-
-### Stage 2b — Self-play with branched mid-game rollouts
-
-**Goal:** Broaden trajectory diversity without the training/inference gap of an undo
-mechanism.  Two additions on top of Stage 2:
-
-**Self-play (50% of main games):** The live model (temperature-sampled) plays against a
-periodically frozen copy of itself (refreshed every 50 games, `argmax` mode).  The other
-50% use the heuristic opponent from Stage 2.  Mixing prevents the model from only learning
-to beat itself.
-
-**Branched rollouts:** Every 10 learner turns, the current board state is snapshotted.
-After the main game ends, up to 2 of those snapshots are used as starting points for
-fresh independent rollouts (model vs frozen copy).  Each branch is stored as a completely
-separate trajectory — it never shares a gradient-update batch with the game it was spawned
-from, so there is **no gradient contamination for shared positions**.
-
-**Game-stage diversity — phase buckets:** Branch points are classified as:
-- `opening` — placement phase, OR first 3 moves (6 plies) of the movement phase
-- `midgame` — movement phase, > 3 moves past placement, ≥ 12 pieces on board
-- `endgame` — movement phase with < 12 pieces on board
-
-A rolling counter (300-game window) caps how many branches can come from any single bucket
-(`MAX_PER_BUCKET = 80`).  Once a bucket saturates, new branches from that phase are
-skipped.  This ensures the training set always spans beginning, middle, and end-game play.
-
-**Why not the "rewind" approach:** Rewinding and replaying within the same trajectory
-causes the same board positions to receive contradictory gradient signals (credited from
-path A in one update, penalised from path B in another).  It also trains a skill (undoing
-moves) that doesn't exist at inference.  Independent branches avoid both problems.
-
-**Curriculum (five-level):**
-- Start at difficulty 4 (`DIFF_START=4`; the model already beats diff 3 at 100%).
-- Advance: diff 4 → 5 at ≥ 70% rolling-200 win rate; 5 → 6 at ≥ 65%; 6 → 7 at ≥ 60%.
-- Exit: ≥ 70% win rate vs difficulty 7 (`EXIT_THRESHOLD=0.70`, `DIFF_MAX=7`).
-- When a difficulty threshold is crossed, `win_history` is cleared so progress against the
-  new opponent is measured fresh.
-
-**Commands:**
-```bash
-# Resume a previous s2b run (recommended — starts where you left off)
-.venv/bin/python scripts/train_scaffolded_s2b.py --auto-resume-best --max-games 5000
-
-# Explicit checkpoint (e.g. start from a known stage)
-.venv/bin/python scripts/train_scaffolded_s2b.py \
-    --resume learned_ai/checkpoints/scaffolded/s2/best.pt --max-games 5000
-
-# Disable self-play — pure heuristic opponent with branches only
-.venv/bin/python scripts/train_scaffolded_s2b.py --auto-resume-best --self-play-ratio 0.0
-
-# More aggressive branching (3 per game, snapshot every 8 moves)
-.venv/bin/python scripts/train_scaffolded_s2b.py \
-    --auto-resume-best --max-branches-per-game 3 --branch-every 8
-
-# Lower advance thresholds to move faster through difficulty levels
-.venv/bin/python scripts/train_scaffolded_s2b.py \
-    --auto-resume-best --advance-threshold 0.50 --exit-threshold 0.60
-
-# Quick smoke test (3 games, 1 branch max, log immediately)
-.venv/bin/python scripts/train_scaffolded_s2b.py \
-    --max-games 3 --max-branches-per-game 1 --log-every 3
-
-# Checkpoint → learned_ai/checkpoints/scaffolded/s2b/best.pt
-# Logs → learned_ai/checkpoints/scaffolded/s2b/train_log.jsonl
-#         learned_ai/checkpoints/scaffolded/s2b/update_log.jsonl
-```
-
-**What to watch in the logs (`train_log.jsonl`):**
-- `bucket_opening / bucket_midgame / bucket_endgame` — all should be non-zero; if one
-  saturates, branches from that phase auto-suppress
-- `game_type: "branch"` entries with varying `phase_bucket` — confirms game-stage coverage
-- Win rate trend vs Stage 2 — should be equal or better; if notably worse, reduce
-  `--max-branches-per-game` to 1
-
----
-
-### Stage 3 — Malom supervised fine-tuning
-
-**Goal:** Sharpen strategy with explicit DB supervision.  When Malom knows the WDL for
-all legal moves, push the policy toward the winning move(s), weighted by DTM quality.
-
-**This is the first and only stage where the model sees Malom WDL/DTM in its input
-features.**  `encode_position(db=db)` is called, populating the DB slots in [40:58).
-The model can now condition its policy directly on Malom information, and the SL loss
-explicitly pushes weights toward Malom-preferred move distributions.
-
-**Loss:** `total = 0.6 × A2C_loss + 0.4 × KL(policy → malom_target)`
-
-The Malom target is a probability distribution over legal moves:
-- Win moves: weight = dtm_quality (faster wins get more weight)
-- Draw moves: weight = 0.15
-- Loss moves: weight = 0.0
-
-The SL loss fires only when Malom has entries — in endgame and tractable midgame positions.
-It is zero in opening positions where the DB is unavailable.
-
-**Opponent:** Heuristic diff 3, advancing to diff 4.
-**LR:** 3e-5 (fine-tuning, lower than Stage 2).
-
-**Exit criterion:** Rolling-200 win rate ≥ 40% vs diff 4.
-
-**Commands:**
-```bash
-# From s2b/best.pt (recommended if you ran s2b)
-.venv/bin/python scripts/train_scaffolded_s3.py \
-    --resume learned_ai/checkpoints/scaffolded/s2b/best.pt \
-    --max-games 5000 \
+# Resume training (auto-resumes from s_open/best.pt)
+.venv/bin/python scripts/train_scaffolded_opening.py \
+    --max-games 10000 --max-ply 140 \
     --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
-
-# Higher difficulty (Malom fine-tuning works best at diff 3-4)
-.venv/bin/python scripts/train_scaffolded_s3.py \
-    --resume learned_ai/checkpoints/scaffolded/s2b/best.pt \
-    --diff 4 --max-games 5000 \
-    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
-
-# With PPO
-.venv/bin/python scripts/train_scaffolded_s3.py \
-    --resume learned_ai/checkpoints/scaffolded/s2b/best.pt \
-    --ppo --max-games 5000 \
-    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
-
-# Checkpoint → learned_ai/checkpoints/scaffolded/s3/best.pt
+# → learned_ai/checkpoints/scaffolded/s_open/best{N}.pt, best.pt
 ```
 
----
+To restart from a specific difficulty:
+```bash
+.venv/bin/python scripts/train_scaffolded_opening.py \
+    --resume learned_ai/checkpoints/scaffolded/s_open/best1.pt \
+    --diff-start 2 --max-games 10000 --max-ply 140
+```
 
-## Overseer — Live Overlay & Player Mode
+**Note:** `--malom` is passed for Malom feature encoding (DB probe flags in base features),
+not for reward — opening rewards are sentinel + heuristic only (GAMMA=DELTA=0).
 
-`OverseerAdvisor` in `learned_ai/models/overseer.py` wraps the `ScaffoldedPolicyNet`
-checkpoint and exposes per-move pick probabilities for two purposes:
+### Stage 3 — Midgame Specialist
 
-### Advisory overlay (always active when checkpoint found)
-
-Runs alongside the heuristic engine on every AI turn.  Each legal move in the diagnostic
-panel gets an "O:XX%" label showing the policy network's probability for that move.
-Helps evaluate whether the trained policy agrees with the heuristic's pick.
-
-Checkpoint search order (most-trained first): `s3/best.pt → s2b/best.pt → s2/best.pt → s1b/best.pt → s1/best.pt`
-
-### Overseer player mode (selectable in UI)
-
-When enabled (`use_overseer_player=True`), replaces the heuristic engine's choice with
-the policy network's **argmax** move.  Used to evaluate the ScaffoldedPolicyNet in live
-play without writing a full game loop.  Activated via `"use_overseer_player": true` in
-the WebSocket game-start message; exposed as a toggle in the game UI.
-
-Both modes call `encode_position()` → `ScaffoldedPolicyNet.policy_probs()`.  The sentinel,
-Malom DB, and value net are wired in from the server's global advisors so the policy sees
-the same features it was trained on.
-
-**Bug fixed (b9cb779):** Overseer was leaking Malom DB features from the encoding context
-into positions where the DB had no entry — a silent feature-value shift that degraded
-overlay accuracy.  Fixed by resetting the DB query context correctly per call.
-
----
-
-## Integration with Existing Engine
-
-The `ScaffoldedAgent` has a `choose_move(board)` interface identical to `HeuristicAgent`
-and `LearnedAgent`.  At deployment it calls:
-
-1. `SentinelAdvisor.advise()` — already called by the Coordinator anyway
-2. `evaluate(board_after, player, strength_mode=True)` — per legal move, instantaneous static eval
-3. `ScaffoldedPolicyNet.policy_logits()` — tiny MLP, <1ms
-
-Total added latency: negligible.  The sentinel was already the bottleneck.
-
-Overseer player mode (see above) is the current live-test path while Stage 2 A2C is
-being re-run.  Full `ScaffoldedAgent` integration into `ai/coordinator.py` follows once
-Stage 2 converges.
-
----
-
-## Success Metrics
-
-| Stage | Target | Why |
-|-------|--------|-----|
-| Stage 1 | Val policy loss decreasing; model plays legal moves better than random | Confirms imitation is working |
-| Stage 1.5 | Human-deviated positions weighted; policy loss lower than s1 | Human intuition added on top of heuristic baseline |
-| Stage 2 | Rolling-200 win rate ≥ 60% vs difficulty 2 in < 3,000 games | Per-move rewards should produce visible improvement within 500 games |
-| Stage 2 → diff 3 | Rolling-200 win rate ≥ 60% | |
-| Stage 2b | ≥70% win rate vs diff 7; `bucket_*` all non-zero in logs | Five-level curriculum: 70%→65%→60%→70% exit at diff 7 |
-| Stage 3 | Rolling-200 win rate ≥ 40% vs difficulty 4 | Fine-tuning on top of a working Stage 2/2b model |
-
-Early warning (check after 500 games of Stage 2): if win rate is still below 5% and
-not trending up, the per-move reward signal is not working.  Check:
-- Are sentinel scores varying across moves? (should not all be 0.5)
-- Is `h_delta` varying? (should see positive and negative values)
-- Is A2C advantage non-zero? (log in training loop)
-
----
-
-## What Changed vs All Previous Attempts
-
-| | REINFORCE | A2C raw board | **Scaffolded A2C** |
-|--|-----------|---------------|-------------------|
-| State input | 84-float one-hot board | 84-float one-hot board | **62-float expert features per move** |
-| Knows what a good move looks like? | No | No | **Yes — sentinel + heuristic say so explicitly** |
-| Reward density | 1 signal / game | per-step TD | **per-step TD + dense per-move shaping** |
-| Starting quality | random | imitation prior | **imitation prior at heuristic level** |
-| Must discover NMM strategy from scratch? | Yes | Yes | **No** |
-| Model can be dependent on sentinel/heuristic? | N/A | N/A | **Yes — they're available at deployment** |
-
----
-
-## Benchmarking
-
-The agent is given **sentinel + value net by default** — use `--no-agent-sentinel` to
-disable sentinel for ablation.
+Rewards: sentinel delta + heuristic delta + mill + Malom opponent-state reward/penalty.
+Sentinel used as feature source (ALPHA=0.20 reward weight) AND in 5-ply lookahead.
+Positions sampled from real games at movement turn 10 ±2.
 
 ```bash
-# Quick smoke test with Stage 1 checkpoint, 5 games, easy only
-.venv/bin/python scripts/bench_scaffolded.py \
-    --checkpoint learned_ai/checkpoints/scaffolded/s1/best.pt \
-    --games 5 --difficulties 2 --opponents raw
-
-# Bench test s1b
-.venv/bin/python scripts/bench_scaffolded.py \
-    --checkpoint learned_ai/checkpoints/scaffolded/s1b/best.pt \
-    --games 20 --difficulties 2,3,4
-
-# Full benchmark after Stage 2 / 2b
-.venv/bin/python scripts/bench_scaffolded.py \
-    --checkpoint learned_ai/checkpoints/scaffolded/s2/best.pt \
-    --games 40 --difficulties 2,3,4
-
-# Agent without sentinel (ablation)
-.venv/bin/python scripts/bench_scaffolded.py \
-    --checkpoint learned_ai/checkpoints/scaffolded/s2b/best.pt \
-    --games 40 --difficulties 3 --no-agent-sentinel
+.venv/bin/python scripts/train_scaffolded_midgame.py \
+    --max-games 10000 --max-ply 140 \
+    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
+# → learned_ai/checkpoints/scaffolded/s_mid/best{N}.pt, best.pt
 ```
+
+### Stage 4 — Endgame Specialist ✓ TRAINED
+
+**Result:** Reached difficulty 6/7.  Best win rate 0.54 at difficulty 6.
+Checkpoint `s_end/best.pt` is production-ready for endgame play.
+
+Rewards: Malom DTM win quality + trap bonus + EndgameSolvedDB WDL.
+Positions sampled from real games with < 12 pieces total.
+
+```bash
+# Resume training
+.venv/bin/python scripts/train_scaffolded_endgame.py \
+    --max-games 10000 --max-ply 140 \
+    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
+# → learned_ai/checkpoints/scaffolded/s_end/best{N}.pt, best.pt
+```
+
+### Stage 5 — Overseer
+
+Requires all three specialist checkpoints to be complete first.
+The Overseer uses 85-float features: 77 base+lookahead + 3 specialist probs + 2 GameAI + 3 HumanDB.
+GameAI runs depth=3 during training, depth=5 at gameplay inference.
+
+```bash
+.venv/bin/python scripts/train_scaffolded_overseer.py \
+    --opening-ckpt  learned_ai/checkpoints/scaffolded/s_open/best.pt \
+    --midgame-ckpt  learned_ai/checkpoints/scaffolded/s_mid/best.pt \
+    --endgame-ckpt  learned_ai/checkpoints/scaffolded/s_end/best.pt \
+    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
+    --max-games 10000 --max-ply 140
+# Optional: --human-db data/human_db.sqlite (default)
+# Optional: --gameai-depth 3 (training depth, default 3)
+# → learned_ai/checkpoints/scaffolded/s_over/best.pt
+```
+
+---
+
+## Advancement Criteria
+
+| Specialist | Advance condition | Window |
+|-|-|-|
+| Opening | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 50%` | 50-game rolling, full-difficulty heuristic games only |
+| Midgame | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 50%` | 50-game rolling, full-difficulty heuristic games only |
+| Endgame | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 60%` | 50-game rolling, full-difficulty heuristic games only |
+| Overseer | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 60%` | 50-game rolling, full-difficulty heuristic games only |
+
+**Checkpoint safety:** `best{N}.pt` is saved both at every periodic log interval AND at the
+moment of advancement (if not already saved).  This prevents the case where the deque fills
+to exactly 50 entries between log checkpoints and advancement fires without saving the weights.
+
+**Exit criterion:** same threshold as advancement, evaluated vs the maximum difficulty level.
+
+---
+
+## Recovery Mechanism
+
+If rolling win rate drops below 12% for 30+ consecutive games:
+- Reload `best{N}.pt` for the current difficulty.
+- Reset optimizer (fresh Adam at `lr_base`).
+- Reset temperature to `TEMP_START` (0.50).
+- Clear win history.
+
+---
+
+## LR Scaling
+
+```
+scale  = clamp(win_rate / 0.35, 0.5, 2.0)
+new_lr = lr_base × scale
+```
+
+---
+
+## Integration with Existing Engine (Wiring into Gameplay)
+
+At deployment the Coordinator selects the agent mode via `ai/coordinator.py`.
+The `scaffolded` mode uses the Overseer checkpoint (`s_over/best.pt`) as the primary decision maker.
+
+### Inference path per learner turn
+
+1. `encode_position_with_lookahead(board, player, sentinel_advisor, db, value_net, lookahead_advisor)`
+   → 77-float feature matrix (k, 77) for k legal moves.
+
+2. **Specialists only (77-float path):** Forward through the relevant specialist net → logits → choose move.
+
+3. **Overseer (85-float path):** Call `build_overseer_extras(base_77, board, enc, player, spec_open, spec_mid, spec_end, gameai, human_db, gameai_depth=5)` to extend to (k, 85), then forward through OverseerNet.
+
+### ScaffoldedAgent wiring
+
+`ScaffoldedAgent` handles both specialists and overseer at inference:
+
+```python
+from learned_ai.agents.scaffolded_agent import ScaffoldedAgent
+from ai.game_ai import GameAI
+from ai.human_db import HumanDB
+
+# Specialist agent (77-float):
+agent = ScaffoldedAgent(
+    color="W",
+    checkpoint_path="learned_ai/checkpoints/scaffolded/s_open/best.pt",
+    sentinel_advisor=sentinel,
+    value_net=value_net,
+)
+
+# Overseer agent (85-float):
+gameai = GameAI(color="W", difficulty=5)   # depth=5 at inference
+human_db = HumanDB("data/human_db.sqlite")
+spec_open = _load_specialist("...s_open/best.pt")
+spec_mid  = _load_specialist("...s_mid/best.pt")
+spec_end  = _load_specialist("...s_end/best.pt")
+overseer_agent = ScaffoldedAgent(
+    color="W",
+    checkpoint_path="learned_ai/checkpoints/scaffolded/s_over/best.pt",
+    sentinel_advisor=sentinel,
+    value_net=value_net,
+    is_overseer=True,
+    spec_open=spec_open, spec_mid=spec_mid, spec_end=spec_end,
+    gameai=gameai, human_db=human_db, gameai_depth=5,
+)
+# ScaffoldedAgent.choose_move() returns a move dict — drop-in replacement for GameAI.choose_move()
+```
+
+The `is_overseer=True` flag tells `ScaffoldedAgent` to call `build_overseer_extras` before the
+forward pass, extending the 77-float base to 85 floats.
+
+### Coordinator modes
+
+- `heuristic` — existing GameAI engine
+- `scaffolded` — Overseer checkpoint (`s_over/best.pt`) via ScaffoldedAgent(is_overseer=True)
+- `overseer_overlay` — heuristic picks the move; Overseer probabilities shown as "O:XX%"
 
 ---
 
 ## Files
 
 | File | Purpose |
-|------|---------|
-| `learned_ai/models/scaffolded_encoder.py` | `encode_position()` — builds (k,62) feat matrix + (23,) value input |
-| `learned_ai/models/scaffolded_net.py` | `ScaffoldedPolicyNet` — per-move MLP policy + value head |
-| `learned_ai/models/overseer.py` | `OverseerAdvisor` — advisory overlay + Overseer player mode |
+|-|-|
+| `learned_ai/models/scaffolded_encoder.py` | `encode_position()` + `encode_position_with_lookahead()` — builds (k,62) or (k,77) feat matrix |
+| `learned_ai/models/scaffolded_net.py` | `ScaffoldedPolicyNet` — policy (dim→128→64→1) + value head |
+| `learned_ai/models/lookahead_advisor.py` | `LookaheadAdvisor` — 5-ply forward simulation, all models |
+| `learned_ai/models/overseer_extras.py` | `build_overseer_extras()` — 77→85 float extension for Overseer |
 | `learned_ai/training/scaffolded_a2c.py` | `ScaffoldedStep`, `scaffolded_a2c_update()`, `scaffolded_ppo_update()` |
-| `learned_ai/agents/scaffolded_agent.py` | `ScaffoldedAgent` — inference wrapper for gameplay |
-| `scripts/gen_imitation_data.py` | Generate supervised dataset from heuristic self-play (book-guided White, `top_n=2`) |
-| `scripts/train_scaffolded_s1.py` | Stage 1: imitation training with Malom soft labels (cross-entropy) |
-| `scripts/gen_human_imitation_data.py` | Extract human-game dataset from `data/games/*.jsonl` |
-| `scripts/train_scaffolded_s1b.py` | Stage 1.5: human-game fine-tune (policy head only) |
-| `scripts/train_scaffolded_s2_diagnostic.py` | Stage 2: A2C/PPO with rich per-component reward diagnostics and self-adjusting LR/temperature |
-| `scripts/train_scaffolded_s2b.py` | Stage 2b: self-play (model vs frozen copy) + branched mid-game rollouts with phase-bucket saturation cap |
-| `scripts/train_scaffolded_s3.py` | Stage 3: Malom supervised fine-tuning; resumes from s2b/best.pt (falls back to s2/best.pt) |
-| `scripts/bench_scaffolded.py` | Headless benchmark: ScaffoldedAgent (sentinel + value net on by default) vs heuristic configs |
-| `tests/test_scaffolded_policy.py` | 25 unit tests (encoder shapes, net forward, A2C update, agent legality) |
+| `learned_ai/training/position_pool.py` | `load_position_pool()` — midgame turn-10 and endgame <12-piece pools |
+| `learned_ai/agents/scaffolded_agent.py` | `ScaffoldedAgent` — inference wrapper (specialists + overseer) |
+| `ai/game_ai.py` | `GameAI` — classical engine; `score_root_moves(board, depth)` for Overseer features |
+| `ai/human_db.py` | `HumanDB` — 22,895 human game SQLite; `query_moves()` for Overseer features |
+| `scripts/gen_imitation_data.py` | Stage 1 supervised dataset (heuristic self-play, Malom soft labels) |
+| `scripts/train_scaffolded_s1.py` | Stage 1: imitation training |
+| `scripts/gen_human_imitation_data.py` | Stage 1b supervised dataset (human games) |
+| `scripts/train_scaffolded_s1b.py` | Stage 1b: human-game fine-tune (policy head only) |
+| `scripts/train_scaffolded_opening.py` | Stage 2: Opening Specialist |
+| `scripts/train_scaffolded_midgame.py` | Stage 3: Midgame Specialist |
+| `scripts/train_scaffolded_endgame.py` | Stage 4: Endgame Specialist |
+| `scripts/train_scaffolded_overseer.py` | Stage 5: Overseer |
+| `scripts/bench_scaffolded.py` | Headless benchmark vs heuristic configs |
+| `tests/test_scaffolded_policy.py` | 25 unit tests (encoder, net, A2C, agent) |
+
+---
+
+## Success Metrics
+
+| Stage | Target | Status |
+|-|-|-|
+| Stage 1 | Policy loss decreasing; plays better than random | ✓ |
+| Stage 1b | Human-deviated positions weighted; policy loss < Stage 1 | ✓ |
+| Stage 2 (Opening) | Reaches diff 7 with wins ≥ 30% + draws ≥ 30% | Reached diff 6; 100% wr at diff 5 ✓; retraining with sentinel lookahead |
+| Stage 3 (Midgame) | Reaches diff 7; Malom trap rate > 20% in midgame | Pending |
+| Stage 4 (Endgame) | Reaches diff 7; Malom move-match rate > 60% | Reached diff 6; best wr 0.54 ✓; s_end/best.pt production-ready |
+| Stage 5 (Overseer) | Reaches diff 7; wins ≥ 30% + draws ≥ 30% vs diff 7 | Pending |

@@ -59,6 +59,11 @@ VALUE_INPUT_DIM: int = 23
 # 0.0 = pure heuristic (old behaviour); 1.0 = pure value-net; 0.5 = equal blend.
 VN_BLEND: float = 0.5
 
+# ── Lookahead extension ────────────────────────────────────────────────────────
+# 5 half-plies × 3 signals (h_norm, vn_norm, sent_mean) = 15 floats
+LOOKAHEAD_FEAT_DIM: int = 15
+MOVE_FEAT_DIM_WITH_LOOKAHEAD: int = MOVE_FEAT_DIM + LOOKAHEAD_FEAT_DIM  # 77
+
 
 # ── heuristic evaluate import (avoids ai/__init__ heavy imports) ───────────────
 
@@ -322,3 +327,36 @@ def encode_position(
         vn_scores_abs=vn_scores_abs,
         vn_before=vn_before,
     )
+
+
+def encode_position_with_lookahead(
+    board,
+    player: str,
+    sentinel_advisor=None,
+    db=None,
+    value_net=None,
+    lookahead_advisor=None,
+) -> Optional[EncodedPosition]:
+    """Encode legal moves with an optional 15-float lookahead block appended.
+
+    When lookahead_advisor is provided, calls score_moves_matrix() and appends
+    the (k, 15) result to the base (k, 62) feat_matrix, yielding (k, 77).
+    When lookahead_advisor is None, the lookahead block is zero-filled.
+
+    All other fields of EncodedPosition are identical to encode_position().
+    """
+    enc = encode_position(board, player, sentinel_advisor, db, value_net)
+    if enc is None:
+        return None
+
+    k = len(enc.legal_moves)
+    if lookahead_advisor is not None:
+        try:
+            la_block = lookahead_advisor.score_moves_matrix(board, enc, player)
+        except Exception:
+            la_block = np.zeros((k, LOOKAHEAD_FEAT_DIM), dtype=np.float32)
+    else:
+        la_block = np.zeros((k, LOOKAHEAD_FEAT_DIM), dtype=np.float32)
+
+    enc.feat_matrix = np.concatenate([enc.feat_matrix, la_block], axis=1).astype(np.float32)
+    return enc
