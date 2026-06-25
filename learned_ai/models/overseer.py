@@ -217,21 +217,31 @@ def load_overseer(
         return None
 
     move_feat_dim = cfg.get("move_feat_dim", 0)
-    log.info("OverseerAdvisor: loaded %s (stage=%s, move_feat_dim=%d)", chosen, stage, move_feat_dim)
+
+    # Derive lookahead ply depth and GameAI depth from the checkpoint's feature dim.
+    # move_feat_dim = 62 (base) + ply_depth*3 (lookahead) + 8 (extras)
+    _OVERSEER_EXTRA_DIM = 8
+    _BASE_DIM = 62
+    lookahead_block_dim = move_feat_dim - _BASE_DIM - _OVERSEER_EXTRA_DIM
+    ply_depth  = max(1, lookahead_block_dim // 3) if lookahead_block_dim > 0 else 5
+    gameai_inf_depth = 7 if move_feat_dim >= 106 else 3
+
+    log.info("OverseerAdvisor: loaded %s (stage=%s, move_feat_dim=%d, ply_depth=%d, gameai_depth=%d)",
+             chosen, stage, move_feat_dim, ply_depth, gameai_inf_depth)
 
     # ── Specialist models ─────────────────────────────────────────────────────
-    # Only load specialists when the checkpoint expects 85-dim input (s_over).
+    # Only load specialists when the checkpoint uses the full Overseer feature set.
     spec_open = spec_mid = spec_end = None
-    if move_feat_dim == 85:
+    if move_feat_dim >= 85:
         log.info("OverseerAdvisor: loading specialist models…")
         spec_open = _load_spec_model(ckpt_dir / "s_open-retired" / "best.pt")
         spec_mid  = _load_spec_model(ckpt_dir / "s_mid"          / "best.pt")
         spec_end  = _load_spec_model(ckpt_dir / "s_end"          / "best.pt")
 
     # ── LookaheadAdvisor ─────────────────────────────────────────────────────
-    # Replicates the training setup: 5-ply heuristic + value net + sentinel.
+    # ply_depth is derived from the checkpoint so inference always matches training.
     lookahead = None
-    if move_feat_dim >= 77:
+    if move_feat_dim > 62:
         try:
             from learned_ai.models.lookahead_advisor import LookaheadAdvisor
             from learned_ai.agents.heuristic_agent import get_heuristic_evaluate
@@ -241,18 +251,20 @@ def load_overseer(
                 value_net=value_net,
                 evaluate_fn=evaluate_fn,
                 use_sentinel=True,
+                ply_depth=ply_depth,
             )
-            log.info("OverseerAdvisor: LookaheadAdvisor ready (use_sentinel=True)")
+            log.info("OverseerAdvisor: LookaheadAdvisor ready (ply_depth=%d, feat_dim=%d)",
+                     ply_depth, lookahead.feat_dim)
         except Exception as e:
             log.warning("OverseerAdvisor: LookaheadAdvisor failed — lookahead block will be zero: %s", e)
 
     # ── GameAI singleton for alpha-beta features ──────────────────────────────
     _gameai = gameai
-    if _gameai is None and move_feat_dim == 85:
+    if _gameai is None and move_feat_dim >= 85:
         try:
             from ai.game_ai import GameAI
-            _gameai = GameAI(color="W", difficulty=3)
-            log.info("OverseerAdvisor: GameAI singleton created (depth=3)")
+            _gameai = GameAI(color="W", difficulty=gameai_inf_depth)
+            log.info("OverseerAdvisor: GameAI singleton created (depth=%d)", gameai_inf_depth)
         except Exception as e:
             log.warning("OverseerAdvisor: GameAI unavailable — alpha-beta features will be neutral: %s", e)
 

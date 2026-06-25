@@ -336,12 +336,17 @@ def encode_position_with_lookahead(
     db=None,
     value_net=None,
     lookahead_advisor=None,
+    lookahead_dim: Optional[int] = None,
 ) -> Optional[EncodedPosition]:
-    """Encode legal moves with an optional 15-float lookahead block appended.
+    """Encode legal moves with a lookahead block appended.
 
     When lookahead_advisor is provided, calls score_moves_matrix() and appends
-    the (k, 15) result to the base (k, 62) feat_matrix, yielding (k, 77).
-    When lookahead_advisor is None, the lookahead block is zero-filled.
+    its (k, N) result to the base (k, 62) feat_matrix.  N = advisor.feat_dim
+    (e.g. 15 for 5-ply specialists, 36 for 12-ply Overseer).
+
+    When lookahead_advisor is None, a zero block is appended whose width is:
+      - lookahead_dim  if explicitly provided (e.g. OVERSEER_LOOKAHEAD_DIM=36)
+      - LOOKAHEAD_FEAT_DIM (15)  otherwise — backward-compatible default
 
     All other fields of EncodedPosition are identical to encode_position().
     """
@@ -354,9 +359,11 @@ def encode_position_with_lookahead(
         try:
             la_block = lookahead_advisor.score_moves_matrix(board, enc, player)
         except Exception:
-            la_block = np.zeros((k, LOOKAHEAD_FEAT_DIM), dtype=np.float32)
+            _dim = getattr(lookahead_advisor, "feat_dim", LOOKAHEAD_FEAT_DIM)
+            la_block = np.zeros((k, _dim), dtype=np.float32)
     else:
-        la_block = np.zeros((k, LOOKAHEAD_FEAT_DIM), dtype=np.float32)
+        _dim = lookahead_dim if lookahead_dim is not None else LOOKAHEAD_FEAT_DIM
+        la_block = np.zeros((k, _dim), dtype=np.float32)
 
     enc.feat_matrix = np.concatenate([enc.feat_matrix, la_block], axis=1).astype(np.float32)
     return enc

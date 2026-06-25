@@ -1,17 +1,17 @@
 """scripts/train_scaffolded_overseer.py — Overseer meta-policy training.
 
 The Overseer is the meta-policy that consults Opening, Midgame, and Endgame
-specialists and makes the final move decision. It uses an 85-float per-move
+specialists and makes the final move decision. It uses a 106-float per-move
 feature vector:
 
-  [0:62)  base sentinel/heuristic/VN features (from encode_position)
-  [62:77) 5-ply lookahead block: 5 depths × 3 signals (h_norm, vn_norm, sent_mean)
-  [77:80) specialist probs: opening, midgame, endgame
-  [80:82) GameAI alpha-beta features: score_norm, is_gameai_best
-  [82:85) HumanDB features: win_rate, freq_norm, seen_flag
+  [0:62)   base sentinel/heuristic/VN features (from encode_position)
+  [62:98)  12-ply lookahead block: 12 depths × 3 signals (h_norm, vn_norm, sent_mean)
+  [98:101) specialist probs: opening, midgame, endgame
+  [101:103) GameAI alpha-beta features: score_norm, is_gameai_best
+  [103:106) HumanDB features: win_rate, freq_norm, seen_flag
 
 Extends train_scaffolded_s2b-v2.py with:
-  1. OverseerNet: ScaffoldedPolicyNet with move_feat_dim=85
+  1. OverseerNet: ScaffoldedPolicyNet with move_feat_dim=106
   2. build_overseer_extras: appends 8 extra floats to 77-float base features
   3. FrozenOverseerOpponent: self-play opponent using OverseerNet + augmented feats
   4. Win-first reward: outcome-based (win=+1, loss=-1, draw=0) + specialist-filtered
@@ -70,7 +70,7 @@ from ai.game_ai import GameAI as _GameAI
 from ai.human_db import HumanDB as _HumanDB
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
 from learned_ai.models.overseer_extras import build_overseer_extras, OVERSEER_EXTRA_DIM
-from learned_ai.models.scaffolded_encoder import encode_position_with_lookahead, MOVE_FEAT_DIM_WITH_LOOKAHEAD
+from learned_ai.models.scaffolded_encoder import encode_position_with_lookahead, MOVE_FEAT_DIM, MOVE_FEAT_DIM_WITH_LOOKAHEAD
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.sentinel.labels import dtm_quality
@@ -82,13 +82,16 @@ from learned_ai.training.scaffolded_a2c import (
 
 # ── OverseerNet ────────────────────────────────────────────────────────────────
 
-OVERSEER_FEAT_DIM = MOVE_FEAT_DIM_WITH_LOOKAHEAD + OVERSEER_EXTRA_DIM  # 77 + 8 = 85
+OVERSEER_LOOKAHEAD_PLY = 12
+OVERSEER_LOOKAHEAD_DIM = OVERSEER_LOOKAHEAD_PLY * 3          # 36
+OVERSEER_BASE_DIM      = MOVE_FEAT_DIM + OVERSEER_LOOKAHEAD_DIM  # 62 + 36 = 98
+OVERSEER_FEAT_DIM      = OVERSEER_BASE_DIM + OVERSEER_EXTRA_DIM  # 98 + 8 = 106
 
 STAGE_TAG = "s_over"
 
 
 class OverseerNet(ScaffoldedPolicyNet):
-    """ScaffoldedPolicyNet with move_feat_dim=80 for Overseer training."""
+    """ScaffoldedPolicyNet with move_feat_dim=106 for Overseer training."""
 
     def __init__(self, **kwargs):
         kwargs.setdefault("move_feat_dim", OVERSEER_FEAT_DIM)
@@ -154,8 +157,8 @@ LOSS_REWARD = -1.0
 DRAW_SHORT  =  0.0    # draws give no reward (neutral)
 DRAW_LONG   =  0.0    # draws give no reward (neutral)
 
-# Specialist feature columns within the 85-float overseer feature vector
-_SPEC_FEAT_OFFSET = 77  # feat_85[:, 77] = opening prob, [78] = midgame, [79] = endgame
+# Specialist feature columns within the 106-float overseer feature vector
+_SPEC_FEAT_OFFSET = OVERSEER_BASE_DIM  # feat[:,98]=opening prob, [99]=midgame, [100]=endgame
 
 # ── Optimiser / schedule ──────────────────────────────────────────────────────
 
@@ -571,7 +574,8 @@ class FrozenOverseerOpponent:
         enc = encode_position_with_lookahead(board, player,
                                              sentinel_advisor=self._sentinel,
                                              db=None, value_net=self._value_net,
-                                             lookahead_advisor=None)
+                                             lookahead_advisor=None,
+                                             lookahead_dim=OVERSEER_LOOKAHEAD_DIM)
         if enc is None or not enc.legal_moves:
             return {}
         feat_85 = build_overseer_extras(
@@ -807,7 +811,8 @@ def _rollout(
             enc_after   = encode_position_with_lookahead(board_after, opp_color,
                                                          sentinel_advisor=sentinel,
                                                          db=None, value_net=value_net,
-                                                         lookahead_advisor=None)
+                                                         lookahead_advisor=None,
+                                                         lookahead_dim=OVERSEER_LOOKAHEAD_DIM)
 
             db_moves = []
             if db is not None:
@@ -1061,8 +1066,9 @@ def run(args: argparse.Namespace) -> None:
             value_net=value_net,
             evaluate_fn=_evaluate_fn,
             use_sentinel=True,
+            ply_depth=OVERSEER_LOOKAHEAD_PLY,
         )
-        print("[s_over] LookaheadAdvisor enabled (5-ply heuristic+sentinel+VN)")
+        print(f"[s_over] LookaheadAdvisor enabled ({OVERSEER_LOOKAHEAD_PLY}-ply heuristic+sentinel+VN, feat_dim={OVERSEER_LOOKAHEAD_DIM})")
     else:
         print("[s_over] LookaheadAdvisor disabled (--no-lookahead)")
 
@@ -1558,11 +1564,11 @@ def main() -> None:
     p.add_argument("--endgame-ckpt",        type=str,   default="",
                    help="Path to Endgame specialist checkpoint (optional)")
     p.add_argument("--no-lookahead",        action="store_true",
-                   help="Disable 5-ply LookaheadAdvisor (default: enabled)")
+                   help=f"Disable {OVERSEER_LOOKAHEAD_PLY}-ply LookaheadAdvisor (default: enabled)")
     p.add_argument("--human-db",            type=str,   default="",
                    help="Path to HumanDB SQLite file (default: data/human_db.sqlite)")
-    p.add_argument("--gameai-depth",        type=int,   default=3,
-                   help="Alpha-beta depth for GameAI overseer features during training (default: 3)")
+    p.add_argument("--gameai-depth",        type=int,   default=7,
+                   help="Alpha-beta depth for GameAI overseer features during training (default: 7)")
     # s1b refresher
     p.add_argument("--s1b-data",             type=str,   default=str(_ROOT / "learned_ai" / "data" / "human_imitation.npz"))
     p.add_argument("--s1b-refresher-epochs", type=int,   default=S1B_REFRESHER_EPOCHS)
