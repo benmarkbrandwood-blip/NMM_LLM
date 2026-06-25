@@ -1,17 +1,18 @@
 """scripts/train_scaffolded_overseer.py — Overseer meta-policy training.
 
 The Overseer is the meta-policy that consults Opening, Midgame, and Endgame
-specialists and makes the final move decision. It uses a 106-float per-move
+specialists and makes the final move decision. It uses a 94-float per-move
 feature vector:
 
-  [0:62)   base sentinel/heuristic/VN features (from encode_position)
-  [62:98)  12-ply lookahead block: 12 depths × 3 signals (h_norm, vn_norm, sent_mean)
-  [98:101) specialist probs: opening, midgame, endgame
-  [101:103) GameAI alpha-beta features: score_norm, is_gameai_best
-  [103:106) HumanDB features: win_rate, freq_norm, seen_flag
+  [0:62)  base sentinel/heuristic/VN features (from encode_position)
+  [62:86) 8-ply lookahead block: 8 depths × 3 signals (h_norm, vn_norm, sent_mean)
+           sentinel disabled in lookahead during placement phase (speed)
+  [86:89) specialist probs: opening, midgame, endgame
+  [89:91) GameAI alpha-beta features: score_norm, is_gameai_best
+  [91:94) HumanDB features: win_rate, freq_norm, seen_flag
 
 Extends train_scaffolded_s2b-v2.py with:
-  1. OverseerNet: ScaffoldedPolicyNet with move_feat_dim=106
+  1. OverseerNet: ScaffoldedPolicyNet with move_feat_dim=94
   2. build_overseer_extras: appends 8 extra floats to 77-float base features
   3. FrozenOverseerOpponent: self-play opponent using OverseerNet + augmented feats
   4. Win-first reward: outcome-based (win=+1, loss=-1, draw=0) + specialist-filtered
@@ -82,7 +83,7 @@ from learned_ai.training.scaffolded_a2c import (
 
 # ── OverseerNet ────────────────────────────────────────────────────────────────
 
-OVERSEER_LOOKAHEAD_PLY = 12
+OVERSEER_LOOKAHEAD_PLY = 8
 OVERSEER_LOOKAHEAD_DIM = OVERSEER_LOOKAHEAD_PLY * 3          # 36
 OVERSEER_BASE_DIM      = MOVE_FEAT_DIM + OVERSEER_LOOKAHEAD_DIM  # 62 + 36 = 98
 OVERSEER_FEAT_DIM      = OVERSEER_BASE_DIM + OVERSEER_EXTRA_DIM  # 98 + 8 = 106
@@ -755,6 +756,9 @@ def _rollout(
         player = board.turn
 
         if player == learner_color:
+            # Disable sentinel inside lookahead during placement (24 legal moves makes it too slow).
+            if lookahead_advisor is not None:
+                lookahead_advisor._use_sentinel = (board.phase != "place")
             # Overseer always uses db=db for Malom features
             enc = encode_position_with_lookahead(board, player,
                                                  sentinel_advisor=sentinel, db=db,
