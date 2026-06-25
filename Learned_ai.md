@@ -99,8 +99,9 @@ consults all three and makes the final decision.
                    │   [80:82)  GameAI alpha-beta (score, best) │
                    │   [82:85)  HumanDB (win_rate, freq, seen)  │
                    │                                            │
-                   │   Reward: Malom DTM + mill creation        │
-                   │   Penalty: Malom losing move DTM           │
+                   │   Reward: win/loss outcome (retroactive)   │
+                   │         + specialist-filtered Malom win    │
+                   │   Draws: 0 (neutral). No mill bonus.       │
                    └──────────────────────────────────────────┘
                           ↑          ↑          ↑
                ┌──────────┘   ┌──────┘   └──────────┐
@@ -136,7 +137,7 @@ concept and cover endgame positions only.  These are distinct from Malom.
 | Opening specialist | No Malom reward (GAMMA=DELTA=0). Reward is sentinel + heuristic only. |
 | Midgame specialist | Per-move reward (+0.15) when opponent enters losing state; penalty (−0.15) when opponent enters winning state |
 | Endgame specialist | DTM-quality reward + trap bonus; plus EndgameSolvedDB WDL reward (+0.20 win / −0.10 loss) |
-| Overseer | Full DTM-scaled reward and penalty |
+| Overseer | Specialist-filtered Malom win only: fires when the active phase specialist's top-1 also hits a Malom win. No loss penalty. No mill bonus. Main signal is game outcome. |
 
 ---
 
@@ -267,12 +268,31 @@ r_retro      = 0.50 × outcome × 0.98^(plies_remaining)
 
 ### Overseer rewards
 
+Win-first design.  Main signal is the game outcome retroactively spread across all moves.
+The only per-move bonus fires when the Malom database and the active phase specialist agree.
+
+**Phase boundaries:**
+- Opening: `board.phase == "place"` (placement turns 1–9 per side)
+- Midgame: movement phase with ≥ 12 total pieces on board
+- Endgame: movement phase with < 12 total pieces on board
+
 ```
-r_malom_win  = +0.40 × dtm_quality(move)   if Malom winning trajectory
-r_mill_open  = +0.20 × mills_closed        if mill is unblocked (opponent can't capture next)
-r_malom_loss = −0.30 × dtm_quality(move)   if Malom losing trajectory
+# Game outcome (retroactive across all learner moves):
 r_retro      =  0.60 × outcome × 0.98^(plies_remaining)
+  outcome: win = +1.0,  loss = −1.0,  draw = 0.0
+
+# Per-move bonus (sparse — fires only when specialist endorses Malom):
+r_malom_win  = +0.40 × dtm_quality(move)
+  fires when: chosen move is Malom "win" AND
+              active phase specialist's top-1 is also Malom "win"
+
+# Disabled (kept in code, may re-enable):
+# r_malom_loss = −0.30 × dtm_quality(move)   if Malom losing trajectory
+# r_mill       = +0.20 / +0.05 per mill formed
 ```
+
+**Starting difficulty:** 1 (curriculum: 1 → 2 → … → 7, advance at 60% win rate each level).
+**Draws:** neutral (0.0); no reward, no penalty.
 
 ---
 
@@ -362,10 +382,10 @@ Heuristic opponent time budget varied ±40% each game.
 
 120 opening lines from two sources; 50% of games follow a random line.
 
-**5. Advancement threshold includes draws**
+**5. Advancement threshold**
 
-Wins ≥ 30% AND draws ≥ 30%, OR wins ≥ 50% (opening/midgame) / ≥ 60% (endgame/overseer) —
-encourages solid all-round play, not narrow exploits.
+Wins ≥ 60% at each difficulty level (Overseer: pure win rate, draws neutral).
+Opening/midgame specialists use the draw-inclusive path; Overseer does not.
 
 ---
 
@@ -455,9 +475,19 @@ Requires all three specialist checkpoints to be complete first.
 The Overseer uses 85-float features: 77 base+lookahead + 3 specialist probs + 2 GameAI + 3 HumanDB.
 GameAI runs depth=3 during training, depth=5 at gameplay inference.
 
+**Reward design (revised 2026-06-25):** Win-first.  Main signal is game outcome.
+Specialist-filtered Malom win bonus: fires only when the active phase specialist's top-1
+also agrees with Malom's winning trajectory.  No mill bonus.  No Malom loss penalty.
+Draws score 0 (neutral).  Starts at difficulty 1 and advances at 60% win rate per level.
+
+**Early result (2026-06-25, game 10):** diff 1 — hwr=0.333, awr=0.600, malom=74.4%.
+Significantly stronger start than the previous diff-3 run (which showed hwr≈0.08 at game 10).
+
 ```bash
+# Fresh start (clears old logs, ignores previous s_over checkpoints)
 .venv/bin/python scripts/train_scaffolded_overseer.py \
-    --opening-ckpt  learned_ai/checkpoints/scaffolded/s_open/best.pt \
+    --scratch \
+    --opening-ckpt  learned_ai/checkpoints/scaffolded/s_open-retired/best.pt \
     --midgame-ckpt  learned_ai/checkpoints/scaffolded/s_mid/best.pt \
     --endgame-ckpt  learned_ai/checkpoints/scaffolded/s_end/best.pt \
     --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
@@ -465,6 +495,15 @@ GameAI runs depth=3 during training, depth=5 at gameplay inference.
 # Optional: --human-db data/human_db.sqlite (default)
 # Optional: --gameai-depth 3 (training depth, default 3)
 # → learned_ai/checkpoints/scaffolded/s_over/best.pt
+
+# Resume training (auto-resumes from s_over/best.pt)
+.venv/bin/python scripts/train_scaffolded_overseer.py \
+    --auto-resume-best \
+    --opening-ckpt  learned_ai/checkpoints/scaffolded/s_open-retired/best.pt \
+    --midgame-ckpt  learned_ai/checkpoints/scaffolded/s_mid/best.pt \
+    --endgame-ckpt  learned_ai/checkpoints/scaffolded/s_end/best.pt \
+    --malom /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
+    --max-games 10000 --max-ply 140
 ```
 
 ---
@@ -476,7 +515,7 @@ GameAI runs depth=3 during training, depth=5 at gameplay inference.
 | Opening | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 50%` | 50-game rolling, full-difficulty heuristic games only |
 | Midgame | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 50%` | 50-game rolling, full-difficulty heuristic games only |
 | Endgame | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 60%` | 50-game rolling, full-difficulty heuristic games only |
-| Overseer | `(wr ≥ 30% AND dr ≥ 30%) OR wr ≥ 60%` | 50-game rolling, full-difficulty heuristic games only |
+| Overseer | `wr ≥ 60%` (wins only — draws score 0, not 0.5) | 50-game rolling, full-difficulty heuristic games only |
 
 **Checkpoint safety:** `best{N}.pt` is saved both at every periodic log interval AND at the
 moment of advancement (if not already saved).  This prevents the case where the deque fills
@@ -600,4 +639,4 @@ forward pass, extending the 77-float base to 85 floats.
 | Stage 2 (Opening) | Reaches diff 7 with wins ≥ 30% + draws ≥ 30% | Reached diff 6; 100% wr at diff 5 ✓; retraining with sentinel lookahead |
 | Stage 3 (Midgame) | Reaches diff 7; Malom trap rate > 20% in midgame | Pending |
 | Stage 4 (Endgame) | Reaches diff 7; Malom move-match rate > 60% | Reached diff 6; best wr 0.54 ✓; s_end/best.pt production-ready |
-| Stage 5 (Overseer) | Reaches diff 7; wins ≥ 30% + draws ≥ 30% vs diff 7 | Pending |
+| Stage 5 (Overseer) | Reaches diff 7; wins ≥ 60% vs diff 7 | In progress — diff 1; hwr=0.333 at game 10 (2026-06-25) |

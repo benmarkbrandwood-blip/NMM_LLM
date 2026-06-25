@@ -257,7 +257,8 @@ except Exception as _oe:
 # ── Malom perfect DB (ExternalSolvedDB) — used for DB Lines overlay and DB fallback ──
 # Path is read from settings.json "malom_db_path" (user-configurable via Tools page);
 # falls back to the sentinel config's external_db_path when the setting is absent.
-_malom_db = None
+_malom_db = None        # ExternalSolvedDB — WDL string, used by game AI + validate
+_malom_puzzle_db = None  # MalomDB          — WDL dict with dtw, used by puzzle generators
 try:
     from learned_ai.sentinel.db_teacher import ExternalSolvedDB as _ExternalSolvedDB
     _malom_path = _load_settings().get("malom_db_path") or ""
@@ -269,6 +270,11 @@ try:
         _malom_db = _ExternalSolvedDB(_malom_path)
         if _malom_db.is_available():
             log.info("Malom perfect DB loaded from %s", _malom_path)
+            from ai.malom_db import MalomDB as _MalomDB
+            _mpdb = _MalomDB(_malom_path)
+            if _mpdb.is_available():
+                _malom_puzzle_db = _mpdb
+                log.info("MalomDB puzzle instance ready")
         else:
             log.warning("Malom DB path configured but unavailable: %s", _malom_path)
             _malom_db = None
@@ -280,6 +286,19 @@ except Exception as _e:
 # Wire Malom DB into Overseer now that both are loaded.
 if _overseer_advisor is not None and _malom_db is not None:
     _overseer_advisor.set_db(_malom_db)
+
+# Pre-warm Malom hash states in background so midgame puzzle generation is fast.
+if _malom_db is not None and _malom_db.is_available():
+    import threading as _threading
+    def _malom_prewarm():
+        try:
+            from ai.malom_puzzle_search import prewarm_hash_cache
+            log.info("Malom hash cache warming (3–7 pieces)…")
+            prewarm_hash_cache(7)
+            log.info("Malom hash cache warmed.")
+        except Exception as _pe:
+            log.warning("Malom hash prewarm failed (non-fatal): %s", _pe)
+    _threading.Thread(target=_malom_prewarm, daemon=True).start()
 
 # Probability that sentinel (or DB fallback) intervenes, by difficulty level.
 SENTINEL_PROB_BY_DIFF: dict[int, float] = {
@@ -678,6 +697,7 @@ class Session:
 
 app = FastAPI(title="Nine Men's Morris")
 app.mount("/static", StaticFiles(directory=str(_WEB / "static")), name="static")
+app.mount("/sounds", StaticFiles(directory=str(_ROOT / "sounds")), name="sounds")
 templates = Jinja2Templates(directory=str(_WEB / "templates"))
 
 
@@ -867,6 +887,598 @@ async def tools_page(request: Request):
 @app.get("/explorer")
 async def explorer_page(request: Request):
     return templates.TemplateResponse(request, "explorer.html", {"v": _static_ver()})
+
+
+@app.get("/puzzles")
+async def puzzles_page(request: Request):
+    return templates.TemplateResponse(request, "puzzles.html", {"v": _static_ver()})
+
+
+_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "endgame"
+_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_MALOM_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "malom"
+_MALOM_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_PLACEMENT_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "placement"
+_PLACEMENT_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+from datetime import datetime as _puzzle_dt
+
+
+@app.get("/api/puzzles/random")
+async def api_puzzle_random(
+    side: str = "random",
+    depth: int = 0,
+    db: str = "random",
+    generate: bool = False,
+):
+    """Return a random endgame puzzle as JSON.
+
+    Serves from pre-generated cache (data/puzzles/endgame/*.json) by default.
+    Pass generate=true to attempt live generation for small tables (3v3/4v3/3v4).
+
+    Query params:
+        side:     "W" | "B" | "random"
+        depth:    3 | 4 | 0 (random)
+        db:       e.g. "3_3" | "4_3" | "random" (nW_nB of source table)
+        generate: true to allow live generation if cache is empty
+    """
+    import json, random as _rand
+
+    # ── Resolve random params ─────────────────────────────────────────────────
+    effective_side  = _rand.choice(["W", "B"]) if side == "random" else side
+    effective_depth = _rand.choice([3, 4, 5, 6, 7]) if depth == 0 else depth
+    if side not in ("W", "B", "random") or effective_depth not in (3, 4, 5, 6, 7):
+        from fastapi import HTTPException
+        raise HTTPException(400, "side must be W/B/random; depth must be 3–7 or 0")
+
+    # ── Cache path (skipped when generate=True so we always produce something new) ──
+    if not generate:
+        all_cached: list[dict] = []
+        for jf in _PUZZLE_CACHE_DIR.glob("*.json"):
+            try:
+                data = json.loads(jf.read_text())
+            except Exception:
+                continue
+            if "created_at" not in data:
+                data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            all_cached.append(data)
+
+        # Sort by created_at so puzzle numbers are stable
+        all_cached.sort(key=lambda d: d.get("created_at", ""))
+        id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
+
+        candidates = [
+            d for d in all_cached
+            if (side == "random" or d.get("winning_side") == effective_side)
+            and (not effective_depth or d.get("target_win_in") == effective_depth)
+            and (db == "random" or db.replace("endgame_", "").replace(".wdl", "") in (d.get("source_db") or ""))
+        ]
+
+        if candidates:
+            chosen = _rand.choice(candidates)
+            chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
+            chosen["total_puzzles"] = len(all_cached)
+            return chosen
+
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "No cached puzzles found. Click 'Generate new' to create one "
+                         "(takes ~30–90s), or pre-generate with the CLI.",
+                "hint": ".venv/bin/python tools/puzzle_generator.py --count 20",
+            },
+        )
+
+    # ── Live generation ────────────────────────────────────────────────────────
+    from ai.puzzle_search import generate_puzzle
+
+    if _endgame_solved_db is None:
+        from fastapi import HTTPException
+        raise HTTPException(503, "EndgameSolvedDB not loaded on this server.")
+
+    # Prefer smaller tables for live generation — they yield results in 10–30s.
+    # Larger tables (5v5, 6v4) need thousands of attempts; keep them for CLI batch runs.
+    _MAX_TABLE_BYTES = 30_000_000   # ~30 MB cap for web generation
+    db_dir = _ROOT / "data" / "endgame"
+
+    if db == "random":
+        available = [
+            (nW2, nB2)
+            for (nW2, nB2) in _endgame_solved_db._tables.keys()
+            if (db_dir / f"endgame_{nW2}_{nB2}.wdl").stat().st_size <= _MAX_TABLE_BYTES
+        ]
+        if not available:
+            available = list(_endgame_solved_db._tables.keys())
+        nW, nB = _rand.choice(available)
+    else:
+        stem = db.replace("endgame_", "").replace(".wdl", "")
+        try:
+            nW, nB = map(int, stem.split("_"))
+        except ValueError:
+            from fastapi import HTTPException
+            raise HTTPException(400, f"Invalid db parameter: {db!r}")
+
+    if _endgame_solved_db._tables.get((nW, nB)) is None:
+        from fastapi import HTTPException
+        raise HTTPException(503, f"Table ({nW},{nB}) not loaded on this server.")
+
+    import asyncio as _asyncio
+    _edb_ref = _endgame_solved_db
+
+    def _run_generate():
+        return generate_puzzle(_edb_ref, nW, nB, effective_side, effective_depth, max_attempts=300)
+
+    puzzle = await _asyncio.to_thread(_run_generate)
+
+    if puzzle is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "No puzzle found within the attempt budget. Try again."},
+        )
+
+    d = puzzle.to_dict()
+    d["created_at"] = _puzzle_dt.utcnow().strftime("%Y-%m-%d %H:%M")
+    # Cache for future requests
+    out = _PUZZLE_CACHE_DIR / f"{puzzle.puzzle_id}.json"
+    out.write_text(json.dumps(d, indent=2))
+    # Assign puzzle number based on cache size after save
+    total = len(list(_PUZZLE_CACHE_DIR.glob("*.json")))
+    d["puzzle_number"] = total
+    d["total_puzzles"] = total
+    return d
+
+
+@app.get("/api/puzzles/validate")
+async def api_puzzle_validate(fen: str, move: str, winning_side: str, target_win_in: int = 3):
+    """Check if a move is on the forced-win line for the current puzzle position.
+
+    Returns {"ok": true, "result": "W"|"L"|"D"|null, "still_winning": bool}
+    """
+    from fastapi import HTTPException
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception:
+        raise HTTPException(400, f"Invalid FEN: {fen!r}")
+
+    if _endgame_solved_db is None:
+        raise HTTPException(503, "EndgameSolvedDB not loaded on this server.")
+
+    # Find the move dict matching the notation
+    move = move.replace("×", "x")
+    legal = get_all_legal_moves(board)
+    from ai.puzzle_search import _notation as _pnot, find_win_depth
+    mv_dict = next((m for m in legal if _pnot(m) == move), None)
+    if mv_dict is None:
+        raise HTTPException(400, f"Move {move!r} is not legal from this position.")
+
+    child = board.apply_move(mv_dict)
+    child_wdl = _endgame_solved_db.query(child)
+
+    # Check if winning side still has forced win in budget
+    remaining = max(0, target_win_in - 1)
+    still_winning = False
+    if child_wdl == "L" and remaining > 0:
+        d = find_win_depth(_endgame_solved_db, child, winning_side, remaining)
+        still_winning = d is not None
+    elif child.pieces_on_board.get("W", 0) < 3 or child.pieces_on_board.get("B", 0) < 3:
+        still_winning = (board.turn == winning_side)  # we just won
+    elif not get_all_legal_moves(child):
+        still_winning = (board.turn == winning_side)
+
+    return {
+        "ok": True,
+        "child_fen": child.to_fen_string(),
+        "child_wdl": child_wdl,
+        "still_winning": still_winning,
+    }
+
+
+@app.post("/api/puzzles/submit")
+async def api_puzzle_submit(request: Request):
+    """Validate and save a user-entered puzzle.
+
+    Body JSON: {fen, winning_side, solution_line: [move, ...]}
+    Walks the solution moves to verify each is legal, then saves to cache.
+    """
+    import hashlib
+    from fastapi import HTTPException
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+    from ai.puzzle_search import _notation as _pnot
+
+    data = await request.json()
+    fen           = str(data.get("fen", "")).strip()
+    winning_side  = str(data.get("winning_side", "W"))
+    solution_line = [str(m).strip() for m in (data.get("solution_line") or []) if str(m).strip()]
+
+    if winning_side not in ("W", "B"):
+        raise HTTPException(400, "winning_side must be W or B")
+    if not solution_line:
+        raise HTTPException(400, "solution_line must contain at least one move")
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception as exc:
+        raise HTTPException(400, f"Invalid FEN: {exc}")
+
+    if board.turn != winning_side:
+        raise HTTPException(
+            400,
+            f"The FEN says it is {board.turn}'s turn, but winning_side={winning_side!r}. "
+            "Set the turn to match the winning side.",
+        )
+
+    nW = board.pieces_on_board.get("W", 0)
+    nB = board.pieces_on_board.get("B", 0)
+    if nW < 3 or nB < 3:
+        raise HTTPException(400, f"Each side needs ≥3 pieces on board (got W={nW}, B={nB}).")
+    if nW > 9 or nB > 9:
+        raise HTTPException(400, f"Too many pieces (W={nW}, B={nB}). Max 9 per side.")
+
+    # Walk solution — verify every move is legal from the resulting positions
+    cur = board
+    for i, note in enumerate(solution_line):
+        legal = get_all_legal_moves(cur)
+        cleaned = note.replace("×", "x")
+        mv = next((m for m in legal if _pnot(m) == cleaned), None)
+        if mv is None:
+            legal_notations = sorted(_pnot(m) for m in legal)
+            raise HTTPException(
+                400,
+                f"Move {i + 1} ({note!r}) is not legal from this position. "
+                f"Legal moves: {', '.join(legal_notations)}",
+            )
+        cur = cur.apply_move(mv)
+
+    # Quick DB check — tag as db-verified if the starting position is a known win
+    wdl_tag = None
+    if _endgame_solved_db is not None:
+        wdl = _endgame_solved_db.query(board)
+        if wdl == "W":
+            wdl_tag = "db-verified"
+
+    target_win_in = (len(solution_line) + 1) // 2
+    all_legal     = [_pnot(m) for m in get_all_legal_moves(board)]
+    side_label    = "White" if winning_side == "W" else "Black"
+    goal          = f"{side_label} to move and win in {target_win_in}"
+    source_db     = f"data/endgame/endgame_{nW}_{nB}.wdl"
+    pid           = "custom_" + hashlib.md5(fen.encode()).hexdigest()[:8]
+
+    tags = ["endgame", "custom", f"win-in-{target_win_in}"]
+    if wdl_tag:
+        tags.append(wdl_tag)
+
+    puzzle_dict = {
+        "id": pid,
+        "source_db": source_db,
+        "board_fen": fen,
+        "side_to_move": winning_side,
+        "winning_side": winning_side,
+        "goal": goal,
+        "target_win_in": target_win_in,
+        "best_move": solution_line[0],
+        "solution_line": solution_line,
+        "legal_moves": all_legal,
+        "losing_moves": [],
+        "drawing_moves": [],
+        "hardness_score": 0.0,
+        "tags": tags,
+        "created_at": _puzzle_dt.utcnow().strftime("%Y-%m-%d %H:%M"),
+    }
+
+    out = _PUZZLE_CACHE_DIR / f"{pid}.json"
+    out.write_text(json.dumps(puzzle_dict, indent=2))
+    total = len(list(_PUZZLE_CACHE_DIR.glob("*.json")))
+    puzzle_dict["puzzle_number"] = total
+    puzzle_dict["total_puzzles"] = total
+    return puzzle_dict
+
+
+@app.get("/api/puzzles/malom/random")
+async def api_malom_puzzle_random(
+    side: str = "random",
+    depth: int = 0,
+):
+    """Return a random Malom midgame puzzle.
+
+    Serves from cache (data/puzzles/malom/*.json) when available; falls back to
+    live generation using the Malom perfect database.
+
+    Query params:
+        side:  "W" | "B" | "random"
+        depth: 4–7, or 0 (any in range)
+    """
+    import json, random as _rand
+    import asyncio as _asyncio
+
+    if side not in ("W", "B", "random"):
+        from fastapi import HTTPException
+        raise HTTPException(400, "side must be W/B/random")
+    if depth not in (0, 4, 5, 6, 7):
+        from fastapi import HTTPException
+        raise HTTPException(400, "depth must be 0/4/5/6/7")
+
+    # ── Try cache first ──────────────────────────────────────────────────────
+    all_cached: list[dict] = []
+    for jf in _MALOM_PUZZLE_CACHE_DIR.glob("*.json"):
+        try:
+            data = json.loads(jf.read_text())
+        except Exception:
+            continue
+        if "created_at" not in data:
+            data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+        all_cached.append(data)
+
+    all_cached.sort(key=lambda d: d.get("created_at", ""))
+    id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
+
+    effective_side = _rand.choice(["W", "B"]) if side == "random" else side
+    candidates = [
+        d for d in all_cached
+        if (side == "random" or d.get("winning_side") == effective_side)
+        and (depth == 0 or d.get("target_win_in") == depth)
+    ]
+    if candidates:
+        chosen = _rand.choice(candidates)
+        chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
+        chosen["total_puzzles"] = len(all_cached)
+        return chosen
+
+    # ── Live generation ──────────────────────────────────────────────────────
+    if _malom_db is None or not _malom_db.is_available():
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
+        )
+
+    if _malom_puzzle_db is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Malom puzzle DB not ready. Try again in a moment."},
+        )
+
+    from ai.malom_puzzle_search import generate_malom_puzzle
+    _db_ref = _malom_puzzle_db
+
+    def _run():
+        return generate_malom_puzzle(
+            _db_ref,
+            winning_side=side,
+            target_win_in=depth,
+            max_attempts=3000,
+        )
+
+    puzzle = await _asyncio.to_thread(_run)
+
+    if puzzle is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "No midgame puzzle found. Try again or adjust depth/side."},
+        )
+
+    d = puzzle.to_dict()
+    d["created_at"] = _puzzle_dt.utcnow().strftime("%Y-%m-%d %H:%M")
+    out = _MALOM_PUZZLE_CACHE_DIR / f"{puzzle.puzzle_id}.json"
+    out.write_text(json.dumps(d, indent=2))
+    total = len(list(_MALOM_PUZZLE_CACHE_DIR.glob("*.json")))
+    d["puzzle_number"] = total
+    d["total_puzzles"] = total
+    return d
+
+
+@app.get("/api/puzzles/malom/validate")
+async def api_malom_puzzle_validate(
+    fen: str, move: str, winning_side: str, target_win_in: int = 4
+):
+    """Check if a move maintains the forced win in a Malom midgame puzzle.
+
+    Returns {"ok": true, "child_fen": str, "child_wdl": str|null, "still_winning": bool}
+    """
+    from fastapi import HTTPException
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+    from ai.malom_puzzle_search import _notation as _mnot
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception:
+        raise HTTPException(400, f"Invalid FEN: {fen!r}")
+
+    if _malom_db is None or not _malom_db.is_available():
+        raise HTTPException(503, "Malom DB not available.")
+
+    move = move.replace("×", "x")
+    legal = get_all_legal_moves(board)
+    mv_dict = next((m for m in legal if _mnot(m) == move), None)
+    if mv_dict is None:
+        raise HTTPException(400, f"Move {move!r} is not legal from this position.")
+
+    child = board.apply_move(mv_dict)
+    child_wdl = _malom_db.query(child)  # ExternalSolvedDB returns "W"/"L"/"D"/None
+
+    # Malom is a perfect database: child_wdl == "L" means the opponent (now to
+    # move) is in a provably losing position, so the winning side maintains the
+    # forced win regardless of depth — no minimax required.
+    still_winning = False
+    if child_wdl == "L":
+        still_winning = True
+    elif child.pieces_on_board.get("W", 0) < 3 or child.pieces_on_board.get("B", 0) < 3:
+        still_winning = (board.turn == winning_side)
+    elif not get_all_legal_moves(child):
+        still_winning = (board.turn == winning_side)
+
+    return {
+        "ok": True,
+        "child_fen": child.to_fen_string(),
+        "child_wdl": child_wdl,
+        "still_winning": still_winning,
+    }
+
+
+@app.get("/api/puzzles/malom/best-response")
+async def api_malom_best_response(fen: str, winning_side: str):
+    """Return the hardest opponent response from the current FEN using Malom WDL.
+
+    Picks the legal move for the opponent (the side NOT winning_side) that
+    maximises the winning side's remaining dtw — i.e., the hardest defense.
+    Falls back to any legal move if _malom_puzzle_db is unavailable.
+
+    Returns {"move": str|null, "child_fen": str, "game_over": bool}
+    """
+    from fastapi import HTTPException
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+    from ai.malom_puzzle_search import _notation as _mnot
+
+    if _malom_db is None or not _malom_db.is_available():
+        raise HTTPException(503, "Malom DB not available.")
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception:
+        raise HTTPException(400, f"Invalid FEN: {fen!r}")
+
+    moves = get_all_legal_moves(board)
+    opp = "B" if winning_side == "W" else "W"
+
+    if not moves:
+        return {"move": None, "child_fen": fen, "game_over": True}
+
+    best_mv = None
+    best_child = None
+    best_dtw = -1
+
+    for mv in moves:
+        child = board.apply_move(mv)
+        # After opponent moves, check winning side's WDL (they're now to move)
+        wdl = _malom_db.query(child)
+        # Prefer moves where the winning side is still winning (forced loss for opp)
+        # Use dtw from _malom_puzzle_db to pick the hardest defense
+        if wdl == "W":
+            dtw = 0
+            if _malom_puzzle_db is not None:
+                r = _malom_puzzle_db.query(child)
+                dtw = r.get("dtw", 0) if r else 0
+            if best_mv is None or dtw > best_dtw:
+                best_dtw = dtw
+                best_mv = mv
+                best_child = child
+
+    if best_mv is None:
+        # All opponent moves lose immediately — pick first legal move
+        best_mv = moves[0]
+        best_child = board.apply_move(best_mv)
+
+    # Check if winning side has already won after this move
+    ws_pieces = best_child.pieces_on_board.get(winning_side, 0)
+    opp_pieces = best_child.pieces_on_board.get(opp, 0)
+    game_over = opp_pieces < 3 or not get_all_legal_moves(best_child)
+
+    return {
+        "move": _mnot(best_mv),
+        "child_fen": best_child.to_fen_string(),
+        "game_over": game_over,
+    }
+
+
+@app.get("/api/puzzles/placement/random")
+async def api_placement_puzzle_random(
+    side: str = "random",
+    depth: int = 0,
+):
+    """Return a random Malom placement-phase puzzle.
+
+    Serves from cache (data/puzzles/placement/*.json) when available; falls back
+    to live generation using the Malom perfect database.
+
+    Query params:
+        side:  "W" | "B" | "random"
+        depth: 4–7, or 0 (any in range)
+    """
+    import json, random as _rand
+    import asyncio as _asyncio
+
+    if side not in ("W", "B", "random"):
+        from fastapi import HTTPException
+        raise HTTPException(400, "side must be W/B/random")
+    if depth not in (0, 4, 5, 6, 7):
+        from fastapi import HTTPException
+        raise HTTPException(400, "depth must be 0/4/5/6/7")
+
+    all_cached: list[dict] = []
+    for jf in _PLACEMENT_PUZZLE_CACHE_DIR.glob("*.json"):
+        try:
+            data = json.loads(jf.read_text())
+        except Exception:
+            continue
+        if "created_at" not in data:
+            data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+        all_cached.append(data)
+
+    all_cached.sort(key=lambda d: d.get("created_at", ""))
+    id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
+
+    effective_side = _rand.choice(["W", "B"]) if side == "random" else side
+    candidates = [
+        d for d in all_cached
+        if (side == "random" or d.get("winning_side") == effective_side)
+        and (depth == 0 or d.get("target_win_in") == depth)
+    ]
+    if candidates:
+        chosen = _rand.choice(candidates)
+        chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
+        chosen["total_puzzles"] = len(all_cached)
+        return chosen
+
+    if _malom_db is None or not _malom_db.is_available():
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
+        )
+
+    if _malom_puzzle_db is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "Malom puzzle DB not ready. Try again in a moment."},
+        )
+
+    from ai.malom_puzzle_search import generate_malom_placement_puzzle
+    _db_ref = _malom_puzzle_db
+
+    def _run():
+        return generate_malom_placement_puzzle(
+            _db_ref,
+            winning_side=side,
+            target_win_in=depth,
+            max_attempts=3000,
+        )
+
+    puzzle = await _asyncio.to_thread(_run)
+
+    if puzzle is None:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "No placement puzzle found. Try again or adjust depth/side."},
+        )
+
+    d = puzzle.to_dict()
+    d["created_at"] = _puzzle_dt.utcnow().strftime("%Y-%m-%d %H:%M")
+    out = _PLACEMENT_PUZZLE_CACHE_DIR / f"{puzzle.puzzle_id}.json"
+    out.write_text(json.dumps(d, indent=2))
+    total = len(list(_PLACEMENT_PUZZLE_CACHE_DIR.glob("*.json")))
+    d["puzzle_number"] = total
+    d["total_puzzles"] = total
+    return d
 
 
 def _parse_notation_squares(notation: str) -> tuple[str | None, str]:

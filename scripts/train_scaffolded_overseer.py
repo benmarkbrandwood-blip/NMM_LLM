@@ -14,8 +14,15 @@ Extends train_scaffolded_s2b-v2.py with:
   1. OverseerNet: ScaffoldedPolicyNet with move_feat_dim=85
   2. build_overseer_extras: appends 8 extra floats to 77-float base features
   3. FrozenOverseerOpponent: self-play opponent using OverseerNet + augmented feats
-  4. Malom-centric reward (no sentinel/heuristic/VN terms — only Malom + mill)
+  4. Win-first reward: outcome-based (win=+1, loss=-1, draw=0) + specialist-filtered
+     Malom win bonus (only when the active phase specialist also agrees with the
+     Malom winning trajectory). No mill bonus. No Malom loss penalty.
   5. Resume chain: explicit → s_over/best → s_over/latest → s1c/best → s1b/best → s1/best
+
+Phase boundaries (user-defined):
+  opening  — placement phase (board.phase == "place", turns 1–9 per side)
+  midgame  — movement phase with ≥12 total pieces on board
+  endgame  — movement phase with <12 total pieces on board
 
 All existing infrastructure (s1b refresher, retroactive rescore, branch games,
 recovery, LR adaptation, diagnostics) is identical to s2b-v2.
@@ -56,7 +63,7 @@ import torch.nn.functional as F
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from game.board import BoardState, MILLS
+from game.board import BoardState
 from game.rules import is_terminal
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from ai.game_ai import GameAI as _GameAI
@@ -132,25 +139,23 @@ def _sample_forced_placements(line_moves: list[str], learner_color: str) -> list
     return [line_moves[i] for i in range(start, len(line_moves), 2)][:4]
 
 
-# ── Reward weights — Malom-centric only ───────────────────────────────────────
+# ── Reward weights ────────────────────────────────────────────────────────────
+# Win-first: main signal is the game outcome (retroactive).
+# Per-move Malom reward fires only when the active phase specialist also endorses
+# a Malom-winning move (specialist-filtered signal). No mill bonus.
 
-MALOM_WIN_REWARD    = 0.40   # Malom winning trajectory, DTM-weighted
-MILL_UNBLOCKED      = 0.20   # unblocked mill creation
-MILL_BLOCKED        = 0.05   # blocked mill creation (reduced)
-MALOM_LOSS_PENALTY  = 0.30   # penalty for Malom losing move (applied negative)
-LAMBDA              = 0.60   # retroactive outcome weight (higher for overseer)
+MALOM_WIN_REWARD    = 0.40   # specialist-endorsed Malom winning move, DTM-weighted
+MALOM_LOSS_PENALTY  = 0.30   # (disabled — kept for reference, may re-enable later)
+LAMBDA              = 0.60   # retroactive outcome weight
 DECAY               = 0.98
-
-ALPHA   = 0.0   # no sentinel
-BETA    = 0.0   # no heuristic
-GAMMA   = 0.0   # no malom win (handled separately)
-DELTA   = 0.0   # no malom trap (handled separately)
-VN_BETA = 0.0   # no value_net
 
 WIN_REWARD  =  1.0
 LOSS_REWARD = -1.0
-DRAW_SHORT  =  0.15   # draw in < 100 plies
-DRAW_LONG   = -0.05   # draw by exhaustion
+DRAW_SHORT  =  0.0    # draws give no reward (neutral)
+DRAW_LONG   =  0.0    # draws give no reward (neutral)
+
+# Specialist feature columns within the 85-float overseer feature vector
+_SPEC_FEAT_OFFSET = 77  # feat_85[:, 77] = opening prob, [78] = midgame, [79] = endgame
 
 # ── Optimiser / schedule ──────────────────────────────────────────────────────
 
@@ -162,16 +167,16 @@ TEMP_MAX      = 0.90
 ENTROPY_COEF  = 0.01
 UPDATE_EVERY  = 16
 ROLLING_WIN   = 50
-DIFF_START    = 3
+DIFF_START    = 1
 DIFF_MAX      = 7
-ADVANCE_THRESHOLDS = {3: 0.60, 4: 0.55, 5: 0.50, 6: 0.45}
-EXIT_THRESHOLD = 0.50
+ADVANCE_THRESHOLDS = {1: 0.60, 2: 0.60, 3: 0.60, 4: 0.60, 5: 0.60, 6: 0.60}
+EXIT_THRESHOLD = 0.60
 
 S1B_REFRESHER_EPOCHS = 3
 S1B_REFRESHER_LR     = 3e-4
 S1B_REFRESHER_BATCH  = 32
-MAX_PLY       = 60
-MAX_PLY_BRANCH = 60
+MAX_PLY       = 140
+MAX_PLY_BRANCH = 100
 TIME_BUDGET   = 0.05
 
 LOG_EVERY     = 50
@@ -310,19 +315,29 @@ def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) 
 # ── Specialist loading ─────────────────────────────────────────────────────────
 
 def _load_specialist(ckpt_path: Optional[str], label: str) -> Optional[ScaffoldedPolicyNet]:
-    """Load a 77-float specialist checkpoint for advisory scoring."""
+    """Load a specialist checkpoint, auto-detecting the feature dimension.
+
+    Supports both legacy 62-float and current 77-float checkpoints.
+    build_overseer_extras slices the input to spec.move_feat_dim so the
+    specialist receives exactly the features it was trained on.
+    """
     if not ckpt_path or not Path(ckpt_path).exists():
         print(f"[s_over] {label} specialist not found: {ckpt_path}")
         return None
     try:
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         cfg = ckpt.get("model_config", {})
-        cfg["move_feat_dim"] = MOVE_FEAT_DIM_WITH_LOOKAHEAD  # specialists are 77-float
-        model = ScaffoldedPolicyNet.from_config(cfg)
         sd_key = "model" if "model" in ckpt else "state_dict"
-        model.load_state_dict(ckpt[sd_key])
+        sd = ckpt[sd_key]
+        # Auto-detect feat dim from first policy layer rather than assuming 77.
+        if "policy_mlp.0.weight" in sd:
+            cfg["move_feat_dim"] = sd["policy_mlp.0.weight"].shape[1]
+        else:
+            cfg["move_feat_dim"] = MOVE_FEAT_DIM_WITH_LOOKAHEAD
+        model = ScaffoldedPolicyNet.from_config(cfg)
+        model.load_state_dict(sd)
         model.eval()
-        print(f"[s_over] {label} specialist loaded: {ckpt_path}")
+        print(f"[s_over] {label} specialist loaded: {ckpt_path} (feat_dim={cfg['move_feat_dim']})")
         return model
     except Exception as e:
         print(f"[s_over] {label} specialist load failed: {e}")
@@ -447,6 +462,8 @@ def _run_s1b_refresher(
 # ── Resume / model loading ─────────────────────────────────────────────────────
 
 def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
+    if getattr(args, "scratch", False):
+        return None, "scratch"
     if args.resume:
         p = Path(args.resume)
         if p.exists():
@@ -575,22 +592,53 @@ def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> No
 
 
 def _check_advance(win_history_heuristic: deque, rolling_win: int) -> bool:
-    """Return True if the model has improved enough to advance difficulty."""
+    """Return True if win rate over the last rolling_win heuristic games hits 60%."""
     if len(win_history_heuristic) < rolling_win:
         return False
     recent = list(win_history_heuristic)[-rolling_win:]
     wr = sum(1 for x in recent if x == 1.0) / len(recent)
-    dr = sum(1 for x in recent if x == 0.5) / len(recent)
-    return (wr >= 0.30 and dr >= 0.30) or wr >= 0.60
+    return wr >= 0.60
 
 
 # ── Reward computation ─────────────────────────────────────────────────────────
 
-def _compute_per_move_reward(enc, chosen_idx: int, enc_after, db_moves=None) -> tuple[float, RewardBreakdown, dict[str, Any]]:
+def _get_active_specialist_col(board) -> int:
+    """Return the feat_85 column offset (0/1/2) for the active phase specialist.
+
+    0 = opening (placement phase), 1 = midgame (≥12 pieces), 2 = endgame (<12 pieces).
+    """
+    if board.phase == "place":
+        return 0
+    total = board.pieces_on_board["W"] + board.pieces_on_board["B"]
+    return 2 if total < 12 else 1
+
+
+def _compute_per_move_reward(
+    enc,
+    chosen_idx: int,
+    enc_after,
+    db_moves=None,
+    feat_85: "np.ndarray | None" = None,
+    board=None,
+) -> tuple[float, RewardBreakdown, dict[str, Any]]:
     rb = RewardBreakdown()
     extra: dict[str, Any] = {"malom_chosen_wdl": "unknown", "malom_chosen_dtm": None}
 
-    if db_moves:
+    if db_moves and feat_85 is not None and board is not None:
+        # Determine which specialist is active for this phase and find its top-1 move.
+        spec_col = _SPEC_FEAT_OFFSET + _get_active_specialist_col(board)
+        spec_probs = feat_85[:, spec_col]
+        spec_top1_idx = int(np.argmax(spec_probs))
+
+        # Check whether the specialist's top-1 is itself a Malom-winning move.
+        spec_mv_key  = _move_key(enc.legal_moves[spec_top1_idx])
+        spec_db_entry = next((m for m in db_moves if _move_key(m.get("move", {})) == spec_mv_key), None)
+        spec_endorses_malom = (
+            spec_db_entry is not None
+            and str(spec_db_entry.get("wdl", "unknown")) == "win"
+        )
+
+        # Look up the overseer's chosen move in Malom.
         mv_key   = _move_key(enc.legal_moves[chosen_idx])
         db_entry = next((m for m in db_moves if _move_key(m.get("move", {})) == mv_key), None)
         if db_entry:
@@ -598,11 +646,12 @@ def _compute_per_move_reward(enc, chosen_idx: int, enc_after, db_moves=None) -> 
             dtm = db_entry.get("dtm")
             extra["malom_chosen_wdl"] = wdl
             extra["malom_chosen_dtm"] = dtm
-            if wdl == "win":
+            # Reward only when both Malom and the active specialist agree it's a win.
+            if wdl == "win" and spec_endorses_malom:
                 rb.malom_win = MALOM_WIN_REWARD * float(dtm_quality("win", dtm))
-            elif wdl == "loss":
-                # Penalise playing a Malom-losing move; faster loss = bigger penalty
-                rb.malom_win = -MALOM_LOSS_PENALTY * float(dtm_quality("loss", dtm))
+            # Loss penalty disabled — kept for reference:
+            # elif wdl == "loss":
+            #     rb.malom_win = -MALOM_LOSS_PENALTY * float(dtm_quality("loss", dtm))
 
     rb.total = rb.malom_win
     return float(rb.total), rb, extra
@@ -755,29 +804,10 @@ def _rollout(
                 except Exception:
                     pass
 
-            reward, rb, extra = _compute_per_move_reward(enc, chosen_idx, enc_after, db_moves=db_moves)
-
-            # Mill formation bonus — per-mill unblocked/blocked detection
-            mills_before = sum(1 for m in MILLS if all(board.positions.get(p) == learner_color for p in m))
-            mills_after  = sum(1 for m in MILLS if all(board_after.positions.get(p) == learner_color for p in m))
-            if mills_after > mills_before:
-                from game.rules import get_all_legal_moves as _gal
-                opp_captures: set = set()
-                for opp_mv in _gal(board_after):
-                    cap = opp_mv.get("capture")
-                    if cap:
-                        opp_captures.add(cap)
-                mill_bonus = 0.0
-                for mill in MILLS:
-                    if all(board_after.positions.get(p) == learner_color for p in mill):
-                        if not any(p in opp_captures for p in mill):
-                            mill_bonus += MILL_UNBLOCKED
-                        else:
-                            mill_bonus += MILL_BLOCKED
-                if mill_bonus > 0:
-                    reward += mill_bonus
-                    rb.mill_formed += mill_bonus
-                    rb.total += mill_bonus
+            reward, rb, extra = _compute_per_move_reward(
+                enc, chosen_idx, enc_after, db_moves=db_moves,
+                feat_85=feat_85, board=board,
+            )
 
             if enc_after is not None and enc_after.legal_moves:
                 next_mf = build_overseer_extras(
@@ -1078,6 +1108,12 @@ def run(args: argparse.Namespace) -> None:
 
     log_path        = out_dir / "train_log.jsonl"
     update_log_path = out_dir / "update_log.jsonl"
+
+    if getattr(args, "scratch", False):
+        for stale in (log_path, update_log_path):
+            if stale.exists():
+                stale.unlink()
+                print(f"[s_over] --scratch: cleared {stale.name}")
 
     print(f"[s_over] Starting at game {game_count}, difficulty {difficulty}")
     print(f"[s_over] Self-play ratio {args.self_play_ratio:.0%}, "
@@ -1476,6 +1512,8 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Overseer meta-policy training (66-float features)")
     p.add_argument("--resume",             default="",  type=str, help="Explicit checkpoint path")
     p.add_argument("--auto-resume-best",   action="store_true", help="Prefer s_over/best.pt in resume chain")
+    p.add_argument("--scratch",            action="store_true",
+                   help="Always start from scratch: skip all resume candidates and clear old log files")
     p.add_argument("--out-dir",  default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_over"))
     p.add_argument("--sentinel", default=str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"))
     p.add_argument("--malom",    default="", type=str)

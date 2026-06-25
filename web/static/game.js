@@ -2,6 +2,7 @@
  * game.js — WebSocket game controller for Nine Men's Morris.
  */
 import { Board } from "./board.js";
+import { playSound } from "./sounds.js";
 
 const $ = id => document.getElementById(id);
 
@@ -1194,6 +1195,8 @@ function handleMessage(msg) {
 
     case "ai_move": {
       _aiThinking = false;      // AI done — diagnostics can fire again
+      playSound(msg.from ? "move" : "place");
+      if (msg.capture) playSound("remove");
       const from    = msg.from ? msg.from : "—";
       const to      = msg.to;
       const cap     = msg.capture ? ` × ${msg.capture}` : "";
@@ -1581,6 +1584,7 @@ function onNodeClick(name) {
   if (phase === "capture") {
     canOverride = false;
     $("btn-override").hidden = true;
+    playSound("remove");
     ws.send(JSON.stringify({ type: "capture", position: name }));
     return;
   }
@@ -1590,6 +1594,7 @@ function onNodeClick(name) {
       canOverride = false;
       $("btn-override").hidden = true;
       // Optimistic render: show piece immediately before server confirms.
+      playSound("place");
       board.grid = { ...gameState.board, [name]: gameState.turn };
       board.legalDests = new Set();
       board.legalSrcs  = new Set();
@@ -1622,6 +1627,7 @@ function onNodeClick(name) {
       canOverride = false;
       $("btn-override").hidden = true;
       // Optimistic render: move piece to destination immediately.
+      playSound("move");
       const newGrid = { ...gameState.board };
       newGrid[name] = newGrid[src];
       delete newGrid[src];
