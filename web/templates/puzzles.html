@@ -85,6 +85,26 @@
   a.back { color: #5a8abe; text-decoration: none; display: inline-block; margin-bottom: 16px; }
   a.back:hover { color: #8ab8ee; }
   .capture-prompt { color: #ffd080; font-size: 0.9em; margin-top: 4px; }
+
+  /* ── Wrong-move dialog ── */
+  #wrong-move-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.65); z-index: 999;
+    align-items: center; justify-content: center;
+  }
+  #wrong-move-overlay.show { display: flex; }
+  #wrong-move-dialog {
+    background: #1e1a32; border: 1px solid #5a3a9e; border-radius: 8px;
+    padding: 24px 28px; max-width: 380px; width: 90%; text-align: center;
+  }
+  #wrong-move-dialog h3 { margin: 0 0 8px; color: #f44336; font-size: 1.05em; }
+  #wrong-move-dialog p  { color: #bbb; font-size: 0.9em; margin: 0 0 18px; }
+  .wmd-btns { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .wmd-btns button { padding: 8px 18px; font-size: 0.95em; }
+  #wmd-retry    { background: #3a5a8e; border-color: #5a8abe; }
+  #wmd-retry:hover    { background: #4a6aae; }
+  #wmd-continue { background: #3a4a2e; border-color: #5a7a4e; }
+  #wmd-continue:hover { background: #4a5a3e; }
 </style>
 </head>
 <body>
@@ -391,13 +411,14 @@ window._savePuzzle = async function() {
       return;
     }
     // Load the saved puzzle for immediate play
-    puzzle      = data;
-    currentFen  = data.board_fen;
-    posMap      = parseFen(currentFen);
-    movesDone   = [];
-    solved      = false;
-    failed      = false;
-    pendingMove = null;
+    puzzle       = data;
+    currentFen   = data.board_fen;
+    posMap       = parseFen(currentFen);
+    movesDone    = [];
+    solved       = false;
+    failed       = false;
+    freePlayMode = false;
+    pendingMove  = null;
     document.getElementById('goal-label').style.display = '';
     document.getElementById('goal-label').textContent   = puzzle.goal;
     document.getElementById('btn-area').style.display   = '';
@@ -437,6 +458,8 @@ let solved      = false;
 let failed      = false;
 let pendingMove = null;
 let puzzleMode  = 'endgame';  // 'endgame' | 'midgame' | 'placement'
+let freePlayMode = false;      // true after user chooses "Continue vs AI" on a wrong move
+let _wrongMoveNotation = null; // the wrong move to apply if user picks "Continue vs AI"
 
 function isPlacementPhase(fen) {
   const parts = fen ? fen.split('|') : [];
@@ -611,13 +634,58 @@ function onNodeClick(pos) {
   if (owner === opp) setStatus('Select one of your own pieces first.', 'info');
 }
 
+// ── Wrong-move dialog ────────────────────────────────────────────────────────
+function showWrongMoveDialog(notation) {
+  _wrongMoveNotation = notation;
+  document.getElementById('wrong-move-overlay').classList.add('show');
+}
+
+window._wrongMoveRetry = function() {
+  document.getElementById('wrong-move-overlay').classList.remove('show');
+  _wrongMoveNotation = null;
+  setupUserTurn(null);
+  setStatus('Try again or good luck!', 'info');
+};
+
+window._wrongMoveContinue = async function() {
+  document.getElementById('wrong-move-overlay').classList.remove('show');
+  freePlayMode = true;
+  const notation = _wrongMoveNotation;
+  _wrongMoveNotation = null;
+
+  // Apply the wrong move via the validate endpoint (ignoring still_winning).
+  const url = `${_validateBaseUrl()}?fen=${encodeURIComponent(currentFen)}`
+            + `&move=${encodeURIComponent(notation)}`
+            + `&winning_side=${puzzle.winning_side}`
+            + `&target_win_in=99`;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) {
+      setStatus('Could not apply that move — try again.', 'fail');
+      freePlayMode = false;
+      setupUserTurn(null);
+      return;
+    }
+    const data = await r.json();
+    movesDone.push(notation);
+    currentFen = data.child_fen;
+    posMap     = parseFen(currentFen);
+    updateMoveLog();
+    showBoard();
+    setStatus('Free play — opponent thinking…', 'info');
+    setTimeout(autoPlayOpponent, 700);
+  } catch (e) {
+    setStatus('Network error: ' + e.message, 'fail');
+    freePlayMode = false;
+  }
+};
+
 // ── Server communication ──────────────────────────────────────────────────────
 async function submitMove(notation) {
-  // Strict solution-line matching: only accept the exact answer move.
-  if (puzzle.solution_line && movesDone.length < puzzle.solution_line.length) {
+  // In free-play mode skip solution-line checking entirely.
+  if (!freePlayMode && puzzle.solution_line && movesDone.length < puzzle.solution_line.length) {
     if (notation !== puzzle.solution_line[movesDone.length]) {
-      setStatus('This move is not in the answer string. Try again and good luck!', 'fail');
-      setupUserTurn(null);
+      showWrongMoveDialog(notation);
       return;
     }
   }
@@ -665,7 +733,49 @@ async function submitMove(notation) {
 async function autoPlayOpponent() {
   const soFar = movesDone.length;
 
-  // All modes: replay the pre-computed solution line.
+  if (freePlayMode) {
+    // Free-play: ask Malom for the hardest opponent reply.
+    const opp = puzzle.winning_side === 'W' ? 'B' : 'W';
+    try {
+      const r = await fetch(`/api/puzzles/malom/best-response?fen=${encodeURIComponent(currentFen)}&winning_side=${opp}`);
+      if (!r.ok) {
+        setupUserTurn(null);
+        setStatus('Free play — your turn.', 'info');
+        return;
+      }
+      const data = await r.json();
+      if (!data.move) {
+        setStatus('🎉 You win — opponent has no moves!', 'ok');
+        solved = true;
+        return;
+      }
+      const oppMove = data.move;
+      const valUrl  = `${_validateBaseUrl()}?fen=${encodeURIComponent(currentFen)}`
+                    + `&move=${encodeURIComponent(oppMove)}`
+                    + `&winning_side=${puzzle.winning_side}`
+                    + `&target_win_in=99`;
+      const vr = await fetch(valUrl);
+      if (vr.ok) {
+        const vd   = await vr.json();
+        movesDone.push(oppMove);
+        currentFen = vd.child_fen;
+        posMap     = parseFen(currentFen);
+        updateMoveLog();
+        showBoard();
+        setupUserTurn(null);
+        setStatus(`Free play — opponent played ${oppMove}. Your turn.`, 'info');
+      } else {
+        setupUserTurn(null);
+        setStatus('Free play — your turn.', 'info');
+      }
+    } catch (_) {
+      setupUserTurn(null);
+      setStatus('Free play — your turn.', 'info');
+    }
+    return;
+  }
+
+  // Puzzle mode: replay the pre-computed solution line.
   if (soFar >= puzzle.solution_line.length) {
     setStatus('🎉 Puzzle complete!', 'ok');
     solved = true;
@@ -722,12 +832,13 @@ window._openExplorer = function() {
 
 window._resetPuzzle = function() {
   if (!puzzle) return;
-  currentFen  = puzzle.board_fen;
-  posMap      = parseFen(currentFen);
-  movesDone   = [];
-  solved      = false;
-  failed      = false;
-  pendingMove = null;
+  currentFen   = puzzle.board_fen;
+  posMap       = parseFen(currentFen);
+  movesDone    = [];
+  solved       = false;
+  failed       = false;
+  freePlayMode = false;
+  pendingMove  = null;
   document.getElementById('capture-prompt').style.display = 'none';
   updateMoveLog();
   if (isPlacementPhase(currentFen)) {
@@ -765,9 +876,10 @@ window._loadPuzzle = async function(generate = false) {
     currentFen  = puzzle.board_fen;
     posMap      = parseFen(currentFen);
     movesDone   = [];
-    solved      = false;
-    failed      = false;
-    pendingMove = null;
+    solved       = false;
+    failed       = false;
+    freePlayMode = false;
+    pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
     document.getElementById('goal-label').textContent   = puzzle.goal;
@@ -863,9 +975,10 @@ window._loadMalomPuzzle = async function() {
     currentFen  = puzzle.board_fen;
     posMap      = parseFen(currentFen);
     movesDone   = [];
-    solved      = false;
-    failed      = false;
-    pendingMove = null;
+    solved       = false;
+    failed       = false;
+    freePlayMode = false;
+    pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
     document.getElementById('goal-label').textContent   = puzzle.goal;
@@ -924,9 +1037,10 @@ window._loadPlacementPuzzle = async function() {
     currentFen  = puzzle.board_fen;
     posMap      = parseFen(currentFen);
     movesDone   = [];
-    solved      = false;
-    failed      = false;
-    pendingMove = null;
+    solved       = false;
+    failed       = false;
+    freePlayMode = false;
+    pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
     document.getElementById('goal-label').textContent   = puzzle.goal;
@@ -960,5 +1074,17 @@ window._loadPlacementPuzzle = async function() {
   }
 };
 </script>
+
+<!-- Wrong-move dialog -->
+<div id="wrong-move-overlay">
+  <div id="wrong-move-dialog">
+    <h3>Wrong move</h3>
+    <p id="wmd-msg">That's not on the solution path — but you may still find a win!</p>
+    <div class="wmd-btns">
+      <button id="wmd-retry"    onclick="window._wrongMoveRetry()">Try again or good luck!</button>
+      <button id="wmd-continue" onclick="window._wrongMoveContinue()">Continue vs AI</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
