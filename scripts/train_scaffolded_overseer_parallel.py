@@ -429,14 +429,12 @@ def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
     s1c_best      = _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s1c" / "best.pt"
     s1b_best      = _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s1b" / "best.pt"
     s1_best       = _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s1"  / "best.pt"
-    candidates = []
-    if args.auto_resume_best:
-        candidates.append((s_over_best,   "s_over_best"))
-        candidates.append((s_over_latest, "s_over_latest"))
-    candidates += [
-        (s1c_best, "s1c_best"),
-        (s1b_best, "s1b_best"),
-        (s1_best,  "s1_best"),
+    candidates = [
+        (s_over_best,   "s_over_best"),
+        (s_over_latest, "s_over_latest"),
+        (s1c_best,      "s1c_best"),
+        (s1b_best,      "s1b_best"),
+        (s1_best,       "s1_best"),
     ]
     for p, tag in candidates:
         if p.exists():

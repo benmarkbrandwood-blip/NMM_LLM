@@ -5,6 +5,10 @@ annotates each resulting position with Malom WDL + DTW, and writes a SQLite
 database that HumanDB (ai/human_db.py) reads at server startup in milliseconds
 instead of scanning tens of thousands of files.
 
+A SHA-256 checksum of the finished database is written alongside it as
+``data/human_db.sqlite.sha256`` so users can verify downloads from the Internet
+Archive or any other distribution channel.
+
 Usage
 -----
     # Full build (first time, or after --rebuild):
@@ -26,12 +30,13 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
-import os
 import sqlite3
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -39,8 +44,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from ai.trajectory_db import make_board_state_key, _norm
-from ai.board_symmetry import transform_notation, SYM_INVERSE
-from game.board import BoardState, POSITIONS
+from ai.board_symmetry import transform_notation
+from game.board import BoardState
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,7 +54,7 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 
 # ── Schema ────────────────────────────────────────────────────────────────────
@@ -84,6 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_moves_state ON moves(state_key);
 CREATE TABLE IF NOT EXISTS processed_files (
     file_path   TEXT PRIMARY KEY,
     mtime       REAL    NOT NULL,
+    sha256      TEXT,
     games_found INTEGER NOT NULL DEFAULT 0
 );
 
@@ -103,6 +109,14 @@ def _init_db(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Add sha256 column to processed_files if upgrading from schema v1."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(processed_files)")}
+    if "sha256" not in cols:
+        conn.execute("ALTER TABLE processed_files ADD COLUMN sha256 TEXT")
+        conn.commit()
+
+
 def _clear_db(conn: sqlite3.Connection) -> None:
     conn.executescript("""
         DELETE FROM positions;
@@ -112,6 +126,27 @@ def _clear_db(conn: sqlite3.Connection) -> None:
     """)
     conn.commit()
     log.info("Cleared existing data (--rebuild).")
+
+
+# ── Checksums ─────────────────────────────────────────────────────────────────
+
+def _sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _write_output_checksum(output_path: Path) -> str:
+    """Write a <name>.sha256 sidecar and return the digest."""
+    digest = _sha256_file(output_path)
+    checksum_path = output_path.with_suffix(output_path.suffix + ".sha256")
+    checksum_path.write_text(f"{digest}  {output_path.name}\n", encoding="utf-8")
+    return digest
 
 
 # ── Game parsing ──────────────────────────────────────────────────────────────
@@ -163,7 +198,7 @@ def _process_file(
         games_found += 1
         total_plies = len(moves)
 
-        parsed_plies: list[tuple] = []  # (state_key, sym_idx, canon_notation, board, next_board)
+        parsed_plies: list[tuple] = []  # (state_key, canon_notation, board, next_board, color)
 
         for i, move in enumerate(moves):
             notation = _norm(move.get("notation", ""))
@@ -191,9 +226,9 @@ def _process_file(
                         pass
 
             color = move.get("color", "W")
-            parsed_plies.append((state_key, sym_idx, canon_notation, board, next_board, color))
+            parsed_plies.append((state_key, canon_notation, board, next_board, color))
 
-        for i, (state_key, sym_idx, canon_notation, board, next_board, color) in enumerate(parsed_plies):
+        for i, (state_key, canon_notation, board, next_board, color) in enumerate(parsed_plies):
             plies_remaining = total_plies - i
 
             # — positions table —
@@ -270,7 +305,7 @@ def _annotate_malom(
 
     total = len(pos_boards) + len(move_boards)
     done = 0
-    log_every = max(1, total // 20)
+    log_every = max(1, total // 20) if total else 1
 
     for state_key, board in pos_boards.items():
         res = _query(board)
@@ -363,7 +398,6 @@ def _recompute_canonical_winning_moves(conn: sqlite3.Connection) -> None:
 
 
 def _update_meta(conn: sqlite3.Connection, game_count: int, file_count: int) -> None:
-    from datetime import datetime
     conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES ('build_date', ?)",
                  (datetime.now().isoformat(timespec="seconds"),))
     existing_games = conn.execute(
@@ -391,7 +425,7 @@ def main() -> None:
     ap.add_argument("--no-malom", action="store_true",
                     help="Skip Malom annotation (malom_wdl/dtw columns stay NULL)")
     ap.add_argument("--update", action="store_true",
-                    help="Only process files not yet in processed_files table")
+                    help="Only process files not yet in processed_files table or whose SHA-256 changed")
     ap.add_argument("--rebuild", action="store_true",
                     help="Clear DB and reprocess all files from scratch")
     args = ap.parse_args()
@@ -399,10 +433,11 @@ def main() -> None:
     output_path = ROOT / args.output
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    conn = sqlite3.connect(output_path)
+    conn = sqlite3.connect(str(output_path))
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA synchronous=NORMAL")
     _init_db(conn)
+    _migrate_schema(conn)
 
     if args.rebuild:
         _clear_db(conn)
@@ -416,22 +451,35 @@ def main() -> None:
         else:
             log.warning("Directory not found: %s", d)
 
+    # pending_hashes: file_path → (mtime, sha256)
+    pending_hashes: dict[str, tuple[float, str]] = {}
+
     if args.update and not args.rebuild:
         already = {
-            row[0]: row[1]
-            for row in conn.execute("SELECT file_path, mtime FROM processed_files")
+            row[0]: {"mtime": row[1], "sha256": row[2]}
+            for row in conn.execute("SELECT file_path, mtime, sha256 FROM processed_files")
         }
-        new_files = []
+        new_files: list[Path] = []
         for p in all_files:
             mtime = p.stat().st_mtime
-            if str(p) not in already or already[str(p)] != mtime:
+            sha256 = _sha256_file(p)
+            prev = already.get(str(p))
+            if prev is None or prev.get("sha256") != sha256:
                 new_files.append(p)
+                pending_hashes[str(p)] = (mtime, sha256)
         log.info("--update: %d / %d files need processing.", len(new_files), len(all_files))
         all_files = new_files
+    else:
+        for p in all_files:
+            pending_hashes[str(p)] = (p.stat().st_mtime, _sha256_file(p))
 
     if not all_files:
-        log.info("No files to process. DB is up to date.")
         conn.close()
+        if output_path.exists():
+            db_sha = _write_output_checksum(output_path)
+            log.info("No files to process. DB is up to date. SQLite SHA-256: %s", db_sha)
+        else:
+            log.info("No files to process. DB is up to date.")
         return
 
     log.info("Processing %d files from %s…", len(all_files), args.games_dir)
@@ -443,18 +491,19 @@ def main() -> None:
     move_boards: dict = {} # (state_key, canon_notation) → next BoardState
 
     total_games = 0
-    file_mtime_map: dict[str, tuple[float, int]] = {}  # file_path → (mtime, games_found)
+    # file_info_map: file_path → (mtime, games_found, sha256)
+    file_info_map: dict[str, tuple[float, int, str]] = {}
 
     t0 = time.time()
     for i, path in enumerate(all_files):
-        mtime = path.stat().st_mtime
+        mtime, sha256 = pending_hashes[str(path)]
         try:
             n = _process_file(path, pos_stats, move_stats, pos_boards, move_boards)
         except Exception as exc:
             log.warning("Skipping %s — %s", path.name, exc)
             n = 0
         total_games += n
-        file_mtime_map[str(path)] = (mtime, n)
+        file_info_map[str(path)] = (mtime, n, sha256)
         if (i + 1) % 500 == 0 or (i + 1) == len(all_files):
             elapsed = time.time() - t0
             log.info("  Parsed %d / %d files, %d games, %.1f s",
@@ -485,10 +534,10 @@ def main() -> None:
         _upsert_positions(conn, pos_stats, pos_malom)
         _upsert_moves(conn, move_stats, move_malom)
         _recompute_canonical_winning_moves(conn)
-        _update_meta(conn, total_games, len(file_mtime_map))
+        _update_meta(conn, total_games, len(file_info_map))
         conn.executemany(
-            "INSERT OR REPLACE INTO processed_files(file_path, mtime, games_found) VALUES (?, ?, ?)",
-            [(fp, mt, gf) for fp, (mt, gf) in file_mtime_map.items()],
+            "INSERT OR REPLACE INTO processed_files(file_path, mtime, sha256, games_found) VALUES (?, ?, ?, ?)",
+            [(fp, mt, sha, gf) for fp, (mt, gf, sha) in file_info_map.items()],
         )
 
     elapsed = time.time() - t0
@@ -496,9 +545,10 @@ def main() -> None:
     move_count = conn.execute("SELECT COUNT(*) FROM moves").fetchone()[0]
     conn.close()
 
+    db_sha = _write_output_checksum(output_path)
     log.info(
-        "Done in %.1f s. DB: %d positions, %d moves, %d games. → %s",
-        elapsed, pos_count, move_count, total_games, output_path,
+        "Done in %.1f s. DB: %d positions, %d moves, %d games. SQLite SHA-256: %s → %s",
+        elapsed, pos_count, move_count, total_games, db_sha, output_path,
     )
 
 
