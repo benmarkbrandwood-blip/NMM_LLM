@@ -21,29 +21,55 @@ pub struct SearchResult {
     pub depth_reached: u8,
 }
 
+pub struct RootMoveScore {
+    pub mv: Move,
+    pub score: i64,
+}
+
+pub struct SearchResultScored {
+    pub scored_moves: Vec<RootMoveScore>,
+    pub nodes: u64,
+    pub depth_reached: u8,
+}
+
 struct Searcher {
     zobrist: Zobrist,
     tt: TranspositionTable,
     nodes: u64,
     deadline: Instant,
     aborted: bool,
+    killers: [[Option<Move>; 2]; MAX_PLY],
+    history: [[i32; 24]; 25],  // [from_or_24][to]; from=24 for placements
 }
 
 const ABORT_SCORE: i64 = i64::MIN + 1;
+const MAX_PLY: usize = 64;
+const ASP_MARGIN: i64 = 50;
 
 impl Searcher {
-    fn ordered_moves(&self, board: &Board, tt_best: Option<u16>) -> Vec<Move> {
+    fn store_killer(&mut self, ply: usize, mv: Move) {
+        if ply >= MAX_PLY || mv.capture.is_some() { return; }
+        if self.killers[ply][0] != Some(mv) {
+            self.killers[ply][1] = self.killers[ply][0];
+            self.killers[ply][0] = Some(mv);
+        }
+    }
+
+    fn ordered_moves(&self, board: &Board, tt_best: Option<u16>, ply: usize) -> Vec<Move> {
         let mut moves = legal_moves(board);
         let color = board.side_to_move;
-        // Score: mill-forming + captures first, then a light static touch.
+        let k = if ply < MAX_PLY { self.killers[ply] } else { [None; 2] };
         moves.sort_by_key(|mv| {
             let mut s = 0i64;
-            if mv.capture.is_some() {
-                s -= 1000;
-            }
-            if move_forms_mill(board, color, mv.from, mv.to) {
-                s -= 500;
-            }
+            if mv.capture.is_some() { s -= 2000; }
+            if move_forms_mill(board, color, mv.from, mv.to) { s -= 1000; }
+            // T-B3: killer moves after captures/mills.
+            if k[0] == Some(*mv) { s -= 600; }
+            else if k[1] == Some(*mv) { s -= 500; }
+            // T-B3: history heuristic as tiebreaker.
+            let fi = mv.from.map_or(24usize, |f| f as usize);
+            let ti = mv.to as usize;
+            if ti < 24 { s -= self.history[fi][ti] as i64; }
             s
         });
         if let Some(bi) = tt_best {
@@ -56,10 +82,45 @@ impl Searcher {
         moves
     }
 
+    // T-B4: Quiescence search — extends depth-0 with captures and mill-forming moves
+    // to avoid horizon-effect blunders at tactical boundaries.
+    fn qsearch(&mut self, board: &Board, mut alpha: i64, beta: i64) -> i64 {
+        if self.aborted { return ABORT_SCORE; }
+        self.nodes += 1;
+        if self.nodes & 2047 == 0 && Instant::now() >= self.deadline {
+            self.aborted = true;
+            return ABORT_SCORE;
+        }
+        let color = board.side_to_move;
+        if let Some(winner) = terminal_winner(board) {
+            return if winner == color { INF } else { -INF };
+        }
+        let stand_pat = evaluate_v2(board, color);
+        if stand_pat >= beta { return beta; }
+        if stand_pat > alpha { alpha = stand_pat; }
+        for mv in legal_moves(board).iter() {
+            if mv.capture.is_none() && !move_forms_mill(board, color, mv.from, mv.to) {
+                continue;
+            }
+            let nb = make_move(board, mv);
+            let score = -self.qsearch(&nb, -beta, -alpha);
+            if self.aborted { return ABORT_SCORE; }
+            if score >= beta { return beta; }
+            if score > alpha { alpha = score; }
+        }
+        alpha
+    }
+
     // SE-11: extend by 1 ply for moves that form a mill at the first opponent ply.
-    // `first_opp_ply` is true only when called directly from root(); all recursive
-    // calls pass false, so the extension applies at most once per root move.
-    fn negamax(&mut self, board: &Board, depth: u8, mut alpha: i64, beta: i64, first_opp_ply: bool) -> i64 {
+    // `first_opp_ply` is true only when called directly from root/root_scored; all
+    // recursive calls pass false, so the extension fires at most once per root move.
+    //
+    // T-B1: PVS — first move gets full window; subsequent moves use null window then re-search.
+    // T-B2: LMR — late non-tactical moves searched at depth-1 first.
+    // T-B3: killers + history updated on beta cutoff.
+    // T-B4: qsearch at depth==0.
+    // T-B5: null-move pruning at depth>=3 outside fly phase.
+    fn negamax(&mut self, board: &Board, depth: u8, mut alpha: i64, beta: i64, first_opp_ply: bool, ply: u8) -> i64 {
         if self.aborted {
             return ABORT_SCORE;
         }
@@ -71,7 +132,6 @@ impl Searcher {
 
         let color = board.side_to_move;
         if let Some(winner) = terminal_winner(board) {
-            // From side-to-move perspective: losing if winner != stm.
             return if winner == color {
                 INF - depth as i64
             } else {
@@ -95,14 +155,29 @@ impl Searcher {
             }
         }
 
+        // T-B4: quiescence search at horizon.
         if depth == 0 {
-            return evaluate_v2(board, color);
+            return self.qsearch(board, alpha, beta);
+        }
+
+        // T-B5: Null-move pruning (skip in fly phase to avoid zugzwang, and when
+        // own side has ≤ 3 pieces where zugzwang risk is highest).
+        let phase = get_phase(board, color);
+        if depth >= 3
+            && beta < INF / 2
+            && phase != Phase::Fly
+            && board.count(color) > 3
+        {
+            let null_board = Board { side_to_move: color.opponent(), ..*board };
+            let null_score = -self.negamax(&null_board, depth - 3, -beta, -beta + 1, false, ply + 1);
+            if !self.aborted && null_score >= beta {
+                return beta;
+            }
         }
 
         let alpha_orig = alpha;
-        let moves = self.ordered_moves(board, tt_best);
+        let moves = self.ordered_moves(board, tt_best, ply as usize);
         if moves.is_empty() {
-            // No moves: treat as loss for side-to-move (blocked).
             return -(INF - depth as i64);
         }
 
@@ -110,13 +185,28 @@ impl Searcher {
         let mut best_idx: u16 = u16::MAX;
         for (i, mv) in moves.iter().enumerate() {
             let nb = make_move(board, mv);
+            let is_tactical = mv.capture.is_some() || move_forms_mill(board, color, mv.from, mv.to);
             // SE-11: extend by 1 for mill-forming moves at first opponent ply.
-            let se11_ext: u8 = if first_opp_ply && move_forms_mill(board, color, mv.from, mv.to) {
-                1
+            let se11_ext: u8 = if first_opp_ply && is_tactical { 1 } else { 0 };
+
+            // T-B1 + T-B2: PVS with LMR for moves after the first.
+            let score = if i == 0 {
+                -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1)
             } else {
-                0
+                // T-B2: reduce late non-tactical moves at depth >= 3.
+                let lmr: u8 = if depth >= 3 && i >= 3 && !is_tactical && se11_ext == 0 { 1 } else { 0 };
+                // T-B1: null window at (possibly reduced) depth.
+                let mut s = -self.negamax(
+                    &nb, (depth - 1 + se11_ext).saturating_sub(lmr),
+                    -alpha - 1, -alpha, false, ply + 1,
+                );
+                // Re-search at full depth+window if null window or LMR was wrong.
+                if !self.aborted && s > alpha {
+                    s = -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1);
+                }
+                s
             };
-            let score = -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false);
+
             if self.aborted {
                 return ABORT_SCORE;
             }
@@ -128,6 +218,16 @@ impl Searcher {
                 alpha = score;
             }
             if alpha >= beta {
+                // T-B3: update killers and history on quiet beta cutoff.
+                if !is_tactical {
+                    self.store_killer(ply as usize, *mv);
+                    let fi = mv.from.map_or(24usize, |f| f as usize);
+                    let ti = mv.to as usize;
+                    if ti < 24 {
+                        self.history[fi][ti] = self.history[fi][ti]
+                            .saturating_add((depth as i32) * (depth as i32));
+                    }
+                }
                 break;
             }
         }
@@ -149,20 +249,19 @@ impl Searcher {
         best_score
     }
 
-    fn root(&mut self, board: &Board, depth: u8) -> (Option<Move>, i64) {
-        let moves = self.ordered_moves(board, None);
+    fn root(&mut self, board: &Board, depth: u8, alpha_init: i64, beta_init: i64) -> (Option<Move>, i64) {
+        let moves = self.ordered_moves(board, None, 0);
         if moves.is_empty() {
             return (None, -INF);
         }
         let color = board.side_to_move;
         let in_placement = get_phase(board, color) == Phase::Place;
-        let mut alpha = -INF * 4;
-        let beta = INF * 4;
+        let mut alpha = alpha_init;
+        let beta = beta_init;
         let mut best_move = Some(moves[0]);
         for mv in moves.iter() {
             let nb = make_move(board, mv);
             // B-64: dead/near-dead placement penalty (mirrors Python tactical_move_bonus).
-            // Only penalise non-mill placements with 0 or 1 free adjacent squares.
             let b64_penalty: i64 = if in_placement
                 && mv.from.is_none()
                 && !move_forms_mill(board, color, mv.from, mv.to)
@@ -181,7 +280,7 @@ impl Searcher {
                 0
             };
             // SE-11: first_opp_ply=true so negamax extends mill-forming opponent replies.
-            let score = -self.negamax(&nb, depth - 1, -beta, -alpha, true) - b64_penalty;
+            let score = -self.negamax(&nb, depth - 1, -beta, -alpha, true, 1) - b64_penalty;
             if self.aborted {
                 break;
             }
@@ -192,19 +291,66 @@ impl Searcher {
         }
         (best_move, alpha)
     }
+
+    /// Full-window root search: every move gets an independent (-INF, INF) window
+    /// so all returned scores are exact. Mirrors `root()` B-64 penalty exactly.
+    /// `preferred` is an optional list of (from, to, capture) triples promoted to
+    /// the front of the move list for better alpha-beta pruning (M3).
+    fn root_scored(&mut self, board: &Board, depth: u8, preferred: &[(Option<u8>, u8, Option<u8>)]) -> Vec<RootMoveScore> {
+        let mut moves = self.ordered_moves(board, None, 0);
+        // M3: promote preferred moves to front (stable sort by priority tier).
+        if !preferred.is_empty() {
+            let preferred_set: std::collections::HashSet<(Option<u8>, u8, Option<u8>)> =
+                preferred.iter().cloned().collect();
+            moves.sort_by_key(|mv| {
+                if preferred_set.contains(&(mv.from, mv.to, mv.capture)) { 0u8 } else { 1u8 }
+            });
+        }
+        let color = board.side_to_move;
+        let in_placement = get_phase(board, color) == Phase::Place;
+        let mut result = Vec::with_capacity(moves.len());
+        for mv in moves.iter() {
+            let nb = make_move(board, mv);
+            let b64_penalty: i64 = if in_placement
+                && mv.from.is_none()
+                && !move_forms_mill(board, color, mv.from, mv.to)
+            {
+                let sq = mv.to as usize;
+                let occupied_after = nb.white | nb.black;
+                let free_after = (ADJACENCY[sq] & !occupied_after & FULL_MASK).count_ones();
+                if free_after == 0 { 1500 } else if free_after == 1 { 400 } else { 0 }
+            } else {
+                0
+            };
+            let score = -self.negamax(&nb, depth - 1, -INF * 4, INF * 4, true, 1) - b64_penalty;
+            if self.aborted {
+                break;
+            }
+            result.push(RootMoveScore { mv: *mv, score });
+        }
+        result
+    }
 }
 
-/// Iterative deepening with a wall-clock time limit. Returns the best move found
-/// at the deepest fully (or partially) completed iteration.
-pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> SearchResult {
-    let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
-    let mut searcher = Searcher {
+
+fn new_searcher(deadline: Instant) -> Searcher {
+    Searcher {
         zobrist: Zobrist::new(),
         tt: TranspositionTable::new(),
         nodes: 0,
         deadline,
         aborted: false,
-    };
+        killers: [[None; 2]; MAX_PLY],
+        history: [[0i32; 24]; 25],
+    }
+}
+
+/// Iterative deepening with a wall-clock time limit. Returns the best move found
+/// at the deepest fully (or partially) completed iteration.
+/// T-B2: aspiration windows seeded from the previous depth's best score.
+pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> SearchResult {
+    let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
+    let mut searcher = new_searcher(deadline);
 
     let mut best = SearchResult {
         best_move: None,
@@ -214,10 +360,30 @@ pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> 
     };
 
     let cap = max_depth.max(1);
+    let mut last_score = 0i64;
     for d in 1..=cap {
-        let (mv, score) = searcher.root(board, d);
+        // T-B2: aspiration windows after depth 1.
+        let (a_init, b_init) = if d > 1 {
+            (last_score - ASP_MARGIN, last_score + ASP_MARGIN)
+        } else {
+            (-INF * 4, INF * 4)
+        };
+        let (mv, score) = searcher.root(board, d, a_init, b_init);
         if searcher.aborted {
-            // Keep previous completed depth's result if we have one.
+            if best.best_move.is_none() {
+                best.best_move = mv;
+                best.score = score;
+                best.depth_reached = d;
+            }
+            break;
+        }
+        // Re-search with full window on aspiration fail.
+        let (mv, score) = if score <= a_init || score >= b_init {
+            searcher.root(board, d, -INF * 4, INF * 4)
+        } else {
+            (mv, score)
+        };
+        if searcher.aborted {
             if best.best_move.is_none() {
                 best.best_move = mv;
                 best.score = score;
@@ -229,11 +395,53 @@ pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> 
         best.score = score;
         best.depth_reached = d;
         best.nodes = searcher.nodes;
+        last_score = score;
         if score.abs() >= INF - 100 {
             break; // forced mate found
         }
     }
     best.nodes = searcher.nodes;
+    best
+}
+
+/// Iterative deepening returning scores for all root moves. Each move is
+/// evaluated with a full (-INF, INF) window so every score is exact.
+/// `preferred` moves are promoted to the front of root ordering (M3 hint).
+/// Returns sorted descending by score.
+pub fn iterative_deepening_scored(
+    board: &Board,
+    max_depth: u8,
+    time_limit_ms: u64,
+    preferred: &[(Option<u8>, u8, Option<u8>)],
+) -> SearchResultScored {
+    let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
+    let mut searcher = new_searcher(deadline);
+
+    let mut best = SearchResultScored {
+        scored_moves: Vec::new(),
+        nodes: 0,
+        depth_reached: 0,
+    };
+
+    let cap = max_depth.max(1);
+    for d in 1..=cap {
+        let scored = searcher.root_scored(board, d, preferred);
+        if searcher.aborted {
+            if best.scored_moves.is_empty() {
+                best.scored_moves = scored;
+                best.depth_reached = d;
+            }
+            break;
+        }
+        best.scored_moves = scored;
+        best.depth_reached = d;
+        best.nodes = searcher.nodes;
+        if best.scored_moves.iter().any(|rm| rm.score.abs() >= INF - 100) {
+            break;
+        }
+    }
+    best.nodes = searcher.nodes;
+    best.scored_moves.sort_by(|a, b| b.score.cmp(&a.score));
     best
 }
 
@@ -283,5 +491,25 @@ mod tests {
         let mv = r.best_move.unwrap();
         // The strongest move forms the mill at g7 with a capture.
         assert!(mv.capture.is_some() || mv.to == 2);
+    }
+
+    #[test]
+    fn root_scored_returns_all_placement_moves() {
+        let board = Board {
+            white: 0,
+            black: 0,
+            white_placed: 0,
+            black_placed: 0,
+            side_to_move: Color::White,
+        };
+        let r = iterative_deepening_scored(&board, 3, 5000, &[]);
+        assert_eq!(r.scored_moves.len(), 24, "expected 24 moves on empty board");
+        assert!(r.nodes > 0);
+        for rm in &r.scored_moves {
+            assert!(rm.score.abs() < INF * 2, "score {} out of range", rm.score);
+        }
+        for pair in r.scored_moves.windows(2) {
+            assert!(pair[0].score >= pair[1].score, "not sorted descending");
+        }
     }
 }

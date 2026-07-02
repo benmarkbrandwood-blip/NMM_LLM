@@ -161,6 +161,40 @@ fn py_search_stats(
     }
 }
 
+/// Per-move scored root search. Returns `(nodes, depth_reached, moves)` where
+/// each move is `(from|None, to, capture|None, score)`, sorted best-first.
+/// Every score is exact (full-window search — no root alpha-beta pruning).
+/// `preferred_root`: optional list of (from|None, to, cap|None) triples promoted
+/// to the front of move ordering for better alpha-beta pruning (M3 trajectory hint).
+#[pyfunction]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None))]
+fn py_search_root_scored(
+    white: u32,
+    black: u32,
+    white_placed: u8,
+    black_placed: u8,
+    side_to_move: u8,
+    max_depth: u8,
+    time_limit_ms: u64,
+    preferred_root: Option<Vec<(Option<u8>, u8, Option<u8>)>>,
+) -> (u64, u8, Vec<(Option<u8>, u8, Option<u8>, i64)>) {
+    let board = Board {
+        white,
+        black,
+        white_placed,
+        black_placed,
+        side_to_move: Color::from_u8(side_to_move),
+    };
+    let preferred = preferred_root.unwrap_or_default();
+    let r = search::iterative_deepening_scored(&board, max_depth, time_limit_ms, &preferred);
+    let moves = r
+        .scored_moves
+        .into_iter()
+        .map(|rm| (rm.mv.from, rm.mv.to, rm.mv.capture, rm.score))
+        .collect();
+    (r.nodes, r.depth_reached, moves)
+}
+
 /// FullGame DB 9-byte key (byte-identical to Python `_encode_canonical`).
 #[pyfunction]
 fn py_db_key(white: u32, black: u32, turn: u8, placed_w: u8, placed_b: u8) -> Vec<u8> {
@@ -203,6 +237,7 @@ fn nmm_core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_immediate_threats, m)?)?;
     m.add_function(wrap_pyfunction!(py_get_best_move, m)?)?;
     m.add_function(wrap_pyfunction!(py_search_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(py_search_root_scored, m)?)?;
     m.add_function(wrap_pyfunction!(py_db_key, m)?)?;
     m.add_function(wrap_pyfunction!(py_endgame_key, m)?)?;
     m.add_function(wrap_pyfunction!(py_opening_key, m)?)?;
