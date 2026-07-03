@@ -260,42 +260,31 @@ In `negamax`: guard on `white_placed >= 9 && black_placed >= 9` + piece range
 3..=7, then direct O(1) combinatorial-rank lookup via `probe_endgame_solved`.
 Returns `INF-depth` / `-(INF-depth)` / `0`.
 
-### T-C4 — Persistent Rust TT across turns
+### T-C4 — Persistent Rust TT across turns ✅ DONE
 
-Currently the Rust `Searcher` creates a fresh TT for every call. Python's
-Ponder → live-search → next-turn chain could reuse cached entries.
-
-**Rust:**
-- Move `TranspositionTable` behind a module-level `Mutex<Arc<TranspositionTable>>`
-  or expose PyO3 accessors to construct + hold a handle in Python.
-- Design: Python holds a `TtHandle` PyO3 object; passes it to
-  `py_search_root_scored`. Rust reuses it. On new-game, Python drops the
-  handle and creates a new one.
-- Locking overhead is only at TT access time; keep it small (per-entry mutex
-  or lock-free with `AtomicU64` slots).
-
-Warm TT between moves = free depth. Also enables ponder-to-live handoff
-(B-94 equivalent, but native).
+`game_ai._rust_tt_handle` (`RustTtHandle` PyO3 object) is created lazily on the
+first Rust search call and reused for the game lifetime. Cleared via
+`reset_game_bans()` on new game. Passed as `tt_handle=` to every
+`py_search_root_scored` call. `RustTtHandle` holds `Arc<TranspositionTable>`
+(atomic slots — no Mutex overhead); ponder branches create their own handles
+so they don't pollute the live-search TT.
 
 ---
 
 ## Track D — Cleanup: wire Python to existing Rust primitives
 
-### T-D1 — `_immediate_mill_threats` via Rust
+### T-D1 — `_immediate_mill_threats` via Rust ✅ DONE
 
-Python `_immediate_mill_threats` in `ai/game_ai.py` scans 16 mills on every
-turn. Rust already has `tactics::immediate_mill_threats` (exposed as
-`py_immediate_threats`). Swap the Python impl to call the Rust function via
-`native_core`; keep the Python fallback path.
+`_immediate_mill_threats` calls `py_immediate_threats` (Rust) as primary path;
+Python fallback retained.
 
-Trivial diff, per-turn microseconds saved, but keeps the codebase consistent.
+### T-D2 — Skip move-dict allocations in tight loops ✅ DONE
 
-### T-D2 — Skip move-dict allocations in tight loops
-
-Rust returns `(from_idx, to_idx, cap_idx)` tuples; Python wraps each in a
-dict. Where callers iterate the result immediately (root filter, hint
-application) they can operate on tuples directly and only build dicts for the
-one move that ends up chosen. Small win, medium refactor churn.
+Added module-level `_POS_TO_IDX` reverse lookup dict. `_notation_to_triple`
+now uses `_POS_TO_IDX[str]` (O(1)) instead of `POSITIONS.index(str)` (O(24)).
+In `_choose_rust_scored`: `moves is not None` filter now converts allowed moves
+to an `allowed_idx` set of index tuples and filters `raw_moves` before
+allocating dicts — only surviving moves are converted to dicts.
 
 ---
 

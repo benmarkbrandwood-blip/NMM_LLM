@@ -24,6 +24,9 @@ class _SearchAbort(Exception):
 
 from game.board import ADJACENCY, MILLS, POSITIONS, BoardState
 from game.rules import get_all_legal_moves, is_terminal
+
+# T-D2: O(1) reverse lookup used by _notation_to_triple and _choose_rust_scored filter.
+_POS_TO_IDX: dict[str, int] = {pos: i for i, pos in enumerate(POSITIONS)}
 from .heuristics import INF, evaluate, clear_eval_cache, HeuristicWeights, DEFAULT_WEIGHTS, tactical_move_bonus, _sealed_two_configs, _dual_connected_mill_alert, _closeable_mills, evaluate_v2
 from .transposition_table import TranspositionTable, EXACT, LOWER_BOUND, UPPER_BOUND
 from .board_symmetry import SYM_INVERSE, transform_notation as _transform_notation
@@ -123,18 +126,18 @@ def _notation_to_triple(notation: str) -> "tuple[int | None, int, int | None] | 
         cap: "int | None" = None
         if "x" in notation:
             main, cap_str = notation.split("x", 1)
-            cap = POSITIONS.index(cap_str)
+            cap = _POS_TO_IDX[cap_str]
         else:
             main = notation
         frm: "int | None" = None
         if "-" in main:
             fr_str, to_str = main.split("-", 1)
-            frm = POSITIONS.index(fr_str)
+            frm = _POS_TO_IDX[fr_str]
         else:
             to_str = main
-        to = POSITIONS.index(to_str)
+        to = _POS_TO_IDX[to_str]
         return (frm, to, cap)
-    except (ValueError, IndexError):
+    except KeyError:
         return None
 
 
@@ -2301,24 +2304,34 @@ class GameAI:
                 print(f"R:NO-MOVE depth={depth} nodes={_nodes} t={_dt:.2f}s (falling back to Python)", flush=True)
                 return None
 
-            # Convert Rust (from_idx, to_idx, cap_idx, score) tuples to (move_dict, score).
-            scored: list[tuple[dict, int]] = []
-            for frm, to, cap, score in raw_moves:
-                mv = {
-                    "from": None if frm is None else POSITIONS[frm],
-                    "to":   POSITIONS[to],
-                    "capture": None if cap is None else POSITIONS[cap],
-                }
-                scored.append((mv, score))
-
-            # Filter to allowed moves (mandatory-block, sentinel bans, pin rules).
+            # T-D2: filter raw index tuples before allocating move dicts.
             if moves is not None:
-                allowed = {(m.get("from"), m["to"], m.get("capture")) for m in moves}
-                scored = [(mv, s) for mv, s in scored
-                          if (mv.get("from"), mv["to"], mv.get("capture")) in allowed]
-                if not scored:
+                allowed_idx = {
+                    (
+                        _POS_TO_IDX.get(m["from"]) if m.get("from") else None,
+                        _POS_TO_IDX[m["to"]],
+                        _POS_TO_IDX.get(m["capture"]) if m.get("capture") else None,
+                    )
+                    for m in moves
+                }
+                raw_moves = [(frm, to, cap, s) for frm, to, cap, s in raw_moves
+                             if (frm, to, cap) in allowed_idx]
+                if not raw_moves:
                     print(f"R:FILTERED-OUT depth={depth} nodes={_nodes} t={_dt:.2f}s (falling back to Python)", flush=True)
                     return None
+
+            # Convert surviving Rust (from_idx, to_idx, cap_idx, score) tuples to (move_dict, score).
+            scored: list[tuple[dict, int]] = [
+                (
+                    {
+                        "from": None if frm is None else POSITIONS[frm],
+                        "to":   POSITIONS[to],
+                        "capture": None if cap is None else POSITIONS[cap],
+                    },
+                    score,
+                )
+                for frm, to, cap, score in raw_moves
+            ]
 
             # Apply Python-side bonuses.
             n_bonuses = 0
