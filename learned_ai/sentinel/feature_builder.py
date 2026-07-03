@@ -367,6 +367,7 @@ def build_move_features(
     move: Dict[str, Any],
     player: str,
     move_ctx: Optional[Dict[str, Any]] = None,
+    _board_ctx: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Return the FEATURE_DIM-float per-move feature vector.
 
@@ -376,9 +377,11 @@ def build_move_features(
       heuristic_rank:       int rank of this move (0 = top)
       n_legal:              int number of legal moves
       heuristic_score_norm: float [0,1] heuristic score across candidates
+    ``_board_ctx``: pre-computed board_context_features array; avoids redundant
+      recomputation when scoring all moves at the same position.
     """
     ctx = move_ctx or {}
-    board_block = board_context_features(board, player)
+    board_block = _board_ctx if _board_ctx is not None else board_context_features(board, player)
     mv_block = move_features(board, move, player)
     cf_block = counterfactual_features(
         move,

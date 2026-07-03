@@ -23,7 +23,7 @@ import numpy as np
 import torch
 
 from learned_ai.sentinel.config import SentinelConfig
-from learned_ai.sentinel.feature_builder import FEATURE_DIM, build_move_features
+from learned_ai.sentinel.feature_builder import FEATURE_DIM, build_move_features, board_context_features
 from learned_ai.sentinel.model import SentinelNet
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,7 @@ class SentinelAdvisor:
         self.device = torch.device(device)
         self.model: Optional[SentinelNet] = None
         self._loaded = False
+        self._np_weights: Optional[dict] = None  # lazily populated on first advise() call
         if checkpoint_path:
             self.load(checkpoint_path)
 
@@ -115,7 +116,28 @@ class SentinelAdvisor:
 
     # ----- inference -----------------------------------------------------------
 
-    @torch.no_grad()
+    def _np_forward(self, X: np.ndarray) -> np.ndarray:
+        """Pure NumPy forward pass — ~10× faster than PyTorch for small CPU batches.
+
+        Weights are extracted from self.model on the first call and cached.
+        Trunk structure: [Linear → ReLU → Dropout?] × n_hidden_layers,
+        then quality_head Linear → Sigmoid. Dropout is a no-op at eval time.
+        """
+        if self._np_weights is None:
+            w = {n: p.detach().cpu().numpy() for n, p in self.model.named_parameters()}
+            self._np_weights = w
+            # Detect stride: with Dropout each hidden layer takes 3 Sequential slots
+            # (Linear, ReLU, Dropout); without, 2 slots (Linear, ReLU).
+            self._np_trunk_stride = 3 if 'trunk.3.weight' in w else 2
+        w = self._np_weights
+        h = X
+        stride = self._np_trunk_stride
+        for layer_i, _ in enumerate(self.model.hidden_dims):
+            idx = layer_i * stride
+            h = np.maximum(0.0, h @ w[f'trunk.{idx}.weight'].T + w[f'trunk.{idx}.bias'])
+        logit = h @ w['quality_head.weight'].T + w['quality_head.bias']
+        return (1.0 / (1.0 + np.exp(-logit))).ravel()
+
     def advise(
         self,
         board_state,
@@ -138,16 +160,20 @@ class SentinelAdvisor:
 
         ctx_map = move_ctx_by_idx or {}
         n = len(candidates)
+        # Compute board-level features once; reuse for every move at this position.
+        try:
+            board_ctx = board_context_features(board_state, player)
+        except Exception:
+            board_ctx = None
         feats = np.zeros((n, FEATURE_DIM), dtype=np.float32)
         for i, mv in enumerate(candidates):
             try:
-                feats[i] = build_move_features(board_state, mv, player, ctx_map.get(i))
+                feats[i] = build_move_features(board_state, mv, player, ctx_map.get(i),
+                                               _board_ctx=board_ctx)
             except Exception:
                 feats[i] = 0.0  # neutral row; keeps batch shape stable
 
-        x = torch.from_numpy(feats).to(self.device)
-        out = self.model(x).reshape(-1)
-        scores = [float(v) for v in out.cpu().numpy()]
+        scores = list(self._np_forward(feats))
 
         best_idx = int(max(range(n), key=lambda i: scores[i]))
         best_quality = scores[best_idx]

@@ -44,6 +44,9 @@ struct Searcher {
     aborted: bool,
     killers: [[Option<Move>; 2]; MAX_PLY],
     history: [[i32; 24]; 25],  // [from_or_24][to]; from=24 for placements
+    // Countermove table: given the previous move (from, to), store the refutation
+    // that caused a beta cutoff.  Indexed [from_or_24][to] (0..25 × 0..24).
+    countermoves: Box<[[Option<Move>; 24]; 25]>,
     // T-C1: high-frequency opponent moves that earn a SE-11 depth extension.
     opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)>,
     // T-C2: mmap'd fullgame DB for in-search probe (probe between terminal check and TT).
@@ -55,6 +58,8 @@ struct Searcher {
 const ABORT_SCORE: i64 = i64::MIN + 1;
 const MAX_PLY: usize = 64;
 const ASP_MARGIN: i64 = 50;
+// LMR fires for move index >= this (same threshold as the lmr condition below).
+const LMR_LATE_IDX: usize = 3;
 
 impl Searcher {
     fn store_killer(&mut self, ply: usize, mv: Move) {
@@ -65,10 +70,16 @@ impl Searcher {
         }
     }
 
-    fn ordered_moves(&self, board: &Board, tt_best: Option<u16>, ply: usize) -> Vec<Move> {
+    fn ordered_moves(&self, board: &Board, tt_best: Option<u16>, ply: usize, prev_move: Option<Move>) -> Vec<Move> {
         let mut moves = legal_moves(board);
         let color = board.side_to_move;
         let k = if ply < MAX_PLY { self.killers[ply] } else { [None; 2] };
+        // Look up countermove for the previous ply's move.
+        let cm: Option<Move> = prev_move.and_then(|pm| {
+            let pf = pm.from.map_or(24usize, |f| f as usize);
+            let pt = pm.to as usize;
+            if pt < 24 { self.countermoves[pf][pt] } else { None }
+        });
         moves.sort_by_key(|mv| {
             let mut s = 0i64;
             if mv.capture.is_some() { s -= 2000; }
@@ -76,6 +87,8 @@ impl Searcher {
             // T-B3: killer moves after captures/mills.
             if k[0] == Some(*mv) { s -= 600; }
             else if k[1] == Some(*mv) { s -= 500; }
+            // Countermove: refutation of the previous move, between killers and history.
+            if cm == Some(*mv) { s -= 450; }
             // T-B3: history heuristic as tiebreaker.
             let fi = mv.from.map_or(24usize, |f| f as usize);
             let ti = mv.to as usize;
@@ -127,10 +140,11 @@ impl Searcher {
     //
     // T-B1: PVS — first move gets full window; subsequent moves use null window then re-search.
     // T-B2: LMR — late non-tactical moves searched at depth-1 first.
-    // T-B3: killers + history updated on beta cutoff.
+    // T-B3: killers + history + countermoves updated on beta cutoff.
     // T-B4: qsearch at depth==0.
     // T-B5: null-move pruning at depth>=3 outside fly phase.
-    fn negamax(&mut self, board: &Board, depth: u8, mut alpha: i64, beta: i64, first_opp_ply: bool, ply: u8) -> i64 {
+    // `prev_move`: the move played to reach this node (None at root / after null move).
+    fn negamax(&mut self, board: &Board, depth: u8, mut alpha: i64, beta: i64, first_opp_ply: bool, ply: u8, prev_move: Option<Move>) -> i64 {
         if self.aborted {
             return ABORT_SCORE;
         }
@@ -214,14 +228,14 @@ impl Searcher {
             && board.count(color) > 3
         {
             let null_board = Board { side_to_move: color.opponent(), ..*board };
-            let null_score = -self.negamax(&null_board, depth - 3, -beta, -beta + 1, false, ply + 1);
+            let null_score = -self.negamax(&null_board, depth - 3, -beta, -beta + 1, false, ply + 1, None);
             if !self.aborted && null_score >= beta {
                 return beta;
             }
         }
 
         let alpha_orig = alpha;
-        let moves = self.ordered_moves(board, tt_best, ply as usize);
+        let mut moves = self.ordered_moves(board, tt_best, ply as usize, prev_move);
         if moves.is_empty() {
             return -(INF - depth as i64);
         }
@@ -240,18 +254,18 @@ impl Searcher {
 
             // T-B1 + T-B2: PVS with LMR for moves after the first.
             let score = if i == 0 {
-                -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1)
+                -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1, Some(*mv))
             } else {
                 // T-B2: reduce late non-tactical moves at depth >= 3.
-                let lmr: u8 = if depth >= 3 && i >= 3 && !is_tactical && se11_ext == 0 { 1 } else { 0 };
+                let lmr: u8 = if depth >= 3 && i >= LMR_LATE_IDX && !is_tactical && se11_ext == 0 { 1 } else { 0 };
                 // T-B1: null window at (possibly reduced) depth.
                 let mut s = -self.negamax(
                     &nb, (depth - 1 + se11_ext).saturating_sub(lmr),
-                    -alpha - 1, -alpha, false, ply + 1,
+                    -alpha - 1, -alpha, false, ply + 1, Some(*mv),
                 );
                 // Re-search at full depth+window if null window or LMR was wrong.
                 if !self.aborted && s > alpha {
-                    s = -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1);
+                    s = -self.negamax(&nb, depth - 1 + se11_ext, -beta, -alpha, false, ply + 1, Some(*mv));
                 }
                 s
             };
@@ -275,6 +289,14 @@ impl Searcher {
                     if ti < 24 {
                         self.history[fi][ti] = self.history[fi][ti]
                             .saturating_add((depth as i32) * (depth as i32));
+                        // Countermove: record this refutation against the previous move.
+                        if let Some(pm) = prev_move {
+                            let pf = pm.from.map_or(24usize, |f| f as usize);
+                            let pt = pm.to as usize;
+                            if pt < 24 {
+                                self.countermoves[pf][pt] = Some(*mv);
+                            }
+                        }
                     }
                 }
                 break;
@@ -298,7 +320,7 @@ impl Searcher {
     }
 
     fn root(&mut self, board: &Board, depth: u8, alpha_init: i64, beta_init: i64) -> (Option<Move>, i64) {
-        let moves = self.ordered_moves(board, None, 0);
+        let moves = self.ordered_moves(board, None, 0, None);
         if moves.is_empty() {
             return (None, -INF);
         }
@@ -328,7 +350,7 @@ impl Searcher {
                 0
             };
             // SE-11: first_opp_ply=true so negamax extends mill-forming opponent replies.
-            let score = -self.negamax(&nb, depth - 1, -beta, -alpha, true, 1) - b64_penalty;
+            let score = -self.negamax(&nb, depth - 1, -beta, -alpha, true, 1, Some(*mv)) - b64_penalty;
             if self.aborted {
                 break;
             }
@@ -345,7 +367,7 @@ impl Searcher {
     /// `preferred` is an optional list of (from, to, capture) triples promoted to
     /// the front of the move list for better alpha-beta pruning (M3).
     fn root_scored(&mut self, board: &Board, depth: u8, preferred: &[(Option<u8>, u8, Option<u8>)]) -> Vec<RootMoveScore> {
-        let mut moves = self.ordered_moves(board, None, 0);
+        let mut moves = self.ordered_moves(board, None, 0, None);
         // M3: promote preferred moves to front (stable sort by priority tier).
         if !preferred.is_empty() {
             let preferred_set: std::collections::HashSet<(Option<u8>, u8, Option<u8>)> =
@@ -370,7 +392,7 @@ impl Searcher {
             } else {
                 0
             };
-            let score = -self.negamax(&nb, depth - 1, -INF * 4, INF * 4, true, 1) - b64_penalty;
+            let score = -self.negamax(&nb, depth - 1, -INF * 4, INF * 4, true, 1, Some(*mv)) - b64_penalty;
             if self.aborted {
                 break;
             }
@@ -390,6 +412,7 @@ fn new_searcher(deadline: Instant) -> Searcher {
         aborted: false,
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
+        countermoves: Box::new([[None; 24]; 25]),
         opp_ext_set: HashSet::new(),
         fullgame_db: None,
         endgame_solved_db: None,
@@ -482,6 +505,7 @@ pub fn iterative_deepening_scored(
         aborted: false,
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
+        countermoves: Box::new([[None; 24]; 25]),
         opp_ext_set,
         fullgame_db,
         endgame_solved_db,
@@ -557,6 +581,7 @@ pub fn iterative_deepening_scored_smp(
                     aborted: false,
                     killers: [[None; 2]; MAX_PLY],
                     history: [[0i32; 24]; 25],
+                    countermoves: Box::new([[None; 24]; 25]),
                     opp_ext_set: opp_c,
                     fullgame_db: db_c,
                     endgame_solved_db: esdb_c,
