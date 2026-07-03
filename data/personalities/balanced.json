@@ -9,7 +9,6 @@
   "scatter_placement": 75,
   "setup_mill": 100,
   "mill_opening": 200,
-  "long_term_position": 100,
   "mill_count_scale": 100,
   "mobility_scale": 100,
   "blocked_scale": 100,
