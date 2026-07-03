@@ -134,11 +134,14 @@ class PonderManager:
                 fullgame_db=fullgame_db,
                 endgame_solved_db=game_ai._endgame_solved_db,
             )
-            # 1A: inherit search depth + cap budget at 60% so Rust searches
-            # finish before the human's next move, reducing terminal noise.
-            ponder_ai.max_search_depth = game_ai.max_search_depth
-            if game_ai.time_budget_override is not None:
-                ponder_ai.time_budget_override = game_ai.time_budget_override * 0.6
+            # Cap ponder at depth 6 (~0.9s per branch) so both branches finish
+            # well within the human's think time regardless of GIL scheduling.
+            # Depth-6 TT entries still accelerate B-94 deepening on a ponder hit.
+            _PONDER_MAX_DEPTH = 6
+            ponder_ai.max_search_depth = _PONDER_MAX_DEPTH
+            ponder_ai.time_budget_override = min(
+                0.065 * (1.66 ** _PONDER_MAX_DEPTH), 2.0
+            )  # ≈ 0.9s; hard cap at 2s for safety
             ponder_ai.search_threads = 1  # no nested SMP inside ponder branches
 
             branch = _Branch(
