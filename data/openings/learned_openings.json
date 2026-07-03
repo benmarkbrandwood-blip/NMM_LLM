@@ -401,7 +401,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 87,
+      "W": 90,
       "B": 5,
       "D": 0
     },
@@ -1943,11 +1943,11 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 1,
+      "W": 2,
       "B": 0,
       "D": 0,
-      "human_wins": 1,
-      "ai_losses": 1
+      "human_wins": 2,
+      "ai_losses": 2
     },
     "confidence": 0.8,
     "tags": [
@@ -6696,7 +6696,7 @@
   },
   {
     "opening_id": "novel-57888c26",
-    "name": "Novel — f4-b4-d6",
+    "name": "Fortress Rampart",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -6757,7 +6757,7 @@
       "learned"
     ],
     "source_reference": "",
-    "needs_llm_name": true,
+    "needs_llm_name": false,
     "favored_side": "W"
   },
   {
@@ -7145,6 +7145,72 @@
     "outcome_stats": {
       "W": 0,
       "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-886250b5",
+    "name": "Novel — b4-d6-c3",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "d6",
+      "c3",
+      "d2",
+      "d1",
+      "a4",
+      "e3",
+      "d3",
+      "c5",
+      "d5",
+      "c4",
+      "a4",
+      "d7",
+      "f6",
+      "b6",
+      "f2",
+      "b2",
+      "a4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B...B.W......W.|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....W.B.B...B.W......W.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".....W.B.B...B.W....WBW.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".....W.B.B...B.WWB..WBW.|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
       "D": 0
     },
     "confidence": 0.3,

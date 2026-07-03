@@ -12,6 +12,21 @@ use crate::types::{Board, Color, Phase};
 pub const INF: i64 = 10_000_000;
 const FLY_MOBILITY_CAP: i64 = 5;
 
+/// Per-personality scale factors for the three main leaf-eval components.
+/// Values are percentages (100 = unchanged). Passed from Python personality
+/// weights (mill_count_scale / mobility_scale / blocked_scale) so the Rust
+/// search reflects the active personality at every leaf node.
+#[derive(Copy, Clone)]
+pub struct EvalScale {
+    pub mill: i32,   // mill_count_scale, default 100
+    pub mob: i32,    // mobility_scale,   default 100
+    pub block: i32,  // blocked_scale,    default 100
+}
+
+impl Default for EvalScale {
+    fn default() -> Self { Self { mill: 100, mob: 100, block: 100 } }
+}
+
 // Cardinal nodes (4-conn): b4,d2,d6,f4 = idx 15,13,9,11
 const CARDINAL_MASK: u32 = (1 << 9) | (1 << 11) | (1 << 13) | (1 << 15);
 // Cross nodes (3-conn): d7,g4,d1,a4,d5,e4,d3,c4 = 1,3,5,7,17,19,21,23
@@ -354,7 +369,7 @@ pub fn open_mill_domination(board: &Board, color: Color) -> i64 {
 ///   Place: piece(1) mob(1) blocked(8) mill(30) threat(15)
 ///   Move:  piece(12) mob(1) opp_blocked(48) mill(30) threat(18) zugzwang(600)
 ///   Fly:   piece(2) mill(32) threat(80) surplus(900)
-pub fn evaluate_v2(board: &Board, color: Color) -> i64 {
+pub fn evaluate_v2(board: &Board, color: Color, scale: EvalScale) -> i64 {
     if let Some(winner) = terminal_winner(board) {
         return if winner == color { INF } else { -INF };
     }
@@ -420,20 +435,25 @@ pub fn evaluate_v2(board: &Board, color: Color) -> i64 {
             _ => {}
         }
     }
+    // Pre-scale the three personality-controlled components (integer %, default 100).
+    let mill_w  = scale.mill  as i64;
+    let mob_w   = scale.mob   as i64;
+    let block_w = scale.block as i64;
+
     match phase {
         Phase::Place => {
             (own_p - opp_p)
-                + (own_mob - opp_mob)
-                + 8 * (opp_blocked - own_blocked)
-                + 30 * (own_mills - opp_mills)
-                + 15 * (own_thr - opp_thr)
+                + mob_w   * (own_mob - opp_mob) / 100
+                + block_w * 8 * (opp_blocked - own_blocked) / 100
+                + mill_w  * 30 * (own_mills - opp_mills) / 100
+                + mill_w  * 15 * (own_thr - opp_thr) / 100
         }
         Phase::Move => {
             let mut score = 12 * (own_p - opp_p)
-                + (own_mob - opp_mob)
-                + 48 * opp_blocked
-                + 30 * (own_mills - opp_mills)
-                + 18 * (own_thr - opp_thr);
+                + mob_w   * (own_mob - opp_mob) / 100
+                + block_w * 48 * opp_blocked / 100
+                + mill_w  * 30 * (own_mills - opp_mills) / 100
+                + mill_w  * 18 * (own_thr - opp_thr) / 100;
             if opp_mob < 3 {
                 score += 600 * (3 - opp_mob);
             }
@@ -443,9 +463,9 @@ pub fn evaluate_v2(board: &Board, color: Color) -> i64 {
             let own_surp = (own_thr - 1).max(0);
             let opp_surp = (opp_thr - 1).max(0);
             2 * (own_p - opp_p)
-                + 32 * (own_mills - opp_mills)
-                + 80 * (own_thr - opp_thr)
-                + 900 * (own_surp - opp_surp)
+                + mill_w * 32 * (own_mills - opp_mills) / 100
+                + mill_w * 80 * (own_thr - opp_thr) / 100
+                + mill_w * 900 * (own_surp - opp_surp) / 100
         }
     }
 }

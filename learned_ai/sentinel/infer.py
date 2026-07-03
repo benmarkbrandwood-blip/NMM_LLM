@@ -173,7 +173,7 @@ class SentinelAdvisor:
             except Exception:
                 feats[i] = 0.0  # neutral row; keeps batch shape stable
 
-        scores = list(self._np_forward(feats))
+        scores = [float(v) for v in self._np_forward(feats)]
 
         best_idx = int(max(range(n), key=lambda i: scores[i]))
         best_quality = scores[best_idx]

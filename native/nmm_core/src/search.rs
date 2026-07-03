@@ -12,7 +12,7 @@ use memmap2::Mmap;
 
 use crate::board::{make_move, terminal_winner, ADJACENCY, get_phase};
 use crate::db_probe;
-use crate::heuristics::{evaluate_v2, INF};
+use crate::heuristics::{evaluate_v2, EvalScale, INF};
 use crate::hash::{TranspositionTable, TtEntry, Zobrist, EXACT, LOWER_BOUND, UPPER_BOUND};
 use crate::movegen::legal_moves;
 use crate::tactics::move_forms_mill;
@@ -47,12 +47,16 @@ struct Searcher {
     // Countermove table: given the previous move (from, to), store the refutation
     // that caused a beta cutoff.  Indexed [from_or_24][to] (0..25 × 0..24).
     countermoves: Box<[[Option<Move>; 24]; 25]>,
+    // Per-personality eval scale factors (mill / mobility / blocked_opp), default 100%.
+    eval_scale: EvalScale,
     // T-C1: high-frequency opponent moves that earn a SE-11 depth extension.
     opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)>,
     // T-C2: mmap'd fullgame DB for in-search probe (probe between terminal check and TT).
     fullgame_db: Option<Arc<Mmap>>,
     // T-C3: mmap'd endgame solved tables, keyed by (nW, nB). O(1) WDL probe.
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
+    // FGOP: AI's root color — used to detect opponent-to-move nodes inside negamax.
+    ai_color: Color,
 }
 
 const ABORT_SCORE: i64 = i64::MIN + 1;
@@ -60,6 +64,42 @@ const MAX_PLY: usize = 64;
 const ASP_MARGIN: i64 = 50;
 // LMR fires for move index >= this (same threshold as the lmr condition below).
 const LMR_LATE_IDX: usize = 3;
+// FGOP: frequency-gated opponent pruning constants.
+const FGOP_DEPTH: u8  = 5;   // only prune when remaining depth ≤ this
+const FGOP_MARGIN: i64 = 150; // eval margin below best opp move to trigger gate 1
+
+/// FGOP Gate 2b: true if `mv` is structurally rare for `color` to play.
+///
+/// Checks: the piece is being moved FROM a square that is part of an own
+/// two-config (2-of-3 in a mill), AND the destination does not complete
+/// any mill for `color`. Such moves voluntarily destroy own setup without
+/// gaining a mill — humans almost never make them.
+///
+/// Uses SQUARE_MILLS per square (≤3 mills each) → O(6) total.
+fn is_structurally_rare(mv: &Move, board: &Board, color: Color) -> bool {
+    use crate::mills::{MILL_MASKS, SQUARE_MILLS};
+    let Some(from_sq) = mv.from else { return false; };
+    let to_sq = mv.to as usize;
+    let from_bit = 1u32 << from_sq;
+    let to_bit   = 1u32 << to_sq;
+    let own   = board.bits(color);
+    let empty = board.empty();
+
+    // Gate A: from_sq is in an own two-config (will be broken by this move).
+    let from_in_two_cfg = SQUARE_MILLS[from_sq as usize]
+        .iter()
+        .any(|&mi| {
+            let mm = MILL_MASKS[mi as usize];
+            (own & mm).count_ones() == 2 && (empty & mm).count_ones() == 1
+        });
+    if !from_in_two_cfg { return false; }
+
+    // Gate B: to_sq does NOT complete any mill (move isn't compensating).
+    let own_after = (own | to_bit) & !from_bit;
+    !SQUARE_MILLS[to_sq]
+        .iter()
+        .any(|&mi| (own_after & MILL_MASKS[mi as usize]) == MILL_MASKS[mi as usize])
+}
 
 impl Searcher {
     fn store_killer(&mut self, ply: usize, mv: Move) {
@@ -118,7 +158,7 @@ impl Searcher {
         if let Some(winner) = terminal_winner(board) {
             return if winner == color { INF } else { -INF };
         }
-        let stand_pat = evaluate_v2(board, color);
+        let stand_pat = evaluate_v2(board, color, self.eval_scale);
         if stand_pat >= beta { return beta; }
         if stand_pat > alpha { alpha = stand_pat; }
         for mv in legal_moves(board).iter() {
@@ -242,9 +282,26 @@ impl Searcher {
 
         let mut best_score = -INF * 4;
         let mut best_idx: u16 = u16::MAX;
+        // FGOP: track best static eval from opponent's POV to compute eval gate.
+        let is_opp_ply = color != self.ai_color;
+        let fgop_active = is_opp_ply && depth <= FGOP_DEPTH && ply > 0;
+        let mut best_opp_static: i64 = -INF * 4;
         for (i, mv) in moves.iter().enumerate() {
             let nb = make_move(board, mv);
             let is_tactical = mv.capture.is_some() || move_forms_mill(board, color, mv.from, mv.to);
+            // FGOP dual-gate: skip clearly-bad opponent moves that are also structurally rare.
+            // Gate 1: static eval from opponent's POV is far below the best seen so far.
+            // Gate 2: this move voluntarily breaks own two-config without completing a mill.
+            // Never prune the first move (i==0) or tactical moves (captures/mills).
+            if fgop_active && i > 0 && !is_tactical {
+                let opp_static = evaluate_v2(&nb, color, self.eval_scale);
+                if opp_static < best_opp_static - FGOP_MARGIN
+                    && is_structurally_rare(mv, board, color)
+                {
+                    continue;
+                }
+                best_opp_static = best_opp_static.max(opp_static);
+            }
             // SE-11: extend by 1 at first opponent ply for tactical moves (original) or
             // high-frequency trajectory moves (T-C1: opp_ext_set from trajectory_db).
             let in_opp_ext = first_opp_ply
@@ -403,7 +460,7 @@ impl Searcher {
 }
 
 
-fn new_searcher(deadline: Instant) -> Searcher {
+fn new_searcher(deadline: Instant, ai_color: Color) -> Searcher {
     Searcher {
         zobrist: Zobrist::new(),
         tt: Arc::new(TranspositionTable::new()),
@@ -413,6 +470,8 @@ fn new_searcher(deadline: Instant) -> Searcher {
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
         countermoves: Box::new([[None; 24]; 25]),
+        eval_scale: EvalScale::default(),
+        ai_color,
         opp_ext_set: HashSet::new(),
         fullgame_db: None,
         endgame_solved_db: None,
@@ -424,7 +483,7 @@ fn new_searcher(deadline: Instant) -> Searcher {
 /// T-B2: aspiration windows seeded from the previous depth's best score.
 pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> SearchResult {
     let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
-    let mut searcher = new_searcher(deadline);
+    let mut searcher = new_searcher(deadline, board.side_to_move);
 
     let mut best = SearchResult {
         best_move: None,
@@ -495,6 +554,7 @@ pub fn iterative_deepening_scored(
     opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)>,
     fullgame_db: Option<Arc<Mmap>>,
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
+    eval_scale: EvalScale,
 ) -> SearchResultScored {
     let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
     let mut searcher = Searcher {
@@ -506,6 +566,8 @@ pub fn iterative_deepening_scored(
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
         countermoves: Box::new([[None; 24]; 25]),
+        eval_scale,
+        ai_color: board.side_to_move,
         opp_ext_set,
         fullgame_db,
         endgame_solved_db,
@@ -555,9 +617,10 @@ pub fn iterative_deepening_scored_smp(
     fullgame_db: Option<Arc<Mmap>>,
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
     n_threads: usize,
+    eval_scale: EvalScale,
 ) -> SearchResultScored {
     if n_threads <= 1 {
-        return iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db);
+        return iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale);
     }
 
     let board_copy = *board;
@@ -582,6 +645,8 @@ pub fn iterative_deepening_scored_smp(
                     killers: [[None; 2]; MAX_PLY],
                     history: [[0i32; 24]; 25],
                     countermoves: Box::new([[None; 24]; 25]),
+                    eval_scale,
+                    ai_color: board_copy.side_to_move,
                     opp_ext_set: opp_c,
                     fullgame_db: db_c,
                     endgame_solved_db: esdb_c,
@@ -596,7 +661,7 @@ pub fn iterative_deepening_scored_smp(
         })
         .collect();
 
-    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db);
+    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale);
 
     drop(helpers);
     result

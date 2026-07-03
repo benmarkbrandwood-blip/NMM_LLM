@@ -485,3 +485,9 @@ Rust `heuristics.rs::evaluate_v2` is missing vs Python v2:
 - **Fly:** cycle-ready mills (×80), fork threats (×55), win-config bonus (×1190)
 
 These are intentional simplifications for Rust speed. The Rust evaluator is the primary search; Python v2 is the fallback and reaches the same decisions via deeper ply. If alignment is needed, extend Rust `evaluate_v2` to include the missing terms.
+
+---
+
+## Known bugs / crash logs
+
+- **[CRASH] float32 JSON serialization in get_diagnostic** (2026-07-03): Sentinel NumPy path returns `numpy.float32` instead of Python `float`. Crashes `ws_endpoint` at app.py:3446 with `TypeError: Object of type float32 is not JSON serializable`. Immediate fix: `[float(v) for v in ...]` in `infer.py` + explicit `float()` casts on `traj_freq`/`db_delta` in `app.py`. Root cause: NumPy ufuncs propagate float32 through `round()`. Check `_np_forward` return type on any future NumPy path changes.

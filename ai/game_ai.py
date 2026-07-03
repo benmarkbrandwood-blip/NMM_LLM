@@ -2331,6 +2331,9 @@ class GameAI:
                 endgame_db_handle=self._rust_endgame_solved_handle,
                 opp_ext_moves=_opp_ext if _opp_ext else None,
                 threads=_threads,
+                mill_scale=self._weights.mill_count_scale,
+                mob_scale=self._weights.mobility_scale,
+                block_scale=self._weights.blocked_scale,
             )
             _dt = time.perf_counter() - _t0
             if not raw_moves:

@@ -3382,8 +3382,9 @@ async def ws_endpoint(websocket: WebSocket):
 
                 for mv_e in moves_out:
                     ntn = _diag_ntn(mv_e)
-                    mv_e["traj_freq"] = round(traj_freqs.get(ntn, 0.0), 3)
-                    mv_e["db_delta"]  = db_deltas.get(ntn)   # float or None
+                    mv_e["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
+                    _dd = db_deltas.get(ntn)
+                    mv_e["db_delta"]  = float(_dd) if _dd is not None else None
                     # Capture mode eg_flags keyed by captured square
                     cap_pos = mv_e.get("to") if diag_mode == "capture" else None
                     mv_e["eg_flag"] = eg_flags.get(cap_pos or ntn)  # "W"/"L"/"D"/None

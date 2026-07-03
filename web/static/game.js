@@ -132,13 +132,13 @@ const PERSONALITIES = [
 
 const PERSONALITY_PRESETS = {
   balanced: {
-    close_mill: 500, cycling_mill: 50, block_opponent_mill: 400,
+    close_mill: 500, cycling_mill: 300, block_opponent_mill: 400,
     stop_opponent_mills: 450, feeder_diamond: 200, mill_wrapping: 150,
     cardinal_block: 200, scatter_placement: 75, setup_mill: 100, mill_opening: 200,
     long_term_position: 100, mill_count_scale: 100, mobility_scale: 100, blocked_scale: 100,
     fork_anticipation: 90, locked_mill_escape: 160, redirected_pin: 140,
     defer_for_chain: 300, block_cycling_priority: 120,
-    make_mistakes: 0, opening_adherence: 30, loss_exploit: 150,
+    value_net_blend: 80, make_mistakes: 0, opening_adherence: 50, loss_exploit: 150,
   },
   // Hunts mills relentlessly; ignores cycling in favour of immediate mill closure.
   aggressive: {
@@ -148,7 +148,7 @@ const PERSONALITY_PRESETS = {
     long_term_position: 70, mill_count_scale: 180, mobility_scale: 50, blocked_scale: 80,
     fork_anticipation: 50, locked_mill_escape: 100, redirected_pin: 80,
     defer_for_chain: 200, block_cycling_priority: 60,
-    make_mistakes: 0, opening_adherence: 15, loss_exploit: 200,
+    value_net_blend: 75, make_mistakes: 0, opening_adherence: 15, loss_exploit: 200,
   },
   // Smothers every opponent threat; wraps opponent mills; builds resilient diamond setups.
   defensive: {
@@ -158,7 +158,7 @@ const PERSONALITY_PRESETS = {
     long_term_position: 150, mill_count_scale: 75, mobility_scale: 200, blocked_scale: 250,
     fork_anticipation: 150, locked_mill_escape: 220, redirected_pin: 200,
     defer_for_chain: 350, block_cycling_priority: 200,
-    make_mistakes: 0, opening_adherence: 25, loss_exploit: 100,
+    value_net_blend: 80, make_mistakes: 0, opening_adherence: 25, loss_exploit: 100,
   },
   // Spreads out, controls cross nodes, builds long-term structures.
   positional: {
@@ -168,17 +168,17 @@ const PERSONALITY_PRESETS = {
     long_term_position: 200, mill_count_scale: 80, mobility_scale: 300, blocked_scale: 150,
     fork_anticipation: 120, locked_mill_escape: 180, redirected_pin: 160,
     defer_for_chain: 320, block_cycling_priority: 180,
-    make_mistakes: 0, opening_adherence: 40, loss_exploit: 180,
+    value_net_blend: 80, make_mistakes: 0, opening_adherence: 40, loss_exploit: 180,
   },
-  // Methodical opening, solid diamond structures, balanced wrapping awareness.
+  // Methodical opening, solid diamond structures, strong book adherence.
   scholar: {
-    close_mill: 450, cycling_mill: 50, block_opponent_mill: 400,
+    close_mill: 450, cycling_mill: 200, block_opponent_mill: 500,
     stop_opponent_mills: 400, feeder_diamond: 250, mill_wrapping: 200,
-    cardinal_block: 300, scatter_placement: 300, setup_mill: 150, mill_opening: 225,
-    long_term_position: 175, mill_count_scale: 100, mobility_scale: 200, blocked_scale: 125,
-    fork_anticipation: 100, locked_mill_escape: 160, redirected_pin: 150,
-    defer_for_chain: 300, block_cycling_priority: 140,
-    make_mistakes: 0, opening_adherence: 50, loss_exploit: 180,
+    cardinal_block: 300, scatter_placement: 125, setup_mill: 150, mill_opening: 250,
+    long_term_position: 175, mill_count_scale: 130, mobility_scale: 190, blocked_scale: 125,
+    fork_anticipation: 100, locked_mill_escape: 230, redirected_pin: 100,
+    defer_for_chain: 475, block_cycling_priority: 160,
+    value_net_blend: 85, make_mistakes: 0, opening_adherence: 90, loss_exploit: 270,
   },
   // Scatters pieces randomly, ignores strategy, makes frequent blunders.
   chaos: {
@@ -188,7 +188,7 @@ const PERSONALITY_PRESETS = {
     long_term_position: 10, mill_count_scale: 50, mobility_scale: 50, blocked_scale: 50,
     fork_anticipation: 20, locked_mill_escape: 50, redirected_pin: 30,
     defer_for_chain: 100, block_cycling_priority: 30,
-    make_mistakes: 45, opening_adherence: 0, loss_exploit: 50,
+    value_net_blend: 30, make_mistakes: 45, opening_adherence: 0, loss_exploit: 50,
   },
 };
 

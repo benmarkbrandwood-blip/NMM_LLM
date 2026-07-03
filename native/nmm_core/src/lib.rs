@@ -22,6 +22,7 @@ mod tactics;
 mod types;
 
 use crate::hash::TranspositionTable;
+use crate::heuristics::EvalScale;
 use crate::types::{Board, Color};
 
 /// T-C4 + T-E1: Persistent Rust transposition table held across `choose_move` calls.
@@ -251,7 +252,7 @@ fn py_search_stats(
 /// `opp_ext_moves` (T-C1): high-freq opponent moves that earn SE-11 depth extension.
 /// `threads` (T-E3): Lazy-SMP thread count; default = 1 (single-threaded).
 #[pyfunction]
-#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None))]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None))]
 fn py_search_root_scored(
     py: Python<'_>,
     white: u32,
@@ -267,6 +268,9 @@ fn py_search_root_scored(
     endgame_db_handle: Option<Py<EndgameSolvedDbHandle>>,
     opp_ext_moves: Option<Vec<(Option<u8>, u8, Option<u8>)>>,
     threads: Option<usize>,
+    mill_scale: Option<i32>,
+    mob_scale: Option<i32>,
+    block_scale: Option<i32>,
 ) -> (u64, u8, Vec<(Option<u8>, u8, Option<u8>, i64)>) {
     let board = Board {
         white,
@@ -300,9 +304,15 @@ fn py_search_root_scored(
     // T-E3: resolve thread count. Default = 1 (single-threaded); pass threads>1 to enable Lazy SMP.
     let n_threads = threads.unwrap_or(1);
 
+    let eval_scale = EvalScale {
+        mill:  mill_scale.unwrap_or(100).clamp(0, 500),
+        mob:   mob_scale.unwrap_or(100).clamp(0, 500),
+        block: block_scale.unwrap_or(100).clamp(0, 500),
+    };
+
     let r = search::iterative_deepening_scored_smp(
         &board, max_depth, time_limit_ms, &preferred,
-        tt, opp_ext_set, fullgame_db, endgame_solved_db, n_threads,
+        tt, opp_ext_set, fullgame_db, endgame_solved_db, n_threads, eval_scale,
     );
 
     let moves = r
