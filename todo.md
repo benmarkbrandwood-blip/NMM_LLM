@@ -213,44 +213,26 @@ Improves alpha-beta pruning by 20-30% cumulatively.
 
 ## Track C — Integration (Python-only features living inside the search)
 
-### T-C1 — SE-11b: opponent-frequency depth extension
+### T-C1 — SE-11b: opponent-frequency depth extension ✅ DONE
 
-Python's `_negamax` extends depth by +1 at the first opponent ply for
-high-frequency human moves (`trajectory_db.query_all_frequencies`). Rust has
-no equivalent.
-
-**Rust:** extend `py_search_root_scored` with
-`opp_ext_moves: Vec<(Option<u8>, u8, Option<u8>)>`. Inside `negamax`, when at
-`opp_ply_from_root == 1` and the move matches the list, add +1 to the child's
-search depth. Cap total extensions per node at 1.
-
-**Python:** query trajectory frequencies at the root (once per turn), select
-moves above the frequency threshold, pass to Rust.
+`py_search_root_scored` accepts `opp_ext_moves: Vec<(Option<u8>, u8, Option<u8>)>`.
+In `negamax`: when `first_opp_ply && self.opp_ext_set.contains(&(mv.from, mv.to, mv.capture))`,
+adds `se11_ext = 1` to the child depth. Cap 1 extension per node.
+Python queries `trajectory_db.query_all_frequencies` at root, filters moves with
+frequency ≥ 0.5, converts to index triples, passes as `opp_ext_moves=`.
 
 **SE-11c value-net re-ordering** stays Python-only (PyTorch). Python can
 pre-order the first-opp-ply candidates with VN and pass them via
 `preferred_root` (M3).
 
-### T-C2 — FullGame DB mmap probe in Rust
+### T-C2 — FullGame DB mmap probe in Rust ✅ DONE
 
-Python's `_negamax` at line 1669 probes the fullgame DB at internal nodes
-(gated by `_db_active_this_move`). Currently the key is generated in Rust
-(`py_db_key`) but the read is Python.
-
-**Rust:**
-- Add `mmap2 = "0.9"` crate to `nmm_core/Cargo.toml`.
-- New `db_probe::FullgameDbHandle` that mmaps the binary file at creation.
-- Expose a construction path: `iterative_deepening_scored` accepts an optional
-  `&FullgameDbHandle`. Path passed in from Python as bytes.
-- Inside `negamax`, when a probe would fire, look up the WDL byte directly and
-  bypass leaf eval on a hit.
-- WDL byte format documented in `docs/HumanDB.md` and `endgame_db.py`.
-
-**Python:** pass `_fullgame_db.path` (or an mmap handle) when constructing the
-Rust search context.
-
-Every DB hit inside the search skips a Python round-trip. Impact scales with
-DB coverage in the search tree — could be very large in mid/endgame positions.
+`Searcher` holds `fullgame_db: Option<Arc<Mmap>>`. In `negamax`, between the
+terminal check and TT lookup, calls `db_probe::probe_fullgame` to return exact
+WDL score when the DB covers the position. `FullgameDbHandle` PyO3 class mmaps
+the binary file at creation; Python lazy-inits it on first call and passes as
+`db_handle=` to `py_search_root_scored`. Every DB hit inside the search skips
+a Python round-trip — large impact in mid/endgame positions.
 
 ### T-C3 — Endgame DB mmap probe in Rust ✅ DONE
 
