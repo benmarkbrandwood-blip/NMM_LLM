@@ -536,13 +536,16 @@ class TournamentState:
 
     QUALIFY_GAMES = 0  # no qualification required — tournament always available
 
-    ROSTER: list[dict] = [  # ordered weakest → strongest
-        {"name": "chaos",      "label": "Chaos — The Trickster",      "diff": 3, "elo": 720},
-        {"name": "aggressive", "label": "Aggressive — The Crusher",    "diff": 4, "elo": 850},
-        {"name": "scholar",    "label": "Scholar — The Bookworm",      "diff": 4, "elo": 900},
-        {"name": "balanced",   "label": "Balanced",                    "diff": 5, "elo": 960},
-        {"name": "defensive",  "label": "Defensive — The Blocker",     "diff": 5, "elo": 1020},
-        {"name": "positional", "label": "Positional — The Strategist", "diff": 6, "elo": 1080},
+    # Roster defines personality style and ELO rating for scoring; difficulty
+    # is NOT stored here — it is computed per-game from the player's live ELO
+    # so every opponent plays at the same strength relative to the player.
+    ROSTER: list[dict] = [
+        {"name": "chaos",      "label": "Chaos — The Trickster",      "elo": 720},
+        {"name": "aggressive", "label": "Aggressive — The Crusher",    "elo": 850},
+        {"name": "scholar",    "label": "Scholar — The Bookworm",      "elo": 900},
+        {"name": "balanced",   "label": "Balanced",                    "elo": 960},
+        {"name": "defensive",  "label": "Defensive — The Blocker",     "elo": 1020},
+        {"name": "positional", "label": "Positional — The Strategist", "elo": 1080},
     ]
     _COLORS = ["W", "B", "W", "B", "W", "B"]  # alternate for fairness
 
@@ -550,6 +553,16 @@ class TournamentState:
         self.results: list[dict] = []
         self.current_idx: int   = 0
         self.player_elo: int    = player_elo
+
+    @staticmethod
+    def _diff_for_elo(elo: int) -> int:
+        """Map player ELO to search difficulty so every game is a real challenge."""
+        if elo < 800:  return 3
+        if elo < 1000: return 4
+        if elo < 1200: return 5
+        if elo < 1400: return 6
+        if elo < 1600: return 7
+        return 8
 
     @property
     def complete(self) -> bool:
@@ -562,19 +575,21 @@ class TournamentState:
         entry = self.ROSTER[self.current_idx]
         return {
             **entry,
+            "diff":        self._diff_for_elo(self.player_elo),
             "human_color": self._COLORS[self.current_idx],
             "game_idx":    self.current_idx,
         }
 
     def record(self, winner: str | None, human_color: str) -> None:
         entry     = self.ROSTER[self.current_idx]
+        diff      = self._diff_for_elo(self.player_elo)
         human_won = (winner == human_color) if winner else None
         pts       = 2 if human_won is True else (1 if human_won is None else 0)
         ai_color = "B" if human_color == "W" else "W"
         self.results.append({
             "personality":       entry["name"],
             "label":             entry["label"],
-            "difficulty":        entry["diff"],
+            "difficulty":        diff,
             "human_color":       human_color,
             "white_personality": "Human" if human_color == "W" else entry["label"],
             "black_personality": "Human" if human_color == "B" else entry["label"],
