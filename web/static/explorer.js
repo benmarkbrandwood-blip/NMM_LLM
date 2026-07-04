@@ -1064,6 +1064,17 @@ document.getElementById('btn-back').addEventListener('click', () => {
   loadPosition(history.pop());
 });
 
+document.getElementById('btn-reset').addEventListener('click', () => {
+  history.length = 0;
+  if (_otToggle && _otToggle.checked) {
+    _otPath = [];
+    _otRender();
+    document.getElementById('btn-back').disabled = true;
+  } else {
+    loadPosition('........................|W|0|0');
+  }
+});
+
 document.getElementById('btn-best').addEventListener('click', async () => {
   if (!currentData || !currentData.position_stats) return;
   const best = currentData.position_stats.canonical_winning_move;
@@ -1301,7 +1312,8 @@ async function _otSyncBoard() {
 }
 
 function _otApplyCameraPan(open) {
-  controls.target.set(open ? -1.2 : 0, 0, 0);
+  controls.target.set(open ? 2.2 : 0, 0, 0);
+  camera.position.set(open ? 2.2 : 0, 8, 9);
   controls.update();
 }
 
