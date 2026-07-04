@@ -246,12 +246,15 @@ def run(args: argparse.Namespace) -> None:
     mutable_by_id = {e.get("opening_id"): e for e in mutable_data}
 
     totals = {"W": 0, "B": 0, "equal": 0, "unknown": 0}
+    only_id = getattr(args, "only_id", None)  # --only-id filter
 
     # ── Book openings ──────────────────────────────────────────────────────────
     print(f"\n{'='*70}")
     print(f"BOOK OPENINGS  ({len(book_data)} entries from {book_path.name})")
     print(f"{'='*70}")
     for entry in book_data:
+        if only_id and entry.get("opening_id") != only_id:
+            continue
         entry = audit_opening(entry, args, rng)
         totals[entry["favored_side"]] = totals.get(entry["favored_side"], 0) + 1
         # Mirror tag into mutable copy
@@ -264,6 +267,8 @@ def run(args: argparse.Namespace) -> None:
     print(f"LEARNED OPENINGS  ({len(learned_data)} entries from {learned_path.name})")
     print(f"{'='*70}")
     for entry in learned_data:
+        if only_id and entry.get("opening_id") != only_id:
+            continue
         entry = audit_opening(entry, args, rng)
         totals[entry["favored_side"]] = totals.get(entry["favored_side"], 0) + 1
 
@@ -303,6 +308,7 @@ def main() -> None:
     p.add_argument("--sim-margin", type=float, default=0.08, help="Win-rate margin for sim classification")
     p.add_argument("--dry-run",    action="store_true",      help="Print report without writing files")
     p.add_argument("--seed",       type=int,   default=42)
+    p.add_argument("--only-id",    type=str,   default=None, help="Only audit the opening with this opening_id")
     args = p.parse_args()
     run(args)
 

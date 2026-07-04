@@ -225,8 +225,8 @@ const hintGroup  = new THREE.Group();
 malomGroup.visible = false;
 scene.add(pieceGroup, barGroup, arrowGroup, malomGroup, hintGroup);
 
-const pieceGeoW = new THREE.CylinderGeometry(0.26, 0.26, 0.4, 20);
-const pieceGeoB = new THREE.CylinderGeometry(0.26, 0.26, 0.4, 20);
+const pieceGeoW = new THREE.CylinderGeometry(0.26, 0.26, 0.13, 20);
+const pieceGeoB = new THREE.CylinderGeometry(0.26, 0.26, 0.13, 20);
 
 // ── Interaction state machine ─────────────────────────────────────────────────
 
@@ -248,7 +248,7 @@ function rebuildPieces(boardDict) {
     const base = new THREE.Color(piece === 'W' ? C.white : C.black);
     const mat  = new THREE.MeshLambertMaterial({ color: base.clone(), transparent: true, opacity: 1.0 });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.position.set(x, 0.23, z);
+    mesh.position.set(x, 0.10, z);
     mesh.castShadow = true;
     mesh.userData.pos       = pos;
     mesh.userData.color     = piece;
@@ -1171,7 +1171,7 @@ function _otRenderBreadcrumb() {
   }
 }
 
-function _otRender() {
+function _otRender(syncBoard = true) {
   if (!_otData) {
     _otRows.innerHTML = '<div id="ot-loading">Loading…</div>';
     return;
@@ -1198,13 +1198,13 @@ function _otRender() {
     msg.className = 'ot-diverge-msg';
     msg.textContent = `Diverged from book at ply ${divergePly}. Enter a name below to save this path.`;
     _otRows.appendChild(msg);
-    _otSyncBoard();
+    if (syncBoard) _otSyncBoard();
     return;
   }
 
   if (!children.length) {
     _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
-    _otSyncBoard();
+    if (syncBoard) _otSyncBoard();
     return;
   }
 
@@ -1275,7 +1275,7 @@ function _otRender() {
     });
     _otRows.appendChild(row);
   }
-  _otSyncBoard();
+  if (syncBoard) _otSyncBoard();
 }
 
 async function _otLoad() {
@@ -1285,7 +1285,7 @@ async function _otLoad() {
     const res = await fetch(`/api/opening_tree?depth=${depth}`);
     _otData = await res.json();
     _otLoaded = true;
-    _otRender();
+    _otRender(false); // keep current board on initial load
   } catch (e) {
     _otRows.innerHTML = `<div id="ot-empty">Failed to load tree: ${e.message}</div>`;
   }
@@ -1321,8 +1321,8 @@ _otToggle.addEventListener('change', () => {
   if (_otToggle.checked) {
     _otLeftPanel.style.display = 'flex';
     _otApplyCameraPan(true);
-    if (!_otLoaded) _otLoad();
-    else _otSyncBoard();
+    if (!_otLoaded) _otLoad(); // _otLoad uses syncBoard=false → keeps current board
+    // No sync here — current board position carries over into tree mode
   } else {
     _otLeftPanel.style.display = 'none';
     _otApplyCameraPan(false);
@@ -1346,7 +1346,9 @@ const _otSaveName = document.getElementById('ot-save-name');
 const _otSaveFamily = document.getElementById('ot-save-family');
 const _otSaveFamilyCustom = document.getElementById('ot-save-family-custom');
 const _otSaveBtn = document.getElementById('ot-save-btn');
+const _otAssessBtn = document.getElementById('ot-assess-btn');
 const _otSaveMsg = document.getElementById('ot-save-msg');
+let _otLastSavedId = null;
 
 function _otUpdateSaveBar() {
   _otSaveBar.style.display = _otPath.length >= 4 ? 'flex' : 'none';
@@ -1372,6 +1374,8 @@ _otSaveBtn.addEventListener('click', async () => {
       _otSaveMsg.textContent = `Saved as "${name}".`;
       _otSaveMsg.style.color = '#4ade80';
       _otSaveName.value = '';
+      _otLastSavedId = data.opening_id ?? null;
+      if (_otAssessBtn) _otAssessBtn.style.display = _otLastSavedId ? 'inline-block' : 'none';
       _otData   = null;
       _otLoaded = false;
       _otLoad();
@@ -1386,3 +1390,34 @@ _otSaveBtn.addEventListener('click', async () => {
     _otSaveBtn.disabled = false;
   }
 });
+
+if (_otAssessBtn) {
+  _otAssessBtn.addEventListener('click', async () => {
+    if (!_otLastSavedId) return;
+    _otAssessBtn.disabled = true;
+    _otSaveMsg.textContent = 'Assessing…';
+    _otSaveMsg.style.color = '#8a7a5a';
+    try {
+      const res = await fetch('/api/opening_tree/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_id: _otLastSavedId }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const labels = { W: '♙ favours White', B: '♟ favours Black', equal: '⚖ balanced', unknown: '— unknown' };
+        _otSaveMsg.textContent = labels[data.favored_side] || data.favored_side;
+        _otSaveMsg.style.color = data.favored_side === 'W' ? '#e8c87a' : data.favored_side === 'B' ? '#aaa' : '#4ade80';
+        _otAssessBtn.style.display = 'none';
+      } else {
+        _otSaveMsg.textContent = 'Assess failed: ' + (data.error || '');
+        _otSaveMsg.style.color = '#ef4444';
+      }
+    } catch (e) {
+      _otSaveMsg.textContent = 'Network error.';
+      _otSaveMsg.style.color = '#ef4444';
+    } finally {
+      _otAssessBtn.disabled = false;
+    }
+  });
+}

@@ -604,6 +604,38 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") _saveOpeningRename();
     if (e.key === "Escape") $("opening-rename-row").style.display = "none";
   });
+  // ── Opening heading change ─────────────────────────────────────────────
+  $("btn-opening-heading").addEventListener("click", () => {
+    const id = $("sel-opening").value;
+    if (!id) return;
+    const op = _openingsData.find(o => o.id === id);
+    if (op) $("opening-heading-sel").value = op.family || "novel";
+    $("opening-heading-custom").value = "";
+    $("opening-heading-row").style.display = "flex";
+    $("opening-heading-sel").focus();
+  });
+  $("btn-opening-heading-cancel").addEventListener("click", () => {
+    $("opening-heading-row").style.display = "none";
+  });
+  $("btn-opening-heading-save").addEventListener("click", async () => {
+    const id = $("sel-opening").value;
+    if (!id) return;
+    const custom = $("opening-heading-custom").value.trim();
+    const family = custom || $("opening-heading-sel").value;
+    const res = await fetch("/api/openings/set_family", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ opening_id: id, family }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      $("opening-heading-row").style.display = "none";
+      _loadOpenings();
+    } else {
+      addCommentary("Error", data.error || "Heading change failed.", "ai");
+    }
+  });
+
   $("btn-opening-delete").addEventListener("click", () => {
     const id = $("sel-opening").value;
     if (!id) return;

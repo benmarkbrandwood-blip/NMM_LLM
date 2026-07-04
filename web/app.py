@@ -1096,6 +1096,56 @@ async def api_opening_tree_save(body: dict):
     return JSONResponse({"ok": True, "opening_id": opening_id})
 
 
+@app.post("/api/opening_tree/audit")
+async def api_opening_audit(body: dict):
+    """Run audit_openings.py for a single opening_id; returns {favored_side}."""
+    from fastapi.responses import JSONResponse
+    opening_id = str(body.get("opening_id", "")).strip()
+    if not opening_id:
+        return JSONResponse({"ok": False, "error": "opening_id required"}, status_code=400)
+
+    import subprocess, sys
+    script = Path(__file__).parent.parent / "scripts" / "audit_openings.py"
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [sys.executable, str(script), "--only-id", opening_id],
+        capture_output=True, text=True, timeout=60,
+    )
+    if result.returncode != 0:
+        return JSONResponse({"ok": False, "error": result.stderr[:400]}, status_code=500)
+
+    # Re-read the opening to get the updated favored_side
+    book = OpeningBook()
+    opening = book.get_by_id(opening_id)
+    favored = opening.favored_side if opening else "unknown"
+    return JSONResponse({"ok": True, "favored_side": favored})
+
+
+@app.post("/api/openings/set_family")
+async def api_set_family(body: dict):
+    """Change the family/heading of an existing opening."""
+    from fastapi.responses import JSONResponse
+    opening_id = str(body.get("opening_id", "")).strip()
+    family     = str(body.get("family", "")).strip()
+    if not opening_id or not family:
+        return JSONResponse({"ok": False, "error": "opening_id and family required"}, status_code=400)
+
+    def _do():
+        book = OpeningBook()
+        opening = book.get_by_id(opening_id)
+        if opening is None:
+            return False
+        opening.family = family
+        book.save_opening(opening)
+        return True
+
+    found = await asyncio.to_thread(_do)
+    if not found:
+        return JSONResponse({"ok": False, "error": "Opening not found"}, status_code=404)
+    _opening_tree_cache.clear()
+    return JSONResponse({"ok": True})
+
+
 # ── Tools page ────────────────────────────────────────────────────────────────
 
 import collections as _collections
