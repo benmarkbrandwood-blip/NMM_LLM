@@ -975,6 +975,126 @@ async def list_openings():
     return JSONResponse(result)
 
 
+# ── Opening tree ──────────────────────────────────────────────────────────────
+
+_opening_tree_cache: "dict | None" = None
+
+
+def _build_opening_tree(max_depth: int = 8) -> dict:
+    """Build a prefix trie from the opening book + HumanDB frequencies.
+
+    Each node has: move, ply, human_pct, w_wins, draws, b_wins,
+    opening_names (openings whose line ends here), children.
+    Children are sorted descending by human_pct.
+    """
+    from game.board import BoardState
+
+    book = OpeningBook()
+
+    # Pre-index: prefix_tuple -> {move -> {w_wins, draws, b_wins, openings[]}}
+    prefix_idx: dict = {}
+    for op in book.values():
+        for ply in range(len(op.line_moves)):
+            prefix = tuple(op.line_moves[:ply])
+            moves_at = prefix_idx.setdefault(prefix, {})
+            entry = moves_at.setdefault(op.line_moves[ply], {"w": 0, "d": 0, "b": 0, "ops": []})
+            entry["w"] += op.outcome_stats.get("W", 0)
+            entry["d"] += op.outcome_stats.get("D", 0)
+            entry["b"] += op.outcome_stats.get("B", 0)
+            entry["ops"].append(op)
+
+    def _recurse(board: BoardState, ply: int, prefix: tuple) -> list:
+        if ply >= max_depth:
+            return []
+
+        # Only traverse moves that appear in the opening book at this prefix.
+        # HumanDB is queried once per node to get frequency for those moves only —
+        # not to discover new moves. This keeps the tree bounded to book paths.
+        book_moves = prefix_idx.get(prefix, {})
+        if not book_moves:
+            return []
+
+        human_freqs: dict = {}
+        if _human_db is not None and _human_db.is_available():
+            human_freqs = _human_db.query_all_frequencies(board, min_samples=1)
+        elif _trajectory_db is not None and hasattr(_trajectory_db, "query_all_frequencies"):
+            human_freqs = _trajectory_db.query_all_frequencies(board)
+
+        nodes = []
+        for move, entry in book_moves.items():
+            new_board = board.apply_move({"from": None, "to": move, "capture": None})
+
+            ops_here = entry.get("ops", [])
+            # Names of openings whose stored line ends exactly at this ply
+            term_names = [op.name for op in ops_here if len(op.line_moves) == ply + 1]
+            # All opening names that pass through (include) this move
+            all_names  = [op.name for op in ops_here]
+
+            children = _recurse(new_board, ply + 1, prefix + (move,))
+            nodes.append({
+                "move":            move,
+                "ply":             ply + 1,
+                "human_pct":       round(human_freqs.get(move, 0.0) * 100, 1),
+                "w_wins":          entry.get("w", 0),
+                "draws":           entry.get("d", 0),
+                "b_wins":          entry.get("b", 0),
+                "opening_names":   term_names,
+                "through_openings": all_names,
+                "children":        children,
+            })
+
+        return sorted(nodes, key=lambda n: -n["human_pct"])
+
+    root = BoardState.new_game()
+    return {
+        "max_depth": max_depth,
+        "children":  _recurse(root, 0, ()),
+    }
+
+
+@app.get("/api/opening_tree")
+async def api_opening_tree(depth: int = 6):
+    global _opening_tree_cache
+    if _opening_tree_cache is None:
+        _opening_tree_cache = await asyncio.to_thread(_build_opening_tree, max(2, min(depth, 10)))
+    from fastapi.responses import JSONResponse
+    return JSONResponse(_opening_tree_cache)
+
+
+@app.post("/api/opening_tree/save")
+async def api_opening_tree_save(body: dict):
+    """Save the current tree path as a named opening in learned_openings.json."""
+    global _opening_tree_cache
+    from fastapi.responses import JSONResponse
+
+    moves  = body.get("moves", [])
+    name   = str(body.get("name", "")).strip()
+    family = str(body.get("family", "novel")).strip() or "novel"
+
+    if not name:
+        return JSONResponse({"ok": False, "error": "Name is required."}, status_code=400)
+    if len(moves) < 4:
+        return JSONResponse({"ok": False, "error": "Path must be at least 4 moves."}, status_code=400)
+
+    def _save():
+        from ai.coordinator import Coordinator
+        book = OpeningBook()
+        sigs = Coordinator._compute_fen_signatures(moves)
+        opening = book.save_novel_opening(
+            moves, sigs,
+            outcome=None,
+            needs_llm_name=False,
+        )
+        opening.name   = name
+        opening.family = family
+        book.save_opening(opening)
+        return opening.opening_id
+
+    opening_id = await asyncio.to_thread(_save)
+    _opening_tree_cache = None
+    return JSONResponse({"ok": True, "opening_id": opening_id})
+
+
 # ── Tools page ────────────────────────────────────────────────────────────────
 
 import collections as _collections
@@ -2107,6 +2227,7 @@ async def _commentary(ws: WebSocket, session: Session) -> None:
 
 
 async def _game_over(ws: WebSocket, session: Session) -> None:
+    global _opening_tree_cache
     _clear_autosave()
     winner      = session.engine.winner
     draw_reason = session.engine.draw_reason
@@ -2177,6 +2298,7 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         if novel_id:
             opening = session.coordinator.opening_recognizer.book.get_by_id(novel_id)
             if opening:
+                _opening_tree_cache = None
                 await _send(ws, {"type": "openings_updated"})
                 await _send(ws, {
                     "type":       "name_opening_prompt",
@@ -2247,6 +2369,7 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
                         novel_id = novel.opening_id
                     # Notify frontend; /api/openings reads from disk each call so
                     # the client will get the new entry on its next fetch.
+                    _opening_tree_cache = None
                     await _send(ws, {"type": "openings_updated"})
 
         if novel_id:
@@ -2727,6 +2850,7 @@ def _is_ai_turn(session: Session) -> bool:
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
+    global _opening_tree_cache
     await websocket.accept()
     # Offer autosave restore before the first new_game message arrives.
     if _AUTOSAVE_PATH.exists():
@@ -4086,6 +4210,7 @@ async def ws_endpoint(websocket: WebSocket):
                         else OpeningBook()
                     )
                     if _book.set_name(opening_id, name, needs_llm_name=False):
+                        _opening_tree_cache = None
                         await _send(websocket, {
                             "type": "rename_opening_ack",
                             "opening_id": opening_id,

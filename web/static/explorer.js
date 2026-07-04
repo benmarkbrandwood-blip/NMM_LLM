@@ -999,3 +999,220 @@ animate();
 
 const _urlFen = new URLSearchParams(window.location.search).get('fen');
 loadPosition(_urlFen || '........................|W|0|0');
+
+// ── Opening Tree ──────────────────────────────────────────────────────────────
+
+let _otData   = null;   // full tree JSON from /api/opening_tree
+let _otPath   = [];     // current drilldown path (array of move strings)
+let _otLoaded = false;
+
+const _otWrap      = document.getElementById('ot-wrap');
+const _otBody      = document.getElementById('ot-body');
+const _otBreadcrumb = document.getElementById('ot-breadcrumb');
+const _otRows      = document.getElementById('ot-rows');
+const _otDepthIn   = document.getElementById('ot-depth');
+const _otDepthVal  = document.getElementById('ot-depth-val');
+const _otToggle    = document.getElementById('ot-toggle');
+
+function _otNodeAtPath(data, path) {
+  let node = data;
+  for (const mv of path) {
+    const child = (node.children || []).find(c => c.move === mv);
+    if (!child) return null;
+    node = child;
+  }
+  return node;
+}
+
+function _otRenderBreadcrumb() {
+  _otBreadcrumb.innerHTML = '';
+  const root = document.createElement('span');
+  root.className = 'ot-crumb ot-crumb-root';
+  root.textContent = 'Opening tree';
+  root.onclick = () => { _otPath = []; _otRender(); };
+  _otBreadcrumb.appendChild(root);
+  for (let i = 0; i < _otPath.length; i++) {
+    const sep = document.createElement('span');
+    sep.className = 'ot-crumb-sep';
+    sep.textContent = ' › ';
+    _otBreadcrumb.appendChild(sep);
+    const crumb = document.createElement('span');
+    crumb.className = 'ot-crumb';
+    crumb.textContent = _otPath[i];
+    const idx = i;
+    crumb.onclick = () => { _otPath = _otPath.slice(0, idx + 1); _otRender(); };
+    _otBreadcrumb.appendChild(crumb);
+  }
+  if (_otPath.length > 0) {
+    const plyLabel = document.createElement('span');
+    plyLabel.className = 'ot-ply-label';
+    plyLabel.textContent = `(ply ${_otPath.length})`;
+    _otBreadcrumb.appendChild(plyLabel);
+  }
+}
+
+function _otRender() {
+  if (!_otData) {
+    _otRows.innerHTML = '<div id="ot-loading">Loading…</div>';
+    return;
+  }
+  _otRenderBreadcrumb();
+  _otUpdateSaveBar();
+  const node = _otNodeAtPath(_otData, _otPath);
+  const children = node ? (node.children || []) : [];
+
+  _otRows.innerHTML = '';
+  if (!children.length) {
+    _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
+    return;
+  }
+
+  // Header row
+  const hdr = document.createElement('div');
+  hdr.className = 'ot-row';
+  hdr.style.cssText = 'cursor:default;opacity:0.55;font-size:0.68rem;padding-bottom:0.1rem;';
+  hdr.innerHTML = '<div>Move</div><div>Human frequency</div><div>Opening book W/D/L</div><div></div>';
+  _otRows.appendChild(hdr);
+
+  for (const child of children) {
+    const total  = child.w_wins + child.draws + child.b_wins;
+    const hasWdl = total > 0;
+    const wPct   = hasWdl ? child.w_wins / total * 100 : 0;
+    const dPct   = hasWdl ? child.draws  / total * 100 : 0;
+    const bPct   = hasWdl ? child.b_wins / total * 100 : 0;
+    const isLeaf = !child.children || child.children.length === 0;
+    // White plays on odd plies (ply 1,3,5…), Black on even (2,4,6…)
+    const isWhiteTurn = (child.ply % 2 === 1);
+
+    const row = document.createElement('div');
+    row.className = 'ot-row' + (isLeaf ? ' ot-leaf' : '');
+
+    const turnDot = `<span class="ot-turn-dot ${isWhiteTurn ? 'ot-turn-w' : 'ot-turn-b'}"></span>`;
+    // Prefer terminal names; fall back to through_openings when there are ≤2
+    const throughNames = child.through_openings || [];
+    const displayNames = child.opening_names.length
+      ? child.opening_names
+      : (throughNames.length <= 2 ? throughNames : [throughNames[0], `+${throughNames.length - 1} more`]);
+    const nameHtml = displayNames.length
+      ? displayNames.map(n => `<div class="ot-opening-label" title="${throughNames.join(', ')}">${n}</div>`).join('')
+      : '';
+    const expandHint = !isLeaf
+      ? `<div class="ot-expand-hint">${child.children.length} continuation${child.children.length > 1 ? 's' : ''} ›</div>`
+      : '';
+
+    const barWidth = Math.min(100, child.human_pct);
+    const pctText  = child.human_pct > 0 ? child.human_pct.toFixed(1) + '%' : '—';
+
+    const wdlHtml = hasWdl
+      ? `<div class="ot-wdl-bar">
+           <div class="ot-wdl-w" style="width:${wPct.toFixed(1)}%"></div>
+           <div class="ot-wdl-d" style="width:${dPct.toFixed(1)}%"></div>
+           <div class="ot-wdl-b" style="width:${bPct.toFixed(1)}%"></div>
+         </div>
+         <span class="ot-wdl-text">${child.w_wins}W ${child.draws}D ${child.b_wins}B</span>`
+      : '<span class="ot-wdl-text" style="color:#3a2e1e">—</span>';
+
+    const childCount = !isLeaf
+      ? `<span class="ot-arrow">›</span><span>${child.children.length}</span>`
+      : '';
+
+    row.innerHTML = `
+      <div class="ot-move-cell">
+        <div class="ot-move">${turnDot}${child.move}</div>
+        ${nameHtml}
+        ${expandHint}
+      </div>
+      <div class="ot-pct-cell">
+        <div class="ot-pct-track"><div class="ot-pct-fill" style="width:${barWidth}%"></div></div>
+        <span class="ot-pct-text">${pctText}</span>
+      </div>
+      <div class="ot-wdl-cell">${wdlHtml}</div>
+      <div class="ot-children-cell">${childCount}</div>
+    `;
+
+    if (!isLeaf) {
+      row.addEventListener('click', () => {
+        _otPath.push(child.move);
+        _otRender();
+      });
+    }
+    _otRows.appendChild(row);
+  }
+}
+
+async function _otLoad() {
+  const depth = parseInt(_otDepthIn.value, 10);
+  _otRows.innerHTML = '<div id="ot-loading">Loading…</div>';
+  try {
+    const res = await fetch(`/api/opening_tree?depth=${depth}`);
+    _otData = await res.json();
+    _otLoaded = true;
+    _otRender();
+  } catch (e) {
+    _otRows.innerHTML = `<div id="ot-empty">Failed to load tree: ${e.message}</div>`;
+  }
+}
+
+_otToggle.addEventListener('change', () => {
+  if (_otToggle.checked) {
+    _otWrap.style.display = 'flex';
+    if (!_otLoaded) _otLoad();
+  } else {
+    _otWrap.style.display = 'none';
+  }
+});
+
+_otDepthIn.addEventListener('input', () => {
+  _otDepthVal.textContent = _otDepthIn.value;
+});
+_otDepthIn.addEventListener('change', () => {
+  _otData   = null;
+  _otLoaded = false;
+  _otPath   = [];
+  if (_otToggle.checked) _otLoad();
+});
+
+// ── Save path as opening ──────────────────────────────────────────────────────
+
+const _otSaveBar = document.getElementById('ot-save-bar');
+const _otSaveName = document.getElementById('ot-save-name');
+const _otSaveFamily = document.getElementById('ot-save-family');
+const _otSaveBtn = document.getElementById('ot-save-btn');
+const _otSaveMsg = document.getElementById('ot-save-msg');
+
+function _otUpdateSaveBar() {
+  _otSaveBar.style.display = _otPath.length >= 4 ? 'flex' : 'none';
+  _otSaveMsg.textContent = '';
+}
+
+_otSaveBtn.addEventListener('click', async () => {
+  const name = _otSaveName.value.trim();
+  if (!name) { _otSaveMsg.textContent = 'Enter a name first.'; _otSaveMsg.style.color = '#ef4444'; return; }
+  _otSaveBtn.disabled = true;
+  _otSaveMsg.textContent = 'Saving…';
+  _otSaveMsg.style.color = '#8a7a5a';
+  try {
+    const res = await fetch('/api/opening_tree/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ moves: _otPath, name, family: _otSaveFamily.value }),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      _otSaveMsg.textContent = `Saved as "${name}".`;
+      _otSaveMsg.style.color = '#4ade80';
+      _otSaveName.value = '';
+      _otData   = null;
+      _otLoaded = false;
+      _otLoad();
+    } else {
+      _otSaveMsg.textContent = data.error || 'Save failed.';
+      _otSaveMsg.style.color = '#ef4444';
+    }
+  } catch (e) {
+    _otSaveMsg.textContent = 'Network error.';
+    _otSaveMsg.style.color = '#ef4444';
+  } finally {
+    _otSaveBtn.disabled = false;
+  }
+});
