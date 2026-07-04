@@ -79,6 +79,14 @@ const C = {
   barHov: 0xffd700,
 };
 
+// Wilson score lower bound (z=1.645 → 95% one-sided confidence)
+function wilsonLower(wins, total, z = 1.645) {
+  if (total === 0) return 0;
+  const p  = wins / total;
+  const z2 = z * z;
+  return (p + z2 / (2 * total) - z * Math.sqrt(p * (1 - p) / total + z2 / (4 * total * total))) / (1 + z2 / total);
+}
+
 function winPctColor(pct) {
   const t = Math.max(0, Math.min(1, pct));
   if (t < 0.5) {
@@ -144,6 +152,8 @@ scene.add(fillLight);
 
 // ── Static board geometry ─────────────────────────────────────────────────────
 
+const padMeshList = [];
+
 function buildStaticBoard() {
   const planeGeo = new THREE.PlaneGeometry(9, 9);
   const planeMat = new THREE.MeshLambertMaterial({ color: C.board });
@@ -161,6 +171,7 @@ function buildStaticBoard() {
     mesh.userData.pos   = pos;
     mesh.userData.isPad = true;
     scene.add(mesh);
+    padMeshList.push(mesh);
   }
 
   const lineMat = new THREE.MeshLambertMaterial({ color: C.lineWd });
@@ -255,6 +266,8 @@ const BAR_W          = 0.14;
 const BAR_OFFSET_X   = 0.38;  // trajectory bar: beside piece to the right
 const SENT_OFFSET_X  = 0.62;  // sentinel bar: further right
 const SENT_W         = 0.10;
+const HEUR_OFFSET_X  = 0.84;  // heuristic bar: rightmost column (purple)
+const HEUR_W         = 0.10;
 
 function _addBarMesh(barX, z, segH, yBot, colHex, opacity, rep, mvsForSq, needsCapture, toSq) {
   const mat  = new THREE.MeshLambertMaterial({ color: colHex, transparent: true, opacity });
@@ -287,12 +300,13 @@ function rebuildBars(movesArray) {
     byToSq.get(mv.to_sq).push(mv);
   }
 
-  const dbMoves  = movesArray.filter(m => m.has_db_data);
-  const maxTotal = Math.max(1, ...dbMoves.map(m => m.total || 0));
-  const hScores  = movesArray.filter(m => !m.has_db_data).map(m => m.heuristic_score);
-  const minH     = hScores.length ? Math.min(...hScores) : 0;
-  const maxH     = hScores.length ? Math.max(...hScores) : 1;
-  const hRange   = Math.max(1, maxH - minH);
+  const dbMoves     = movesArray.filter(m => m.has_db_data);
+  const maxTotal    = Math.max(1, ...dbMoves.map(m => m.total || 0));
+  const hScores     = movesArray.filter(m => !m.has_db_data).map(m => m.heuristic_score);
+  const minH        = hScores.length ? Math.min(...hScores) : 0;
+  const maxH        = hScores.length ? Math.max(...hScores) : 1;
+  const hRange      = Math.max(1, maxH - minH);
+  const allHAbsMax  = Math.max(1, ...movesArray.map(m => Math.abs(m.heuristic_score || 0)));
 
   for (const [toSq, mvsForSq] of byToSq) {
     const rep          = mvsForSq.find(m => !m.capture_sq) || mvsForSq[0];
@@ -358,6 +372,25 @@ function rebuildBars(movesArray) {
       barGroup.add(sm);
       segMeshes.push(sm);
     }
+
+    // ── Heuristic bar (purple, rightmost column) ──
+    const heurAbs = Math.abs(rep.heuristic_score || 0);
+    const heurH   = Math.max(0.04, (heurAbs / allHAbsMax) * MAX_BAR_HEIGHT);
+    const hm = new THREE.Mesh(
+      new THREE.BoxGeometry(HEUR_W, heurH, HEUR_W),
+      new THREE.MeshLambertMaterial({ color: 0xa855f7, transparent: true, opacity: 0.85 }),
+    );
+    hm.position.set(x + HEUR_OFFSET_X, baseY + heurH / 2, z);
+    hm.castShadow = true;
+    hm.userData.notation     = rep.notation;
+    hm.userData.moveData     = rep;
+    hm.userData.allMoves     = mvsForSq;
+    hm.userData.needsCapture = needsCapture;
+    hm.userData.toSq         = toSq;
+    hm.userData.baseColor    = new THREE.Color(0xa855f7);
+    hm.userData.baseOpacity  = 0.85;
+    barGroup.add(hm);
+    segMeshes.push(hm);
 
     barGroupMap.set(toSq, segMeshes);
   }
@@ -494,10 +527,10 @@ function rebuildHints(allMoves) {
     : allMoves;
   if (visibleMoves.length === 0) return;
 
-  const dbMoves = visibleMoves.filter(m => m.has_db_data && m.win_pct != null);
+  const dbMoves = visibleMoves.filter(m => m.has_db_data && (m.total || 0) > 0);
   let humanBestSq = null;
   if (dbMoves.length > 0) {
-    humanBestSq = [...dbMoves].sort((a, b) => b.win_pct - a.win_pct)[0].to_sq;
+    humanBestSq = [...dbMoves].sort((a, b) => wilsonLower(b.wins, b.total) - wilsonLower(a.wins, a.total))[0].to_sq;
     const ring = makeHintRing(humanBestSq, 0xffd700);
     if (ring) hintGroup.add(ring);
   }
@@ -507,6 +540,15 @@ function rebuildHints(allMoves) {
     const sentBestSq = [...sentMoves].sort((a, b) => b.sentinel_score - a.sentinel_score)[0].to_sq;
     if (sentBestSq !== humanBestSq) {
       const ring = makeHintRing(sentBestSq, 0x4488ff);
+      if (ring) hintGroup.add(ring);
+    }
+  }
+
+  const heurMoves = visibleMoves.filter(m => m.heuristic_score != null);
+  if (heurMoves.length > 0) {
+    const heurBestSq = [...heurMoves].sort((a, b) => b.heuristic_score - a.heuristic_score)[0].to_sq;
+    if (heurBestSq !== humanBestSq && heurBestSq !== (sentMoves.length > 0 ? [...sentMoves].sort((a, b) => b.sentinel_score - a.sentinel_score)[0].to_sq : null)) {
+      const ring = makeHintRing(heurBestSq, 0xa855f7);
       if (ring) hintGroup.add(ring);
     }
   }
@@ -572,7 +614,7 @@ function updateStatusIndicator() {
   if (selectionState === 'capture') {
     msg = '▶ Click an opponent piece to capture  ·  Esc or click empty to cancel';
   } else if (selectionState === 'piece_selected') {
-    msg = `▶ ${selectedPieceSq} selected — click a destination bar`;
+    msg = `▶ ${selectedPieceSq} selected — click a destination square`;
   } else {
     msg = '▶ Click one of your pieces to move';
   }
@@ -595,6 +637,7 @@ const raycaster = new THREE.Raycaster();
 const mouse     = new THREE.Vector2();
 let   hoveredBar   = null;
 let   hoveredPiece = null;
+let   hoveredPad   = null;
 
 function onMouseMove(e) {
   const rect = canvas.getBoundingClientRect();
@@ -656,7 +699,14 @@ function onMouseMove(e) {
     }
   }
 
-  canvas.style.cursor = (hoveredBar || hoveredPiece) ? 'pointer' : 'default';
+  // ── Pad hover (for placement / destination click without bar) ──
+  hoveredPad = null;
+  if (!hoveredPiece && !hoveredBar) {
+    const padHits = raycaster.intersectObjects(padMeshList);
+    if (padHits.length > 0) hoveredPad = padHits[0].object;
+  }
+
+  canvas.style.cursor = (hoveredBar || hoveredPiece || hoveredPad) ? 'pointer' : 'default';
 }
 
 canvas.addEventListener('mousemove', onMouseMove);
@@ -700,6 +750,30 @@ canvas.addEventListener('click', () => {
       }
       return;
     }
+    if (hoveredPad && !hoveredPiece) {
+      // Click on destination pad square
+      const sq = hoveredPad.userData.pos;
+      const mvsForSq = (currentData?.moves || []).filter(m => m.from_sq === selectedPieceSq && m.to_sq === sq);
+      if (mvsForSq.length > 0) {
+        const needsCapture = mvsForSq.every(m => m.capture_sq != null);
+        if (needsCapture) {
+          pendingCaptureMoves = mvsForSq;
+          captureReturnState  = 'piece_selected';
+          selectionState      = 'capture';
+          _refreshAfterStateChange();
+        } else {
+          const notation = mvsForSq.find(m => !m.capture_sq)?.notation ?? mvsForSq[0].notation;
+          selectionState  = 'idle';
+          selectedPieceSq = null;
+          applyMove(notation);
+        }
+      } else {
+        selectionState  = 'idle';
+        selectedPieceSq = null;
+        _refreshAfterStateChange();
+      }
+      return;
+    }
     if (hoveredPiece) {
       const sq = hoveredPiece.userData.pos;
       if (sq === selectedPieceSq) {
@@ -733,11 +807,28 @@ canvas.addEventListener('click', () => {
         const notation = allMoves.find(m => !m.capture_sq)?.notation ?? allMoves[0].notation;
         applyMove(notation);
       }
+    } else if (hoveredPad) {
+      // Click on a board square pad — find move with matching to_sq
+      const sq = hoveredPad.userData.pos;
+      const mvsForSq = (currentData?.moves || []).filter(m => m.to_sq === sq);
+      if (mvsForSq.length > 0) {
+        const needsCapture = mvsForSq.every(m => m.capture_sq != null);
+        if (needsCapture) {
+          pendingCaptureMoves = mvsForSq;
+          captureReturnState  = 'idle';
+          selectionState      = 'capture';
+          _refreshAfterStateChange();
+        } else {
+          const notation = mvsForSq.find(m => !m.capture_sq)?.notation ?? mvsForSq[0].notation;
+          applyMove(notation);
+        }
+      }
     }
   } else {
-    // move / fly phase — require piece click first
-    if (hoveredPiece && hoveredPiece.userData.color === currentTurn) {
-      selectedPieceSq = hoveredPiece.userData.pos;
+    // move / fly phase — require piece click first (piece or pad with own piece on it)
+    const clickSq = hoveredPiece?.userData.pos ?? (hoveredPad?.userData.pos ?? null);
+    if (clickSq && hoveredPiece?.userData.color === currentTurn) {
+      selectedPieceSq = clickSq;
       selectionState  = 'piece_selected';
       _refreshAfterStateChange();
     }
@@ -766,8 +857,9 @@ function showTooltip(cx, cy, mv) {
   const sentText = mv.sentinel_score != null
     ? `${(mv.sentinel_score * 100).toFixed(1)}%`
     : '—';
+  const allHAbsMax = Math.max(1, ...(currentData?.moves || []).map(m => Math.abs(m.heuristic_score || 0)));
   const heurText = mv.heuristic_score != null
-    ? (mv.heuristic_score >= 0 ? '+' : '') + mv.heuristic_score
+    ? `${(Math.abs(mv.heuristic_score) / allHAbsMax * 100).toFixed(0)}% (${mv.heuristic_score >= 0 ? '+' : ''}${mv.heuristic_score})`
     : '—';
 
   let dbRows = '';
@@ -835,9 +927,16 @@ function updatePanel(data) {
   const listEl = document.getElementById('move-list');
   listEl.innerHTML = '';
   if (data.moves && data.moves.length > 0) {
+    const hAbsMax = Math.max(1, ...data.moves.map(m => Math.abs(m.heuristic_score || 0)));
     for (const mv of data.moves) {
       const col    = barColor(mv);
       const colHex = '#' + col.getHexString();
+      const heurPct = mv.heuristic_score != null
+        ? `<span class="move-heuristic" style="color:#a855f7">${(Math.abs(mv.heuristic_score) / hAbsMax * 100).toFixed(0)}%</span>`
+        : '';
+      const sentStr = mv.sentinel_score != null
+        ? `<span class="move-sentinel">${(mv.sentinel_score * 100).toFixed(0)}%</span>`
+        : '';
 
       let rightContent = '';
       if (mv.has_db_data) {
@@ -848,15 +947,11 @@ function updatePanel(data) {
           <span class="move-sub">${mv.total}</span>
           ${wdl}
           <span class="move-pct" style="color:${colHex}">${(mv.win_pct*100).toFixed(1)}%</span>
+          ${sentStr}${heurPct}
         `;
       } else {
-        const heurStr = (mv.heuristic_score >= 0 ? '+' : '') + mv.heuristic_score;
-        const sentStr = mv.sentinel_score != null
-          ? `<span class="move-sentinel">${(mv.sentinel_score*100).toFixed(0)}%</span>`
-          : '';
         rightContent = `
-          <span class="move-heuristic">${heurStr}</span>
-          ${sentStr}
+          ${sentStr}${heurPct}
         `;
       }
 
@@ -942,6 +1037,12 @@ async function loadPosition(fen) {
 
 async function applyMove(notation) {
   if (!currentData) return;
+  if (_otToggle && _otToggle.checked) {
+    _otPath.push(notation);
+    _otRender();
+    document.getElementById('btn-back').disabled = false;
+    return;
+  }
   history.push(currentData.fen);
   await loadPosition(await fenAfterMove(currentData.fen, notation));
 }
@@ -953,6 +1054,12 @@ async function fenAfterMove(fen, move) {
 }
 
 document.getElementById('btn-back').addEventListener('click', () => {
+  if (_otToggle && _otToggle.checked && _otPath.length > 0) {
+    _otPath.pop();
+    _otRender();
+    document.getElementById('btn-back').disabled = _otPath.length === 0;
+    return;
+  }
   if (history.length === 0) return;
   loadPosition(history.pop());
 });
@@ -1002,11 +1109,12 @@ loadPosition(_urlFen || '........................|W|0|0');
 
 // ── Opening Tree ──────────────────────────────────────────────────────────────
 
-let _otData   = null;   // full tree JSON from /api/opening_tree
-let _otPath   = [];     // current drilldown path (array of move strings)
-let _otLoaded = false;
+let _otData      = null;   // full tree JSON from /api/opening_tree
+let _otPath      = [];     // current drilldown path (array of move strings)
+let _otLoaded    = false;
+let _otSyncToken = 0;      // request token to cancel stale board-sync fetches
 
-const _otWrap      = document.getElementById('ot-wrap');
+const _otLeftPanel = document.getElementById('ot-left-panel');
 const _otBody      = document.getElementById('ot-body');
 const _otBreadcrumb = document.getElementById('ot-breadcrumb');
 const _otRows      = document.getElementById('ot-rows');
@@ -1037,7 +1145,8 @@ function _otRenderBreadcrumb() {
     sep.textContent = ' › ';
     _otBreadcrumb.appendChild(sep);
     const crumb = document.createElement('span');
-    crumb.className = 'ot-crumb';
+    // Even index = White's move (ply 1,3,5…), odd = Black's (ply 2,4,6…)
+    crumb.className = 'ot-crumb ' + (i % 2 === 0 ? 'ot-crumb-w' : 'ot-crumb-b');
     crumb.textContent = _otPath[i];
     const idx = i;
     crumb.onclick = () => { _otPath = _otPath.slice(0, idx + 1); _otRender(); };
@@ -1062,17 +1171,31 @@ function _otRender() {
   const children = node ? (node.children || []) : [];
 
   _otRows.innerHTML = '';
-  if (!children.length) {
-    _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
+
+  // Show divergence message when off-book
+  if (_otPath.length > 0 && !node) {
+    const divergePly = (() => {
+      let n = _otData;
+      for (let i = 0; i < _otPath.length; i++) {
+        const c = (n.children || []).find(ch => ch.move === _otPath[i]);
+        if (!c) return i + 1;
+        n = c;
+      }
+      return _otPath.length;
+    })();
+    const msg = document.createElement('div');
+    msg.className = 'ot-diverge-msg';
+    msg.textContent = `Diverged from book at ply ${divergePly}. Enter a name below to save this path.`;
+    _otRows.appendChild(msg);
+    _otSyncBoard();
     return;
   }
 
-  // Header row
-  const hdr = document.createElement('div');
-  hdr.className = 'ot-row';
-  hdr.style.cssText = 'cursor:default;opacity:0.55;font-size:0.68rem;padding-bottom:0.1rem;';
-  hdr.innerHTML = '<div>Move</div><div>Human frequency</div><div>Opening book W/D/L</div><div></div>';
-  _otRows.appendChild(hdr);
+  if (!children.length) {
+    _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
+    _otSyncBoard();
+    return;
+  }
 
   for (const child of children) {
     const total  = child.w_wins + child.draws + child.b_wins;
@@ -1085,7 +1208,7 @@ function _otRender() {
     const isWhiteTurn = (child.ply % 2 === 1);
 
     const row = document.createElement('div');
-    row.className = 'ot-row' + (isLeaf ? ' ot-leaf' : '');
+    row.className = 'ot-row';
 
     const turnDot = `<span class="ot-turn-dot ${isWhiteTurn ? 'ot-turn-w' : 'ot-turn-b'}"></span>`;
     // Prefer terminal names; fall back to through_openings when there are ≤2
@@ -1094,10 +1217,10 @@ function _otRender() {
       ? child.opening_names
       : (throughNames.length <= 2 ? throughNames : [throughNames[0], `+${throughNames.length - 1} more`]);
     const nameHtml = displayNames.length
-      ? displayNames.map(n => `<div class="ot-opening-label" title="${throughNames.join(', ')}">${n}</div>`).join('')
+      ? displayNames.map(n => `<span class="ot-opening-label" title="${throughNames.join(', ')}">${n}</span>`).join('')
       : '';
     const expandHint = !isLeaf
-      ? `<div class="ot-expand-hint">${child.children.length} continuation${child.children.length > 1 ? 's' : ''} ›</div>`
+      ? `<span class="ot-expand-hint">${child.children.length}›</span>`
       : '';
 
     const barWidth = Math.min(100, child.human_pct);
@@ -1112,32 +1235,36 @@ function _otRender() {
          <span class="ot-wdl-text">${child.w_wins}W ${child.draws}D ${child.b_wins}B</span>`
       : '<span class="ot-wdl-text" style="color:#3a2e1e">—</span>';
 
-    const childCount = !isLeaf
-      ? `<span class="ot-arrow">›</span><span>${child.children.length}</span>`
-      : '';
-
     row.innerHTML = `
-      <div class="ot-move-cell">
+      <div class="ot-row-top">
         <div class="ot-move">${turnDot}${child.move}</div>
-        ${nameHtml}
         ${expandHint}
       </div>
+      <div class="ot-names-cell">${nameHtml}</div>
       <div class="ot-pct-cell">
         <div class="ot-pct-track"><div class="ot-pct-fill" style="width:${barWidth}%"></div></div>
         <span class="ot-pct-text">${pctText}</span>
       </div>
       <div class="ot-wdl-cell">${wdlHtml}</div>
-      <div class="ot-children-cell">${childCount}</div>
     `;
 
-    if (!isLeaf) {
-      row.addEventListener('click', () => {
+    row.addEventListener('click', () => {
+      if (!isLeaf) {
         _otPath.push(child.move);
         _otRender();
-      });
-    }
+        document.getElementById('btn-back').disabled = false;
+      } else {
+        // Leaf: just sync board to show this position
+        _otPath.push(child.move);
+        _otSyncBoard();
+        _otRenderBreadcrumb();
+        _otUpdateSaveBar();
+        document.getElementById('btn-back').disabled = false;
+      }
+    });
     _otRows.appendChild(row);
   }
+  _otSyncBoard();
 }
 
 async function _otLoad() {
@@ -1153,12 +1280,40 @@ async function _otLoad() {
   }
 }
 
+// ── Board ↔ tree sync ─────────────────────────────────────────────────────────
+
+async function _otSyncBoard() {
+  if (!_otToggle || !_otToggle.checked) return;
+  const token = ++_otSyncToken;
+  const url = _otPath.length
+    ? `/api/explorer/fen_after_moves?moves=${encodeURIComponent(_otPath.join(','))}`
+    : `/api/explorer/fen_after_moves`;
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (token !== _otSyncToken) return; // superseded by newer sync
+    if (data.fen) {
+      await loadPosition(data.fen);
+      // In tree mode btn-back reflects _otPath depth, not history
+      document.getElementById('btn-back').disabled = _otPath.length === 0;
+    }
+  } catch (_e) { /* ignore network errors */ }
+}
+
+function _otApplyCameraPan(open) {
+  controls.target.set(open ? -1.2 : 0, 0, 0);
+  controls.update();
+}
+
 _otToggle.addEventListener('change', () => {
   if (_otToggle.checked) {
-    _otWrap.style.display = 'flex';
+    _otLeftPanel.style.display = 'flex';
+    _otApplyCameraPan(true);
     if (!_otLoaded) _otLoad();
+    else _otSyncBoard();
   } else {
-    _otWrap.style.display = 'none';
+    _otLeftPanel.style.display = 'none';
+    _otApplyCameraPan(false);
   }
 });
 
@@ -1177,12 +1332,13 @@ _otDepthIn.addEventListener('change', () => {
 const _otSaveBar = document.getElementById('ot-save-bar');
 const _otSaveName = document.getElementById('ot-save-name');
 const _otSaveFamily = document.getElementById('ot-save-family');
+const _otSaveFamilyCustom = document.getElementById('ot-save-family-custom');
 const _otSaveBtn = document.getElementById('ot-save-btn');
 const _otSaveMsg = document.getElementById('ot-save-msg');
 
 function _otUpdateSaveBar() {
   _otSaveBar.style.display = _otPath.length >= 4 ? 'flex' : 'none';
-  _otSaveMsg.textContent = '';
+  if (_otPath.length < 4) _otSaveMsg.textContent = '';
 }
 
 _otSaveBtn.addEventListener('click', async () => {
@@ -1192,10 +1348,12 @@ _otSaveBtn.addEventListener('click', async () => {
   _otSaveMsg.textContent = 'Saving…';
   _otSaveMsg.style.color = '#8a7a5a';
   try {
+    const customFamily = _otSaveFamilyCustom?.value.trim();
+    const family = customFamily || _otSaveFamily.value;
     const res = await fetch('/api/opening_tree/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ moves: _otPath, name, family: _otSaveFamily.value }),
+      body: JSON.stringify({ moves: _otPath, name, family }),
     });
     const data = await res.json();
     if (data.ok) {

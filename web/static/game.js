@@ -569,6 +569,24 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btn-replay-opening").addEventListener("click", startReplayOpening);
   $("sel-opening").addEventListener("change", _showOpeningInfo);
 
+  // ── Opening search filter ─────────────────────────────────────────────
+  const _openingSearchEl = $("opening-search");
+  if (_openingSearchEl) {
+    _openingSearchEl.addEventListener("input", () => {
+      const q = _openingSearchEl.value.trim().toLowerCase();
+      const sel = $("sel-opening");
+      for (const grp of sel.querySelectorAll("optgroup")) {
+        let anyVisible = false;
+        for (const opt of grp.querySelectorAll("option")) {
+          const match = !q || opt.textContent.toLowerCase().includes(q) || grp.label.toLowerCase().includes(q);
+          opt.hidden = !match;
+          if (match) anyVisible = true;
+        }
+        grp.hidden = !anyVisible;
+      }
+    });
+  }
+
   // ── Opening rename / delete ───────────────────────────────────────────
   $("btn-opening-rename").addEventListener("click", () => {
     const id = $("sel-opening").value;
@@ -1576,13 +1594,31 @@ function handleMessage(msg) {
       input.placeholder = "Opening name…";
       div.appendChild(input);
 
+      const familySel = document.createElement("select");
+      familySel.className = "opening-name-input";
+      familySel.style.cssText = "width:auto;margin-left:4px";
+      ["novel","Mill Rush","Battle Lines","Z Mill","Corner Gambit","Early Game",
+       "Inverted Mill Rush","Man-to-Man Marking","Black Diamond"].forEach(f => {
+        const o = document.createElement("option"); o.value = f; o.textContent = f;
+        familySel.appendChild(o);
+      });
+      div.appendChild(familySel);
+
+      const familyCustom = document.createElement("input");
+      familyCustom.type = "text";
+      familyCustom.className = "opening-name-input";
+      familyCustom.placeholder = "New heading…";
+      familyCustom.style.cssText = "width:9em;margin-left:4px";
+      div.appendChild(familyCustom);
+
       const saveBtn = document.createElement("button");
       saveBtn.className = "opening-name-btn";
       saveBtn.textContent = "Save";
       saveBtn.onclick = () => {
         const name = input.value.trim();
         if (!name) return;
-        ws.send(JSON.stringify({ type: "rename_opening", opening_id: opId, name }));
+        const family = familyCustom.value.trim() || familySel.value;
+        ws.send(JSON.stringify({ type: "rename_opening", opening_id: opId, name, family }));
         div.remove();
       };
       div.appendChild(saveBtn);

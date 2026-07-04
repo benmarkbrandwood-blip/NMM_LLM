@@ -977,7 +977,7 @@ async def list_openings():
 
 # ── Opening tree ──────────────────────────────────────────────────────────────
 
-_opening_tree_cache: "dict | None" = None
+_opening_tree_cache: dict = {}  # keyed by depth int
 
 
 def _build_opening_tree(max_depth: int = 8) -> dict:
@@ -1053,12 +1053,13 @@ def _build_opening_tree(max_depth: int = 8) -> dict:
 
 
 @app.get("/api/opening_tree")
-async def api_opening_tree(depth: int = 6):
+async def api_opening_tree(depth: int = 8):
     global _opening_tree_cache
-    if _opening_tree_cache is None:
-        _opening_tree_cache = await asyncio.to_thread(_build_opening_tree, max(2, min(depth, 10)))
+    d = max(2, min(depth, 16))
+    if d not in _opening_tree_cache:
+        _opening_tree_cache[d] = await asyncio.to_thread(_build_opening_tree, d)
     from fastapi.responses import JSONResponse
-    return JSONResponse(_opening_tree_cache)
+    return JSONResponse(_opening_tree_cache[d])
 
 
 @app.post("/api/opening_tree/save")
@@ -1091,7 +1092,7 @@ async def api_opening_tree_save(body: dict):
         return opening.opening_id
 
     opening_id = await asyncio.to_thread(_save)
-    _opening_tree_cache = None
+    _opening_tree_cache.clear()
     return JSONResponse({"ok": True, "opening_id": opening_id})
 
 
@@ -1781,6 +1782,20 @@ async def explorer_position(fen: str = "........................|W|0|0"):
             db_by_notation[ms.notation] = ms
         winning_line = _human_db.canonical_winning_line(board, depth=15)
 
+    # Malom fallback: probe malom_db if pos_stats is missing WDL
+    if _malom_db is not None and _malom_db.is_available():
+        if pos_stats is None or pos_stats.get("malom_wdl") is None:
+            try:
+                ml = _malom_db.query(board)
+                if ml:
+                    if pos_stats is None:
+                        pos_stats = {"total_games": 0, "wins": 0, "losses": 0, "draws": 0,
+                                     "malom_wdl": ml, "malom_dtw": None, "canonical_winning_move": None}
+                    else:
+                        pos_stats["malom_wdl"] = ml
+            except Exception:
+                pass
+
     # ── Heuristic scores for every legal move ─────────────────────────────────
     legal  = get_all_legal_moves(board)
     candidates_ordered = []  # parallel list of candidate dicts for sentinel
@@ -1795,6 +1810,12 @@ async def explorer_position(fen: str = "........................|W|0|0"):
 
         ms = db_by_notation.get(notation)
         has_db = ms is not None
+        malom_after = ms.malom_wdl_after if has_db else None
+        if malom_after is None and _malom_db is not None and _malom_db.is_available():
+            try:
+                malom_after = _malom_db.query(after)
+            except Exception:
+                pass
         moves_out.append({
             "notation":          notation,
             "from_sq":           from_sq,
@@ -1808,7 +1829,7 @@ async def explorer_position(fen: str = "........................|W|0|0"):
             "total":             ms.total              if has_db else None,
             "win_pct":           round(ms.win_pct, 4)  if has_db else None,
             "avg_moves_to_end":  round(ms.avg_moves_to_end, 1) if has_db else None,
-            "malom_wdl_after":   ms.malom_wdl_after    if has_db else None,
+            "malom_wdl_after":   malom_after,
             "malom_dtw_after":   ms.malom_dtw_after    if has_db else None,
             # Always present
             "heuristic_score":   heuristic_score,
@@ -1863,6 +1884,28 @@ async def explorer_move(fen: str, move: str):
     if next_board is None:
         return {"error": f"Could not apply move {move!r} to position"}
     return await explorer_position(next_board.to_fen_string())
+
+
+@app.get("/api/explorer/fen_after_moves")
+async def explorer_fen_after_moves(moves: str = ""):
+    """Apply a comma-separated sequence of moves from the starting position. Returns FEN."""
+    from fastapi.responses import JSONResponse
+    from ai.human_db import _apply_notation
+    from game.board import BoardState
+    try:
+        board = BoardState.new_game()
+        if moves.strip():
+            for move_str in moves.split(","):
+                move_str = move_str.strip()
+                if not move_str:
+                    continue
+                next_board = _apply_notation(board, move_str)
+                if next_board is None:
+                    return JSONResponse({"error": f"Illegal move: {move_str}", "fen": board.to_fen_string()})
+                board = next_board
+        return JSONResponse({"fen": board.to_fen_string()})
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)})
 
 
 def _db_file_info(path: "Path | None") -> dict:
@@ -2298,7 +2341,7 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         if novel_id:
             opening = session.coordinator.opening_recognizer.book.get_by_id(novel_id)
             if opening:
-                _opening_tree_cache = None
+                _opening_tree_cache.clear()
                 await _send(ws, {"type": "openings_updated"})
                 await _send(ws, {
                     "type":       "name_opening_prompt",
@@ -2348,28 +2391,38 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
                     first3 = "-".join(placement_moves[:3])
                     auto_name = f"Novel — {first3}"
                     sigs = Coordinator._compute_fen_signatures(placement_moves)
-                    similar = book.find_similar(placement_moves, min_common=4)
-                    if similar:
-                        canonical = max(
-                            similar,
-                            key=lambda o: sum(o.outcome_stats.get(k, 0) for k in ("W","B","D")),
-                        )
+                    # Exact match: update stats only, no new entry
+                    exact = next(
+                        (o for o in book.values() if list(o.line_moves) == list(placement_moves)),
+                        None,
+                    )
+                    if exact:
                         if winner in ("W", "B", "D"):
-                            canonical.outcome_stats[winner] = canonical.outcome_stats.get(winner, 0) + 1
-                        book.save_opening(canonical)
-                        novel_id = canonical.opening_id
+                            exact.outcome_stats[winner] = exact.outcome_stats.get(winner, 0) + 1
+                        book.save_opening(exact)
+                        novel_id = exact.opening_id
                     else:
+                        # Novel sequence — always create a new entry
                         novel = book.save_novel_opening(
                             placement_moves, sigs,
                             outcome=winner,
                             needs_llm_name=True,
                         )
                         novel.name = auto_name
+                        # If it shares early moves with an existing opening,
+                        # label it as a variant of the most-played similar one.
+                        similar = book.find_similar(placement_moves, min_common=4)
+                        if similar:
+                            canonical = max(
+                                similar,
+                                key=lambda o: sum(o.outcome_stats.get(k, 0) for k in ("W", "B", "D")),
+                            )
+                            novel.name = f"{canonical.name} Var. {first3}"
                         book.save_opening(novel)
                         novel_id = novel.opening_id
                     # Notify frontend; /api/openings reads from disk each call so
                     # the client will get the new entry on its next fetch.
-                    _opening_tree_cache = None
+                    _opening_tree_cache.clear()
                     await _send(ws, {"type": "openings_updated"})
 
         if novel_id:
@@ -4201,6 +4254,7 @@ async def ws_endpoint(websocket: WebSocket):
             elif kind == "rename_opening":
                 opening_id = msg.get("opening_id", "")
                 name = str(msg.get("name", "")).strip()
+                family = str(msg.get("family", "")).strip() or None
                 if not opening_id or not name:
                     await _send(websocket, {"type": "error", "message": "Missing opening_id or name"})
                 else:
@@ -4209,8 +4263,14 @@ async def ws_endpoint(websocket: WebSocket):
                         if session and session.coordinator and session.coordinator.opening_recognizer
                         else OpeningBook()
                     )
-                    if _book.set_name(opening_id, name, needs_llm_name=False):
-                        _opening_tree_cache = None
+                    opening = _book.get_by_id(opening_id)
+                    if opening is not None:
+                        opening.name = name
+                        if family:
+                            opening.family = family
+                        opening.needs_llm_name = False
+                        _book.save_opening(opening)
+                        _opening_tree_cache.clear()
                         await _send(websocket, {
                             "type": "rename_opening_ack",
                             "opening_id": opening_id,
