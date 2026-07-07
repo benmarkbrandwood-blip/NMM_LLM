@@ -350,9 +350,9 @@
   },
   {
     "opening_id": "book-07-a33845",
-    "name": "Battle Lines - Bloss v2",
+    "name": "Z Mill - c4/e3 - White dancer",
     "aliases": [],
-    "family": "Early Game",
+    "family": "Z Mill",
     "side": "W",
     "seed_source": "learned",
     "line_moves": [
@@ -401,8 +401,8 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 95,
-      "B": 5,
+      "W": 97,
+      "B": 7,
       "D": 0
     },
     "confidence": 0.8,
@@ -600,7 +600,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 15,
+      "B": 16,
       "D": 0
     },
     "confidence": 0.8,
@@ -7210,6 +7210,600 @@
     },
     "outcome_stats": {
       "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-fe322ae5",
+    "name": "Black central column",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d2",
+      "d6",
+      "f4",
+      "b2",
+      "c4",
+      "b6",
+      "b4",
+      "f6",
+      "a7",
+      "c4",
+      "g7",
+      "d7",
+      "d5",
+      "g4",
+      "a1",
+      "d1",
+      "d3",
+      "e3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B.W.WB.........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........BB.W.WB........W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........BBBW.WBW.......W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W.......BBBW.WBW.......B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-e3eaec85",
+    "name": "Z Mill - c4/e3 - White dancer Var. d6-d2-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "f2",
+      "c4",
+      "d7",
+      "e3",
+      "d1",
+      "d3",
+      "c3",
+      "g4",
+      "e4",
+      "a1",
+      "b2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B......WWWWBB.B.......W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-a3b44306",
+    "name": "Scattered start Var. d2-d6-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d2",
+      "d6",
+      "f4",
+      "b4",
+      "c3",
+      "d1",
+      "d5",
+      "e4",
+      "d7",
+      "b6",
+      "f6",
+      "f2",
+      "b2",
+      "d3",
+      "a4",
+      "g7",
+      "c4",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B.W.W.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....B...B.W.W.B......W.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".....B...B.W.W.B.W.B..W.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W...B..BB.W.W.B.W.B..W.|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-abf40b6c",
+    "name": "Opposed spring— a4-f4-d2 Var. a4-f4-d2",
+    "aliases": [],
+    "family": "AI Generated",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a4",
+      "f4",
+      "d2",
+      "b4",
+      "d6",
+      "d1",
+      "e4",
+      "d5",
+      "c4",
+      "e5",
+      "c5",
+      "c3",
+      "g4",
+      "g7",
+      "a7",
+      "a1",
+      "g1",
+      "f6"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".......W...B.W.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....B.W.W.B.W.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".....B.W.W.B.W.B.B.W....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".....B.W.W.B.W.B.BBW...W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-68ecb2f9",
+    "name": "Black diagonal Var. d6-d2-b4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "b4",
+      "f4",
+      "e5",
+      "d5",
+      "a1",
+      "a4",
+      "d7",
+      "d3",
+      "d1",
+      "g1",
+      "c4",
+      "e4",
+      "g4",
+      "f2",
+      "b2",
+      "f6"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.B.B.W.BW.....|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "......WB.W.B.B.W.BW.....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W....WB.W.B.B.W.BW..B..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-dc2b02f3",
+    "name": "Z Mill - c4/e3 - White dancer Var. d6-d2-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "d7",
+      "d3",
+      "c4",
+      "a4",
+      "g4",
+      "g1",
+      "d5",
+      "a1",
+      "a7",
+      "d1",
+      "b2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B......WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B......WWWWBB.B.....W.B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-eb43f1d0",
+    "name": "Z Mill - c4/e3 - White dancer Var. d6-d2-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "f2",
+      "c4",
+      "d7",
+      "e3",
+      "b2",
+      "e3",
+      "d5",
+      "c3",
+      "d3",
+      "c5",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B......WWWWBB.B.......W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-e93aec17",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "d1",
+      "d5",
+      "e3",
+      "a7",
+      "c3",
+      "c4",
+      "d3",
+      "d2",
+      "g4",
+      "g7",
+      "d7",
+      "a1",
+      "a4",
+      "b2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".....W...W.B.B.W.B......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "B....W...W.B.B.W.B..W...|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "B....W...W.B.B.W.B..W.WB|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-1a394c25",
+    "name": "Z Mill - c4/e3 - White dancer Var. d6-d2-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "c4",
+      "d7",
+      "d3",
+      "e4",
+      "a4",
+      "g1",
+      "a1",
+      "a7",
+      "g7",
+      "d5",
+      "f6",
+      "b6",
+      "f2",
+      "b4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.......W.W.B.B.......W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.......W.W.B.B...B.W.W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B..B..W.W.W.B.B...B.W.W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
       "B": 0,
       "D": 0
     },

@@ -237,6 +237,16 @@ if _value_net is not None:
 else:
     log.info("ValueNet: not found at %s", _value_net_path)
 
+# Load gap network — blunder-zone exploitation (V3a). Optional.
+from ai.value_net import ValueNet as _GapNetCls
+_gap_net_path = _ROOT / "data" / "gap_net.npz"
+_gap_net: "_GapNetCls | None" = _GapNetCls.load_if_exists(_gap_net_path)
+if _gap_net is not None:
+    _gn_size_kb = round(_gap_net_path.stat().st_size / 1024, 1)
+    log.info("GapNet: loaded from %s (%s KB)", _gap_net_path, _gn_size_kb)
+else:
+    log.info("GapNet: not found at %s — blunder exploitation disabled", _gap_net_path)
+
 
 # ── Sentinel overlay (optional — only loads if checkpoint exists) ─────────────
 _sentinel_advisor = None
@@ -2523,6 +2533,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         endgame_solved_db=_endgame_solved_db,
         malom_db=_malom_db,
         value_net=_value_net,
+        gap_net=_gap_net,
     )
     _apply_search_depth(_gai)
     return _gai
@@ -3110,6 +3121,7 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_solved_db=_endgame_solved_db,
                             malom_db=_malom_db,
                             value_net=_value_net,
+                            gap_net=_gap_net,
                         )
                         _apply_search_depth(_re_ai)
 
@@ -3164,6 +3176,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_sentinel   = bool(msg.get("use_sentinel", False))
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")  # "advisory"|"score_adjust"|"reconsider"
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))  # min opportunity gap to intercede
+                use_gap_net    = bool(msg.get("use_gap_net", True))
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
@@ -3213,6 +3226,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
+                        gap_net=_gap_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
@@ -3238,6 +3252,7 @@ async def ws_endpoint(websocket: WebSocket):
                         game_ai._sentinel_min_gap = sentinel_gap
                         game_ai._sentinel_reconsider_threshold = sentinel_gap
                         log.info("Sentinel attached (diff=%d, mode=%s, gap≥%.0f%%)", eff_diff, sentinel_mode, sentinel_gap * 100)
+                    game_ai.use_gap_net = use_gap_net and _gap_net is not None
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -3306,6 +3321,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_sentinel   = bool(msg.get("use_sentinel", False))
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))
+                use_gap_net    = bool(msg.get("use_gap_net", True))
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
@@ -3360,6 +3376,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
+                        gap_net=_gap_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
@@ -3381,6 +3398,7 @@ async def ws_endpoint(websocket: WebSocket):
                         game_ai._sentinel_min_gap = sentinel_gap
                         game_ai._sentinel_reconsider_threshold = sentinel_gap
                         log.info("Sentinel attached (diff=%d, mode=%s, gap≥%.0f%%)", diff, sentinel_mode, sentinel_gap * 100)
+                    game_ai.use_gap_net = use_gap_net and _gap_net is not None
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -3842,7 +3860,7 @@ async def ws_endpoint(websocket: WebSocket):
                     value_net_blend=_w("value_net_blend", 80),
                     cross_mill_cycling=_w("cross_mill_cycling", 300),
                 )
-                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
+                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
                 _apply_search_depth(new_ai)
 
                 new_coord = None
@@ -4213,7 +4231,7 @@ async def ws_endpoint(websocket: WebSocket):
                     _gai = GameAI(
                         color=ai_color, difficulty=_ava_diff, weights=_ava_hw,
                         fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db,
-                        malom_db=_malom_db, value_net=_value_net,
+                        malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net,
                     )
                     session.game_ai    = _gai
                     session.human_color = hc
@@ -4230,8 +4248,8 @@ async def ws_endpoint(websocket: WebSocket):
 
                 else:
                     # "auto" — AI vs AI watch mode
-                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
-                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net)
+                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
+                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
                     session.ai_vs_ai        = True
                     session.vs_human        = False
                     session.game_ai_white   = _ai_w

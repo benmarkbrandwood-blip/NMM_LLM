@@ -17,8 +17,9 @@
   "redirected_pin": 100,
   "defer_for_chain": 475,
   "block_cycling_priority": 160,
+  "value_net_blend": 10,
+  "move_variance_pct": 0,
   "make_mistakes": 0,
   "opening_adherence": 90,
-  "loss_exploit": 270,
-  "value_net_blend": 85
+  "loss_exploit": 270
 }
