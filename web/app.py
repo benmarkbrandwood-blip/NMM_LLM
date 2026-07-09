@@ -2678,18 +2678,32 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
 
 
 def _expected_think_seconds(difficulty: int, total_pieces: int) -> float:
-    """Estimate search time based on configured depth for this difficulty level."""
+    """Estimate search time based on configured depth and per-difficulty time cap."""
     settings = _load_settings()
     sd = settings.get("search_depth", _SEARCH_DEPTH_DEFAULTS)
     min_d = int(sd.get("min", _SEARCH_DEPTH_DEFAULTS["min"]))
     max_d = int(sd.get("max", _SEARCH_DEPTH_DEFAULTS["max"]))
     depth = _compute_search_depth_for_level(difficulty, min_d, max_d)
-    # Benchmarked on representative positions (move phase = slower bound).
+    # Rust engine benchmarks (move phase, 2026-07).
     _DEPTH_TIMES = {
-        4: 2, 5: 4, 6: 13, 7: 15, 8: 45, 9: 120, 10: 300,
-        11: 900, 12: 2700, 13: 7200, 14: 21600, 15: 64800, 16: 194400,
+        4: 1, 5: 3, 6: 8, 7: 15, 8: 30, 9: 45, 10: 60,
+        11: 60, 12: 60, 13: 60, 14: 60, 15: 60, 16: 60,
     }
-    return float(_DEPTH_TIMES.get(depth, 60))
+    uncapped = float(_DEPTH_TIMES.get(depth, 60))
+    # Apply the same GUI time caps used in game_ai.py._choose_rust_scored.
+    if total_pieces <= 1:
+        cap = 3.0
+    elif total_pieces <= 4:
+        cap = 10.0
+    elif difficulty >= 8:
+        cap = 60.0
+    elif difficulty == 7:
+        cap = 45.0
+    elif difficulty == 6:
+        cap = 30.0
+    else:
+        cap = 15.0
+    return min(uncapped, cap)
 
 
 # Typical max search depth reachable at each time-limited difficulty.

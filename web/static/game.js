@@ -386,10 +386,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     return Math.round(minD + (level - 1) / 7 * (maxD - minD));
   }
 
-  function _timeForDepth(d) {
-    // Benchmarked on representative NMM positions (move phase = slower bound).
-    const TABLE = {4:2, 5:4, 6:13, 7:15, 8:45, 9:120, 10:300, 11:900, 12:2700, 13:7200, 14:21600, 15:64800, 16:194400};
-    const t = TABLE[d] || Math.round(2 * Math.pow(3, Math.max(0, d - 4)));
+  // Per-difficulty GUI time caps (seconds): diff<6 → 15s, 6 → 30s, 7 → 45s, 8 → 60s.
+  const _DIFF_TIME_CAPS = [15, 15, 15, 15, 15, 30, 45, 60]; // index 0 = Lv1
+
+  function _timeForDepth(d, capSec) {
+    // Rust engine benchmarks (move phase, Lv6 default position, 2026-07).
+    const TABLE = {4:1, 5:3, 6:8, 7:15, 8:30, 9:45, 10:60, 11:60, 12:60, 13:60, 14:60, 15:60, 16:60};
+    const raw = TABLE[d] ?? Math.round(2 * Math.pow(3, Math.max(0, d - 4)));
+    const t   = capSec !== undefined ? Math.min(raw, capSec) : raw;
     return t < 60 ? t + "s" : t < 3600 ? (t / 60).toFixed(0) + "m" : (t / 3600).toFixed(0) + "h";
   }
 
@@ -414,14 +418,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       const active = activeDiff === lvl;
       const col    = active ? `hsl(42, 90%, 58%)` : `hsl(${210 + (lvl - 1) * 12}, 70%, 55%)`;
       const seg    = document.createElement("div");
-      seg.title    = `Lv ${lvl}: depth ${d} (~${_timeForDepth(d)})`;
+      const capSec = _DIFF_TIME_CAPS[lvl - 1];
+      seg.title    = `Lv ${lvl}: depth ${d} (~${_timeForDepth(d, capSec)})`;
       seg.style.cssText = `flex:1; height:${pct}%; background:${col}; border-radius:2px 2px 0 0; position:relative; cursor:default;${active ? " box-shadow:0 0 0 1px #fff4;" : ""}`;
       const depthLbl = document.createElement("span");
       depthLbl.textContent = d;
       depthLbl.style.cssText = "position:absolute; top:-14px; left:50%; transform:translateX(-50%); font-size:.65rem; color:var(--text); white-space:nowrap;";
       seg.appendChild(depthLbl);
       const timeLbl = document.createElement("span");
-      timeLbl.textContent = _timeForDepth(d);
+      timeLbl.textContent = _timeForDepth(d, capSec);
       timeLbl.style.cssText = "position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); font-size:.6rem; color:var(--text-dim); white-space:nowrap;";
       seg.appendChild(timeLbl);
       bar.appendChild(seg);
