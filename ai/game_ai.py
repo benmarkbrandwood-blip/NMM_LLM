@@ -38,6 +38,15 @@ _VN_SCALE = 3000
 _MAX_OPP_PLIES    = 2
 _MAX_OPP_PLIES_V2 = 6   # deeper path-buffer tracking when v2 heuristics are active
 
+# Star square mode: the 12 cross/junction positions (3-way connectivity) used to
+# force structured openings. Both rings' cross points: outer d7/g4/d1/a4,
+# middle d6/f4/d2/b4, inner d5/e4/d3/c4.
+_STAR_SQUARES: frozenset[str] = frozenset({
+    "d7", "g4", "d1", "a4",  # outer ring crosses
+    "d6", "f4", "d2", "b4",  # middle ring crosses
+    "d5", "e4", "d3", "c4",  # inner ring crosses
+})
+
 
 def _stm_can_close_mill(board: BoardState, color: str) -> bool:
     """True if color can close a mill on the next placement or slide."""
@@ -542,6 +551,9 @@ class GameAI:
         self.suppress_fork_variety: bool = False
         self._suppress_fork_this_move: bool = False
         self._variety_weights: HeuristicWeights | None = None  # lazily built
+        # Star square opening mode: restrict placement moves to the 12 cross/junction
+        # positions until all are claimed, then open all squares.
+        self.star_square_mode: bool = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -994,6 +1006,16 @@ class GameAI:
         _original_move_count = len(moves)   # for detecting later filtering (mandatory block, bans, …)
         if not moves:
             return {}
+
+        # Star square mode: restrict placement moves to the 12 cross/junction positions
+        # until all star squares are occupied, then open all squares.
+        if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 9:
+            _empty_stars = {sq for sq in _STAR_SQUARES if board.positions.get(sq, "") == ""}
+            if _empty_stars:
+                _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_stars]
+                if _star_moves:
+                    moves = _star_moves
+
         if len(moves) == 1:
             self.last_was_blunder = False
             return moves[0]
@@ -2400,6 +2422,7 @@ class GameAI:
                 mill_scale=self._weights.mill_count_scale,
                 mob_scale=self._weights.mobility_scale,
                 block_scale=self._weights.blocked_scale,
+                fast_eval=not self.use_extended_qsearch,
             )
             _dt = time.perf_counter() - _t0
             if not raw_moves:

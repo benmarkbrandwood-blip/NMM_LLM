@@ -251,8 +251,9 @@ fn py_search_stats(
 /// `endgame_db_handle` (T-C3): mmap'd endgame solved (.wdl) files for O(1) WDL probe.
 /// `opp_ext_moves` (T-C1): high-freq opponent moves that earn SE-11 depth extension.
 /// `threads` (T-E3): Lazy-SMP thread count; default = 1 (single-threaded).
+/// `fast_eval`: skip qsearch at depth=0; return static eval immediately for deeper/faster search.
 #[pyfunction]
-#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None))]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None, fast_eval=None))]
 fn py_search_root_scored(
     py: Python<'_>,
     white: u32,
@@ -271,6 +272,7 @@ fn py_search_root_scored(
     mill_scale: Option<i32>,
     mob_scale: Option<i32>,
     block_scale: Option<i32>,
+    fast_eval: Option<bool>,
 ) -> (u64, u8, Vec<(Option<u8>, u8, Option<u8>, i64)>) {
     let board = Board {
         white,
@@ -313,6 +315,7 @@ fn py_search_root_scored(
     let r = search::iterative_deepening_scored_smp(
         &board, max_depth, time_limit_ms, &preferred,
         tt, opp_ext_set, fullgame_db, endgame_solved_db, n_threads, eval_scale,
+        fast_eval.unwrap_or(false),
     );
 
     let moves = r

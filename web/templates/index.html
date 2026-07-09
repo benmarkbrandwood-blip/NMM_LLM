@@ -400,7 +400,15 @@
           <input type="checkbox" id="chk-ext-qsearch" checked>
           <label for="chk-ext-qsearch" style="color:var(--text); font-size:.9rem;">
             Extended tactical search
-            <span style="font-size:.75rem; color:var(--text-dim);">(mill threats + forced blocks at leaf nodes)</span>
+            <span style="font-size:.75rem; color:var(--text-dim);">(mill threats + forced blocks at leaf nodes; disable for deeper ply)</span>
+          </label>
+        </div>
+
+        <div class="form-row" id="row-star-square" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-star-square">
+          <label for="chk-star-square" style="color:var(--text); font-size:.9rem;">
+            Star square opening
+            <span style="font-size:.75rem; color:var(--text-dim);">(restrict placements to 12 cross-junction squares until all are claimed)</span>
           </label>
         </div>
 

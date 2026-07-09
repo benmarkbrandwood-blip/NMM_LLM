@@ -3187,6 +3187,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
+                star_square_mode = bool(msg.get("star_square_mode", False))
                 settings  = _load_settings()
 
                 engine   = GameEngine(human_color=hc)
@@ -3267,6 +3268,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai.use_extended_qsearch = use_extended_qsearch
                     game_ai.use_ngram_search = use_ngram_search
                     game_ai._ngram_model = _ngram_model if use_ngram_search else None
+                    game_ai.star_square_mode = star_square_mode
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
@@ -3342,6 +3344,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
+                star_square_mode = bool(msg.get("star_square_mode", False))
                 setup_fen_str = msg.get("setup_fen", "")
                 if setup_fen_str:
                     setup_board = BoardState.from_fen_string(setup_fen_str)
@@ -3423,6 +3426,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai.use_extended_qsearch = use_extended_qsearch
                     game_ai.use_ngram_search = use_ngram_search
                     game_ai._ngram_model = _ngram_model if use_ngram_search else None
+                    game_ai.star_square_mode = star_square_mode
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")

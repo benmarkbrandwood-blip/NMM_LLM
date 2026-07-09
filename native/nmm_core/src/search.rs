@@ -62,6 +62,8 @@ struct Searcher {
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
     // FGOP: AI's root color — used to detect opponent-to-move nodes inside negamax.
     ai_color: Color,
+    // Fast-eval mode: skip qsearch at depth=0, return static eval immediately.
+    fast_eval: bool,
 }
 
 const ABORT_SCORE: i64 = i64::MIN + 1;
@@ -380,7 +382,11 @@ impl Searcher {
         }
 
         // T-B4: quiescence search at horizon (qs_ply=0 → fresh forcing budget).
+        // fast_eval skips qsearch entirely for faster/deeper search at cost of tactical sharpness.
         if depth == 0 {
+            if self.fast_eval {
+                return evaluate_v2(board, color, self.eval_scale);
+            }
             return self.qsearch(board, alpha, beta, 0);
         }
 
@@ -627,6 +633,7 @@ fn new_searcher(deadline: Instant, ai_color: Color) -> Searcher {
         opp_ext_set: HashSet::new(),
         fullgame_db: None,
         endgame_solved_db: None,
+        fast_eval: false,
     }
 }
 
@@ -692,6 +699,7 @@ pub fn iterative_deepening_scored(
     fullgame_db: Option<Arc<Mmap>>,
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
     eval_scale: EvalScale,
+    fast_eval: bool,
 ) -> SearchResultScored {
     let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
     let mut searcher = Searcher {
@@ -708,6 +716,7 @@ pub fn iterative_deepening_scored(
         opp_ext_set,
         fullgame_db,
         endgame_solved_db,
+        fast_eval,
     };
 
     let mut best = SearchResultScored {
@@ -755,9 +764,10 @@ pub fn iterative_deepening_scored_smp(
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
     n_threads: usize,
     eval_scale: EvalScale,
+    fast_eval: bool,
 ) -> SearchResultScored {
     if n_threads <= 1 {
-        return iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale);
+        return iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
     }
 
     let board_copy = *board;
@@ -787,6 +797,7 @@ pub fn iterative_deepening_scored_smp(
                     opp_ext_set: opp_c,
                     fullgame_db: db_c,
                     endgame_solved_db: esdb_c,
+                    fast_eval,
                 };
                 for d in start_depth..=max_depth {
                     helper.root(&board_copy, d, -INF * 4, INF * 4);
@@ -798,7 +809,7 @@ pub fn iterative_deepening_scored_smp(
         })
         .collect();
 
-    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale);
+    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
 
     drop(helpers);
     result
