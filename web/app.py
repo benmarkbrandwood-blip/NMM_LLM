@@ -69,8 +69,14 @@ _AUTOSAVE_PATH = _ROOT / "data" / "autosave_game.json"
 
 
 def _write_autosave(session: "Session") -> None:
-    """Write current game state to autosave_game.json after each move."""
+    """Write current game state to autosave_game.json after each move.
+
+    Skipped until at least 4 pieces are on the board so the very first
+    placement moves cannot overwrite a meaningful saved game.
+    """
     try:
+        if sum(session.engine.board.pieces_on_board.values()) < 4:
+            return
         from datetime import datetime as _dt
         ai_color = session.game_ai.color if session.game_ai else None
         diff = session.game_ai.difficulty if session.game_ai else 3
