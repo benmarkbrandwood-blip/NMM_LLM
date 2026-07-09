@@ -402,7 +402,7 @@ export class Board {
       if (delta == null)  return null;
       if (delta > 0.1)    return "#4caf50";
       if (delta < -0.1)   return "#e05050";
-      return null;   // neutral FullGame delta — no display (not enough info)
+      return "#888";   // neutral delta (FullGame "N" flag, or within ±0.1 threshold)
     };
     const markerId = col =>
       col === "#4caf50" ? "arr-green" : col === "#e05050" ? "arr-red" : "arr-grey";
