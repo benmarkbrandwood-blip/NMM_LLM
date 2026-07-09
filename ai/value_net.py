@@ -106,64 +106,129 @@ class ValueNet:
         batch_size: int = 256,
         lr: float = 0.001,
         verbose: bool = False,
+        val_frac: float = 0.2,
+        patience: int = 20,
+        weight_decay: float = 0.0,
+        print_every: int = 10,
     ) -> list[float]:
         """
         Train in-place with mini-batch SGD and MSE loss.
 
         Parameters
         ----------
-        X : (N, _INPUT_DIM) float32
-        y : (N,) float32  in [-1, 1]
-        Returns per-epoch mean loss list.
+        X           : (N, _INPUT_DIM) float32
+        y           : (N,) float32  in [-1, 1]
+        val_frac    : fraction held out for validation / early stopping
+        patience    : epochs without val-loss improvement before stopping (0 = disabled)
+        weight_decay: L2 regularisation coefficient
+        print_every : print progress every N epochs (only when verbose=True)
+        Returns per-epoch training-loss list (may be shorter than epochs if early-stopped).
         """
-        losses: list[float] = []
         rng = np.random.default_rng()
-        N = len(X)
+        N   = len(X)
+
+        # Train / val split (shuffle once before splitting)
+        n_val = max(1, int(N * val_frac)) if (val_frac > 0 and patience > 0) else 0
+        order = rng.permutation(N)
+        X, y  = X[order], y[order]
+        if n_val > 0:
+            X_val, y_val = X[-n_val:], y[-n_val:]
+            X_tr,  y_tr  = X[:-n_val], y[:-n_val]
+        else:
+            X_val = y_val = None
+            X_tr,  y_tr  = X, y
+        N_tr = len(X_tr)
+
+        best_val   = float("inf")
+        best_w     = self._get_weights()
+        no_improve = 0
+        train_losses: list[float] = []
+
         for ep in range(epochs):
-            order = rng.permutation(N)
-            X, y = X[order], y[order]
+            perm = rng.permutation(N_tr)
+            Xe, ye = X_tr[perm], y_tr[perm]
             ep_loss = 0.0
-            steps = 0
-            for start in range(0, N, batch_size):
-                xb = X[start:start + batch_size]
-                yb = y[start:start + batch_size].reshape(-1, 1)
+            steps   = 0
+
+            for start in range(0, N_tr, batch_size):
+                xb = Xe[start:start + batch_size]
+                yb = ye[start:start + batch_size].reshape(-1, 1)
                 B  = len(xb)
 
                 # Forward
                 h1   = np.maximum(0.0, xb @ self.W1.T + self.b1)   # (B, H1)
                 h2   = np.maximum(0.0, h1 @ self.W2.T + self.b2)   # (B, H2)
-                pred = np.tanh(h2 @ self.W3.T + self.b3)             # (B, 1)
+                pred = np.tanh(h2 @ self.W3.T + self.b3)            # (B, 1)
 
-                err  = pred - yb                                      # (B, 1)
+                err  = pred - yb                                     # (B, 1)
                 ep_loss += float(np.mean(err ** 2))
-                steps += 1
+                steps   += 1
 
                 # Backprop through tanh output
-                d3  = (2.0 / B) * err * (1.0 - pred ** 2)           # (B, 1)
-                dW3 = d3.T @ h2                                       # (1, H2)
+                d3  = (2.0 / B) * err * (1.0 - pred ** 2)          # (B, 1)
+                dW3 = d3.T @ h2                                      # (1, H2)
                 db3 = d3.sum(axis=0)
 
                 # Layer 2 (ReLU)
-                dh2  = d3 @ self.W3                                   # (B, H2)
+                dh2  = d3 @ self.W3                                  # (B, H2)
                 dh2 *= (h2 > 0).astype(np.float32)
-                dW2  = dh2.T @ h1                                     # (H2, H1)
+                dW2  = dh2.T @ h1                                    # (H2, H1)
                 db2  = dh2.sum(axis=0)
 
                 # Layer 1 (ReLU)
-                dh1  = dh2 @ self.W2                                  # (B, H1)
+                dh1  = dh2 @ self.W2                                 # (B, H1)
                 dh1 *= (h1 > 0).astype(np.float32)
-                dW1  = dh1.T @ xb                                     # (H1, input)
+                dW1  = dh1.T @ xb                                    # (H1, input)
                 db1  = dh1.sum(axis=0)
 
-                self.W3 -= lr * dW3;  self.b3 -= lr * db3
-                self.W2 -= lr * dW2;  self.b2 -= lr * db2
-                self.W1 -= lr * dW1;  self.b1 -= lr * db1
+                # Update with optional L2 weight decay
+                self.W3 -= lr * (dW3 + weight_decay * self.W3);  self.b3 -= lr * db3
+                self.W2 -= lr * (dW2 + weight_decay * self.W2);  self.b2 -= lr * db2
+                self.W1 -= lr * (dW1 + weight_decay * self.W1);  self.b1 -= lr * db1
 
             ep_mean = ep_loss / max(steps, 1)
-            losses.append(ep_mean)
-            if verbose:
-                print(f"  epoch {ep+1:3d}/{epochs}  loss={ep_mean:.5f}")
-        return losses
+            train_losses.append(ep_mean)
+
+            # Validation loss + early stopping
+            val_loss   = 0.0
+            stop_early = False
+            if X_val is not None:
+                val_pred = self._forward(X_val)
+                val_loss = float(np.mean((val_pred.ravel() - y_val) ** 2))
+                if val_loss < best_val:
+                    best_val   = val_loss
+                    best_w     = self._get_weights()
+                    no_improve = 0
+                else:
+                    no_improve += 1
+                if patience > 0 and no_improve >= patience:
+                    stop_early = True
+
+            if verbose and ((ep + 1) % print_every == 0 or stop_early or ep == 0):
+                val_str = f"  val={val_loss:.5f}  (best={best_val:.5f}  patience={patience - no_improve})" if X_val is not None else ""
+                print(f"  epoch {ep+1:3d}/{epochs}  loss={ep_mean:.5f}{val_str}")
+
+            if stop_early:
+                if verbose:
+                    print(f"  Early stop at epoch {ep+1} — restoring best weights (val={best_val:.5f})")
+                break
+
+        if X_val is not None:
+            self._set_weights(best_w)
+
+        return train_losses
+
+    def _get_weights(self) -> dict:
+        return {
+            "W1": self.W1.copy(), "b1": self.b1.copy(),
+            "W2": self.W2.copy(), "b2": self.b2.copy(),
+            "W3": self.W3.copy(), "b3": self.b3.copy(),
+        }
+
+    def _set_weights(self, w: dict) -> None:
+        self.W1, self.b1 = w["W1"], w["b1"]
+        self.W2, self.b2 = w["W2"], w["b2"]
+        self.W3, self.b3 = w["W3"], w["b3"]
 
     # ── Persistence ───────────────────────────────────────────────────────────
 

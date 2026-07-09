@@ -8,20 +8,23 @@ Three separate nets are trained (placement / movement / fly) and saved as:
 These are loaded at inference by PhaseValueNet, which dispatches predict() calls
 to the correct sub-net based on get_game_phase(board, color).
 
-Reward signal (Option B — Malom-weighted composite):
-  malom_sign = +1 if Malom says position is W, −1 if L, 0 if D
+Reward signal — compound Malom-weighted composite:
+  malom_sign     = +1 if Malom says position is W, −1 if L, 0 if D
   best_composite = max over legal moves of:
       0.6 × sentinel_score + 0.4 × normalised_heuristic_score
-  y = malom_sign × best_composite   ∈ [−1, 1]
+  depth_mult     = min(2.0, 1.0 + compound_rate × step)   (grows with trajectory depth)
+  y = malom_sign × best_composite × depth_mult
 
-This blends the Malom oracle (winning/losing trajectory signal) with the sentinel +
-heuristic composite (same signals used by the GAP net), without needing pre-built
-GAP net data.  Winning positions that also look strong per sentinel/heuristics get
-large positive labels; losing positions get large negative labels.
+Positions sampled from W, L, and D starting states across all game types so the
+net learns good, bad, AND neutral positions.  The depth multiplier distinguishes
+this from the gap-net: rather than scoring individual bad moves in isolation, the
+trajectory VN rewards positions that appear deep in consistent winning paths.
 
 Winner's moves are randomly sampled from ALL winning successors (outcome='L'),
 not just the single highest-DTW move, so the net learns to recognise any winning
 move rather than only the optimal path.
+
+Training includes 80/20 train/val split, early stopping, and optional L2 weight decay.
 
 Usage:
     .venv/bin/python scripts/train_vn_trajectory.py
@@ -215,23 +218,29 @@ def run_trajectory(
     heuristic_ai_w=None,
     heuristic_ai_b=None,
     max_depth: int = 40,
+    compound_rate: float = 0.05,
 ) -> list[tuple[BoardState, float, str]]:
-    """Follow a winning trajectory from start_board.
+    """Run a trajectory from start_board handling W, L, and D starting positions.
 
-    At each winner's turn: randomly pick one of ALL winning moves (any 'L' successor).
-    At each loser's turn: Malom best-defense (or heuristic AI if provided).
+    At each step the move is chosen based on the current position's Malom outcome:
+      W → randomly pick one of ALL winning moves (any 'L' successor) so the net
+          learns to recognise ANY winning move, not just the optimal path.
+      L/D → Malom best-defense/draw (or heuristic AI if provided).
 
-    Label for each position (Option B — Malom-weighted composite):
+    Label for each position (compound Malom-weighted composite):
       malom_sign = +1 (W) / −1 (L) / 0 (D)
-      y = malom_sign × best_composite_quality   ∈ [−1, 1]
+      depth_mult = min(2.0, 1.0 + compound_rate × step)   — grows with trajectory depth
+      y = malom_sign × best_composite × depth_mult   ∈ [−2, 2] (clipped at net level)
+
+    The depth multiplier rewards positions that occur deeper in consistent trajectories,
+    distinguishing this from gap-net which scores individual bad moves without context.
 
     Returns list of (board, y, phase) triples.
     """
     trajectory: list[tuple[BoardState, float, str]] = []
-    board        = start_board
-    winner_color = board.turn
+    board = start_board
 
-    for _ in range(max_depth):
+    for step in range(max_depth):
         term, _ = is_terminal(board)
         if term:
             break
@@ -240,20 +249,26 @@ def run_trajectory(
         if result is None:
             break
 
-        outcome   = result["outcome"]
+        outcome    = result["outcome"]
         malom_sign = _MALOM_SIGN.get(outcome, 0.0)
         legal      = get_all_legal_moves(board)
         composite  = _best_composite(board, legal, sentinel_advisor)
-        stm_label  = malom_sign * composite
-        phase      = get_game_phase(board, board.turn)
+
+        # Compound multiplier: positions deeper in the trajectory earn a higher reward,
+        # rewarding the AI for maintaining a winning or losing path over many moves.
+        depth_mult = min(2.0, 1.0 + compound_rate * step)
+        stm_label  = malom_sign * composite * depth_mult
+
+        phase = get_game_phase(board, board.turn)
         trajectory.append((board, stm_label, phase))
 
-        if board.turn == winner_color:
+        if outcome == "W":
             winners = enumerate_malom_winner_moves(board, malom_db)
             if not winners:
                 break
             move = winners[int(rng.integers(len(winners)))]
         else:
+            # L or D: heuristic AI or Malom best-defense / draw-preserve
             ai = heuristic_ai_w if board.turn == "W" else heuristic_ai_b
             move = None
             if ai is not None:
@@ -283,18 +298,21 @@ def build_dataset(
     sentinel_advisor,
     heuristic_ai_w=None,
     heuristic_ai_b=None,
-    n_starts: int = 5000,
+    n_starts: int = 10000,
     min_placed: int = 7,
     max_traj_depth: int = 40,
     bucket_cap: Optional[int] = None,
+    compound_rate: float = 0.05,
     verbose: bool = True,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Build trajectory training data.
+    """Build trajectory training data from W, L, and D positions across all game types.
 
     Returns (X, y, phases) where phases is a str array of phase labels per sample.
     """
+    # Sample from ALL malom outcomes (W/L/D) so the net learns good, bad, AND neutral
+    # positions — not just winning trajectories.
     rows = conn.execute(
-        "SELECT state_key FROM positions WHERE malom_wdl = 'W' ORDER BY RANDOM() LIMIT ?",
+        "SELECT state_key FROM positions WHERE malom_wdl IS NOT NULL ORDER BY RANDOM() LIMIT ?",
         (n_starts * 4,)
     ).fetchall()
 
@@ -341,7 +359,7 @@ def build_dataset(
 
         traj = run_trajectory(board, malom_db, rng,
                               sentinel_advisor, heuristic_ai_w, heuristic_ai_b,
-                              max_depth=max_traj_depth)
+                              max_depth=max_traj_depth, compound_rate=compound_rate)
         total_traj  += 1
         total_steps += len(traj)
 
@@ -576,6 +594,9 @@ def _train_phase_net(
     batch: int,
     continue_from: Optional[Path],
     out_base: Path,
+    val_frac: float = 0.2,
+    patience: int = 20,
+    weight_decay: float = 0.0,
 ) -> ValueNet:
     """Train and save one phase-specific net.  Returns the trained net."""
     print(f"\n── Phase: {phase}  N={len(X):,} ──")
@@ -597,7 +618,8 @@ def _train_phase_net(
 
     if epochs > 0:
         t0 = time.perf_counter()
-        losses = net.train(X, y, epochs=epochs, lr=lr, batch_size=batch, verbose=True)
+        losses = net.train(X, y, epochs=epochs, lr=lr, batch_size=batch, verbose=True,
+                           val_frac=val_frac, patience=patience, weight_decay=weight_decay)
         elapsed = time.perf_counter() - t0
         print(f"  Training done in {elapsed:.1f}s  "
               f"final loss={losses[-1]:.5f}  "
@@ -624,8 +646,8 @@ def main() -> None:
                          "Saves {out}_place.npz, {out}_move.npz, {out}_fly.npz")
     ap.add_argument("--phase",          choices=list(ALL_PHASES) + ["all"], default="all",
                     help="Which phase net(s) to train (default: all)")
-    ap.add_argument("--n-starts",       type=int, default=5000,
-                    help="Starting positions to sample from human_db (default 5000)")
+    ap.add_argument("--n-starts",       type=int, default=10000,
+                    help="Starting positions to sample from human_db (default 10000)")
     ap.add_argument("--traj-depth",     type=int, default=40,
                     help="Max plies per trajectory (default 40)")
     ap.add_argument("--min-placed",     type=int, default=7,
@@ -637,9 +659,17 @@ def main() -> None:
     ap.add_argument("--heuristic-time",       type=float, default=0.05)
     ap.add_argument("--seed",           type=int, default=42,
                     help="RNG seed for winner-move sampling (default 42)")
-    ap.add_argument("--epochs",         type=int,   default=40)
-    ap.add_argument("--lr",             type=float, default=8e-4)
+    ap.add_argument("--epochs",         type=int,   default=500)
+    ap.add_argument("--lr",             type=float, default=3e-3)
     ap.add_argument("--batch",          type=int,   default=512)
+    ap.add_argument("--val-frac",       type=float, default=0.2,
+                    help="Fraction of data held out for validation / early stopping (default 0.2)")
+    ap.add_argument("--patience",       type=int,   default=20,
+                    help="Early-stop patience in epochs without val improvement (default 20; 0=off)")
+    ap.add_argument("--weight-decay",   type=float, default=1e-5,
+                    help="L2 weight decay coefficient (default 1e-5)")
+    ap.add_argument("--compound-rate",  type=float, default=0.05,
+                    help="Depth multiplier per trajectory step: mult=min(2.0, 1+rate×step) (default 0.05)")
     ap.add_argument("--continue-from",  default=None,
                     help="Base path of existing phase nets to fine-tune from")
     ap.add_argument("--bench-accuracy", type=int, default=2000)
@@ -706,7 +736,8 @@ def main() -> None:
     print(f"\nBuilding trajectory dataset  "
           f"n_starts={args.n_starts}  traj_depth={args.traj_depth}  "
           f"min_placed={args.min_placed}  seed={args.seed}  "
-          f"reward=malom_sign×composite...")
+          f"reward=malom_sign×composite×depth_mult  compound_rate={args.compound_rate}  "
+          f"samples=W+L+D...")
     t0 = time.perf_counter()
     X_all, y_all, phases_all = build_dataset(
         conn, malom_db, rng,
@@ -716,6 +747,7 @@ def main() -> None:
         min_placed=args.min_placed,
         max_traj_depth=args.traj_depth,
         bucket_cap=args.bucket_cap,
+        compound_rate=args.compound_rate,
         verbose=True,
     )
     build_time = time.perf_counter() - t0
@@ -743,6 +775,9 @@ def main() -> None:
             batch=args.batch,
             continue_from=continue_base,
             out_base=out_base,
+            val_frac=args.val_frac,
+            patience=args.patience,
+            weight_decay=args.weight_decay,
         )
         trained_nets[phase] = net
 
