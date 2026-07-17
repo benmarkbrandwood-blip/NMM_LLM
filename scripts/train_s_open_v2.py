@@ -147,14 +147,14 @@ def _simple_evaluate(board: BoardState, color: str) -> float:
 
 # ── Difficulty / history helpers ─────────────────────────────────────────────
 
-def _time_budget_for_level(level: int) -> float:
-    """Opening heuristic time budget (opponent + handoff playout).
+def _heuristic_time_budget(level: int) -> float:
+    """Heuristic opponent time budget: 0.1 s at L1 → 14.0 s at L20 (exponential ramp)."""
+    return 0.1 * (140.0 ** ((level - 1) / 19.0))
 
-    Half of mid/end so specialist (sentinel lookahead ~0.5-1 s) gets ≥2× per move.
-    Ramp: L1=0.5 ms → L≈13 reaches cap of 1.0 s, held through L20.
-    Rule: specialist deployment time ≥ max(2 × heuristic, 1 s + sentinel_lookahead)."""
-    raw = 0.0005 * (60000.0 ** ((level - 1) / 19.0))
-    return min(raw, 1.0)
+
+def _specialist_time_budget(level: int) -> float:
+    """Specialist (learner) alpha-beta time budget: 0.5 s at L1 → 20.0 s at L20."""
+    return 0.5 * (40.0 ** ((level - 1) / 19.0))
 
 
 def _build_history_features(history: deque, n: int = 3) -> np.ndarray:
@@ -688,7 +688,7 @@ def _rollout(
         color=learner_color,
         difficulty=game_difficulty,
         value_net=value_net,
-        override_time_budget=_time_budget_for_level(game_difficulty),
+        override_time_budget=_specialist_time_budget(game_difficulty),
     )
     if sentinel is not None:
         try:
@@ -718,7 +718,7 @@ def _rollout(
         # ── Placement done: hand off to heuristic vs heuristic for scoring ────
         if board.phase != "place":
             if not handoff_agents:
-                _hb = _time_budget_for_level(game_difficulty)
+                _hb = _heuristic_time_budget(game_difficulty)
                 for _c in ("W", "B"):
                     _ha = HeuristicAgent(color=_c, difficulty=game_difficulty, game_ai=None)
                     _ha._inner = _GA(color=_c, difficulty=game_difficulty, override_time_budget=_hb)
@@ -1138,7 +1138,7 @@ def run(args: argparse.Namespace) -> None:
                 _gd = difficulty
                 if difficulty > 1 and rng.random() < 0.15:
                     _gd = rng.randint(1, difficulty - 1)
-                _tb = _time_budget_for_level(_gd) if args.time_budget <= 0 else args.time_budget
+                _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
                 _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _GA(color=_oc, difficulty=_gd, override_time_budget=_tb)
                 _opp, _gt = _h, "vs_heuristic"

@@ -108,14 +108,14 @@ def _build_raw_board_features(board) -> np.ndarray:
     return feats
 
 
-def _time_budget_for_level(level: int) -> float:
-    """Endgame heuristic time budget (opponent).
+def _heuristic_time_budget(level: int) -> float:
+    """Heuristic opponent time budget: 0.1 s at L1 → 14.0 s at L20 (exponential ramp)."""
+    return 0.1 * (140.0 ** ((level - 1) / 19.0))
 
-    Capped so specialist (sentinel lookahead ~0.5-1 s) has ≥2× per-move time.
-    Ramp: L1=1 ms → L≈15 reaches cap of 2.0 s, held through L20.
-    Rule: specialist deployment time ≥ max(2 × heuristic, 1 s + sentinel_lookahead)."""
-    raw = 0.001 * (60000.0 ** ((level - 1) / 19.0))
-    return min(raw, 2.0)
+
+def _specialist_time_budget(level: int) -> float:
+    """Specialist (learner) alpha-beta time budget: 0.5 s at L1 → 20.0 s at L20."""
+    return 0.5 * (40.0 ** ((level - 1) / 19.0))
 
 
 def _build_history_features(history: deque, n: int = 3) -> np.ndarray:
@@ -678,7 +678,7 @@ def _rollout(
         color=learner_color,
         difficulty=game_difficulty,
         value_net=value_net,
-        override_time_budget=_time_budget_for_level(game_difficulty),
+        override_time_budget=_specialist_time_budget(game_difficulty),
     )
     if sentinel is not None:
         try:
@@ -1178,7 +1178,7 @@ def run(args: argparse.Namespace) -> None:
             if rng.random() < args.self_play_ratio:
                 _opp, _gt = frozen_opp, "vs_frozen"
             else:
-                _tb = _time_budget_for_level(_gd) if args.time_budget <= 0 else args.time_budget
+                _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
                 _h  = HeuristicAgent(color="B", difficulty=_gd, game_ai=None)
                 _h._inner = _GA(color="B", difficulty=_gd, override_time_budget=_tb)
                 _opp, _gt = _h, "vs_heuristic"
@@ -1193,7 +1193,7 @@ def run(args: argparse.Namespace) -> None:
             _lc = _sb.turn
             _oc = "B" if _lc == "W" else "W"
             if _gt == "vs_heuristic":
-                _tb = _time_budget_for_level(_gd) if args.time_budget <= 0 else args.time_budget
+                _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
                 _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _GA(color=_oc, difficulty=_gd, override_time_budget=_tb)
                 _opp = _h
