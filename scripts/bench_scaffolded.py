@@ -309,7 +309,7 @@ def main() -> int:
                         "Default (-1) uses the game's per-difficulty caps "
                         "(15/30/45/60 s at diff 1-5/6/7/8+, with 3-10 s early-placement reductions). "
                         "Pass a positive value for a flat override.")
-    p.add_argument("--specialist-ply-depth", type=int, default=15,
+    p.add_argument("--specialist-ply-depth", type=int, default=20,
                    help="LookaheadAdvisor ply depth for the specialists (default 15).")
     p.add_argument("--max-plies",       type=int,   default=400)
     p.add_argument("--sentinel-path",   default=_SENTINEL_CKPT)
