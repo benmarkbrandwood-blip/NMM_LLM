@@ -191,11 +191,11 @@ DRAW_LONG   =  0.0    # 2026-07-18: neutral (was -0.25)
 
 LR            = 1e-4
 GAMMA_TD      = 0.99
-TEMP_START    = 0.50
-TEMP_MAX      = 0.90
+TEMP_START    = 0.90   # explore early; anneals down to TEMP_END over training
+TEMP_END      = 0.20   # exploit late
 ENTROPY_COEF  = 0.01
-UPDATE_EVERY  = 16
-ROLLING_WIN   = 100
+UPDATE_EVERY  = 64
+ROLLING_WIN   = 40
 DIFF_START    = 1
 DIFF_MAX      = 20
 
@@ -498,7 +498,7 @@ def _apply_diff_start_override(difficulty: int, args: argparse.Namespace) -> int
 
 def _compute_temperature(game_count: int, max_games: int) -> float:
     progress = min(1.0, game_count / max(max_games * 0.8, 1))
-    return float(TEMP_START + (TEMP_MAX - TEMP_START) * progress)
+    return float(TEMP_START - (TEMP_START - TEMP_END) * progress)
 
 
 def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:

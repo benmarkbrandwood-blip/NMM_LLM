@@ -315,13 +315,28 @@ The following bugs were identified and fixed before first training run:
 
 ---
 
+## Optimization Fixes (2026-07-18)
+
+Applied based on first-run diagnostics (all specialists stuck at difficulty 1, win rate 16–20%):
+
+| Change | Before | After | Rationale |
+|---|---|---|---|
+| Temperature schedule | `TEMP_START=0.50 → TEMP_MAX=0.90` (rising) | `TEMP_START=0.90 → TEMP_END=0.20` (annealing) | Rising temperature was actively preventing convergence — more noise as training progressed |
+| `UPDATE_EVERY` | 16 steps | 64 steps | 16 steps ≈ 1 game of transitions; gradient estimate too noisy for policy-gradient |
+| `ROLLING_WIN` (advancement window) | 100 games | 40 games | Faster escape from difficulty 1 when near threshold; shorter window reduces variance cost |
+| Lookahead signal count | 5 signals/ply (`feat_dim=60`, total 122) | 6 signals/ply (`feat_dim=72`, total 134) | `was_simulated` flag distinguishes genuine neutral 0.5 from speed-padding 0.5 |
+
+These changes break checkpoint compatibility — training must restart from scratch.
+
 ## Next Steps
 
-1. Smoke test: `--max-games 20` on all three specialists, confirm no shape errors
+1. Smoke test: `--max-games 20` on all three specialists, confirm no shape errors (feat_dim=134)
 2. First real training run: ~500 games each specialist in parallel
-3. Check SpecialistDB: `≥300` positions, some Malom-labelled entries
-4. After ~5000 games: verify `preferred_plays` table has promoted entries
-5. Implement deferred coordinator features (smooth handoff, confidence gate)
+3. **Pull value-loss from `update_log.jsonl` or watch Row 5 of the plot** — if `update_value_loss` is flat or rising after 100 games, the value baseline is broken and is the primary blocker
+4. Check SpecialistDB: `≥300` positions, some Malom-labelled entries
+5. **Once win rate shows movement (>25% sustained), ablate flat reward bonuses** (`MILL_BONUS`, `MALOM_REWARD`, `EXPLORE_COEF`) against a pure potential-shaped + outcome baseline to rule out reward hacking. Run each ablation for ~200 games and compare win-rate trajectory. The flat bonuses (0.05–0.25) are comparable in magnitude to the sentinel/heuristic deltas (0.01–0.03) and could be optimised independently of actually winning.
+6. After ~5000 games: verify `preferred_plays` table has promoted entries
+7. Implement deferred coordinator features (smooth handoff, confidence gate)
 
 ---
 

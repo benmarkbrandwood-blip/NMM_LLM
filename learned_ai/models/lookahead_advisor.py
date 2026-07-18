@@ -1,21 +1,20 @@
-"""learned_ai/models/lookahead_advisor.py — 12-ply 5-signal lookahead for specialists.
+"""learned_ai/models/lookahead_advisor.py — 12-ply 6-signal lookahead for specialists.
 
-For each legal move, simulates up to 12 half-plies and records 5 signals per ply:
+For each legal move, simulates up to 12 half-plies and records 6 signals per ply:
 
-  h_norm      : (evaluate(board, learner_color) + 1) / 2  → [0, 1]
-  learner_sent: mean sentinel quality of learner's legal moves (learner-turn plies only,
-                else 0.5).  Represents how good the learner's options are at this depth.
-  opp_sent    : mean sentinel quality of opponent's legal moves (opp-turn plies only,
-                else 0.5).  Represents how constrained the opponent is at this depth.
-  vn_norm     : (value_net.predict(board, learner_color) + 1) / 2 → [0, 1]; 0.5 if absent
-  gap_norm    : (gap_net.predict(board, board.turn) + 1) / 2 → [0, 1]; 0.5 if absent
+  h_norm       : (evaluate(board, learner_color) + 1) / 2  → [0, 1]
+  learner_sent : mean sentinel quality of learner's legal moves (learner-turn plies only,
+                 else 0.5).  Represents how good the learner's options are at this depth.
+  opp_sent     : mean sentinel quality of opponent's legal moves (opp-turn plies only,
+                 else 0.5).  Represents how constrained the opponent is at this depth.
+  vn_norm      : (value_net.predict(board, learner_color) + 1) / 2 → [0, 1]; 0.5 if absent
+  gap_norm     : (gap_net.predict(board, board.turn) + 1) / 2 → [0, 1]; 0.5 if absent
+  was_simulated: 1.0 if this ply was actually simulated; 0.0 if speed-padding or early exit.
+                 Lets the network discount unsimulated plies rather than treating neutral 0.5
+                 as meaningful evaluation.  In fast mode (19/20 games, sim_ply_depth=5),
+                 plies 5-11 get was_simulated=0.0; in deep mode (1/20) all 12 get 1.0.
 
-The contrast between learner_sent (rising) and opp_sent (falling) across plies is
-the signature of a trap being set.  This lets the specialist learn trap patterns
-implicitly without explicit trap labelling.
-
-12 plies × 5 signals = 60 floats — same width as the previous 20×3 design.
-Total per candidate: 62 base + 60 lookahead + 4 topK = 126 (shape unchanged).
+12 plies × 6 signals = 72 floats.  Total per candidate: 62 base + 72 lookahead = 134.
 """
 
 from __future__ import annotations
@@ -92,7 +91,7 @@ class LookaheadAdvisor:
         self._sim_ply_depth = int(sim_ply_depth) if sim_ply_depth is not None else ply_depth
         self._frozen_model  = frozen_model
         self._frozen_device = frozen_device
-        self.feat_dim       = ply_depth * 5   # e.g. 12 × 5 = 60
+        self.feat_dim       = ply_depth * 6   # e.g. 12 × 6 = 72
 
     def set_frozen_model(self, model, device=None) -> None:
         """Update the frozen-model snapshot used to pick learner-side moves in lookahead."""
@@ -171,14 +170,14 @@ class LookaheadAdvisor:
         opp_color: str,
         sim_override: Optional[int] = None,
     ) -> np.ndarray:
-        """Simulate half-plies and return (ply_depth*5,) float array.
+        """Simulate half-plies and return (ply_depth*6,) float array.
 
-        Layout per ply: [h_norm, learner_sent, opp_sent, vn_norm, gap_norm]
-        Half-plies alternate learner → opponent → learner → …
-        Terminal and DB probes fill remaining slots with the terminal/probe value.
-        If fewer plies are simulated than ply_depth, last valid signal pads the rest.
+        Layout per ply: [h_norm, learner_sent, opp_sent, vn_norm, gap_norm, was_simulated]
+        was_simulated = 1.0 for plies that were actually run; 0.0 for speed-padding or
+        early-exit fill.  Lets the network discount unsimulated plies.
         """
-        result = np.full(self._ply_depth * 5, 0.5, dtype=np.float32)
+        result = np.full(self._ply_depth * 6, 0.5, dtype=np.float32)
+        result[5::6] = 0.0   # was_simulated: default to not-simulated
         _sim = min(
             sim_override if sim_override is not None else self._sim_ply_depth,
             self._ply_depth
@@ -204,7 +203,7 @@ class LookaheadAdvisor:
                         mv = _static_best_move(b, actor, self._evaluate)
                     if mv is None:
                         for fill in range(depth_idx, self._ply_depth):
-                            result[fill * 5 : fill * 5 + 5] = last_sig
+                            result[fill * 6 : fill * 6 + 6] = (*last_sig, 0.0)
                         return result
                     b = b.apply_move(mv)
 
@@ -212,8 +211,9 @@ class LookaheadAdvisor:
                 terminal, winner = is_terminal(b)
                 if terminal:
                     val = 1.0 if winner == learner_color else (0.0 if winner else 0.5)
-                    for fill in range(depth_idx, self._ply_depth):
-                        result[fill * 5 : fill * 5 + 5] = [val, val, val, val, val]
+                    result[depth_idx * 6 : depth_idx * 6 + 6] = (val, val, val, val, val, 1.0)
+                    for fill in range(depth_idx + 1, self._ply_depth):
+                        result[fill * 6 : fill * 6 + 6] = (val, val, val, val, val, 0.0)
                     return result
 
                 # Endgame DB probe — exact WDL terminates trajectory early
@@ -225,24 +225,25 @@ class LookaheadAdvisor:
                                 val = 1.0 if db_result == "W" else (0.0 if db_result == "L" else 0.5)
                             else:
                                 val = 0.0 if db_result == "W" else (1.0 if db_result == "L" else 0.5)
-                            for fill in range(depth_idx, self._ply_depth):
-                                result[fill * 5 : fill * 5 + 5] = [val, val, val, val, val]
+                            result[depth_idx * 6 : depth_idx * 6 + 6] = (val, val, val, val, val, 1.0)
+                            for fill in range(depth_idx + 1, self._ply_depth):
+                                result[fill * 6 : fill * 6 + 6] = (val, val, val, val, val, 0.0)
                             return result
                     except Exception:
                         pass
 
-                # Record 5 signals at this position
+                # Record 5 signals + was_simulated=1.0
                 sig = self._record_signals(b, learner_color)
                 last_sig = sig
-                result[depth_idx * 5 : depth_idx * 5 + 5] = sig
+                result[depth_idx * 6 : depth_idx * 6 + 6] = (*sig, 1.0)
 
-            # Pad remaining slots with last valid signal (training speed-up mode)
+            # Pad remaining slots — was_simulated=0.0 marks these as not simulated
             if _sim < self._ply_depth:
                 for fill in range(_sim, self._ply_depth):
-                    result[fill * 5 : fill * 5 + 5] = last_sig
+                    result[fill * 6 : fill * 6 + 6] = (*last_sig, 0.0)
 
         except Exception:
-            pass   # partial result stays; remaining slots keep 0.5
+            pass   # partial result stays; remaining slots keep 0.5/0.0
 
         return result
 

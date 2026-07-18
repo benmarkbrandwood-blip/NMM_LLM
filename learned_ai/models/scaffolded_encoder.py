@@ -60,11 +60,13 @@ VALUE_INPUT_DIM: int = 23
 VN_BLEND: float = 0.0
 
 # ── Lookahead extension ────────────────────────────────────────────────────────
-# 12 half-plies × 5 signals (h_norm, learner_sent, opp_sent, vn_norm, gap_norm) = 60 floats
+# 12 half-plies × 6 signals = 72 floats
+# Signals per ply: h_norm, learner_sent, opp_sent, vn_norm, gap_norm, was_simulated
+# was_simulated = 1.0 if that ply was actually run; 0.0 if filled by padding or not reached.
 LOOKAHEAD_PLIES:              int = 12
-LOOKAHEAD_SIGNALS:            int = 5
-LOOKAHEAD_FEAT_DIM:           int = LOOKAHEAD_PLIES * LOOKAHEAD_SIGNALS   # 60
-MOVE_FEAT_DIM_WITH_LOOKAHEAD: int = MOVE_FEAT_DIM + LOOKAHEAD_FEAT_DIM  # 122
+LOOKAHEAD_SIGNALS:            int = 6
+LOOKAHEAD_FEAT_DIM:           int = LOOKAHEAD_PLIES * LOOKAHEAD_SIGNALS   # 72
+MOVE_FEAT_DIM_WITH_LOOKAHEAD: int = MOVE_FEAT_DIM + LOOKAHEAD_FEAT_DIM  # 134
 
 # ── Top-K search-informed extension (v3, 2026-07-16) ──────────────────────────
 # Per-candidate row on top of the 122-float base+lookahead:
