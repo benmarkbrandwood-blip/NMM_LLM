@@ -1528,12 +1528,13 @@ def run(args: argparse.Namespace) -> None:
                 recent_h     = list(win_history_heuristic)
                 win_rate     = sum(1 for x in recent_h if x == 1.0) / max(len(recent_h), 1)
                 draw_rate    = sum(1 for x in recent_h if x == 0.5) / max(len(recent_h), 1)
+                loss_rate    = sum(1 for x in recent_h if x == 0.0) / max(len(recent_h), 1)
                 win_rate_all = sum(1 for x in win_history  if x == 1.0) / max(len(win_history), 1)
 
                 _adapt_lr(opt, win_rate, args.lr)
 
                 if (len(win_history_heuristic) >= RECOVERY_MIN_GAMES
-                        and win_rate < RECOVERY_THRESHOLD):
+                        and loss_rate > win_rate):
                     _h_list = list(win_history_heuristic)
                     _mid    = len(_h_list) // 2
                     _first_wr  = sum(1 for x in _h_list[:_mid] if x == 1.0) / max(_mid, 1)
@@ -1564,7 +1565,7 @@ def run(args: argparse.Namespace) -> None:
                                 win_history.clear()
                                 win_history_heuristic.clear()
                                 temperature = TEMP_START
-                                print(f"[s_open_v2] Recovery: reloaded best{difficulty}.pt (win rate was {win_rate:.2f})")
+                                print(f"[s_open_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
                 branch_diags = [d for d in diag_buffer if d.is_branch]
