@@ -103,6 +103,36 @@ def _get_draw_rate(rows: list[dict], window: int = SMOOTH) -> tuple[list[int], l
     return xs, ys
 
 
+def _get_advances(rows: list[dict]) -> list[tuple[int, int]]:
+    """Return (game, new_difficulty) for each level-up event."""
+    advances = []
+    prev = None
+    for r in rows:
+        d = r.get("difficulty")
+        g = r.get("game")
+        if d is None or g is None:
+            continue
+        if prev is not None and d > prev:
+            advances.append((g, d))
+        prev = d
+    return advances
+
+
+def _draw_advances(axes_col: list, advances: list[tuple[int, int]]) -> None:
+    """Draw a vertical dashed line + level label at each advance point on all axes."""
+    if not advances:
+        return
+    for ax in axes_col:
+        for game, _ in advances:
+            ax.axvline(game, color="#76FF03", linewidth=0.9, linestyle="--", alpha=0.7, zorder=3)
+    # Label only on the top axis to avoid clutter; use axes-fraction coords for y
+    ax_top = axes_col[0]
+    for game, level in advances:
+        ax_top.text(game, 1.0, f"L{level}", fontsize=6, color="#76FF03",
+                    ha="left", va="top", transform=ax_top.get_xaxis_transform(),
+                    zorder=4, bbox=dict(boxstyle="round,pad=0.1", fc="black", alpha=0.5, lw=0))
+
+
 def _plot_series(ax, xs, ys, label, color, window=SMOOTH, alpha_raw=0.15):
     if not ys:
         return
@@ -185,6 +215,10 @@ def draw(fig, axes):
         _plot_series(ax_loss, xs_vl, ys_vl, "value loss",   "#FF9800", alpha_raw=0.20)
         ax_loss.set_xlabel("game", fontsize=7)
         ax_loss.legend(fontsize=6, loc="upper right")
+
+        # ── Level advancement markers ─────────────────────────────────────────
+        advances = _get_advances(rows)
+        _draw_advances([ax_malom, ax_top1, ax_wr, ax_sent, ax_loss], advances)
 
         for ax in (ax_malom, ax_top1, ax_wr, ax_sent, ax_loss):
             ax.tick_params(labelsize=6)
