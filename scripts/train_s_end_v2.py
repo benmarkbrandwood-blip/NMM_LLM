@@ -138,7 +138,7 @@ def _simple_evaluate(board: BoardState, color: str) -> float:
     """Fast heuristic for rollout move selection: mills + mobility + blocked."""
     terminal, winner = is_terminal(board)
     if terminal:
-        return 1e9 if winner == color else -1e9
+        return 1.0 if winner == color else -1.0
     opp = "B" if color == "W" else "W"
     from game.board import ADJACENCY
     our_mills = sum(1 for m in MILLS if all(board.positions.get(p) == color for p in m))
@@ -160,7 +160,8 @@ def _simple_evaluate(board: BoardState, color: str) -> float:
         if piece == opp
         and all(board.positions.get(adj) is not None for adj in ADJACENCY.get(pos, []))
     )
-    return float(500 * (our_mills - opp_mills) + 10 * (our_mob - opp_mob) + 50 * blocked)
+    raw = float(500 * (our_mills - opp_mills) + 10 * (our_mob - opp_mob) + 50 * blocked)
+    return math.tanh(raw / 1500.0)
 
 
 # ── Stage tag ─────────────────────────────────────────────────────────────────
@@ -182,8 +183,8 @@ ENDGAME_DB_LOSS_PENALTY = -0.10  # learner landed opponent in a WDL-DB-winning p
 
 WIN_REWARD  =  1.0
 LOSS_REWARD = -1.0
-DRAW_SHORT  = -0.10   # 2026-07-14: 0.00 → -0.10
-DRAW_LONG   = -0.25   # 2026-07-14: -0.15 → -0.25
+DRAW_SHORT  =  0.0    # 2026-07-18: neutral (was -0.10); penalising draws hurts value head at low win rates
+DRAW_LONG   =  0.0    # 2026-07-18: neutral (was -0.25)
 
 # ── Optimiser / schedule ──────────────────────────────────────────────────────
 
@@ -723,6 +724,8 @@ def _rollout(
                 value_net=value_net,
                 lookahead_advisor=lookahead_advisor,
                 specialist_db=specialist_db,
+                sdb_min_samples=3,
+                wdl_db=wdl_db,
             )
             if enc is None or not enc.legal_moves:
                 outcome = LOSS_REWARD
@@ -912,7 +915,7 @@ def _rollout(
     if specialist_db is not None and learner_boards:
         try:
             _res = "W" if outcome == WIN_REWARD else ("D" if outcome in (DRAW_SHORT, DRAW_LONG) else "L")
-            specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "end")
+            specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "end", learner_color=learner_color)
         except Exception:
             pass
         if wdl_db is not None:
@@ -992,8 +995,9 @@ def _build_game_diag(
         legal_moves_mean=_safe_mean([float(d.legal_moves) for d in sd]),
         policy_top1_rate=_safe_mean([float(d.was_top1_policy) for d in sd]),
         heuristic_top1_rate=_safe_mean([float(d.was_top1_heuristic) for d in sd]),
-        malom_win_move_rate=0.0,
-        malom_unknown_rate=0.0,
+        malom_win_move_rate=_safe_mean([1.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm >= 0] +
+                                       [0.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm < 0]),
+        malom_unknown_rate=_safe_mean([1.0 if d.malom_chosen_dtm is None else 0.0 for d in sd]),
         best_win_rate=float(best_win_rate),
         temp_frozen=int(temp_frozen),
         lr=float(opt.param_groups[0]["lr"]),
@@ -1360,11 +1364,12 @@ def run(args: argparse.Namespace) -> None:
 
             if game_count % 10 == 0:
                 _hwr  = sum(1.0 if x == 1.0 else 0.0 for x in win_history_heuristic) / max(len(win_history_heuristic), 1)
+                _hdwr = sum(1.0 if x == 0.5 else 0.0 for x in win_history_heuristic) / max(len(win_history_heuristic), 1)
                 _awr  = sum(1.0 if x == 1.0 else 0.0 for x in win_history) / max(len(win_history), 1)
                 _oc   = "W" if result.outcome == WIN_REWARD else ("L" if result.outcome == LOSS_REWARD else "D")
                 _gt   = "heur" if game_type == "vs_heuristic" else "self"
                 _md   = f"d{game_difficulty}"
-                print(f"[s_end_v2] {game_count:6d} {_gt:4s} {learner_color} | diff {difficulty} {_md} | {_oc} ply={result.ply:3d} | hwr={_hwr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
+                print(f"[s_end_v2] {game_count:6d} {_gt:4s} {learner_color} | diff {difficulty} {_md} | {_oc} ply={result.ply:3d} | hwr={_hwr:.3f} dwr={_hdwr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
 
             if (not args.minimal_rollouts
                 and result.outcome != WIN_REWARD

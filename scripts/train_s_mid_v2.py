@@ -113,9 +113,10 @@ def _build_raw_board_features(board) -> np.ndarray:
 
 def _simple_evaluate(board: BoardState, color: str) -> float:
     """Fast heuristic for rollout move selection: mills + mobility + blocked."""
+    import math as _math
     terminal, winner = is_terminal(board)
     if terminal:
-        return 1e9 if winner == color else -1e9
+        return 1.0 if winner == color else -1.0
     opp = "B" if color == "W" else "W"
     from game.board import ADJACENCY
     our_mills = sum(1 for m in MILLS if all(board.positions.get(p) == color for p in m))
@@ -137,7 +138,8 @@ def _simple_evaluate(board: BoardState, color: str) -> float:
         if piece == opp
         and all(board.positions.get(adj) is not None for adj in ADJACENCY.get(pos, []))
     )
-    return float(500 * (our_mills - opp_mills) + 10 * (our_mob - opp_mob) + 50 * blocked)
+    raw = float(500 * (our_mills - opp_mills) + 10 * (our_mob - opp_mob) + 50 * blocked)
+    return _math.tanh(raw / 1500.0)
 
 
 # ── Difficulty / history helpers ─────────────────────────────────────────────
@@ -182,8 +184,8 @@ EXPLORE_COEF = 0.08 # bonus for winning with non-heuristic-top1 moves (Option A)
 
 WIN_REWARD  =  1.0
 LOSS_REWARD = -1.0
-DRAW_SHORT  = -0.10   # 2026-07-14: 0.00 → -0.10
-DRAW_LONG   = -0.25   # 2026-07-14: -0.15 → -0.25
+DRAW_SHORT  =  0.0    # 2026-07-18: neutral (was -0.10); penalising draws hurts value head at low win rates
+DRAW_LONG   =  0.0    # 2026-07-18: neutral (was -0.25)
 
 # ── Optimiser / schedule ──────────────────────────────────────────────────────
 
@@ -227,6 +229,8 @@ OPENING_EXTENSION_PLY = 6
 
 PHASE_BUCKETS = ("opening", "midgame", "endgame")
 
+MALOM_REWARD = 0.05
+
 
 # ── Dataclasses ───────────────────────────────────────────────────────────────
 
@@ -237,6 +241,7 @@ class RewardBreakdown:
     heuristic:   float = 0.0
     mill_formed: float = 0.0
     retro:       float = 0.0
+    malom:       float = 0.0
 
 
 @dataclass
@@ -511,6 +516,7 @@ def _compute_per_move_reward(
     total_pieces: int = 18,
     move_phase_start_ply: Optional[int] = None,
     current_ply: int = 0,
+    malom_q: Optional[str] = None,
 ) -> tuple[float, RewardBreakdown]:
     rb = RewardBreakdown()
 
@@ -527,7 +533,12 @@ def _compute_per_move_reward(
             h_after  = float(enc.h_scores_abs[chosen_idx]) if getattr(enc, "h_scores_abs", None) else h_before
             rb.heuristic = BETA * math.tanh(h_after - h_before)
 
-    rb.total = rb.sentinel + rb.heuristic
+    if malom_q == "W":
+        rb.malom = MALOM_REWARD
+    elif malom_q == "L":
+        rb.malom = -MALOM_REWARD
+
+    rb.total = rb.sentinel + rb.heuristic + rb.malom
     return float(rb.total), rb
 
 
@@ -717,6 +728,7 @@ def _rollout(
                 value_net=value_net,
                 lookahead_advisor=lookahead_advisor,
                 specialist_db=specialist_db,
+                sdb_min_samples=3,
             )
             if enc is None or not enc.legal_moves:
                 outcome = LOSS_REWARD
@@ -771,12 +783,14 @@ def _rollout(
                                                           lookahead_advisor=None)
 
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
+            malom_q = malom_db.query_move_quality(board, move) if malom_db is not None else None
             reward, rb = _compute_per_move_reward(
                 enc, chosen_idx, enc_after,
                 board_phase=board.phase,
                 total_pieces=total_pieces,
                 move_phase_start_ply=move_phase_start_ply,
                 current_ply=ply,
+                malom_q=malom_q,
             )
 
             # Mill formation bonus (un-gated)
@@ -847,7 +861,7 @@ def _rollout(
                 vn_after=vn_after,
                 vn_delta=vn_after - vn_before,
                 malom_chosen_wdl="n/a",
-                malom_chosen_dtm=None,
+                malom_chosen_dtm=malom_q,
                 was_top1_policy=was_top1_policy,
                 was_top1_heuristic=heuristic_top1,
             ))
@@ -882,7 +896,7 @@ def _rollout(
     if specialist_db is not None and learner_boards:
         try:
             _res = "W" if outcome == WIN_REWARD else ("D" if outcome in (DRAW_SHORT, DRAW_LONG) else "L")
-            specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "mid")
+            specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "mid", learner_color=learner_color)
         except Exception:
             pass
         if malom_db is not None:
@@ -960,8 +974,9 @@ def _build_game_diag(
         legal_moves_mean     =_safe_mean([float(d.legal_moves) for d in sd]),
         policy_top1_rate     =_safe_mean([float(d.was_top1_policy)    for d in sd]),
         heuristic_top1_rate  =_safe_mean([float(d.was_top1_heuristic) for d in sd]),
-        malom_win_move_rate  =0.0,
-        malom_unknown_rate   =0.0,
+        malom_win_move_rate  =_safe_mean([1.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm >= 0] +
+                                         [0.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm < 0]),
+        malom_unknown_rate   =_safe_mean([1.0 if d.malom_chosen_dtm is None else 0.0 for d in sd]),
         best_win_rate  =float(best_win_rate),
         temp_frozen    =int(temp_frozen),
         lr             =float(opt.param_groups[0]["lr"]),

@@ -61,7 +61,7 @@ _PROMOTE_MIN_PLAYED = 5
 _PROMOTE_WIN_RATE   = 0.65
 _DEMOTE_WIN_RATE    = 0.45
 _DEMOTE_MIN_RECENT  = 20
-_MIN_SAMPLES_QUERY  = 10
+_MIN_SAMPLES_QUERY  = 5
 
 
 def _board_hash(board) -> str:
@@ -102,20 +102,30 @@ class SpecialistDB:
         result: str,
         move_seq: List[str],
         phase: str,
+        learner_color: str = None,
     ) -> None:
         """Record all positions from a completed game and update winning lines.
 
         Parameters
         ----------
-        boards   : list of BoardState objects at each of the learner's turns
-        result   : 'W', 'D', or 'L' from the learner's perspective
-        move_seq : list of move notation strings (learner's moves only)
-        phase    : 'open' | 'mid' | 'end'
+        boards        : list of BoardState objects (pre- and post-move boards)
+        result        : 'W', 'D', or 'L' from the learner's perspective
+        move_seq      : list of move notation strings (learner's moves only)
+        phase         : 'open' | 'mid' | 'end'
+        learner_color : 'W' or 'B' — when set, boards where board.turn != learner_color
+                        are opponent-to-move; WDL is stored from the current player's
+                        perspective, so W↔L are flipped for those boards.
         """
         now = _now()
         with self._conn:
             for board in boards:
                 h = _board_hash(board)
+                # Flip W↔L for opponent-to-move boards so DB is always stored from
+                # the current player's perspective (matched to encoder query path).
+                if learner_color is not None and getattr(board, "turn", None) != learner_color:
+                    eff = "L" if result == "W" else ("W" if result == "L" else "D")
+                else:
+                    eff = result
                 self._conn.execute("""
                     INSERT INTO positions (pos_hash, wins, draws, losses, last_seen)
                     VALUES (?, ?, ?, ?, ?)
@@ -125,9 +135,9 @@ class SpecialistDB:
                         losses    = losses + excluded.losses,
                         last_seen = excluded.last_seen
                 """, (h,
-                      1 if result == "W" else 0,
-                      1 if result == "D" else 0,
-                      1 if result == "L" else 0,
+                      1 if eff == "W" else 0,
+                      1 if eff == "D" else 0,
+                      1 if eff == "L" else 0,
                       now))
 
             if result in ("W", "D") and move_seq:
@@ -192,7 +202,8 @@ class SpecialistDB:
         self._conn.execute("""
             INSERT INTO positions (pos_hash, wins, draws, losses, malom_label, last_seen)
             VALUES (?, 0, 0, 0, ?, ?)
-            ON CONFLICT(pos_hash) DO UPDATE SET malom_label = excluded.malom_label
+            ON CONFLICT(pos_hash) DO UPDATE SET
+                malom_label = COALESCE(positions.malom_label, excluded.malom_label)
         """, (h, wdl, _now()))
         self._conn.commit()
 

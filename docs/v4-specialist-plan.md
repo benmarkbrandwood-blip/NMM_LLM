@@ -260,17 +260,55 @@ by more than 2 — requires a shared state file read by all three training proce
 
 ---
 
+## Bug Fixes (2026-07-18)
+
+The following bugs were identified and fixed before first training run:
+
+### P-03 — COALESCE in `label_position_malom()`
+**Problem:** `ON CONFLICT DO UPDATE SET malom_label = excluded.malom_label` overwrote valid Malom labels with NULL on subsequent inserts from games where Malom wasn't queried.
+**Fix:** `specialist_db.py` — changed to `COALESCE(positions.malom_label, excluded.malom_label)` so existing labels are never overwritten.
+
+### P0-2 — Encoder label interpretation (`_sl` vs `_sw`)
+**Problem:** `scaffolded_encoder.py` read the SpecialistDB WDL triple as `_sw, _sd, _sl` (win/draw/loss from current player) but the DB stores the post-move board's perspective — `_sl` (opponent-loses = learner-wins) is the win signal, not `_sw`.
+**Fix:** Label decoding now checks `_sl >= _sw and _sl >= _sd` to identify wins, consistently with the P0-2 perspective convention in `record_game()`.
+
+### P0-5 — `_simple_evaluate` saturation
+**Problem:** `_simple_evaluate` in all three training scripts returned raw heuristic scores (up to ±2650) and ±1e9 for terminals. The lookahead `(h+1)/2` normalisation expects input in `[-1, 1]` — values outside that range saturate to 0 or 1, making all lookahead trajectories look like certain wins or losses.
+**Fix:** Terminal positions return `±1.0`. Non-terminal positions return `math.tanh(raw / 1500.0)`, which maps the typical heuristic range to `[-0.95, 0.95]`.
+
+### P0-4 — Human DB as opponent model in lookahead
+**Problem:** The `LookaheadAdvisor` used only the static heuristic to pick opponent moves during simulation. This underestimates human-like threats (humans often play suboptimally but consistently).
+**Fix:** Added `_human_db_best_move()` to `LookaheadAdvisor`. When `_human_db` is set, opponent moves in the trajectory are drawn from the most-played human move at that position first, falling back to the heuristic only when no human data exists.
+
+### Per-move Malom reward shaping (open + mid)
+**Problem:** The open and mid specialists had no per-move Malom signal. Good Malom moves were only rewarded retroactively at end of game.
+**Fix:** `MALOM_REWARD = 0.05` constant added. `malom_q` computed before the reward call in `_rollout` and passed to `_compute_per_move_reward`. The `RewardBreakdown.malom` field accumulates the per-step bonus/penalty. Not added to the end specialist — it already has `MALOM_AGREE_BONUS = 0.10` via `_retroactive_rescore`.
+
+### `learner_color` missing from `record_game()` calls
+**Problem:** All three training scripts called `specialist_db.record_game()` without `learner_color`, so the W↔L flip for opponent-to-move boards was never applied — positions were stored with the wrong outcome polarity.
+**Fix:** All three scripts now pass `learner_color=learner_color` to `record_game()`.
+
+### P0-1 — Continuous learning at inference
+**Problem:** The specialist AI played games but never recorded them into the SpecialistDB at inference time — only training self-play contributed to the DB. User-played games were wasted experience.
+**Fix:**
+- `SpecialistRouter.record_game_result(game_record)` added — reconstructs board states from `board_fen_before` FEN strings, identifies AI-played moves, determines dominant phase, and calls `specialist_db.record_game()`.
+- `web/app.py` loads `SpecialistDB` as `_specialist_db` at startup and passes it to `load_specialist_router`.
+- Both `coordinator.on_game_end()` call sites now call `_overseer_advisor.record_game_result(record)` (guarded with `hasattr` for compatibility with the legacy Overseer fallback).
+
+---
+
 ## Files Changed (implemented 2026-07-18)
 
 | File | Status | Change |
 |---|---|---|
-| `learned_ai/data/specialist_db.py` | **NEW** | SpecialistDB — SQLite, D4-canonical hash, positions/winning_lines/preferred_plays, Malom label support |
-| `learned_ai/models/lookahead_advisor.py` | Updated | 5-signal layout; `learner_sent`/`opp_sent` split; value_net + gap_net restored; `feat_dim = ply_depth * 5`; `sim_ply_depth` override on `score_moves_matrix` |
-| `learned_ai/models/scaffolded_encoder.py` | Updated | `LOOKAHEAD_PLIES=12`, `LOOKAHEAD_SIGNALS=5` constants added |
-| `learned_ai/agents/specialist_router.py` | Updated | Full-legal-moves mode (top-K branch removed); value_net + gap_net wired to LookaheadAdvisors |
-| `scripts/train_s_open_v2.py` | Updated | Full-legal-moves rollout; specialist_db record_game; 1-in-20 deep games; VN + gap in LookaheadAdvisor; feat_dim = 122 |
+| `learned_ai/data/specialist_db.py` | **NEW** | SpecialistDB — SQLite, D4-canonical hash, positions/winning_lines/preferred_plays, Malom label support; COALESCE fix (P-03) |
+| `learned_ai/models/lookahead_advisor.py` | Updated | 5-signal layout; `learner_sent`/`opp_sent` split; value_net + gap_net restored; `feat_dim = ply_depth * 5`; `sim_ply_depth` override on `score_moves_matrix`; `_human_db_best_move()` for opponent moves (P0-4) |
+| `learned_ai/models/scaffolded_encoder.py` | Updated | `LOOKAHEAD_PLIES=12`, `LOOKAHEAD_SIGNALS=5` constants added; `_sl` label fix (P0-2) |
+| `learned_ai/agents/specialist_router.py` | Updated | Full-legal-moves mode; value_net + gap_net wired; `record_game_result()` for continuous inference learning (P0-1) |
+| `scripts/train_s_open_v2.py` | Updated | Full-legal-moves rollout; per-move Malom reward; `_simple_evaluate` tanh fix (P0-5); `learner_color` in `record_game` |
 | `scripts/train_s_mid_v2.py` | Updated | Same |
-| `scripts/train_s_end_v2.py` | Updated | Same |
+| `scripts/train_s_end_v2.py` | Updated | `_simple_evaluate` tanh fix (P0-5); `learner_color` in `record_game` |
+| `web/app.py` | Updated | Load `_specialist_db`; pass to `load_specialist_router`; call `record_game_result` at both `on_game_end` sites (P0-1) |
 | `scripts/bench_scaffolded.py` | Updated | value_net + gap_net passed to router; default ply_depth = 12 |
 | `docs/three-specialist-plan.md` | Updated | V4 section added |
 | `docs/v4-specialist-plan.md` | **NEW** | This file |

@@ -221,6 +221,8 @@ def encode_position(
     db=None,
     value_net=None,
     specialist_db=None,
+    sdb_min_samples: int = 5,
+    wdl_db=None,
 ) -> Optional[EncodedPosition]:
     """Encode all legal moves at ``board`` into the scaffolded feature format.
 
@@ -299,26 +301,52 @@ def encode_position(
     # Populates counterfactual feature slots [40:58] from self-play experience.
     # Available at both training and inference (DB ships pre-seeded from training).
     sdb_all_moves: List[Dict[str, Any]] = []
+    _sdb_covered: set = set()
     if specialist_db is not None:
         for _sdb_mv in legal_moves:
             try:
                 _sdb_after = board.apply_move(_sdb_mv)
-                _sdb_wdl = specialist_db.query_wdl(_sdb_after)
+                _sdb_wdl = specialist_db.query_wdl(_sdb_after, min_samples=sdb_min_samples)
                 if _sdb_wdl is not None:
                     _sw, _sd, _sl = _sdb_wdl
-                    if _sw >= _sd and _sw >= _sl:
+                    # _sdb_wdl is stored from the post-move board's perspective
+                    # (opponent-to-move after learner's move), so _sl = opponent loses = learner wins
+                    if _sl >= _sw and _sl >= _sd:
                         _slbl = "win"
-                    elif _sd >= _sl:
+                    elif _sd >= _sw:
                         _slbl = "draw"
                     else:
                         _slbl = "loss"
                     sdb_all_moves.append({"move": _sdb_mv, "wdl": _slbl, "dtm": None})
+                    _sdb_covered.add(id(_sdb_mv))
+            except Exception:
+                pass
+
+    # ── Endgame WDL DB — fills counterfactual slots for moves not in SpecialistDB ─
+    # wdl_db.query(board_after) returns W/L/D from the *next player's* perspective
+    # (opponent to move after learner's move), so "L" = learner wins.
+    if wdl_db is not None:
+        for _wdl_mv in legal_moves:
+            if id(_wdl_mv) in _sdb_covered:
+                continue  # SpecialistDB already has richer stats for this move
+            try:
+                _wdl_after = board.apply_move(_wdl_mv)
+                _wdl_res = wdl_db.query(_wdl_after)
+                if _wdl_res == "L":
+                    _wlbl = "win"
+                elif _wdl_res == "W":
+                    _wlbl = "loss"
+                elif _wdl_res == "D":
+                    _wlbl = "draw"
+                else:
+                    continue
+                sdb_all_moves.append({"move": _wdl_mv, "wdl": _wlbl, "dtm": None})
             except Exception:
                 pass
 
     # ── Build feature matrix ───────────────────────────────────────────────────
     # Malom DB data stays in db_moves (reward-only — not available at inference).
-    # SpecialistDB data flows into ctx["all_moves"] — available at both.
+    # SpecialistDB + endgame WDL DB flow into ctx["all_moves"] — available at training.
     rows: List[np.ndarray] = []
     for i, mv in enumerate(legal_moves):
         ctx = {
@@ -371,6 +399,8 @@ def encode_position_with_lookahead(
     lookahead_advisor=None,
     lookahead_dim: Optional[int] = None,
     specialist_db=None,
+    sdb_min_samples: int = 5,
+    wdl_db=None,
 ) -> Optional[EncodedPosition]:
     """Encode legal moves with a lookahead block appended.
 
@@ -386,7 +416,7 @@ def encode_position_with_lookahead(
     specialist_db: SpecialistDB instance — populates counterfactual slots [40:58]
     from self-play experience; available at both training and inference.
     """
-    enc = encode_position(board, player, sentinel_advisor, db, value_net, specialist_db)
+    enc = encode_position(board, player, sentinel_advisor, db, value_net, specialist_db, sdb_min_samples, wdl_db)
     if enc is None:
         return None
 

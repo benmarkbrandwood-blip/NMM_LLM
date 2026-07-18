@@ -129,6 +129,77 @@ class SpecialistRouter:
     def set_gameai(self, gameai) -> None:
         self._gameai = gameai
 
+    # ── continuous learning ───────────────────────────────────────────────────
+
+    def record_game_result(self, game_record: dict) -> None:
+        """Record AI-played boards from a completed game into the SpecialistDB."""
+        if self._specialist_db is None:
+            return
+        try:
+            human_color = game_record.get("human_color")
+            ai_color = "B" if human_color == "W" else ("W" if human_color == "B" else None)
+            if ai_color is None:
+                return
+
+            winner = game_record.get("winner")
+            result = "W" if winner == ai_color else ("D" if winner is None else "L")
+
+            moves = game_record.get("moves", [])
+            ai_boards: list = []
+            ai_move_seq: list = []
+            phase_counts = {"open": 0, "mid": 0, "end": 0}
+
+            for entry in moves:
+                fen_before = entry.get("board_fen_before", "")
+                if not fen_before:
+                    continue
+                try:
+                    b = BoardState.from_fen_string(fen_before)
+                except Exception:
+                    continue
+                mv = {
+                    "from":    entry.get("from"),
+                    "to":      entry.get("to"),
+                    "capture": entry.get("capture"),
+                }
+                try:
+                    b_after = b.apply_move(mv)
+                except Exception:
+                    continue
+
+                if entry.get("color") == ai_color:
+                    ai_boards.append(b)
+                    ai_boards.append(b_after)
+                    notation = entry.get("notation", "")
+                    if notation:
+                        ai_move_seq.append(notation)
+                    move_type = entry.get("type", "move")
+                    if move_type == "place":
+                        phase_counts["open"] += 1
+                    elif move_type == "fly":
+                        phase_counts["end"] += 1
+                    else:
+                        own = int(b.pieces_on_board.get(ai_color, 0))
+                        opp_color = "B" if ai_color == "W" else "W"
+                        opp = int(b.pieces_on_board.get(opp_color, 0))
+                        if own <= 5 or opp <= 5:
+                            phase_counts["end"] += 1
+                        else:
+                            phase_counts["mid"] += 1
+
+            if not ai_boards:
+                return
+
+            phase = max(phase_counts, key=lambda k: phase_counts[k])
+            self._specialist_db.record_game(
+                ai_boards, result, ai_move_seq, phase,
+                learner_color=ai_color,
+            )
+            log.debug("record_game_result: %s boards, phase=%s, result=%s",
+                      len(ai_boards) // 2, phase, result)
+        except Exception as e:
+            log.warning("SpecialistRouter.record_game_result failed: %s", e)
+
     # ── routing ───────────────────────────────────────────────────────────────
 
     def _pick_specialist(self, board: BoardState, color: str):

@@ -295,6 +295,16 @@ try:
 except Exception as _le:
     log.warning("Learned AI sentinel unavailable: %s", _le)
 
+# ── SpecialistDB for continuous learning at inference ─────────────────────────
+_specialist_db = None
+try:
+    from learned_ai.data.specialist_db import SpecialistDB as _SpecialistDB
+    _sdb_path = Path(_ROOT) / "data" / "specialist_db.sqlite"
+    _specialist_db = _SpecialistDB(str(_sdb_path))
+    log.info("SpecialistDB loaded for continuous inference learning: %s", _sdb_path)
+except Exception as _sdbe:
+    log.warning("SpecialistDB unavailable: %s", _sdbe)
+
 # ── Overseer (ScaffoldedPolicyNet) — advisory pick-probability overlay ───────
 _overseer_advisor = None
 # Prefer v2 SpecialistRouter (three phase specialists) — falls back to legacy Overseer.
@@ -305,6 +315,7 @@ try:
         value_net=_value_net,
         gap_net=_gap_net,
         human_db=_human_db,
+        specialist_db=_specialist_db,
     )
     if _overseer_advisor is not None:
         log.info("SpecialistRouter (v2 three-specialist) loaded — using in place of Overseer")
@@ -2450,6 +2461,8 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
             record["adaptive_softened"] = True
         session._last_game_record = record
         await asyncio.to_thread(session.coordinator.on_game_end, record)
+        if hasattr(_overseer_advisor, "record_game_result"):
+            await asyncio.to_thread(_overseer_advisor.record_game_result, record)
         await _commentary(ws, session)
         asyncio.create_task(_maybe_consolidate(ws))
         asyncio.create_task(_maybe_auto_evolve())
@@ -3639,6 +3652,8 @@ async def ws_endpoint(websocket: WebSocket):
                         winner=session.human_color, human_color=session.human_color
                     )
                     await asyncio.to_thread(session.coordinator.on_game_end, record)
+                    if hasattr(_overseer_advisor, "record_game_result"):
+                        await asyncio.to_thread(_overseer_advisor.record_game_result, record)
                     await _commentary(websocket, session)
                     asyncio.create_task(_maybe_consolidate(websocket))
                 await _after_game_end()

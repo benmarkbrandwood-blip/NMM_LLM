@@ -198,6 +198,8 @@ class LookaheadAdvisor:
                     mv = None
                     if self._frozen_model is not None and actor == learner_color:
                         mv = self._frozen_model_best_move(b, actor)
+                    if mv is None and actor != learner_color and self._human_db is not None:
+                        mv = self._human_db_best_move(b, actor)
                     if mv is None:
                         mv = _static_best_move(b, actor, self._evaluate)
                     if mv is None:
@@ -243,6 +245,31 @@ class LookaheadAdvisor:
             pass   # partial result stays; remaining slots keep 0.5
 
         return result
+
+    def _human_db_best_move(self, board: BoardState, color: str) -> Optional[dict]:
+        """Return the most-played human move for `color` at `board`, or None."""
+        if self._human_db is None:
+            return None
+        try:
+            from learned_ai.models.scaffolded_encoder import _human_prior_freqs, _move_notation
+            from game.rules import get_all_legal_moves as _legal
+            freqs = _human_prior_freqs(board, color, human_db=self._human_db)
+            if not freqs:
+                return None
+            legal = _legal(board)
+            if not legal:
+                return None
+            best_move = None
+            best_freq = 0.0
+            for mv in legal:
+                ntn = _move_notation(mv)
+                f = freqs.get(ntn, 0.0)
+                if f > best_freq:
+                    best_freq = f
+                    best_move = mv
+            return best_move if best_freq > 0.0 else None
+        except Exception:
+            return None
 
     def _record_signals(
         self,
