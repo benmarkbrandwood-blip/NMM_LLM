@@ -16,7 +16,7 @@ Bytes 0–63     : 64-byte header
 Bytes 64 … 64+N*3-1 : N×3-byte entries, little-endian 24-bit words.
     raw24   = b[0] | (b[1]<<8) | (b[2]<<16)
     key1    = sign_extend(raw24 & 0xFFF, 12)   # sector-relative value
-    key2    = sign_extend(raw24 >> 12,   12)   # depth / DTW (signed)
+    key2    = sign_extend(raw24 >> 12,   12)   # secondary value key
 
 Bytes 64+N*3 … end:
     int32 em_set_size   (number of overflow entries)
@@ -76,6 +76,7 @@ Public surface
     MalomDB(db_dir)
         .is_available()  → True when .sec2 files are found in db_dir
         .query_value(board) → OracleValue | None
+        .move_value(parent, child) → OracleMoveValue
         .query(board)    → {"outcome": "W"|"L"|"D", "dtw": int} | None
         .close()
 
@@ -521,6 +522,162 @@ class OracleValue:
 
 
 @dataclass(frozen=True)
+class OracleMoveValue:
+    """Complete Malom value of one candidate in its parent sector.
+
+    ``key1`` is relative to the parent sector, so candidates from the same
+    position can be compared directly.  ``key2`` is the transformed secondary
+    key after undoing the child viewpoint and adding the candidate ply.  It is
+    not globally ordered on its own: larger values are preferred when key1 is
+    negative, smaller values are preferred when key1 is positive, and key2 is
+    ignored when key1 is zero.
+    """
+
+    key1: int
+    key2: int
+    sector_value: int
+    absolute_key1: int
+    perspective: str
+    sector: tuple[int, int, int, int]
+    outcome: str
+    source: str
+    terminal: bool = False
+    child_value: Optional[OracleValue] = None
+
+    def ordering_key(self) -> tuple[int, int]:
+        """Return a key whose maximum is the preferred candidate."""
+        if self.key1 < 0:
+            secondary = self.key2
+        elif self.key1 > 0:
+            secondary = -self.key2
+        else:
+            secondary = 0
+        return self.key1, secondary
+
+
+def _signed_int16(value: int) -> int:
+    """Match the int16_t conversion used by Malom value correction."""
+    value &= 0xFFFF
+    return value - 0x10000 if value & 0x8000 else value
+
+
+def _sign(value: int) -> int:
+    return (value > 0) - (value < 0)
+
+
+def _project_absolute_outcome(
+    absolute_key1: int,
+    virt_win: int,
+    virt_loss: int,
+) -> str:
+    if absolute_key1 == virt_win:
+        return "W"
+    if absolute_key1 == virt_loss:
+        return "L"
+    return "D"
+
+
+def compare_oracle_move_values(
+    left: OracleMoveValue,
+    right: OracleMoveValue,
+) -> int:
+    """Compare two candidates from one parent position.
+
+    Return a negative integer when ``left`` is worse, zero for an oracle tie,
+    and a positive integer when ``left`` is better.  Comparing values from
+    different parent sectors or viewpoints is undefined in Malom and is
+    rejected rather than silently producing a plausible but invalid order.
+    """
+    if (
+        left.sector != right.sector
+        or left.sector_value != right.sector_value
+        or left.perspective != right.perspective
+    ):
+        raise ValueError("oracle move values have different parent contexts")
+
+    if left.key1 != right.key1:
+        return -1 if left.key1 < right.key1 else 1
+    if left.key1 < 0:
+        return (left.key2 > right.key2) - (left.key2 < right.key2)
+    if left.key1 > 0:
+        return (right.key2 > left.key2) - (right.key2 < left.key2)
+    return 0
+
+
+def undo_negate_oracle_value(
+    parent: OracleValue,
+    child: OracleValue,
+    virt_win: int,
+    virt_loss: int,
+) -> OracleMoveValue:
+    """Convert a child probe into a comparable parent candidate value.
+
+    Malom stores every probe relative to that probe's sector and side to move.
+    A candidate therefore needs both sector corrections before its viewpoint
+    can be negated.  If correction crosses zero, key2 changes sign; the final
+    increment accounts for the move from the parent to the child.
+    """
+    if parent.perspective == child.perspective:
+        raise ValueError("a child value must use the opposite viewpoint")
+
+    correction = parent.sector_value + child.sector_value
+    corrected_key1 = _signed_int16(child.raw_key1 + correction)
+    corrected_key2 = _sign(corrected_key1 * child.raw_key1) * child.key2
+    key1 = _signed_int16(-corrected_key1)
+    key2 = corrected_key2 + 1
+    absolute_key1 = key1 + parent.sector_value
+
+    return OracleMoveValue(
+        key1=key1,
+        key2=key2,
+        sector_value=parent.sector_value,
+        absolute_key1=absolute_key1,
+        perspective=parent.perspective,
+        sector=parent.sector,
+        outcome=_project_absolute_outcome(
+            absolute_key1,
+            virt_win,
+            virt_loss,
+        ),
+        source="malom",
+        child_value=child,
+    )
+
+
+def terminal_oracle_move_value(
+    parent: OracleValue,
+    child_outcome: str,
+    virt_win: int,
+    virt_loss: int,
+) -> OracleMoveValue:
+    """Create the exact one-ply parent value for a rules-terminal child."""
+    mover_outcome = {"W": "L", "L": "W", "D": "D"}.get(child_outcome)
+    if mover_outcome is None:
+        raise ValueError(f"invalid terminal child outcome: {child_outcome!r}")
+
+    if mover_outcome == "W":
+        absolute_key1 = virt_win
+    elif mover_outcome == "L":
+        absolute_key1 = virt_loss
+    else:
+        # Current project rules have no drawn terminal, but zero is the neutral
+        # full-value projection if such a rule is added later.
+        absolute_key1 = 0
+
+    return OracleMoveValue(
+        key1=_signed_int16(absolute_key1 - parent.sector_value),
+        key2=1,
+        sector_value=parent.sector_value,
+        absolute_key1=absolute_key1,
+        perspective=parent.perspective,
+        sector=parent.sector,
+        outcome=mover_outcome,
+        source="rules_terminal",
+        terminal=True,
+    )
+
+
+@dataclass(frozen=True)
 class _RawEntry:
     key1: int
     key2: int
@@ -805,6 +962,32 @@ class MalomDB:
         if value is None:
             return None
         return {"outcome": value.outcome, "dtw": value.key2}
+
+    def move_value(
+        self,
+        parent: OracleValue,
+        child: OracleValue,
+    ) -> OracleMoveValue:
+        """Convert a child probe to a full value in the parent context."""
+        return undo_negate_oracle_value(
+            parent,
+            child,
+            self._virt_win,
+            self._virt_loss,
+        )
+
+    def terminal_move_value(
+        self,
+        parent: OracleValue,
+        child_outcome: str,
+    ) -> OracleMoveValue:
+        """Return a full parent value for a rules-terminal successor."""
+        return terminal_oracle_move_value(
+            parent,
+            child_outcome,
+            self._virt_win,
+            self._virt_loss,
+        )
 
     def close(self) -> None:
         """Release cached sector data."""

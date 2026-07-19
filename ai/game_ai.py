@@ -855,6 +855,34 @@ class GameAI:
         if not malom_ok and not esdb_ok and not (fgdb and fgdb.is_available()):
             return move
         try:
+            if malom_ok:
+                try:
+                    malom_results = malom.query_all_moves(board, self.color)
+                except Exception:
+                    malom_results = []
+                eligible = [
+                    row for row in malom_results
+                    if row.get("move") in moves
+                ]
+                if (
+                    len(eligible) == len(moves)
+                    and eligible
+                    and all(row.get("oracle_value") is not None for row in eligible)
+                ):
+                    best_result = malom.best_move_result(eligible)
+                    if best_result is not None:
+                        best_move = best_result["move"]
+                        if best_move != move:
+                            _logger.info(
+                                "[Sentinel] Malom full-value override: %s -> %s "
+                                "(wdl: %s, value: %s)",
+                                self._move_notation(move),
+                                self._move_notation(best_move),
+                                best_result["wdl"],
+                                best_result["oracle_value"].ordering_key(),
+                            )
+                        return best_move
+
             wdl_map = {"W": 2, "D": 1, "L": 0}
             _flip   = {"W": "L", "L": "W", "D": "D"}
             best_move  = move
@@ -1099,9 +1127,9 @@ class GameAI:
                     # No drawing move found — fall through to search
 
         # ── Malom perfect DB fast path ─────────────────────────────────────
-        # When Malom DB is available, query all moves for WDL+DTM and return
-        # the best one immediately.  Fastest win first (lowest DTM), then draw.
-        # Losses fall through to search for most-stubborn defence.
+        # When Malom is available, compare its complete two-key candidate
+        # values.  Bare key2 is not monotonic for ultra-strong draw grades.
+        # Losses still fall through to search after the best DB result is known.
         _mdb = self._malom_db
         if (not fast_early_game
                 and _mdb is not None
@@ -1112,13 +1140,11 @@ class GameAI:
             except Exception:
                 _mdb_results = []
             if _mdb_results:
-                _wdl_rank = {"win": 0, "draw": 1, "loss": 2, "unknown": 3}
-                _mdb_results.sort(key=lambda r: (
-                    _wdl_rank.get(r["wdl"], 3),
-                    r["dtm"] if r["dtm"] is not None else 9999,
-                ))
-                _best_mdb = _mdb_results[0]
-                if _best_mdb["wdl"] in ("win", "draw"):
+                try:
+                    _best_mdb = _mdb.best_move_result(_mdb_results)
+                except Exception:
+                    _best_mdb = None
+                if _best_mdb and _best_mdb["wdl"] in ("win", "draw"):
                     self.last_was_blunder = False
                     self.last_thinking = f"Malom ({_best_mdb['wdl']})"
                     return _best_mdb["move"]

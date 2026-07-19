@@ -227,6 +227,7 @@ class ExternalSolvedDB:
     # opponent's perspective (it becomes their turn). Negate to score the move
     # for the player who made it.
     _NEGATE_WDL = {"W": "loss", "L": "win", "D": "draw"}
+    _PROJECT_WDL = {"W": "win", "L": "loss", "D": "draw"}
 
     def _enumerate_legal_moves(self, board, player) -> List[Dict[str, Any]]:
         """All legal apply-move dicts {from,to,capture} for ``player`` on ``board``.
@@ -240,15 +241,17 @@ class ExternalSolvedDB:
         return [dict(move) for move in get_all_legal_moves(board)]
 
     def query_all_moves(self, board, player) -> List[Dict[str, Any]]:
-        """All legal moves at ``board`` for ``player`` with their Malom WDL.
+        """Return legal moves with coarse labels and complete Malom values.
 
         Returns a list of dicts, one per legal move::
 
             {"move": {"from","to","capture"}, "wdl": "win"|"draw"|"loss"|"unknown",
-             "dtm": int | None}
+             "dtm": int | None, "oracle_value": OracleMoveValue | None}
 
-        WDL is from ``player``'s perspective. Returns an empty list when the DB
-        is unavailable (never raises).
+        WDL and ``oracle_value`` use ``player``'s perspective. ``dtm`` exposes
+        the transformed candidate key2 only for decisive WDL values; draw
+        ordering requires the complete two-key comparator.  Returns an empty
+        list when the DB is unavailable (never raises).
         """
         if not self._available:
             self._warn_unavailable_once()
@@ -259,30 +262,129 @@ class ExternalSolvedDB:
         except Exception as exc:
             logger.debug("[ExternalSolvedDB] move enumeration error: %s", exc)
             return []
+
+        query_value = getattr(self._malom, "query_value", None)
+        parent_value = None
+        if callable(query_value):
+            try:
+                parent_value = query_value(board)
+            except Exception:
+                parent_value = None
+
         for mv in legal:
             wdl = "unknown"
             dtm: Optional[int] = None
+            oracle_value = None
+            child_outcome = None
+            child_key2 = None
+            terminal_child = False
             try:
                 after = board.apply_move(mv)
                 rules_result = terminal_wdl(after)
                 if rules_result is not None:
-                    result = {"outcome": rules_result}
-                    dtm = 0
-                else:
-                    result = (
-                        self._malom.query(after)
-                        if self._malom is not None
-                        else None
+                    terminal_child = True
+                    child_outcome = rules_result
+                    make_terminal_value = getattr(
+                        self._malom,
+                        "terminal_move_value",
+                        None,
                     )
+                    if parent_value is not None and callable(make_terminal_value):
+                        oracle_value = make_terminal_value(
+                            parent_value,
+                            rules_result,
+                        )
+                else:
+                    child_value = query_value(after) if callable(query_value) else None
+                    if child_value is not None:
+                        child_outcome = child_value.outcome
+                        child_key2 = child_value.key2
+                        make_move_value = getattr(self._malom, "move_value", None)
+                        if parent_value is not None and callable(make_move_value):
+                            oracle_value = make_move_value(
+                                parent_value,
+                                child_value,
+                            )
+                    elif self._malom is not None:
+                        result = self._malom.query(after)
+                        if result:
+                            child_outcome = result.get("outcome")
+                            child_key2 = result.get("dtw")
             except Exception:
-                result = None
-            if result:
-                wdl = self._NEGATE_WDL.get(result.get("outcome"), "unknown")
-                if dtm is None:
-                    d = result.get("dtw")
-                    dtm = int(d) if isinstance(d, (int, float)) else None
-            out.append({"move": mv, "wdl": wdl, "dtm": dtm})
+                child_outcome = None
+                oracle_value = None
+
+            if oracle_value is not None:
+                wdl = self._PROJECT_WDL.get(oracle_value.outcome, "unknown")
+                if wdl in ("win", "loss"):
+                    dtm = oracle_value.key2
+            elif child_outcome is not None:
+                wdl = self._NEGATE_WDL.get(child_outcome, "unknown")
+                if terminal_child:
+                    dtm = 0
+                elif wdl in ("win", "loss") and isinstance(
+                    child_key2,
+                    (int, float),
+                ):
+                    dtm = int(child_key2)
+
+            out.append(
+                {
+                    "move": mv,
+                    "wdl": wdl,
+                    "dtm": dtm,
+                    "oracle_value": oracle_value,
+                }
+            )
         return out
+
+    @staticmethod
+    def best_move_result(
+        results: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Return the strongest result using full values when available."""
+        known = [row for row in results if row.get("wdl") != "unknown"]
+        if not known:
+            return None
+
+        valued = [row for row in known if row.get("oracle_value") is not None]
+        if len(valued) == len(known):
+            contexts = {
+                (
+                    value.sector,
+                    value.sector_value,
+                    value.perspective,
+                )
+                for value in (row["oracle_value"] for row in valued)
+            }
+            if len(contexts) == 1:
+                return max(
+                    valued,
+                    key=lambda row: row["oracle_value"].ordering_key(),
+                )
+            logger.error(
+                "[ExternalSolvedDB] cannot compare values from mixed contexts"
+            )
+
+        # Compatibility fallback for test doubles and older adapters that only
+        # expose WDL.  Draws deliberately tie: bare key2 cannot order them.
+        def coarse_key(row: Dict[str, Any]) -> tuple[int, int]:
+            rank = {"win": 2, "draw": 1, "loss": 0}.get(row.get("wdl"), -1)
+            raw_distance = row.get("dtm")
+            distance = (
+                abs(int(raw_distance))
+                if isinstance(raw_distance, (int, float))
+                else 0
+            )
+            if row.get("wdl") == "win":
+                secondary = -distance
+            elif row.get("wdl") == "loss":
+                secondary = distance
+            else:
+                secondary = 0
+            return rank, secondary
+
+        return max(known, key=coarse_key)
 
     def query_trajectory(self, states: List[Any]) -> List[Optional[str]]:
         """Return a WDL (or None) for each state in a trajectory.

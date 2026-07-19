@@ -53,6 +53,10 @@ _mdb = _load_leaf("malom_db", _ROOT / "ai" / "malom_db.py")
 # Imports from module under test
 MalomDB = _mdb.MalomDB
 OracleValue = _mdb.OracleValue
+OracleMoveValue = _mdb.OracleMoveValue
+compare_oracle_move_values = _mdb.compare_oracle_move_values
+terminal_oracle_move_value = _mdb.terminal_oracle_move_value
+undo_negate_oracle_value = _mdb.undo_negate_oracle_value
 parse_secval = _mdb.parse_secval
 board_to_wbf = _mdb.board_to_wbf
 read_sector = _mdb.read_sector
@@ -426,6 +430,111 @@ class TestDecodeEntry(unittest.TestCase):
         self.assertIsNone(result)
 
 
+class TestOracleMoveValues(unittest.TestCase):
+    @staticmethod
+    def _state_value(
+        raw_key1,
+        sector_value,
+        key2,
+        perspective,
+        sector,
+        entry_kind="value",
+    ):
+        absolute_key1 = raw_key1 + sector_value
+        outcome = (
+            "W" if absolute_key1 == 299
+            else "L" if absolute_key1 == -299
+            else "D"
+        )
+        return OracleValue(
+            raw_key1=raw_key1,
+            sector_value=sector_value,
+            absolute_key1=absolute_key1,
+            key2=key2,
+            entry_kind=entry_kind,
+            perspective=perspective,
+            sector=sector,
+            outcome=outcome,
+        )
+
+    @staticmethod
+    def _move_value(key1, key2):
+        return OracleMoveValue(
+            key1=key1,
+            key2=key2,
+            sector_value=0,
+            absolute_key1=key1,
+            perspective="W",
+            sector=(5, 5, 0, 0),
+            outcome="D",
+            source="test",
+        )
+
+    def test_undo_negate_applies_both_sectors_and_key2_sign_change(self):
+        parent = self._state_value(0, 4, 1, "W", (5, 5, 0, 0))
+        child = self._state_value(-3, 1, 7, "B", (5, 5, 0, 0))
+
+        candidate = undo_negate_oracle_value(parent, child, 299, -299)
+
+        self.assertEqual(candidate.key1, -2)
+        self.assertEqual(candidate.key2, -6)
+        self.assertEqual(candidate.absolute_key1, 2)
+        self.assertEqual(candidate.outcome, "D")
+        self.assertEqual(candidate.child_value, child)
+
+    def test_undo_negate_resets_count_key2_before_adding_move(self):
+        parent = self._state_value(
+            0, 0, 1, "W", (5, 5, 0, 0), entry_kind="count")
+        child = self._state_value(
+            0, 0, 14, "B", (5, 5, 0, 0), entry_kind="count")
+
+        candidate = undo_negate_oracle_value(parent, child, 299, -299)
+
+        self.assertEqual(candidate.key1, 0)
+        self.assertEqual(candidate.key2, 1)
+
+    def test_comparator_uses_both_keys_with_sign_dependent_direction(self):
+        self.assertGreater(
+            compare_oracle_move_values(
+                self._move_value(0, 99),
+                self._move_value(-29, 1),
+            ),
+            0,
+        )
+        self.assertGreater(
+            compare_oracle_move_values(
+                self._move_value(-10, 8),
+                self._move_value(-10, 3),
+            ),
+            0,
+        )
+        self.assertGreater(
+            compare_oracle_move_values(
+                self._move_value(10, 3),
+                self._move_value(10, 8),
+            ),
+            0,
+        )
+        self.assertEqual(
+            compare_oracle_move_values(
+                self._move_value(0, 1),
+                self._move_value(0, 999),
+            ),
+            0,
+        )
+
+    def test_terminal_value_is_one_ply_virtual_result_in_parent_sector(self):
+        parent = self._state_value(0, 7, 1, "W", (3, 3, 0, 0))
+
+        candidate = terminal_oracle_move_value(parent, "L", 299, -299)
+
+        self.assertEqual(candidate.key1, 292)
+        self.assertEqual(candidate.key2, 1)
+        self.assertEqual(candidate.absolute_key1, 299)
+        self.assertEqual(candidate.outcome, "W")
+        self.assertTrue(candidate.terminal)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 6. parse_secval (requires secval file)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -775,7 +884,53 @@ class TestExternalSolvedDB(unittest.TestCase):
             if row["move"] == move
         )
         self.assertEqual(result["wdl"], "win")
-        self.assertEqual(result["dtm"], 0)
+        self.assertEqual(result["dtm"], 1)
+        self.assertEqual(result["oracle_value"].outcome, "W")
+        self.assertEqual(result["oracle_value"].source, "rules_terminal")
+
+    def test_complete_draw_comparator_beats_raw_child_key2_order(self):
+        mod = self._load_db_teacher()
+        db = mod.ExternalSolvedDB(db_path=str(_DB_DIR), enabled=True)
+        board = BoardState.from_setup(
+            {
+                "c3": "W", "e4": "W", "f6": "W",
+                "f4": "W", "b4": "W",
+                "a7": "B", "d2": "B", "g1": "B",
+                "d5": "B", "d3": "B",
+            },
+            turn="W",
+            phase="move",
+        )
+        raw_key2_choice = {"from": "f4", "to": "f2", "capture": None}
+        complete_choice = {"from": "b4", "to": "b6", "capture": None}
+
+        results = db.query_all_moves(board, "W")
+        raw_row = next(r for r in results if r["move"] == raw_key2_choice)
+        complete_row = next(r for r in results if r["move"] == complete_choice)
+
+        self.assertEqual(raw_row["wdl"], "draw")
+        self.assertEqual(complete_row["wdl"], "draw")
+        self.assertEqual(raw_row["oracle_value"].child_value.key2, 1)
+        self.assertEqual(complete_row["oracle_value"].child_value.key2, 14)
+        self.assertEqual(
+            (raw_row["oracle_value"].key1, raw_row["oracle_value"].key2),
+            (-29, 2),
+        )
+        self.assertEqual(
+            (
+                complete_row["oracle_value"].key1,
+                complete_row["oracle_value"].key2,
+            ),
+            (0, 1),
+        )
+        self.assertGreater(
+            compare_oracle_move_values(
+                complete_row["oracle_value"],
+                raw_row["oracle_value"],
+            ),
+            0,
+        )
+        self.assertEqual(db.best_move_result(results)["move"], complete_choice)
 
     def test_disabled_not_available(self):
         mod = self._load_db_teacher()
