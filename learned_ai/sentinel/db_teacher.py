@@ -45,6 +45,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from game.rules import get_all_legal_moves
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -93,15 +95,16 @@ class ExternalSolvedDB:
         else:
             return
 
+        self.format_probe = {
+            "db_dir": str(self.db_dir),
+            "available": False,
+        }
         if _MalomDB is None:
             logger.warning("[ExternalSolvedDB] ai.malom_db not importable; DB unavailable")
             return
 
         self._malom = _MalomDB(self.db_dir)
-        self.format_probe = {
-            "db_dir": str(self.db_dir),
-            "available": self._malom.is_available(),
-        }
+        self.format_probe["available"] = self._malom.is_available()
         if self._malom.is_available():
             logger.info("[ExternalSolvedDB] Malom DB ready at %s", self.db_dir)
 
@@ -151,18 +154,59 @@ class ExternalSolvedDB:
         """Alias of ``query_state`` matching EndgameSolvedDB.query()."""
         return self.query_state(board)
 
+    @staticmethod
+    def _validated_atomic_move(board, move: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Return a normalized complete legal move, or ``None``.
+
+        Malom stores only settled positions.  A move that forms a Mill is not
+        complete until its mandatory capture has been selected, so validation
+        must happen before either the current or successor state is queried.
+        ``get_all_legal_moves`` is the project's authoritative atomic-action
+        enumerator and rejects missing, spurious, or illegal captures.
+        """
+        if not isinstance(move, dict):
+            return None
+        if any(field not in move for field in ("from", "to", "capture")):
+            return None
+
+        atomic_move = {
+            "from": move["from"],
+            "to": move["to"],
+            "capture": move["capture"],
+        }
+        try:
+            if atomic_move not in get_all_legal_moves(board):
+                return None
+        except Exception:
+            return None
+        return atomic_move
+
     def query_move_quality(self, board, move: Dict[str, Any]) -> Optional[float]:
         """Quality delta of ``move`` from ``board``: + good, - bad, None unknown.
 
-        Computed (once decodable) as WDL(before) vs WDL(after move) from the
-        mover's perspective. Returns None while the format is undecoded.
+        ``move`` must be a complete legal atomic action with explicit ``from``,
+        ``to``, and ``capture`` fields.  A Mill-forming move without its
+        mandatory capture, or a move with a spurious/illegal capture, returns
+        ``None`` without querying Malom.
+
+        The score compares WDL before the action with WDL after the fully
+        settled action, from the original mover's perspective.
         """
         if not self._available:
             self._warn_unavailable_once()
             return None
+
+        atomic_move = self._validated_atomic_move(board, move)
+        if atomic_move is None:
+            logger.debug(
+                "[ExternalSolvedDB] rejected incomplete or illegal atomic move: %r",
+                move,
+            )
+            return None
+
         try:
             before = self._lookup(board)
-            after_board = board.apply_move(move)
+            after_board = board.apply_move(atomic_move)
             after = self._lookup(after_board)
         except Exception:
             return None
@@ -184,30 +228,13 @@ class ExternalSolvedDB:
     def _enumerate_legal_moves(self, board, player) -> List[Dict[str, Any]]:
         """All legal apply-move dicts {from,to,capture} for ``player`` on ``board``.
 
-        Mill-closing moves are expanded into one entry per legal capture target.
-        Uses only BoardState's own move generation — no game-logic changes here.
+        Delegate to the rules engine's authoritative atomic-action enumerator.
+        Asking for a player other than the side to move fails closed; applying
+        such a move would otherwise move the wrong colour in ``BoardState``.
         """
-        moves: List[Dict[str, Any]] = []
-        if board.phase == "place":
-            base = [{"from": None, "to": tgt} for tgt in board.legal_placements(player)]
-        else:
-            base = [{"from": src, "to": tgt} for src, tgt in board.legal_moves(player)]
-
-        for mv in base:
-            mv = {"from": mv.get("from"), "to": mv.get("to"), "capture": None}
-            try:
-                after = board.apply_move(mv)
-                closes = mv["to"] is not None and after.is_mill(mv["to"], player)
-            except Exception:
-                closes = False
-            if closes:
-                caps = board.legal_captures(player)
-                if caps:
-                    for cap in caps:
-                        moves.append({"from": mv["from"], "to": mv["to"], "capture": cap})
-                    continue
-            moves.append(mv)
-        return moves
+        if player != board.turn:
+            return []
+        return [dict(move) for move in get_all_legal_moves(board)]
 
     def query_all_moves(self, board, player) -> List[Dict[str, Any]]:
         """All legal moves at ``board`` for ``player`` with their Malom WDL.

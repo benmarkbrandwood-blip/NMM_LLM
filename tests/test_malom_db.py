@@ -730,6 +730,30 @@ class TestExternalSolvedDB(unittest.TestCase):
         result = db.query_state(board)
         self.assertIn(result, ("W", "L", "D"))
 
+    def test_query_move_quality_uses_settled_four_to_three_capture(self):
+        mod = self._load_db_teacher()
+        db = mod.ExternalSolvedDB(db_path=str(_DB_DIR), enabled=True)
+        board = BoardState.from_setup(
+            {
+                "a7": "W", "d7": "W", "g4": "W", "b4": "W",
+                "a4": "B", "b6": "B", "d6": "B", "f6": "B",
+            },
+            turn="W",
+            phase="move",
+        )
+        complete = {"from": "g4", "to": "g7", "capture": "a4"}
+        incomplete = {"from": "g4", "to": "g7", "capture": None}
+        spurious = {"from": "g4", "to": "g1", "capture": "a4"}
+
+        self.assertIsInstance(db.query_move_quality(board, complete), float)
+        self.assertIsNone(db.query_move_quality(board, incomplete))
+        self.assertIsNone(db.query_move_quality(board, spurious))
+
+        settled = board.apply_move(complete)
+        self.assertEqual(settled.turn, "B")
+        self.assertEqual(settled.pieces_on_board, {"W": 4, "B": 3})
+        self.assertEqual(settled.positions["a4"], "")
+
     def test_disabled_not_available(self):
         mod = self._load_db_teacher()
         db = mod.ExternalSolvedDB(db_path=str(_DB_DIR), enabled=False)

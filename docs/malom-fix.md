@@ -3,9 +3,9 @@
 This document catalogues the known problems with how the Malom perfect-play database
 is decoded and used throughout training, the specialist database, and the game.
 
-Status (2026-07-20): Step 1 is implemented and verified against Sanmill plus the
-local 498-sector database. Steps 2–5 remain pending; this change did not write to
-SpecialistDB or resume training.
+Status (2026-07-20): Steps 1 and 3 are implemented and verified against Sanmill
+plus the local 498-sector database. Steps 2, 4, and 5 remain pending; these
+changes did not write to SpecialistDB or resume training.
 
 ---
 
@@ -196,10 +196,12 @@ Once the decoder is verified correct, clear all `malom_label` fields in
 drop and rebuild the DB from scratch — the position hashes are deterministic so
 game re-play isn't needed; just re-label existing rows.
 
-### Step 3 — Fix Mill atomicity in `query_move_quality`
+### Step 3 — Fix Mill atomicity in `query_move_quality` (completed 2026-07-20)
 
-Skip Malom query (return `None`) when `move` contains a Mill close without a
-capture, or ensure callers always pass the complete move dict including `capture`.
+`query_move_quality` now validates the input against the rules engine's complete
+atomic-action list before either Malom lookup. A Mill close without its mandatory
+capture, a spurious capture, or any other illegal action returns `None`. A valid
+action is applied once with its capture before the successor position is queried.
 
 ### Step 4 — Reinstate `MALOM_REWARD`
 

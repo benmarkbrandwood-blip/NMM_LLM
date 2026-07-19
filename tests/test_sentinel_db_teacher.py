@@ -3,12 +3,56 @@
 from __future__ import annotations
 
 from game.board import BoardState
+from game.rules import get_game_phase
 from learned_ai.sentinel.config import SentinelConfig
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB, open_external_db
 
 
 def _board():
     return BoardState.from_fen_string("BBW....B.W.W............|W|3|3")
+
+
+class _FakeMalom:
+    def __init__(self, outcomes=("D", "L")):
+        self.outcomes = outcomes
+        self.queried_boards = []
+
+    def is_available(self):
+        return True
+
+    def query(self, board):
+        index = len(self.queried_boards)
+        self.queried_boards.append(board)
+        return {"outcome": self.outcomes[index], "dtw": 0}
+
+    def close(self):
+        pass
+
+
+def _available_fake_db(outcomes=("D", "L")):
+    db = ExternalSolvedDB("")
+    fake = _FakeMalom(outcomes)
+    db._malom = fake
+    return db, fake
+
+
+def _placement_mill_board():
+    return BoardState.from_setup(
+        {"a7": "W", "d7": "W", "a4": "B", "b4": "B"},
+        turn="W",
+        phase="place",
+    )
+
+
+def _four_vs_four_mill_board():
+    return BoardState.from_setup(
+        {
+            "a7": "W", "d7": "W", "g4": "W", "b4": "W",
+            "a4": "B", "b6": "B", "d6": "B", "f6": "B",
+        },
+        turn="W",
+        phase="move",
+    )
 
 
 def test_unavailable_returns_none_empty_path():
@@ -69,3 +113,85 @@ def test_open_external_db_from_config():
 def test_close_is_noop():
     db = ExternalSolvedDB("")
     db.close()  # must not raise
+
+
+def test_query_move_quality_accepts_explicit_non_capture_action():
+    db, fake = _available_fake_db()
+    board = _placement_mill_board()
+
+    quality = db.query_move_quality(
+        board, {"from": None, "to": "g4", "capture": None})
+
+    assert quality == 1.0
+    assert len(fake.queried_boards) == 2
+    assert fake.queried_boards[1].positions["g4"] == "W"
+    assert fake.queried_boards[1].turn == "B"
+
+
+def test_query_move_quality_rejects_mill_without_capture_before_lookup():
+    board = _placement_mill_board()
+    incomplete_moves = (
+        {"from": None, "to": "g7"},
+        {"from": None, "to": "g7", "capture": None},
+    )
+
+    for move in incomplete_moves:
+        db, fake = _available_fake_db()
+        assert db.query_move_quality(board, move) is None
+        assert fake.queried_boards == []
+
+
+def test_query_move_quality_rejects_spurious_or_illegal_capture():
+    board = _placement_mill_board()
+    invalid_moves = (
+        {"from": None, "to": "g4", "capture": "a4"},
+        {"from": None, "to": "g7", "capture": "g4"},
+    )
+
+    for move in invalid_moves:
+        db, fake = _available_fake_db()
+        assert db.query_move_quality(board, move) is None
+        assert fake.queried_boards == []
+
+
+def test_query_move_quality_applies_complete_mill_and_capture_atomically():
+    db, fake = _available_fake_db()
+    board = _placement_mill_board()
+    move = {"from": None, "to": "g7", "capture": "a4"}
+
+    quality = db.query_move_quality(board, move)
+
+    assert quality == 1.0
+    assert len(fake.queried_boards) == 2
+    settled = fake.queried_boards[1]
+    assert settled.positions["g7"] == "W"
+    assert settled.positions["a4"] == ""
+    assert settled.pieces_on_board == {"W": 3, "B": 1}
+    assert settled.turn == "B"
+
+
+def test_query_move_quality_capture_covers_four_to_three_and_side_swap():
+    db, fake = _available_fake_db()
+    board = _four_vs_four_mill_board()
+    move = {"from": "g4", "to": "g7", "capture": "a4"}
+
+    quality = db.query_move_quality(board, move)
+
+    assert quality == 1.0
+    settled = fake.queried_boards[1]
+    assert settled.pieces_on_board == {"W": 4, "B": 3}
+    assert settled.turn == "B"
+    assert get_game_phase(settled, "B") == "fly"
+
+
+def test_db_teacher_move_enumerator_uses_atomic_rules_source():
+    db, _ = _available_fake_db()
+    board = _placement_mill_board()
+    complete = {"from": None, "to": "g7", "capture": "a4"}
+    incomplete = {"from": None, "to": "g7", "capture": None}
+
+    moves = db._enumerate_legal_moves(board, "W")
+
+    assert complete in moves
+    assert incomplete not in moves
+    assert db._enumerate_legal_moves(board, "B") == []
