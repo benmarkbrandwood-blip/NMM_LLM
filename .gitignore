@@ -21,6 +21,9 @@ env/
 # Claude Code local settings
 .claude/
 
+# Per-machine training paths (copy from training_paths.example.json)
+data/training_paths.local.json
+
 # ChromaDB data (generated at runtime)
 data/chroma/
 

@@ -18,6 +18,7 @@ import argparse
 import copy
 import json
 import math
+import os
 import random
 import sys
 import time
@@ -313,12 +314,75 @@ class GameDiag:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _load_settings() -> dict:
-    p = _ROOT / "data" / "settings.json"
-    if p.exists():
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+def _load_settings(paths_config: Optional[str] = None) -> dict:
+    """Load shared settings, then overlay per-machine training paths."""
+    settings: dict = {}
+    shared_path = _ROOT / "data" / "settings.json"
+    if shared_path.exists():
+        with open(shared_path, "r", encoding="utf-8") as f:
+            settings.update(json.load(f))
+
+    local_path = Path(paths_config).expanduser() if paths_config else (
+        _ROOT / "data" / "training_paths.local.json"
+    )
+    if not local_path.is_absolute():
+        local_path = _ROOT / local_path
+    if local_path.exists():
+        with open(local_path, "r", encoding="utf-8") as f:
+            local_settings = json.load(f)
+        if not isinstance(local_settings, dict):
+            raise ValueError(f"Training paths config must contain a JSON object: {local_path}")
+        settings.update(local_settings)
+        print(f"[s_gen_v2] Path config: {local_path}")
+    elif paths_config:
+        raise FileNotFoundError(f"Training paths config not found: {local_path}")
+    else:
+        print("[s_gen_v2] No local path config; using environment/shared/default paths")
+    return settings
+
+
+def _resolve_configured_path(value: Any) -> str:
+    """Expand a configured path and anchor relative paths at the repo root."""
+    if value is None or str(value).strip() == "":
+        return ""
+    expanded = os.path.expandvars(os.path.expanduser(str(value).strip()))
+    path = Path(expanded)
+    if not path.is_absolute():
+        path = _ROOT / path
+    return str(path)
+
+
+def _configure_paths(args: argparse.Namespace) -> None:
+    """Apply CLI > environment > local/shared config > default precedence."""
+    settings = _load_settings(args.paths_config)
+    specs = {
+        "out_dir": (
+            "NMM_GENERALIST_OUT_DIR", "generalist_output_dir",
+            _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2",
+        ),
+        "sentinel": (
+            "NMM_SENTINEL_CHECKPOINT", "sentinel_checkpoint",
+            _ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt",
+        ),
+        "malom": ("NMM_MALOM_DB", "malom_db_path", ""),
+        "value_net": ("NMM_VALUE_NET", "value_net_path", _ROOT / "data" / "value_net.npz"),
+        "gap_net": ("NMM_GAP_NET", "gap_net_path", _ROOT / "data" / "gap_net.npz"),
+        "human_db": ("NMM_HUMAN_DB", "human_db_path", _ROOT / "data" / "human_db.sqlite"),
+        "specialist_db": (
+            "NMM_SPECIALIST_DB", "specialist_db_path", _ROOT / "data" / "specialist_db.sqlite",
+        ),
+    }
+    for attr, (env_name, setting_name, default) in specs.items():
+        cli_value = getattr(args, attr)
+        if cli_value is not None:
+            value = cli_value
+        elif env_name in os.environ:
+            value = os.environ[env_name]
+        elif setting_name in settings:
+            value = settings[setting_name]
+        else:
+            value = default
+        setattr(args, attr, _resolve_configured_path(value))
 
 
 def _safe_mean(xs: list[float]) -> float:
@@ -1041,6 +1105,7 @@ def _build_game_diag(
 # ── Main training loop ────────────────────────────────────────────────────────
 
 def run(args: argparse.Namespace) -> None:
+    _configure_paths(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
     rng = random.Random(args.seed)
@@ -1051,7 +1116,7 @@ def run(args: argparse.Namespace) -> None:
 
     # ── Load components ────────────────────────────────────────────────────────
     sentinel = None
-    sent_path = args.sentinel or str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt")
+    sent_path = args.sentinel
     if Path(sent_path).exists():
         sentinel = load_advisor(sent_path)
         if sentinel and sentinel.is_loaded():
@@ -1062,7 +1127,7 @@ def run(args: argparse.Namespace) -> None:
         print("[s_gen_v2] Sentinel unavailable — sentinel reward = 0")
 
     db = None
-    malom_path = args.malom or _load_settings().get("malom_db_path", "")
+    malom_path = args.malom
     if malom_path and Path(malom_path).exists():
         try:
             from learned_ai.sentinel.db_teacher import ExternalSolvedDB
@@ -1077,7 +1142,7 @@ def run(args: argparse.Namespace) -> None:
         print("[s_gen_v2] Malom DB unavailable — lookahead uses no endgame early-exit")
 
     value_net = None
-    vn_path = args.value_net or str(_ROOT / "data" / "value_net.npz")
+    vn_path = args.value_net
     if vn_path and Path(vn_path).exists():
         try:
             from ai.value_net import ValueNet as _ValueNet
@@ -1089,7 +1154,7 @@ def run(args: argparse.Namespace) -> None:
         print("[s_gen_v2] No value net — VN features will be 0")
 
     gap_net = None
-    gap_path = args.gap_net or str(_ROOT / "data" / "gap_net.npz")
+    gap_path = args.gap_net
     if gap_path and Path(gap_path).exists():
         try:
             from ai.gap_net import GapNet as _GapNet
@@ -1102,7 +1167,7 @@ def run(args: argparse.Namespace) -> None:
 
     # v3: HumanDB — for per-candidate human-play-frequency feature
     human_db = None
-    hdb_path = _ROOT / "data" / "human_db.sqlite"
+    hdb_path = Path(args.human_db)
     if hdb_path.exists():
         try:
             from ai.human_db import HumanDB
@@ -1129,7 +1194,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"[s_gen_v2] LookaheadAdvisor: 12-ply width, {args.sim_ply_depth}-ply sim, 5 signals (h+learner_sent+opp_sent+vn+gap)")
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
-    specialist_db = SpecialistDB(_ROOT / "data" / "specialist_db.sqlite")
+    specialist_db = SpecialistDB(args.specialist_db)
     print(f"[s_gen_v2] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────
@@ -1678,11 +1743,15 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
-    p.add_argument("--out-dir",  default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2"))
-    p.add_argument("--sentinel", default=str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"))
-    p.add_argument("--malom",    default="", type=str)
-    p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
-    p.add_argument("--gap-net",  default=str(_ROOT / "data" / "gap_net.npz"),   type=str)
+    p.add_argument("--paths-config", default=None, type=str,
+                   help="Per-machine JSON path config (default: data/training_paths.local.json when present)")
+    p.add_argument("--out-dir",       default=None, type=str)
+    p.add_argument("--sentinel",      default=None, type=str)
+    p.add_argument("--malom",         default=None, type=str)
+    p.add_argument("--value-net",     default=None, type=str)
+    p.add_argument("--gap-net",       default=None, type=str)
+    p.add_argument("--human-db",      default=None, type=str)
+    p.add_argument("--specialist-db", default=None, type=str)
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument("--seed",                type=int,   default=42)
