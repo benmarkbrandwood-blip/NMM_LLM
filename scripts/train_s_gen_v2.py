@@ -583,12 +583,14 @@ def _compute_per_move_reward(
     return float(rb.total), rb
 
 
-def _retroactive_rescore(trajectory: list[ScaffoldedStep], step_diags: list[StepDiag], outcome: float) -> None:
+def _retroactive_rescore(trajectory: list[ScaffoldedStep], step_diags: list[StepDiag], outcome: float,
+                         draw_penalty_scale: float = 1.0) -> None:
     n = len(trajectory)
     outcome_positive = 1.0 if outcome == WIN_REWARD else 0.0
+    effective_outcome = outcome * draw_penalty_scale if outcome in (DRAW_SHORT, DRAW_LONG) else outcome
     for t_idx, step in enumerate(trajectory):
         plies_remaining  = n - t_idx - 1
-        delta            = LAMBDA * outcome * (DECAY ** plies_remaining)
+        delta            = LAMBDA * effective_outcome * (DECAY ** plies_remaining)
         if outcome_positive > 0.0:
             not_top1 = 1.0 - float(step_diags[t_idx].was_top1_heuristic)
             delta   += EXPLORE_COEF * not_top1
@@ -1161,6 +1163,7 @@ def run(args: argparse.Namespace) -> None:
     last_update_vl  = None
     last_update_ent = None
     best_win_rate_at_diff = 0.0
+    recovery_grace: int   = 0   # games remaining where draw penalty is suppressed post-recovery
 
     branch_bucket_history: deque[str] = deque(maxlen=args.bucket_window)
 
@@ -1245,6 +1248,13 @@ def run(args: argparse.Namespace) -> None:
                 _opp,
             ))
 
+        # ── Draw penalty scale (suppressed during post-recovery grace period) ──
+        _draw_scale = 0.0 if recovery_grace > 0 else 1.0
+        if recovery_grace > 0:
+            recovery_grace -= 1
+            if recovery_grace == 0:
+                print(f"[s_gen_v2] Recovery grace expired — draw penalty restored")
+
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
         _is_deep_game = (game_count % 20 == 0)   # 1-in-20 games use full 12-ply sim
 
@@ -1282,7 +1292,7 @@ def run(args: argparse.Namespace) -> None:
             game_retry_ply         = cfg.retry_ply
 
             if result.trajectory:
-                _retroactive_rescore(result.trajectory, result.step_diags, result.outcome)
+                _retroactive_rescore(result.trajectory, result.step_diags, result.outcome, _draw_scale)
 
             if result.outcome == WIN_REWARD:
                 ep_steps.extend(result.trajectory)
@@ -1311,7 +1321,7 @@ def run(args: argparse.Namespace) -> None:
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
-                                         confirm_result.outcome)
+                                         confirm_result.outcome, _draw_scale)
                 confirmed = (
                     (result.outcome == LOSS_REWARD and confirm_result.outcome == LOSS_REWARD) or
                     (result.outcome == DRAW_SHORT  and confirm_result.outcome == DRAW_SHORT)
@@ -1384,7 +1394,7 @@ def run(args: argparse.Namespace) -> None:
                     malom_db=db,
                 )
                 if retry_result.trajectory:
-                    _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome)
+                    _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
                 _rv = _outcome_to_history_float(retry_result.outcome)
@@ -1440,7 +1450,7 @@ def run(args: argparse.Namespace) -> None:
                 )
 
                 if branch_result.trajectory:
-                    _retroactive_rescore(branch_result.trajectory, branch_result.step_diags, branch_result.outcome)
+                    _retroactive_rescore(branch_result.trajectory, branch_result.step_diags, branch_result.outcome, _draw_scale)
                     if branch_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(branch_result.trajectory)
                     branch_bucket_history.append(bucket)
@@ -1525,7 +1535,9 @@ def run(args: argparse.Namespace) -> None:
                                 win_history.clear()
                                 win_history_heuristic.clear()
                                 temperature = TEMP_START
+                                recovery_grace = 100
                                 print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                                print(f"[s_gen_v2] Recovery grace: draw penalty suppressed for 100 games")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
                 branch_diags = [d for d in diag_buffer if d.is_branch]
