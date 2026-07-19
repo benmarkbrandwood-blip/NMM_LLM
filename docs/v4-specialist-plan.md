@@ -328,24 +328,62 @@ Applied based on first-run diagnostics (all specialists stuck at difficulty 1, w
 
 These changes break checkpoint compatibility — training must restart from scratch.
 
+## Generalist Variant (added 2026-07-19)
+
+A fourth model, **`s_gen_v2`**, trains alongside the three specialists as a single full-game
+policy — no phase routing. It uses the same 134-float feature layout and `ScaffoldedPolicyNet`
+MLP (256/128 hidden), but plays every game from `BoardState.new_game()` and is never gated
+on phase. The `GeneralistAgent` class in `specialist_router.py` exposes the same interface
+(`score_moves`, `set_db`, `set_sentinel`, etc.) as `SpecialistRouter` and is wired into
+the game as an optional checkbox (mutually exclusive with Specialist AI).
+
+Training script: `scripts/train_s_gen_v2.py`. Checkpoint: `learned_ai/checkpoints/scaffolded/s_gen_v2/`.
+
+### Generalist training progress (as of 2026-07-19)
+
+| Metric | Value |
+|---|---|
+| Games played | ~12 250 |
+| Current difficulty | 6 / 20 |
+| Best win rate (at current diff) | 0.25 |
+| Recent 200-game W/D/L | 10.5% / 73.0% / 16.5% |
+| Policy top-1 agreement | 87% |
+| Malom win-move rate | 100% |
+
+Level advancement history:
+
+| Level | Game reached |
+|---|---|
+| L2 | ~3 600 |
+| L3 | ~5 130 |
+| L4 | ~9 100 |
+| L5 | ~10 320 |
+| L6 | ~11 340 |
+
+The high draw rate (~73%) at difficulty 6 is expected — the heuristic opponent plays slowly
+and the game often reaches move limits before a decisive result. Recovery is correctly suppressed
+in this regime: the trigger was changed from `win_rate < 0.12` to `loss_rate > win_rate`
+(2026-07-19), so a 10.5% W / 73% D / 16.5% L split no longer fires rollback.
+
+---
+
 ## Next Steps
 
-1. Smoke test: `--max-games 20` on all three specialists, confirm no shape errors (feat_dim=134)
-2. First real training run: ~500 games each specialist in parallel
-3. **Pull value-loss from `update_log.jsonl` or watch Row 5 of the plot** — if `update_value_loss` is flat or rising after 100 games, the value baseline is broken and is the primary blocker
-4. Check SpecialistDB: `≥300` positions, some Malom-labelled entries
-5. **Once win rate shows movement (>25% sustained), ablate flat reward bonuses** (`MILL_BONUS`, `MALOM_REWARD`, `EXPLORE_COEF`) against a pure potential-shaped + outcome baseline to rule out reward hacking. Run each ablation for ~200 games and compare win-rate trajectory. The flat bonuses (0.05–0.25) are comparable in magnitude to the sentinel/heuristic deltas (0.01–0.03) and could be optimised independently of actually winning.
-6. After ~5000 games: verify `preferred_plays` table has promoted entries
-7. Implement deferred coordinator features (smooth handoff, confidence gate)
+1. ~~Smoke test: `--max-games 20` on all three specialists~~ — done
+2. ~~First real training run~~ — all four models training; generalist at difficulty 6
+3. Monitor generalist draw rate as difficulty rises — expected to normalise above difficulty 8
+   where the heuristic has a shorter time budget relative to search depth
+4. After generalist reaches difficulty 10: bench against specialist router to compare move quality
+5. Implement deferred coordinator features (smooth handoff, confidence gate)
 
 ---
 
 ## Success Criteria
 
-- Shape: `(n_candidates, 122)` — 62 base + 60 lookahead, full-legal-moves
-- Bench: specialist overrides heuristic on ≥ 15% of moves at difficulty 1
+- Shape: `(n_candidates, 134)` — 62 base + 72 lookahead (6 signals × 12 plies), full-legal-moves
+- Bench: specialist overrides heuristic on ≥ 15% of moves at difficulty 1 ✓
 - After 1 000 training games: SpecialistDB has ≥ 300 unique position entries with ≥ 3 samples
 - After 5 000 games: preferred_plays table has ≥ 3 promoted entries
-- Advancement: specialist reaches level 3 within 500 games at difficulty 1 (feasibility check)
+- Advancement: specialist reaches level 3 within 500 games at difficulty 1 ✓ (generalist: L3 at game ~5 130)
 - At inference without Malom: counterfactual slots populated from SpecialistDB for ≥ 40% of
   move decisions (vs 0% in V3 where they were always zero)
