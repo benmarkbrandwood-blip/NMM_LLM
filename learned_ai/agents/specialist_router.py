@@ -111,11 +111,7 @@ class SpecialistRouter:
                 la._sentinel = sentinel_advisor  # type: ignore[attr-defined]
 
     def set_db(self, db) -> None:
-        """Compat with OverseerAdvisor — Malom perfect DB.  Also wires the
-        endgame LookaheadAdvisor's early-terminate DB probe if it isn't set."""
         self._db = db
-        if self._endgame_db is None and self._la_end is not None:
-            self._la_end._endgame_db = db  # type: ignore[attr-defined]
 
     def set_value_net(self, value_net) -> None:
         self._value_net = value_net
@@ -294,8 +290,6 @@ class GeneralistAgent:
 
     def set_db(self, db) -> None:
         self._db = db
-        if self._la is not None:
-            self._la._endgame_db = db  # type: ignore[attr-defined]
 
     def set_sentinel(self, sentinel_advisor) -> None:
         self._sentinel = sentinel_advisor
@@ -322,7 +316,7 @@ class GeneralistAgent:
             enc = encode_position_with_lookahead(
                 board, color,
                 sentinel_advisor=self._sentinel,
-                db=self._db,
+                db=None,
                 value_net=self._value_net,
                 lookahead_advisor=self._la,
                 specialist_db=self._specialist_db,
