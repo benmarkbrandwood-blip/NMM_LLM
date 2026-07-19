@@ -45,7 +45,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from game.rules import get_all_legal_moves
+from game.rules import get_all_legal_moves, terminal_wdl
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,9 @@ class ExternalSolvedDB:
         if self._malom is None:
             return None
         try:
+            rules_result = terminal_wdl(board)
+            if rules_result is not None:
+                return rules_result
             result = self._malom.query(board)
             return result["outcome"] if result else None
         except Exception as exc:
@@ -261,13 +264,23 @@ class ExternalSolvedDB:
             dtm: Optional[int] = None
             try:
                 after = board.apply_move(mv)
-                result = self._malom.query(after) if self._malom is not None else None
+                rules_result = terminal_wdl(after)
+                if rules_result is not None:
+                    result = {"outcome": rules_result}
+                    dtm = 0
+                else:
+                    result = (
+                        self._malom.query(after)
+                        if self._malom is not None
+                        else None
+                    )
             except Exception:
                 result = None
             if result:
                 wdl = self._NEGATE_WDL.get(result.get("outcome"), "unknown")
-                d = result.get("dtw")
-                dtm = int(d) if isinstance(d, (int, float)) else None
+                if dtm is None:
+                    d = result.get("dtw")
+                    dtm = int(d) if isinstance(d, (int, float)) else None
             out.append({"move": mv, "wdl": wdl, "dtm": dtm})
         return out
 

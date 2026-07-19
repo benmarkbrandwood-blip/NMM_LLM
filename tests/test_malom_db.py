@@ -754,6 +754,29 @@ class TestExternalSolvedDB(unittest.TestCase):
         self.assertEqual(settled.pieces_on_board, {"W": 4, "B": 3})
         self.assertEqual(settled.positions["a4"], "")
 
+    def test_terminal_three_to_two_capture_uses_rules_not_missing_sector(self):
+        mod = self._load_db_teacher()
+        db = mod.ExternalSolvedDB(db_path=str(_DB_DIR), enabled=True)
+        board = BoardState.from_setup(
+            {
+                "a7": "W", "d7": "W", "g4": "W",
+                "a4": "B", "b6": "B", "d6": "B",
+            },
+            turn="W",
+            phase="move",
+        )
+        move = {"from": "g4", "to": "g7", "capture": "a4"}
+
+        self.assertEqual(db.query_state(board), "W")
+        self.assertEqual(db.query_move_quality(board, move), 0.0)
+
+        result = next(
+            row for row in db.query_all_moves(board, "W")
+            if row["move"] == move
+        )
+        self.assertEqual(result["wdl"], "win")
+        self.assertEqual(result["dtm"], 0)
+
     def test_disabled_not_available(self):
         mod = self._load_db_teacher()
         db = mod.ExternalSolvedDB(db_path=str(_DB_DIR), enabled=False)

@@ -67,6 +67,30 @@ def is_terminal(board: BoardState) -> Tuple[bool, Optional[str]]:
     return False, None
 
 
+def terminal_wdl(
+    board: BoardState,
+    perspective: Optional[str] = None,
+) -> Optional[str]:
+    """Return the rules-terminal WDL for ``perspective``, or ``None``.
+
+    External position databases generally contain only stable, hashable board
+    states.  The game rules remain authoritative for terminal positions such
+    as a completed capture that leaves the opponent with fewer than three
+    pieces, or a side to move that is blocked.  By default the result uses the
+    side to move, matching the query convention of the solved databases.
+    """
+    side = board.turn if perspective is None else perspective
+    if side not in ("W", "B"):
+        raise ValueError(f"invalid WDL perspective: {side!r}")
+
+    terminal, winner = is_terminal(board)
+    if not terminal:
+        return None
+    if winner is None:
+        return "D"
+    return "W" if winner == side else "L"
+
+
 # ── Mill-formation check ──────────────────────────────────────────────────────
 
 def does_form_mill(board: BoardState, move: dict) -> bool:

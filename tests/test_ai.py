@@ -4,7 +4,7 @@ import time
 import unittest
 
 from game.board import BoardState, POSITIONS
-from game.rules import get_all_legal_moves
+from game.rules import get_all_legal_moves, terminal_wdl
 from ai.heuristics import evaluate, INF, _closed_mills, _blocked_count, _two_configs, _double_mills
 from ai.game_ai import GameAI
 
@@ -125,6 +125,39 @@ class TestGameAIChooseMove(unittest.TestCase):
         elapsed = time.time() - start
         self.assertIn(move, get_all_legal_moves(board))
         self.assertLess(elapsed, 5.0, "Difficulty 3 must respond in under 5 seconds")
+
+    def test_db_adjust_prefers_rules_terminal_without_database_probe(self):
+        class FakeDB:
+            def __init__(self):
+                self.queried = []
+
+            def is_available(self):
+                return True
+
+            def query(self, position):
+                self.queried.append(position)
+                return "W"
+
+        board = BoardState.from_setup(
+            {
+                "a7": "W", "d7": "W", "g4": "W",
+                "a4": "B", "b6": "B", "d6": "B",
+            },
+            turn="W",
+            phase="move",
+        )
+        terminal_move = {"from": "g4", "to": "g7", "capture": "a4"}
+        legal = get_all_legal_moves(board)
+        fallback = next(move for move in legal if move != terminal_move)
+        fake = FakeDB()
+        ai = GameAI(color="W", difficulty=1, malom_db=fake)
+        ai._db_active_this_move = True
+
+        selected = ai._db_score_adjust(board, fallback, legal)
+
+        self.assertEqual(selected, terminal_move)
+        self.assertTrue(fake.queried)
+        self.assertTrue(all(terminal_wdl(pos) is None for pos in fake.queried))
 
     def test_completes_obvious_mill(self):
         # W at a7, d7; B has two isolated pieces (b6, g1) that cannot reform a mill.

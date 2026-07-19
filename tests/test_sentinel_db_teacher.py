@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from game.board import BoardState
-from game.rules import get_game_phase
+from game.rules import get_game_phase, terminal_wdl
 from learned_ai.sentinel.config import SentinelConfig
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB, open_external_db
 
@@ -49,6 +49,28 @@ def _four_vs_four_mill_board():
         {
             "a7": "W", "d7": "W", "g4": "W", "b4": "W",
             "a4": "B", "b6": "B", "d6": "B", "f6": "B",
+        },
+        turn="W",
+        phase="move",
+    )
+
+
+def _three_vs_three_terminal_capture_board():
+    return BoardState.from_setup(
+        {
+            "a7": "W", "d7": "W", "g4": "W",
+            "a4": "B", "b6": "B", "d6": "B",
+        },
+        turn="W",
+        phase="move",
+    )
+
+
+def _blocked_board():
+    return BoardState.from_setup(
+        {
+            "a7": "W", "g7": "W", "g1": "W", "a1": "W",
+            "d7": "B", "g4": "B", "d1": "B", "a4": "B",
         },
         turn="W",
         phase="move",
@@ -195,3 +217,45 @@ def test_db_teacher_move_enumerator_uses_atomic_rules_source():
     assert complete in moves
     assert incomplete not in moves
     assert db._enumerate_legal_moves(board, "B") == []
+
+
+def test_terminal_wdl_covers_capture_blocking_and_placement_phase():
+    capture_board = _three_vs_three_terminal_capture_board()
+    settled = capture_board.apply_move(
+        {"from": "g4", "to": "g7", "capture": "a4"})
+
+    assert terminal_wdl(settled) == "L"
+    assert terminal_wdl(settled, "W") == "W"
+    assert terminal_wdl(_blocked_board()) == "L"
+    assert terminal_wdl(_placement_mill_board()) is None
+
+
+def test_query_state_resolves_rules_terminal_without_malom_probe():
+    db, fake = _available_fake_db(("W",))
+    settled = _three_vs_three_terminal_capture_board().apply_move(
+        {"from": "g4", "to": "g7", "capture": "a4"})
+
+    assert db.query_state(settled) == "L"
+    assert fake.queried_boards == []
+
+
+def test_query_move_quality_resolves_terminal_capture_without_child_probe():
+    db, fake = _available_fake_db(("W",))
+    board = _three_vs_three_terminal_capture_board()
+    move = {"from": "g4", "to": "g7", "capture": "a4"}
+
+    assert db.query_move_quality(board, move) == 0.0
+    assert fake.queried_boards == [board]
+
+
+def test_query_all_moves_labels_terminal_capture_without_child_probe():
+    db, fake = _available_fake_db(("D",) * 100)
+    board = _three_vs_three_terminal_capture_board()
+    terminal_move = {"from": "g4", "to": "g7", "capture": "a4"}
+
+    results = db.query_all_moves(board, "W")
+    terminal_result = next(r for r in results if r["move"] == terminal_move)
+
+    assert terminal_result["wdl"] == "win"
+    assert terminal_result["dtm"] == 0
+    assert all(terminal_wdl(queried) is None for queried in fake.queried_boards)

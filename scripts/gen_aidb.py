@@ -37,6 +37,7 @@ from ai.game_ai import GameAI
 from ai.heuristics import HeuristicWeights
 from ai.value_net import ValueNet
 from game.game_engine import GameEngine
+from game.rules import terminal_wdl
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 
 # ── Constants ─────────────────────────────────────────────────────────────────
@@ -141,9 +142,11 @@ def _annotate_move_malom(
 
     try:
         after_board = board.apply_move(move)
-        post = malom.query(after_board)
-        if post:
-            malom_move_wdl = _NEGATE_WDL.get(post.get("outcome"))
+        post_outcome = terminal_wdl(after_board)
+        if post_outcome is None:
+            post = malom.query(after_board)
+            post_outcome = post.get("outcome") if post else None
+        malom_move_wdl = _NEGATE_WDL.get(post_outcome)
     except Exception:
         pass
 
@@ -183,20 +186,6 @@ def play_annotated_game(
         if not legal:
             break
 
-        # Malom annotation before choosing / applying the move.
-        # For move-quality we need to know which move was chosen first, so we
-        # separate pre-move annotation (done here) from post-move (done after choice).
-        malom_wdl = None
-        malom_dtw = None
-        if malom is not None:
-            try:
-                pre = malom.query(board)
-                if pre:
-                    malom_wdl = _OUTCOME_MAP.get(pre.get("outcome"))
-                    malom_dtw = pre.get("dtw")
-            except Exception:
-                pass
-
         # Choose move.
         if ply < random_plies:
             move = random.choice(legal)
@@ -209,16 +198,11 @@ def play_annotated_game(
             if move is None:
                 move = random.choice(legal)
 
-        # Move-quality annotation (apply move → opponent's turn → flip).
-        malom_move_wdl = None
-        if malom is not None:
-            try:
-                after_board = board.apply_move(move)
-                post = malom.query(after_board)
-                if post:
-                    malom_move_wdl = _NEGATE_WDL.get(post.get("outcome"))
-            except Exception:
-                pass
+        malom_wdl, malom_dtw, malom_move_wdl = _annotate_move_malom(
+            board,
+            move,
+            malom,
+        )
 
         # Apply and amend the game-record entry with Malom data.
         engine.apply_move(move)

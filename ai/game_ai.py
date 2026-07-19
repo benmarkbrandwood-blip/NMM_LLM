@@ -23,7 +23,7 @@ class _SearchAbort(Exception):
     """Raised inside _negamax when the search deadline has passed."""
 
 from game.board import ADJACENCY, MILLS, POSITIONS, BoardState
-from game.rules import get_all_legal_moves, is_terminal
+from game.rules import get_all_legal_moves, is_terminal, terminal_wdl
 
 # T-D2: O(1) reverse lookup used by _notation_to_triple and _choose_rust_scored filter.
 _POS_TO_IDX: dict[str, int] = {pos: i for i, pos in enumerate(POSITIONS)}
@@ -865,8 +865,8 @@ class GameAI:
                 except Exception:
                     continue
                 # Query from opponent's POV (after the move it's their turn), then flip
-                res = None
-                if malom_ok:
+                res = terminal_wdl(after)
+                if res is None and malom_ok:
                     res = malom.query(after)
                 if res is None and esdb_ok:
                     res = esdb.query(after)
