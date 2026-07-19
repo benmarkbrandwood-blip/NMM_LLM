@@ -733,7 +733,7 @@ Full plan: `Learned_ai.md` — root-cause analysis of v1 failure, 6-stage traini
 
 **Malom reward shaping (two signals, both Malom-exact, active for first `--malom-frac` of games):**
 
-1. **Move quality** — `query_move_quality(board, move)` returns a delta ∈ [−2, +2] from the mover's perspective. Scaled by `malom_weight` and added to the transition reward. Rewards moves that directly improve the learner's position.
+1. **Move quality** — `query_move_quality(board, move)` returns `0` when the move preserves the exact root WDL, `−1` or `−2` when it downgrades that value, and `None` when the value is unavailable or inconsistent. An exact minimax move cannot improve on its root value; a positive delta indicates an adapter contradiction and is rejected. When enabled, the non-positive delta is scaled by `malom_weight` and added to the transition reward.
 
 2. **Trap reward** — after each learner move, `query(board)` checks the resulting position from the *opponent's* perspective. If the opponent is now in an "L" (losing) state, the learner's transition receives an additional `+malom_weight` bonus. This rewards the strategically critical NMM skill of constraining the opponent — cycling mill setups (oscillating a pivot piece between two 2-configs to force a capture every turn), forced captures, zugzwang. The sentinel approximates this signal; Malom is exact.
 

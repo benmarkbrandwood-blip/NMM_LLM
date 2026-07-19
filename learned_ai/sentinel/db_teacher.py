@@ -185,7 +185,7 @@ class ExternalSolvedDB:
         return atomic_move
 
     def query_move_quality(self, board, move: Dict[str, Any]) -> Optional[float]:
-        """Quality delta of ``move`` from ``board``: + good, - bad, None unknown.
+        """Return the exact WDL downgrade of ``move``, or ``None``.
 
         ``move`` must be a complete legal atomic action with explicit ``from``,
         ``to``, and ``capture`` fields.  A Mill-forming move without its
@@ -193,7 +193,10 @@ class ExternalSolvedDB:
         ``None`` without querying Malom.
 
         The score compares WDL before the action with WDL after the fully
-        settled action, from the original mover's perspective.
+        settled action, from the original mover's perspective.  Exact minimax
+        values permit only 0 (value preserved), -1, or -2 (value downgraded).
+        A positive delta contradicts the root value and fails closed to
+        ``None`` instead of becoming a corrupt training label.
         """
         if not self._available:
             self._warn_unavailable_once()
@@ -218,10 +221,31 @@ class ExternalSolvedDB:
         # Mover's perspective: after applying the move it is the opponent's turn,
         # so an opponent "L" (they lose) is good for the mover.
         rank = {"W": 1.0, "D": 0.0, "L": -1.0}
-        before_v = rank.get(before, 0.0)
-        after_opp_v = rank.get(after, 0.0)
+        if before not in rank or after not in rank:
+            logger.error(
+                "[ExternalSolvedDB] invalid WDL during move-quality query: "
+                "before=%r after=%r move=%r",
+                before,
+                after,
+                atomic_move,
+            )
+            return None
+
+        before_v = rank[before]
+        after_opp_v = rank[after]
         after_mover_v = -after_opp_v
-        return after_mover_v - before_v
+        delta = after_mover_v - before_v
+        if delta > 0.0:
+            logger.error(
+                "[ExternalSolvedDB] inconsistent positive WDL delta: "
+                "before=%s after=%s mover_delta=%s move=%r",
+                before,
+                after,
+                delta,
+                atomic_move,
+            )
+            return None
+        return delta
 
     # Outcome from the mover's perspective after applying a move flips to the
     # opponent's perspective (it becomes their turn). Negate to score the move

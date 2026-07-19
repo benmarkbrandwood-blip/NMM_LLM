@@ -97,9 +97,12 @@ malom_win_move_rate = _safe_mean(
 )
 ```
 
-`malom_chosen_dtm` stores the float returned by `ExternalSolvedDB.query_move_quality()`,
-which is the WDL delta: `+` = move didn't downgrade position, `−` = it did. The `>= 0`
-check is asking "did the chosen move not worsen the Malom value?"
+`malom_chosen_dtm` stores the float returned by `ExternalSolvedDB.query_move_quality()`.
+Despite the legacy field name, this is a WDL delta: `0` means the move preserves the
+exact root value, while `-1` or `-2` means it downgrades that value. A positive delta
+is impossible under exact minimax semantics and is now rejected as an adapter
+contradiction. The `>= 0` check is therefore equivalent to asking whether the chosen
+move preserved the Malom value; unavailable or inconsistent probes remain `None`.
 
 Because the underlying WDL labels are wrong, a `1.0` rate here only means the model is
 consistently choosing moves that the broken decoder agrees with — not that the moves are

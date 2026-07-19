@@ -13,7 +13,7 @@ def _board():
 
 
 class _FakeMalom:
-    def __init__(self, outcomes=("D", "L")):
+    def __init__(self, outcomes=("D", "D")):
         self.outcomes = outcomes
         self.queried_boards = []
 
@@ -29,7 +29,7 @@ class _FakeMalom:
         pass
 
 
-def _available_fake_db(outcomes=("D", "L")):
+def _available_fake_db(outcomes=("D", "D")):
     db = ExternalSolvedDB("")
     fake = _FakeMalom(outcomes)
     db._malom = fake
@@ -144,7 +144,7 @@ def test_query_move_quality_accepts_explicit_non_capture_action():
     quality = db.query_move_quality(
         board, {"from": None, "to": "g4", "capture": None})
 
-    assert quality == 1.0
+    assert quality == 0.0
     assert len(fake.queried_boards) == 2
     assert fake.queried_boards[1].positions["g4"] == "W"
     assert fake.queried_boards[1].turn == "B"
@@ -183,7 +183,7 @@ def test_query_move_quality_applies_complete_mill_and_capture_atomically():
 
     quality = db.query_move_quality(board, move)
 
-    assert quality == 1.0
+    assert quality == 0.0
     assert len(fake.queried_boards) == 2
     settled = fake.queried_boards[1]
     assert settled.positions["g7"] == "W"
@@ -199,11 +199,40 @@ def test_query_move_quality_capture_covers_four_to_three_and_side_swap():
 
     quality = db.query_move_quality(board, move)
 
-    assert quality == 1.0
+    assert quality == 0.0
     settled = fake.queried_boards[1]
     assert settled.pieces_on_board == {"W": 4, "B": 3}
     assert settled.turn == "B"
     assert get_game_phase(settled, "B") == "fly"
+
+
+def test_query_move_quality_reports_only_preservation_or_downgrade():
+    board = _placement_mill_board()
+    move = {"from": None, "to": "g4", "capture": None}
+    cases = (
+        (("W", "L"), 0.0),
+        (("W", "D"), -1.0),
+        (("W", "W"), -2.0),
+        (("D", "D"), 0.0),
+        (("D", "W"), -1.0),
+        (("L", "W"), 0.0),
+    )
+
+    for outcomes, expected in cases:
+        db, _ = _available_fake_db(outcomes)
+        assert db.query_move_quality(board, move) == expected
+
+
+def test_query_move_quality_rejects_positive_minimax_contradiction(caplog):
+    db, fake = _available_fake_db(("D", "L"))
+    board = _placement_mill_board()
+    move = {"from": None, "to": "g4", "capture": None}
+
+    quality = db.query_move_quality(board, move)
+
+    assert quality is None
+    assert len(fake.queried_boards) == 2
+    assert "inconsistent positive WDL delta" in caplog.text
 
 
 def test_db_teacher_move_enumerator_uses_atomic_rules_source():
