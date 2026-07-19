@@ -2,7 +2,10 @@
 
 This document catalogues the known problems with how the Malom perfect-play database
 is decoded and used throughout training, the specialist database, and the game.
-No code has been changed yet; this is an investigation doc.
+
+Status (2026-07-20): Step 1 is implemented and verified against Sanmill plus the
+local 498-sector database. Steps 2–5 remain pending; this change did not write to
+SpecialistDB or resume training.
 
 ---
 
@@ -169,7 +172,7 @@ inference — and it's carrying corrupted labels.
 
 ## Proposed fix sequence
 
-### Step 1 — Fix `decode_entry` (unblocks everything else)
+### Step 1 — Fix `decode_entry` (completed 2026-07-20)
 
 `decode_entry` needs `sector_value` for the queried sector passed in as an argument.
 The call sites in `MalomDB.query()` already have `sector = (qW, qB, qWF, qBF)` and

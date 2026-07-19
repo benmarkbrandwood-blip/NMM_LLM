@@ -2,7 +2,7 @@
 
 Tests are grouped into:
   1. Unit tests that do NOT require the database files (fast, always run).
-  2. Integration tests that require /mnt/windows/NMM_DB/strong/ (skipped if absent).
+  2. Integration tests that require a configured Malom database (skipped if absent).
 
 Fast tests cover:
   - Symmetry operations (rot90, swap, etc.)
@@ -20,6 +20,7 @@ Integration tests cover:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import types
@@ -51,10 +52,12 @@ _mdb = _load_leaf("malom_db", _ROOT / "ai" / "malom_db.py")
 
 # Imports from module under test
 MalomDB = _mdb.MalomDB
+OracleValue = _mdb.OracleValue
 parse_secval = _mdb.parse_secval
 board_to_wbf = _mdb.board_to_wbf
 read_sector = _mdb.read_sector
 decode_entry = _mdb.decode_entry
+_decode_raw_entry = _mdb._decode_raw_entry
 MALOM_BITS_TO_POS = _mdb.MALOM_BITS_TO_POS
 _POS_TO_MALOM_BIT = _mdb._POS_TO_MALOM_BIT
 _HashState = _mdb._HashState
@@ -66,9 +69,34 @@ _get_hash_state = _mdb._get_hash_state
 # Load game.board for BoardState
 from game.board import BoardState, POSITIONS
 
-_DB_DIR = Path("/mnt/windows/NMM_DB/strong")
+
+def _resolve_db_dir() -> Path:
+    candidates: list[Path] = []
+    if os.environ.get("NMM_MALOM_DB"):
+        candidates.append(Path(os.environ["NMM_MALOM_DB"]))
+
+    local_config = _ROOT / "data" / "training_paths.local.json"
+    if local_config.exists():
+        try:
+            configured = json.loads(local_config.read_text(encoding="utf-8"))
+            value = configured.get("malom_db_path")
+            if value:
+                path = Path(value)
+                candidates.append(path if path.is_absolute() else _ROOT / path)
+        except (OSError, ValueError, TypeError):
+            pass
+
+    candidates.append(Path("/mnt/windows/NMM_DB/strong"))
+    for candidate in candidates:
+        if candidate.is_dir() and (candidate / "std.secval").is_file():
+            return candidate
+    return candidates[0]
+
+
+_DB_DIR = _resolve_db_dir()
 _SECVAL_PATH = _DB_DIR / "std.secval"
 _DB_AVAILABLE = _DB_DIR.is_dir() and any(_DB_DIR.glob("std_*.sec2"))
+_DB_SKIP_REASON = f"Malom DB not found at configured path: {_DB_DIR}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -295,52 +323,78 @@ class TestDecodeEntry(unittest.TestCase):
         return bytes([raw & 0xFF, (raw >> 8) & 0xFF, (raw >> 16) & 0xFF])
 
     def test_win_entry(self):
-        data = self._make_entry(299, 5)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+        # Sanmill: raw 298 + sector 1 reaches the +299 virtual win value.
+        data = self._make_entry(298, 5)
+        result = decode_entry(data, 0, {}, 1, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertEqual(result, "W")
 
     def test_loss_entry(self):
-        data = self._make_entry(-299, 3)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+        data = self._make_entry(-298, 3)
+        result = decode_entry(data, 0, {}, -1, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertEqual(result, "L")
 
-    def test_draw_entry(self):
-        # key1=0, key2=0 → draw
-        data = self._make_entry(0, 0)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+    def test_positive_raw_draw_grade(self):
+        data = self._make_entry(18, 1)
+        result = decode_entry(data, 0, {}, -18, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertEqual(result, "D")
 
-    def test_count_entry_returns_none(self):
-        # key1=0, key2>0 → Count state → None
+    def test_negative_raw_draw_grade(self):
+        data = self._make_entry(-21, 2)
+        result = decode_entry(data, 0, {}, 21, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "D")
+
+    def test_raw_virtual_value_is_not_enough(self):
+        data = self._make_entry(299, 5)
+        result = decode_entry(data, 0, {}, -1, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "D")
+
+    def test_zero_zero_count_projects_to_draw(self):
+        # Sanmill classifies this as Count, then applies sector correction.
+        data = self._make_entry(0, 0)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "D")
+
+    def test_positive_count_entry_projects_to_draw(self):
         data = self._make_entry(0, 5)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
-        self.assertIsNone(result)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "D")
+
+    def test_count_entry_can_reach_virtual_loss(self):
+        # Mirrors Sanmill's raw=(0,51), sector=-299 regression vector.
+        data = self._make_entry(0, 51)
+        result = decode_entry(
+            data, 0, {}, -299, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "L")
 
     def test_spec_field2_without_emset_returns_none(self):
         # key2 = spec_field2 = -2048, no em_set entry → None
         data = self._make_entry(299, -2048)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertIsNone(result)
 
     def test_spec_field2_with_emset(self):
         # key2 = spec_field2 = -2048, em_set[0] = 7 → Win (key1=299, key2 from em_set)
         data = self._make_entry(299, -2048)
-        result = decode_entry(data, 0, {0: 7}, self.VIRT_WIN, self.VIRT_LOSS)
+        result = decode_entry(data, 0, {0: 7}, 0, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertEqual(result, "W")
+        self.assertEqual(_decode_raw_entry(data, 0, {0: 7}).key2, 7)
 
     def test_multiple_entries(self):
         w = self._make_entry(299, 10)
         l = self._make_entry(-299, 2)
-        d = self._make_entry(0, 0)
+        d = self._make_entry(1, 0)
         data = w + l + d
-        self.assertEqual(decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS), "W")
-        self.assertEqual(decode_entry(data, 1, {}, self.VIRT_WIN, self.VIRT_LOSS), "L")
-        self.assertEqual(decode_entry(data, 2, {}, self.VIRT_WIN, self.VIRT_LOSS), "D")
+        self.assertEqual(
+            decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS), "W")
+        self.assertEqual(
+            decode_entry(data, 1, {}, 0, self.VIRT_WIN, self.VIRT_LOSS), "L")
+        self.assertEqual(
+            decode_entry(data, 2, {}, 0, self.VIRT_WIN, self.VIRT_LOSS), "D")
 
     def test_sym_entry_returns_tuple(self):
         # key1=0, key2=-1 → Sym, sym_op = -((-1)+1) = 0
         data = self._make_entry(0, -1)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertIsInstance(result, tuple)
         self.assertEqual(result[0], "SYM")
         self.assertEqual(result[1], 0)  # sym_op = -((-1)+1) = 0
@@ -350,21 +404,25 @@ class TestDecodeEntry(unittest.TestCase):
         for sym_op in range(16):
             key2 = -(sym_op + 1)
             data = self._make_entry(0, key2)
-            result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+            result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
             self.assertIsInstance(result, tuple, f"Expected SYM tuple for sym_op={sym_op}")
             self.assertEqual(result[0], "SYM")
             self.assertEqual(result[1], sym_op)
 
-    def test_draw_not_sym(self):
-        # key1=0, key2=0 → Draw (not Sym)
-        data = self._make_entry(0, 0)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
-        self.assertEqual(result, "D")
-
     def test_count_not_sym(self):
         # key1=0, key2>0 → Count (not Sym)
         data = self._make_entry(0, 10)
-        result = decode_entry(data, 0, {}, self.VIRT_WIN, self.VIRT_LOSS)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertEqual(result, "D")
+
+    def test_invalid_symmetry_operation_fails_closed(self):
+        data = self._make_entry(0, -17)
+        result = decode_entry(data, 0, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
+        self.assertIsNone(result)
+
+    def test_out_of_range_index_fails_closed(self):
+        data = self._make_entry(299, 1)
+        result = decode_entry(data, 1, {}, 0, self.VIRT_WIN, self.VIRT_LOSS)
         self.assertIsNone(result)
 
 
@@ -384,7 +442,18 @@ class TestParseSecval(unittest.TestCase):
         self.assertEqual(self.vl, -299)
 
     def test_has_entries(self):
-        self.assertGreater(len(self.sv), 0)
+        self.assertEqual(len(self.sv), 498)
+
+    def test_nonzero_sector_value_count_matches_audit(self):
+        self.assertEqual(sum(value != 0 for value in self.sv.values()), 491)
+
+    def test_sector_manifest_matches_files(self):
+        expected = {
+            f"std_{w}_{b}_{wf}_{bf}.sec2"
+            for w, b, wf, bf in self.sv
+        }
+        actual = {path.name for path in _DB_DIR.glob("std_*.sec2")}
+        self.assertEqual(actual, expected)
 
     def test_known_draw_sector(self):
         # (3,3,0,0) should be a draw (value 0) from the secval file
@@ -401,7 +470,7 @@ class TestParseSecval(unittest.TestCase):
 # 7. read_sector (requires DB files)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@unittest.skipUnless(_DB_AVAILABLE, "Malom DB not found at /mnt/windows/NMM_DB/strong")
+@unittest.skipUnless(_DB_AVAILABLE, _DB_SKIP_REASON)
 class TestReadSector(unittest.TestCase):
     def test_read_3_3_0_0(self):
         path = _DB_DIR / "std_3_3_0_0.sec2"
@@ -425,9 +494,12 @@ class TestReadSector(unittest.TestCase):
         outcomes = {"W": 0, "L": 0, "D": 0, "SYM": 0, "Count": 0}
         sample = min(10000, hash_count)
         for i in range(sample):
-            o = decode_entry(data, i, em_set, vw, vl)
-            if o is None:
+            raw = _decode_raw_entry(data, i, em_set)
+            if raw is not None and raw.kind == "count":
                 outcomes["Count"] += 1
+            o = decode_entry(data, i, em_set, 0, vw, vl)
+            if o is None:
+                continue
             elif isinstance(o, tuple) and o[0] == "SYM":
                 outcomes["SYM"] += 1
             else:
@@ -442,12 +514,56 @@ class TestReadSector(unittest.TestCase):
         self.assertGreater(outcomes["SYM"], 0,
                            "Expected some Sym entries in sector (3,3,0,0)")
 
+    def test_all_sector_boundary_samples_follow_reference_projection(self):
+        """Read first/middle/last entries from every declared std sector."""
+        vw, vl, secvals = parse_secval(_SECVAL_PATH)
+        seen = {"value": 0, "count": 0, "symmetry": 0}
+        nonzero_raw_draws = 0
+        sampled_entries = 0
+
+        for sector, sector_value in sorted(secvals.items()):
+            with self.subTest(sector=sector):
+                path = _DB_DIR / ("std_%d_%d_%d_%d.sec2" % sector)
+                data, hash_count, em_set, _, _ = read_sector(path, vw, vl)
+                mapped_file = data.obj
+                try:
+                    indices = sorted({0, hash_count // 2, hash_count - 1})
+                    sampled_entries += len(indices)
+                    for idx in indices:
+                        raw = _decode_raw_entry(data, idx, em_set)
+                        self.assertIsNotNone(raw)
+                        seen[raw.kind] += 1
+
+                        actual = decode_entry(
+                            data, idx, em_set, sector_value, vw, vl)
+                        if raw.kind == "symmetry":
+                            expected = ("SYM", raw.symmetry_operation)
+                        else:
+                            absolute = raw.key1 + sector_value
+                            expected = (
+                                "W" if absolute == vw
+                                else "L" if absolute == vl
+                                else "D"
+                            )
+                            if expected == "D" and raw.key1 != 0:
+                                nonzero_raw_draws += 1
+                        self.assertEqual(actual, expected)
+                finally:
+                    data.release()
+                    mapped_file.close()
+
+        self.assertEqual(sum(seen.values()), sampled_entries)
+        self.assertGreaterEqual(sampled_entries, len(secvals))
+        self.assertGreater(seen["count"], 0)
+        self.assertGreater(seen["symmetry"], 0)
+        self.assertGreater(nonzero_raw_draws, 0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 8. MalomDB integration (requires DB files)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@unittest.skipUnless(_DB_AVAILABLE, "Malom DB not found at /mnt/windows/NMM_DB/strong")
+@unittest.skipUnless(_DB_AVAILABLE, _DB_SKIP_REASON)
 class TestMalomDB(unittest.TestCase):
     def setUp(self):
         self.db = MalomDB(str(_DB_DIR))
@@ -460,17 +576,58 @@ class TestMalomDB(unittest.TestCase):
 
     def test_repr_contains_dir(self):
         r = repr(self.db)
-        self.assertIn("strong", r)
+        self.assertIn(repr(str(_DB_DIR)), r)
 
-    def test_query_new_game_returns_none(self):
-        """New game (placement phase) sector (0,0,9,9) should return a result
-        (not necessarily None) — std_0_0_9_9.sec2 exists."""
+    def test_empty_board_matches_sanmill_reference(self):
+        """Golden vector from Sanmill database.rs::evaluates_empty_board."""
         board = BoardState.new_game()
-        result = self.db.query(board)
-        # sector std_0_0_9_9.sec2 exists; result should not crash
-        # (may be None if hash lookup fails, but no exception)
-        # No assertion on value since placement-phase handling is complex
-        self.assertIsInstance(result, (dict, type(None)))
+        value = self.db.query_value(board)
+        self.assertIsInstance(value, OracleValue)
+        self.assertEqual(value.raw_key1, -21)
+        self.assertEqual(value.sector_value, 21)
+        self.assertEqual(value.absolute_key1, 0)
+        self.assertEqual(value.key2, 2)
+        self.assertEqual(value.entry_kind, "value")
+        self.assertEqual(value.perspective, "W")
+        self.assertEqual(value.sector, (0, 0, 9, 9))
+        self.assertEqual(value.outcome, "D")
+        self.assertEqual(self.db.query(board), {"outcome": "D", "dtw": 2})
+
+    def test_black_to_move_after_a4_matches_sanmill_reference(self):
+        """Golden vector from Sanmill's black-to-move side-swap test."""
+        board = BoardState.new_game().apply_move(
+            {"from": None, "to": "a4", "capture": None}
+        )
+        value = self.db.query_value(board)
+        self.assertIsInstance(value, OracleValue)
+        self.assertEqual(value.raw_key1, 18)
+        self.assertEqual(value.sector_value, -18)
+        self.assertEqual(value.absolute_key1, 0)
+        self.assertEqual(value.key2, 1)
+        self.assertEqual(value.perspective, "B")
+        self.assertEqual(value.sector, (0, 1, 9, 8))
+        self.assertEqual(value.outcome, "D")
+
+    def test_symmetry_redirect_matches_sanmill_reference(self):
+        """Golden vector from Sanmill's c3 symmetry-redirect test."""
+        positions = {position: "" for position in POSITIONS}
+        positions["c3"] = "B"
+        board = BoardState(
+            positions=positions,
+            turn="W",
+            pieces_on_board={"W": 0, "B": 1},
+            pieces_placed={"W": 0, "B": 1},
+            pieces_captured={"W": 0, "B": 0},
+            hash_key=0,
+        )
+        value = self.db.query_value(board)
+        self.assertIsInstance(value, OracleValue)
+        self.assertEqual(value.raw_key1, 18)
+        self.assertEqual(value.sector_value, -18)
+        self.assertEqual(value.absolute_key1, 0)
+        self.assertEqual(value.key2, 1)
+        self.assertIsNotNone(value.symmetry_operation)
+        self.assertEqual(value.outcome, "D")
 
     def test_query_endgame_position(self):
         """A fully-placed 3v3 position should return a valid WDL result."""
@@ -545,7 +702,7 @@ class TestMalomDB(unittest.TestCase):
 # 9. ExternalSolvedDB integration via db_teacher
 # ─────────────────────────────────────────────────────────────────────────────
 
-@unittest.skipUnless(_DB_AVAILABLE, "Malom DB not found at /mnt/windows/NMM_DB/strong")
+@unittest.skipUnless(_DB_AVAILABLE, _DB_SKIP_REASON)
 class TestExternalSolvedDB(unittest.TestCase):
     def _load_db_teacher(self):
         import importlib.util
