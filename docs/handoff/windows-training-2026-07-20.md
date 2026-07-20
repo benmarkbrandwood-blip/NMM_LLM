@@ -11,8 +11,10 @@ The auto-resume and temperature-schedule defects have now been fixed and tested
 on local `dev`. The owner has defined the first experiment as a fresh,
 Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
 disabled. Its bounded one-game smoke passed with a checkpoint observation; a
-long monitored run has not started and remains gated on frozen launch choices
-and an explicit checkpoint/resume policy.
+later `dev` commit corrected the inaccurate checkpoint report and records a
+conservative explicit-resume policy. A long monitored run has not started and
+remains gated on frozen launch choices plus a newly authorised final smoke and
+preflight.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -62,10 +64,12 @@ handover, both `dev` and `origin/dev` pointed to:
 handover commit `8751da4` was subsequently pushed and is now the recorded
 `origin/dev` tip. Local `dev` then added the independently tested auto-resume
 and temperature commits `5eadb4e` and `006715b`, the component-disable commit
-`24be10b`, and the experiment-definition commit `80f4a1f`. Inspect the live
-graph rather than relying on this snapshot. The completed force-with-lease
-approval is not standing permission for a future push or history rewrite;
-obtain fresh authorisation when such an operation becomes necessary.
+`24be10b`, the experiment-definition and smoke-evidence commits `80f4a1f` and
+`53d86d1`, and the follow-up maintenance commits through `9c7dceb`. Inspect the
+live graph rather than relying on this snapshot. The completed
+force-with-lease approval is not standing permission for a future push or
+history rewrite; obtain fresh authorisation when such an operation becomes
+necessary.
 
 ## Environment State
 
@@ -119,6 +123,17 @@ These are missing/stale internal interfaces, not third-party dependency errors.
 The complete suite is therefore not a clean project baseline. Do not hide the
 four collection errors, but do not confuse them with the focused Malom result
 either.
+
+Follow-up maintenance on local `dev` recalibrated the two stale GameAI tactical
+fixtures against a legal terminal-mill position. It also replaced tests that
+depended on an untracked `data/games` corpus with deterministic JSONL fixtures;
+the current Sentinel and TrajectoryDB loader tests therefore execute rather
+than skip when that local directory is absent. The four unrelated collection
+errors above remain unresolved and continue to bound any full-suite claim. The
+combined Generalist, GameAI, Sentinel-dataset, and TrajectoryDB verification
+reported `58 passed`; the mandatory Malom/provenance rerun again reported
+`102 passed, 498 subtests passed`. A fresh collection-only check still stopped
+on exactly the same four interface errors listed above.
 
 ## Data and Model State
 
@@ -255,6 +270,20 @@ the selected weights and applies the existing draw-penalty grace, but
 exploration stays on the global schedule. Focused tests cover a custom start,
 ordinary decay, endpoint clamping, and the unchanged default schedule.
 
+Commit `fe0b1f1` additionally makes `--temp-start` reject zero, negative, and
+non-finite values during argument parsing, before training resources are
+opened. Focused tests cover valid decimal and exponential forms plus zero,
+negative, `NaN`, infinities, and non-numeric input.
+
+### Final checkpoint reporting matches repository state
+
+Commit `bf9472c` always reports the final `latest.pt` path and reports
+`best.pt` only when that file actually exists. The best snapshot is optional:
+it is created only at a logging checkpoint after at least 10 heuristic games
+when the current win rate strictly improves on the prior best at that
+difficulty. Regression tests cover both reporting outcomes and all sides of
+that gate.
+
 ## First Dev Experiment Decision
 
 The owner selected `dev-v4-malom-corrected-fresh-v1`: a fresh-initialised,
@@ -278,9 +307,16 @@ integration evidence only, not strength evidence.
 
 The generated `latest.pt` is readable, but the final console message named
 `best.pt` even though no such file was produced by the one-game run. This does
-not invalidate the smoke. It does mean that the message is not checkpoint
-evidence and automatic continuation must not be assumed to work until a real
-`best.pt` exists or an explicit reviewed resume path is selected.
+not invalidate the historical smoke. Commit `bf9472c` fixes the message; a
+one-game run is now explicitly reported as having no best checkpoint.
+
+The experiment now treats `latest.pt` as a weight-continuation snapshot and
+`best.pt` as optional model-selection evidence. Initial launch remains fresh
+and omits all resume flags. After an interruption, automatic continuation is
+forbidden: inspect the latest snapshot and use a separately recorded explicit
+`--resume` only if weight continuation is acceptable. Current checkpoints do
+not restore optimiser, rolling-history, difficulty-local, target-age, or RNG
+state, so they are not evidence of exact trainer-state recovery.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -379,18 +415,17 @@ database growth.
 ## Recommended Next Actions
 
 The workspace/root check, graph inspection, trainer fixes, focused tests,
-102-test Malom/provenance rerun, first-experiment component decision, and
-bounded smoke are complete. Proceed in this order:
+102-test Malom/provenance rerun, first-experiment component decision, bounded
+smoke, and checkpoint-policy correction are complete. Proceed in this order:
 
-1. Resolve the checkpoint observation before relying on automatic
-   continuation: correct the inaccurate final message and establish when
-   `best.pt` must exist, or select a reviewed explicit-resume policy.
-2. Freeze the long-run update algorithm, opponent schedule, temperature start,
+1. Freeze the long-run update algorithm, opponent schedule, temperature start,
    game budget, seed, concurrency, checkpoint cadence, monitor interval, and
    stop criteria.
+2. Run the repository training-readiness workflow and a newly authorised
+   bounded smoke on the intended launch commit with new disposable paths.
 3. Re-run the clean-worktree, path, active-DB, test, and component preflight
-   immediately before any long run. Do not push or start that run without the
-   corresponding explicit approval.
+   immediately before any long run. Do not push, smoke, or start that run
+   without the corresponding explicit approval.
 
 The executed isolated smoke command was:
 
@@ -429,15 +464,15 @@ The following choices are recorded for the first `dev` experiment:
 - use the corrected v4-style Generalist path, not claim the staged v5 baseline;
 - exclude legacy Sentinel, ValueNet, and GapNet from the first run.
 
-The remaining decisions before a long run are its update algorithm, opponent
-schedule, temperature start, game budget, seed, concurrency,
-checkpoint/monitor cadence, checkpoint/resume policy, and stop criteria. The
-local endgame/fullgame files also remain exploratory unless separately
-validated and promoted.
+The checkpoint roles and interruption policy are recorded above. The remaining
+decisions before a long run are its update algorithm, opponent schedule,
+temperature start, game budget, seed, concurrency, checkpoint/monitor cadence,
+and stop criteria. The local endgame/fullgame files also remain exploratory
+unless separately validated and promoted.
 
 Until the remaining launch choices are recorded, safe work consists of local
-inspection, tests, and focused checkpoint-policy work. It does not include a
-long training job, a push, or a history rewrite.
+inspection, tests, and launch-contract review. It does not include an
+additional smoke, a long training job, a push, or a history rewrite.
 
 ## Reference Material
 

@@ -5,9 +5,10 @@
 Experiment ID: `dev-v4-malom-corrected-fresh-v1`
 
 The one-game integration smoke completed on 20 July 2026 with status
-`passed_with_observation`. The long run has not started. Its update algorithm,
-opponent schedule, temperature start, game budget, concurrency, monitoring
-cadence, checkpoint/resume policy, and stop criteria still need to be frozen.
+`passed_with_observation`; the checkpoint-reporting observation has since been
+resolved on `dev`. The long run has not started. Its update algorithm, opponent
+schedule, temperature start, game budget, concurrency, monitoring cadence, and
+stop criteria still need to be frozen.
 
 This is a fresh-initialised, Malom-corrected **v4-style Generalist baseline**.
 It is not the v5 `reference_safe_baseline`, a release candidate, or evidence of
@@ -28,6 +29,8 @@ labelled legacy comparison.
 | ValueNet | Disabled with `--no-value-net` |
 | GapNet | Disabled with `--no-gap-net` |
 | Temperature | Recovery does not reheat; the smoke uses the current `0.90` default |
+| Checkpoint roles | `latest.pt` is the continuation snapshot; `best.pt` is an optional, evaluation-gated model-selection snapshot |
+| Interruption | Never resume automatically; inspect the run and use a recorded explicit `--resume` only if weight continuation is accepted |
 
 The intended long-run paths are:
 
@@ -131,26 +134,47 @@ That output directory contains `train_log.jsonl`, `latest.pt`, and the local
 `smoke_manifest.json` with the exact command and result. These generated files
 remain ignored and are not part of this documentation commit.
 
-### Checkpoint observation
+### Checkpoint observation and resolution
 
 The trainer's final console message named the output path `best.pt`, but the
 one-game smoke produced only `latest.pt`; `best.pt` was absent. The checkpoint
 that exists is readable and records stage `s_gen_v2`, game count `1`,
 `source_checkpoint=scratch`, and temperature `0.9`.
 
-This discrepancy does not invalidate the bounded initialisation smoke, but the
-console claim is inaccurate and `--auto-resume-best` would not find this
-one-game result. Before relying on automatic continuation, either ensure the
-run has produced a real `best.pt` or use a reviewed explicit `--resume` path;
-correct the final message separately rather than treating it as checkpoint
-evidence. The one-game run also did not create `update_log.jsonl`, so it did not
-exercise periodic update-log or best-checkpoint cadence.
+This discrepancy did not invalidate the bounded initialisation smoke. Commit
+`bf9472c` subsequently changed the final report to always name `latest.pt` and
+to name `best.pt` only when that file exists. Otherwise it reports that no best
+checkpoint was created. Regression tests also lock the actual best-checkpoint
+gate: it is evaluated at a logging checkpoint, requires at least 10 heuristic
+games, and requires a win rate strictly above the prior best at that
+difficulty. A one-game run is therefore not expected to create `best.pt`.
+
+The first experiment uses this conservative recovery policy:
+
+- its initial launch omits both `--resume` and `--auto-resume-best`;
+- `best.pt` is optional model-selection evidence, not an operational recovery
+  requirement;
+- after an interruption, do not continue automatically; inspect `latest.pt`
+  and, if continuation is accepted, start a separately recorded segment with
+  an explicit `--resume` path;
+- current resume restores weights and selected scalar counters, but not the
+  optimiser, rolling histories, difficulty-local counters, target age, or RNG
+  state. It is a weight continuation, not exact trainer-state recovery. If an
+  exact continuation is required, stop and extend the checkpoint schema and
+  tests before launch.
+
+The original one-game run also did not create `update_log.jsonl`, so it did not
+exercise periodic update-log or best-checkpoint cadence. The reporting fix is
+covered by focused tests; a new post-fix smoke has not been launched without a
+separate readiness gate and launch authorisation.
 
 ## Long-Run Launch Gate
 
-The bounded smoke gate has passed with the checkpoint observation above. Before
-the long run, freeze the update algorithm, opponent schedule, temperature
-start, game budget, seed, concurrency, checkpoint cadence, resume policy,
-monitor interval, and stop criteria. Re-run the preflight against the active
-empty SpecialistDB and dedicated long-run output immediately before launch. Do
-not reuse the disposable smoke DB or smoke checkpoint.
+The bounded initialisation smoke passed, and its checkpoint observation is
+resolved in code and tests. Before the long run, freeze the update algorithm,
+opponent schedule, temperature start, game budget, seed, concurrency,
+checkpoint cadence, monitor interval, and stop criteria. Re-run the readiness
+preflight and a newly authorised bounded smoke against disposable paths on the
+intended launch commit, then re-check the active empty SpecialistDB and
+dedicated long-run output immediately before launch. Do not reuse the original
+smoke DB or smoke checkpoint.
