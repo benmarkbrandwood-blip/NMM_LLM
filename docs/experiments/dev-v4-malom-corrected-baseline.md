@@ -6,9 +6,11 @@ Experiment ID: `dev-v4-malom-corrected-fresh-v1`
 
 The one-game integration smoke completed on 20 July 2026 with status
 `passed_with_observation`; the checkpoint-reporting observation has since been
-resolved on `dev`. The long run has not started. Its update algorithm, opponent
-schedule, temperature start, game budget, concurrency, monitoring cadence, and
-stop criteria still need to be frozen.
+resolved on `dev`. The long run has not started. A complete recommended
+configuration is recorded below, but the owner has not yet accepted or revised
+it. Two parts of that proposal also cannot be expressed safely by the current
+CLI: disabling ongoing imitation mixing and selecting measured fixed search
+work instead of a wall-clock opponent cutoff.
 
 This is a fresh-initialised, Malom-corrected **v4-style Generalist baseline**.
 It is not the v5 `reference_safe_baseline`, a release candidate, or evidence of
@@ -20,7 +22,9 @@ labelled legacy comparison.
 | Component | First-run decision |
 | --- | --- |
 | Code | Run from a clean `dev`; record `git rev-parse HEAD` at launch |
+| Execution | One Windows process on one CUDA device; no distributed or C++ trainer |
 | Model checkpoint | Fresh initialisation; omit both `--resume` and `--auto-resume-best` |
+| Author `main` bundle | Diagnostic reference only; never an input, resume source, or `dev` acceptance artefact |
 | Output | Use a new, dedicated directory with no historical checkpoints or logs |
 | Malom | Enable the machine-local `malom_db_path` through `data/training_paths.local.json` and the corrected decoder |
 | SpecialistDB | Start with an empty DB carrying `malom_label_version=sector-corrected-v1` |
@@ -30,7 +34,7 @@ labelled legacy comparison.
 | GapNet | Disabled with `--no-gap-net` |
 | Temperature | Recovery does not reheat; the smoke uses the current `0.90` default |
 | Checkpoint roles | `latest.pt` is the continuation snapshot; `best.pt` is an optional, evaluation-gated model-selection snapshot |
-| Interruption | Never resume automatically; inspect the run and use a recorded explicit `--resume` only if weight continuation is accepted |
+| Interruption | Never resume automatically; only a separately preflighted explicit `exact-resume` from a compatible v2 envelope may continue the baseline |
 
 The intended long-run paths are:
 
@@ -41,6 +45,72 @@ On 20 July 2026, the SpecialistDB above was verified read-only with zero rows
 in `positions`, `winning_lines`, and `preferred_plays`, and metadata
 `malom_label_version=sector-corrected-v1`. Verify those facts again immediately
 before the long run. Do not use the active baseline DB for the smoke.
+
+## Recommended Long-Run Definition - Not Yet Frozen
+
+The following is the recommended corrected v4-style baseline. Recording it
+does not approve a smoke or long run, and it does not silently convert the
+proposal into an owner decision.
+
+| Choice | Recommended value |
+| --- | --- |
+| Update algorithm | A2C; omit `--ppo` |
+| Imitation | No S1A warm-start and no imitation mini-step during RL |
+| Opponents | 50% frozen target and 50% heuristic; refresh target every 50 games; adaptive difficulty 1 through 20 |
+| Rollout | Complete rollout, `sim_ply_depth=5`, no branch rollouts, `max_ply=60` |
+| Search work | Fixed measured work per move; no wall-clock search cutoff |
+| Temperature | Start `0.90`; linearly reach `0.20` at 80% total progress |
+| Game budget | 5,000 |
+| Seed | 42 |
+| Concurrency | `batch_games=1` |
+| Process segments | End every 250 games and continue only by explicit `exact-resume` |
+| Checkpoints | Save `latest.pt` every 50 games through `--log-every=50` |
+| Monitoring | Record every 50 games; audit integrity and resources at each 250-game boundary |
+| Ordinary stopping | Do not stop for an intermediate win-rate result |
+| Quarantine stopping | Stop for non-finite values, Malom/DB identity change, wrong label version, checkpoint corruption, CUDA failure, or broken evidence chain |
+
+The author-`main` bundle does not alter any row in this table. Its model and
+logs are not warm-start material, a target model, or a formal baseline.
+
+### Launch-control gaps
+
+The proposal is not yet smoke-ready for two independent reasons:
+
+1. `--no-s1a-warmstart` disables only the pre-RL warm-start. The trainer still
+   loads `human_imitation2.npz` when present and applies an imitation mini-step
+   after RL updates. Add `--no-imitation-mix`, make the disabled state visible
+   in preflight/log/contract evidence, and test launch plus exact-resume
+   compatibility. That file is absent from the current Windows checkout, but
+   absence is not an experiment control and must not substitute for the flag.
+2. A negative `--time-budget` currently selects the trainer's automatic
+   per-difficulty wall-clock seconds. It does not mean unlimited or fixed-work
+   search. Add a deterministic work-budget control and log the effective work,
+   or explicitly revise this proposed row before readiness review.
+
+PPO is not a launch blocker for this A2C baseline, but it is quarantined for a
+separate reason: sampled old log probabilities use temperature-scaled logits,
+while the current PPO update recomputes unscaled logits. Do not enable `--ppo`
+until a deterministic ratio-at-collection regression test and reviewed fix
+exist. See
+[`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
+
+### Formal evaluation proposal - also not frozen
+
+Formal evaluation is not required to implement the launch controls or run a
+disposable infrastructure smoke. It must be frozen before candidate results
+are inspected or used for promotion. The current proposal is:
+
+- a compatible immutable baseline bundle, still to be selected;
+- 64 reviewed, training-disjoint starts spanning placement, movement, and
+  flying phases;
+- 256 colour-swapped pairs, for 512 games total;
+- fixed work per move and `max_ply=200`, with overflow scored as a draw;
+- accept only when the 95% confidence-interval lower bound is above zero,
+  reject only when its upper bound is below zero, otherwise report
+  `inconclusive`.
+
+The existing random smoke bundle and three infrastructure positions are not a
+formal baseline or evaluation corpus.
 
 ## Required Preflight Evidence
 
@@ -67,8 +137,12 @@ explicitly disabled component for this experiment.
 
 ## One-Game Integration Smoke
 
-Use new disposable paths. If either path already contains a prior run, choose
-a new name rather than mixing evidence.
+The following is the exact historical command that produced the first smoke.
+It is retained as evidence, not as a reusable current command. The hardened CLI
+now also requires a launch mode and run ID; the reviewed command must state its
+start mode explicitly. The proposed pure RL baseline still needs the new
+imitation-mix control. Any future smoke must use new disposable paths and a
+freshly reviewed command.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
@@ -90,10 +164,11 @@ a new name rather than mixing evidence.
 
 The absence of `--resume` and `--auto-resume-best` is part of the baseline
 lineage decision. The smoke also omits `--ppo` and the archived mixed-opponent
-changes to keep the integration check bounded; this does not yet freeze the
-long-run update algorithm or opponent schedule. The smoke proves only that the
-selected components, writers, and corrected label boundary initialise and
-complete one bounded game. It does not approve a long run or establish
+changes to keep the integration check bounded. It predates the recommended
+long-run definition and did not prove that RL imitation mixing was disabled;
+the one-game run did not reach a periodic RL update. The smoke proves only that
+the selected components, writers, and corrected label boundary initialised and
+completed one bounded game. It does not approve a long run or establish
 strength.
 
 ## Smoke Result - 20 July 2026
@@ -177,10 +252,15 @@ separate readiness gate and launch authorisation.
 ## Long-Run Launch Gate
 
 The bounded initialisation smoke passed, and its checkpoint observation is
-resolved in code and tests. Before the long run, freeze the update algorithm,
-opponent schedule, temperature start, game budget, seed, concurrency,
-checkpoint cadence, monitor interval, and stop criteria. Re-run the readiness
-preflight and a newly authorised bounded smoke against disposable paths on the
-intended launch commit, then re-check the active empty SpecialistDB and
-dedicated long-run output immediately before launch. Do not reuse the original
-smoke DB or smoke checkpoint.
+resolved in code and tests. Before another smoke, the owner must accept or
+revise the recommended definition, the explicit imitation-mix disable control
+must exist, and the fixed-work search row must be implemented or deliberately
+changed. The new smoke must use the hardened launch contract, disposable paths,
+and enough work to exercise an RL update while proving that imitation stayed
+disabled.
+
+Before the long run, rerun readiness on the intended clean launch commit, then
+re-check the empty corrected SpecialistDB, new output directory, resolved work
+budget, component manifest, and quarantine rules immediately before launch. Do
+not reuse the original smoke DB, smoke checkpoint, or any author-`main`
+checkpoint.

@@ -14,29 +14,30 @@ The observation supplied for review was:
 > stringest one yet. Im itching to start another ai model and fix a few bits on
 > the game here and there.
 
-This is a valuable diagnostic lead, but it is not yet strength evidence. The
-exact checkpoint, route, opponent, positions, colours, time controls, and game
-records behind the observation have not been supplied.
+The maintainer later corrected “10/20” to “9/20” and supplied two checkpoints,
+training/update logs, a plot, and a browser screenshot. The owner confirms that
+all of them were produced by continued `main` training. They narrow the model
+identity but still do not supply the exact source commit, frozen launch
+contract, route manifest, opponent records, phase-labelled positions, colours,
+or fixed work controls needed for a strength claim.
 
 ## Facts Reproduced Locally
 
-### The delivered checkpoint is not the quoted 10/20 checkpoint
+### The author checkpoint supports level 9, not `dev` lineage
 
-The delivered historical Generalist `s_gen_v2/best.pt` reports:
+The repository's older `s_gen_v2/best.pt` is a game-11,450, difficulty-6
+checkpoint. The newly supplied `../notes/best (copy).pt` is distinct: it reports
+stage `s_gen_v2`, game 17,400, difficulty 9, temperature `0.5956225`, and SHA-256
+`335462EC3A503E316EAAEF63A7669F1A725FC488A2C27E29B39EFD0021B804D6`.
+That metadata supports the maintainer's correction to level 9.
 
-| Field | Value |
-| --- | --- |
-| `stage` | `s_gen_v2` |
-| `game_count` | `11450` |
-| `difficulty` | `6` |
-| `best_win_rate` | `0.225` |
-| move/value feature dimensions | `134` / `80` |
-
-The same directory contains `best1.pt` through `best6.pt`, but no checkpoint
-identified as difficulty 10. These assets also pre-date the corrected Malom
-decoder and persisted-label migration. They remain useful legacy comparison
-inputs, but they cannot establish the state or strength of the model described
-in the quotation.
+It remains a legacy weights-only `main` artefact. It has no optimiser, RNG,
+data identity, run contract, or complete trainer state, and its exact source
+commit is unknown. The `/home/.../dev/...` path embedded in its metadata is a
+directory label, not Git branch evidence. The file is suitable only for an
+explicitly labelled replay or legacy comparison and must never initialise or
+resume the fresh `dev` experiment. Full hashes and log findings are in
+[`docs/evidence/author-main-generalist-audit-2026-07-20.md`](evidence/author-main-generalist-audit-2026-07-20.md).
 
 ### The current Generalist can advance without an endgame-specific pass
 
@@ -56,7 +57,45 @@ Generalist trainer:
 
 These facts make the reported phase profile plausible: a model can win enough
 complete games through strong early play to advance while retaining a weaker
-endgame. They do not prove that this happened in the unavailable 10/20 model.
+endgame. They do not prove that this happened in the supplied level-9 model.
+
+### The author logs show concentration and instability, not a phase result
+
+The 10,547-row `main` training log shows `policy_top1_rate` rising from about
+0.42 in its first 500 rows to 0.84 in its last 500, while entropy falls from
+about 1.55 to 0.34. This supports the narrow observation that sampling became
+concentrated on the policy argmax. It does not show that those moves are better:
+heuristic-top-1 agreement also rises, no row identifies policy-versus-heuristic
+disagreement positions, and every row is labelled `phase_bucket=main`.
+
+The log also has 768 duplicated game numbers, six counter regressions, and a
+mid-file opponent-schedule change. It is not one frozen experiment. The update
+log's finite policy loss has median about `9.88e7` and maximum about `1.71e29`,
+which is incompatible with treating the curve as uncomplicated improvement.
+The recorded `--ppo --temp-start 1.1` launch and a log beginning near `0.9`
+also show that the author run was affected by trainer behaviour already changed
+on `dev`.
+
+The inspected PPO path stores old log probabilities from temperature-scaled
+logits and recomputes new probabilities from unscaled logits. Because the exact
+author source commit is absent, this is a serious mechanism risk rather than a
+complete causal diagnosis of the loss curve. It is enough to keep PPO out of
+the fresh baseline pending a focused ratio test and fix.
+
+### Browser Generalist is not the training route
+
+The supplied manual-game screenshot shows the Generalist checkbox selected,
+but it does not prove which learned inputs affected the move. The browser builds
+the Generalist with globally loaded Sentinel, ValueNet, GapNet, HumanDB, and
+SpecialistDB objects; the visible checkboxes are not a component manifest. The
+trainer passes Malom as the Generalist lookahead's `endgame_db`, while the
+browser loader omits that argument and `GeneralistAgent.score_moves()` encodes
+with `db=None` even after `set_db()` is called.
+
+This train/inference mismatch is a plausible contributor to differing endgame
+behaviour, but not a diagnosis. A replay must freeze the exact route, feature
+inputs, checkpoint hash, work per move, and phase-labelled starts before
+comparing models or deciding to enable a separate endgame database.
 
 ### Corrected Generalist inputs are available, but the long run is undecided
 
@@ -153,16 +192,22 @@ internal WDL reward until the local files are validated or rebuilt.
 
 ## Smallest Useful Next Experiment
 
-The shortest evidence-producing loop is not an immediate long run:
+The shortest evidence-producing loop is not an immediate long run or enabling
+the unverified internal endgame files:
 
-1. Obtain or identify the exact 10/20 checkpoint and its training log.
-2. Freeze a colour-swapped evaluation corpus stratified by opening, midgame,
+1. Record the author checkpoint/log hashes already supplied and, if possible,
+   obtain the exact `main` commit and launch configuration. Do not make that a
+   `dev` dependency.
+2. Complete the first baseline's launch controls: explicit imitation-mix
+   disablement and an observable fixed-work search budget. Keep it on A2C.
+3. Freeze a colour-swapped evaluation corpus stratified by opening, midgame,
    3v3, 4v3, 4v4, 5v4, 6v4, capture-to-fly, and W/D/L starting value.
-3. Replay the quoted model, the delivered legacy Generalist, and the first
-   corrected baseline with the same route, time budget, and random streams.
-4. Report complete Malom move regret, W-to-D/L and D-to-L downgrades, W
+4. Replay the author level-9 model, the older legacy Generalist, and the first
+   corrected baseline with the same explicit route, components, work budget,
+   and random streams.
+5. Report complete Malom move regret, W-to-D/L and D-to-L downgrades, W
    conversion, rules draws, outcome, and latency separately by phase.
-5. Only if the endgame deficit reproduces, define a separate fresh
+6. Only if the endgame deficit reproduces, define a separate fresh
    `endgame-corrected-v1` experiment with isolated output and database paths.
 
 An endgame specialist may be useful as a diagnostic candidate, but the
@@ -172,24 +217,22 @@ an explicit decision about whether its learned result is later distilled into
 a unified Phase-aware Generalist. It must also prove that an endgame gain does
 not purchase an opening or full-game regression.
 
-## Questions for the Original Maintainer
+## Remaining Questions for the Original Maintainer
 
-1. Does `10/20` mean the Generalist curriculum's difficulty level 10, or a
-   separate strength score?
-2. Which exact checkpoint, commit, branch, training output directory, and log
-   correspond to that observation? Can a checksum or copy be supplied?
-3. Which runtime route selected moves: Generalist, Overseer, specialist router,
+1. Which exact `main` commit and launch configuration produced the supplied
+   level-9 checkpoint and the appended logs?
+2. Which runtime route selected moves: Generalist, Overseer, specialist router,
    or `GameAI`? Which Sentinel, ValueNet, GapNet, Malom, and internal WDL inputs
    were enabled?
-4. Was the endgame assessment based on human games, heuristic opponents,
+3. Was the endgame assessment based on human games, heuristic opponents,
    self-play, or particular recorded positions? Can representative full FENs,
-   colours, moves, and time controls be supplied?
-5. Was the 10/20 model trained before or after the sector-corrected Malom
+   colours, moves, and completed search work be supplied?
+4. Was the level-9 model trained before or after the sector-corrected Malom
    decoder and atomic-capture changes?
-6. Are `endgame_4_6.wdl`, `endgame_5_4.wdl`, `endgame_5_5.wdl`, and
+5. Are `endgame_4_6.wdl`, `endgame_5_4.wdl`, `endgame_5_5.wdl`, and
    `endgame_6_4.wdl` expected to be partially built? Was `endgame_7_3.wdl`
    intentionally omitted or was the build interrupted?
-7. What generator revision, completion log, hash manifest, and rule variant
+6. What generator revision, completion log, hash manifest, and rule variant
    produced the fourteen `.wdl` files and `fullgame.bin`?
 
 Answers to these questions can change the experiment choice, but not the

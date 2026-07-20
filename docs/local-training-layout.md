@@ -31,7 +31,7 @@ repository merely to describe its children.
 | `../NMM_DB` | External Malom tablebase | Never add to Git |
 | `../human_database` | Human-game source archives and database-building source material | Never add to Git |
 | `../opening_book` | Source opening-book material | Keep outside Git unless deliberately imported as reviewed source data |
-| `../notes` | Original handover (`Notes.md`), its images, and the unfinished archived trainer copy (`train_s_gen_v2_handoff_unfinished.py`) | Historical reference only; independently verify claims, and do not execute or merge the draft blindly |
+| `../notes` | Original handover (`Notes.md`), its images, the unfinished archived trainer copy, and the 20 July author-`main` diagnostic bundle | Historical reference only; independently verify claims, never use these files as `dev` resume/input evidence, and do not execute or merge the draft blindly |
 | `../Mills` | Temporary import staging directory | Currently empty; safe to reuse as staging |
 | `../.cargo-target` | Optional external Rust build cache | Currently empty; not project source |
 
@@ -110,6 +110,7 @@ This inventory was measured on 20 July 2026.
 | Malom tablebase | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted`; 512 files and 83,582,223,577 bytes |
 | Sentinel | `learned_ai/sentinel/checkpoints/best.pt` |
 | Generalist checkpoints | `learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt` and `best1.pt` through `best6.pt` |
+| Author `main` diagnostics | `../notes/best (copy).pt`, `best6.pt`, `train_log.jsonl`, and `update_log.jsonl`; reference-only and not part of the `dev` checkpoint lineage |
 | Specialist checkpoints | Opening: two; midgame: four; endgame: two, all under `learned_ai/checkpoints/scaffolded` |
 | Value nets | `data/value_net.npz` and the tracked human, phase, and trajectory variants |
 | Gap-net artefacts | `data/gap_net.npz` and `data/gap_net_training.npz`; present but disabled in the local training path configuration pending provenance review |
@@ -118,6 +119,25 @@ The checkpoint and net files listed above exist. The important limitation is
 their lineage: they pre-date the sector-decoder and persisted-label migration,
 so they are exploratory baselines rather than evidence of a corrected training
 run.
+
+### Author `main` diagnostic bundle
+
+The owner confirms that the four newly supplied Generalist files under
+`../notes` came from the maintainer's continuing `main` training, not `dev`.
+Their inventory is:
+
+| Asset | SHA-256 | Legacy metadata or state |
+| --- | --- | --- |
+| `../notes/best (copy).pt` | `335462EC3A503E316EAAEF63A7669F1A725FC488A2C27E29B39EFD0021B804D6` | `s_gen_v2`, game `17400`, difficulty `9`; weights-only |
+| `../notes/best6.pt` | `0E024D4402160BEFA4A7DDEDB56735FCA8CC9D924FC069A550F1761E643CA93D` | `s_gen_v2`, game `12750`, difficulty `6`; weights-only |
+| `../notes/train_log.jsonl` | `FE332D39E9CA92552EF79A493C175208DAD4168ADA9E484EDEF1A630C58B250B` | 10,547 valid JSON rows spanning appended/restarted histories |
+| `../notes/update_log.jsonl` | `41D68B45FFB31F7B6207AC7FD58EF906F5FAE626C56A971933473F4CC25FE03B` | 1,190 valid JSON rows; diagnostic only |
+
+The checkpoints have finite tensors but no optimiser, RNG, run contract, or
+complete trainer state. The embedded `/home/.../dev/...` source path is a
+directory name and does not override the owner-confirmed `main` lineage. See
+[`docs/evidence/author-main-generalist-audit-2026-07-20.md`](evidence/author-main-generalist-audit-2026-07-20.md)
+for the plot, log, configuration, and runtime-route audit.
 
 ## Persisted-label Trust Boundary
 
@@ -157,10 +177,11 @@ It is 268,521,472 bytes and has SHA-256:
 ```
 
 Its SQLite integrity check passes and it contains 1,954,437 positions, of which
-339,904 have a Malom label. It has no `meta` table, so those labels are
-unversioned and must be treated as legacy. The file is retained only as a
-read-only empirical/audit snapshot; it did not replace the active corrected
-database.
+339,904 have a Malom label, plus 54,456 winning lines and 27 preferred plays.
+All 27 preferred-play rows are marked promoted. It has no `meta` table, so the
+labels are unversioned and must be treated as legacy. The file is retained only
+as a read-only empirical/audit snapshot; it did not replace the active
+corrected database.
 
 Do not open either legacy snapshot in write mode, copy it back to the active
 database path, or add corrected labels to it.

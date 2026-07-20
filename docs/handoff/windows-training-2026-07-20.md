@@ -13,7 +13,8 @@ Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
 disabled. Its bounded one-game smoke passed with a checkpoint observation; a
 later `dev` commit corrected the inaccurate checkpoint report and records a
 conservative explicit-resume policy. A long monitored run has not started and
-remains gated on frozen launch choices plus a newly authorised final smoke and
+remains gated on owner acceptance of the proposed launch choices, explicit
+imitation-mix and fixed-work controls, plus a newly authorised final smoke and
 preflight.
 
 Read
@@ -65,8 +66,11 @@ handover commit `8751da4` was subsequently pushed and is now the recorded
 `origin/dev` tip. Local `dev` then added the independently tested auto-resume
 and temperature commits `5eadb4e` and `006715b`, the component-disable commit
 `24be10b`, the experiment-definition and smoke-evidence commits `80f4a1f` and
-`53d86d1`, and the follow-up maintenance commits through `9c7dceb`. Inspect the
-live graph rather than relying on this snapshot. The completed
+`53d86d1`, and the follow-up maintenance commits through `9c7dceb`. Later local
+infrastructure commits through `59a4cf9` add exact-resume hardening, bounded
+segments, checkpoint migration and validation, self-describing evaluation
+bundles, paired promotion evidence, and the first author-asset refresh. Inspect
+the live graph rather than relying on this snapshot. The completed
 force-with-lease approval is not standing permission for a future push or
 history rewrite; obtain fresh authorisation when such an operation becomes
 necessary.
@@ -134,6 +138,19 @@ combined Generalist, GameAI, Sentinel-dataset, and TrajectoryDB verification
 reported `58 passed`; the mandatory Malom/provenance rerun again reported
 `102 passed, 498 subtests passed`. A fresh collection-only check still stopped
 on exactly the same four interface errors listed above.
+
+This author-bundle review reran the current trainer contract, preflight,
+checkpoint-envelope, exact-resume, launch, temperature, data-contract, and
+paired-evaluation tests at code HEAD `59a4cf9`: `113 passed`. The mandatory
+Malom/provenance group again reported `102 passed, 498 subtests passed`.
+Adding the older `tests/test_scaffolded_policy.py` interface tests produced
+`22 passed, 3 failed`: a default `ScaffoldedAgent` builds a 62-feature model
+while its default 15-ply lookahead encoder emits 152 features. No production
+call site outside documentation currently instantiates that wrapper, so this
+does not invalidate the focused Generalist-trainer results. It remains a real
+internal-interface failure and blocks describing that inference wrapper or the
+complete suite as healthy. That test file also has no regression covering the
+temperature consistency of PPO old/new log probabilities.
 
 ## Data and Model State
 
@@ -277,6 +294,52 @@ FENs with a pinned checkpoint and log policy entropy, top-one mass, Sentinel
 rank, legal-move coverage, and corrected oracle values; evaluate strength only
 with frozen, colour-swapped matches and intervals.
 
+### Newly supplied author-`main` Generalist evidence
+
+The owner confirms that the newly supplied Generalist checkpoints, JSONL logs,
+plot, and browser screenshot all came from the maintainer's continuing `main`
+training. They are not `dev` artefacts even though a legacy checkpoint embeds a
+host directory containing the word `dev`. Exact hashes and the read-only audit
+are recorded in
+[`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
+
+The delivered `best (copy).pt` is a finite, legacy weights-only `s_gen_v2`
+checkpoint at game 17,400 and difficulty 9. That supports the maintainer's
+correction from “10/20” to “9/20”, but its exact source commit and full launch
+contract remain unknown. It has no optimiser, RNG, data identity, or complete
+trainer state and must never initialise or resume the fresh `dev` experiment.
+
+The accompanying log supports a narrower version of the maintainer's policy
+observation. Across its first and last 500 rows, `policy_top1_rate` rises from
+about 0.42 to 0.84 while entropy falls from about 1.55 to 0.34. However,
+`heuristic_top1_rate` also rises, from about 0.30 to 0.51. These fields measure
+whether the sampled move equals each argmax; they do not measure strength or
+isolate positions where policy and heuristic disagree. The 10,547-row file
+also contains duplicate game numbers, six counter regressions, and a mid-log
+opponent-schedule change, so it is an appended operational history rather than
+one frozen experiment.
+
+The 1,190-row update log raises a separate stop condition for PPO reuse. Its
+policy loss has median about `9.88e7`, reaches about `1.71e29`, and ends around
+`7.80e21`, while value loss remains ordinary and all values remain finite. The
+inspected trainer family records old PPO log probabilities from
+temperature-scaled logits but recomputes new log probabilities without that
+temperature. The missing exact `main` commit prevents attributing every spike
+to that mismatch, but PPO remains quarantined for the first `dev` baseline
+until a deterministic ratio test and reviewed fix exist.
+
+The latest browser screenshot proves only that the Generalist checkbox was
+selected during one manual game. It does not freeze the actual feature inputs,
+opponent, position, colours, or work budget. The author log has only
+`phase_bucket=main`, so the reported strong opening and weak endgame profile
+still requires a phase-stratified replay before it can guide architecture.
+
+The author-update SpecialistDB does contain 27 promoted preferred plays, which
+supports the narrow “favourite plays” statement. It still lacks a `meta` table
+and a trusted Malom label version, so it remains quarantined and read-only. The
+maintainer also explicitly said the internal endgame files had not been
+checked, consistent with keeping them disabled as authoritative inputs.
+
 ## Generalist Trainer Corrections
 
 ### Auto-resume follows the configured output directory
@@ -342,13 +405,16 @@ The generated `latest.pt` is readable, but the final console message named
 not invalidate the historical smoke. Commit `bf9472c` fixes the message; a
 one-game run is now explicitly reported as having no best checkpoint.
 
-The experiment now treats `latest.pt` as a weight-continuation snapshot and
-`best.pt` as optional model-selection evidence. Initial launch remains fresh
-and omits all resume flags. After an interruption, automatic continuation is
-forbidden: inspect the latest snapshot and use a separately recorded explicit
-`--resume` only if weight continuation is acceptable. Current checkpoints do
-not restore optimiser, rolling-history, difficulty-local, target-age, or RNG
-state, so they are not evidence of exact trainer-state recovery.
+The historical smoke's `latest.pt` is a pre-envelope weights-continuation
+snapshot; `best.pt` remains optional model-selection evidence. Subsequent
+infrastructure now emits a version-2 checkpoint envelope and has proved bounded
+exact-resume parity for model, optimiser, scheduler/scaler, counters, rolling
+histories, curriculum, target state, component RNGs, data cursor, log state,
+and SpecialistDB identity. Initial launch still uses explicit `fresh` mode and
+automatic continuation remains forbidden. A continuation must pass a separate
+preflight and name a compatible version-2 source in explicit `exact-resume`
+mode. Legacy checkpoints, including every author-`main` file, remain
+weights-only and cannot satisfy that gate.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -366,6 +432,23 @@ and generalist checkpoints all pre-date the correction. They may be used only
 as explicitly labelled legacy inputs or ablations; loading one does not make it
 a corrected model. Whether Sentinel training improves after corrected labels
 is still untested.
+
+The newly supplied browser evidence exposes a second route mismatch. The
+trainer constructs its Generalist lookahead with the configured Malom database
+as `endgame_db`, but `load_generalist()` does not pass an endgame database and
+`GeneralistAgent.score_moves()` still calls the encoder with `db=None`. Although
+the browser calls `set_db()` after loading Malom, that score path never consumes
+the stored reference. Conversely, the browser constructs the Generalist with
+globally loaded Sentinel, ValueNet, GapNet, HumanDB, and SpecialistDB objects;
+unchecked UI boxes are not an auditable component-disable contract for those
+features.
+
+Before formal evaluation, either align inference deliberately with the frozen
+training route or record the difference as a separate experiment. Emit the
+checkpoint hash, route name, component-presence flags, data identities, Malom
+availability, and fixed search work for every evaluation. Until then, the
+maintainer's manual endgame assessment is a useful replay lead, not evidence
+that an endgame database or new specialist should be enabled.
 
 ## Mixed-opponent Handover Copy
 
@@ -446,20 +529,37 @@ database growth.
 
 ## Recommended Next Actions
 
-The workspace/root check, graph inspection, trainer fixes, focused tests,
-102-test Malom/provenance rerun, first-experiment component decision, bounded
-smoke, and checkpoint-policy correction are complete. Proceed in this order:
+The workspace/root check, graph inspection, earlier trainer fixes, focused
+tests, 102-test Malom/provenance rerun, first-experiment component decision,
+bounded smoke, and checkpoint-policy correction are complete. The author
+bundle and proposed pure-RL definition expose additional gates. Proceed in this
+order:
 
-1. Freeze the long-run update algorithm, opponent schedule, temperature start,
-   game budget, seed, concurrency, checkpoint cadence, monitor interval, and
-   stop criteria.
-2. Run the repository training-readiness workflow and a newly authorised
-   bounded smoke on the intended launch commit with new disposable paths.
-3. Re-run the clean-worktree, path, active-DB, test, and component preflight
-   immediately before any long run. Do not push, smoke, or start that run
-   without the corresponding explicit approval.
+1. Accept or revise the proposed long-run choices recorded in the experiment
+   document: A2C, no imitation warm-start or RL mixing, a 50/50 frozen/heuristic
+   schedule, full depth-5 rollout, temperature `0.90` to `0.20`, 5,000 games,
+   seed 42, single-game batching, and 250-game exact-resume segments.
+2. Add an explicit `--no-imitation-mix` switch. Prove that it prevents loading
+   and applying `human_imitation2.npz`, and include its state in preflight,
+   launch-contract, log, and exact-resume compatibility tests.
+3. Make the proposed fixed-work opponent contract expressible and observable.
+   Current negative `--time-budget` values select an automatic wall-clock
+   budget; they do not disable wall-clock search. Record effective work in the
+   run evidence instead of inferring it from difficulty labels.
+4. Keep the first baseline on A2C and omit `--ppo`. Separately add a
+   deterministic test for temperature-consistent PPO old/new log probabilities
+   before considering a PPO fix or experiment.
+5. After the required controls exist, rerun the training-readiness workflow and
+   request approval for a disposable smoke that reaches at least one RL update.
+   Then repeat the clean-worktree, path, DB, test, and component preflight
+   immediately before any long run.
+6. Before examining a candidate for promotion, freeze the inference route,
+   baseline bundle, phase-stratified starting corpus, paired colour-swapped
+   workload, interval rule, and maximum-ply draw rule. This evaluation freeze
+   is not needed to implement the two launch controls, but it is required for a
+   strength or promotion claim.
 
-The executed isolated smoke command was:
+The previously executed isolated smoke command was:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
@@ -481,8 +581,12 @@ The executed isolated smoke command was:
 
 The command intentionally omitted `--resume`, `--auto-resume-best`, and `--ppo`.
 It exited successfully in approximately 24.4 seconds. Its output and database
-remain ignored and separate from the intended long-run paths. The experiment
-document records their verified contents and the checkpoint observation.
+remain ignored and separate from the intended long-run paths. It is historical
+evidence, not a current launch command: the hardened CLI now requires
+`--launch` and `--run-id`, and the reviewed command must state its start mode
+explicitly. It also predates an explicit imitation-mix disable control. The
+experiment document records its verified contents and the checkpoint
+observation.
 
 The original handover's 50,000-game PPO command should not be launched
 unchanged. PPO and the more complex opponent mixture are optional experiments
@@ -496,22 +600,28 @@ The following choices are recorded for the first `dev` experiment:
 - use the corrected v4-style Generalist path, not claim the staged v5 baseline;
 - exclude legacy Sentinel, ValueNet, and GapNet from the first run.
 
-The checkpoint roles and interruption policy are recorded above. The remaining
-decisions before a long run are its update algorithm, opponent schedule,
-temperature start, game budget, seed, concurrency, checkpoint/monitor cadence,
-and stop criteria. The local endgame/fullgame files also remain exploratory
+The checkpoint roles and interruption policy are recorded above. A complete
+recommended long-run configuration is now written down, but it remains a
+proposal until the owner accepts or revises it. Even after acceptance, the
+current CLI cannot yet express two parts of the proposal: disabling ongoing
+imitation mixing and using a measured fixed-work heuristic search instead of a
+wall-clock cutoff. The local endgame/fullgame files also remain exploratory
 unless separately validated and promoted.
 
-Until the remaining launch choices are recorded, safe work consists of local
-inspection, tests, and launch-contract review. It does not include an
-additional smoke, a long training job, a push, or a history rewrite.
+Until those launch controls and choices are recorded and verified, safe work
+consists of local inspection, implementation, tests, and launch-contract
+review. It does not include an additional smoke, a long training job, a push,
+or a history rewrite.
 
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
-  read-only analysis of the reported 10/20 phase profile, the delivered
-  checkpoint boundary, provisional local WDL coverage evidence, and questions
-  for the original maintainer.
+  read-only analysis of the corrected 9/20 phase observation, supplied
+  author-`main` bundle, Generalist runtime route, provisional local WDL
+  coverage evidence, and remaining questions for the original maintainer.
+- [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md):
+  hashes and reproducible diagnostic findings for the newly supplied
+  author-`main` checkpoints, logs, screenshots, and related database claims.
 - [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): target
   architecture, evidence boundaries, and staged acceptance plan.
 - [`docs/malom-fix.md`](../malom-fix.md): decoder investigation and correction
