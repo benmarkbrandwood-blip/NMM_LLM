@@ -191,7 +191,7 @@ DRAW_LONG   = -0.25   # max-ply timeout draws penalised harder (passive play)
 
 LR            = 1e-4
 GAMMA_TD      = 0.99
-TEMP_START    = 0.90   # explore early; anneals down to TEMP_END over training
+TEMP_START    = 0.90   # default --temp-start; anneals to TEMP_END over training
 TEMP_END      = 0.20   # exploit late
 ENTROPY_COEF  = 0.01
 UPDATE_EVERY  = 64
@@ -601,9 +601,14 @@ def _apply_diff_start_override(difficulty: int, args: argparse.Namespace) -> int
     return difficulty
 
 
-def _compute_temperature(game_count: int, max_games: int) -> float:
+def _compute_temperature(
+    game_count: int,
+    max_games: int,
+    temp_start: float,
+) -> float:
+    """Anneal from the configured start to TEMP_END over 80% of training."""
     progress = min(1.0, game_count / max(max_games * 0.8, 1))
-    return float(TEMP_START - (TEMP_START - TEMP_END) * progress)
+    return float(temp_start - (temp_start - TEMP_END) * progress)
 
 
 def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:
@@ -1221,7 +1226,9 @@ def run(args: argparse.Namespace) -> None:
     update_fn = scaffolded_ppo_update if args.ppo else scaffolded_a2c_update
 
     game_count             = start_game
-    temperature            = args.temp_start
+    temperature            = _compute_temperature(
+        game_count, args.max_games, args.temp_start
+    )
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
     ep_steps: list[ScaffoldedStep] = []
@@ -1276,7 +1283,9 @@ def run(args: argparse.Namespace) -> None:
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
 
     while game_count < args.max_games:
-        temperature = _compute_temperature(game_count, args.max_games)
+        temperature = _compute_temperature(
+            game_count, args.max_games, args.temp_start
+        )
 
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
@@ -1600,7 +1609,7 @@ def run(args: argparse.Namespace) -> None:
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
-                                temperature = TEMP_START
+                                # Recovery does not alter the global temperature schedule.
                                 recovery_grace = 100
                                 print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
                                 print(f"[s_gen_v2] Recovery grace: draw penalty suppressed for 100 games")
@@ -1763,7 +1772,15 @@ def main() -> None:
     p.add_argument("--rolling-win",         type=int,   default=ROLLING_WIN)
     p.add_argument("--diff-start",          type=int,   default=None)
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
-    p.add_argument("--temp-start",          type=float, default=TEMP_START)
+    p.add_argument(
+        "--temp-start",
+        type=float,
+        default=TEMP_START,
+        help=(
+            f"Initial rollout temperature; linearly anneals to {TEMP_END:.2f} "
+            "after 80 percent of --max-games"
+        ),
+    )
     p.add_argument("--log-every",           type=int,   default=LOG_EVERY)
     p.add_argument("--max-ply",             type=int,   default=MAX_PLY)
     p.add_argument("--max-ply-branch",      type=int,   default=MAX_PLY_BRANCH)
