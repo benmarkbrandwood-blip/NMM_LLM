@@ -29,6 +29,7 @@ def _args(tmp_path: Path) -> SimpleNamespace:
         no_value_net=True,
         no_gap_net=True,
         ppo=False,
+        start_mode="fresh",
         out_dir=str(tmp_path / "run"),
         specialist_db=str(tmp_path / "specialist.sqlite"),
     )
@@ -120,6 +121,36 @@ def test_manifest_rejects_nonpassing_or_inconsistent_preflight(tmp_path: Path) -
             run_id="run-001",
             experiment_id="experiment",
         )
+
+
+def test_weights_only_manifest_records_source_checkpoint_lineage(
+    tmp_path: Path,
+) -> None:
+    args = _args(tmp_path)
+    args.start_mode = "weights-only"
+    report = _report()
+    report["checks"]["checkpoint"] = {
+        "identity": "source-identity",
+        "format": "legacy-pytorch-weights",
+    }
+
+    manifest = build_generalist_run_manifest(
+        args,
+        report=report,
+        root=tmp_path,
+        command=("python", "trainer.py"),
+        run_id="run-weights",
+        experiment_id="experiment",
+        created_at_utc="2026-07-20T09:00:00Z",
+        environment={"python": "3.13.1"},
+    )
+
+    assert manifest.checkpoint_policy["start_mode"] == "weights-only"
+    source = next(
+        asset for asset in manifest.assets if asset.logical_name == "source_checkpoint"
+    )
+    assert source.identity == "source-identity"
+    assert source.trust_level == "lineage_labeled_weights_only"
 
 
 def test_initial_contract_publication_is_atomic_and_no_overwrite(

@@ -32,6 +32,7 @@ def _install_launch_mocks(monkeypatch, *, run_effect=None) -> list[str]:
         lambda *_args, **_kwargs: {
             "mode": "smoke",
             "verdict": "ready_for_smoke",
+            "checks": {"checkpoint": None},
         },
     )
     monkeypatch.setattr(

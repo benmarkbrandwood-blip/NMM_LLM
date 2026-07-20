@@ -58,7 +58,7 @@ def _load_spec_model(path: Path):
             cfg = dict(envelope.payload.trainer_state["model_config"])
             state = envelope.payload.model_state
         else:
-            ckpt = torch.load(str(path), map_location="cpu", weights_only=False)
+            ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
             cfg = ckpt.get("model_config", {})
             state = ckpt.get("model") or ckpt
         model = ScaffoldedPolicyNet.from_config(cfg)

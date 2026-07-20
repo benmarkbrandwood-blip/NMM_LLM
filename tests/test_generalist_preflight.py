@@ -7,6 +7,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+import torch
 
 from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
 from learned_ai.training.generalist_preflight import (
@@ -228,6 +229,48 @@ def test_smoke_preflight_rejects_existing_output_and_legacy_specialist_db(
     assert report["verdict"] == "fatal_stop"
     assert "fresh output path must not already exist" in report["errors"]
     assert any("trusted Malom label version" in error for error in report["errors"])
+
+
+def test_weights_only_preflight_accepts_compatible_legacy_weights(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.start_mode = "weights-only"
+    args.experiment_id = "weights-import-test"
+    model = trainer.ScaffoldedPolicyNet(
+        move_feat_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        policy_hidden=args.policy_hidden,
+    )
+    source = tmp_path / "legacy.pt"
+    torch.save(
+        {
+            "model": model.state_dict(),
+            "model_config": model.get_config(),
+            "stage": trainer.STAGE_TAG,
+        },
+        source,
+    )
+    args.resume = str(source)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        expected_move_feature_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        expected_value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_smoke"
+    checkpoint = report["checks"]["checkpoint"]
+    assert checkpoint["format"] == "legacy-pytorch-weights"
+    assert checkpoint["checkpoint_id"].startswith("legacy-sha256:")
 
 
 def test_long_run_preflight_remains_needs_decision(tmp_path: Path) -> None:

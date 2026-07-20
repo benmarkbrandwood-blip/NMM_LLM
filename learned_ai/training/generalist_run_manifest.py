@@ -76,7 +76,7 @@ def _asset_refs(report: Mapping[str, Any]) -> tuple[AssetManifestRef, ...]:
             raise ContractValidationError(
                 f"preflight check {name} does not provide an asset identity"
             )
-    return (
+    assets = [
         AssetManifestRef(
             logical_name="malom_tablebase",
             role="training_oracle",
@@ -101,7 +101,20 @@ def _asset_refs(report: Mapping[str, Any]) -> tuple[AssetManifestRef, ...]:
             trust_level=human["trust"],
             intended_use="human_frequencies_and_empirical_outcomes_only",
         ),
-    )
+    ]
+    checkpoint = checks.get("checkpoint")
+    if checkpoint is not None:
+        assets.append(
+            AssetManifestRef(
+                logical_name="source_checkpoint",
+                role="weights_import",
+                identity=checkpoint["identity"],
+                schema_version=checkpoint["format"],
+                trust_level="lineage_labeled_weights_only",
+                intended_use="model_weights_only",
+            )
+        )
+    return tuple(assets)
 
 
 def build_generalist_run_manifest(
@@ -157,7 +170,7 @@ def build_generalist_run_manifest(
             "event_ledger": RUN_EVENT_LEDGER_NAME,
         },
         checkpoint_policy={
-            "start_mode": "fresh",
+            "start_mode": args.start_mode,
             "automatic_resume": False,
             "historical_checkpoints": "weights_only",
             "roles": ["latest", "best_train", "candidate", "accepted"],

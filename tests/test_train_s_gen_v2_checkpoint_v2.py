@@ -101,6 +101,21 @@ def test_generalist_model_loader_reads_v2_state_and_counters(tmp_path: Path) -> 
         assert torch.equal(loaded.state_dict()[name], tensor)
 
 
+def test_weights_only_model_import_resets_all_training_counters(tmp_path: Path) -> None:
+    model = _model()
+    path = tmp_path / "latest.pt"
+    save_checkpoint(path, _descriptor(), _payload(model))
+
+    _, start_game, best_win_rate, difficulty, source = trainer._load_model(
+        torch.device("cpu"), path, (8,), start_mode="weights-only"
+    )
+
+    assert start_game == 0
+    assert best_win_rate == 0.0
+    assert difficulty == trainer.DIFF_START
+    assert source == str(path)
+
+
 def test_inference_loader_reads_v2_model_config_and_weights(tmp_path: Path) -> None:
     model = _model()
     path = tmp_path / "best.pt"

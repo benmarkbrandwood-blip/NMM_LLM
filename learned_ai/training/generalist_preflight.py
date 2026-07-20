@@ -13,11 +13,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import torch
+
 from learned_ai.data.malom_label_provenance import (
     CURRENT_MALOM_LABEL_VERSION,
     read_malom_label_version,
 )
 from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointError,
+    is_checkpoint_envelope,
+    load_checkpoint,
+)
 
 
 PREFLIGHT_SCHEMA = "nmm.generalist-preflight.v1"
@@ -265,6 +272,16 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             "resume and auto_resume_best are mutually exclusive"
         )
+    if args.auto_resume_best:
+        raise PreflightConfigurationError(
+            "auto_resume_best is not permitted by contract-backed launches"
+        )
+    if args.start_mode == "fresh" and args.resume:
+        raise PreflightConfigurationError("fresh start must not provide resume")
+    if args.start_mode in {"weights-only", "exact-resume"} and not args.resume:
+        raise PreflightConfigurationError(
+            f"{args.start_mode} requires an explicit resume checkpoint"
+        )
 
 
 def _read_git_state(root: Path) -> GitState:
@@ -457,6 +474,98 @@ def _probe_malom(path: Path) -> dict[str, Any]:
     return report
 
 
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _probe_source_checkpoint(
+    path: Path,
+    args: Any,
+    *,
+    feature_schema_version: str,
+    expected_move_feature_dim: int,
+    expected_value_input_dim: int,
+) -> dict[str, Any]:
+    report: dict[str, Any] = {"exists": path.exists(), "kind": "checkpoint"}
+    if not path.is_file():
+        report["error"] = "resume checkpoint is not an existing file"
+        return report
+    try:
+        if is_checkpoint_envelope(path):
+            envelope = load_checkpoint(path)
+            descriptor = envelope.descriptor
+            config = envelope.payload.trainer_state["model_config"]
+            report.update(
+                {
+                    "format": "checkpoint-envelope-v2",
+                    "identity": canonical_sha256(
+                        {
+                            "checkpoint_id": descriptor.checkpoint_id,
+                            "payload_sha256": envelope.payload_sha256,
+                        }
+                    ),
+                    "checkpoint_id": descriptor.checkpoint_id,
+                    "source_run_id": descriptor.run_id,
+                    "feature_schema_version": descriptor.feature_schema_version,
+                    "payload_size": envelope.payload_size,
+                    "model_config": dict(config),
+                }
+            )
+            if descriptor.feature_schema_version != feature_schema_version:
+                report["error"] = "checkpoint feature schema is incompatible"
+            expected = {
+                "policy_hidden": tuple(args.policy_hidden),
+                "move_feat_dim": expected_move_feature_dim,
+                "value_input_dim": expected_value_input_dim,
+            }
+            observed = {
+                "policy_hidden": tuple(config.get("policy_hidden", ())),
+                "move_feat_dim": config.get("move_feat_dim"),
+                "value_input_dim": config.get("value_input_dim"),
+            }
+            if observed != expected:
+                report["error"] = "checkpoint model_config is incompatible"
+        else:
+            checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+            if not isinstance(checkpoint, Mapping):
+                raise ValueError("legacy checkpoint is not a mapping")
+            config = checkpoint.get("model_config")
+            if not isinstance(config, Mapping):
+                report["error"] = "legacy checkpoint has no explicit model_config"
+                return report
+            expected = {
+                "policy_hidden": tuple(args.policy_hidden),
+                "move_feat_dim": expected_move_feature_dim,
+                "value_input_dim": expected_value_input_dim,
+            }
+            observed = {
+                "policy_hidden": tuple(config.get("policy_hidden", ())),
+                "move_feat_dim": config.get("move_feat_dim"),
+                "value_input_dim": config.get("value_input_dim"),
+            }
+            identity = _file_sha256(path)
+            report.update(
+                {
+                    "format": "legacy-pytorch-weights",
+                    "identity": identity,
+                    "checkpoint_id": f"legacy-sha256:{identity}",
+                    "source_run_id": None,
+                    "model_config": dict(config),
+                }
+            )
+            if observed != expected:
+                report["error"] = (
+                    "legacy checkpoint model_config is incompatible with the request"
+                )
+    except (OSError, ValueError, RuntimeError, CheckpointError) as exc:
+        report["error"] = f"checkpoint probe failed: {exc}"
+    return report
+
+
 def _resolved_config(args: Any, mode: str) -> dict[str, Any]:
     raw = {
         key: value
@@ -473,6 +582,9 @@ def run_generalist_preflight(
     mode: str,
     root: Path,
     path_sources: Mapping[str, str],
+    feature_schema_version: str = "unspecified",
+    expected_move_feature_dim: int = -1,
+    expected_value_input_dim: int = -1,
     git_state: GitState | None = None,
 ) -> dict[str, Any]:
     """Return a complete read-only readiness report for the corrected baseline."""
@@ -485,8 +597,13 @@ def run_generalist_preflight(
 
     if state.dirty:
         errors.append("Git worktree must be clean")
-    if args.resume or args.auto_resume_best:
-        errors.append("corrected fresh baseline must not select a resume checkpoint")
+    if (
+        args.start_mode != "fresh"
+        and args.experiment_id == "dev-v4-malom-corrected-fresh-v1"
+    ):
+        errors.append(
+            "non-fresh imports require an explicit non-fresh experiment ID"
+        )
     for flag in ("no_sentinel", "no_value_net", "no_gap_net"):
         if not getattr(args, flag):
             errors.append(f"corrected fresh baseline requires explicit --{flag.replace('_', '-')}")
@@ -501,6 +618,11 @@ def run_generalist_preflight(
         decisions.append(
             "long-run update, opponent, budget, cadence, and stop choices are not "
             "yet frozen in the experiment contract"
+        )
+    if args.start_mode == "exact-resume":
+        decisions.append(
+            "exact resume remains disabled until mutable SpecialistDB state is "
+            "bound to the checkpoint"
         )
 
     output = Path(args.out_dir)
@@ -519,6 +641,15 @@ def run_generalist_preflight(
     }
     specialist_report = _probe_specialist_db(Path(args.specialist_db))
     human_report = _probe_human_db(Path(args.human_db))
+    checkpoint_report: dict[str, Any] | None = None
+    if args.start_mode in {"weights-only", "exact-resume"}:
+        checkpoint_report = _probe_source_checkpoint(
+            Path(args.resume),
+            args,
+            feature_schema_version=feature_schema_version,
+            expected_move_feature_dim=expected_move_feature_dim,
+            expected_value_input_dim=expected_value_input_dim,
+        )
     for name, report in (
         ("malom", malom_report),
         ("specialist_db", specialist_report),
@@ -526,6 +657,11 @@ def run_generalist_preflight(
     ):
         if report.get("error"):
             errors.append(f"{name}: {report['error']}")
+    if checkpoint_report is not None and checkpoint_report.get("error"):
+        errors.append(f"checkpoint: {checkpoint_report['error']}")
+    if args.start_mode == "exact-resume" and checkpoint_report is not None:
+        if checkpoint_report.get("format") != "checkpoint-envelope-v2":
+            errors.append("exact resume requires a CheckpointEnvelope v2 source")
     if not specialist_report.get("exists") and not specialist_report.get(
         "parent_exists"
     ):
@@ -555,6 +691,7 @@ def run_generalist_preflight(
             "malom": malom_report,
             "specialist_db": specialist_report,
             "human_db": human_report,
+            "checkpoint": checkpoint_report,
             "components": {
                 "sentinel": not args.no_sentinel,
                 "value_net": not args.no_value_net,

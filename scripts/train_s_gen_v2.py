@@ -616,6 +616,7 @@ def _load_model(
     device: torch.device,
     resume_path: Optional[Path],
     policy_hidden: tuple[int, ...] = (512, 256, 128),
+    start_mode: str = "fresh",
 ) -> tuple[ScaffoldedPolicyNet, int, float, int, str]:
     feat_dim = MOVE_FEAT_DIM_WITH_LOOKAHEAD
 
@@ -636,7 +637,7 @@ def _load_model(
         checkpoint_state = envelope.payload.trainer_state
         is_mine = envelope.descriptor.implementation.get("trainer") == STAGE_TAG
     else:
-        ckpt = torch.load(resume_path, map_location=device, weights_only=False)
+        ckpt = torch.load(resume_path, map_location=device, weights_only=True)
         cfg = ckpt.get("model_config", {})
         state_key = "model" if "model" in ckpt else "state_dict"
         model_state = ckpt[state_key]
@@ -646,8 +647,10 @@ def _load_model(
     # If the requested architecture differs from the checkpoint, start fresh.
     ckpt_hidden = tuple(cfg.get("policy_hidden", (512, 256, 128)))
     if ckpt_hidden != policy_hidden:
-        print(f"[s_gen_v2] policy_hidden mismatch: ckpt={ckpt_hidden} vs requested={policy_hidden} — starting fresh")
-        return _fresh()
+        raise RuntimeError(
+            f"policy_hidden mismatch: checkpoint={ckpt_hidden}, "
+            f"requested={policy_hidden}"
+        )
 
     cfg["move_feat_dim"]   = feat_dim
     cfg["value_input_dim"] = VALUE_INPUT_DIM_WITH_HISTORY
@@ -664,8 +667,7 @@ def _load_model(
             model.load_state_dict(pol_state, strict=False)
             print("[s_gen_v2] Warning: value_mlp shape mismatch — policy weights loaded, value head reinitialized")
         except RuntimeError:
-            print(f"[s_gen_v2] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
-            return _fresh()
+            raise RuntimeError("checkpoint model state is incompatible")
     metrics = checkpoint_state.get("rolling_metrics", checkpoint_state)
     start_game = int(checkpoint_state.get("game_count", 0)) if is_mine else 0
     best_wr = float(metrics.get("best_win_rate", 0.0)) if is_mine else 0.0
@@ -674,6 +676,8 @@ def _load_model(
         if is_mine
         else DIFF_START
     )
+    if start_mode == "weights-only":
+        return model, 0, 0.0, DIFF_START, str(resume_path)
     return model, start_game, best_wr, difficulty, str(resume_path)
 
 
@@ -1295,7 +1299,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     # ── Load model ─────────────────────────────────────────────────────────────
     resume_path, source_tag = _choose_resume_path(args)
-    model, start_game, best_win_rate, difficulty, source_checkpoint = _load_model(device, resume_path, args.policy_hidden)
+    model, start_game, best_win_rate, difficulty, source_checkpoint = _load_model(
+        device,
+        resume_path,
+        args.policy_hidden,
+        start_mode=args.start_mode,
+    )
     difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
         print("[s_gen_v2] No checkpoint found — starting from scratch")
@@ -1374,7 +1383,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     batch_count = 0
     update_count = 0
     checkpoint_sequence = 0
-    parent_checkpoint_id: Optional[str] = None
+    parent_checkpoint_id: Optional[str] = getattr(
+        args, "_source_checkpoint_id", None
+    )
     run_manifest = getattr(args, "_run_manifest", None)
     if run_manifest is None:
         raise RuntimeError("contract-backed launch did not provide a RunManifest")
@@ -1956,6 +1967,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         type=str,
     )
     p.add_argument("--parent-run-id", default=None, type=str)
+    p.add_argument(
+        "--start-mode",
+        choices=("fresh", "weights-only", "exact-resume"),
+        default="fresh",
+    )
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
     p.add_argument("--paths-config", default=None, type=str,
@@ -2055,6 +2071,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             mode=selected_mode,
             root=_ROOT,
             path_sources=path_sources,
+            feature_schema_version=FEATURE_SCHEMA_VERSION,
+            expected_move_feature_dim=MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+            expected_value_input_dim=VALUE_INPUT_DIM_WITH_HISTORY,
         )
     except (FileNotFoundError, PreflightConfigurationError) as exc:
         p.error(str(exc))
@@ -2076,9 +2095,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         command=command_for_manifest(raw_argv),
         run_id=args.run_id,
         experiment_id=args.experiment_id,
-        parent_run_id=args.parent_run_id,
+        parent_run_id=(
+            args.parent_run_id
+            or (report["checks"].get("checkpoint") or {}).get("source_run_id")
+        ),
     )
     setattr(args, "_run_manifest", manifest)
+    source_checkpoint_report = report["checks"].get("checkpoint")
+    if source_checkpoint_report is not None:
+        setattr(
+            args,
+            "_source_checkpoint_id",
+            source_checkpoint_report["checkpoint_id"],
+        )
     publish_initial_run_contract(args.out_dir, manifest)
     append_run_lifecycle_event(
         args.out_dir,
