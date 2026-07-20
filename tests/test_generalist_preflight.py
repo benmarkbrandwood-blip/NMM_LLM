@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import random
 import sqlite3
 from pathlib import Path
@@ -27,6 +28,11 @@ from learned_ai.training.checkpoint_envelope import (
     CheckpointPayload,
     capture_rng_state,
     save_checkpoint,
+)
+from learned_ai.training.managed_generalist import (
+    ManagedPlan,
+    authorize_plan,
+    publish_managed_plan,
 )
 from scripts import train_s_gen_v2 as trainer
 from scripts.build_malom_dataset_manifest import build_manifest
@@ -491,3 +497,64 @@ def test_long_run_preflight_remains_needs_decision(tmp_path: Path) -> None:
     assert report["verdict"] == "needs_decision"
     assert report["errors"] == []
     assert report["unresolved_decisions"]
+
+
+def test_authorized_managed_long_run_is_ready(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    args.preflight = None
+    args.launch = "long-run"
+    args.run_id = "managed-v4-test-segment-0001"
+    args.experiment_id = "dev-v4-managed-baseline-v1"
+    args.max_games = 5_000
+    args.segment_games = 250
+    args.heuristic_node_budget = 500_000
+    control_dir = tmp_path / "control"
+    args.out_dir = str(control_dir / "segments" / "segment-0001")
+    paths_config = tmp_path / "training_paths.local.json"
+    paths_config.write_text("{}\n", encoding="utf-8")
+    args.paths_config = str(paths_config)
+    plan_path = control_dir / "plan.json"
+    authorization_path = control_dir / "authorization.json"
+    args.managed_plan = str(plan_path)
+    args.managed_authorization = str(authorization_path)
+    plan = ManagedPlan(
+        plan_id="managed-v4-test",
+        created_at_utc="2026-07-20T12:00:00Z",
+        objective="corrected-v4-single-GPU-baseline",
+        experiment_id=args.experiment_id,
+        git_commit="a" * 40,
+        control_dir=str(control_dir.resolve()),
+        paths_config=str(paths_config.resolve()),
+        paths_config_sha256=hashlib.sha256(paths_config.read_bytes()).hexdigest(),
+        resume_config_sha256=resume_config_sha256(args),
+        max_games=args.max_games,
+        segment_games=args.segment_games,
+        max_wall_hours=12.0,
+        common_trainer_args=("--max-games", "5000"),
+        allow_safe_exact_resume=True,
+        publication_allowed=False,
+        promotion_allowed=False,
+    )
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved for the bounded local run.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+
+    report = run_generalist_preflight(
+        args,
+        mode="long-run",
+        root=tmp_path,
+        path_sources={},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_long_run"
+    assert report["errors"] == []
+    assert report["unresolved_decisions"] == []

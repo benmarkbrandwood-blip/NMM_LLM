@@ -2258,6 +2258,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help="Require a passing preflight, publish a run contract, and train",
     )
     p.add_argument("--run-id", default=None, type=str)
+    p.add_argument("--managed-plan", default=None, type=str)
+    p.add_argument("--managed-authorization", default=None, type=str)
     p.add_argument(
         "--experiment-id",
         default="dev-v4-malom-corrected-fresh-v1",

@@ -541,6 +541,8 @@ _RESUME_CONFIG_EXCLUDED_FIELDS = {
     "auto_resume_best",
     "experiment_id",
     "launch",
+    "managed_authorization",
+    "managed_plan",
     "out_dir",
     "parent_run_id",
     "paths_config",
@@ -711,10 +713,43 @@ def run_generalist_preflight(
         if args.batch_games != 1:
             errors.append("smoke preflight requires batch_games=1")
     else:
-        decisions.append(
-            "long-run update, opponent, budget, cadence, and stop choices are not "
-            "yet frozen in the experiment contract"
-        )
+        managed_plan = getattr(args, "managed_plan", None)
+        managed_authorization = getattr(args, "managed_authorization", None)
+        if managed_plan and args.heuristic_node_budget is None:
+            errors.append(
+                "managed long-run requires an explicit --heuristic-node-budget"
+            )
+        if bool(managed_plan) != bool(managed_authorization):
+            errors.append(
+                "managed long-run requires both plan and authorization contracts"
+            )
+        elif not managed_plan:
+            decisions.append(
+                "long-run launch requires a frozen managed plan and separate "
+                "product authorization"
+            )
+        else:
+            from learned_ai.training.managed_generalist import (
+                ManagedContractError,
+                verify_managed_launch,
+            )
+
+            try:
+                verify_managed_launch(
+                    managed_plan,
+                    managed_authorization,
+                    git_commit=state.commit,
+                    resume_config_sha256=resume_config_sha256(args),
+                    out_dir=args.out_dir,
+                    run_id=args.run_id,
+                    segment_games=args.segment_games,
+                    start_mode=args.start_mode,
+                    resume=args.resume,
+                    parent_run_id=args.parent_run_id,
+                    experiment_id=args.experiment_id,
+                )
+            except ManagedContractError as exc:
+                errors.append(f"managed launch: {exc}")
     output = Path(args.out_dir)
     output_report = {
         "exists": output.exists(),
@@ -792,7 +827,7 @@ def run_generalist_preflight(
     elif decisions:
         verdict = "needs_decision"
     else:
-        verdict = "ready_for_smoke"
+        verdict = "ready_for_smoke" if mode == "smoke" else "ready_for_long_run"
     return {
         "schema_version": PREFLIGHT_SCHEMA,
         "mode": mode,
