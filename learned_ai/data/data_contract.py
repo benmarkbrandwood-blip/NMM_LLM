@@ -72,6 +72,44 @@ def _exact_keys(value: Mapping[str, Any], expected: set[str], *, name: str) -> N
 
 
 @dataclass(frozen=True)
+class DatasetComponent:
+    """One immutable file inside a dataset snapshot."""
+
+    relative_path: str
+    size_bytes: int
+    sha256: str
+
+    _FIELDS: ClassVar[set[str]] = {"relative_path", "size_bytes", "sha256"}
+
+    def __post_init__(self) -> None:
+        path = _text(self.relative_path, field="relative_path")
+        candidate = Path(path)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ContractValidationError(
+                "dataset component path must be relative and contained"
+            )
+        if isinstance(self.size_bytes, bool) or not isinstance(self.size_bytes, int):
+            raise ContractValidationError("component size_bytes must be an integer")
+        if self.size_bytes < 0:
+            raise ContractValidationError(
+                "component size_bytes must be non-negative"
+            )
+        object.__setattr__(self, "sha256", _sha256(self.sha256, field="sha256"))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "relative_path": self.relative_path,
+            "size_bytes": self.size_bytes,
+            "sha256": self.sha256,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> DatasetComponent:
+        _exact_keys(value, cls._FIELDS, name="dataset component")
+        return cls(**{field: value[field] for field in cls._FIELDS})
+
+
+@dataclass(frozen=True)
 class DatasetManifest:
     """Immutable provenance and trust declaration for one data snapshot."""
 
@@ -89,6 +127,7 @@ class DatasetManifest:
     validation: tuple[str, ...]
     exclusions: tuple[str, ...]
     label_kinds: tuple[str, ...]
+    components: tuple[DatasetComponent, ...]
 
     _FIELDS: ClassVar[set[str]] = {
         "schema_version",
@@ -106,6 +145,7 @@ class DatasetManifest:
         "validation",
         "exclusions",
         "label_kinds",
+        "components",
     }
 
     def __post_init__(self) -> None:
@@ -143,6 +183,21 @@ class DatasetManifest:
             raise ContractValidationError(
                 f"unsupported label kinds: {sorted(unknown_labels)}"
             )
+        components = tuple(self.components)
+        if any(not isinstance(item, DatasetComponent) for item in components):
+            raise ContractValidationError(
+                "components must contain DatasetComponent values"
+            )
+        component_paths = [item.relative_path for item in components]
+        if len(set(component_paths)) != len(component_paths):
+            raise ContractValidationError("dataset component paths must be unique")
+        if tuple(sorted(component_paths)) != tuple(component_paths):
+            raise ContractValidationError("dataset components must be path-sorted")
+        if sum(item.size_bytes for item in components) != self.size_bytes:
+            raise ContractValidationError(
+                "dataset size_bytes must equal the component size total"
+            )
+        object.__setattr__(self, "components", components)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -161,6 +216,7 @@ class DatasetManifest:
             "validation": list(self.validation),
             "exclusions": list(self.exclusions),
             "label_kinds": list(self.label_kinds),
+            "components": [item.to_dict() for item in self.components],
         }
 
     @property
@@ -187,7 +243,53 @@ class DatasetManifest:
             validation=tuple(value["validation"]),
             exclusions=tuple(value["exclusions"]),
             label_kinds=tuple(value["label_kinds"]),
+            components=tuple(
+                DatasetComponent.from_dict(item) for item in value["components"]
+            ),
         )
+
+
+def verify_dataset_snapshot(
+    root: str | Path,
+    manifest: DatasetManifest,
+    *,
+    full_hash: bool = False,
+) -> dict[str, Any]:
+    """Verify an exact component inventory, optionally rehashing every file."""
+    base = Path(root)
+    observed_paths = tuple(
+        sorted(
+            path.relative_to(base).as_posix()
+            for path in base.rglob("*")
+            if path.is_file()
+        )
+    )
+    expected_paths = tuple(item.relative_path for item in manifest.components)
+    if observed_paths != expected_paths:
+        raise ContractValidationError("dataset component inventory has changed")
+    for component in manifest.components:
+        path = base / component.relative_path
+        if path.stat().st_size != component.size_bytes:
+            raise ContractValidationError(
+                f"dataset component size changed: {component.relative_path}"
+            )
+        if full_hash:
+            import hashlib
+
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                while chunk := handle.read(8 * 1024 * 1024):
+                    digest.update(chunk)
+            if digest.hexdigest() != component.sha256:
+                raise ContractValidationError(
+                    f"dataset component hash changed: {component.relative_path}"
+                )
+    return {
+        "manifest_sha256": manifest.manifest_sha256,
+        "component_count": len(manifest.components),
+        "size_bytes": manifest.size_bytes,
+        "full_hash": full_hash,
+    }
 
 
 def publish_dataset_manifest(path: str | Path, manifest: DatasetManifest) -> None:
