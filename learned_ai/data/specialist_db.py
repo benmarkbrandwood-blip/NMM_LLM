@@ -109,18 +109,27 @@ class SpecialistDB:
     Grows indefinitely — even 100 000 games stay under 1 GB.
     """
 
-    def __init__(self, db_path) -> None:
+    def __init__(self, db_path, *, read_only: bool = False) -> None:
         self._path = Path(db_path)
+        self._read_only = bool(read_only)
+        if self._read_only and not self._path.is_file():
+            raise FileNotFoundError(f"read-only SpecialistDB does not exist: {self._path}")
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.executescript(_SCHEMA_SQL)
+        if self._read_only:
+            uri = f"file:{self._path.resolve().as_posix()}?mode=ro"
+            self._conn = sqlite3.connect(
+                uri, uri=True, check_same_thread=False
+            )
+        else:
+            self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.executescript(_SCHEMA_SQL)
         self._malom_label_count = self._conn.execute(
             "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
         ).fetchone()[0]
         self._malom_label_version = read_malom_label_version(self._conn)
-        if self._malom_label_count == 0:
+        if self._malom_label_count == 0 and not self._read_only:
             # An empty label set is safe to adopt.  This covers both a new DB
             # and an existing self-play-only DB.
             write_current_malom_label_version(self._conn)
@@ -129,7 +138,8 @@ class SpecialistDB:
             self._malom_label_version == CURRENT_MALOM_LABEL_VERSION
         )
         self._checkpoint_identity_cache = None
-        self._conn.commit()
+        if not self._read_only:
+            self._conn.commit()
 
     @property
     def malom_label_version(self) -> Optional[str]:
@@ -151,8 +161,14 @@ class SpecialistDB:
             "path or rebuild the SpecialistDB before training."
         )
 
+    def require_writable(self) -> None:
+        """Reject writes through a SpecialistDB opened as a trusted snapshot."""
+        if self._read_only:
+            raise RuntimeError("SpecialistDB is read-only; runtime writes are quarantined")
+
     def checkpoint_identity(self) -> dict:
         """Flush WAL state and return a cached cryptographic database identity."""
+        self.require_writable()
         change_count = self._conn.total_changes
         cached = self._checkpoint_identity_cache
         if cached is not None and cached[0] == change_count:
@@ -207,6 +223,7 @@ class SpecialistDB:
                         are opponent-to-move; WDL is stored from the current player's
                         perspective, so W↔L are flipped for those boards.
         """
+        self.require_writable()
         now = _now()
         with self._conn:
             for board in boards:
@@ -289,6 +306,7 @@ class SpecialistDB:
 
     def label_position_malom(self, board, wdl: str) -> None:
         """Store a Malom WDL label ('W'/'D'/'L') for a position (training time only)."""
+        self.require_writable()
         self.require_trusted_malom_labels()
         if wdl not in ("W", "D", "L"):
             raise ValueError(f"Invalid Malom WDL label: {wdl!r}")

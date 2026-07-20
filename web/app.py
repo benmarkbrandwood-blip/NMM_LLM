@@ -295,15 +295,27 @@ try:
 except Exception as _le:
     log.warning("Learned AI sentinel unavailable: %s", _le)
 
-# ── SpecialistDB for continuous learning at inference ─────────────────────────
+# ── Read-only SpecialistDB and quarantined runtime evidence ───────────────────
 _specialist_db = None
+_runtime_game_quarantine = None
 try:
     from learned_ai.data.specialist_db import SpecialistDB as _SpecialistDB
     _sdb_path = Path(_ROOT) / "data" / "specialist_db.sqlite"
-    _specialist_db = _SpecialistDB(str(_sdb_path))
-    log.info("SpecialistDB loaded for continuous inference learning: %s", _sdb_path)
+    _specialist_db = _SpecialistDB(str(_sdb_path), read_only=True)
+    log.info("SpecialistDB loaded as a read-only inference snapshot: %s", _sdb_path)
 except Exception as _sdbe:
     log.warning("SpecialistDB unavailable: %s", _sdbe)
+try:
+    from learned_ai.data.runtime_quarantine import (
+        RuntimeGameQuarantine as _RuntimeGameQuarantine,
+    )
+    _quarantine_path = (
+        Path(_ROOT) / "data" / "ai_games" / "quarantine" / "runtime-games.jsonl"
+    )
+    _runtime_game_quarantine = _RuntimeGameQuarantine(_quarantine_path)
+    log.info("Runtime game quarantine ready: %s", _quarantine_path)
+except Exception as _rqe:
+    log.warning("Runtime game quarantine unavailable: %s", _rqe)
 
 # ── Overseer (ScaffoldedPolicyNet) — advisory pick-probability overlay ───────
 _overseer_advisor = None
@@ -316,6 +328,7 @@ try:
         gap_net=_gap_net,
         human_db=_human_db,
         specialist_db=_specialist_db,
+        runtime_quarantine=_runtime_game_quarantine,
     )
     if _overseer_advisor is not None:
         log.info("SpecialistRouter (v2 three-specialist) loaded — using in place of Overseer")
