@@ -4,7 +4,7 @@ Plays complete games from BoardState.new_game(); rewards fire during movement
 phase (sentinel delta + heuristic delta + mill bonus).  No phase restriction.
 Malom reward = 0.  Gap net included in lookahead (12-ply × 6 signals).
 
-Resume chain: explicit --resume → s_gen_v2/best.pt → scratch
+Resume chain: explicit --resume → --out-dir/best.pt → scratch
 
 Usage
 -----
@@ -541,9 +541,9 @@ def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
         p = Path(args.resume)
         if p.exists():
             return p, "explicit_resume"
-    s_gen_v2_best = _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2" / "best.pt"
-    if args.auto_resume_best and s_gen_v2_best.exists():
-        return s_gen_v2_best, "s_gen_v2_best"
+    out_dir_best = Path(args.out_dir) / "best.pt"
+    if args.auto_resume_best and out_dir_best.exists():
+        return out_dir_best, "s_gen_v2_best"
     return None, "scratch"
 
 
