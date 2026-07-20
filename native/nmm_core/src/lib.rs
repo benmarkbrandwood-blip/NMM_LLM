@@ -253,7 +253,7 @@ fn py_search_stats(
 /// `threads` (T-E3): Lazy-SMP thread count; default = 1 (single-threaded).
 /// `fast_eval`: skip qsearch at depth=0; return static eval immediately for deeper/faster search.
 #[pyfunction]
-#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None, fast_eval=None))]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, node_limit=None, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None, fast_eval=None))]
 fn py_search_root_scored(
     py: Python<'_>,
     white: u32,
@@ -263,6 +263,7 @@ fn py_search_root_scored(
     side_to_move: u8,
     max_depth: u8,
     time_limit_ms: u64,
+    node_limit: Option<u64>,
     preferred_root: Option<Vec<(Option<u8>, u8, Option<u8>)>>,
     tt_handle: Option<Py<RustTtHandle>>,
     db_handle: Option<Py<FullgameDbHandle>>,
@@ -273,7 +274,12 @@ fn py_search_root_scored(
     mob_scale: Option<i32>,
     block_scale: Option<i32>,
     fast_eval: Option<bool>,
-) -> (u64, u8, Vec<(Option<u8>, u8, Option<u8>, i64)>) {
+) -> PyResult<(u64, u8, Vec<(Option<u8>, u8, Option<u8>, i64)>)> {
+    if node_limit == Some(0) {
+        return Err(pyo3::exceptions::PyValueError::new_err(
+            "node_limit must be a positive integer",
+        ));
+    }
     let board = Board {
         white,
         black,
@@ -313,7 +319,7 @@ fn py_search_root_scored(
     };
 
     let r = search::iterative_deepening_scored_smp(
-        &board, max_depth, time_limit_ms, &preferred,
+        &board, max_depth, time_limit_ms, node_limit, &preferred,
         tt, opp_ext_set, fullgame_db, endgame_solved_db, n_threads, eval_scale,
         fast_eval.unwrap_or(false),
     );
@@ -323,7 +329,7 @@ fn py_search_root_scored(
         .into_iter()
         .map(|rm| (rm.mv.from, rm.mv.to, rm.mv.capture, rm.score))
         .collect();
-    (r.nodes, r.depth_reached, moves)
+    Ok((r.nodes, r.depth_reached, moves))
 }
 
 /// FullGame DB 9-byte key (byte-identical to Python `_encode_canonical`).

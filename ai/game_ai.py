@@ -451,7 +451,21 @@ class GameAI:
         endgame_solved_db=None,     # ai.endgame_solved_db.EndgameSolvedDB | None
         malom_db=None,              # learned_ai.sentinel.db_teacher.ExternalSolvedDB | None
         override_time_budget: float | None = None,  # seconds; for bench/training callers only
+        override_node_budget: int | None = None,  # nodes; deterministic training callers only
     ) -> None:
+        if override_time_budget is not None and override_node_budget is not None:
+            raise ValueError("time and node budgets are mutually exclusive")
+        if (
+            override_node_budget is not None
+            and (
+                isinstance(override_node_budget, bool)
+                or not isinstance(override_node_budget, int)
+                or override_node_budget <= 0
+            )
+        ):
+            raise ValueError("node budget must be a positive integer")
+        if use_mcts and override_node_budget is not None:
+            raise ValueError("fixed node budgets are not supported by MCTS")
         self.color = color
         self.difficulty = max(1, min(10, difficulty))
         self.blunder_probability = max(0.0, min(1.0, blunder_probability))
@@ -523,6 +537,7 @@ class GameAI:
         self._move_path_buf: list = []  # SE-11b: shared push/pop path buffer for _negamax recursion
         # Per-instance time-budget override (used during training to keep games fast).
         self._override_time_budget = override_time_budget
+        self._override_node_budget = override_node_budget
         # Sentinel overlay (advisory only by default). None => zero impact; the
         # game plays identically. Set via set_sentinel(). See ai/../learned_ai/sentinel.
         self.sentinel = None                 # SentinelAdvisor | None
@@ -1030,6 +1045,8 @@ class GameAI:
         """
         self._force_stop = False
         self._deadline   = math.inf  # reset any prior force_stop() effect
+        self._nodes = 0
+        self.last_depth_reached = 0
         self.last_thinking = ""       # reset thinking trace
         if self.suppress_fork_variety:
             import random as _r
@@ -1415,7 +1432,12 @@ class GameAI:
         else:
             _time_cap = 15.0
         _time_ms: int = int(min(_time_cap, 3600.0) * 1000)
-        if (_in_placement and not fast_early_game and self._override_time_budget is None):
+        if (
+            _in_placement
+            and not fast_early_game
+            and self._override_time_budget is None
+            and self._override_node_budget is None
+        ):
             depth = _opening_ramp_depth(self.max_search_depth, total_on_board)
         else:
             depth = self.max_search_depth
@@ -1424,13 +1446,30 @@ class GameAI:
         if endgame_state is not None and endgame_state.active and not fast_early_game:
             depth += 2 if endgame_state.deep else 1
 
-        move = (
-            self._choose_rust_scored(board, depth, recognition, trajectory_hints, moves,
-                                     time_limit_ms=_time_ms, top_n=top_n)
-            or self._iterative_deepen(board, _time_cap,
-                                      recognition=recognition, trajectory_hints=trajectory_hints,
-                                      top_n=top_n, moves=moves, max_depth=depth)
+        move = self._choose_rust_scored(
+            board,
+            depth,
+            recognition,
+            trajectory_hints,
+            moves,
+            time_limit_ms=_time_ms,
+            node_limit=self._override_node_budget,
+            top_n=top_n,
         )
+        if move is None:
+            if self._override_node_budget is not None:
+                raise RuntimeError(
+                    "fixed-node search requires the native search backend"
+                )
+            move = self._iterative_deepen(
+                board,
+                _time_cap,
+                recognition=recognition,
+                trajectory_hints=trajectory_hints,
+                top_n=top_n,
+                moves=moves,
+                max_depth=depth,
+            )
         move = self._apply_sentinel_intervention(board, move, moves)
         self._populate_thinking(board, move, _forced_block=bool(threats))
         return move
@@ -2404,6 +2443,7 @@ class GameAI:
         trajectory_hints: "dict | None" = None,
         moves: "list | None" = None,
         time_limit_ms: "int | None" = None,
+        node_limit: "int | None" = None,
         top_n: int = 1,
     ) -> "dict | None":
         """Rust negamax returning per-move scores; Python applies hint semantics on top.
@@ -2419,6 +2459,8 @@ class GameAI:
             if not _nc.RUST_AVAILABLE:
                 print("R:UNAVAILABLE (nmm_core not importable)", flush=True)
                 return None
+            if node_limit is not None and self.search_threads != 1:
+                raise RuntimeError("fixed-node search requires search_threads=1")
             import nmm_core as _rc
             white, black, wp, bp, stm = _nc.board_to_bits(board)
             # Ponder's own budget always takes precedence over caller-supplied limit.
@@ -2475,21 +2517,30 @@ class GameAI:
                     _preferred.append(_t)
 
             _threads = self.search_threads if self.search_threads > 1 else None
+            _search_options = {
+                "preferred_root": _preferred if _preferred else None,
+                "tt_handle": self._rust_tt_handle,
+                "db_handle": self._rust_fullgame_db_handle,
+                "endgame_db_handle": self._rust_endgame_solved_handle,
+                "opp_ext_moves": _opp_ext if _opp_ext else None,
+                "threads": _threads,
+                "mill_scale": self._weights.mill_count_scale,
+                "mob_scale": self._weights.mobility_scale,
+                "block_scale": self._weights.blocked_scale,
+                "fast_eval": not self.use_extended_qsearch,
+            }
+            if node_limit is not None:
+                _search_options["node_limit"] = node_limit
             _nodes, depth, raw_moves = _rc.py_search_root_scored(
                 white, black, wp, bp, stm, max_depth, time_limit_ms,
-                preferred_root=_preferred if _preferred else None,
-                tt_handle=self._rust_tt_handle,
-                db_handle=self._rust_fullgame_db_handle,
-                endgame_db_handle=self._rust_endgame_solved_handle,
-                opp_ext_moves=_opp_ext if _opp_ext else None,
-                threads=_threads,
-                mill_scale=self._weights.mill_count_scale,
-                mob_scale=self._weights.mobility_scale,
-                block_scale=self._weights.blocked_scale,
-                fast_eval=not self.use_extended_qsearch,
+                **_search_options,
             )
             _dt = time.perf_counter() - _t0
             if not raw_moves:
+                if node_limit is not None:
+                    raise RuntimeError(
+                        "fixed-node search exhausted its budget before scoring a move"
+                    )
                 return None
 
             # T-D2: filter raw index tuples before allocating move dicts.
@@ -2505,6 +2556,10 @@ class GameAI:
                 raw_moves = [(frm, to, cap, s) for frm, to, cap, s in raw_moves
                              if (frm, to, cap) in allowed_idx]
                 if not raw_moves:
+                    if node_limit is not None:
+                        raise RuntimeError(
+                            "fixed-node search returned no allowed move"
+                        )
                     return None
 
             # Convert surviving Rust (from_idx, to_idx, cap_idx, score) tuples to (move_dict, score).
@@ -2549,8 +2604,10 @@ class GameAI:
             self.last_depth_reached = depth
             self._nodes = _nodes  # expose Rust node count to test observers
             return best_move
-        except Exception:
+        except Exception as exc:
             _dt = time.perf_counter() - _t0
+            if node_limit is not None:
+                raise RuntimeError("fixed-node native search failed") from exc
             _logger.exception("%s:FAIL after %.2fs — falling back to Python", self._search_label, _dt)
             print(f"{self._search_label}:FAIL after {_dt:.2f}s (see traceback above) — falling back to Python", flush=True)
             return None

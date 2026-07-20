@@ -342,6 +342,9 @@ class GameDiag:
     bucket_opening:          int
     bucket_midgame:          int
     bucket_endgame:          int
+    opponent_search_nodes:   int = 0
+    opponent_search_calls:   int = 0
+    opponent_node_budget:    Optional[int] = None
 
 
 def _make_checkpoint_payload(
@@ -987,6 +990,9 @@ class RolloutResult:
     ply:               int
     branch_candidates: list[tuple[int, BoardState, str]]
     retry_board:       Optional[BoardState] = None
+    opponent_search_nodes: int = 0
+    opponent_search_calls: int = 0
+    opponent_node_budget: Optional[int] = None
 
 
 def _move_notation(mv: dict) -> str:
@@ -1077,6 +1083,9 @@ def _rollout(
     learner_boards: list[BoardState] = []
     learner_result_boards: list[BoardState] = []
     learner_moves_notation: list[str] = []
+    opponent_search_nodes = 0
+    opponent_search_calls = 0
+    opponent_node_budget = getattr(opponent, "node_budget", None)
 
     while ply < max_ply:
         if ply == retry_ply:
@@ -1260,7 +1269,13 @@ def _rollout(
             try:
                 opp_move = opponent.choose_move(board)
             except Exception:
+                if opponent_node_budget is not None:
+                    raise
                 opp_move = None
+            last_search_nodes = getattr(opponent, "last_search_nodes", None)
+            if last_search_nodes is not None:
+                opponent_search_nodes += int(last_search_nodes)
+                opponent_search_calls += 1
             if not opp_move:
                 outcome = WIN_REWARD
                 done    = True
@@ -1303,6 +1318,9 @@ def _rollout(
         ply=ply,
         branch_candidates=branch_candidates,
         retry_board=retry_board,
+        opponent_search_nodes=opponent_search_nodes,
+        opponent_search_calls=opponent_search_calls,
+        opponent_node_budget=opponent_node_budget,
     )
 
 
@@ -1374,6 +1392,9 @@ def _build_game_diag(
         bucket_opening =bucket_counts.get("opening",  0),
         bucket_midgame =bucket_counts.get("midgame",  0),
         bucket_endgame =bucket_counts.get("endgame",  0),
+        opponent_search_nodes=result.opponent_search_nodes,
+        opponent_search_calls=result.opponent_search_calls,
+        opponent_node_budget=result.opponent_node_budget,
     )
 
 
@@ -1698,9 +1719,20 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 _gd = difficulty
                 if difficulty > 1 and config_rng.random() < 0.15:
                     _gd = config_rng.randint(1, difficulty - 1)
-                _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
                 _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
-                _h._inner = _GA(color=_oc, difficulty=_gd, override_time_budget=_tb)
+                if args.heuristic_node_budget is not None:
+                    _h._inner = _GA(
+                        color=_oc,
+                        difficulty=_gd,
+                        override_node_budget=args.heuristic_node_budget,
+                    )
+                else:
+                    _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
+                    _h._inner = _GA(
+                        color=_oc,
+                        difficulty=_gd,
+                        override_time_budget=_tb,
+                    )
                 _opp, _gt = _h, "vs_heuristic"
             _fp: Optional[list[str]] = None
             if _OPENING_LINES and config_rng.random() < BOOK_GAME_PROB:
@@ -2284,6 +2316,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-ply",             type=int,   default=MAX_PLY)
     p.add_argument("--max-ply-branch",      type=int,   default=MAX_PLY_BRANCH)
     p.add_argument("--time-budget",         type=float, default=-1.0)
+    p.add_argument(
+        "--heuristic-node-budget",
+        type=int,
+        default=None,
+        help=(
+            "Deterministic per-move native-search node cap for heuristic "
+            "opponents; mutually exclusive with an explicit --time-budget"
+        ),
+    )
     p.add_argument("--self-play-ratio",     type=float, default=SELF_PLAY_RATIO)
     p.add_argument("--update-target-every", type=int,   default=UPDATE_TARGET_EVERY)
     p.add_argument("--branch-every",        type=int,   default=BRANCH_EVERY)

@@ -260,6 +260,16 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             "time_budget must be -1 or a positive number"
         )
+    heuristic_node_budget = getattr(args, "heuristic_node_budget", None)
+    if heuristic_node_budget is not None:
+        _positive_integer(
+            heuristic_node_budget,
+            field="heuristic_node_budget",
+        )
+        if time_budget != -1:
+            raise PreflightConfigurationError(
+                "heuristic node and time budgets are mutually exclusive"
+            )
     if args.max_branches_per_game < 0:
         raise PreflightConfigurationError(
             "max_branches_per_game must not be negative"

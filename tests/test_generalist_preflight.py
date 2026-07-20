@@ -167,6 +167,7 @@ def test_path_resolution_records_cli_environment_config_and_disable_sources(
         ("gamma_td", 1.1, "between zero and one"),
         ("self_play_ratio", -0.1, "between zero and one"),
         ("time_budget", 0.0, "-1 or a positive"),
+        ("heuristic_node_budget", 0, "positive integer"),
         ("batch_games", 2, "must not exceed max_games"),
     ],
 )
@@ -186,6 +187,17 @@ def test_configuration_rejects_unproven_parallel_rollouts(tmp_path: Path) -> Non
     args.batch_games = 2
 
     with pytest.raises(PreflightConfigurationError, match="shared rollout state"):
+        validate_generalist_configuration(args)
+
+
+def test_configuration_rejects_mixed_heuristic_work_budgets(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.heuristic_node_budget = 25_000
+    args.time_budget = 1.0
+
+    with pytest.raises(PreflightConfigurationError, match="mutually exclusive"):
         validate_generalist_configuration(args)
 
 
