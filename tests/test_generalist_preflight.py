@@ -195,6 +195,9 @@ def test_smoke_preflight_is_read_only_and_ready_for_corrected_baseline(
     assert report["verdict"] == "ready_for_smoke"
     assert report["errors"] == []
     assert report["checks"]["specialist_db"]["trust"] == "trusted"
+    assert report["checks"]["specialist_db"]["identity"]
+    assert report["checks"]["malom"]["identity"]
+    assert report["checks"]["human_db"]["identity"]
     assert report["checks"]["human_db"]["malom_columns_policy"] == (
         "masked_historical_labels"
     )

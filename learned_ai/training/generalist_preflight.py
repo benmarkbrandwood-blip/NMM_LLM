@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -319,6 +320,21 @@ def _probe_sqlite(path: Path) -> tuple[sqlite3.Connection | None, dict[str, Any]
             report["error"] = "SQLite quick_check did not return ok"
             connection.close()
             return None, report
+        stat = path.stat()
+        report["identity"] = canonical_sha256(
+            {
+                "size": stat.st_size,
+                "modified_ns": stat.st_mtime_ns,
+                "page_count": connection.execute("PRAGMA page_count").fetchone()[0],
+                "page_size": connection.execute("PRAGMA page_size").fetchone()[0],
+                "schema_version": connection.execute(
+                    "PRAGMA schema_version"
+                ).fetchone()[0],
+                "user_version": connection.execute(
+                    "PRAGMA user_version"
+                ).fetchone()[0],
+            }
+        )
         return connection, report
     except sqlite3.Error as exc:
         report["error"] = f"SQLite read-only probe failed: {exc}"
@@ -334,6 +350,12 @@ def _probe_specialist_db(path: Path) -> dict[str, Any]:
             "parent_exists": parent.is_dir(),
             "label_version": CURRENT_MALOM_LABEL_VERSION,
             "trust": "new_database_adopts_current_version",
+            "identity": canonical_sha256(
+                {
+                    "state": "new_database",
+                    "label_version": CURRENT_MALOM_LABEL_VERSION,
+                }
+            ),
         }
     connection, report = _probe_sqlite(path)
     if connection is None:
@@ -420,6 +442,16 @@ def _probe_malom(path: Path) -> dict[str, Any]:
         report["available"] = database.is_available()
         if not database.is_available():
             report["error"] = "MalomDB did not find a usable secval/sector set"
+        else:
+            secval = path / "std.secval"
+            secval_hash = hashlib.sha256(secval.read_bytes()).hexdigest()
+            sectors = sorted(
+                (item.name, item.stat().st_size) for item in path.glob("std_*.sec2")
+            )
+            report["sector_file_count"] = len(sectors)
+            report["identity"] = canonical_sha256(
+                {"secval_sha256": secval_hash, "sectors": sectors}
+            )
     except Exception as exc:
         report["error"] = f"Malom read-only probe failed: {exc}"
     return report

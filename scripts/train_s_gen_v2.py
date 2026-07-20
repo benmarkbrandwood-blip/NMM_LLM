@@ -4,12 +4,13 @@ Plays complete games from BoardState.new_game(); rewards fire during movement
 phase (sentinel delta + heuristic delta + mill bonus).  No phase restriction.
 Malom reward = 0.  Gap net included in lookahead (12-ply × 6 signals).
 
-Resume chain: explicit --resume → --out-dir/best.pt → scratch
+The CLI requires either a read-only preflight or a contract-backed launch.
+The corrected baseline currently permits fresh launches only.
 
 Usage
 -----
-.venv/bin/python scripts/train_s_gen_v2.py --max-games 20
-.venv/bin/python scripts/train_s_gen_v2.py --auto-resume-best
+.venv/bin/python scripts/train_s_gen_v2.py --preflight smoke [options]
+.venv/bin/python scripts/train_s_gen_v2.py --launch smoke --run-id RUN_ID [options]
 """
 
 from __future__ import annotations
@@ -63,6 +64,12 @@ from learned_ai.training.generalist_preflight import (
     load_training_settings,
     run_generalist_preflight,
     validate_generalist_configuration,
+)
+from learned_ai.training.generalist_run_manifest import (
+    append_run_lifecycle_event,
+    build_generalist_run_manifest,
+    command_for_manifest,
+    publish_initial_run_contract,
 )
 
 # ── Opening book ──────────────────────────────────────────────────────────────
@@ -1085,8 +1092,9 @@ def _build_game_diag(
 
 # ── Main training loop ────────────────────────────────────────────────────────
 
-def run(args: argparse.Namespace) -> None:
-    _configure_paths(args)
+def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
+    if not paths_configured:
+        _configure_paths(args)
     validate_generalist_configuration(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
@@ -1764,12 +1772,26 @@ def _policy_hidden_widths(value: str) -> tuple[int, ...]:
 
 def _build_argument_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
-    p.add_argument(
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument(
         "--preflight",
         choices=("smoke", "long-run"),
         default=None,
         help="Run read-only readiness checks and exit without training",
     )
+    mode.add_argument(
+        "--launch",
+        choices=("smoke", "long-run"),
+        default=None,
+        help="Require a passing preflight, publish a run contract, and train",
+    )
+    p.add_argument("--run-id", default=None, type=str)
+    p.add_argument(
+        "--experiment-id",
+        default="dev-v4-malom-corrected-fresh-v1",
+        type=str,
+    )
+    p.add_argument("--parent-run-id", default=None, type=str)
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
     p.add_argument("--paths-config", default=None, type=str,
@@ -1859,20 +1881,73 @@ def main(argv: Optional[list[str]] = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     _reject_duplicate_cli_options(p, raw_argv)
     args = p.parse_args(raw_argv)
+    if args.preflight is None and args.launch is None:
+        p.error("one of --preflight or --launch is required")
+    selected_mode = args.preflight or args.launch
+    try:
+        path_sources = _configure_paths(args)
+        report = run_generalist_preflight(
+            args,
+            mode=selected_mode,
+            root=_ROOT,
+            path_sources=path_sources,
+        )
+    except (FileNotFoundError, PreflightConfigurationError) as exc:
+        p.error(str(exc))
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
     if args.preflight is not None:
-        try:
-            path_sources = _configure_paths(args)
-            report = run_generalist_preflight(
-                args,
-                mode=args.preflight,
-                root=_ROOT,
-                path_sources=path_sources,
-            )
-        except (FileNotFoundError, PreflightConfigurationError) as exc:
-            p.error(str(exc))
-        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
         return 0 if report["verdict"] == "ready_for_smoke" else 2
-    run(args)
+
+    expected_verdict = (
+        "ready_for_smoke" if args.launch == "smoke" else "ready_for_long_run"
+    )
+    if report["verdict"] != expected_verdict:
+        return 2
+    if not args.run_id or not args.run_id.strip():
+        p.error("--run-id is required for --launch")
+    manifest = build_generalist_run_manifest(
+        args,
+        report=report,
+        root=_ROOT,
+        command=command_for_manifest(raw_argv),
+        run_id=args.run_id,
+        experiment_id=args.experiment_id,
+        parent_run_id=args.parent_run_id,
+    )
+    publish_initial_run_contract(args.out_dir, manifest)
+    append_run_lifecycle_event(
+        args.out_dir,
+        run_id=args.run_id,
+        status="running",
+        event_type="training_started",
+    )
+    try:
+        run(args, paths_configured=True)
+    except KeyboardInterrupt:
+        append_run_lifecycle_event(
+            args.out_dir,
+            run_id=args.run_id,
+            status="interrupted",
+            event_type="training_interrupted",
+            reason_code="operator_interrupt",
+        )
+        return 130
+    except Exception as exc:
+        append_run_lifecycle_event(
+            args.out_dir,
+            run_id=args.run_id,
+            status="failed",
+            event_type="training_failed",
+            reason_code="training_exception",
+            details={"exception_type": type(exc).__name__},
+        )
+        raise
+    append_run_lifecycle_event(
+        args.out_dir,
+        run_id=args.run_id,
+        status="completed",
+        event_type="training_completed",
+    )
     return 0
 
 
