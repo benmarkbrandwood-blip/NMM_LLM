@@ -245,6 +245,35 @@ def test_smoke_preflight_rejects_existing_output_and_legacy_specialist_db(
     assert any("trusted Malom label version" in error for error in report["errors"])
 
 
+def test_fresh_preflight_rejects_reused_specialist_database(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+    connection = sqlite3.connect(args.specialist_db)
+    connection.execute(
+        "INSERT INTO positions(pos_hash, malom_label) VALUES ('old', NULL)"
+    )
+    connection.execute(
+        "INSERT INTO meta(key, value) VALUES "
+        "('training_lineage_root_run_id', 'old-run')"
+    )
+    connection.commit()
+    connection.close()
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "fatal_stop"
+    assert any("empty isolated database" in item for item in report["errors"])
+    assert any("already bound" in item for item in report["errors"])
+
+
 def test_smoke_preflight_rejects_malom_inventory_drift(tmp_path: Path) -> None:
     args = _smoke_args(tmp_path)
     _write_malom(Path(args.malom))

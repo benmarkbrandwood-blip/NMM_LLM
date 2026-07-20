@@ -118,6 +118,11 @@ def test_new_specialist_db_stamps_and_uses_current_labels(tmp_path: Path) -> Non
     try:
         assert db.malom_labels_trusted
         assert db.malom_label_version == CURRENT_MALOM_LABEL_VERSION
+        db.bind_training_lineage("run-001")
+        db.bind_training_lineage("run-001")
+        assert db.training_lineage_root_run_id == "run-001"
+        with pytest.raises(RuntimeError, match="already bound"):
+            db.bind_training_lineage("run-002")
         db.label_position_malom(board, "D")
         evidence = db.query_wdl_evidence(board, min_samples=3)
         assert evidence is not None

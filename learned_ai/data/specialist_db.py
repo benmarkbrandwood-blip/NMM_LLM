@@ -76,6 +76,7 @@ _DEMOTE_WIN_RATE    = 0.45
 _DEMOTE_MIN_RECENT  = 20
 _MIN_SAMPLES_QUERY  = 5
 _RULES_VERSION = "nmm-project-rules-v1"
+_TRAINING_LINEAGE_ROOT_KEY = "training_lineage_root_run_id"
 
 
 @dataclass(frozen=True)
@@ -165,6 +166,36 @@ class SpecialistDB:
         """Reject writes through a SpecialistDB opened as a trusted snapshot."""
         if self._read_only:
             raise RuntimeError("SpecialistDB is read-only; runtime writes are quarantined")
+
+    @property
+    def training_lineage_root_run_id(self) -> Optional[str]:
+        row = self._conn.execute(
+            "SELECT value FROM meta WHERE key=?", (_TRAINING_LINEAGE_ROOT_KEY,)
+        ).fetchone()
+        return row[0] if row and row[0] else None
+
+    def bind_training_lineage(self, run_id: str) -> None:
+        """Bind an empty writable database to one training lineage root."""
+        self.require_writable()
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be a non-empty string")
+        existing = self.training_lineage_root_run_id
+        if existing is not None:
+            if existing != run_id:
+                raise RuntimeError(
+                    f"SpecialistDB is already bound to training lineage {existing!r}"
+                )
+            return
+        if any(
+            self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in ("positions", "winning_lines", "preferred_plays")
+        ):
+            raise RuntimeError("cannot bind a non-empty SpecialistDB to a new lineage")
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO meta(key, value) VALUES (?, ?)",
+                (_TRAINING_LINEAGE_ROOT_KEY, run_id),
+            )
 
     def checkpoint_identity(self) -> dict:
         """Flush WAL state and return a cached cryptographic database identity."""
@@ -433,6 +464,7 @@ class SpecialistDB:
             "malom_labels_trusted": self._malom_labels_trusted,
             "winning_lines": lines,
             "preferred_plays": prefs,
+            "training_lineage_root_run_id": self.training_lineage_root_run_id,
         }
 
     def close(self) -> None:

@@ -1386,6 +1386,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     # ── SpecialistDB ─────────────────────────────────────────────────────────
     specialist_db = SpecialistDB(args.specialist_db)
     specialist_db.require_trusted_malom_labels()
+    if args.start_mode != "exact-resume":
+        specialist_db.bind_training_lineage(getattr(args, "_run_manifest").run_id)
     print(f"[s_gen_v2] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────

@@ -414,6 +414,12 @@ def _probe_specialist_db(path: Path) -> dict[str, Any]:
                 "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
             ).fetchone()[0]
         )
+        lineage = connection.execute(
+            "SELECT value FROM meta WHERE key='training_lineage_root_run_id'"
+        ).fetchone()
+        report["training_lineage_root_run_id"] = (
+            lineage[0] if lineage and lineage[0] else None
+        )
         if report["label_version"] != CURRENT_MALOM_LABEL_VERSION:
             report["error"] = (
                 "SpecialistDB does not declare the trusted Malom label version"
@@ -731,6 +737,21 @@ def run_generalist_preflight(
             "content_sha256"
         ):
             errors.append("checkpoint: SpecialistDB content identity has changed")
+    if args.start_mode in {"fresh", "weights-only"} and specialist_report.get(
+        "exists"
+    ):
+        counts = specialist_report.get("counts", {})
+        if any(
+            counts.get(name, 0)
+            for name in ("positions", "winning_lines", "preferred_plays")
+        ):
+            errors.append(
+                "specialist_db: non-resume training requires an empty isolated database"
+            )
+        if specialist_report.get("training_lineage_root_run_id") is not None:
+            errors.append(
+                "specialist_db: database is already bound to another training lineage"
+            )
     if not specialist_report.get("exists") and not specialist_report.get(
         "parent_exists"
     ):
