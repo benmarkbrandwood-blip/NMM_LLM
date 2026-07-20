@@ -334,9 +334,14 @@ def restore_rng_state(
             )
     random.setstate(state["python"])
     np.random.set_state(tuple(state["numpy"]))
-    torch.set_rng_state(state["torch_cpu"])
+    torch_cpu_state = state["torch_cpu"]
+    if not isinstance(torch_cpu_state, torch.Tensor):
+        raise CheckpointFormatError("checkpoint CPU RNG state must be a tensor")
+    torch.set_rng_state(torch_cpu_state.detach().cpu())
     if cuda_states:
-        torch.cuda.set_rng_state_all(cuda_states)
+        torch.cuda.set_rng_state_all(
+            [item.detach().cpu() for item in cuda_states]
+        )
     for name, component_state in expected_components.items():
         generator = provided_components[name]
         generator.setstate(component_state)

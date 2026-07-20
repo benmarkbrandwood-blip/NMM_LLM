@@ -1437,7 +1437,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     if args.start_mode == "exact-resume":
         if resume_path is None or not is_checkpoint_envelope(resume_path):
             raise RuntimeError("exact-resume requires a CheckpointEnvelope v2 source")
-        exact_resume = load_checkpoint(resume_path, map_location=device)
+        exact_resume = load_checkpoint(resume_path, map_location="cpu")
         checkpoint_specialist = exact_resume.payload.data_state["mutable_assets"][
             "specialist_db"
         ]["sha256"]

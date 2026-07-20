@@ -253,3 +253,18 @@ def test_rng_capture_and_restore_replays_all_cpu_generators() -> None:
         component_rng.random(),
     )
     assert actual == pytest.approx(expected)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is unavailable")
+def test_rng_restore_normalizes_map_location_cuda_tensors() -> None:
+    component_rng = random.Random(23)
+    state = capture_rng_state({"game": component_rng.getstate()})
+    expected_cpu = state["torch_cpu"].clone()
+    relocated = dict(state)
+    relocated["torch_cpu"] = state["torch_cpu"].cuda()
+    relocated["torch_cuda"] = [item.cuda() for item in state["torch_cuda"]]
+    torch.manual_seed(999)
+
+    restore_rng_state(relocated, component_rngs={"game": component_rng})
+
+    assert torch.equal(torch.get_rng_state(), expected_cpu)
