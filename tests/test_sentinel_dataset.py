@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
 
 import numpy as np
 import pytest
 
+from game.board import BoardState
+from game.rules import get_all_legal_moves
 from learned_ai.sentinel.dataset import (
     SentinelDataset,
     examples_from_game,
@@ -14,29 +16,47 @@ from learned_ai.sentinel.dataset import (
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 from learned_ai.sentinel.feature_builder import FEATURE_DIM
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_GAME_DIR = _REPO_ROOT / "data" / "games"
+
+@pytest.fixture
+def game_logs_dir(tmp_path):
+    """Create one deterministic six-ply JSONL game for loader tests."""
+    board = BoardState.new_game()
+    moves = []
+    malom_labels = ("win", "loss", "draw")
+    for ply in range(6):
+        move = get_all_legal_moves(board)[0]
+        moves.append(
+            {
+                "board_fen_before": board.to_fen_string(),
+                "color": board.turn,
+                **move,
+                "malom_move_wdl": malom_labels[ply % len(malom_labels)],
+                "malom_dtw": 20 + ply,
+            }
+        )
+        board = board.apply_move(move)
+
+    game_dir = tmp_path / "games"
+    game_dir.mkdir()
+    record = {"winner": "W", "moves": moves}
+    (game_dir / "fixture.jsonl").write_text(
+        json.dumps(record) + "\n",
+        encoding="utf-8",
+    )
+    return game_dir
 
 
-def _have_games():
-    return _GAME_DIR.is_dir() and next(_GAME_DIR.rglob("*.jsonl"), None) is not None
-
-
-requires_game_logs = pytest.mark.skipif(
-    not _have_games(),
-    reason="requires local JSONL game logs under data/games",
-)
-
-
-@requires_game_logs
-def test_load_from_games_no_crash():
-    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=20)
+def test_load_from_games_no_crash(game_logs_dir):
+    ds = SentinelDataset.load_from_games(
+        str(game_logs_dir), db=ExternalSolvedDB(""), limit=20
+    )
     assert len(ds) > 0
 
 
-@requires_game_logs
-def test_item_shape_and_targets():
-    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=10)
+def test_item_shape_and_targets(game_logs_dir):
+    ds = SentinelDataset.load_from_games(
+        str(game_logs_dir), db=ExternalSolvedDB(""), limit=10
+    )
     feat, label = ds[0]
     assert tuple(feat.shape) == (FEATURE_DIM,)
     # label is (quality: float, weight: float, wdl_cls: int)
@@ -46,16 +66,17 @@ def test_item_shape_and_targets():
     assert wdl_cls in (-1, 0, 1, 2)
 
 
-@requires_game_logs
-def test_dataset_length_positive_per_game():
-    # A handful of games should each yield at least one example.
-    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=5)
-    assert len(ds) >= 5
+def test_dataset_length_positive_for_fixture_positions(game_logs_dir):
+    ds = SentinelDataset.load_from_games(
+        str(game_logs_dir), db=ExternalSolvedDB(""), limit=5
+    )
+    assert len(ds) >= 6
 
 
-@requires_game_logs
-def test_save_load_roundtrip(tmp_path):
-    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=10)
+def test_save_load_roundtrip(game_logs_dir, tmp_path):
+    ds = SentinelDataset.load_from_games(
+        str(game_logs_dir), db=ExternalSolvedDB(""), limit=10
+    )
     path = str(tmp_path / "ds.npz")
     ds.save_to_disk(path)
     ds2 = SentinelDataset.load_from_disk(path)
@@ -67,11 +88,12 @@ def test_save_load_roundtrip(tmp_path):
     assert abs(float(w1) - float(w2)) < 1e-5
 
 
-@requires_game_logs
-def test_quality_distribution_has_multiple_types():
-    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=60)
+def test_quality_distribution_has_multiple_types(game_logs_dir):
+    ds = SentinelDataset.load_from_games(
+        str(game_logs_dir), db=ExternalSolvedDB(""), limit=60
+    )
     dist = ds.quality_distribution()
-    assert len(dist) >= 2        # at least win + loss buckets
+    assert sum(count > 0 for count in dist.values()) >= 2
     assert sum(dist.values()) == len(ds)
 
 

@@ -10,25 +10,11 @@ from ai.trajectory_db import TrajectoryDB, make_board_state_key
 from game.board import BoardState
 
 
-_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
-_GAME_DIR = _REPO_ROOT / "data" / "games"
-
-
-def _have_game_logs() -> bool:
-    return _GAME_DIR.is_dir() and next(_GAME_DIR.rglob("*.jsonl"), None) is not None
-
-
-requires_game_logs = pytest.mark.skipif(
-    not _have_game_logs(),
-    reason="requires local JSONL game logs under data/games",
-)
-
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_db(*records: dict) -> TrajectoryDB:
     db = TrajectoryDB.__new__(TrajectoryDB)
-    db._games_dir = _GAME_DIR
+    db._games_dir = pathlib.Path("unused-in-memory-fixture")
     db._extra_dirs = []
     db._index = {}
     db._game_count = 0
@@ -50,6 +36,24 @@ def _move(fen: str, color: str, notation: str) -> dict:
     return {"board_fen_before": fen, "color": color, "notation": notation}
 
 
+@pytest.fixture
+def game_logs_dir(tmp_path):
+    """Create a deterministic local corpus for TrajectoryDB loader tests."""
+    empty_fen = BoardState.new_game().to_fen_string()
+    records = [
+        _minimal_game([_move(empty_fen, "W", "d6")], winner="W"),
+        _minimal_game([_move(empty_fen, "W", "a7")], winner="B"),
+        _minimal_game([_move(empty_fen, "W", "g7")], winner=None),
+    ]
+    game_dir = tmp_path / "games"
+    game_dir.mkdir()
+    (game_dir / "fixture.jsonl").write_text(
+        "".join(json.dumps(record) + "\n" for record in records),
+        encoding="utf-8",
+    )
+    return game_dir
+
+
 # ── FEN round-trip ────────────────────────────────────────────────────────────
 
 class TestFenRoundTrip:
@@ -63,9 +67,8 @@ class TestFenRoundTrip:
         assert b2.pieces_captured == b.pieces_captured
         assert b2.hash_key == b.hash_key
 
-    @requires_game_logs
-    def test_mid_game_from_real_file(self):
-        games = sorted(_GAME_DIR.rglob("*.jsonl"))
+    def test_mid_game_from_fixture_file(self, game_logs_dir):
+        games = sorted(game_logs_dir.rglob("*.jsonl"))
         rec = json.loads(games[0].read_text().splitlines()[0])
         for mv in rec.get("moves", [])[:10]:
             fen = mv.get("board_fen_before")
@@ -203,18 +206,17 @@ class TestSourceTypeSeparation:
 
 # ── Full load integration ─────────────────────────────────────────────────────
 
-@requires_game_logs
 class TestFullLoad:
-    def test_load_all_games(self):
-        """All 317+ game files are indexed without error."""
-        db = TrajectoryDB(_GAME_DIR)
+    def test_load_fixture_games(self, game_logs_dir):
+        """Every valid game in the fixed JSONL corpus is indexed."""
+        db = TrajectoryDB(game_logs_dir)
         db.load()
-        assert db.game_count >= 317, f"Expected ≥317 games, got {db.game_count}"
-        assert db.entry_count > 1000, f"Expected >1000 state entries, got {db.entry_count}"
+        assert db.game_count == 3
+        assert db.entry_count > 0
 
-    def test_query_start_position(self):
+    def test_query_start_position(self, game_logs_dir):
         """Query on the empty board returns placement moves with |delta| ≤ 0.5."""
-        db = TrajectoryDB(_GAME_DIR)
+        db = TrajectoryDB(game_logs_dir)
         db.load()
         b = BoardState.new_game()
         result = db.query(b, "W", min_samples=1)
@@ -222,12 +224,12 @@ class TestFullLoad:
         for notation, delta in result.items():
             assert -0.5 <= delta <= 0.5, f"{notation} delta {delta:.3f} out of range"
 
-    def test_frequencies_sum_to_one(self):
+    def test_frequencies_sum_to_one(self, game_logs_dir):
         """query_all_frequencies() at start returns frequencies summing to ~1.0."""
-        db = TrajectoryDB(_GAME_DIR)
+        db = TrajectoryDB(game_logs_dir)
         db.load()
         b = BoardState.new_game()
         freq = db.query_all_frequencies(b, min_samples=1)
-        if freq:
-            total = sum(freq.values())
-            assert abs(total - 1.0) < 0.01, f"Frequencies sum to {total:.4f}, expected ~1.0"
+        assert freq
+        total = sum(freq.values())
+        assert abs(total - 1.0) < 0.01, f"Frequencies sum to {total:.4f}, expected ~1.0"
