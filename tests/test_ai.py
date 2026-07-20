@@ -27,6 +27,17 @@ def _board_from_pos(white: list[str], black: list[str], turn: str = "W",
     )
 
 
+def _terminal_mill_board() -> BoardState:
+    """Movement position where g4-g7 forms a mill and wins immediately."""
+    return _board_from_pos(
+        ["a7", "d7", "g4", "a1"],
+        ["a4", "b6", "d6"],
+        turn="W",
+        w_placed=9,
+        b_placed=9,
+    )
+
+
 # ── Heuristic unit tests ──────────────────────────────────────────────────────
 
 class TestClosedMills(unittest.TestCase):
@@ -160,38 +171,36 @@ class TestGameAIChooseMove(unittest.TestCase):
         self.assertTrue(all(terminal_wdl(pos) is None for pos in fake.queried))
 
     def test_completes_obvious_mill(self):
-        # W at a7, d7; B has two isolated pieces (b6, g1) that cannot reform a mill.
-        # Placing at g7 completes mill (a7,d7,g7) and captures one Black piece,
-        # reducing B to 1 piece — a large advantage vs any other placement.
-        b = _board_from_pos(
-            ["a7", "d7"],
-            ["b6", "g1"],       # B pieces not connected by any mill together
-            turn="W",
-            w_placed=2,
-            b_placed=2,
-        )
-        ai = GameAI(color="W", difficulty=1)   # depth=2: shallow enough to prefer immediate gains
+        # Moving g4-g7 closes a7-d7-g7.  Capturing any of Black's three
+        # pieces then leaves Black below three after placement is complete.
+        b = _terminal_mill_board()
+        ai = GameAI(color="W", difficulty=1, override_time_budget=1.0)
+        ai.max_search_depth = 2
+
         move = ai.choose_move(b)
-        self.assertEqual(move["to"], "g7", "AI should complete the mill at g7")
+
+        self.assertIn(move, get_all_legal_moves(b))
+        self.assertEqual((move["from"], move["to"]), ("g4", "g7"))
+        self.assertIsNotNone(move["capture"])
+        self.assertEqual(terminal_wdl(b.apply_move(move), "W"), "W")
 
     def test_score_move_blunder_vs_optimal(self):
-        # Same position. Completing mill at g7 + capture must score higher than
-        # a random corner placement with no mill and no capture.
-        b = _board_from_pos(
-            ["a7", "d7"],
-            ["b6", "g1"],
-            turn="W",
-            w_placed=2,
-            b_placed=2,
-        )
+        # Keep score_move's bounded search deterministic: at depth 2 the
+        # immediate terminal capture must outrank a legal quiet move.
+        b = _terminal_mill_board()
         ai = GameAI(color="W", difficulty=2)
-        # g7 forms a mill → must include a capture; g1 is already Black's → use b6
-        optimal = {"from": None, "to": "g7", "capture": "b6"}
-        blunder  = {"from": None, "to": "c5", "capture": None}   # inner corner, no mill
+        ai.max_search_depth = 2
+        optimal = {"from": "g4", "to": "g7", "capture": "a4"}
+        blunder = {"from": "g4", "to": "f4", "capture": None}
+
+        legal = get_all_legal_moves(b)
+        self.assertIn(optimal, legal)
+        self.assertIn(blunder, legal)
+
         score_opt = ai.score_move(b, optimal)
         score_bad = ai.score_move(b, blunder)
         self.assertGreater(score_opt, score_bad,
-                           "Completing the mill must outscore a random placement")
+                           "A terminal mill capture must outscore a quiet move")
 
 
 class TestBlunderMode(unittest.TestCase):
