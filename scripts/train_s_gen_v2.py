@@ -196,6 +196,7 @@ TEMP_END      = 0.20   # exploit late
 ENTROPY_COEF  = 0.01
 UPDATE_EVERY  = 64
 ROLLING_WIN   = 40
+BEST_CHECKPOINT_MIN_GAMES = 10
 DIFF_START    = 1
 DIFF_MAX      = 20
 
@@ -553,6 +554,34 @@ def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
     if args.auto_resume_best and out_dir_best.exists():
         return out_dir_best, "s_gen_v2_best"
     return None, "scratch"
+
+
+def _should_save_best_checkpoint(
+    win_rate: float,
+    best_win_rate_at_diff: float,
+    heuristic_game_count: int,
+) -> bool:
+    """Return whether the current logging checkpoint qualifies as a new best."""
+    return (
+        heuristic_game_count >= BEST_CHECKPOINT_MIN_GAMES
+        and win_rate > best_win_rate_at_diff
+    )
+
+
+def _report_final_checkpoints(out_dir: Path) -> None:
+    """Report only checkpoint files that are actually available."""
+    latest_path = out_dir / "latest.pt"
+    best_path = out_dir / "best.pt"
+    print(f"[s_gen_v2] Latest checkpoint: {latest_path}")
+    if best_path.exists():
+        print(f"[s_gen_v2] Best checkpoint available: {best_path}")
+    else:
+        print(
+            "[s_gen_v2] Best checkpoint: not created "
+            f"(requires a logging checkpoint with at least "
+            f"{BEST_CHECKPOINT_MIN_GAMES} heuristic games and an improved "
+            "win rate)"
+        )
 
 
 def _load_model(
@@ -1667,7 +1696,11 @@ def run(args: argparse.Namespace) -> None:
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
-                if win_rate > best_win_rate_at_diff and len(win_history_heuristic) >= 10:
+                if _should_save_best_checkpoint(
+                    win_rate,
+                    best_win_rate_at_diff,
+                    len(win_history_heuristic),
+                ):
                     best_win_rate_at_diff = win_rate
                     ckpt["best_win_rate"] = best_win_rate_at_diff
                     torch.save(ckpt, out_dir / f"best{difficulty}.pt")
@@ -1758,7 +1791,7 @@ def run(args: argparse.Namespace) -> None:
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
-    print(f"[s_gen_v2] Checkpoint: {out_dir / 'best.pt'}")
+    _report_final_checkpoints(out_dir)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
