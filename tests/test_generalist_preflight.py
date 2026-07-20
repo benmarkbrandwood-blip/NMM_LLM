@@ -179,6 +179,15 @@ def test_configuration_validation_rejects_invalid_values(
         validate_generalist_configuration(args)
 
 
+def test_configuration_rejects_unproven_parallel_rollouts(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    args.max_games = 2
+    args.batch_games = 2
+
+    with pytest.raises(PreflightConfigurationError, match="shared rollout state"):
+        validate_generalist_configuration(args)
+
+
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:
     with pytest.raises(SystemExit) as raised:
         trainer.main(["--max-games", "1", "--max-games=2"])

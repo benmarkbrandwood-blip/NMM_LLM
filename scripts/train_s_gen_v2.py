@@ -82,6 +82,7 @@ from learned_ai.training.checkpoint_envelope import (
     restore_rng_state,
     save_checkpoint,
 )
+from learned_ai.training.run_contract import canonical_sha256
 
 # ── Opening book ──────────────────────────────────────────────────────────────
 
@@ -301,6 +302,7 @@ class StepDiag:
 
 @dataclass
 class GameDiag:
+    game_id:                 str
     game:                    int
     difficulty:              int
     learner_color:           str
@@ -916,6 +918,9 @@ RETRY_PLY_MAX = 15
 
 @dataclass
 class _GameConfig:
+    game_id:                str
+    scheduled_index:        int
+    torch_seed:             int
     learner_color:          str
     opp_color:              str
     game_type:              str
@@ -946,6 +951,29 @@ def _move_notation(mv: dict) -> str:
     return s
 
 
+def _derive_game_identity(
+    run_seed: int, scheduled_index: int, role: str
+) -> tuple[str, int]:
+    """Derive a stable game ID and CPU Torch seed from immutable inputs."""
+    if scheduled_index < 0 or not role:
+        raise ValueError("scheduled_index and role must identify a game")
+    identity = canonical_sha256(
+        {
+            "schema": "nmm.game-identity.v1",
+            "run_seed": run_seed,
+            "scheduled_index": scheduled_index,
+            "role": role,
+        }
+    )
+    return f"game:{identity}", int(identity[:16], 16) & ((1 << 63) - 1)
+
+
+def _game_torch_generator(seed: int) -> torch.Generator:
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(seed)
+    return generator
+
+
 def _rollout(
     model:          ScaffoldedPolicyNet,
     device:         torch.device,
@@ -968,6 +996,7 @@ def _rollout(
     specialist_db=None,
     malom_db=None,
     deep_game: bool = False,
+    torch_generator: Optional[torch.Generator] = None,
 ) -> RolloutResult:
     # For deep games (1-in-20): temporarily run full ply_depth simulation
     _saved_sim_ply = None
@@ -1051,7 +1080,11 @@ def _rollout(
                 if forced_idx is not None:
                     chosen_idx = forced_idx
                 else:
-                    chosen_idx = int(torch.multinomial(probs.cpu(), 1).item())
+                    chosen_idx = int(
+                        torch.multinomial(
+                            probs.cpu(), 1, generator=torch_generator
+                        ).item()
+                    )
                 chosen_prob     = float(probs[chosen_idx].item())
                 top1_prob       = float(probs.max().item())
                 was_top1_policy = int(chosen_idx == int(torch.argmax(probs).item()))
@@ -1218,6 +1251,7 @@ def _rollout(
 # ── Diagnostic logging ────────────────────────────────────────────────────────
 
 def _build_game_diag(
+    game_id:        str,
     game_count:      int,
     difficulty:      int,
     learner_color:   str,
@@ -1241,6 +1275,7 @@ def _build_game_diag(
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
     return GameDiag(
+        game_id=game_id,
         game=game_count,
         difficulty=difficulty,
         learner_color=learner_color,
@@ -1601,30 +1636,42 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
         # ── Build N game configs ──────────────────────────────────────────────
         batch_slots: list[tuple[_GameConfig, Any]] = []
-        for _ in range(max(1, min(args.batch_games, args.max_games - game_count))):
-            _lc = "W" if rng.random() < 0.5 else "B"
+        for slot_index in range(
+            max(1, min(args.batch_games, args.max_games - game_count))
+        ):
+            scheduled_index = game_count + slot_index
+            game_id, torch_seed = _derive_game_identity(
+                args.seed, scheduled_index, "primary"
+            )
+            config_rng = random.Random(torch_seed)
+            _lc = "W" if config_rng.random() < 0.5 else "B"
             _oc = "B" if _lc == "W" else "W"
-            if rng.random() < args.self_play_ratio:
+            if config_rng.random() < args.self_play_ratio:
                 _opp, _gt, _gd = frozen_opp, "vs_frozen", difficulty
             else:
                 _gd = difficulty
-                if difficulty > 1 and rng.random() < 0.15:
-                    _gd = rng.randint(1, difficulty - 1)
+                if difficulty > 1 and config_rng.random() < 0.15:
+                    _gd = config_rng.randint(1, difficulty - 1)
                 _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
                 _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _GA(color=_oc, difficulty=_gd, override_time_budget=_tb)
                 _opp, _gt = _h, "vs_heuristic"
             _fp: Optional[list[str]] = None
-            if _OPENING_LINES and rng.random() < BOOK_GAME_PROB:
-                _ln = _OPENING_LINES[rng.randint(0, len(_OPENING_LINES) - 1)]
+            if _OPENING_LINES and config_rng.random() < BOOK_GAME_PROB:
+                _ln = _OPENING_LINES[
+                    config_rng.randint(0, len(_OPENING_LINES) - 1)
+                ]
                 _fp = _sample_forced_placements(_ln, _lc)
             batch_slots.append((
                 _GameConfig(
+                    game_id=game_id,
+                    scheduled_index=scheduled_index,
+                    torch_seed=torch_seed,
                     learner_color=_lc, opp_color=_oc, game_type=_gt,
                     game_difficulty=_gd,
                     is_full_diff=(_gt == "vs_heuristic" and _gd == difficulty),
                     game_forced_placements=_fp,
-                    retry_ply=rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
+                    retry_ply=config_rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
                     temperature=temperature,
                 ),
                 _opp,
@@ -1638,8 +1685,6 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 print(f"[s_gen_v2] Recovery grace expired — draw penalty restored")
 
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
-        _is_deep_game = (game_count % 20 == 0)   # 1-in-20 games use full 12-ply sim
-
         def _primary(cfg: _GameConfig, opp: Any) -> RolloutResult:
             return _rollout(
                 model=model, device=device, start_board=BoardState.new_game(),
@@ -1653,7 +1698,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 human_db=human_db,
                 specialist_db=specialist_db,
                 malom_db=db,
-                deep_game=_is_deep_game,
+                deep_game=(cfg.scheduled_index % 20 == 0),
+                torch_generator=_game_torch_generator(cfg.torch_seed),
             )
 
         if _executor is not None and len(batch_slots) > 1:
@@ -1700,6 +1746,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed, cfg.scheduled_index, "confirm"
+                        )[1]
+                    ),
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
@@ -1733,7 +1784,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
             bucket_counts = Counter(branch_bucket_history)
             _diag = _build_game_diag(
-                game_count, difficulty, learner_color, temperature, result,
+                cfg.game_id, game_count, difficulty, learner_color, temperature, result,
                 best_win_rate, win_history, last_update_pl, last_update_vl, last_update_ent,
                 opt, False, source_checkpoint,
                 game_type=game_type, phase_bucket="main", is_branch=False,
@@ -1774,6 +1825,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed, cfg.scheduled_index, "retry"
+                        )[1]
+                    ),
                 )
                 if retry_result.trajectory:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
@@ -1793,7 +1849,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             # ── Branch games ───────────────────────────────────────────────────
             branches_spawned = 0
             candidates = list(result.branch_candidates)
-            rng.shuffle(candidates)
+            branch_order_rng = random.Random(
+                _derive_game_identity(
+                    args.seed, cfg.scheduled_index, "branch-order"
+                )[1]
+            )
+            branch_order_rng.shuffle(candidates)
             seen_buckets: set[str] = set()
             ordered_candidates: list[tuple[int, BoardState, str]] = []
             for cand in candidates:
@@ -1803,7 +1864,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 else:
                     ordered_candidates.append(cand)
 
-            for branch_ply, branch_board, bucket in ordered_candidates:
+            for branch_candidate_index, (
+                branch_ply,
+                branch_board,
+                bucket,
+            ) in enumerate(ordered_candidates):
                 if branches_spawned >= args.max_branches_per_game:
                     break
                 bucket_counts = Counter(branch_bucket_history)
@@ -1829,6 +1894,13 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed,
+                            cfg.scheduled_index,
+                            f"branch:{branch_candidate_index}:{branch_ply}:{bucket}",
+                        )[1]
+                    ),
                 )
 
                 if branch_result.trajectory:
@@ -1844,6 +1916,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
                     bucket_counts = Counter(branch_bucket_history)
                     diag_buffer.append(_build_game_diag(
+                        _derive_game_identity(
+                            args.seed,
+                            cfg.scheduled_index,
+                            f"branch:{branch_candidate_index}:{branch_ply}:{bucket}",
+                        )[0],
                         game_count, difficulty, learner_color, temperature, branch_result,
                         best_win_rate, win_history, last_update_pl, last_update_vl, last_update_ent,
                         opt, False, source_checkpoint,

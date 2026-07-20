@@ -180,7 +180,7 @@ def configure_generalist_paths(
     environment = os.environ if environ is None else environ
     sources: dict[str, str] = {}
     for attr, (environment_name, setting_name, default) in PATH_SPECS.items():
-        cli_value = getattr(args, attr)
+        cli_value = getattr(args, attr, None)
         if cli_value is not None:
             value = cli_value
             source = "cli"
@@ -275,6 +275,10 @@ def validate_generalist_configuration(args: Any) -> None:
     if args.batch_games > args.max_games:
         raise PreflightConfigurationError(
             "batch_games must not exceed max_games"
+        )
+    if args.batch_games != 1:
+        raise PreflightConfigurationError(
+            "batch_games must remain 1 until shared rollout state is removed"
         )
     if not args.policy_hidden or any(
         isinstance(width, bool) or not isinstance(width, int) or width <= 0
