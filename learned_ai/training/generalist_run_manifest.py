@@ -173,6 +173,8 @@ def build_generalist_run_manifest(
             "value_net": not args.no_value_net,
             "gap_net": not args.no_gap_net,
             "ppo": bool(args.ppo),
+            "imitation_warmstart": not args.no_s1a_warmstart,
+            "imitation_mix": not args.no_imitation_mix,
         },
         outputs={
             "run_directory": _portable_path(args.out_dir, root),

@@ -683,7 +683,13 @@ def run_generalist_preflight(
         errors.append(
             "non-fresh imports require an explicit non-fresh experiment ID"
         )
-    for flag in ("no_sentinel", "no_value_net", "no_gap_net"):
+    for flag in (
+        "no_sentinel",
+        "no_value_net",
+        "no_gap_net",
+        "no_s1a_warmstart",
+        "no_imitation_mix",
+    ):
         if not getattr(args, flag):
             errors.append(f"corrected fresh baseline requires explicit --{flag.replace('_', '-')}")
     if args.ppo:
@@ -801,6 +807,8 @@ def run_generalist_preflight(
                 "value_net": not args.no_value_net,
                 "gap_net": not args.no_gap_net,
                 "ppo": bool(args.ppo),
+                "imitation_warmstart": not args.no_s1a_warmstart,
+                "imitation_mix": not args.no_imitation_mix,
             },
         },
         "errors": errors,

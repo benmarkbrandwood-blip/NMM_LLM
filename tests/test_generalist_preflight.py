@@ -97,6 +97,7 @@ def _smoke_args(tmp_path: Path):
             "--no-value-net",
             "--no-gap-net",
             "--no-s1a-warmstart",
+            "--no-imitation-mix",
             "--max-games",
             "1",
             "--batch-games",
@@ -196,6 +197,14 @@ def test_segment_boundary_does_not_change_resume_semantics(tmp_path: Path) -> No
     args.segment_games = 2
 
     assert resume_config_sha256(args) == segmented
+
+
+def test_imitation_mix_control_changes_resume_semantics(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    disabled = resume_config_sha256(args)
+    args.no_imitation_mix = False
+
+    assert resume_config_sha256(args) != disabled
 
 
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:

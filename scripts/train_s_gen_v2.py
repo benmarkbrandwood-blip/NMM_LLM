@@ -666,6 +666,54 @@ def _imitation_mix_step(
     return float(loss.item())
 
 
+def _load_imitation_mix_data(args: argparse.Namespace) -> dict[str, np.ndarray] | None:
+    """Load required imitation data, or honor an explicit disabled contract."""
+    if args.no_imitation_mix:
+        print("[s_gen_v2] Imitation mixing explicitly disabled")
+        return None
+
+    imitation_path = Path(args.s1a_data)
+    if not imitation_path.exists():
+        raise RuntimeError(
+            "required imitation mixing dataset does not exist: "
+            f"{imitation_path}"
+        )
+    raw = None
+    try:
+        raw = np.load(str(imitation_path), allow_pickle=True)
+        feat_matrices = raw["feat_matrices"]
+        label_dists = raw["label_dists"]
+        is_winner = (
+            raw["is_winner"]
+            if "is_winner" in raw
+            else np.ones(len(feat_matrices), dtype=bool)
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "required imitation mixing dataset could not be loaded: "
+            f"{imitation_path}"
+        ) from exc
+    finally:
+        close = getattr(raw, "close", None)
+        if close is not None:
+            close()
+    if len(feat_matrices) == 0 or len(feat_matrices) != len(label_dists):
+        raise RuntimeError(
+            "required imitation mixing dataset has inconsistent or empty arrays: "
+            f"{imitation_path}"
+        )
+    data = {
+        "feat_matrices": feat_matrices,
+        "label_dists": label_dists,
+        "is_winner": is_winner,
+    }
+    print(
+        "[s_gen_v2] Imitation data loaded: "
+        f"{len(feat_matrices)} positions for mixing"
+    )
+    return data
+
+
 def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
     if args.resume:
         p = Path(args.resume)
@@ -1505,20 +1553,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                            epochs=args.s1b_refresher_epochs,
                            lr=args.s1b_refresher_lr)
 
-    # Load imitation data for ongoing mixing during RL (AlphaZero-style)
-    _imitation_data = None
-    _imitation_path = Path(args.s1a_data)
-    if _imitation_path.exists():
-        try:
-            _raw = np.load(str(_imitation_path), allow_pickle=True)
-            _imitation_data = {
-                "feat_matrices": _raw["feat_matrices"],
-                "label_dists":   _raw["label_dists"],
-                "is_winner":     _raw["is_winner"] if "is_winner" in _raw else np.ones(len(_raw["feat_matrices"]), dtype=bool),
-            }
-            print(f"[s_gen_v2] Imitation data loaded: {len(_imitation_data['feat_matrices'])} positions for mixing")
-        except Exception as e:
-            print(f"[s_gen_v2] Imitation data load failed ({e}) — imitation mixing disabled")
+    # Ongoing imitation mixing is independent of the one-time warm-start.
+    _imitation_data = _load_imitation_mix_data(args)
 
     # Warm the lazy-init heuristic eval global before spawning threads
     if args.batch_games > 1:
@@ -2260,6 +2296,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-s1b-refresher",     action="store_true")
     p.add_argument("--s1a-data",             type=str,  default=str(_ROOT / "learned_ai" / "data" / "human_imitation2.npz"))
     p.add_argument("--no-s1a-warmstart",     action="store_true")
+    p.add_argument(
+        "--no-imitation-mix",
+        action="store_true",
+        help="Explicitly disable ongoing imitation updates during RL",
+    )
     p.add_argument("--minimal-rollouts",    action="store_true",
                    help="Skip retry + confirm rollouts (branches are already off by default). "
                         "Trades sample efficiency for wall-clock speed — one primary rollout per game.")
