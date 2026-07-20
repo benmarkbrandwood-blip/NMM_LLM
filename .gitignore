@@ -45,9 +45,9 @@ data/session_memory/
 data/human_db.sqlite
 data/human_db.sqlite-shm
 data/human_db.sqlite-wal
-data/specialist_db.sqlite
-data/specialist_db.sqlite-shm
-data/specialist_db.sqlite-wal
+data/specialist_db*.sqlite
+data/specialist_db*.sqlite-shm
+data/specialist_db*.sqlite-wal
 
 # Endgame retrograde tables and fullgame position DB — built locally, can be hundreds of MB
 data/endgame/*.wdl
