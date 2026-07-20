@@ -145,7 +145,7 @@ location and the relative destination map are recorded in the
 
 Available assets include:
 
-- the 738,091,008-byte HumanDB and 94,983 human-game `.jsonl` files;
+- the 738,091,008-byte HumanDB and 95,389 human-game `.jsonl` files;
 - fourteen endgame WDL tables and `fullgame.bin`;
 - the complete external Malom directory, with 512 files totalling
   83,582,223,577 bytes;
@@ -159,8 +159,8 @@ The assets are present, but they are not all equally trustworthy:
 - HumanDB's unversioned historical Malom columns are masked by current readers.
 - `data/specialist_db.sector_corrected.sqlite` is trusted and deliberately
   empty. It is the active SpecialistDB for a corrected run.
-- The old SpecialistDB is isolated in the ignored backup directory and must
-  remain read-only.
+- Both legacy SpecialistDB deliveries are isolated in the ignored backup
+  directory and must remain read-only.
 - Historical checkpoints and nets pre-date the corrected decoder/provenance
   migration. Retain them as exploratory baselines; do not claim that they were
   trained from corrected labels.
@@ -216,6 +216,34 @@ The active HumanDB has 1,560,069 labelled position rows and 1,691,422 labelled
 move rows but no label-version key, so its Malom fields are intentionally
 untrusted. The active corrected SpecialistDB has zero positions, winning lines,
 or preferred plays.
+
+The 20 July author update added 406 valid human-game JSONL files. Their content
+matches `human_games_94559.zip`, and the import manifest grew from 94,134 to
+94,540 entries. Four added records have an empty `moves` list and were retained
+unchanged from the source package. `data/human_db.sqlite` was not rebuilt, so
+its 94,429-game inventory still represents the earlier corpus.
+The source ZIP is archived outside Git at
+`../human_database/human_games_94559.zip`; its SHA-256 is
+`45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07`.
+Do not run the current builder's `--update` mode blindly: all 94,983 existing
+`processed_files.file_path` values use the author's `/home/...` absolute path,
+so Windows paths would be treated as new files and their statistics would be
+added again. Migrate those keys or perform a controlled rebuild before adding
+the 406 games to HumanDB.
+
+The accompanying 268,521,472-byte SpecialistDB passed `integrity_check` and
+contains 1,954,437 positions with 339,904 labels, but it has no `meta` table and
+therefore no trusted label version. It is quarantined as
+`data/backups/drive_import_20260720/specialist_db.sqlite.legacy-author-update-20260720`
+with SHA-256
+`5C6A4EA1ACFB90BF05248580A07DAE7CF4645C09E5A4A69E2EC89EA9EE41811B`.
+The active corrected database was not replaced and retains SHA-256
+`CB4153A14752357587890EB5F8B655AB04AF8242E43BE1C80D4847A11D101A94`.
+
+The downloaded `build_endgame_db.py` and `build_fullgame_db.py` are byte-for-byte
+identical to the repository copies. The downloaded `build_human_db_sha.py` is
+an older version that lacks the repository's Malom label-provenance guard, so
+it was not copied over `tools/build_human_db_sha.py`.
 
 ## Source-note Evidence Boundary
 

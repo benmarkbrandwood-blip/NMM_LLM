@@ -102,8 +102,10 @@ This inventory was measured on 20 July 2026.
 | Asset | Current location and state |
 | --- | --- |
 | HumanDB | `data/human_db.sqlite`, 738,091,008 bytes; 94,429 games, 2,152,889 positions, and 2,516,356 move rows |
-| Human game files | `data/human_games`, 94,983 `.jsonl` files plus import metadata |
+| Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
+| Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; metadata is `sector-corrected-v1`; all three data tables are currently empty |
+| Legacy SpecialistDB snapshots | Two ignored, read-only snapshots under `data/backups/drive_import_20260720`; neither is an active training database |
 | Endgame databases | `data/endgame`, fourteen `.wdl` files plus `fullgame.bin` at 571,683,560 bytes |
 | Malom tablebase | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted`; 512 files and 83,582,223,577 bytes |
 | Sentinel | `learned_ai/sentinel/checkpoints/best.pt` |
@@ -130,7 +132,7 @@ because it carries `malom_label_version=sector-corrected-v1`; the trainer can
 add empirical game statistics and freshly decoded Malom labels without mixing
 them with legacy labels.
 
-The legacy SpecialistDB is isolated at:
+The original legacy SpecialistDB is isolated at:
 
 ```text
 data\backups\drive_import_20260720\specialist_db.sqlite.legacy-pre-sector-fix
@@ -142,8 +144,34 @@ Its SHA-256 is:
 3DDD7172457E846602CBB026CEA3EB1F9E024B0D828F28EFA323105004DAE48F
 ```
 
-Do not open that file in write mode, copy it back to the active database path,
-or add corrected labels to it.
+The author's 20 July update is separately isolated at:
+
+```text
+data\backups\drive_import_20260720\specialist_db.sqlite.legacy-author-update-20260720
+```
+
+It is 268,521,472 bytes and has SHA-256:
+
+```text
+5C6A4EA1ACFB90BF05248580A07DAE7CF4645C09E5A4A69E2EC89EA9EE41811B
+```
+
+Its SQLite integrity check passes and it contains 1,954,437 positions, of which
+339,904 have a Malom label. It has no `meta` table, so those labels are
+unversioned and must be treated as legacy. The file is retained only as a
+read-only empirical/audit snapshot; it did not replace the active corrected
+database.
+
+Do not open either legacy snapshot in write mode, copy it back to the active
+database path, or add corrected labels to it.
+
+The 406 new human-game files were imported without rebuilding
+`data/human_db.sqlite`. HumanDB therefore still describes the earlier corpus
+until a separately reviewed incremental or full rebuild is performed. Its
+94,983 `processed_files.file_path` keys use the author's `/home/...` absolute
+paths, while the current builder compares Windows absolute paths. A blind
+`--update` would therefore treat the existing corpus as new and double-count
+it; migrate the processed-file keys or perform a controlled rebuild first.
 
 ## Machine-specific Configuration
 
