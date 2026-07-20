@@ -1038,6 +1038,24 @@ def _initialize_training_rngs(seed: int) -> random.Random:
     return random.Random(seed)
 
 
+def _segment_slots_remaining(game_count: int, segment_stop_game: int) -> int:
+    """Slots left before the managed/exact segment stop."""
+    assert game_count >= 0
+    assert segment_stop_game >= 0
+    return max(0, segment_stop_game - game_count)
+
+
+def _confirm_fits_in_segment(slots_remaining: int) -> bool:
+    """Confirm plus the subsequent primary consume two game_count slots."""
+    assert slots_remaining >= 0
+    return slots_remaining >= 2
+
+
+def _extra_rollout_fits_in_segment(game_count: int, segment_stop_game: int) -> bool:
+    """Retry/branch may run only while the segment still has an open slot."""
+    return _segment_slots_remaining(game_count, segment_stop_game) > 0
+
+
 def _rollout(
     model:          ScaffoldedPolicyNet,
     device:         torch.device,
@@ -1703,9 +1721,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
         # ── Build N game configs ──────────────────────────────────────────────
         batch_slots: list[tuple[_GameConfig, Any]] = []
-        for slot_index in range(
-            max(1, min(args.batch_games, args.max_games - game_count))
-        ):
+        _slots_remaining = min(
+            args.batch_games,
+            _segment_slots_remaining(game_count, segment_stop_game),
+            args.max_games - game_count,
+        )
+        for slot_index in range(max(0, _slots_remaining)):
             scheduled_index = game_count + slot_index
             game_id, torch_seed = _derive_game_identity(
                 args.seed, scheduled_index, "primary"
@@ -1780,6 +1801,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 torch_generator=_game_torch_generator(cfg.torch_seed),
             )
 
+        if not batch_slots:
+            break
+
         if _executor is not None and len(batch_slots) > 1:
             _futs = {_executor.submit(_primary, cfg, opp): (cfg, opp) for cfg, opp in batch_slots}
             batch_results = [(cfg_opp[0], cfg_opp[1], f.result()) for f, cfg_opp in _futs.items()]
@@ -1789,6 +1813,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         # ── Process each result sequentially ──────────────────────────────────
         _advance_done = False
         for cfg, opponent, result in batch_results:
+            if game_count >= segment_stop_game:
+                break
             learner_color          = cfg.learner_color
             opp_color              = cfg.opp_color
             game_type              = cfg.game_type
@@ -1800,11 +1826,16 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             if result.trajectory:
                 _retroactive_rescore(result.trajectory, result.step_diags, result.outcome, _draw_scale)
 
+            # Confirm/retry each consume an extra game_count slot. Skip them when
+            # the managed segment has only one remaining slot so game_count cannot
+            # overshoot segment_stop_game (managed evidence requires an exact match).
+            _room = _segment_slots_remaining(game_count, segment_stop_game)
             if result.outcome == WIN_REWARD:
                 ep_steps.extend(result.trajectory)
             elif (not args.minimal_rollouts
                   and result.outcome in (LOSS_REWARD, DRAW_SHORT)
-                  and result.retry_board is not None):
+                  and result.retry_board is not None
+                  and _confirm_fits_in_segment(_room)):
                 confirm_result = _rollout(
                     model=model,
                     device=device,
@@ -1883,7 +1914,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
             if (not args.minimal_rollouts
                 and result.outcome != WIN_REWARD
-                and result.retry_board is not None):
+                and result.retry_board is not None
+                and _extra_rollout_fits_in_segment(game_count, segment_stop_game)):
                 retry_result = _rollout(
                     model=model,
                     device=device,
@@ -1947,6 +1979,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 branch_board,
                 bucket,
             ) in enumerate(ordered_candidates):
+                if not _extra_rollout_fits_in_segment(game_count, segment_stop_game):
+                    break
                 if branches_spawned >= args.max_branches_per_game:
                     break
                 bucket_counts = Counter(branch_bucket_history)
