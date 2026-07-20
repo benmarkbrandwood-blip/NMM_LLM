@@ -1796,6 +1796,19 @@ def run(args: argparse.Namespace) -> None:
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
+def _finite_positive_float(value: str) -> float:
+    """Parse a finite, strictly positive command-line float."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number"
+        ) from exc
+    if not math.isfinite(parsed) or parsed <= 0.0:
+        raise argparse.ArgumentTypeError("must be a finite positive number")
+    return parsed
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
     p.add_argument("--resume",             default="",   type=str)
@@ -1827,7 +1840,7 @@ def main() -> None:
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
     p.add_argument(
         "--temp-start",
-        type=float,
+        type=_finite_positive_float,
         default=TEMP_START,
         help=(
             f"Initial rollout temperature; linearly anneals to {TEMP_END:.2f} "

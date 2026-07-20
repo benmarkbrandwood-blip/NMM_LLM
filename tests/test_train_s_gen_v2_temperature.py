@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import argparse
+
 import pytest
 
-from scripts.train_s_gen_v2 import TEMP_END, TEMP_START, _compute_temperature
+from scripts.train_s_gen_v2 import (
+    TEMP_END,
+    TEMP_START,
+    _compute_temperature,
+    _finite_positive_float,
+)
 
 
 @pytest.mark.parametrize(
@@ -30,3 +37,27 @@ def test_default_temperature_schedule_is_unchanged():
     assert _compute_temperature(0, 1_000, TEMP_START) == pytest.approx(0.90)
     assert _compute_temperature(400, 1_000, TEMP_START) == pytest.approx(0.55)
     assert _compute_temperature(800, 1_000, TEMP_START) == pytest.approx(TEMP_END)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("0.01", 0.01),
+        ("1", 1.0),
+        ("1e2", 100.0),
+    ],
+)
+def test_temp_start_accepts_finite_positive_values(value, expected):
+    assert _finite_positive_float(value) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["0", "-0.1", "nan", "inf", "-inf", "not-a-number"],
+)
+def test_temp_start_rejects_non_positive_or_non_finite_values(value):
+    with pytest.raises(
+        argparse.ArgumentTypeError,
+        match="finite positive number",
+    ):
+        _finite_positive_float(value)
