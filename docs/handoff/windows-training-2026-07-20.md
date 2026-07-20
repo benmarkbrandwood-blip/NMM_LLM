@@ -7,12 +7,11 @@ and existing model artefacts are in their intended locations, and the focused
 Malom/provenance suite is green. A long corrected training run has not been
 started.
 
-The next safe objective is not simply to repeat the old training command. It is
-to preserve the corrected data boundary, fix or explicitly avoid the
-generalist trainer's hard-coded auto-resume path, correct and test its
-temperature schedule, choose whether the next run starts from scratch or
-accepts a documented legacy warm start, run a bounded smoke test, and only then
-start a monitored run.
+The auto-resume and temperature-schedule defects have now been fixed and tested
+on local `dev`. The owner has defined the first experiment as a fresh,
+Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
+disabled. The next safe executable step is a bounded, isolated smoke test; a
+long monitored run remains gated on its result and a frozen run budget.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -59,10 +58,12 @@ handover, both `dev` and `origin/dev` pointed to:
 ```
 
 `git rev-list --left-right --count dev...origin/dev` returned `0 0`. The
-documentation commit will make local `dev` ahead until that new commit is
-separately pushed. The completed force-with-lease approval is not standing
-permission for a future push or history rewrite; inspect the graph again and
-obtain fresh authorisation when such an operation becomes necessary.
+handover commit `8751da4` was subsequently pushed and is now the recorded
+`origin/dev` tip. Local `dev` then added the independently tested auto-resume
+and temperature commits `5eadb4e` and `006715b`. Inspect the live graph rather
+than relying on this snapshot. The completed force-with-lease approval is not
+standing permission for a future push or history rewrite; obtain fresh
+authorisation when such an operation becomes necessary.
 
 ## Environment State
 
@@ -101,7 +102,7 @@ The command was:
 ```
 
 `scripts/train_s_gen_v2.py --help` also completes successfully. A fresh full
-collection found 696 tests and stopped on four repository-interface errors:
+collection found 705 tests and stopped on four repository-interface errors:
 
 - `tests/test_legal_moves.py` imports the absent
   `learned_ai.models.action_encoder` module;
@@ -227,9 +228,9 @@ FENs with a pinned checkpoint and log policy entropy, top-one mass, Sentinel
 rank, legal-move coverage, and corrected oracle values; evaluate strength only
 with frozen, colour-swapped matches and intervals.
 
-## Known Generalist Trainer Risks
+## Generalist Trainer Corrections
 
-### Auto-resume ignores the configured output directory
+### Auto-resume follows the configured output directory
 
 The machine-specific configuration sends new output to:
 
@@ -237,44 +238,34 @@ The machine-specific configuration sends new output to:
 learned_ai/checkpoints/scaffolded/s_gen_v2_sector_corrected
 ```
 
-However, `_choose_resume_path()` in `scripts/train_s_gen_v2.py` currently
-handles `--auto-resume-best` by hard-coding:
+Commit `5eadb4e` changes `_choose_resume_path()` so `--auto-resume-best` reads
+`best.pt` from the resolved `args.out_dir`; it no longer falls back to the
+historical fixed directory. Regression tests cover explicit-resume precedence,
+the configured output path, and isolation from the old directory. The fresh
+baseline still intentionally omits both `--resume` and `--auto-resume-best`.
 
-```text
-learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt
-```
+### The CLI temperature schedule controls the loop
 
-It does not use `args.out_dir`. Consequently, running the original handover
-command with `--auto-resume-best` would silently load the historical pre-fix
-generalist even though the output directory is named `sector_corrected`.
+Commit `006715b` passes `--temp-start` into the schedule for both fresh and
+resumed game counts. Temperature reaches the fixed `0.20` endpoint after 80 per
+cent of `--max-games`. Recovery no longer resets temperature: it still restores
+the selected weights and applies the existing draw-penalty grace, but
+exploration stays on the global schedule. Focused tests cover a custom start,
+ordinary decay, endpoint clamping, and the unchanged default schedule.
 
-Before a long run, either:
+## First Dev Experiment Decision
 
-1. fix auto-resume so it resolves `best.pt` inside the configured output
-   directory and add a focused regression test; or
-2. omit `--auto-resume-best` and provide an explicit `--resume` path only after
-   the checkpoint-lineage decision has been recorded.
+The owner selected `dev-v4-malom-corrected-fresh-v1`: a fresh-initialised,
+Malom-corrected v4-style Generalist baseline. It does not load the author's
+continuing `main` checkpoint, does not use automatic resume, starts with an
+empty `sector-corrected-v1` SpecialistDB, and explicitly disables the legacy
+Sentinel, ValueNet, and GapNet. The trainer exposes `--no-sentinel`,
+`--no-value-net`, and `--no-gap-net` so this choice overrides machine-local
+configured paths rather than depending on missing files.
 
-For a genuinely fresh corrected run, omit both options. This issue should be
-fixed as a separate commit before relying on automatic continuation.
-
-### Temperature options and recovery reheat do not control the loop
-
-The original note proposes increasing temperature after repeated recovery and
-uses `--temp-start 1.1`. The current script first assigns
-`temperature = args.temp_start`, but the start of every training-loop iteration
-replaces it with `_compute_temperature(game_count, args.max_games)`. That
-function uses the module constants `TEMP_START=0.90` and `TEMP_END=0.20`, not
-the command-line value. Recovery later assigns `temperature = TEMP_START`, but
-the next loop iteration replaces that assignment before another rollout.
-
-Consequently, the CLI start value and recovery assignment do not implement the
-requested rollout schedule. Before a long run, define the intended annealing
-and decide whether recovery reheat is desirable at all. Implement the approved
-state as checkpoint-resumable behaviour, or remove the ineffective assignment,
-and add focused tests covering the CLI value, ordinary decay, approved recovery
-behaviour, and resumption. Until then, do not describe recovery as increasing
-exploration.
+The complete definition, preflight evidence, claim boundary, and isolated
+smoke command are in
+[`docs/experiments/dev-v4-malom-corrected-baseline.md`](../experiments/dev-v4-malom-corrected-baseline.md).
 
 ## Live Malom and Legacy-model Boundary
 
@@ -372,74 +363,67 @@ database growth.
 
 ## Recommended Next Actions
 
-Proceed in this order:
+The workspace/root check, graph inspection, two trainer fixes, focused trainer
+tests, 102-test Malom/provenance rerun, and first-experiment component decision
+are complete. Proceed in this order:
 
-1. Confirm that the current or newly opened Codex task remains at the
-   repository root with `git rev-parse --show-toplevel`.
-2. Inspect `git status` and the local/remote graph. The earlier divergence is
-   resolved; do not repeat the force-with-lease operation or push the
-   documentation commit without explicit approval.
-3. Fix the `--auto-resume-best`/configured-output mismatch in one focused
-   commit, with a regression test.
-4. Fix and test the CLI temperature schedule in a separate focused commit.
-   Decide explicitly whether recovery should reheat; implement the approved
-   behaviour or remove the ineffective reset. Do not combine this work with
-   mixed-opponent experimentation.
-5. Add or run focused checks for every Malom-enabled inference route intended
-   for the next baseline, then re-run the 102-test Malom/provenance suite.
-6. Record an explicit lineage and component choice: fresh corrected model or
-   documented legacy warm start, and which legacy Sentinel/value-net inputs are
-   enabled as inputs or ablations. The safer model-lineage default is fresh.
-7. Run one bounded smoke game using separate smoke output and SpecialistDB
+1. Pin a clean `dev` commit containing the explicit component-disable switches
+   and the experiment definition; record its exact SHA. Do not push without
+   explicit approval.
+2. Run focused checks for the Malom-enabled inference route exercised by the
+   smoke, then run one bounded smoke game using separate output and SpecialistDB
    paths. Confirm that the selected Malom, HumanDB, legacy model inputs, GPU,
    log writer, checkpoint writer, and versioned SpecialistDB initialise, and
    record the exact decision route exercised.
-8. Inspect the smoke log and database metadata. If an endgame/fullgame asset is
+3. Inspect the smoke log and database metadata. If an endgame/fullgame asset is
    enabled, validate its manifest and reader separately. Only then choose
    long-run concurrency, monitoring intervals, and stop criteria.
 
-A suitable fresh smoke command, after the auto-resume review, is:
+A suitable isolated smoke command is:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
-  --out-dir learned_ai\checkpoints\smoke\s_gen_v2 `
-  --specialist-db data\specialist_db.smoke.sqlite `
+  --paths-config data\training_paths.local.json `
+  --out-dir learned_ai\checkpoints\smoke\s_gen_v2_v4_malom_corrected_fresh_v1 `
+  --specialist-db data\specialist_db.smoke.v4_malom_corrected_fresh_v1.sqlite `
+  --no-sentinel `
+  --no-value-net `
+  --no-gap-net `
+  --temp-start 0.90 `
   --max-games 1 `
   --batch-games 1 `
   --max-ply 40 `
   --sim-ply-depth 2 `
   --minimal-rollouts `
-  --no-s1a-warmstart `
-  --no-s1b-refresher
+  --no-s1a-warmstart
 ```
 
-Do not add `--auto-resume-best` to this command. This is an integration smoke
-test, not strength evidence or a test of recovery reheating. Keep its output
-separate from the intended long-run directory.
+Do not add `--resume` or `--auto-resume-best` to this command. The smoke also
+omits `--ppo` to keep the integration check bounded; that does not decide the
+long-run update algorithm. This is not strength evidence or a test of recovery
+reheating. Keep its output and database separate from the intended long-run
+paths.
 
 The original handover's 50,000-game PPO command should not be launched
 unchanged. PPO and the more complex opponent mixture are optional experiments
 under the v5 plan, not prerequisites for a corrected baseline.
 
-## Open Decisions for the Owner
+## Recorded and Remaining Owner Decisions
 
-The next task should seek explicit decisions on these points when they become
-actionable:
+The following choices are recorded for the first `dev` experiment:
 
-1. Must the corrected generalist start from scratch, or may a historical
-   checkpoint be used as a clearly labelled warm start?
-2. Is the immediate target a bounded continuation of the existing v4
-   generalist, or the stricter staged v5 reference baseline?
-3. Should the first baseline load the legacy Sentinel and value net as explicit
-   inputs/ablations, or exclude them until corrected retraining is available?
-4. Should mixed-opponent work be revisited only after the corrected baseline is
-   measured?
-5. Will the local endgame/fullgame files remain exploratory, or be promoted to
-   an authoritative role only after independent validation?
+- start from random model weights, not a historical checkpoint;
+- use the corrected v4-style Generalist path, not claim the staged v5 baseline;
+- exclude legacy Sentinel, ValueNet, and GapNet from the first run.
 
-Until those choices are recorded, safe work consists of local inspection,
-tests, the two focused trainer fixes, and a separate bounded smoke run. It does
-not include a long training job, a push, or a history rewrite.
+The remaining decisions before a long run are its update algorithm, opponent
+schedule, temperature start, game budget, seed, concurrency,
+checkpoint/monitor cadence, and stop criteria. The local endgame/fullgame files
+also remain exploratory unless separately validated and promoted.
+
+Until the smoke and remaining launch choices are recorded, safe work consists
+of local inspection, tests, and the separate bounded smoke. It does not include
+a long training job, a push, or a history rewrite.
 
 ## Reference Material
 
