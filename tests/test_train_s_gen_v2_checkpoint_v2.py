@@ -51,6 +51,7 @@ def _payload(model: ScaffoldedPolicyNet, *, game_count: int = 7):
         last_update_losses=(0.1, 0.2, 0.3),
         source_checkpoint="scratch",
         checkpoint_sequence=1,
+        specialist_db_identity={"sha256": "specialist-identity"},
     )
 
 
@@ -81,6 +82,9 @@ def test_generalist_payload_captures_mutable_training_state() -> None:
     assert payload.trainer_state["target_network"]["games_since_update"] == 3
     assert payload.trainer_state["model_config"] == model.get_config()
     assert payload.data_state["cursor"] == {"completed_games": 7}
+    assert payload.data_state["mutable_assets"]["specialist_db"] == {
+        "sha256": "specialist-identity"
+    }
     assert set(payload.rng_state["components"]) == {"game"}
 
 

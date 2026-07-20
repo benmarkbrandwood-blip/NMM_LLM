@@ -71,6 +71,9 @@ def _payload(model: torch.nn.Module, optimizer: torch.optim.Optimizer):
             "consumed_snapshots": [],
             "cache": {},
             "buckets": {},
+            "mutable_assets": {
+                "specialist_db": {"sha256": "specialist-identity"}
+            },
         },
     )
 

@@ -51,7 +51,13 @@ _TRAINER_STATE_FIELDS = {
     "recovery_state",
     "model_config",
 }
-_DATA_STATE_FIELDS = {"cursor", "consumed_snapshots", "cache", "buckets"}
+_DATA_STATE_FIELDS = {
+    "cursor",
+    "consumed_snapshots",
+    "cache",
+    "buckets",
+    "mutable_assets",
+}
 _RNG_STATE_FIELDS = {"python", "numpy", "torch_cpu", "torch_cuda", "components"}
 
 

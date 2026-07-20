@@ -364,6 +364,7 @@ def _make_checkpoint_payload(
     last_update_losses: tuple[Optional[float], Optional[float], Optional[float]],
     source_checkpoint: str,
     checkpoint_sequence: int,
+    specialist_db_identity: dict,
 ) -> CheckpointPayload:
     """Capture every mutable state element needed for exact continuation."""
     return CheckpointPayload(
@@ -404,6 +405,7 @@ def _make_checkpoint_payload(
             "consumed_snapshots": [],
             "cache": {},
             "buckets": {"branch_history": list(branch_bucket_history)},
+            "mutable_assets": {"specialist_db": dict(specialist_db_identity)},
         },
     )
 
@@ -1394,6 +1396,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         nonlocal checkpoint_sequence, parent_checkpoint_id
         checkpoint_sequence += 1
         checkpoint_id = f"{run_manifest.run_id}:checkpoint:{checkpoint_sequence:08d}"
+        specialist_db_identity = specialist_db.checkpoint_identity()
         descriptor = CheckpointDescriptor(
             checkpoint_id=checkpoint_id,
             run_id=run_manifest.run_id,
@@ -1411,7 +1414,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             },
             asset_identities={
                 asset.logical_name: asset.identity for asset in run_manifest.assets
-            },
+            }
+            | {"specialist_db": specialist_db_identity["sha256"]},
             implementation={
                 "trainer": STAGE_TAG,
                 "framework": "pytorch",
@@ -1441,6 +1445,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             last_update_losses=(last_update_pl, last_update_vl, last_update_ent),
             source_checkpoint=source_checkpoint,
             checkpoint_sequence=checkpoint_sequence,
+            specialist_db_identity=specialist_db_identity,
         )
         save_checkpoint(path, descriptor, payload)
         parent_checkpoint_id = checkpoint_id

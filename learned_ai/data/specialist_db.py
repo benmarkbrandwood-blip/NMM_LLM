@@ -115,6 +115,7 @@ class SpecialistDB:
         self._malom_labels_trusted = (
             self._malom_label_version == CURRENT_MALOM_LABEL_VERSION
         )
+        self._checkpoint_identity_cache = None
         self._conn.commit()
 
     @property
@@ -136,6 +137,40 @@ class SpecialistDB:
             f"{CURRENT_MALOM_LABEL_VERSION!r} is required. Use a new database "
             "path or rebuild the SpecialistDB before training."
         )
+
+    def checkpoint_identity(self) -> dict:
+        """Flush WAL state and return a cached cryptographic database identity."""
+        change_count = self._conn.total_changes
+        cached = self._checkpoint_identity_cache
+        if cached is not None and cached[0] == change_count:
+            return dict(cached[1])
+
+        self._conn.commit()
+        busy, log_pages, checkpointed_pages = self._conn.execute(
+            "PRAGMA wal_checkpoint(FULL)"
+        ).fetchone()
+        if busy:
+            raise RuntimeError(
+                "SpecialistDB WAL checkpoint was busy; refusing checkpoint identity"
+            )
+        digest = hashlib.sha256()
+        with self._path.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        identity = {
+            "sha256": digest.hexdigest(),
+            "size": self._path.stat().st_size,
+            "label_version": self._malom_label_version,
+            "malom_label_count": int(
+                self._conn.execute(
+                    "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
+                ).fetchone()[0]
+            ),
+            "wal_log_pages": int(log_pages),
+            "wal_checkpointed_pages": int(checkpointed_pages),
+        }
+        self._checkpoint_identity_cache = (change_count, identity)
+        return dict(identity)
 
     # ── Position statistics ───────────────────────────────────────────────────
 
