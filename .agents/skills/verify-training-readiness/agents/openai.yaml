@@ -1,0 +1,7 @@
+interface:
+  display_name: "Verify Training Readiness"
+  short_description: "Verify NMM training lineage, paths, and safety gates"
+  default_prompt: "Use $verify-training-readiness to verify this NMM training run before launch."
+
+policy:
+  allow_implicit_invocation: true

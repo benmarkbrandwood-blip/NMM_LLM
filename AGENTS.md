@@ -16,6 +16,19 @@ Before changing code or Git history:
    before moving, regenerating, or deleting any training data.
 4. Inspect `git status --short --branch` and the local/remote commit graph.
 
+## Authority and Evidence
+
+- Keep durable repository rules in this file. Put current machine and run state
+  in the handover, machine-local data contracts in the local-layout document,
+  frozen run decisions in `docs/experiments/`, and target architecture in the
+  relevant design or plan document.
+- Verify prose against current code, configuration, artefacts, and tests. When
+  they disagree, stop and reconcile the document that owns the disputed fact;
+  do not silently choose the more convenient account.
+- For training changes, preserve a traceable chain from requirement to code,
+  focused test, and runtime evidence. A screenshot, narrative, or generated
+  report is supporting context, not acceptance evidence by itself.
+
 ## Git Safety
 
 - Do not use a blind `git pull` to resolve rewritten but patch-equivalent
@@ -57,6 +70,29 @@ Before changing code or Git history:
   directory, database paths, and smoke-test result have been recorded.
 - In particular, review the known `--auto-resume-best` path issue documented
   in the handover before starting the generalist trainer.
+
+## Change and Diagnosis Discipline
+
+- Treat answer, review, and diagnosis requests as read-only unless the user
+  also asks for implementation.
+- Before fixing a defect, establish the smallest deterministic reproduction or
+  focused test that is capable of failing for the reported reason.
+- Keep diagnostic hypotheses falsifiable, record decisive evidence, and remove
+  temporary instrumentation after the cause is understood.
+- Never obtain a green result by deleting, skipping, or weakening tests;
+  swallowing required errors; substituting empty or mock data; or turning a
+  required component failure into a neutral/default value.
+- A component is absent only when the selected experiment explicitly disables
+  it. Missing files, incompatible checkpoints, and unavailable required data
+  are stop conditions, not implicit disablement.
+
+## Project Skills
+
+- Use `.agents/skills/verify-training-readiness` when preparing, reviewing,
+  resuming, smoke-testing, or starting a training run. It is a preflight and
+  evidence workflow; invoking it does not itself authorise a training launch.
+- Long-running training still requires an explicit user request and the launch
+  gate recorded by the owning experiment document.
 
 ## Proportionate Verification
 
