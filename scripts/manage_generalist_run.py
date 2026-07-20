@@ -79,7 +79,7 @@ def _default_plan_id(commit: str) -> str:
 
 
 def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[str]:
-    return [
+    common_args = [
         "--experiment-id",
         args.experiment_id,
         "--paths-config",
@@ -115,6 +115,10 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--no-imitation-mix",
         "--no-s1b-refresher",
     ]
+    specialist_db = getattr(args, "specialist_db", None)
+    if specialist_db:
+        common_args.extend(("--specialist-db", str(Path(specialist_db).resolve())))
+    return common_args
 
 
 def _prepare(args: argparse.Namespace) -> dict:
@@ -133,7 +137,7 @@ def _prepare(args: argparse.Namespace) -> dict:
     plan = ManagedPlan(
         plan_id=args.plan_id or _default_plan_id(commit),
         created_at_utc=utc_now_text(),
-        objective="corrected-v4-single-machine-single-GPU-baseline",
+        objective=args.objective,
         experiment_id=args.experiment_id,
         git_commit=commit,
         control_dir=str(control_dir),
@@ -174,6 +178,10 @@ def _build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--max-wall-hours", required=True, type=float)
     prepare.add_argument("--plan-id")
     prepare.add_argument(
+        "--objective",
+        default="corrected-v4-single-machine-single-GPU-baseline",
+    )
+    prepare.add_argument(
         "--paths-config",
         default=str(_ROOT / "data" / "training_paths.local.json"),
     )
@@ -192,6 +200,14 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_NODE_BUDGET,
         help="Technical fixed-work setting; normally selected by the Agent",
+    )
+    prepare.add_argument(
+        "--specialist-db",
+        default=None,
+        help=(
+            "Optional disposable SpecialistDB path. Required for smoke so the "
+            "active sector-corrected baseline database is never reused."
+        ),
     )
 
     authorize = commands.add_parser("authorize")

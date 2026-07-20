@@ -282,3 +282,21 @@ def test_supervisor_never_removes_a_lock_it_does_not_own(
         )
 
     assert lock.read_text(encoding="ascii") == "pid=123\n"
+
+
+def test_prepare_common_args_can_isolate_specialist_db(tmp_path: Path) -> None:
+    from argparse import Namespace
+    from scripts.manage_generalist_run import _common_trainer_args
+
+    specialist_db = tmp_path / "specialist_db.smoke.sqlite"
+    args = Namespace(
+        experiment_id="dev-v4-managed-smoke-rl-update-v1",
+        max_games=16,
+        heuristic_node_budget=500_000,
+        specialist_db=str(specialist_db),
+    )
+    common = _common_trainer_args(args, tmp_path / "training_paths.local.json")
+    assert "--specialist-db" in common
+    assert common[common.index("--specialist-db") + 1] == str(specialist_db.resolve())
+    assert "--no-imitation-mix" in common
+    assert common[common.index("--heuristic-node-budget") + 1] == "500000"
