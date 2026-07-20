@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import random
 import sqlite3
 from pathlib import Path
 
@@ -13,10 +14,18 @@ from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
 from learned_ai.training.generalist_preflight import (
     GitState,
     PreflightConfigurationError,
+    _file_sha256,
     configure_generalist_paths,
     load_training_settings,
+    resume_config_sha256,
     run_generalist_preflight,
     validate_generalist_configuration,
+)
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointDescriptor,
+    CheckpointPayload,
+    capture_rng_state,
+    save_checkpoint,
 )
 from scripts import train_s_gen_v2 as trainer
 
@@ -271,6 +280,103 @@ def test_weights_only_preflight_accepts_compatible_legacy_weights(
     checkpoint = report["checks"]["checkpoint"]
     assert checkpoint["format"] == "legacy-pytorch-weights"
     assert checkpoint["checkpoint_id"].startswith("legacy-sha256:")
+
+
+def test_exact_resume_preflight_binds_semantics_and_specialist_db(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.experiment_id = "exact-resume-test"
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    specialist_path = Path(args.specialist_db)
+    _write_specialist_db(specialist_path, CURRENT_MALOM_LABEL_VERSION)
+    specialist_sha256 = _file_sha256(specialist_path)
+    model = trainer.ScaffoldedPolicyNet(
+        move_feat_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        policy_hidden=args.policy_hidden,
+    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    payload = CheckpointPayload(
+        model_state=model.state_dict(),
+        optimizer_state=optimizer.state_dict(),
+        scheduler_state=None,
+        scaler_state=None,
+        rng_state=capture_rng_state({"game": random.Random(args.seed).getstate()}),
+        trainer_state={
+            "game_count": 0,
+            "batch_count": 0,
+            "update_count": 0,
+            "difficulty": trainer.DIFF_START,
+            "temperature": args.temp_start,
+            "rolling_metrics": {},
+            "curriculum": {},
+            "target_network": {},
+            "recovery_state": {},
+            "model_config": model.get_config(),
+        },
+        data_state={
+            "cursor": {"completed_games": 0},
+            "consumed_snapshots": [],
+            "cache": {},
+            "buckets": {},
+            "mutable_assets": {
+                "specialist_db": {"sha256": specialist_sha256}
+            },
+        },
+    )
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="source:checkpoint:00000001",
+        run_id="source",
+        experiment_id=args.experiment_id,
+        parent_checkpoint_id=None,
+        role="latest",
+        save_reason="test",
+        created_at_utc="2026-07-20T11:00:00Z",
+        config_sha256=resume_config_sha256(args),
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        label_schema_version=trainer.LABEL_SCHEMA_VERSION,
+        database_schema_versions={"specialist_db": trainer.LABEL_SCHEMA_VERSION},
+        asset_identities={"specialist_db": specialist_sha256},
+        implementation={"trainer": trainer.STAGE_TAG, "framework": "pytorch"},
+    )
+    source = tmp_path / "source.pt"
+    save_checkpoint(source, descriptor, payload)
+    args.start_mode = "exact-resume"
+    args.resume = str(source)
+
+    compatible = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        expected_move_feature_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        expected_value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert compatible["verdict"] == "needs_decision"
+    assert compatible["errors"] == []
+
+    connection = sqlite3.connect(specialist_path)
+    connection.execute("INSERT INTO winning_lines(id) VALUES (1)")
+    connection.commit()
+    connection.close()
+    changed = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        expected_move_feature_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        expected_value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert changed["verdict"] == "fatal_stop"
+    assert "checkpoint: SpecialistDB content identity has changed" in changed["errors"]
 
 
 def test_long_run_preflight_remains_needs_decision(tmp_path: Path) -> None:

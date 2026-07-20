@@ -62,6 +62,7 @@ from learned_ai.training.generalist_preflight import (
     PreflightConfigurationError,
     configure_generalist_paths,
     load_training_settings,
+    resume_config_sha256,
     run_generalist_preflight,
     validate_generalist_configuration,
 )
@@ -1405,7 +1406,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             role=role,
             save_reason=reason,
             created_at_utc=utc_now_text(),
-            config_sha256=run_manifest.config_sha256,
+            config_sha256=getattr(args, "_resume_config_sha256"),
             feature_schema_version=FEATURE_SCHEMA_VERSION,
             label_schema_version=LABEL_SCHEMA_VERSION,
             database_schema_versions={
@@ -2106,6 +2107,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         ),
     )
     setattr(args, "_run_manifest", manifest)
+    setattr(
+        args,
+        "_resume_config_sha256",
+        report.get("resume_config_sha256", resume_config_sha256(args)),
+    )
     source_checkpoint_report = report["checks"].get("checkpoint")
     if source_checkpoint_report is not None:
         setattr(

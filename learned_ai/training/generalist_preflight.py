@@ -405,6 +405,7 @@ def _probe_specialist_db(path: Path) -> dict[str, Any]:
             )
         else:
             report["trust"] = "trusted"
+        report["content_sha256"] = _file_sha256(path)
         return report
     except sqlite3.Error as exc:
         report["error"] = f"SpecialistDB schema probe failed: {exc}"
@@ -482,6 +483,35 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+_RESUME_CONFIG_EXCLUDED_FIELDS = {
+    "auto_resume_best",
+    "experiment_id",
+    "launch",
+    "out_dir",
+    "parent_run_id",
+    "paths_config",
+    "preflight",
+    "resume",
+    "run_id",
+    "start_mode",
+}
+
+
+def resolved_resume_config(args: Any) -> dict[str, Any]:
+    """Return only settings that affect the continuation trajectory."""
+    raw = {
+        key: value
+        for key, value in vars(args).items()
+        if not key.startswith("_") and key not in _RESUME_CONFIG_EXCLUDED_FIELDS
+    }
+    return json.loads(canonical_json_bytes(raw))
+
+
+def resume_config_sha256(args: Any) -> str:
+    """Hash training semantics independently of run-segment invocation fields."""
+    return canonical_sha256(resolved_resume_config(args))
+
+
 def _probe_source_checkpoint(
     path: Path,
     args: Any,
@@ -510,9 +540,13 @@ def _probe_source_checkpoint(
                     ),
                     "checkpoint_id": descriptor.checkpoint_id,
                     "source_run_id": descriptor.run_id,
+                    "resume_config_sha256": descriptor.config_sha256,
                     "feature_schema_version": descriptor.feature_schema_version,
                     "payload_size": envelope.payload_size,
                     "model_config": dict(config),
+                    "mutable_assets": dict(
+                        envelope.payload.data_state["mutable_assets"]
+                    ),
                 }
             )
             if descriptor.feature_schema_version != feature_schema_version:
@@ -642,6 +676,7 @@ def run_generalist_preflight(
     specialist_report = _probe_specialist_db(Path(args.specialist_db))
     human_report = _probe_human_db(Path(args.human_db))
     checkpoint_report: dict[str, Any] | None = None
+    expected_resume_config_sha256 = resume_config_sha256(args)
     if args.start_mode in {"weights-only", "exact-resume"}:
         checkpoint_report = _probe_source_checkpoint(
             Path(args.resume),
@@ -662,6 +697,17 @@ def run_generalist_preflight(
     if args.start_mode == "exact-resume" and checkpoint_report is not None:
         if checkpoint_report.get("format") != "checkpoint-envelope-v2":
             errors.append("exact resume requires a CheckpointEnvelope v2 source")
+        elif checkpoint_report.get("resume_config_sha256") != (
+            expected_resume_config_sha256
+        ):
+            errors.append("checkpoint: resume configuration is incompatible")
+        checkpoint_specialist = checkpoint_report.get("mutable_assets", {}).get(
+            "specialist_db", {}
+        )
+        if checkpoint_specialist.get("sha256") != specialist_report.get(
+            "content_sha256"
+        ):
+            errors.append("checkpoint: SpecialistDB content identity has changed")
     if not specialist_report.get("exists") and not specialist_report.get(
         "parent_exists"
     ):
@@ -685,6 +731,7 @@ def run_generalist_preflight(
         },
         "resolved_config": config,
         "config_sha256": canonical_sha256(config),
+        "resume_config_sha256": expected_resume_config_sha256,
         "path_sources": dict(path_sources),
         "checks": {
             "output": output_report,
