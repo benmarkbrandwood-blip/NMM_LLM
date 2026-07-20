@@ -153,6 +153,22 @@ def verify_model_bundle(path: str | Path, *, device: str = "cpu") -> dict[str, A
     return {"status": "verified", "bundle_identity": identity, "model_identity": manifest["model_identity"], "canary_differences": differences}
 
 
+def load_bundle_model(
+    path: str | Path, *, device: str = "cpu"
+) -> tuple[ScaffoldedPolicyNet, dict[str, Any]]:
+    """Return a strictly verified bundle model and its manifest."""
+    verify_model_bundle(path, device=device)
+    root = Path(path)
+    manifest = json.loads((root / "bundle.json").read_text(encoding="utf-8"))
+    model = ScaffoldedPolicyNet.from_config(manifest["architecture"]["parameters"])
+    state = torch.load(
+        root / manifest["weights"]["path"], map_location=device, weights_only=True
+    )
+    model.load_state_dict(state, strict=True)
+    model.to(device).eval()
+    return model, manifest
+
+
 def compare_model_bundles(left: str | Path, right: str | Path) -> dict[str, Any]:
     """Compare declared identities and semantic schemas after verification."""
     left_report = verify_model_bundle(left)
