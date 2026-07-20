@@ -45,7 +45,8 @@ struct Searcher {
     zobrist: Zobrist,
     tt: Arc<TranspositionTable>,
     nodes: u64,
-    deadline: Instant,
+    deadline: Option<Instant>,
+    node_limit: Option<u64>,
     aborted: bool,
     killers: [[Option<Move>; 2]; MAX_PLY],
     history: [[i32; 24]; 25],  // [from_or_24][to]; from=24 for placements
@@ -194,6 +195,24 @@ fn creates_reachable_two_config(board: &Board, color: Color, mv: &Move) -> bool 
 }
 
 impl Searcher {
+    fn enter_node(&mut self) -> bool {
+        if self.aborted {
+            return false;
+        }
+        if self.node_limit.is_some_and(|limit| self.nodes >= limit) {
+            self.aborted = true;
+            return false;
+        }
+        self.nodes += 1;
+        if self.nodes & 2047 == 0
+            && self.deadline.is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            self.aborted = true;
+            return false;
+        }
+        true
+    }
+
     fn store_killer(&mut self, ply: usize, mv: Move) {
         if ply >= MAX_PLY || mv.capture.is_some() { return; }
         if self.killers[ply][0] != Some(mv) {
@@ -255,10 +274,7 @@ impl Searcher {
     // Tactical moves (capture/mill) never count against QS_FORCING_CAP.
     // Forcing-only moves increment qs_ply → cap fires after 6 forcing extensions.
     fn qsearch(&mut self, board: &Board, mut alpha: i64, beta: i64, qs_ply: u8) -> i64 {
-        if self.aborted { return ABORT_SCORE; }
-        self.nodes += 1;
-        if self.nodes & 2047 == 0 && Instant::now() >= self.deadline {
-            self.aborted = true;
+        if !self.enter_node() {
             return ABORT_SCORE;
         }
         let color = board.side_to_move;
@@ -310,12 +326,7 @@ impl Searcher {
     // T-B5: null-move pruning at depth>=3 outside fly phase.
     // `prev_move`: the move played to reach this node (None at root / after null move).
     fn negamax(&mut self, board: &Board, depth: u8, mut alpha: i64, beta: i64, first_opp_ply: bool, ply: u8, prev_move: Option<Move>) -> i64 {
-        if self.aborted {
-            return ABORT_SCORE;
-        }
-        self.nodes += 1;
-        if self.nodes & 2047 == 0 && Instant::now() >= self.deadline {
-            self.aborted = true;
+        if !self.enter_node() {
             return ABORT_SCORE;
         }
 
@@ -623,7 +634,8 @@ fn new_searcher(deadline: Instant, ai_color: Color) -> Searcher {
         zobrist: Zobrist::new(),
         tt: Arc::new(TranspositionTable::new()),
         nodes: 0,
-        deadline,
+        deadline: Some(deadline),
+        node_limit: None,
         aborted: false,
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
@@ -693,6 +705,7 @@ pub fn iterative_deepening_scored(
     board: &Board,
     max_depth: u8,
     time_limit_ms: u64,
+    node_limit: Option<u64>,
     preferred: &[(Option<u8>, u8, Option<u8>)],
     tt: Arc<TranspositionTable>,
     opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)>,
@@ -701,12 +714,15 @@ pub fn iterative_deepening_scored(
     eval_scale: EvalScale,
     fast_eval: bool,
 ) -> SearchResultScored {
-    let deadline = Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1));
+    let deadline = node_limit
+        .is_none()
+        .then(|| Instant::now() + std::time::Duration::from_millis(time_limit_ms.max(1)));
     let mut searcher = Searcher {
         zobrist: Zobrist::new(),
         tt,
         nodes: 0,
         deadline,
+        node_limit,
         aborted: false,
         killers: [[None; 2]; MAX_PLY],
         history: [[0i32; 24]; 25],
@@ -757,6 +773,7 @@ pub fn iterative_deepening_scored_smp(
     board: &Board,
     max_depth: u8,
     time_limit_ms: u64,
+    node_limit: Option<u64>,
     preferred: &[(Option<u8>, u8, Option<u8>)],
     tt: Arc<TranspositionTable>,
     opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)>,
@@ -766,8 +783,8 @@ pub fn iterative_deepening_scored_smp(
     eval_scale: EvalScale,
     fast_eval: bool,
 ) -> SearchResultScored {
-    if n_threads <= 1 {
-        return iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
+    if n_threads <= 1 || node_limit.is_some() {
+        return iterative_deepening_scored(board, max_depth, time_limit_ms, node_limit, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
     }
 
     let board_copy = *board;
@@ -787,7 +804,8 @@ pub fn iterative_deepening_scored_smp(
                     zobrist: Zobrist::new(),
                     tt: tt_c,
                     nodes: 0,
-                    deadline,
+                    deadline: Some(deadline),
+                    node_limit: None,
                     aborted: false,
                     killers: [[None; 2]; MAX_PLY],
                     history: [[0i32; 24]; 25],
@@ -809,7 +827,7 @@ pub fn iterative_deepening_scored_smp(
         })
         .collect();
 
-    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
+    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, None, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
 
     drop(helpers);
     result
@@ -872,7 +890,7 @@ mod tests {
             black_placed: 0,
             side_to_move: Color::White,
         };
-        let r = iterative_deepening_scored(&board, 3, 5000, &[], Arc::new(TranspositionTable::new()), HashSet::new(), None, None, EvalScale::default());
+        let r = iterative_deepening_scored(&board, 3, 5000, None, &[], Arc::new(TranspositionTable::new()), HashSet::new(), None, None, EvalScale::default(), false);
         assert_eq!(r.scored_moves.len(), 24, "expected 24 moves on empty board");
         assert!(r.nodes > 0);
         for rm in &r.scored_moves {
@@ -881,5 +899,33 @@ mod tests {
         for pair in r.scored_moves.windows(2) {
             assert!(pair[0].score >= pair[1].score, "not sorted descending");
         }
+    }
+
+    #[test]
+    fn fixed_node_limit_is_enforced_without_a_clock_cutoff() {
+        let board = Board {
+            white: 0,
+            black: 0,
+            white_placed: 0,
+            black_placed: 0,
+            side_to_move: Color::White,
+        };
+        let limit = 25_000;
+        let r = iterative_deepening_scored(
+            &board,
+            19,
+            1,
+            Some(limit),
+            &[],
+            Arc::new(TranspositionTable::new()),
+            HashSet::new(),
+            None,
+            None,
+            EvalScale::default(),
+            false,
+        );
+
+        assert_eq!(r.nodes, limit);
+        assert!(!r.scored_moves.is_empty());
     }
 }

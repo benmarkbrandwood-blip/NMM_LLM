@@ -35,6 +35,10 @@ import torch
 
 from game.board import BoardState
 from game.rules import get_game_phase
+from learned_ai.training.checkpoint_envelope import (
+    is_checkpoint_envelope,
+    load_checkpoint,
+)
 
 log = logging.getLogger("nmm.specialist_router")
 
@@ -49,10 +53,15 @@ def _load_spec_model(path: Path):
         return None, {}
     try:
         from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
-        ckpt  = torch.load(str(path), map_location="cpu", weights_only=False)
-        cfg   = ckpt.get("model_config", {})
+        if is_checkpoint_envelope(path):
+            envelope = load_checkpoint(path)
+            cfg = dict(envelope.payload.trainer_state["model_config"])
+            state = envelope.payload.model_state
+        else:
+            ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
+            cfg = ckpt.get("model_config", {})
+            state = ckpt.get("model") or ckpt
         model = ScaffoldedPolicyNet.from_config(cfg)
-        state = ckpt.get("model") or ckpt
         model.load_state_dict(state)
         model.eval()
         return model, cfg
@@ -81,6 +90,7 @@ class SpecialistRouter:
         lookahead_advisor_mid=None,
         lookahead_advisor_end=None,
         specialist_db=None,
+        runtime_quarantine=None,
     ) -> None:
         self._spec_open = spec_open
         self._spec_mid  = spec_mid
@@ -97,6 +107,7 @@ class SpecialistRouter:
         self._la_mid    = lookahead_advisor_mid
         self._la_end    = lookahead_advisor_end
         self._specialist_db = specialist_db
+        self._runtime_quarantine = runtime_quarantine
 
     # ── OverseerAdvisor-compatible surface ────────────────────────────────────
 
@@ -128,71 +139,16 @@ class SpecialistRouter:
     # ── continuous learning ───────────────────────────────────────────────────
 
     def record_game_result(self, game_record: dict) -> None:
-        """Record AI-played boards from a completed game into the SpecialistDB."""
-        if self._specialist_db is None:
+        """Quarantine runtime evidence without mutating the trusted SpecialistDB."""
+        if self._runtime_quarantine is None:
+            log.warning("Runtime game was not recorded because quarantine is unavailable")
             return
         try:
-            human_color = game_record.get("human_color")
-            ai_color = "B" if human_color == "W" else ("W" if human_color == "B" else None)
-            if ai_color is None:
-                return
-
-            winner = game_record.get("winner")
-            result = "W" if winner == ai_color else ("D" if winner is None else "L")
-
-            moves = game_record.get("moves", [])
-            ai_boards: list = []
-            ai_move_seq: list = []
-            phase_counts = {"open": 0, "mid": 0, "end": 0}
-
-            for entry in moves:
-                fen_before = entry.get("board_fen_before", "")
-                if not fen_before:
-                    continue
-                try:
-                    b = BoardState.from_fen_string(fen_before)
-                except Exception:
-                    continue
-                mv = {
-                    "from":    entry.get("from"),
-                    "to":      entry.get("to"),
-                    "capture": entry.get("capture"),
-                }
-                try:
-                    b_after = b.apply_move(mv)
-                except Exception:
-                    continue
-
-                if entry.get("color") == ai_color:
-                    ai_boards.append(b)
-                    ai_boards.append(b_after)
-                    notation = entry.get("notation", "")
-                    if notation:
-                        ai_move_seq.append(notation)
-                    move_type = entry.get("type", "move")
-                    if move_type == "place":
-                        phase_counts["open"] += 1
-                    elif move_type == "fly":
-                        phase_counts["end"] += 1
-                    else:
-                        own = int(b.pieces_on_board.get(ai_color, 0))
-                        opp_color = "B" if ai_color == "W" else "W"
-                        opp = int(b.pieces_on_board.get(opp_color, 0))
-                        if own <= 5 or opp <= 5:
-                            phase_counts["end"] += 1
-                        else:
-                            phase_counts["mid"] += 1
-
-            if not ai_boards:
-                return
-
-            phase = max(phase_counts, key=lambda k: phase_counts[k])
-            self._specialist_db.record_game(
-                ai_boards, result, ai_move_seq, phase,
-                learner_color=ai_color,
+            record_id = self._runtime_quarantine.append_game(
+                game_record,
+                source="web.specialist_router",
             )
-            log.debug("record_game_result: %s boards, phase=%s, result=%s",
-                      len(ai_boards) // 2, phase, result)
+            log.debug("Quarantined runtime game as %s", record_id)
         except Exception as e:
             log.warning("SpecialistRouter.record_game_result failed: %s", e)
 
@@ -402,6 +358,7 @@ def load_specialist_router(
     value_net=None,
     gap_net=None,
     specialist_db=None,
+    runtime_quarantine=None,
     ply_depth: int = 12,
 ) -> Optional[SpecialistRouter]:
     """Load the three v2 specialists and their LookaheadAdvisors.
@@ -470,6 +427,7 @@ def load_specialist_router(
         endgame_db=db,
         human_db=human_db,
         specialist_db=specialist_db,
+        runtime_quarantine=runtime_quarantine,
         lookahead_advisor_open=la_open,
         lookahead_advisor_mid=la_mid,
         lookahead_advisor_end=la_end,

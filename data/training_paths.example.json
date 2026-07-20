@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy this file to training_paths.local.json and edit paths for this machine. Relative paths are resolved from the repository root.",
+  "generalist_output_dir": "learned_ai/checkpoints/scaffolded/s_gen_v2",
+  "sentinel_checkpoint": "learned_ai/sentinel/checkpoints/best.pt",
+  "value_net_path": "data/value_net.npz",
+  "gap_net_path": "data/gap_net.npz",
+  "human_db_path": "data/human_db.sqlite",
+  "specialist_db_path": "data/specialist_db.sqlite",
+  "malom_db_path": "",
+  "sanmill_checkout": ""
+}

@@ -21,13 +21,16 @@ env/
 # Claude Code local settings
 .claude/
 
+# Per-machine training paths (copy from training_paths.example.json)
+data/training_paths.local.json
+
 # ChromaDB data (generated at runtime)
 data/chroma/
 
-# Runtime game records — generated as games are played
-data/games/*.jsonl
-data/ai_games/*.jsonl
-data/human_games/*.jsonl
+# Runtime and imported game records — readers scan these trees recursively
+data/games/**/*.jsonl
+data/ai_games/**/*.jsonl
+data/human_games/**/*.jsonl
 data/human_games/imported.json
 data/game_count.json
 data/bad_moves.json
@@ -42,6 +45,9 @@ data/session_memory/
 data/human_db.sqlite
 data/human_db.sqlite-shm
 data/human_db.sqlite-wal
+data/specialist_db*.sqlite
+data/specialist_db*.sqlite-shm
+data/specialist_db*.sqlite-wal
 
 # Endgame retrograde tables and fullgame position DB — built locally, can be hundreds of MB
 data/endgame/*.wdl

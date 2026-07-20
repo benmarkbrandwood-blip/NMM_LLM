@@ -45,6 +45,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from game.rules import get_all_legal_moves, terminal_wdl
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -93,15 +95,16 @@ class ExternalSolvedDB:
         else:
             return
 
+        self.format_probe = {
+            "db_dir": str(self.db_dir),
+            "available": False,
+        }
         if _MalomDB is None:
             logger.warning("[ExternalSolvedDB] ai.malom_db not importable; DB unavailable")
             return
 
         self._malom = _MalomDB(self.db_dir)
-        self.format_probe = {
-            "db_dir": str(self.db_dir),
-            "available": self._malom.is_available(),
-        }
+        self.format_probe["available"] = self._malom.is_available()
         if self._malom.is_available():
             logger.info("[ExternalSolvedDB] Malom DB ready at %s", self.db_dir)
 
@@ -132,6 +135,9 @@ class ExternalSolvedDB:
         if self._malom is None:
             return None
         try:
+            rules_result = terminal_wdl(board)
+            if rules_result is not None:
+                return rules_result
             result = self._malom.query(board)
             return result["outcome"] if result else None
         except Exception as exc:
@@ -151,18 +157,62 @@ class ExternalSolvedDB:
         """Alias of ``query_state`` matching EndgameSolvedDB.query()."""
         return self.query_state(board)
 
-    def query_move_quality(self, board, move: Dict[str, Any]) -> Optional[float]:
-        """Quality delta of ``move`` from ``board``: + good, - bad, None unknown.
+    @staticmethod
+    def _validated_atomic_move(board, move: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Return a normalized complete legal move, or ``None``.
 
-        Computed (once decodable) as WDL(before) vs WDL(after move) from the
-        mover's perspective. Returns None while the format is undecoded.
+        Malom stores only settled positions.  A move that forms a Mill is not
+        complete until its mandatory capture has been selected, so validation
+        must happen before either the current or successor state is queried.
+        ``get_all_legal_moves`` is the project's authoritative atomic-action
+        enumerator and rejects missing, spurious, or illegal captures.
+        """
+        if not isinstance(move, dict):
+            return None
+        if any(field not in move for field in ("from", "to", "capture")):
+            return None
+
+        atomic_move = {
+            "from": move["from"],
+            "to": move["to"],
+            "capture": move["capture"],
+        }
+        try:
+            if atomic_move not in get_all_legal_moves(board):
+                return None
+        except Exception:
+            return None
+        return atomic_move
+
+    def query_move_quality(self, board, move: Dict[str, Any]) -> Optional[float]:
+        """Return the exact WDL downgrade of ``move``, or ``None``.
+
+        ``move`` must be a complete legal atomic action with explicit ``from``,
+        ``to``, and ``capture`` fields.  A Mill-forming move without its
+        mandatory capture, or a move with a spurious/illegal capture, returns
+        ``None`` without querying Malom.
+
+        The score compares WDL before the action with WDL after the fully
+        settled action, from the original mover's perspective.  Exact minimax
+        values permit only 0 (value preserved), -1, or -2 (value downgraded).
+        A positive delta contradicts the root value and fails closed to
+        ``None`` instead of becoming a corrupt training label.
         """
         if not self._available:
             self._warn_unavailable_once()
             return None
+
+        atomic_move = self._validated_atomic_move(board, move)
+        if atomic_move is None:
+            logger.debug(
+                "[ExternalSolvedDB] rejected incomplete or illegal atomic move: %r",
+                move,
+            )
+            return None
+
         try:
             before = self._lookup(board)
-            after_board = board.apply_move(move)
+            after_board = board.apply_move(atomic_move)
             after = self._lookup(after_board)
         except Exception:
             return None
@@ -171,54 +221,61 @@ class ExternalSolvedDB:
         # Mover's perspective: after applying the move it is the opponent's turn,
         # so an opponent "L" (they lose) is good for the mover.
         rank = {"W": 1.0, "D": 0.0, "L": -1.0}
-        before_v = rank.get(before, 0.0)
-        after_opp_v = rank.get(after, 0.0)
+        if before not in rank or after not in rank:
+            logger.error(
+                "[ExternalSolvedDB] invalid WDL during move-quality query: "
+                "before=%r after=%r move=%r",
+                before,
+                after,
+                atomic_move,
+            )
+            return None
+
+        before_v = rank[before]
+        after_opp_v = rank[after]
         after_mover_v = -after_opp_v
-        return after_mover_v - before_v
+        delta = after_mover_v - before_v
+        if delta > 0.0:
+            logger.error(
+                "[ExternalSolvedDB] inconsistent positive WDL delta: "
+                "before=%s after=%s mover_delta=%s move=%r",
+                before,
+                after,
+                delta,
+                atomic_move,
+            )
+            return None
+        return delta
 
     # Outcome from the mover's perspective after applying a move flips to the
     # opponent's perspective (it becomes their turn). Negate to score the move
     # for the player who made it.
     _NEGATE_WDL = {"W": "loss", "L": "win", "D": "draw"}
+    _PROJECT_WDL = {"W": "win", "L": "loss", "D": "draw"}
 
     def _enumerate_legal_moves(self, board, player) -> List[Dict[str, Any]]:
         """All legal apply-move dicts {from,to,capture} for ``player`` on ``board``.
 
-        Mill-closing moves are expanded into one entry per legal capture target.
-        Uses only BoardState's own move generation — no game-logic changes here.
+        Delegate to the rules engine's authoritative atomic-action enumerator.
+        Asking for a player other than the side to move fails closed; applying
+        such a move would otherwise move the wrong colour in ``BoardState``.
         """
-        moves: List[Dict[str, Any]] = []
-        if board.phase == "place":
-            base = [{"from": None, "to": tgt} for tgt in board.legal_placements(player)]
-        else:
-            base = [{"from": src, "to": tgt} for src, tgt in board.legal_moves(player)]
-
-        for mv in base:
-            mv = {"from": mv.get("from"), "to": mv.get("to"), "capture": None}
-            try:
-                after = board.apply_move(mv)
-                closes = mv["to"] is not None and after.is_mill(mv["to"], player)
-            except Exception:
-                closes = False
-            if closes:
-                caps = board.legal_captures(player)
-                if caps:
-                    for cap in caps:
-                        moves.append({"from": mv["from"], "to": mv["to"], "capture": cap})
-                    continue
-            moves.append(mv)
-        return moves
+        if player != board.turn:
+            return []
+        return [dict(move) for move in get_all_legal_moves(board)]
 
     def query_all_moves(self, board, player) -> List[Dict[str, Any]]:
-        """All legal moves at ``board`` for ``player`` with their Malom WDL.
+        """Return legal moves with coarse labels and complete Malom values.
 
         Returns a list of dicts, one per legal move::
 
             {"move": {"from","to","capture"}, "wdl": "win"|"draw"|"loss"|"unknown",
-             "dtm": int | None}
+             "dtm": int | None, "oracle_value": OracleMoveValue | None}
 
-        WDL is from ``player``'s perspective. Returns an empty list when the DB
-        is unavailable (never raises).
+        WDL and ``oracle_value`` use ``player``'s perspective. ``dtm`` exposes
+        the transformed candidate key2 only for decisive WDL values; draw
+        ordering requires the complete two-key comparator.  Returns an empty
+        list when the DB is unavailable (never raises).
         """
         if not self._available:
             self._warn_unavailable_once()
@@ -229,20 +286,129 @@ class ExternalSolvedDB:
         except Exception as exc:
             logger.debug("[ExternalSolvedDB] move enumeration error: %s", exc)
             return []
+
+        query_value = getattr(self._malom, "query_value", None)
+        parent_value = None
+        if callable(query_value):
+            try:
+                parent_value = query_value(board)
+            except Exception:
+                parent_value = None
+
         for mv in legal:
             wdl = "unknown"
             dtm: Optional[int] = None
+            oracle_value = None
+            child_outcome = None
+            child_key2 = None
+            terminal_child = False
             try:
                 after = board.apply_move(mv)
-                result = self._malom.query(after) if self._malom is not None else None
+                rules_result = terminal_wdl(after)
+                if rules_result is not None:
+                    terminal_child = True
+                    child_outcome = rules_result
+                    make_terminal_value = getattr(
+                        self._malom,
+                        "terminal_move_value",
+                        None,
+                    )
+                    if parent_value is not None and callable(make_terminal_value):
+                        oracle_value = make_terminal_value(
+                            parent_value,
+                            rules_result,
+                        )
+                else:
+                    child_value = query_value(after) if callable(query_value) else None
+                    if child_value is not None:
+                        child_outcome = child_value.outcome
+                        child_key2 = child_value.key2
+                        make_move_value = getattr(self._malom, "move_value", None)
+                        if parent_value is not None and callable(make_move_value):
+                            oracle_value = make_move_value(
+                                parent_value,
+                                child_value,
+                            )
+                    elif self._malom is not None:
+                        result = self._malom.query(after)
+                        if result:
+                            child_outcome = result.get("outcome")
+                            child_key2 = result.get("dtw")
             except Exception:
-                result = None
-            if result:
-                wdl = self._NEGATE_WDL.get(result.get("outcome"), "unknown")
-                d = result.get("dtw")
-                dtm = int(d) if isinstance(d, (int, float)) else None
-            out.append({"move": mv, "wdl": wdl, "dtm": dtm})
+                child_outcome = None
+                oracle_value = None
+
+            if oracle_value is not None:
+                wdl = self._PROJECT_WDL.get(oracle_value.outcome, "unknown")
+                if wdl in ("win", "loss"):
+                    dtm = oracle_value.key2
+            elif child_outcome is not None:
+                wdl = self._NEGATE_WDL.get(child_outcome, "unknown")
+                if terminal_child:
+                    dtm = 0
+                elif wdl in ("win", "loss") and isinstance(
+                    child_key2,
+                    (int, float),
+                ):
+                    dtm = int(child_key2)
+
+            out.append(
+                {
+                    "move": mv,
+                    "wdl": wdl,
+                    "dtm": dtm,
+                    "oracle_value": oracle_value,
+                }
+            )
         return out
+
+    @staticmethod
+    def best_move_result(
+        results: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
+        """Return the strongest result using full values when available."""
+        known = [row for row in results if row.get("wdl") != "unknown"]
+        if not known:
+            return None
+
+        valued = [row for row in known if row.get("oracle_value") is not None]
+        if len(valued) == len(known):
+            contexts = {
+                (
+                    value.sector,
+                    value.sector_value,
+                    value.perspective,
+                )
+                for value in (row["oracle_value"] for row in valued)
+            }
+            if len(contexts) == 1:
+                return max(
+                    valued,
+                    key=lambda row: row["oracle_value"].ordering_key(),
+                )
+            logger.error(
+                "[ExternalSolvedDB] cannot compare values from mixed contexts"
+            )
+
+        # Compatibility fallback for test doubles and older adapters that only
+        # expose WDL.  Draws deliberately tie: bare key2 cannot order them.
+        def coarse_key(row: Dict[str, Any]) -> tuple[int, int]:
+            rank = {"win": 2, "draw": 1, "loss": 0}.get(row.get("wdl"), -1)
+            raw_distance = row.get("dtm")
+            distance = (
+                abs(int(raw_distance))
+                if isinstance(raw_distance, (int, float))
+                else 0
+            )
+            if row.get("wdl") == "win":
+                secondary = -distance
+            elif row.get("wdl") == "loss":
+                secondary = distance
+            else:
+                secondary = 0
+            return rank, secondary
+
+        return max(known, key=coarse_key)
 
     def query_trajectory(self, states: List[Any]) -> List[Optional[str]]:
         """Return a WDL (or None) for each state in a trajectory.

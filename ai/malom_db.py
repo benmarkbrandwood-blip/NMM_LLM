@@ -2,7 +2,7 @@
 
 The Malom database (ggevay/malom, GPL-3, by Gabor E. Gevay and Gabor Danner)
 provides a solved endgame for Nine Men's Morris.  The database lives outside
-the repo (typically /mnt/windows/NMM_DB/strong/).
+the repo and its directory is supplied by the caller.
 
 File format  (DD / version-2 .sec2 files)
 ------------------------------------------
@@ -15,8 +15,8 @@ Bytes 0–63     : 64-byte header
 
 Bytes 64 … 64+N*3-1 : N×3-byte entries, little-endian 24-bit words.
     raw24   = b[0] | (b[1]<<8) | (b[2]<<16)
-    key1    = sign_extend(raw24 & 0xFFF, 12)   # sector-relative WDL value
-    key2    = sign_extend(raw24 >> 12,   12)   # depth / DTW (signed)
+    key1    = sign_extend(raw24 & 0xFFF, 12)   # sector-relative value
+    key2    = sign_extend(raw24 >> 12,   12)   # secondary value key
 
 Bytes 64+N*3 … end:
     int32 em_set_size   (number of overflow entries)
@@ -24,11 +24,14 @@ Bytes 64+N*3 … end:
 
 Entry semantics
 ---------------
-key1 == virt_win_val  (+299) → position is a WIN  for the querying side
-key1 == virt_loss_val (-299) → position is a LOSS for the querying side
-key1 == 0                    → DRAW
-key1 == 0 AND key2 > 0       → still in retrograde progress (Count state);
-                               should not appear in the finished database.
+For a concrete value entry, key1 is relative to its sector.  Match the Sanmill
+reference by first computing ``absolute_key1 = key1 + sector_value``.  Only
+``absolute_key1 == virt_win_val`` (+299) is a win and only
+``absolute_key1 == virt_loss_val`` (-299) is a loss.  Every other concrete
+value is an ultra-strong draw grade.  A raw key1 of zero does not determine the
+outcome by itself: non-negative key2 is Count and negative key2 is a symmetry
+redirect.  Sanmill still projects a resolved Count entry using the same
+sector-corrected formula while preserving its kind.
 
 Turn-side convention
 --------------------
@@ -72,19 +75,23 @@ Public surface
 --------------
     MalomDB(db_dir)
         .is_available()  → True when .sec2 files are found in db_dir
+        .query_value(board) → OracleValue | None
+        .move_value(parent, child) → OracleMoveValue
         .query(board)    → {"outcome": "W"|"L"|"D", "dtw": int} | None
         .close()
 
     parse_secval(path)       → (virt_win, virt_loss, {(W,B,WF,BF): int})
     board_to_wbf(board)      → (wb_bits, bb_bits, wf, bf)
     read_sector(path)        → (data, hash_count, em_set, virt_win, virt_loss)
-    decode_entry(data, idx, em_set, virt_win, virt_loss) → "W"|"L"|"D"|None
+    decode_entry(data, idx, em_set, sector_value, virt_win, virt_loss)
+        → "W"|"L"|"D"|("SYM", op)|None
 """
 
 from __future__ import annotations
 
 import logging
 import struct
+from dataclasses import dataclass
 from math import comb
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -492,83 +499,266 @@ def read_sector(path: str | Path,
 
 # ── Entry decoding ─────────────────────────────────────────────────────────────
 
+@dataclass(frozen=True)
+class OracleValue:
+    """Lossless value returned by a successful Malom probe.
+
+    ``outcome`` is only a projection.  The raw, sector-relative and absolute
+    fields are retained so callers do not have to reconstruct the value from a
+    coarse W/D/L result.  ``perspective`` is the original side to move, before
+    the black-to-move normalization used by the Malom hash.
+    """
+
+    raw_key1: int
+    sector_value: int
+    absolute_key1: int
+    key2: int
+    entry_kind: str
+    perspective: str
+    sector: tuple[int, int, int, int]
+    outcome: str
+    status: str = "ok"
+    symmetry_operation: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class OracleMoveValue:
+    """Complete Malom value of one candidate in its parent sector.
+
+    ``key1`` is relative to the parent sector, so candidates from the same
+    position can be compared directly.  ``key2`` is the transformed secondary
+    key after undoing the child viewpoint and adding the candidate ply.  It is
+    not globally ordered on its own: larger values are preferred when key1 is
+    negative, smaller values are preferred when key1 is positive, and key2 is
+    ignored when key1 is zero.
+    """
+
+    key1: int
+    key2: int
+    sector_value: int
+    absolute_key1: int
+    perspective: str
+    sector: tuple[int, int, int, int]
+    outcome: str
+    source: str
+    terminal: bool = False
+    child_value: Optional[OracleValue] = None
+
+    def ordering_key(self) -> tuple[int, int]:
+        """Return a key whose maximum is the preferred candidate."""
+        if self.key1 < 0:
+            secondary = self.key2
+        elif self.key1 > 0:
+            secondary = -self.key2
+        else:
+            secondary = 0
+        return self.key1, secondary
+
+
+def _signed_int16(value: int) -> int:
+    """Match the int16_t conversion used by Malom value correction."""
+    value &= 0xFFFF
+    return value - 0x10000 if value & 0x8000 else value
+
+
+def _sign(value: int) -> int:
+    return (value > 0) - (value < 0)
+
+
+def _project_absolute_outcome(
+    absolute_key1: int,
+    virt_win: int,
+    virt_loss: int,
+) -> str:
+    if absolute_key1 == virt_win:
+        return "W"
+    if absolute_key1 == virt_loss:
+        return "L"
+    return "D"
+
+
+def compare_oracle_move_values(
+    left: OracleMoveValue,
+    right: OracleMoveValue,
+) -> int:
+    """Compare two candidates from one parent position.
+
+    Return a negative integer when ``left`` is worse, zero for an oracle tie,
+    and a positive integer when ``left`` is better.  Comparing values from
+    different parent sectors or viewpoints is undefined in Malom and is
+    rejected rather than silently producing a plausible but invalid order.
+    """
+    if (
+        left.sector != right.sector
+        or left.sector_value != right.sector_value
+        or left.perspective != right.perspective
+    ):
+        raise ValueError("oracle move values have different parent contexts")
+
+    if left.key1 != right.key1:
+        return -1 if left.key1 < right.key1 else 1
+    if left.key1 < 0:
+        return (left.key2 > right.key2) - (left.key2 < right.key2)
+    if left.key1 > 0:
+        return (right.key2 > left.key2) - (right.key2 < left.key2)
+    return 0
+
+
+def undo_negate_oracle_value(
+    parent: OracleValue,
+    child: OracleValue,
+    virt_win: int,
+    virt_loss: int,
+) -> OracleMoveValue:
+    """Convert a child probe into a comparable parent candidate value.
+
+    Malom stores every probe relative to that probe's sector and side to move.
+    A candidate therefore needs both sector corrections before its viewpoint
+    can be negated.  If correction crosses zero, key2 changes sign; the final
+    increment accounts for the move from the parent to the child.
+    """
+    if parent.perspective == child.perspective:
+        raise ValueError("a child value must use the opposite viewpoint")
+
+    correction = parent.sector_value + child.sector_value
+    corrected_key1 = _signed_int16(child.raw_key1 + correction)
+    corrected_key2 = _sign(corrected_key1 * child.raw_key1) * child.key2
+    key1 = _signed_int16(-corrected_key1)
+    key2 = corrected_key2 + 1
+    absolute_key1 = key1 + parent.sector_value
+
+    return OracleMoveValue(
+        key1=key1,
+        key2=key2,
+        sector_value=parent.sector_value,
+        absolute_key1=absolute_key1,
+        perspective=parent.perspective,
+        sector=parent.sector,
+        outcome=_project_absolute_outcome(
+            absolute_key1,
+            virt_win,
+            virt_loss,
+        ),
+        source="malom",
+        child_value=child,
+    )
+
+
+def terminal_oracle_move_value(
+    parent: OracleValue,
+    child_outcome: str,
+    virt_win: int,
+    virt_loss: int,
+) -> OracleMoveValue:
+    """Create the exact one-ply parent value for a rules-terminal child."""
+    mover_outcome = {"W": "L", "L": "W", "D": "D"}.get(child_outcome)
+    if mover_outcome is None:
+        raise ValueError(f"invalid terminal child outcome: {child_outcome!r}")
+
+    if mover_outcome == "W":
+        absolute_key1 = virt_win
+    elif mover_outcome == "L":
+        absolute_key1 = virt_loss
+    else:
+        # Current project rules have no drawn terminal, but zero is the neutral
+        # full-value projection if such a rule is added later.
+        absolute_key1 = 0
+
+    return OracleMoveValue(
+        key1=_signed_int16(absolute_key1 - parent.sector_value),
+        key2=1,
+        sector_value=parent.sector_value,
+        absolute_key1=absolute_key1,
+        perspective=parent.perspective,
+        sector=parent.sector,
+        outcome=mover_outcome,
+        source="rules_terminal",
+        terminal=True,
+    )
+
+
+@dataclass(frozen=True)
+class _RawEntry:
+    key1: int
+    key2: int
+    kind: str
+    symmetry_operation: Optional[int] = None
+
+
 def _sign_extend_12(val: int) -> int:
     if val & 0x800:
         return val - 0x1000
     return val
 
 
+def _decode_raw_entry(data: "bytes | memoryview",
+                      idx: int,
+                      em_set: dict[int, int]) -> Optional[_RawEntry]:
+    """Decode the raw fields and classify them like Sanmill ``RawEval``."""
+    off = idx * _ESIZE
+    if idx < 0 or off + _ESIZE > len(data):
+        return None
+
+    b0, b1, b2 = data[off], data[off + 1], data[off + 2]
+    raw24 = b0 | (b1 << 8) | (b2 << 16)
+    key1 = _sign_extend_12(raw24 & 0xFFF)
+    key2 = _sign_extend_12(raw24 >> 12)
+
+    # The smallest field2 value is a sentinel; the real key2 is in em_set.
+    spec_field2 = -(1 << (_FIELD2_SIZE - 1))  # -2048
+    if key2 == spec_field2:
+        key2 = em_set.get(idx)
+        if key2 is None:
+            return None
+
+    # Sanmill RawEval::kind(): zero/zero is Count, not a concrete draw value.
+    if key1 != 0:
+        return _RawEntry(key1=key1, key2=key2, kind="value")
+    if key2 >= 0:
+        return _RawEntry(key1=key1, key2=key2, kind="count")
+
+    symmetry_operation = -(key2 + 1)
+    if not 0 <= symmetry_operation < len(_SYM_PERMS):
+        return None
+    return _RawEntry(
+        key1=key1,
+        key2=key2,
+        kind="symmetry",
+        symmetry_operation=symmetry_operation,
+    )
+
+
 def decode_entry(data: "bytes | memoryview",
                  idx: int,
                  em_set: dict[int, int],
+                 sector_value: int,
                  virt_win: int,
-                 virt_loss: int):
-    """Decode entry at index `idx` from raw data bytes.
+                 virt_loss: int) -> str | tuple[str, int] | None:
+    """Decode an entry and project a concrete value to W/D/L.
 
-    Returns
-    -------
-    "W"                : position is won  for the querying side (mover)
-    "L"                : position is lost for the querying side (mover)
-    "D"                : draw
-    ("SYM", sym_op)    : Sym redirect — caller must apply sym_op to the
-                         already-canonicalized board, rehash, and call again.
-                         sym_op is an integer 0–15 into _SYM_PERMS.
-    None               : Count state (in-progress; should not appear in
-                         finished DB) or em_set overflow with unexpected key2.
+    Concrete values follow Sanmill ``DatabaseEval::to_outcome``::
 
-    The em_set maps an index to an overflowed key2 value when the 12-bit field
-    in the 3-byte entry is insufficient.
+        absolute_key1 = raw_key1 + sector_value
 
-    Sym state semantics (from eval_elem.cpp, GPL-3):
-        cas() == Sym  when  key1 == 0  and  key2 < 0
-        sym_op = -(key2 + 1)
-    The Sym redirect is guaranteed non-Sym by a C++ assert in hash.cpp.
+    Only the two virtual extrema project to W or L; every other resolved entry
+    is D.  Count and symmetry kinds are classified before sector correction.
+
+    Returns ``("SYM", operation)`` for a redirect, ``None`` for a malformed
+    entry, and otherwise ``"W"``, ``"D"``, or ``"L"``.
     """
-    off = idx * _ESIZE
-    b0, b1, b2 = data[off], data[off + 1], data[off + 2]
-    raw24 = b0 | (b1 << 8) | (b2 << 16)
+    raw = _decode_raw_entry(data, idx, em_set)
+    if raw is None:
+        return None
+    if raw.kind == "symmetry":
+        assert raw.symmetry_operation is not None
+        return ("SYM", raw.symmetry_operation)
 
-    key1 = _sign_extend_12(raw24 & 0xFFF)
-    key2_raw = _sign_extend_12(raw24 >> 12)
-
-    # Check for em_set overflow (key2 field has a sentinel value)
-    # Sentinel: key2 = spec_field2 = -(1 << (field2_size-1)) = -2048
-    _SPEC_FIELD2 = -(1 << (_FIELD2_SIZE - 1))  # = -2048
-    if key2_raw == _SPEC_FIELD2:
-        if idx in em_set:
-            key2 = em_set[idx]
-        else:
-            # Unexpected: spec_field2 without em_set entry; treat as unknown
-            return None
-    else:
-        key2 = key2_raw
-
-    # Determine entry type via cas() semantics from eval_elem.cpp (GPL-3):
-    #   key1 != 0  → Val   (Win or Loss)
-    #   key1 == 0, key2 > 0  → Count  (retrograde in progress)
-    #   key1 == 0, key2 == 0 → Draw
-    #   key1 == 0, key2 < 0  → Sym    (redirect to another entry)
-    if key1 == 0:
-        if key2 > 0:
-            # Count state: retrograde not finished; should not be in released DB
-            return None
-        if key2 < 0:
-            # Sym redirect: the canonical representative is at a different hash.
-            # sym_op is the symmetry to apply to the already-canonicalized board.
-            sym_op = -(key2 + 1)
-            return ("SYM", sym_op)
-        # key2 == 0 → Draw
-        return "D"
-
-    if key1 == virt_win:
+    absolute_key1 = raw.key1 + sector_value
+    if absolute_key1 == virt_win:
         return "W"
-    if key1 == virt_loss:
+    if absolute_key1 == virt_loss:
         return "L"
-
-    # Non-virtual values may appear in intermediate sectors; map by sign
-    if key1 > 0:
-        return "W"
-    return "L"
+    return "D"
 
 
 # ── MalomDB ────────────────────────────────────────────────────────────────────
@@ -578,7 +768,7 @@ class MalomDB:
 
     Usage::
 
-        db = MalomDB("/mnt/windows/NMM_DB/strong")
+        db = MalomDB("path/to/Std_DD_89adjusted")
         if db.is_available():
             result = db.query(board_state)
             # result = {"outcome": "W"|"L"|"D", "dtw": int} or None
@@ -620,7 +810,7 @@ class MalomDB:
     # ── Internal helpers ──────────────────────────────────────────────────
 
     def _get_sector(self, path: Path, sector: tuple[int,int,int,int]
-                    ) -> Optional[tuple[bytes, int, dict[int,int]]]:
+                    ) -> Optional[tuple[memoryview, int, dict[int,int]]]:
         if sector in self._cache:
             return self._cache[sector]
         if not path.exists():
@@ -637,8 +827,8 @@ class MalomDB:
 
     # ── Public query ──────────────────────────────────────────────────────
 
-    def query(self, board) -> Optional[dict]:
-        """Return the WDL outcome for the side to move, or None.
+    def query_value(self, board) -> Optional[OracleValue]:
+        """Return the complete Malom value for the side to move, or None.
 
         Parameters
         ----------
@@ -646,14 +836,14 @@ class MalomDB:
 
         Returns
         -------
-        {"outcome": "W"|"L"|"D", "dtw": int}  on success
+        :class:`OracleValue` on success
         None  if the position cannot be looked up (DB unavailable,
-              sector file missing, or hash failure)
+              sector value/file missing, malformed entry, or hash failure)
 
         The "outcome" is from the perspective of the CURRENT MOVER (board.turn).
-        "dtw" is the depth-to-win (positive) or depth-to-loss (negative);
-        it comes from field2 of the entry.  Its exact semantics depend on which
-        sector the position belongs to; treat it as a relative quality hint.
+        ``key2`` is preserved exactly, including values stored in ``em_set``.
+        Its ordering semantics depend on the complete Malom comparator; callers
+        must not assume that bare key2 is always a monotonic depth-to-win.
         """
         if not self._available:
             if not self._warned:
@@ -677,6 +867,10 @@ class MalomDB:
             qw, qb, qW, qB, qWF, qBF = bb, wb, B, W, bf, wf
 
         sector = (qW, qB, qWF, qBF)
+        sector_value = self._secvals.get(sector)
+        if sector_value is None:
+            logger.warning("[MalomDB] missing sector value for %s", sector)
+            return None
         sec_fname = f"std_{qW}_{qB}_{qWF}_{qBF}.sec2"
         sec_path = self._db_dir / sec_fname
 
@@ -703,13 +897,22 @@ class MalomDB:
         if idx < 0 or idx >= hash_count:
             return None
 
-        entry = decode_entry(data, idx, em_set, self._virt_win, self._virt_loss)
+        entry = decode_entry(
+            data,
+            idx,
+            em_set,
+            sector_value,
+            self._virt_win,
+            self._virt_loss,
+        )
+        symmetry_operation: Optional[int] = None
 
         # Step 2: Sym redirect — apply a second symmetry to the already-canonical
         # board, recompute h2, and read the guaranteed-non-Sym entry.
         # Translated from Hash::hash() in Malom hash.cpp (GPL-3).
         if isinstance(entry, tuple) and entry[0] == "SYM":
             sym_op2 = entry[1]
+            symmetry_operation = sym_op2
             cw2 = _sym24_from_perm(_SYM_PERMS[sym_op2], cw)
             cb2 = _sym24_from_perm(_SYM_PERMS[sym_op2], cb)
             # After a second symmetry the canonical White position may differ;
@@ -721,7 +924,14 @@ class MalomDB:
                 return None
             if idx < 0 or idx >= hash_count:
                 return None
-            entry = decode_entry(data, idx, em_set, self._virt_win, self._virt_loss)
+            entry = decode_entry(
+                data,
+                idx,
+                em_set,
+                sector_value,
+                self._virt_win,
+                self._virt_loss,
+            )
             # Per C++ assert this must not be another Sym; if it is, bail out.
             if isinstance(entry, tuple):
                 logger.warning("[MalomDB] unexpected double Sym redirect at idx=%d", idx)
@@ -730,15 +940,54 @@ class MalomDB:
         if entry is None:
             return None
 
-        outcome = entry
+        raw = _decode_raw_entry(data, idx, em_set)
+        if raw is None or raw.kind == "symmetry":
+            return None
 
-        # Extract dtw from field2
-        off = idx * _ESIZE
-        b0, b1, b2 = data[off], data[off + 1], data[off + 2]
-        raw24 = b0 | (b1 << 8) | (b2 << 16)
-        dtw = _sign_extend_12(raw24 >> 12)
+        return OracleValue(
+            raw_key1=raw.key1,
+            sector_value=sector_value,
+            absolute_key1=raw.key1 + sector_value,
+            key2=raw.key2,
+            entry_kind=raw.kind,
+            perspective=board.turn,
+            sector=sector,
+            outcome=entry,
+            symmetry_operation=symmetry_operation,
+        )
 
-        return {"outcome": outcome, "dtw": dtw}
+    def query(self, board) -> Optional[dict]:
+        """Return the backward-compatible coarse WDL projection, or None."""
+        value = self.query_value(board)
+        if value is None:
+            return None
+        return {"outcome": value.outcome, "dtw": value.key2}
+
+    def move_value(
+        self,
+        parent: OracleValue,
+        child: OracleValue,
+    ) -> OracleMoveValue:
+        """Convert a child probe to a full value in the parent context."""
+        return undo_negate_oracle_value(
+            parent,
+            child,
+            self._virt_win,
+            self._virt_loss,
+        )
+
+    def terminal_move_value(
+        self,
+        parent: OracleValue,
+        child_outcome: str,
+    ) -> OracleMoveValue:
+        """Return a full parent value for a rules-terminal successor."""
+        return terminal_oracle_move_value(
+            parent,
+            child_outcome,
+            self._virt_win,
+            self._virt_loss,
+        )
 
     def close(self) -> None:
         """Release cached sector data."""

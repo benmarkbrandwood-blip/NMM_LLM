@@ -2,7 +2,10 @@
 
 This document catalogues the known problems with how the Malom perfect-play database
 is decoded and used throughout training, the specialist database, and the game.
-No code has been changed yet; this is an investigation doc.
+
+Status (2026-07-20): Steps 1 and 3 are implemented and verified against Sanmill
+plus the local 498-sector database. Steps 2, 4, and 5 remain pending; these
+changes did not write to SpecialistDB or resume training.
 
 ---
 
@@ -94,9 +97,12 @@ malom_win_move_rate = _safe_mean(
 )
 ```
 
-`malom_chosen_dtm` stores the float returned by `ExternalSolvedDB.query_move_quality()`,
-which is the WDL delta: `+` = move didn't downgrade position, `−` = it did. The `>= 0`
-check is asking "did the chosen move not worsen the Malom value?"
+`malom_chosen_dtm` stores the float returned by `ExternalSolvedDB.query_move_quality()`.
+Despite the legacy field name, this is a WDL delta: `0` means the move preserves the
+exact root value, while `-1` or `-2` means it downgrades that value. A positive delta
+is impossible under exact minimax semantics and is now rejected as an adapter
+contradiction. The `>= 0` check is therefore equivalent to asking whether the chosen
+move preserved the Malom value; unavailable or inconsistent probes remain `None`.
 
 Because the underlying WDL labels are wrong, a `1.0` rate here only means the model is
 consistently choosing moves that the broken decoder agrees with — not that the moves are
@@ -169,7 +175,7 @@ inference — and it's carrying corrupted labels.
 
 ## Proposed fix sequence
 
-### Step 1 — Fix `decode_entry` (unblocks everything else)
+### Step 1 — Fix `decode_entry` (completed 2026-07-20)
 
 `decode_entry` needs `sector_value` for the queried sector passed in as an argument.
 The call sites in `MalomDB.query()` already have `sector = (qW, qB, qWF, qBF)` and
@@ -193,10 +199,12 @@ Once the decoder is verified correct, clear all `malom_label` fields in
 drop and rebuild the DB from scratch — the position hashes are deterministic so
 game re-play isn't needed; just re-label existing rows.
 
-### Step 3 — Fix Mill atomicity in `query_move_quality`
+### Step 3 — Fix Mill atomicity in `query_move_quality` (completed 2026-07-20)
 
-Skip Malom query (return `None`) when `move` contains a Mill close without a
-capture, or ensure callers always pass the complete move dict including `capture`.
+`query_move_quality` now validates the input against the rules engine's complete
+atomic-action list before either Malom lookup. A Mill close without its mandatory
+capture, a spurious capture, or any other illegal action returns `None`. A valid
+action is applied once with its capture before the successor position is queried.
 
 ### Step 4 — Reinstate `MALOM_REWARD`
 

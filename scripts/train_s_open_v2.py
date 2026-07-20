@@ -1168,6 +1168,7 @@ def run(args: argparse.Namespace) -> None:
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
     specialist_db = SpecialistDB(_ROOT / "data" / "specialist_db.sqlite")
+    specialist_db.require_trusted_malom_labels()
     print(f"[s_open_v2] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────

@@ -18,8 +18,16 @@ import hashlib
 import json
 import sqlite3
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+from learned_ai.data.malom_label_provenance import (
+    CURRENT_MALOM_LABEL_VERSION,
+    read_malom_label_version,
+    write_current_malom_label_version,
+)
+from learned_ai.data.data_contract import TypedLabel
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS positions (
@@ -55,6 +63,11 @@ CREATE TABLE IF NOT EXISTS preferred_plays (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pp_promoted ON preferred_plays(promoted);
+
+CREATE TABLE IF NOT EXISTS meta (
+    key          TEXT PRIMARY KEY,
+    value        TEXT
+);
 """
 
 _PROMOTE_MIN_PLAYED = 5
@@ -62,6 +75,18 @@ _PROMOTE_WIN_RATE   = 0.65
 _DEMOTE_WIN_RATE    = 0.45
 _DEMOTE_MIN_RECENT  = 20
 _MIN_SAMPLES_QUERY  = 5
+_RULES_VERSION = "nmm-project-rules-v1"
+_TRAINING_LINEAGE_ROOT_KEY = "training_lineage_root_run_id"
+
+
+@dataclass(frozen=True)
+class SpecialistWdlEvidence:
+    """Physically separated theoretical and empirical position evidence."""
+
+    perspective: str
+    theoretical_wdl: Optional[TypedLabel]
+    empirical_counts: tuple[int, int, int]
+    empirical_distribution: Optional[Tuple[float, float, float]]
 
 
 def _board_hash(board) -> str:
@@ -85,14 +110,127 @@ class SpecialistDB:
     Grows indefinitely — even 100 000 games stay under 1 GB.
     """
 
-    def __init__(self, db_path) -> None:
+    def __init__(self, db_path, *, read_only: bool = False) -> None:
         self._path = Path(db_path)
+        self._read_only = bool(read_only)
+        if self._read_only and not self._path.is_file():
+            raise FileNotFoundError(f"read-only SpecialistDB does not exist: {self._path}")
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.executescript(_SCHEMA_SQL)
+        if self._read_only:
+            uri = f"file:{self._path.resolve().as_posix()}?mode=ro"
+            self._conn = sqlite3.connect(
+                uri, uri=True, check_same_thread=False
+            )
+        else:
+            self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.executescript(_SCHEMA_SQL)
+        self._malom_label_count = self._conn.execute(
+            "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
+        ).fetchone()[0]
+        self._malom_label_version = read_malom_label_version(self._conn)
+        if self._malom_label_count == 0 and not self._read_only:
+            # An empty label set is safe to adopt.  This covers both a new DB
+            # and an existing self-play-only DB.
+            write_current_malom_label_version(self._conn)
+            self._malom_label_version = CURRENT_MALOM_LABEL_VERSION
+        self._malom_labels_trusted = (
+            self._malom_label_version == CURRENT_MALOM_LABEL_VERSION
+        )
+        self._checkpoint_identity_cache = None
+        if not self._read_only:
+            self._conn.commit()
+
+    @property
+    def malom_label_version(self) -> Optional[str]:
+        return self._malom_label_version
+
+    @property
+    def malom_labels_trusted(self) -> bool:
+        return self._malom_labels_trusted
+
+    def require_trusted_malom_labels(self) -> None:
+        """Fail before training can read or append incompatible Malom labels."""
+        if self._malom_labels_trusted:
+            return
+        shown_version = self._malom_label_version or "<missing>"
+        raise RuntimeError(
+            f"SpecialistDB {self._path} contains {self._malom_label_count} "
+            f"Malom labels with version {shown_version!r}; "
+            f"{CURRENT_MALOM_LABEL_VERSION!r} is required. Use a new database "
+            "path or rebuild the SpecialistDB before training."
+        )
+
+    def require_writable(self) -> None:
+        """Reject writes through a SpecialistDB opened as a trusted snapshot."""
+        if self._read_only:
+            raise RuntimeError("SpecialistDB is read-only; runtime writes are quarantined")
+
+    @property
+    def training_lineage_root_run_id(self) -> Optional[str]:
+        row = self._conn.execute(
+            "SELECT value FROM meta WHERE key=?", (_TRAINING_LINEAGE_ROOT_KEY,)
+        ).fetchone()
+        return row[0] if row and row[0] else None
+
+    def bind_training_lineage(self, run_id: str) -> None:
+        """Bind an empty writable database to one training lineage root."""
+        self.require_writable()
+        if not isinstance(run_id, str) or not run_id.strip():
+            raise ValueError("run_id must be a non-empty string")
+        existing = self.training_lineage_root_run_id
+        if existing is not None:
+            if existing != run_id:
+                raise RuntimeError(
+                    f"SpecialistDB is already bound to training lineage {existing!r}"
+                )
+            return
+        if any(
+            self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            for table in ("positions", "winning_lines", "preferred_plays")
+        ):
+            raise RuntimeError("cannot bind a non-empty SpecialistDB to a new lineage")
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO meta(key, value) VALUES (?, ?)",
+                (_TRAINING_LINEAGE_ROOT_KEY, run_id),
+            )
+
+    def checkpoint_identity(self) -> dict:
+        """Flush WAL state and return a cached cryptographic database identity."""
+        self.require_writable()
+        change_count = self._conn.total_changes
+        cached = self._checkpoint_identity_cache
+        if cached is not None and cached[0] == change_count:
+            return dict(cached[1])
+
         self._conn.commit()
+        busy, log_pages, checkpointed_pages = self._conn.execute(
+            "PRAGMA wal_checkpoint(FULL)"
+        ).fetchone()
+        if busy:
+            raise RuntimeError(
+                "SpecialistDB WAL checkpoint was busy; refusing checkpoint identity"
+            )
+        digest = hashlib.sha256()
+        with self._path.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        identity = {
+            "sha256": digest.hexdigest(),
+            "size": self._path.stat().st_size,
+            "label_version": self._malom_label_version,
+            "malom_label_count": int(
+                self._conn.execute(
+                    "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
+                ).fetchone()[0]
+            ),
+            "wal_log_pages": int(log_pages),
+            "wal_checkpointed_pages": int(checkpointed_pages),
+        }
+        self._checkpoint_identity_cache = (change_count, identity)
+        return dict(identity)
 
     # ── Position statistics ───────────────────────────────────────────────────
 
@@ -116,6 +254,7 @@ class SpecialistDB:
                         are opponent-to-move; WDL is stored from the current player's
                         perspective, so W↔L are flipped for those boards.
         """
+        self.require_writable()
         now = _now()
         with self._conn:
             for board in boards:
@@ -198,7 +337,18 @@ class SpecialistDB:
 
     def label_position_malom(self, board, wdl: str) -> None:
         """Store a Malom WDL label ('W'/'D'/'L') for a position (training time only)."""
+        self.require_writable()
+        self.require_trusted_malom_labels()
+        if wdl not in ("W", "D", "L"):
+            raise ValueError(f"Invalid Malom WDL label: {wdl!r}")
         h = _board_hash(board)
+        existing = self._conn.execute(
+            "SELECT malom_label FROM positions WHERE pos_hash=?", (h,)
+        ).fetchone()
+        if existing is not None and existing[0] is not None and existing[0] != wdl:
+            raise RuntimeError(
+                "conflicting trusted Malom label; refusing to overwrite evidence"
+            )
         self._conn.execute("""
             INSERT INTO positions (pos_hash, wins, draws, losses, malom_label, last_seen)
             VALUES (?, 0, 0, 0, ?, ?)
@@ -209,37 +359,71 @@ class SpecialistDB:
 
     # ── Inference query ───────────────────────────────────────────────────────
 
+    def query_wdl_evidence(
+        self, board, min_samples: int = _MIN_SAMPLES_QUERY
+    ) -> Optional[SpecialistWdlEvidence]:
+        """Return theoretical and empirical WDL evidence without blending them."""
+        h = _board_hash(board)
+        row = self._conn.execute(
+            "SELECT wins, draws, losses, malom_label FROM positions WHERE pos_hash=?",
+            (h,),
+        ).fetchone()
+        if row is None:
+            return None
+        wins, draws, losses, malom_label = row
+        theoretical = None
+        if self._malom_labels_trusted and malom_label:
+            theoretical = TypedLabel(
+                kind="theoretical_wdl",
+                value=malom_label,
+                perspective=board.turn,
+                rules_version=_RULES_VERSION,
+                history_identity=_board_hash(board),
+                source_identity=(
+                    f"specialist-db-malom:{self._malom_label_version}"
+                ),
+                validity_version=self._malom_label_version,
+            )
+        total = wins + draws + losses
+        empirical = None
+        if total >= min_samples:
+            empirical = (wins / total, draws / total, losses / total)
+        return SpecialistWdlEvidence(
+            perspective=board.turn,
+            theoretical_wdl=theoretical,
+            empirical_counts=(wins, draws, losses),
+            empirical_distribution=empirical,
+        )
+
     def query_wdl(self, board, min_samples: int = _MIN_SAMPLES_QUERY) -> Optional[Tuple[float, float, float]]:
-        """Return (win_frac, draw_frac, loss_frac) or None if insufficient data.
+        """Return the legacy compatibility projection of separated WDL evidence.
 
         When a Malom label exists and self-play count is low, the Malom label
         provides a strong prior.  At inference without Malom, self-play statistics
         substitute once enough games have been played.
         """
-        h = _board_hash(board)
-        row = self._conn.execute(
-            "SELECT wins, draws, losses, malom_label FROM positions WHERE pos_hash=?", (h,)
-        ).fetchone()
-        if row is None:
+        evidence = self.query_wdl_evidence(board, min_samples)
+        if evidence is None:
             return None
-        wins, draws, losses, malom_label = row
-        n = wins + draws + losses
-        if malom_label and n < min_samples:
-            if malom_label == "W":
+        if (
+            evidence.theoretical_wdl is not None
+            and evidence.empirical_distribution is None
+        ):
+            if evidence.theoretical_wdl.value == "W":
                 return (0.90, 0.05, 0.05)
-            if malom_label == "D":
+            if evidence.theoretical_wdl.value == "D":
                 return (0.05, 0.90, 0.05)
-            if malom_label == "L":
+            if evidence.theoretical_wdl.value == "L":
                 return (0.05, 0.05, 0.90)
-        if n < min_samples:
-            return None
-        return (wins / n, draws / n, losses / n)
+        return evidence.empirical_distribution
 
-    def query_win_prob(self, board, min_samples: int = _MIN_SAMPLES_QUERY) -> float:
-        """Return P(win) + 0.5*P(draw) or 0.5 if position is unknown."""
+    def query_win_prob(
+        self, board, min_samples: int = _MIN_SAMPLES_QUERY
+    ) -> Optional[float]:
+        """Return P(win) + 0.5*P(draw), preserving unknown as None."""
         wdl = self.query_wdl(board, min_samples)
         if wdl is None:
-            return 0.5
+            return None
         w, d, _ = wdl
         return w + 0.5 * d
 
@@ -276,8 +460,11 @@ class SpecialistDB:
             "positions": pos,
             "well_sampled": well,
             "malom_labeled": malom,
+            "malom_label_version": self._malom_label_version,
+            "malom_labels_trusted": self._malom_labels_trusted,
             "winning_lines": lines,
             "preferred_plays": prefs,
+            "training_lineage_root_run_id": self.training_lineage_root_run_id,
         }
 
     def close(self) -> None:

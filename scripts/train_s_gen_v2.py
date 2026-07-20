@@ -4,12 +4,13 @@ Plays complete games from BoardState.new_game(); rewards fire during movement
 phase (sentinel delta + heuristic delta + mill bonus).  No phase restriction.
 Malom reward = 0.  Gap net included in lookahead (12-ply × 6 signals).
 
-Resume chain: explicit --resume → s_gen_v2/best.pt → scratch
+The CLI requires either a read-only preflight or a contract-backed launch.
+Fresh, weights-only, and fail-closed exact-resume launches are supported.
 
 Usage
 -----
-.venv/bin/python scripts/train_s_gen_v2.py --max-games 20
-.venv/bin/python scripts/train_s_gen_v2.py --auto-resume-best
+.venv/bin/python scripts/train_s_gen_v2.py --preflight smoke [options]
+.venv/bin/python scripts/train_s_gen_v2.py --launch smoke --run-id RUN_ID [options]
 """
 
 from __future__ import annotations
@@ -57,6 +58,31 @@ from learned_ai.training.advance_stats import (
     check_advance as _sanmill_check_advance,
     advance_target,
 )
+from learned_ai.training.generalist_preflight import (
+    PreflightConfigurationError,
+    configure_generalist_paths,
+    load_training_settings,
+    resume_config_sha256,
+    run_generalist_preflight,
+    validate_generalist_configuration,
+)
+from learned_ai.training.generalist_run_manifest import (
+    append_run_lifecycle_event,
+    build_generalist_run_manifest,
+    command_for_manifest,
+    publish_initial_run_contract,
+    utc_now_text,
+)
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointDescriptor,
+    CheckpointPayload,
+    capture_rng_state,
+    is_checkpoint_envelope,
+    load_checkpoint,
+    restore_rng_state,
+    save_checkpoint,
+)
+from learned_ai.training.run_contract import canonical_sha256
 
 # ── Opening book ──────────────────────────────────────────────────────────────
 
@@ -190,11 +216,12 @@ DRAW_LONG   = -0.25   # max-ply timeout draws penalised harder (passive play)
 
 LR            = 1e-4
 GAMMA_TD      = 0.99
-TEMP_START    = 0.90   # explore early; anneals down to TEMP_END over training
+TEMP_START    = 0.90   # default --temp-start; anneals to TEMP_END over training
 TEMP_END      = 0.20   # exploit late
 ENTROPY_COEF  = 0.01
 UPDATE_EVERY  = 64
 ROLLING_WIN   = 40
+BEST_CHECKPOINT_MIN_GAMES = 10
 DIFF_START    = 1
 DIFF_MAX      = 20
 
@@ -209,6 +236,11 @@ N_HISTORY             = 3    # last N moves appended to value input as context
 HIST_FLOATS_PER_MOVE  = 3    # from_idx_norm, to_idx_norm, capture_idx_norm
 # Value input layout: [23 encoder base | 9 history | 48 raw-board one-hot] = 80 floats
 VALUE_INPUT_DIM_WITH_HISTORY = VALUE_INPUT_DIM + N_HISTORY * HIST_FLOATS_PER_MOVE + 48  # 80
+FEATURE_SCHEMA_VERSION = (
+    f"s-gen-v2-move-{MOVE_FEAT_DIM_WITH_LOOKAHEAD}-value-"
+    f"{VALUE_INPUT_DIM_WITH_HISTORY}"
+)
+LABEL_SCHEMA_VERSION = "sector-corrected-v1"
 
 LOG_EVERY    = 50
 LR_SCALE_WIN = 0.35
@@ -270,6 +302,7 @@ class StepDiag:
 
 @dataclass
 class GameDiag:
+    game_id:                 str
     game:                    int
     difficulty:              int
     learner_color:           str
@@ -309,16 +342,180 @@ class GameDiag:
     bucket_opening:          int
     bucket_midgame:          int
     bucket_endgame:          int
+    opponent_search_nodes:   int = 0
+    opponent_search_calls:   int = 0
+    opponent_node_budget:    Optional[int] = None
+
+
+def _make_checkpoint_payload(
+    *,
+    model: ScaffoldedPolicyNet,
+    optimizer: torch.optim.Optimizer,
+    game_rng: random.Random,
+    game_count: int,
+    batch_count: int,
+    update_count: int,
+    difficulty: int,
+    temperature: float,
+    win_history: deque,
+    win_history_heuristic: deque,
+    diag_buffer: list[GameDiag],
+    games_at_level: int,
+    best_win_rate: float,
+    best_win_rate_at_diff: float,
+    branch_bucket_history: deque,
+    frozen_model: ScaffoldedPolicyNet,
+    games_since_target_update: int,
+    recovery_grace: int,
+    pending_steps: list[ScaffoldedStep],
+    last_update_losses: tuple[Optional[float], Optional[float], Optional[float]],
+    source_checkpoint: str,
+    checkpoint_sequence: int,
+    specialist_db_identity: dict,
+) -> CheckpointPayload:
+    """Capture every mutable state element needed for exact continuation."""
+    return CheckpointPayload(
+        model_state=model.state_dict(),
+        optimizer_state=optimizer.state_dict(),
+        scheduler_state=None,
+        scaler_state=None,
+        rng_state=capture_rng_state({"game": game_rng.getstate()}),
+        trainer_state={
+            "game_count": game_count,
+            "batch_count": batch_count,
+            "update_count": update_count,
+            "difficulty": difficulty,
+            "temperature": temperature,
+            "rolling_metrics": {
+                "win_history": list(win_history),
+                "win_history_heuristic": list(win_history_heuristic),
+                "diag_buffer": [asdict(item) for item in diag_buffer],
+                "best_win_rate": best_win_rate,
+                "best_win_rate_at_diff": best_win_rate_at_diff,
+            },
+            "curriculum": {"games_at_level": games_at_level},
+            "target_network": {
+                "games_since_update": games_since_target_update,
+                "model_state": frozen_model.state_dict(),
+            },
+            "recovery_state": {
+                "grace": recovery_grace,
+                "pending_steps": list(pending_steps),
+                "last_update_losses": last_update_losses,
+                "source_checkpoint": source_checkpoint,
+                "checkpoint_sequence": checkpoint_sequence,
+            },
+            "model_config": model.get_config(),
+        },
+        data_state={
+            "cursor": {"completed_games": game_count},
+            "consumed_snapshots": [],
+            "cache": {},
+            "buckets": {"branch_history": list(branch_bucket_history)},
+            "mutable_assets": {"specialist_db": dict(specialist_db_identity)},
+        },
+    )
+
+
+def _restore_exact_resume_payload(
+    payload: CheckpointPayload,
+    *,
+    optimizer: torch.optim.Optimizer,
+    game_rng: random.Random,
+    frozen_model: ScaffoldedPolicyNet,
+    rolling_win: int,
+    bucket_window: int,
+) -> dict[str, Any]:
+    """Validate and restore a complete Generalist continuation payload."""
+    trainer_state = payload.trainer_state
+    rolling = trainer_state["rolling_metrics"]
+    curriculum = trainer_state["curriculum"]
+    target = trainer_state["target_network"]
+    recovery = trainer_state["recovery_state"]
+    cursor = payload.data_state["cursor"]
+    buckets = payload.data_state["buckets"]
+    expected_nested_fields = (
+        (
+            "rolling_metrics",
+            rolling,
+            {
+                "win_history",
+                "win_history_heuristic",
+                "diag_buffer",
+                "best_win_rate",
+                "best_win_rate_at_diff",
+            },
+        ),
+        ("curriculum", curriculum, {"games_at_level"}),
+        ("target_network", target, {"games_since_update", "model_state"}),
+        (
+            "recovery_state",
+            recovery,
+            {
+                "grace",
+                "pending_steps",
+                "last_update_losses",
+                "source_checkpoint",
+                "checkpoint_sequence",
+            },
+        ),
+        ("cursor", cursor, {"completed_games"}),
+        ("buckets", buckets, {"branch_history"}),
+    )
+    for name, value, expected in expected_nested_fields:
+        if not isinstance(value, dict) or set(value) != expected:
+            raise RuntimeError(f"exact-resume {name} state is incomplete")
+    if cursor["completed_games"] != trainer_state["game_count"]:
+        raise RuntimeError("exact-resume data cursor disagrees with game_count")
+    if payload.optimizer_state is None:
+        raise RuntimeError("exact-resume checkpoint has no optimizer state")
+    if payload.scheduler_state is not None or payload.scaler_state is not None:
+        raise RuntimeError("exact-resume checkpoint uses unsupported trainer state")
+
+    diagnostics = [GameDiag(**dict(item)) for item in rolling["diag_buffer"]]
+    last_losses = tuple(recovery["last_update_losses"])
+    if len(last_losses) != 3:
+        raise RuntimeError("exact-resume loss state must contain three values")
+
+    optimizer.load_state_dict(payload.optimizer_state)
+    frozen_model.load_state_dict(target["model_state"])
+    restore_rng_state(payload.rng_state, component_rngs={"game": game_rng})
+    return {
+        "game_count": int(trainer_state["game_count"]),
+        "batch_count": int(trainer_state["batch_count"]),
+        "update_count": int(trainer_state["update_count"]),
+        "difficulty": int(trainer_state["difficulty"]),
+        "temperature": float(trainer_state["temperature"]),
+        "win_history": deque(rolling["win_history"], maxlen=rolling_win),
+        "win_history_heuristic": deque(
+            rolling["win_history_heuristic"], maxlen=rolling_win
+        ),
+        "diag_buffer": diagnostics,
+        "games_at_level": int(curriculum["games_at_level"]),
+        "best_win_rate": float(rolling["best_win_rate"]),
+        "best_win_rate_at_diff": float(rolling["best_win_rate_at_diff"]),
+        "branch_bucket_history": deque(
+            buckets["branch_history"], maxlen=bucket_window
+        ),
+        "games_since_target_update": int(target["games_since_update"]),
+        "recovery_grace": int(recovery["grace"]),
+        "pending_steps": list(recovery["pending_steps"]),
+        "last_update_losses": last_losses,
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _load_settings() -> dict:
-    p = _ROOT / "data" / "settings.json"
-    if p.exists():
-        with open(p, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+def _configure_paths(args: argparse.Namespace) -> dict[str, str]:
+    """Apply CLI > environment > local/shared config > default precedence."""
+    settings = load_training_settings(_ROOT, args.paths_config)
+    if settings.local_config_path is not None:
+        print(f"[s_gen_v2] Path config: {settings.local_config_path}")
+    else:
+        print("[s_gen_v2] No local path config; using environment/shared/default paths")
+    sources = configure_generalist_paths(args, root=_ROOT, settings=settings)
+    setattr(args, "_path_sources", sources)
+    return sources
 
 
 def _safe_mean(xs: list[float]) -> float:
@@ -472,21 +669,98 @@ def _imitation_mix_step(
     return float(loss.item())
 
 
+def _load_imitation_mix_data(args: argparse.Namespace) -> dict[str, np.ndarray] | None:
+    """Load required imitation data, or honor an explicit disabled contract."""
+    if args.no_imitation_mix:
+        print("[s_gen_v2] Imitation mixing explicitly disabled")
+        return None
+
+    imitation_path = Path(args.s1a_data)
+    if not imitation_path.exists():
+        raise RuntimeError(
+            "required imitation mixing dataset does not exist: "
+            f"{imitation_path}"
+        )
+    raw = None
+    try:
+        raw = np.load(str(imitation_path), allow_pickle=True)
+        feat_matrices = raw["feat_matrices"]
+        label_dists = raw["label_dists"]
+        is_winner = (
+            raw["is_winner"]
+            if "is_winner" in raw
+            else np.ones(len(feat_matrices), dtype=bool)
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            "required imitation mixing dataset could not be loaded: "
+            f"{imitation_path}"
+        ) from exc
+    finally:
+        close = getattr(raw, "close", None)
+        if close is not None:
+            close()
+    if len(feat_matrices) == 0 or len(feat_matrices) != len(label_dists):
+        raise RuntimeError(
+            "required imitation mixing dataset has inconsistent or empty arrays: "
+            f"{imitation_path}"
+        )
+    data = {
+        "feat_matrices": feat_matrices,
+        "label_dists": label_dists,
+        "is_winner": is_winner,
+    }
+    print(
+        "[s_gen_v2] Imitation data loaded: "
+        f"{len(feat_matrices)} positions for mixing"
+    )
+    return data
+
+
 def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
     if args.resume:
         p = Path(args.resume)
         if p.exists():
             return p, "explicit_resume"
-    s_gen_v2_best = _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2" / "best.pt"
-    if args.auto_resume_best and s_gen_v2_best.exists():
-        return s_gen_v2_best, "s_gen_v2_best"
+    out_dir_best = Path(args.out_dir) / "best.pt"
+    if args.auto_resume_best and out_dir_best.exists():
+        return out_dir_best, "s_gen_v2_best"
     return None, "scratch"
+
+
+def _should_save_best_checkpoint(
+    win_rate: float,
+    best_win_rate_at_diff: float,
+    heuristic_game_count: int,
+) -> bool:
+    """Return whether the current logging checkpoint qualifies as a new best."""
+    return (
+        heuristic_game_count >= BEST_CHECKPOINT_MIN_GAMES
+        and win_rate > best_win_rate_at_diff
+    )
+
+
+def _report_final_checkpoints(out_dir: Path) -> None:
+    """Report only checkpoint files that are actually available."""
+    latest_path = out_dir / "latest.pt"
+    best_path = out_dir / "best.pt"
+    print(f"[s_gen_v2] Latest checkpoint: {latest_path}")
+    if best_path.exists():
+        print(f"[s_gen_v2] Best checkpoint available: {best_path}")
+    else:
+        print(
+            "[s_gen_v2] Best checkpoint: not created "
+            f"(requires a logging checkpoint with at least "
+            f"{BEST_CHECKPOINT_MIN_GAMES} heuristic games and an improved "
+            "win rate)"
+        )
 
 
 def _load_model(
     device: torch.device,
     resume_path: Optional[Path],
     policy_hidden: tuple[int, ...] = (512, 256, 128),
+    start_mode: str = "fresh",
 ) -> tuple[ScaffoldedPolicyNet, int, float, int, str]:
     feat_dim = MOVE_FEAT_DIM_WITH_LOOKAHEAD
 
@@ -500,34 +774,54 @@ def _load_model(
     if resume_path is None or not Path(resume_path).exists():
         return _fresh()
 
-    ckpt   = torch.load(resume_path, map_location=device, weights_only=False)
-    cfg    = ckpt.get("model_config", {})
+    if is_checkpoint_envelope(resume_path):
+        envelope = load_checkpoint(resume_path, map_location=device)
+        cfg = dict(envelope.payload.trainer_state["model_config"])
+        model_state = envelope.payload.model_state
+        checkpoint_state = envelope.payload.trainer_state
+        is_mine = envelope.descriptor.implementation.get("trainer") == STAGE_TAG
+    else:
+        ckpt = torch.load(resume_path, map_location=device, weights_only=True)
+        cfg = ckpt.get("model_config", {})
+        state_key = "model" if "model" in ckpt else "state_dict"
+        model_state = ckpt[state_key]
+        checkpoint_state = ckpt
+        is_mine = ckpt.get("stage", "unknown") == STAGE_TAG
 
     # If the requested architecture differs from the checkpoint, start fresh.
     ckpt_hidden = tuple(cfg.get("policy_hidden", (512, 256, 128)))
     if ckpt_hidden != policy_hidden:
-        print(f"[s_gen_v2] policy_hidden mismatch: ckpt={ckpt_hidden} vs requested={policy_hidden} — starting fresh")
-        return _fresh()
+        raise RuntimeError(
+            f"policy_hidden mismatch: checkpoint={ckpt_hidden}, "
+            f"requested={policy_hidden}"
+        )
 
     cfg["move_feat_dim"]   = feat_dim
     cfg["value_input_dim"] = VALUE_INPUT_DIM_WITH_HISTORY
     model  = ScaffoldedPolicyNet.from_config(cfg).to(device)
-    sd_key = "model" if "model" in ckpt else "state_dict"
     try:
-        model.load_state_dict(ckpt[sd_key])
+        model.load_state_dict(model_state)
     except RuntimeError:
-        pol_state = {k: v for k, v in ckpt[sd_key].items() if k.startswith("policy_mlp")}
+        pol_state = {
+            key: value
+            for key, value in model_state.items()
+            if key.startswith("policy_mlp")
+        }
         try:
             model.load_state_dict(pol_state, strict=False)
             print("[s_gen_v2] Warning: value_mlp shape mismatch — policy weights loaded, value head reinitialized")
         except RuntimeError:
-            print(f"[s_gen_v2] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
-            return _fresh()
-    stage      = ckpt.get("stage", "unknown")
-    is_mine    = (stage == STAGE_TAG)
-    start_game = int(ckpt.get("game_count",    0))         if is_mine else 0
-    best_wr    = float(ckpt.get("best_win_rate", 0.0))     if is_mine else 0.0
-    difficulty = int(ckpt.get("difficulty",   DIFF_START)) if is_mine else DIFF_START
+            raise RuntimeError("checkpoint model state is incompatible")
+    metrics = checkpoint_state.get("rolling_metrics", checkpoint_state)
+    start_game = int(checkpoint_state.get("game_count", 0)) if is_mine else 0
+    best_wr = float(metrics.get("best_win_rate", 0.0)) if is_mine else 0.0
+    difficulty = (
+        int(checkpoint_state.get("difficulty", DIFF_START))
+        if is_mine
+        else DIFF_START
+    )
+    if start_mode == "weights-only":
+        return model, 0, 0.0, DIFF_START, str(resume_path)
     return model, start_game, best_wr, difficulty, str(resume_path)
 
 
@@ -537,9 +831,14 @@ def _apply_diff_start_override(difficulty: int, args: argparse.Namespace) -> int
     return difficulty
 
 
-def _compute_temperature(game_count: int, max_games: int) -> float:
+def _compute_temperature(
+    game_count: int,
+    max_games: int,
+    temp_start: float,
+) -> float:
+    """Anneal from the configured start to TEMP_END over 80% of training."""
     progress = min(1.0, game_count / max(max_games * 0.8, 1))
-    return float(TEMP_START - (TEMP_START - TEMP_END) * progress)
+    return float(temp_start - (temp_start - TEMP_END) * progress)
 
 
 def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:
@@ -670,6 +969,9 @@ RETRY_PLY_MAX = 15
 
 @dataclass
 class _GameConfig:
+    game_id:                str
+    scheduled_index:        int
+    torch_seed:             int
     learner_color:          str
     opp_color:              str
     game_type:              str
@@ -688,6 +990,9 @@ class RolloutResult:
     ply:               int
     branch_candidates: list[tuple[int, BoardState, str]]
     retry_board:       Optional[BoardState] = None
+    opponent_search_nodes: int = 0
+    opponent_search_calls: int = 0
+    opponent_node_budget: Optional[int] = None
 
 
 def _move_notation(mv: dict) -> str:
@@ -698,6 +1003,39 @@ def _move_notation(mv: dict) -> str:
     if cap:
         s += f"x{cap}"
     return s
+
+
+def _derive_game_identity(
+    run_seed: int, scheduled_index: int, role: str
+) -> tuple[str, int]:
+    """Derive a stable game ID and CPU Torch seed from immutable inputs."""
+    if scheduled_index < 0 or not role:
+        raise ValueError("scheduled_index and role must identify a game")
+    identity = canonical_sha256(
+        {
+            "schema": "nmm.game-identity.v1",
+            "run_seed": run_seed,
+            "scheduled_index": scheduled_index,
+            "role": role,
+        }
+    )
+    return f"game:{identity}", int(identity[:16], 16) & ((1 << 63) - 1)
+
+
+def _game_torch_generator(seed: int) -> torch.Generator:
+    generator = torch.Generator(device="cpu")
+    generator.manual_seed(seed)
+    return generator
+
+
+def _initialize_training_rngs(seed: int) -> random.Random:
+    """Seed every trainer-global RNG and return the explicit scheduling RNG."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    return random.Random(seed)
 
 
 def _rollout(
@@ -722,6 +1060,7 @@ def _rollout(
     specialist_db=None,
     malom_db=None,
     deep_game: bool = False,
+    torch_generator: Optional[torch.Generator] = None,
 ) -> RolloutResult:
     # For deep games (1-in-20): temporarily run full ply_depth simulation
     _saved_sim_ply = None
@@ -744,6 +1083,9 @@ def _rollout(
     learner_boards: list[BoardState] = []
     learner_result_boards: list[BoardState] = []
     learner_moves_notation: list[str] = []
+    opponent_search_nodes = 0
+    opponent_search_calls = 0
+    opponent_node_budget = getattr(opponent, "node_budget", None)
 
     while ply < max_ply:
         if ply == retry_ply:
@@ -805,7 +1147,11 @@ def _rollout(
                 if forced_idx is not None:
                     chosen_idx = forced_idx
                 else:
-                    chosen_idx = int(torch.multinomial(probs.cpu(), 1).item())
+                    chosen_idx = int(
+                        torch.multinomial(
+                            probs.cpu(), 1, generator=torch_generator
+                        ).item()
+                    )
                 chosen_prob     = float(probs[chosen_idx].item())
                 top1_prob       = float(probs.max().item())
                 was_top1_policy = int(chosen_idx == int(torch.argmax(probs).item()))
@@ -923,7 +1269,13 @@ def _rollout(
             try:
                 opp_move = opponent.choose_move(board)
             except Exception:
+                if opponent_node_budget is not None:
+                    raise
                 opp_move = None
+            last_search_nodes = getattr(opponent, "last_search_nodes", None)
+            if last_search_nodes is not None:
+                opponent_search_nodes += int(last_search_nodes)
+                opponent_search_calls += 1
             if not opp_move:
                 outcome = WIN_REWARD
                 done    = True
@@ -966,12 +1318,16 @@ def _rollout(
         ply=ply,
         branch_candidates=branch_candidates,
         retry_board=retry_board,
+        opponent_search_nodes=opponent_search_nodes,
+        opponent_search_calls=opponent_search_calls,
+        opponent_node_budget=opponent_node_budget,
     )
 
 
 # ── Diagnostic logging ────────────────────────────────────────────────────────
 
 def _build_game_diag(
+    game_id:        str,
     game_count:      int,
     difficulty:      int,
     learner_color:   str,
@@ -995,6 +1351,7 @@ def _build_game_diag(
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
     return GameDiag(
+        game_id=game_id,
         game=game_count,
         difficulty=difficulty,
         learner_color=learner_color,
@@ -1035,34 +1392,38 @@ def _build_game_diag(
         bucket_opening =bucket_counts.get("opening",  0),
         bucket_midgame =bucket_counts.get("midgame",  0),
         bucket_endgame =bucket_counts.get("endgame",  0),
+        opponent_search_nodes=result.opponent_search_nodes,
+        opponent_search_calls=result.opponent_search_calls,
+        opponent_node_budget=result.opponent_node_budget,
     )
 
 
 # ── Main training loop ────────────────────────────────────────────────────────
 
-def run(args: argparse.Namespace) -> None:
+def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
+    if not paths_configured:
+        _configure_paths(args)
+    validate_generalist_configuration(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
-    rng = random.Random(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
+    rng = _initialize_training_rngs(args.seed)
 
     # ── Load components ────────────────────────────────────────────────────────
     sentinel = None
-    sent_path = args.sentinel or str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt")
-    if Path(sent_path).exists():
+    sent_path = args.sentinel
+    if getattr(args, "no_sentinel", False):
+        print("[s_gen_v2] Sentinel disabled by CLI")
+    elif sent_path and Path(sent_path).exists():
         sentinel = load_advisor(sent_path)
         if sentinel and sentinel.is_loaded():
             print(f"[s_gen_v2] Sentinel loaded: {sent_path}")
         else:
             sentinel = None
-    if sentinel is None:
+    if sentinel is None and not getattr(args, "no_sentinel", False):
         print("[s_gen_v2] Sentinel unavailable — sentinel reward = 0")
 
     db = None
-    malom_path = args.malom or _load_settings().get("malom_db_path", "")
+    malom_path = args.malom
     if malom_path and Path(malom_path).exists():
         try:
             from learned_ai.sentinel.db_teacher import ExternalSolvedDB
@@ -1077,8 +1438,10 @@ def run(args: argparse.Namespace) -> None:
         print("[s_gen_v2] Malom DB unavailable — lookahead uses no endgame early-exit")
 
     value_net = None
-    vn_path = args.value_net or str(_ROOT / "data" / "value_net.npz")
-    if vn_path and Path(vn_path).exists():
+    vn_path = args.value_net
+    if getattr(args, "no_value_net", False):
+        print("[s_gen_v2] Value net disabled by CLI")
+    elif vn_path and Path(vn_path).exists():
         try:
             from ai.value_net import ValueNet as _ValueNet
             value_net = _ValueNet.load(vn_path)
@@ -1089,8 +1452,10 @@ def run(args: argparse.Namespace) -> None:
         print("[s_gen_v2] No value net — VN features will be 0")
 
     gap_net = None
-    gap_path = args.gap_net or str(_ROOT / "data" / "gap_net.npz")
-    if gap_path and Path(gap_path).exists():
+    gap_path = args.gap_net
+    if getattr(args, "no_gap_net", False):
+        print("[s_gen_v2] Gap net disabled by CLI")
+    elif gap_path and Path(gap_path).exists():
         try:
             from ai.gap_net import GapNet as _GapNet
             gap_net = _GapNet.load(gap_path)
@@ -1102,7 +1467,7 @@ def run(args: argparse.Namespace) -> None:
 
     # v3: HumanDB — for per-candidate human-play-frequency feature
     human_db = None
-    hdb_path = _ROOT / "data" / "human_db.sqlite"
+    hdb_path = Path(args.human_db)
     if hdb_path.exists():
         try:
             from ai.human_db import HumanDB
@@ -1129,13 +1494,32 @@ def run(args: argparse.Namespace) -> None:
     print(f"[s_gen_v2] LookaheadAdvisor: 12-ply width, {args.sim_ply_depth}-ply sim, 5 signals (h+learner_sent+opp_sent+vn+gap)")
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
-    specialist_db = SpecialistDB(_ROOT / "data" / "specialist_db.sqlite")
+    specialist_db = SpecialistDB(args.specialist_db)
+    specialist_db.require_trusted_malom_labels()
+    if args.start_mode != "exact-resume":
+        specialist_db.bind_training_lineage(getattr(args, "_run_manifest").run_id)
     print(f"[s_gen_v2] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────
     resume_path, source_tag = _choose_resume_path(args)
-    model, start_game, best_win_rate, difficulty, source_checkpoint = _load_model(device, resume_path, args.policy_hidden)
-    difficulty = _apply_diff_start_override(difficulty, args)
+    model, start_game, best_win_rate, difficulty, source_checkpoint = _load_model(
+        device,
+        resume_path,
+        args.policy_hidden,
+        start_mode=args.start_mode,
+    )
+    exact_resume = None
+    if args.start_mode == "exact-resume":
+        if resume_path is None or not is_checkpoint_envelope(resume_path):
+            raise RuntimeError("exact-resume requires a CheckpointEnvelope v2 source")
+        exact_resume = load_checkpoint(resume_path, map_location="cpu")
+        checkpoint_specialist = exact_resume.payload.data_state["mutable_assets"][
+            "specialist_db"
+        ]["sha256"]
+        if specialist_db.checkpoint_identity()["sha256"] != checkpoint_specialist:
+            raise RuntimeError("SpecialistDB changed after exact-resume preflight")
+    else:
+        difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
         print("[s_gen_v2] No checkpoint found — starting from scratch")
     else:
@@ -1155,9 +1539,12 @@ def run(args: argparse.Namespace) -> None:
     update_fn = scaffolded_ppo_update if args.ppo else scaffolded_a2c_update
 
     game_count             = start_game
-    temperature            = args.temp_start
+    temperature            = _compute_temperature(
+        game_count, args.max_games, args.temp_start
+    )
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
+    level_heuristic_history: deque[float] = deque()  # uncapped; cleared on each difficulty advance
     ep_steps: list[ScaffoldedStep] = []
     last_update_pl  = None
     last_update_vl  = None
@@ -1178,26 +1565,18 @@ def run(args: argparse.Namespace) -> None:
           f"max {args.max_branches_per_game} branches/game")
 
     # s1a warm-start: run once before RL if starting from game 0
-    if not args.no_s1a_warmstart and start_game == 0:
+    if (
+        not args.no_s1a_warmstart
+        and start_game == 0
+        and args.start_mode != "exact-resume"
+    ):
         print(f"[s_gen_v2] Running s1a warm-start (pre-RL imitation) from {args.s1a_data}")
         _run_s1b_refresher(model, device, args.s1a_data,
                            epochs=args.s1b_refresher_epochs,
                            lr=args.s1b_refresher_lr)
 
-    # Load imitation data for ongoing mixing during RL (AlphaZero-style)
-    _imitation_data = None
-    _imitation_path = Path(args.s1a_data)
-    if _imitation_path.exists():
-        try:
-            _raw = np.load(str(_imitation_path), allow_pickle=True)
-            _imitation_data = {
-                "feat_matrices": _raw["feat_matrices"],
-                "label_dists":   _raw["label_dists"],
-                "is_winner":     _raw["is_winner"] if "is_winner" in _raw else np.ones(len(_raw["feat_matrices"]), dtype=bool),
-            }
-            print(f"[s_gen_v2] Imitation data loaded: {len(_imitation_data['feat_matrices'])} positions for mixing")
-        except Exception as e:
-            print(f"[s_gen_v2] Imitation data load failed ({e}) — imitation mixing disabled")
+    # Ongoing imitation mixing is independent of the one-time warm-start.
+    _imitation_data = _load_imitation_mix_data(args)
 
     # Warm the lazy-init heuristic eval global before spawning threads
     if args.batch_games > 1:
@@ -1208,9 +1587,115 @@ def run(args: argparse.Namespace) -> None:
 
     diag_buffer: list[GameDiag] = []
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
+    batch_count = 0
+    update_count = 0
+    if exact_resume is not None:
+        restored = _restore_exact_resume_payload(
+            exact_resume.payload,
+            optimizer=opt,
+            game_rng=rng,
+            frozen_model=frozen_opp._model,
+            rolling_win=args.rolling_win,
+            bucket_window=args.bucket_window,
+        )
+        game_count = restored["game_count"]
+        batch_count = restored["batch_count"]
+        update_count = restored["update_count"]
+        difficulty = restored["difficulty"]
+        temperature = restored["temperature"]
+        win_history = restored["win_history"]
+        win_history_heuristic = restored["win_history_heuristic"]
+        diag_buffer = restored["diag_buffer"]
+        games_at_level = restored["games_at_level"]
+        best_win_rate = restored["best_win_rate"]
+        best_win_rate_at_diff = restored["best_win_rate_at_diff"]
+        branch_bucket_history = restored["branch_bucket_history"]
+        games_since_target_update = restored["games_since_target_update"]
+        recovery_grace = restored["recovery_grace"]
+        ep_steps = restored["pending_steps"]
+        last_update_pl, last_update_vl, last_update_ent = restored[
+            "last_update_losses"
+        ]
+        print(
+            f"[s_gen_v2] Exact state restored at game {game_count}, "
+            f"batch {batch_count}, update {update_count}"
+        )
+    checkpoint_sequence = 0
+    parent_checkpoint_id: Optional[str] = getattr(
+        args, "_source_checkpoint_id", None
+    )
+    run_manifest = getattr(args, "_run_manifest", None)
+    if run_manifest is None:
+        raise RuntimeError("contract-backed launch did not provide a RunManifest")
+    segment_stop_game = min(
+        args.max_games,
+        game_count + (args.segment_games or args.max_games),
+    )
 
-    while game_count < args.max_games:
-        temperature = _compute_temperature(game_count, args.max_games)
+    def _save_runtime_checkpoint(path: Path, *, role: str, reason: str) -> str:
+        nonlocal checkpoint_sequence, parent_checkpoint_id
+        checkpoint_sequence += 1
+        checkpoint_id = f"{run_manifest.run_id}:checkpoint:{checkpoint_sequence:08d}"
+        specialist_db_identity = specialist_db.checkpoint_identity()
+        descriptor = CheckpointDescriptor(
+            checkpoint_id=checkpoint_id,
+            run_id=run_manifest.run_id,
+            experiment_id=run_manifest.experiment_id,
+            parent_checkpoint_id=parent_checkpoint_id,
+            role=role,
+            save_reason=reason,
+            created_at_utc=utc_now_text(),
+            config_sha256=getattr(args, "_resume_config_sha256"),
+            feature_schema_version=FEATURE_SCHEMA_VERSION,
+            label_schema_version=LABEL_SCHEMA_VERSION,
+            database_schema_versions={
+                "specialist_db": LABEL_SCHEMA_VERSION,
+                "human_db_malom_columns": "masked-unversioned",
+            },
+            asset_identities={
+                asset.logical_name: asset.identity for asset in run_manifest.assets
+            }
+            | {"specialist_db": specialist_db_identity["sha256"]},
+            implementation={
+                "trainer": STAGE_TAG,
+                "framework": "pytorch",
+                "pytorch": str(torch.__version__),
+            },
+        )
+        payload = _make_checkpoint_payload(
+            model=model,
+            optimizer=opt,
+            game_rng=rng,
+            game_count=game_count,
+            batch_count=batch_count,
+            update_count=update_count,
+            difficulty=difficulty,
+            temperature=temperature,
+            win_history=win_history,
+            win_history_heuristic=win_history_heuristic,
+            diag_buffer=diag_buffer,
+            games_at_level=games_at_level,
+            best_win_rate=best_win_rate,
+            best_win_rate_at_diff=best_win_rate_at_diff,
+            branch_bucket_history=branch_bucket_history,
+            frozen_model=frozen_opp._model,
+            games_since_target_update=games_since_target_update,
+            recovery_grace=recovery_grace,
+            pending_steps=ep_steps,
+            last_update_losses=(last_update_pl, last_update_vl, last_update_ent),
+            source_checkpoint=source_checkpoint,
+            checkpoint_sequence=checkpoint_sequence,
+            specialist_db_identity=specialist_db_identity,
+        )
+        save_checkpoint(path, descriptor, payload)
+        parent_checkpoint_id = checkpoint_id
+        return checkpoint_id
+
+    while game_count < segment_stop_game:
+        batch_count += 1
+        temperature = _compute_temperature(
+            game_count, args.max_games, args.temp_start
+        )
 
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
@@ -1219,30 +1704,53 @@ def run(args: argparse.Namespace) -> None:
 
         # ── Build N game configs ──────────────────────────────────────────────
         batch_slots: list[tuple[_GameConfig, Any]] = []
-        for _ in range(max(1, min(args.batch_games, args.max_games - game_count))):
-            _lc = "W" if rng.random() < 0.5 else "B"
+        for slot_index in range(
+            max(1, min(args.batch_games, args.max_games - game_count))
+        ):
+            scheduled_index = game_count + slot_index
+            game_id, torch_seed = _derive_game_identity(
+                args.seed, scheduled_index, "primary"
+            )
+            config_rng = random.Random(torch_seed)
+            _lc = "W" if config_rng.random() < 0.5 else "B"
             _oc = "B" if _lc == "W" else "W"
-            if rng.random() < args.self_play_ratio:
+            if config_rng.random() < args.self_play_ratio:
                 _opp, _gt, _gd = frozen_opp, "vs_frozen", difficulty
             else:
                 _gd = difficulty
-                if difficulty > 1 and rng.random() < 0.15:
-                    _gd = rng.randint(1, difficulty - 1)
-                _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
+                if difficulty > 1 and config_rng.random() < 0.15:
+                    _gd = config_rng.randint(1, difficulty - 1)
                 _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
-                _h._inner = _GA(color=_oc, difficulty=_gd, override_time_budget=_tb)
+                if args.heuristic_node_budget is not None:
+                    _h._inner = _GA(
+                        color=_oc,
+                        difficulty=_gd,
+                        override_node_budget=args.heuristic_node_budget,
+                    )
+                else:
+                    _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
+                    _h._inner = _GA(
+                        color=_oc,
+                        difficulty=_gd,
+                        override_time_budget=_tb,
+                    )
                 _opp, _gt = _h, "vs_heuristic"
             _fp: Optional[list[str]] = None
-            if _OPENING_LINES and rng.random() < BOOK_GAME_PROB:
-                _ln = _OPENING_LINES[rng.randint(0, len(_OPENING_LINES) - 1)]
+            if _OPENING_LINES and config_rng.random() < BOOK_GAME_PROB:
+                _ln = _OPENING_LINES[
+                    config_rng.randint(0, len(_OPENING_LINES) - 1)
+                ]
                 _fp = _sample_forced_placements(_ln, _lc)
             batch_slots.append((
                 _GameConfig(
+                    game_id=game_id,
+                    scheduled_index=scheduled_index,
+                    torch_seed=torch_seed,
                     learner_color=_lc, opp_color=_oc, game_type=_gt,
                     game_difficulty=_gd,
                     is_full_diff=(_gt == "vs_heuristic" and _gd == difficulty),
                     game_forced_placements=_fp,
-                    retry_ply=rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
+                    retry_ply=config_rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
                     temperature=temperature,
                 ),
                 _opp,
@@ -1256,8 +1764,6 @@ def run(args: argparse.Namespace) -> None:
                 print(f"[s_gen_v2] Recovery grace expired — draw penalty restored")
 
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
-        _is_deep_game = (game_count % 20 == 0)   # 1-in-20 games use full 12-ply sim
-
         def _primary(cfg: _GameConfig, opp: Any) -> RolloutResult:
             return _rollout(
                 model=model, device=device, start_board=BoardState.new_game(),
@@ -1271,7 +1777,8 @@ def run(args: argparse.Namespace) -> None:
                 human_db=human_db,
                 specialist_db=specialist_db,
                 malom_db=db,
-                deep_game=_is_deep_game,
+                deep_game=(cfg.scheduled_index % 20 == 0),
+                torch_generator=_game_torch_generator(cfg.torch_seed),
             )
 
         if _executor is not None and len(batch_slots) > 1:
@@ -1318,6 +1825,11 @@ def run(args: argparse.Namespace) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed, cfg.scheduled_index, "confirm"
+                        )[1]
+                    ),
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
@@ -1337,6 +1849,7 @@ def run(args: argparse.Namespace) -> None:
                 win_history.append(_hv)
                 if is_full_diff:
                     win_history_heuristic.append(_hv)
+                    level_heuristic_history.append(_hv)
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
                     print(f"[s_gen_v2] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
@@ -1345,13 +1858,14 @@ def run(args: argparse.Namespace) -> None:
             win_history.append(_hv)
             if is_full_diff:
                 win_history_heuristic.append(_hv)
+                level_heuristic_history.append(_hv)
             game_count += 1
             games_at_level += 1
             games_since_target_update += 1
 
             bucket_counts = Counter(branch_bucket_history)
             _diag = _build_game_diag(
-                game_count, difficulty, learner_color, temperature, result,
+                cfg.game_id, game_count, difficulty, learner_color, temperature, result,
                 best_win_rate, win_history, last_update_pl, last_update_vl, last_update_ent,
                 opt, False, source_checkpoint,
                 game_type=game_type, phase_bucket="main", is_branch=False,
@@ -1392,6 +1906,11 @@ def run(args: argparse.Namespace) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed, cfg.scheduled_index, "retry"
+                        )[1]
+                    ),
                 )
                 if retry_result.trajectory:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
@@ -1401,6 +1920,7 @@ def run(args: argparse.Namespace) -> None:
                 win_history.append(_rv)
                 if is_full_diff:
                     win_history_heuristic.append(_rv)
+                    level_heuristic_history.append(_rv)
                 game_count += 1
                 games_at_level += 1
                 games_since_target_update += 1
@@ -1411,7 +1931,12 @@ def run(args: argparse.Namespace) -> None:
             # ── Branch games ───────────────────────────────────────────────────
             branches_spawned = 0
             candidates = list(result.branch_candidates)
-            rng.shuffle(candidates)
+            branch_order_rng = random.Random(
+                _derive_game_identity(
+                    args.seed, cfg.scheduled_index, "branch-order"
+                )[1]
+            )
+            branch_order_rng.shuffle(candidates)
             seen_buckets: set[str] = set()
             ordered_candidates: list[tuple[int, BoardState, str]] = []
             for cand in candidates:
@@ -1421,7 +1946,11 @@ def run(args: argparse.Namespace) -> None:
                 else:
                     ordered_candidates.append(cand)
 
-            for branch_ply, branch_board, bucket in ordered_candidates:
+            for branch_candidate_index, (
+                branch_ply,
+                branch_board,
+                bucket,
+            ) in enumerate(ordered_candidates):
                 if branches_spawned >= args.max_branches_per_game:
                     break
                 bucket_counts = Counter(branch_bucket_history)
@@ -1447,6 +1976,13 @@ def run(args: argparse.Namespace) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    torch_generator=_game_torch_generator(
+                        _derive_game_identity(
+                            args.seed,
+                            cfg.scheduled_index,
+                            f"branch:{branch_candidate_index}:{branch_ply}:{bucket}",
+                        )[1]
+                    ),
                 )
 
                 if branch_result.trajectory:
@@ -1462,6 +1998,11 @@ def run(args: argparse.Namespace) -> None:
 
                     bucket_counts = Counter(branch_bucket_history)
                     diag_buffer.append(_build_game_diag(
+                        _derive_game_identity(
+                            args.seed,
+                            cfg.scheduled_index,
+                            f"branch:{branch_candidate_index}:{branch_ply}:{bucket}",
+                        )[0],
                         game_count, difficulty, learner_color, temperature, branch_result,
                         best_win_rate, win_history, last_update_pl, last_update_vl, last_update_ent,
                         opt, False, source_checkpoint,
@@ -1479,6 +2020,7 @@ def run(args: argparse.Namespace) -> None:
                 last_update_pl, last_update_vl, last_update_ent = update_fn(
                     model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef
                 )
+                update_count += 1
                 upd_entry = {
                     "game":        game_count,
                     "policy_loss": None if last_update_pl  is None else float(last_update_pl),
@@ -1515,13 +2057,18 @@ def run(args: argparse.Namespace) -> None:
                     else:
                         best_ckpt = out_dir / f"best{difficulty}.pt"
                         if best_ckpt.exists():
-                            ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
+                            checkpoint = load_checkpoint(best_ckpt, map_location=device)
+                            model_state = checkpoint.payload.model_state
                             _loaded_recovery = False
                             try:
-                                model.load_state_dict(ckpt_r["model"])
+                                model.load_state_dict(model_state)
                                 _loaded_recovery = True
                             except RuntimeError:
-                                pol_state = {k: v for k, v in ckpt_r["model"].items() if k.startswith("policy_mlp")}
+                                pol_state = {
+                                    key: value
+                                    for key, value in model_state.items()
+                                    if key.startswith("policy_mlp")
+                                }
                                 try:
                                     model.load_state_dict(pol_state, strict=False)
                                     _loaded_recovery = True
@@ -1534,7 +2081,7 @@ def run(args: argparse.Namespace) -> None:
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
-                                temperature = TEMP_START
+                                # Recovery does not alter the global temperature schedule.
                                 recovery_grace = 100
                                 print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
                                 print(f"[s_gen_v2] Recovery grace: draw penalty suppressed for 100 games")
@@ -1565,26 +2112,28 @@ def run(args: argparse.Namespace) -> None:
                         f"[op={bc.get('opening',0)} mid={bc.get('midgame',0)} end={bc.get('endgame',0)}]"
                     )
 
-                ckpt = {
-                    "model":             model.state_dict(),
-                    "model_config":      model.get_config(),
-                    "stage":             STAGE_TAG,
-                    "game_count":        game_count,
-                    "best_win_rate":     best_win_rate,
-                    "difficulty":        difficulty,
-                    "source_checkpoint": source_checkpoint,
-                    "lr":                float(opt.param_groups[0]["lr"]),
-                    "temperature":       float(temperature),
-                }
-                torch.save(ckpt, out_dir / "latest.pt")
+                _save_runtime_checkpoint(
+                    out_dir / "latest.pt", role="latest", reason="periodic"
+                )
 
-                if win_rate > best_win_rate_at_diff and len(win_history_heuristic) >= 10:
+                if _should_save_best_checkpoint(
+                    win_rate,
+                    best_win_rate_at_diff,
+                    len(win_history_heuristic),
+                ):
                     best_win_rate_at_diff = win_rate
-                    ckpt["best_win_rate"] = best_win_rate_at_diff
-                    torch.save(ckpt, out_dir / f"best{difficulty}.pt")
-                    torch.save(ckpt, out_dir / "best.pt")
                     if win_rate > best_win_rate:
                         best_win_rate = win_rate
+                    _save_runtime_checkpoint(
+                        out_dir / f"best{difficulty}.pt",
+                        role="best_train",
+                        reason="training_metric_improved",
+                    )
+                    _save_runtime_checkpoint(
+                        out_dir / "best.pt",
+                        role="best_train",
+                        reason="training_metric_improved",
+                    )
                     print(f"[s_gen_v2]  → best diff-{difficulty} win rate: {best_win_rate_at_diff:.3f}")
 
             # ── Difficulty advancement (Sanmill superiority-probability) ──────
@@ -1592,7 +2141,7 @@ def run(args: argparse.Namespace) -> None:
             # level to limit false-positive advances from variance blips.
             _adv = None
             if games_at_level >= 20 and games_at_level % 10 == 0:
-                _adv = _sanmill_check_advance(win_history_heuristic,
+                _adv = _sanmill_check_advance(level_heuristic_history,
                                               difficulty=difficulty,
                                               games_at_level=games_at_level)
                 if game_count % 50 == 0:
@@ -1607,6 +2156,7 @@ def run(args: argparse.Namespace) -> None:
                     difficulty += 1
                     win_history.clear()
                     win_history_heuristic.clear()
+                    level_heuristic_history.clear()
                     games_at_level = 0
                     print(f"[s_gen_v2] *** Advanced to diff {difficulty} (was diff {prev_diff}: "
                           f"score={_adv.score_pct:.3f} P={_adv.p_super:.3f} target={_adv.target:.3f}) ***")
@@ -1614,25 +2164,23 @@ def run(args: argparse.Namespace) -> None:
 
                 prev_best = out_dir / f"best{prev_diff}.pt"
                 if not prev_best.exists():
-                    _adv_ckpt = {
-                        "model":             model.state_dict(),
-                        "model_config":      model.get_config(),
-                        "stage":             STAGE_TAG,
-                        "game_count":        game_count,
-                        "best_win_rate":     wr,
-                        "difficulty":        prev_diff,
-                        "source_checkpoint": source_checkpoint,
-                        "lr":                float(opt.param_groups[0]["lr"]),
-                        "temperature":       float(temperature),
-                    }
-                    torch.save(_adv_ckpt, prev_best)
+                    _save_runtime_checkpoint(
+                        prev_best,
+                        role="best_train",
+                        reason="difficulty_advanced",
+                    )
                     print(f"[s_gen_v2] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
                 if prev_best.exists():
-                    ckpt_prev = torch.load(str(prev_best), map_location=device, weights_only=False)
+                    checkpoint = load_checkpoint(prev_best, map_location=device)
+                    model_state = checkpoint.payload.model_state
                     try:
-                        model.load_state_dict(ckpt_prev["model"])
+                        model.load_state_dict(model_state)
                     except RuntimeError:
-                        pol_state = {k: v for k, v in ckpt_prev["model"].items() if k.startswith("policy_mlp")}
+                        pol_state = {
+                            key: value
+                            for key, value in model_state.items()
+                            if key.startswith("policy_mlp")
+                        }
                         try:
                             model.load_state_dict(pol_state, strict=False)
                             print(f"[s_gen_v2] Advance-load: value_mlp shape mismatch — policy weights loaded, value head kept")
@@ -1650,41 +2198,110 @@ def run(args: argparse.Namespace) -> None:
 
     # ── Final flush ────────────────────────────────────────────────────────────
     if ep_steps:
-        update_fn(model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef)
+        last_update_pl, last_update_vl, last_update_ent = update_fn(
+            model,
+            opt,
+            ep_steps,
+            device,
+            gamma=args.gamma_td,
+            entropy_coef=args.entropy_coef,
+        )
+        update_count += 1
+        ep_steps.clear()
     if diag_buffer:
         with open(log_path, "a", encoding="utf-8") as f:
             for d in diag_buffer:
                 f.write(json.dumps(asdict(d)) + "\n")
+        diag_buffer.clear()
 
-    ckpt = {
-        "model":             model.state_dict(),
-        "model_config":      model.get_config(),
-        "stage":             STAGE_TAG,
-        "game_count":        game_count,
-        "best_win_rate":     best_win_rate,
-        "difficulty":        difficulty,
-        "source_checkpoint": source_checkpoint,
-        "lr":                float(opt.param_groups[0]["lr"]),
-        "temperature":       float(temperature),
-    }
-    torch.save(ckpt, out_dir / "latest.pt")
+    _save_runtime_checkpoint(out_dir / "latest.pt", role="latest", reason="final")
     print(f"\n[s_gen_v2] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
-    print(f"[s_gen_v2] Checkpoint: {out_dir / 'best.pt'}")
+    _report_final_checkpoints(out_dir)
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
-def main() -> None:
+def _finite_positive_float(value: str) -> float:
+    """Parse a finite, strictly positive command-line float."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number"
+        ) from exc
+    if not math.isfinite(parsed) or parsed <= 0.0:
+        raise argparse.ArgumentTypeError("must be a finite positive number")
+    return parsed
+
+
+def _policy_hidden_widths(value: str) -> tuple[int, ...]:
+    """Parse a non-empty comma-separated list of positive hidden widths."""
+    try:
+        widths = tuple(int(item.strip()) for item in value.split(","))
+    except (AttributeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be comma-separated positive integers"
+        ) from exc
+    if not widths or any(width <= 0 for width in widths):
+        raise argparse.ArgumentTypeError("must be comma-separated positive integers")
+    return widths
+
+
+def _build_argument_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--preflight",
+        choices=("smoke", "long-run"),
+        default=None,
+        help="Run read-only readiness checks and exit without training",
+    )
+    mode.add_argument(
+        "--launch",
+        choices=("smoke", "long-run"),
+        default=None,
+        help="Require a passing preflight, publish a run contract, and train",
+    )
+    p.add_argument("--run-id", default=None, type=str)
+    p.add_argument("--managed-plan", default=None, type=str)
+    p.add_argument("--managed-authorization", default=None, type=str)
+    p.add_argument(
+        "--experiment-id",
+        default="dev-v4-malom-corrected-fresh-v1",
+        type=str,
+    )
+    p.add_argument("--parent-run-id", default=None, type=str)
+    p.add_argument(
+        "--start-mode",
+        choices=("fresh", "weights-only", "exact-resume"),
+        default="fresh",
+    )
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
-    p.add_argument("--out-dir",  default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2"))
-    p.add_argument("--sentinel", default=str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"))
-    p.add_argument("--malom",    default="", type=str)
-    p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
-    p.add_argument("--gap-net",  default=str(_ROOT / "data" / "gap_net.npz"),   type=str)
+    p.add_argument("--paths-config", default=None, type=str,
+                   help="Per-machine JSON path config (default: data/training_paths.local.json when present)")
+    p.add_argument("--out-dir",       default=None, type=str)
+    p.add_argument("--sentinel",      default=None, type=str)
+    p.add_argument("--no-sentinel",   action="store_true",
+                   help="Disable Sentinel even when a path is configured")
+    p.add_argument("--malom",         default=None, type=str)
+    p.add_argument("--malom-manifest", default=None, type=str)
+    p.add_argument("--value-net",     default=None, type=str)
+    p.add_argument("--no-value-net",  action="store_true",
+                   help="Disable ValueNet even when a path is configured")
+    p.add_argument("--gap-net",       default=None, type=str)
+    p.add_argument("--no-gap-net",    action="store_true",
+                   help="Disable GapNet even when a path is configured")
+    p.add_argument("--human-db",      default=None, type=str)
+    p.add_argument("--specialist-db", default=None, type=str)
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
+    p.add_argument(
+        "--segment-games",
+        type=int,
+        default=None,
+        help="Bound this process segment without changing the total schedule",
+    )
     p.add_argument("--seed",                type=int,   default=42)
     p.add_argument("--lr",                  type=float, default=LR)
     p.add_argument("--gamma-td",            type=float, default=GAMMA_TD)
@@ -1693,11 +2310,28 @@ def main() -> None:
     p.add_argument("--rolling-win",         type=int,   default=ROLLING_WIN)
     p.add_argument("--diff-start",          type=int,   default=None)
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
-    p.add_argument("--temp-start",          type=float, default=TEMP_START)
+    p.add_argument(
+        "--temp-start",
+        type=_finite_positive_float,
+        default=TEMP_START,
+        help=(
+            f"Initial rollout temperature; linearly anneals to {TEMP_END:.2f} "
+            "after 80 percent of --max-games"
+        ),
+    )
     p.add_argument("--log-every",           type=int,   default=LOG_EVERY)
     p.add_argument("--max-ply",             type=int,   default=MAX_PLY)
     p.add_argument("--max-ply-branch",      type=int,   default=MAX_PLY_BRANCH)
     p.add_argument("--time-budget",         type=float, default=-1.0)
+    p.add_argument(
+        "--heuristic-node-budget",
+        type=int,
+        default=None,
+        help=(
+            "Deterministic per-move native-search node cap for heuristic "
+            "opponents; mutually exclusive with an explicit --time-budget"
+        ),
+    )
     p.add_argument("--self-play-ratio",     type=float, default=SELF_PLAY_RATIO)
     p.add_argument("--update-target-every", type=int,   default=UPDATE_TARGET_EVERY)
     p.add_argument("--branch-every",        type=int,   default=BRANCH_EVERY)
@@ -1710,6 +2344,11 @@ def main() -> None:
     p.add_argument("--no-s1b-refresher",     action="store_true")
     p.add_argument("--s1a-data",             type=str,  default=str(_ROOT / "learned_ai" / "data" / "human_imitation2.npz"))
     p.add_argument("--no-s1a-warmstart",     action="store_true")
+    p.add_argument(
+        "--no-imitation-mix",
+        action="store_true",
+        help="Explicitly disable ongoing imitation updates during RL",
+    )
     p.add_argument("--minimal-rollouts",    action="store_true",
                    help="Skip retry + confirm rollouts (branches are already off by default). "
                         "Trades sample efficiency for wall-clock speed — one primary rollout per game.")
@@ -1717,16 +2356,124 @@ def main() -> None:
                    help="LookaheadAdvisor simulation depth during training (default 5). "
                         "Feature width stays at 15-ply * 4 = 60 floats via padding, so inference "
                         "at full 15 plies matches. Big training speed-up.")
-    p.add_argument("--policy-hidden",       type=str,   default="256,128",
+    p.add_argument("--policy-hidden",       type=_policy_hidden_widths, default=(256, 128),
                    help="Comma-separated hidden layer widths for the policy MLP "
                         "(default '256,128'). Checkpoint is reset if this differs from the "
                         "saved architecture.")
     p.add_argument("--batch-games",          type=int,  default=1,
                    help="Number of games to run in parallel per batch (default 1 = sequential)")
-    args = p.parse_args()
-    args.policy_hidden = tuple(int(x) for x in args.policy_hidden.split(","))
-    run(args)
+    return p
+
+
+def _reject_duplicate_cli_options(
+    parser: argparse.ArgumentParser, argv: list[str]
+) -> None:
+    """Reject repeated option names instead of silently accepting the last value."""
+    seen: set[str] = set()
+    supported = parser._option_string_actions
+    for token in argv:
+        option = token.split("=", 1)[0]
+        if option not in supported:
+            continue
+        canonical = supported[option].dest
+        if canonical in seen:
+            parser.error(f"option {option} was specified more than once")
+        seen.add(canonical)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    p = _build_argument_parser()
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    _reject_duplicate_cli_options(p, raw_argv)
+    args = p.parse_args(raw_argv)
+    if args.preflight is None and args.launch is None:
+        p.error("one of --preflight or --launch is required")
+    selected_mode = args.preflight or args.launch
+    try:
+        path_sources = _configure_paths(args)
+        report = run_generalist_preflight(
+            args,
+            mode=selected_mode,
+            root=_ROOT,
+            path_sources=path_sources,
+            feature_schema_version=FEATURE_SCHEMA_VERSION,
+            expected_move_feature_dim=MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+            expected_value_input_dim=VALUE_INPUT_DIM_WITH_HISTORY,
+        )
+    except (FileNotFoundError, PreflightConfigurationError) as exc:
+        p.error(str(exc))
+    print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    if args.preflight is not None:
+        return 0 if report["verdict"] == "ready_for_smoke" else 2
+
+    expected_verdict = (
+        "ready_for_smoke" if args.launch == "smoke" else "ready_for_long_run"
+    )
+    if report["verdict"] != expected_verdict:
+        return 2
+    if not args.run_id or not args.run_id.strip():
+        p.error("--run-id is required for --launch")
+    manifest = build_generalist_run_manifest(
+        args,
+        report=report,
+        root=_ROOT,
+        command=command_for_manifest(raw_argv),
+        run_id=args.run_id,
+        experiment_id=args.experiment_id,
+        parent_run_id=(
+            args.parent_run_id
+            or (report["checks"].get("checkpoint") or {}).get("source_run_id")
+        ),
+    )
+    setattr(args, "_run_manifest", manifest)
+    setattr(
+        args,
+        "_resume_config_sha256",
+        report.get("resume_config_sha256", resume_config_sha256(args)),
+    )
+    source_checkpoint_report = report["checks"].get("checkpoint")
+    if source_checkpoint_report is not None:
+        setattr(
+            args,
+            "_source_checkpoint_id",
+            source_checkpoint_report["checkpoint_id"],
+        )
+    publish_initial_run_contract(args.out_dir, manifest)
+    append_run_lifecycle_event(
+        args.out_dir,
+        run_id=args.run_id,
+        status="running",
+        event_type="training_started",
+    )
+    try:
+        run(args, paths_configured=True)
+    except KeyboardInterrupt:
+        append_run_lifecycle_event(
+            args.out_dir,
+            run_id=args.run_id,
+            status="interrupted",
+            event_type="training_interrupted",
+            reason_code="operator_interrupt",
+        )
+        return 130
+    except Exception as exc:
+        append_run_lifecycle_event(
+            args.out_dir,
+            run_id=args.run_id,
+            status="failed",
+            event_type="training_failed",
+            reason_code="training_exception",
+            details={"exception_type": type(exc).__name__},
+        )
+        raise
+    append_run_lifecycle_event(
+        args.out_dir,
+        run_id=args.run_id,
+        status="completed",
+        event_type="training_completed",
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

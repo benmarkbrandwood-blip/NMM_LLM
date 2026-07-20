@@ -45,6 +45,10 @@ sys.path.insert(0, str(ROOT))
 
 from ai.trajectory_db import make_board_state_key, _norm
 from ai.board_symmetry import transform_notation
+from learned_ai.data.malom_label_provenance import (
+    ensure_human_db_can_be_annotated,
+    write_current_malom_label_version,
+)
 from game.board import BoardState
 
 logging.basicConfig(
@@ -273,23 +277,24 @@ def _annotate_malom(
     pos_boards: dict,
     move_boards: dict,
     malom_path: str,
-) -> tuple[dict, dict]:
+) -> tuple[dict, dict, bool]:
     """Query Malom for each unique board and return annotation dicts.
 
     Returns:
         pos_malom  : state_key  → {"wdl": "W"|"L"|"D", "dtw": int}
         move_malom : (sk, cn)   → {"wdl": "W"|"L"|"D", "dtw": int}
+        completed  : whether a usable Malom DB completed the annotation pass
     """
     try:
         from ai.malom_db import MalomDB
         malom = MalomDB(malom_path)
     except Exception as exc:
         log.warning("Could not load MalomDB: %s — skipping annotation.", exc)
-        return {}, {}
+        return {}, {}, False
 
     if not malom.is_available():
         log.warning("Malom DB not available at %s — skipping annotation.", malom_path)
-        return {}, {}
+        return {}, {}, False
 
     log.info("Malom DB ready. Annotating %d positions + %d next-positions …",
              len(pos_boards), len(move_boards))
@@ -325,7 +330,7 @@ def _annotate_malom(
 
     log.info("Malom annotation complete: %d position hits, %d move hits.",
              len(pos_malom), len(move_malom))
-    return pos_malom, move_malom
+    return pos_malom, move_malom, True
 
 
 # ── SQLite writes ─────────────────────────────────────────────────────────────
@@ -410,6 +415,19 @@ def _update_meta(conn: sqlite3.Connection, game_count: int, file_count: int) -> 
                  (str(file_count),))
 
 
+def _resolve_malom_path(cli_path: str, no_malom: bool) -> str:
+    if no_malom:
+        return ""
+    if cli_path:
+        return cli_path
+    try:
+        from learned_ai.sentinel.config import load_config as _lc
+
+        return getattr(_lc(), "external_db_path", "") or ""
+    except Exception:
+        return ""
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -441,6 +459,15 @@ def main() -> None:
 
     if args.rebuild:
         _clear_db(conn)
+
+    malom_path = _resolve_malom_path(args.malom_db, args.no_malom)
+    if malom_path:
+        ensure_human_db_can_be_annotated(conn, output_path)
+    elif not args.no_malom:
+        log.info(
+            "No --malom-db specified and no config path found; "
+            "skipping annotation."
+        )
 
     # Discover files.
     all_dirs = [ROOT / args.games_dir] + [ROOT / d for d in args.extra_dirs]
@@ -515,18 +542,13 @@ def main() -> None:
     # Malom annotation.
     pos_malom: dict = {}
     move_malom: dict = {}
-    if not args.no_malom:
-        malom_path = args.malom_db
-        if not malom_path:
-            try:
-                from learned_ai.sentinel.config import load_config as _lc
-                malom_path = getattr(_lc(), "external_db_path", "") or ""
-            except Exception:
-                pass
-        if malom_path:
-            pos_malom, move_malom = _annotate_malom(pos_boards, move_boards, malom_path)
-        else:
-            log.info("No --malom-db specified and no config path found; skipping annotation.")
+    malom_annotation_completed = False
+    if malom_path:
+        pos_malom, move_malom, malom_annotation_completed = _annotate_malom(
+            pos_boards,
+            move_boards,
+            malom_path,
+        )
 
     # Write to SQLite.
     log.info("Writing to %s …", output_path)
@@ -535,6 +557,8 @@ def main() -> None:
         _upsert_moves(conn, move_stats, move_malom)
         _recompute_canonical_winning_moves(conn)
         _update_meta(conn, total_games, len(file_info_map))
+        if malom_annotation_completed:
+            write_current_malom_label_version(conn)
         conn.executemany(
             "INSERT OR REPLACE INTO processed_files(file_path, mtime, sha256, games_found) VALUES (?, ?, ?, ?)",
             [(fp, mt, sha, gf) for fp, (mt, gf, sha) in file_info_map.items()],

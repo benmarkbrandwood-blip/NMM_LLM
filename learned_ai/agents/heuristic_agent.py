@@ -120,3 +120,11 @@ class HeuristicAgent:
     @property
     def last_thinking(self) -> str:
         return self._inner.last_thinking
+
+    @property
+    def last_search_nodes(self) -> int:
+        return int(self._inner._nodes)
+
+    @property
+    def node_budget(self) -> int | None:
+        return self._inner._override_node_budget

@@ -53,6 +53,9 @@ from game.board import BoardState, POSITIONS
 from game.rules import get_all_legal_moves, is_terminal, get_game_phase
 from ai.value_net import ValueNet, PhaseValueNet, board_to_features
 from ai.trajectory_db import make_board_state_key
+from learned_ai.data.malom_label_provenance import (
+    require_current_human_db_malom_labels,
+)
 
 _DB_PATH       = ROOT / "data" / "human_db.sqlite"
 _OUT_BASE      = ROOT / "data" / "value_net_phase"   # → _place.npz, _move.npz, _fly.npz
@@ -62,6 +65,12 @@ _MALOM_PATH    = Path("/mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std
 _SENTINEL_WEIGHT = 0.6   # matches build_gap_dataset.py
 ALL_PHASES       = ("place", "move", "fly")
 _MALOM_SIGN      = {"W": 1.0, "L": -1.0, "D": 0.0}
+
+
+def _require_current_human_labels(conn: sqlite3.Connection) -> None:
+    row = conn.execute("PRAGMA database_list").fetchone()
+    db_path = row[2] if row and row[2] else "<HumanDB connection>"
+    require_current_human_db_malom_labels(conn, db_path)
 
 
 # ── Phase detection from feature vector ───────────────────────────────────────
@@ -309,6 +318,8 @@ def build_dataset(
 
     Returns (X, y, phases) where phases is a str array of phase labels per sample.
     """
+    _require_current_human_labels(conn)
+
     # Sample from ALL malom outcomes (W/L/D) so the net learns good, bad, AND neutral
     # positions — not just winning trajectories.
     rows = conn.execute(
@@ -402,6 +413,7 @@ def bench_accuracy(
     label: str = "",
     min_placed: int = 7,
 ) -> dict:
+    _require_current_human_labels(conn)
     rows = conn.execute(
         "SELECT state_key, malom_wdl FROM positions "
         "WHERE malom_wdl IS NOT NULL ORDER BY RANDOM() LIMIT ?",
@@ -441,6 +453,7 @@ def bench_accuracy(
 
 def bench_trajectory_follow(
     net: ValueNet,
+    conn: sqlite3.Connection,
     malom_db,
     rng: np.random.Generator,
     n: int = 300,
@@ -448,7 +461,8 @@ def bench_trajectory_follow(
     label: str = "",
 ) -> dict:
     """Test how often VN's top move is among the Malom winning moves."""
-    results = sqlite3.connect(str(_DB_PATH)).execute(
+    _require_current_human_labels(conn)
+    results = conn.execute(
         "SELECT state_key FROM positions WHERE malom_wdl='W' ORDER BY RANDOM() LIMIT ?",
         (n * 4,)
     ).fetchall()
@@ -683,6 +697,17 @@ def main() -> None:
 
     rng = np.random.default_rng(args.seed)
 
+    db_path = Path(args.db)
+    if not db_path.exists():
+        sys.exit(f"DB not found: {db_path}")
+    conn = sqlite3.connect(str(db_path))
+    try:
+        _require_current_human_labels(conn)
+    except RuntimeError as exc:
+        conn.close()
+        sys.exit(str(exc))
+    print(f"Human DB: {db_path}")
+
     # ── Malom DB ──────────────────────────────────────────────────────────────
     from ai.malom_db import MalomDB
     malom_db = MalomDB(args.malom_db)
@@ -725,12 +750,6 @@ def main() -> None:
         heuristic_ai_b = None
 
     # ── Build trajectory dataset ───────────────────────────────────────────────
-    db_path = Path(args.db)
-    if not db_path.exists():
-        sys.exit(f"DB not found: {db_path}")
-    conn = sqlite3.connect(str(db_path))
-    print(f"Human DB: {db_path}")
-
     phases_to_train = ALL_PHASES if args.phase == "all" else (args.phase,)
 
     print(f"\nBuilding trajectory dataset  "
@@ -791,7 +810,7 @@ def main() -> None:
 
     if args.bench_traj > 0 and bench_net is not None:
         print(f"\nTrajectory-follow benchmark ({args.bench_traj} positions):")
-        bench_trajectory_follow(bench_net, malom_db, rng,
+        bench_trajectory_follow(bench_net, conn, malom_db, rng,
                                 n=args.bench_traj,
                                 min_placed=args.min_placed, label="phase-move")
 
