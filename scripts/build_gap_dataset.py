@@ -43,6 +43,9 @@ from game.board import BoardState, POSITIONS
 from game.rules import get_all_legal_moves
 from ai.value_net import board_to_features, _INPUT_DIM
 from ai.heuristics import evaluate_v2
+from learned_ai.data.malom_label_provenance import (
+    require_current_human_db_malom_labels,
+)
 
 SENTINEL_WEIGHT = 0.6    # fraction of composite quality from sentinel (rest from heuristics)
 MAX_SYNTHETIC_GAMES = 200  # games to self-play if LOSING category under-represented
@@ -301,6 +304,13 @@ def _generate_synthetic_positions(n_games: int, value_net_path: Path) -> list[Bo
 
 def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
                   n_per_category: int, dtw_threshold: int) -> tuple[np.ndarray, np.ndarray]:
+    conn = sqlite3.connect(str(db_path))
+    try:
+        require_current_human_db_malom_labels(conn, db_path)
+    except Exception:
+        conn.close()
+        raise
+
     # Load sentinel
     sentinel_advisor = None
     if sentinel_path.exists():
@@ -318,7 +328,6 @@ def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
     else:
         print(f"Sentinel checkpoint not found at {sentinel_path} — using heuristics only")
 
-    conn = sqlite3.connect(str(db_path))
     rng = np.random.default_rng(42)
 
     print("Querying categories...")

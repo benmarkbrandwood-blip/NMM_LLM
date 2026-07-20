@@ -32,6 +32,10 @@ from typing import TYPE_CHECKING, Optional
 
 from ai.trajectory_db import make_board_state_key, _norm
 from ai.board_symmetry import transform_notation, SYM_INVERSE
+from learned_ai.data.malom_label_provenance import (
+    CURRENT_MALOM_LABEL_VERSION,
+    read_malom_label_version,
+)
 
 if TYPE_CHECKING:
     from game.board import BoardState
@@ -72,6 +76,8 @@ class HumanDB:
         self._available = False
         self._game_count: int = 0
         self._entry_count: int = 0
+        self._malom_label_version: Optional[str] = None
+        self._malom_labels_trusted = False
 
         if not self._path.exists():
             log.info("HumanDB: file not found at %s — will remain unavailable.", self._path)
@@ -82,12 +88,25 @@ class HumanDB:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.row_factory = sqlite3.Row
+            self._malom_label_version = read_malom_label_version(self._conn)
+            self._malom_labels_trusted = (
+                self._malom_label_version == CURRENT_MALOM_LABEL_VERSION
+            )
             self._available = True
             self._refresh_counts()
             log.info(
                 "HumanDB loaded: %d positions, %d moves, %d games — %s",
                 self._entry_count, self._move_count(), self._game_count, self._path,
             )
+            if not self._malom_labels_trusted:
+                shown_version = self._malom_label_version or "<missing>"
+                log.warning(
+                    "HumanDB Malom labels are disabled: version %r, expected "
+                    "%r — %s",
+                    shown_version,
+                    CURRENT_MALOM_LABEL_VERSION,
+                    self._path,
+                )
         except Exception as exc:
             log.warning("HumanDB: failed to open %s — %s", self._path, exc)
             self._conn = None
@@ -117,6 +136,14 @@ class HumanDB:
     def entry_count(self) -> int:
         return self._entry_count
 
+    @property
+    def malom_label_version(self) -> Optional[str]:
+        return self._malom_label_version
+
+    @property
+    def malom_labels_trusted(self) -> bool:
+        return self._malom_labels_trusted
+
     # ── Visualization queries ─────────────────────────────────────────────────
 
     def query_position(self, board: "BoardState") -> Optional[PositionStats]:
@@ -133,7 +160,9 @@ class HumanDB:
             return None
         return PositionStats(
             total_games=row[0], wins=row[1], losses=row[2], draws=row[3],
-            malom_wdl=row[4], malom_dtw=row[5], canonical_winning_move=row[6],
+            malom_wdl=row[4] if self._malom_labels_trusted else None,
+            malom_dtw=row[5] if self._malom_labels_trusted else None,
+            canonical_winning_move=row[6],
         )
 
     def query_moves(self, board: "BoardState") -> list[MoveStats]:
@@ -161,15 +190,19 @@ class HumanDB:
                 total=total,
                 win_pct=r[1] / total if total else 0.0,
                 avg_moves_to_end=r[5] / total if total else 0.0,
-                malom_wdl_after=r[6],
-                malom_dtw_after=r[7],
+                malom_wdl_after=(
+                    r[6] if self._malom_labels_trusted else None
+                ),
+                malom_dtw_after=(
+                    r[7] if self._malom_labels_trusted else None
+                ),
             ))
         result.sort(key=lambda m: m.win_pct, reverse=True)
         return result
 
     def get_malom_wdl(self, board: "BoardState") -> Optional[dict]:
         """Return {"outcome": "W"|"L"|"D", "dtw": int|None} for this position, or None."""
-        if not self.is_available():
+        if not self.is_available() or not self._malom_labels_trusted:
             return None
         state_key, _ = make_board_state_key(board)
         row = self._conn.execute(

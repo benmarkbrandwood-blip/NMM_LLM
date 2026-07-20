@@ -21,6 +21,12 @@ import time
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from learned_ai.data.malom_label_provenance import (
+    CURRENT_MALOM_LABEL_VERSION,
+    read_malom_label_version,
+    write_current_malom_label_version,
+)
+
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS positions (
     pos_hash     TEXT    PRIMARY KEY,
@@ -55,6 +61,11 @@ CREATE TABLE IF NOT EXISTS preferred_plays (
 );
 
 CREATE INDEX IF NOT EXISTS idx_pp_promoted ON preferred_plays(promoted);
+
+CREATE TABLE IF NOT EXISTS meta (
+    key          TEXT PRIMARY KEY,
+    value        TEXT
+);
 """
 
 _PROMOTE_MIN_PLAYED = 5
@@ -92,7 +103,39 @@ class SpecialistDB:
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(_SCHEMA_SQL)
+        self._malom_label_count = self._conn.execute(
+            "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
+        ).fetchone()[0]
+        self._malom_label_version = read_malom_label_version(self._conn)
+        if self._malom_label_count == 0:
+            # An empty label set is safe to adopt.  This covers both a new DB
+            # and an existing self-play-only DB.
+            write_current_malom_label_version(self._conn)
+            self._malom_label_version = CURRENT_MALOM_LABEL_VERSION
+        self._malom_labels_trusted = (
+            self._malom_label_version == CURRENT_MALOM_LABEL_VERSION
+        )
         self._conn.commit()
+
+    @property
+    def malom_label_version(self) -> Optional[str]:
+        return self._malom_label_version
+
+    @property
+    def malom_labels_trusted(self) -> bool:
+        return self._malom_labels_trusted
+
+    def require_trusted_malom_labels(self) -> None:
+        """Fail before training can read or append incompatible Malom labels."""
+        if self._malom_labels_trusted:
+            return
+        shown_version = self._malom_label_version or "<missing>"
+        raise RuntimeError(
+            f"SpecialistDB {self._path} contains {self._malom_label_count} "
+            f"Malom labels with version {shown_version!r}; "
+            f"{CURRENT_MALOM_LABEL_VERSION!r} is required. Use a new database "
+            "path or rebuild the SpecialistDB before training."
+        )
 
     # ── Position statistics ───────────────────────────────────────────────────
 
@@ -198,6 +241,9 @@ class SpecialistDB:
 
     def label_position_malom(self, board, wdl: str) -> None:
         """Store a Malom WDL label ('W'/'D'/'L') for a position (training time only)."""
+        self.require_trusted_malom_labels()
+        if wdl not in ("W", "D", "L"):
+            raise ValueError(f"Invalid Malom WDL label: {wdl!r}")
         h = _board_hash(board)
         self._conn.execute("""
             INSERT INTO positions (pos_hash, wins, draws, losses, malom_label, last_seen)
@@ -224,7 +270,7 @@ class SpecialistDB:
             return None
         wins, draws, losses, malom_label = row
         n = wins + draws + losses
-        if malom_label and n < min_samples:
+        if self._malom_labels_trusted and malom_label and n < min_samples:
             if malom_label == "W":
                 return (0.90, 0.05, 0.05)
             if malom_label == "D":
@@ -276,6 +322,8 @@ class SpecialistDB:
             "positions": pos,
             "well_sampled": well,
             "malom_labeled": malom,
+            "malom_label_version": self._malom_label_version,
+            "malom_labels_trusted": self._malom_labels_trusted,
             "winning_lines": lines,
             "preferred_plays": prefs,
         }
