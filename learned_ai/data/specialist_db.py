@@ -18,6 +18,7 @@ import hashlib
 import json
 import sqlite3
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -26,6 +27,7 @@ from learned_ai.data.malom_label_provenance import (
     read_malom_label_version,
     write_current_malom_label_version,
 )
+from learned_ai.data.data_contract import TypedLabel
 
 _SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS positions (
@@ -73,6 +75,17 @@ _PROMOTE_WIN_RATE   = 0.65
 _DEMOTE_WIN_RATE    = 0.45
 _DEMOTE_MIN_RECENT  = 20
 _MIN_SAMPLES_QUERY  = 5
+_RULES_VERSION = "nmm-project-rules-v1"
+
+
+@dataclass(frozen=True)
+class SpecialistWdlEvidence:
+    """Physically separated theoretical and empirical position evidence."""
+
+    perspective: str
+    theoretical_wdl: Optional[TypedLabel]
+    empirical_counts: tuple[int, int, int]
+    empirical_distribution: Optional[Tuple[float, float, float]]
 
 
 def _board_hash(board) -> str:
@@ -280,6 +293,13 @@ class SpecialistDB:
         if wdl not in ("W", "D", "L"):
             raise ValueError(f"Invalid Malom WDL label: {wdl!r}")
         h = _board_hash(board)
+        existing = self._conn.execute(
+            "SELECT malom_label FROM positions WHERE pos_hash=?", (h,)
+        ).fetchone()
+        if existing is not None and existing[0] is not None and existing[0] != wdl:
+            raise RuntimeError(
+                "conflicting trusted Malom label; refusing to overwrite evidence"
+            )
         self._conn.execute("""
             INSERT INTO positions (pos_hash, wins, draws, losses, malom_label, last_seen)
             VALUES (?, 0, 0, 0, ?, ?)
@@ -290,37 +310,71 @@ class SpecialistDB:
 
     # ── Inference query ───────────────────────────────────────────────────────
 
+    def query_wdl_evidence(
+        self, board, min_samples: int = _MIN_SAMPLES_QUERY
+    ) -> Optional[SpecialistWdlEvidence]:
+        """Return theoretical and empirical WDL evidence without blending them."""
+        h = _board_hash(board)
+        row = self._conn.execute(
+            "SELECT wins, draws, losses, malom_label FROM positions WHERE pos_hash=?",
+            (h,),
+        ).fetchone()
+        if row is None:
+            return None
+        wins, draws, losses, malom_label = row
+        theoretical = None
+        if self._malom_labels_trusted and malom_label:
+            theoretical = TypedLabel(
+                kind="theoretical_wdl",
+                value=malom_label,
+                perspective=board.turn,
+                rules_version=_RULES_VERSION,
+                history_identity=_board_hash(board),
+                source_identity=(
+                    f"specialist-db-malom:{self._malom_label_version}"
+                ),
+                validity_version=self._malom_label_version,
+            )
+        total = wins + draws + losses
+        empirical = None
+        if total >= min_samples:
+            empirical = (wins / total, draws / total, losses / total)
+        return SpecialistWdlEvidence(
+            perspective=board.turn,
+            theoretical_wdl=theoretical,
+            empirical_counts=(wins, draws, losses),
+            empirical_distribution=empirical,
+        )
+
     def query_wdl(self, board, min_samples: int = _MIN_SAMPLES_QUERY) -> Optional[Tuple[float, float, float]]:
-        """Return (win_frac, draw_frac, loss_frac) or None if insufficient data.
+        """Return the legacy compatibility projection of separated WDL evidence.
 
         When a Malom label exists and self-play count is low, the Malom label
         provides a strong prior.  At inference without Malom, self-play statistics
         substitute once enough games have been played.
         """
-        h = _board_hash(board)
-        row = self._conn.execute(
-            "SELECT wins, draws, losses, malom_label FROM positions WHERE pos_hash=?", (h,)
-        ).fetchone()
-        if row is None:
+        evidence = self.query_wdl_evidence(board, min_samples)
+        if evidence is None:
             return None
-        wins, draws, losses, malom_label = row
-        n = wins + draws + losses
-        if self._malom_labels_trusted and malom_label and n < min_samples:
-            if malom_label == "W":
+        if (
+            evidence.theoretical_wdl is not None
+            and evidence.empirical_distribution is None
+        ):
+            if evidence.theoretical_wdl.value == "W":
                 return (0.90, 0.05, 0.05)
-            if malom_label == "D":
+            if evidence.theoretical_wdl.value == "D":
                 return (0.05, 0.90, 0.05)
-            if malom_label == "L":
+            if evidence.theoretical_wdl.value == "L":
                 return (0.05, 0.05, 0.90)
-        if n < min_samples:
-            return None
-        return (wins / n, draws / n, losses / n)
+        return evidence.empirical_distribution
 
-    def query_win_prob(self, board, min_samples: int = _MIN_SAMPLES_QUERY) -> float:
-        """Return P(win) + 0.5*P(draw) or 0.5 if position is unknown."""
+    def query_win_prob(
+        self, board, min_samples: int = _MIN_SAMPLES_QUERY
+    ) -> Optional[float]:
+        """Return P(win) + 0.5*P(draw), preserving unknown as None."""
         wdl = self.query_wdl(board, min_samples)
         if wdl is None:
-            return 0.5
+            return None
         w, d, _ = wdl
         return w + 0.5 * d
 

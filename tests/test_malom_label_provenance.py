@@ -119,7 +119,15 @@ def test_new_specialist_db_stamps_and_uses_current_labels(tmp_path: Path) -> Non
         assert db.malom_labels_trusted
         assert db.malom_label_version == CURRENT_MALOM_LABEL_VERSION
         db.label_position_malom(board, "D")
+        evidence = db.query_wdl_evidence(board, min_samples=3)
+        assert evidence is not None
+        assert evidence.theoretical_wdl is not None
+        assert evidence.theoretical_wdl.kind == "theoretical_wdl"
+        assert evidence.theoretical_wdl.value == "D"
+        assert evidence.empirical_distribution is None
         assert db.query_wdl(board, min_samples=3) == (0.05, 0.90, 0.05)
+        with pytest.raises(RuntimeError, match="conflicting trusted Malom label"):
+            db.label_position_malom(board, "W")
     finally:
         db.close()
 
@@ -156,6 +164,7 @@ def test_legacy_specialist_labels_are_ignored_and_cannot_be_extended(
         assert not db.malom_labels_trusted
         assert db.malom_label_version is None
         assert db.query_wdl(board, min_samples=3) is None
+        assert db.query_win_prob(board, min_samples=3) is None
         with pytest.raises(RuntimeError, match="new database path"):
             db.label_position_malom(board, "D")
 
