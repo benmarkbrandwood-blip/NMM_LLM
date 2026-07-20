@@ -17,6 +17,14 @@ The present operating boundary is one Windows machine and one CUDA GPU.
 Distributed training, multi-host orchestration, and a C++ data loader are not
 part of this plan.
 
+Implementation status on 20 July 2026: Slices 1 through 6 are implemented and
+validated. Slice 7 completed its baseline probe, but its optimization trigger
+did not activate because the current online serial rollout has no persistent
+loader. P3 remains optional and was not executed. A long run remains subject
+to the owner-controlled experiment decisions listed in the evidence report;
+see
+[`docs/evidence/v4-infrastructure-hardening-2026-07-20.md`](evidence/v4-infrastructure-hardening-2026-07-20.md).
+
 ## Executive Priority Order
 
 | Priority | Outcome | When it is required |
@@ -41,7 +49,7 @@ The shortest execution path is therefore:
 ### 1.1 Current training target
 
 The first target remains the experiment already defined in
-[`experiments/dev-v4-malom-corrected-baseline.md`](experiments/dev-v4-malom-corrected-baseline.md):
+[`docs/experiments/dev-v4-malom-corrected-baseline.md`](experiments/dev-v4-malom-corrected-baseline.md):
 
 - fresh/random model initialization;
 - the corrected v4-style Generalist path;
@@ -56,9 +64,10 @@ The first target remains the experiment already defined in
 - all historical model artifacts retained as lineage-labeled, exploratory
   comparisons rather than described as corrected retraining products.
 
-The present checkpoint format is a weights-continuation mechanism, not exact
-trainer-state recovery. Historical checkpoints must therefore enter the new
-infrastructure through an explicit `weights-only` path.
+Checkpoint envelope v2 now supports complete trainer-state recovery for
+checkpoints created by the hardened Generalist path. Historical checkpoints
+remain weights-continuation artifacts and may enter only through the explicit
+`weights-only` path.
 
 ### 1.2 Engineering boundary
 

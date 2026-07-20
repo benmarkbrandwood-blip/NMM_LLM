@@ -134,7 +134,7 @@ That output directory contains `train_log.jsonl`, `latest.pt`, and the local
 `smoke_manifest.json` with the exact command and result. These generated files
 remain ignored and are not part of this documentation commit.
 
-### Checkpoint observation and resolution
+### Checkpoint observation and superseding recovery contract
 
 The trainer's final console message named the output path `best.pt`, but the
 one-game smoke produced only `latest.pt`; `best.pt` was absent. The checkpoint
@@ -149,19 +149,25 @@ gate: it is evaluated at a logging checkpoint, requires at least 10 heuristic
 games, and requires a win rate strictly above the prior best at that
 difficulty. A one-game run is therefore not expected to create `best.pt`.
 
-The first experiment uses this conservative recovery policy:
+The hardened experiment uses this conservative recovery policy:
 
 - its initial launch omits both `--resume` and `--auto-resume-best`;
 - `best.pt` is optional model-selection evidence, not an operational recovery
   requirement;
-- after an interruption, do not continue automatically; inspect `latest.pt`
-  and, if continuation is accepted, start a separately recorded segment with
-  an explicit `--resume` path;
-- current resume restores weights and selected scalar counters, but not the
-  optimiser, rolling histories, difficulty-local counters, target age, or RNG
-  state. It is a weight continuation, not exact trainer-state recovery. If an
-  exact continuation is required, stop and extend the checkpoint schema and
-  tests before launch.
+- after an interruption, do not continue automatically; inspect and verify
+  `latest.pt`, then start a separately recorded `exact-resume` segment with an
+  explicit `--resume` path;
+- exact resume restores model, optimiser, counters, rolling histories,
+  curriculum, target state, Python/NumPy/PyTorch/CUDA RNG state, component RNG
+  state, data cursor, and SpecialistDB identity;
+- historical pre-v2 checkpoints remain explicit `weights-only` imports and
+  reset optimiser, RNG, counters, and curriculum state.
+
+The bounded parity audit on 20 July 2026 proved that a continuous two-game
+CUDA run and a one-game run followed by one exact-resume game produced equal
+model, optimiser, scheduler/scaler, RNG, trainer, data, log, and SpecialistDB
+semantic state. The full evidence is recorded in
+[`docs/evidence/v4-infrastructure-hardening-2026-07-20.md`](../evidence/v4-infrastructure-hardening-2026-07-20.md).
 
 The original one-game run also did not create `update_log.jsonl`, so it did not
 exercise periodic update-log or best-checkpoint cadence. The reporting fix is
