@@ -67,7 +67,8 @@ The supervisor currently prepares this conservative default:
 - 50% frozen-target and 50% heuristic opponents;
 - target refresh every 50 games;
 - full rollout, `sim_ply_depth=5`, no branch rollouts, and `max_ply=60`;
-- 500,000 single-threaded native search nodes per heuristic move;
+- 500,000 single-threaded native search nodes per heuristic move, under the
+  contract in [`fixed-node-heuristic-search.md`](fixed-node-heuristic-search.md);
 - temperature `0.90` to `0.20` over the existing 80% schedule;
 - seed 42 and `batch_games=1`;
 - 5,000 games in 250-game process segments;

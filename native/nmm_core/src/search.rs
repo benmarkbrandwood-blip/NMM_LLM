@@ -65,6 +65,10 @@ struct Searcher {
     ai_color: Color,
     // Fast-eval mode: skip qsearch at depth=0, return static eval immediately.
     fast_eval: bool,
+    // Optional root candidate allowlist (from, to, capture). Empty = all legal.
+    // Callers that already filtered candidates (e.g. Python mandatory mill
+    // blocks) must search that same set so post-filters cannot go empty.
+    root_restrict: Vec<(Option<u8>, u8, Option<u8>)>,
 }
 
 const ABORT_SCORE: i64 = i64::MIN + 1;
@@ -538,20 +542,37 @@ impl Searcher {
         (best_mv, score)
     }
 
-    /// Full-window root search: every move gets an independent (-INF, INF) window
-    /// so all returned scores are exact. Mirrors `root()` B-64 penalty exactly.
-    /// `preferred` is an optional list of (from, to, capture) triples promoted to
-    /// the front of the move list for better alpha-beta pruning (M3).
-    fn root_scored(&mut self, board: &Board, depth: u8, preferred: &[(Option<u8>, u8, Option<u8>)]) -> Vec<RootMoveScore> {
+    /// Root candidates: optional allowlist, then preferred promotion.
+    fn root_move_list(
+        &self,
+        board: &Board,
+        preferred: &[(Option<u8>, u8, Option<u8>)],
+    ) -> Vec<Move> {
         let mut moves = self.ordered_moves(board, None, 0, None);
-        // M3: promote preferred moves to front (stable sort by priority tier).
+        if !self.root_restrict.is_empty() {
+            let allowed: HashSet<(Option<u8>, u8, Option<u8>)> =
+                self.root_restrict.iter().cloned().collect();
+            moves.retain(|mv| allowed.contains(&(mv.from, mv.to, mv.capture)));
+        }
         if !preferred.is_empty() {
-            let preferred_set: std::collections::HashSet<(Option<u8>, u8, Option<u8>)> =
+            let preferred_set: HashSet<(Option<u8>, u8, Option<u8>)> =
                 preferred.iter().cloned().collect();
             moves.sort_by_key(|mv| {
-                if preferred_set.contains(&(mv.from, mv.to, mv.capture)) { 0u8 } else { 1u8 }
+                if preferred_set.contains(&(mv.from, mv.to, mv.capture)) {
+                    0u8
+                } else {
+                    1u8
+                }
             });
         }
+        moves
+    }
+
+    /// Full-window root search: every move gets an independent (-INF, INF) window
+    /// so all returned scores are exact. Mirrors `root()` B-64 penalty exactly.
+    /// `preferred` moves are promoted to the front of root ordering (M3 hint).
+    fn root_scored(&mut self, board: &Board, depth: u8, preferred: &[(Option<u8>, u8, Option<u8>)]) -> Vec<RootMoveScore> {
+        let moves = self.root_move_list(board, preferred);
         let color = board.side_to_move;
         let in_placement = get_phase(board, color) == Phase::Place;
         let mut result = Vec::with_capacity(moves.len());
@@ -577,25 +598,14 @@ impl Searcher {
         result
     }
 
-    /// Score every root move with a static eval. Used to fill gaps when a
-    /// fixed node budget aborts mid-root before every legal move is scored.
+    /// Score every root candidate with a static eval. Used to fill gaps when a
+    /// fixed node budget aborts mid-root before every candidate is scored.
     fn root_static_scores(
         &self,
         board: &Board,
         preferred: &[(Option<u8>, u8, Option<u8>)],
     ) -> Vec<RootMoveScore> {
-        let mut moves = self.ordered_moves(board, None, 0, None);
-        if !preferred.is_empty() {
-            let preferred_set: std::collections::HashSet<(Option<u8>, u8, Option<u8>)> =
-                preferred.iter().cloned().collect();
-            moves.sort_by_key(|mv| {
-                if preferred_set.contains(&(mv.from, mv.to, mv.capture)) {
-                    0u8
-                } else {
-                    1u8
-                }
-            });
-        }
+        let moves = self.root_move_list(board, preferred);
         let color = board.side_to_move;
         let in_placement = get_phase(board, color) == Phase::Place;
         let mut result = Vec::with_capacity(moves.len());
@@ -625,8 +635,8 @@ impl Searcher {
         result
     }
 
-    /// Keep deeper mid-search scores and fill any missing legal root moves
-    /// with static eval so Python candidate filters cannot see a partial set.
+    /// Keep deeper mid-search scores and fill any missing root candidates
+    /// with static eval so allowlisted callers always see a complete set.
     fn complete_root_scores(
         &self,
         board: &Board,
@@ -665,6 +675,7 @@ fn new_searcher(deadline: Instant, ai_color: Color) -> Searcher {
         fullgame_db: None,
         endgame_solved_db: None,
         fast_eval: false,
+        root_restrict: Vec::new(),
     }
 }
 
@@ -715,6 +726,8 @@ pub fn iterative_deepening(board: &Board, max_depth: u8, time_limit_ms: u64) -> 
 /// Iterative deepening returning scores for all root moves. Each move is
 /// evaluated with a full (-INF, INF) window so every score is exact.
 /// `preferred` moves are promoted to the front of root ordering (M3 hint).
+/// `root_restrict`, when non-empty, limits root scoring to that candidate set
+/// so caller allowlists cannot miss mid-abort partial results.
 /// `tt` (T-C4, T-E1): shared Arc TT — persists across turns via RustTtHandle, thread-safe.
 /// `opp_ext_set` (T-C1): high-frequency opponent moves that earn SE-11 extension.
 /// `fullgame_db` (T-C2): mmap'd DB for in-search binary-search probe.
@@ -732,6 +745,7 @@ pub fn iterative_deepening_scored(
     endgame_solved_db: Option<Arc<HashMap<(u8, u8), Mmap>>>,
     eval_scale: EvalScale,
     fast_eval: bool,
+    root_restrict: &[(Option<u8>, u8, Option<u8>)],
 ) -> SearchResultScored {
     let deadline = node_limit
         .is_none()
@@ -752,6 +766,7 @@ pub fn iterative_deepening_scored(
         fullgame_db,
         endgame_solved_db,
         fast_eval,
+        root_restrict: root_restrict.to_vec(),
     };
 
     let mut best = SearchResultScored {
@@ -760,6 +775,7 @@ pub fn iterative_deepening_scored(
         depth_reached: 0,
     };
 
+    let expected_root = searcher.root_move_list(board, preferred).len();
     let cap = max_depth.max(1);
     for d in 1..=cap {
         let scored = searcher.root_scored(board, d, preferred);
@@ -778,13 +794,10 @@ pub fn iterative_deepening_scored(
         }
     }
     best.nodes = searcher.nodes;
-    // Fixed-node searches may abort mid-root with a partial score list. Python
-    // GameAI then intersects that list with a narrower candidate set (e.g.
-    // mandatory mill blocks). Complete every legal root move so the
-    // intersection cannot spuriously become empty.
+    // Fixed-node searches may abort mid-root with a partial score list.
+    // Complete every root candidate (full legal or caller allowlist).
     if node_limit.is_some() {
-        let legal_count = legal_moves(board).len();
-        if best.scored_moves.len() < legal_count {
+        if best.scored_moves.len() < expected_root {
             best.scored_moves =
                 searcher.complete_root_scores(board, preferred, &best.scored_moves);
             if best.depth_reached == 0 && !best.scored_moves.is_empty() {
@@ -820,9 +833,23 @@ pub fn iterative_deepening_scored_smp(
     n_threads: usize,
     eval_scale: EvalScale,
     fast_eval: bool,
+    root_restrict: &[(Option<u8>, u8, Option<u8>)],
 ) -> SearchResultScored {
     if n_threads <= 1 || node_limit.is_some() {
-        return iterative_deepening_scored(board, max_depth, time_limit_ms, node_limit, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
+        return iterative_deepening_scored(
+            board,
+            max_depth,
+            time_limit_ms,
+            node_limit,
+            preferred,
+            tt,
+            opp_ext_set,
+            fullgame_db,
+            endgame_solved_db,
+            eval_scale,
+            fast_eval,
+            root_restrict,
+        );
     }
 
     let board_copy = *board;
@@ -854,6 +881,7 @@ pub fn iterative_deepening_scored_smp(
                     fullgame_db: db_c,
                     endgame_solved_db: esdb_c,
                     fast_eval,
+                    root_restrict: Vec::new(),
                 };
                 for d in start_depth..=max_depth {
                     helper.root(&board_copy, d, -INF * 4, INF * 4);
@@ -865,7 +893,20 @@ pub fn iterative_deepening_scored_smp(
         })
         .collect();
 
-    let result = iterative_deepening_scored(board, max_depth, time_limit_ms, None, preferred, tt, opp_ext_set, fullgame_db, endgame_solved_db, eval_scale, fast_eval);
+    let result = iterative_deepening_scored(
+        board,
+        max_depth,
+        time_limit_ms,
+        None,
+        preferred,
+        tt,
+        opp_ext_set,
+        fullgame_db,
+        endgame_solved_db,
+        eval_scale,
+        fast_eval,
+        root_restrict,
+    );
 
     drop(helpers);
     result
@@ -928,7 +969,7 @@ mod tests {
             black_placed: 0,
             side_to_move: Color::White,
         };
-        let r = iterative_deepening_scored(&board, 3, 5000, None, &[], Arc::new(TranspositionTable::new()), HashSet::new(), None, None, EvalScale::default(), false);
+        let r = iterative_deepening_scored(&board, 3, 5000, None, &[], Arc::new(TranspositionTable::new()), HashSet::new(), None, None, EvalScale::default(), false, &[]);
         assert_eq!(r.scored_moves.len(), 24, "expected 24 moves on empty board");
         assert!(r.nodes > 0);
         for rm in &r.scored_moves {
@@ -961,6 +1002,7 @@ mod tests {
             None,
             EvalScale::default(),
             false,
+            &[],
         );
 
         assert_eq!(r.nodes, limit);
@@ -995,6 +1037,7 @@ mod tests {
             None,
             EvalScale::default(),
             false,
+            &[],
         );
         assert!(r.nodes > 0);
         assert!(r.nodes <= limit);
@@ -1027,6 +1070,7 @@ mod tests {
             None,
             EvalScale::default(),
             false,
+            &[],
         );
         assert_eq!(r.scored_moves.len(), legal.len());
         assert!(r.scored_moves.iter().any(|rm| rm.mv.to == 2));

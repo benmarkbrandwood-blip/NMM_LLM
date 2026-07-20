@@ -93,17 +93,21 @@ def test_game_ai_passes_fixed_node_budget_to_native_search(
         override_node_budget=25_000,
     )
     board = BoardState.new_game()
+    legal = get_all_legal_moves(board)
 
     move = ai._choose_rust_scored(
         board,
         max_depth=19,
-        moves=get_all_legal_moves(board),
+        moves=legal,
         time_limit_ms=1,
         node_limit=25_000,
     )
 
     assert move == {"from": None, "to": "a7", "capture": None}
     assert captured["node_limit"] == 25_000
+    assert captured["fast_eval"] is True
+    assert captured["root_moves"]
+    assert len(captured["root_moves"]) == len(legal)
     assert ai._nodes == 25_000
 
 
@@ -152,3 +156,34 @@ def test_fixed_node_search_keeps_mandatory_block_candidate() -> None:
 
     assert move == {"from": None, "to": "g7", "capture": None}
     assert 0 < ai._nodes <= 500_000
+
+
+def test_fixed_node_native_root_restrict_scores_only_allowlist() -> None:
+    """Native must score the caller allowlist, not the full legal set."""
+    from ai.native_core import RUST_AVAILABLE
+    from ai import native_core as nc
+    import nmm_core as rc
+
+    if not RUST_AVAILABLE:
+        pytest.skip("nmm_core is required for fixed-node search")
+
+    board = BoardState.from_fen_string("BB.W.....W..............|W|2|2")
+    white, black, wp, bp, stm = nc.board_to_bits(board)
+    # Only g7 (index 2)
+    root_moves = [(None, 2, None)]
+    nodes, depth, raw = rc.py_search_root_scored(
+        white,
+        black,
+        wp,
+        bp,
+        stm,
+        19,
+        1,
+        node_limit=25_000,
+        root_moves=root_moves,
+        threads=1,
+        fast_eval=True,
+    )
+    assert nodes > 0
+    assert len(raw) == 1
+    assert raw[0][0] is None and raw[0][1] == 2

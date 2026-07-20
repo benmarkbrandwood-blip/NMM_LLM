@@ -253,7 +253,7 @@ fn py_search_stats(
 /// `threads` (T-E3): Lazy-SMP thread count; default = 1 (single-threaded).
 /// `fast_eval`: skip qsearch at depth=0; return static eval immediately for deeper/faster search.
 #[pyfunction]
-#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, node_limit=None, preferred_root=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None, fast_eval=None))]
+#[pyo3(signature = (white, black, white_placed, black_placed, side_to_move, max_depth=6, time_limit_ms=5000, node_limit=None, preferred_root=None, root_moves=None, tt_handle=None, db_handle=None, endgame_db_handle=None, opp_ext_moves=None, threads=None, mill_scale=None, mob_scale=None, block_scale=None, fast_eval=None))]
 fn py_search_root_scored(
     py: Python<'_>,
     white: u32,
@@ -265,6 +265,7 @@ fn py_search_root_scored(
     time_limit_ms: u64,
     node_limit: Option<u64>,
     preferred_root: Option<Vec<(Option<u8>, u8, Option<u8>)>>,
+    root_moves: Option<Vec<(Option<u8>, u8, Option<u8>)>>,
     tt_handle: Option<Py<RustTtHandle>>,
     db_handle: Option<Py<FullgameDbHandle>>,
     endgame_db_handle: Option<Py<EndgameSolvedDbHandle>>,
@@ -288,6 +289,7 @@ fn py_search_root_scored(
         side_to_move: Color::from_u8(side_to_move),
     };
     let preferred = preferred_root.unwrap_or_default();
+    let root_restrict = root_moves.unwrap_or_default();
 
     // T-C1: build HashSet of high-frequency opponent moves for SE-11 extension.
     let opp_ext_set: HashSet<(Option<u8>, u8, Option<u8>)> =
@@ -319,9 +321,19 @@ fn py_search_root_scored(
     };
 
     let r = search::iterative_deepening_scored_smp(
-        &board, max_depth, time_limit_ms, node_limit, &preferred,
-        tt, opp_ext_set, fullgame_db, endgame_solved_db, n_threads, eval_scale,
+        &board,
+        max_depth,
+        time_limit_ms,
+        node_limit,
+        &preferred,
+        tt,
+        opp_ext_set,
+        fullgame_db,
+        endgame_solved_db,
+        n_threads,
+        eval_scale,
         fast_eval.unwrap_or(false),
+        &root_restrict,
     );
 
     let moves = r

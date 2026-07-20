@@ -95,10 +95,10 @@ focused tests:
    search-call count, and actual cumulative nodes.
 
 The 500,000-node default is an Agent-owned starting choice, not a strength
-claim. It was selected conservatively from a local release-build throughput
-probe in which the former 0.1-second minimum budget completed about 420,000
-nodes on an empty-board search. The immutable plan, not this calibration note,
-is authoritative for an actual run.
+claim. Fixed-node heuristic search must follow
+[`docs/fixed-node-heuristic-search.md`](fixed-node-heuristic-search.md)
+(Sanmill-aligned stand-pat leaves, same candidate set in and out). The
+immutable plan, not this calibration note, is authoritative for an actual run.
 
 PPO is not a launch blocker for this A2C baseline, but it is quarantined for a
 separate reason: sampled old log probabilities use temperature-scaled logits,

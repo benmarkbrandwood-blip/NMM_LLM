@@ -95,6 +95,10 @@ verified comparator. Record the Sanmill commit in every differential report or
 generated evidence set. Project rules and independently tested NMM_LLM
 semantics remain authoritative.
 
+Fixed-node heuristic training follows the Sanmill-aligned quiescence and
+candidate-set principles in
+[`docs/fixed-node-heuristic-search.md`](fixed-node-heuristic-search.md).
+
 ## Repository-local Data Inventory
 
 This inventory was measured on 20 July 2026.

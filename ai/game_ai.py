@@ -2517,6 +2517,9 @@ class GameAI:
                     _preferred.append(_t)
 
             _threads = self.search_threads if self.search_threads > 1 else None
+            # Fixed-node training follows Sanmill Mill MaxQuiescenceDepth=0:
+            # stand-pat leaves (fast_eval), not extended quiet forcing trees.
+            _fast_eval = True if node_limit is not None else (not self.use_extended_qsearch)
             _search_options = {
                 "preferred_root": _preferred if _preferred else None,
                 "tt_handle": self._rust_tt_handle,
@@ -2527,10 +2530,22 @@ class GameAI:
                 "mill_scale": self._weights.mill_count_scale,
                 "mob_scale": self._weights.mobility_scale,
                 "block_scale": self._weights.blocked_scale,
-                "fast_eval": not self.use_extended_qsearch,
+                "fast_eval": _fast_eval,
             }
             if node_limit is not None:
                 _search_options["node_limit"] = node_limit
+            # Search the same candidate set Python will accept (mandatory block,
+            # dead-placement filters, etc.). Post-filter emptiness is then a
+            # hard bug rather than an expected mid-abort race.
+            if moves is not None:
+                _search_options["root_moves"] = [
+                    (
+                        _POS_TO_IDX.get(m.get("from")) if m.get("from") else None,
+                        _POS_TO_IDX[m["to"]],
+                        _POS_TO_IDX.get(m.get("capture")) if m.get("capture") else None,
+                    )
+                    for m in moves
+                ]
             _nodes, depth, raw_moves = _rc.py_search_root_scored(
                 white, black, wp, bp, stm, max_depth, time_limit_ms,
                 **_search_options,
@@ -2553,29 +2568,15 @@ class GameAI:
                     )
                     for m in moves
                 }
-                filtered = [
+                raw_moves = [
                     (frm, to, cap, s)
                     for frm, to, cap, s in raw_moves
                     if (frm, to, cap) in allowed_idx
                 ]
-                if not filtered:
-                    if node_limit is None:
-                        return None
-                    # Fixed-node mid-root abort can omit the only Python-allowed
-                    # candidates (e.g. mandatory mill blocks). Recover by
-                    # treating the caller allowlist as equal-score options so
-                    # training stays fail-closed without inventing illegal moves.
-                    raw_moves = [
-                        (
-                            _POS_TO_IDX.get(m["from"]) if m.get("from") else None,
-                            _POS_TO_IDX[m["to"]],
-                            _POS_TO_IDX.get(m["capture"]) if m.get("capture") else None,
-                            0,
-                        )
-                        for m in moves
-                    ]
-                else:
-                    raw_moves = filtered
+                if not raw_moves:
+                    raise RuntimeError(
+                        "native root scores missed the caller allowlist"
+                    )
 
             # Convert surviving Rust (from_idx, to_idx, cap_idx, score) tuples to (move_dict, score).
             scored: list[tuple[dict, int]] = [
