@@ -10,11 +10,25 @@ from ai.trajectory_db import TrajectoryDB, make_board_state_key
 from game.board import BoardState
 
 
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_GAME_DIR = _REPO_ROOT / "data" / "games"
+
+
+def _have_game_logs() -> bool:
+    return _GAME_DIR.is_dir() and next(_GAME_DIR.rglob("*.jsonl"), None) is not None
+
+
+requires_game_logs = pytest.mark.skipif(
+    not _have_game_logs(),
+    reason="requires local JSONL game logs under data/games",
+)
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_db(*records: dict) -> TrajectoryDB:
     db = TrajectoryDB.__new__(TrajectoryDB)
-    db._games_dir = pathlib.Path("data/games")
+    db._games_dir = _GAME_DIR
     db._extra_dirs = []
     db._index = {}
     db._game_count = 0
@@ -49,10 +63,9 @@ class TestFenRoundTrip:
         assert b2.pieces_captured == b.pieces_captured
         assert b2.hash_key == b.hash_key
 
+    @requires_game_logs
     def test_mid_game_from_real_file(self):
-        games = sorted(pathlib.Path("data/games").rglob("*.jsonl"))
-        if not games:
-            pytest.skip("No game files")
+        games = sorted(_GAME_DIR.rglob("*.jsonl"))
         rec = json.loads(games[0].read_text().splitlines()[0])
         for mv in rec.get("moves", [])[:10]:
             fen = mv.get("board_fen_before")
@@ -190,17 +203,18 @@ class TestSourceTypeSeparation:
 
 # ── Full load integration ─────────────────────────────────────────────────────
 
+@requires_game_logs
 class TestFullLoad:
     def test_load_all_games(self):
         """All 317+ game files are indexed without error."""
-        db = TrajectoryDB(pathlib.Path("data/games"))
+        db = TrajectoryDB(_GAME_DIR)
         db.load()
         assert db.game_count >= 317, f"Expected ≥317 games, got {db.game_count}"
         assert db.entry_count > 1000, f"Expected >1000 state entries, got {db.entry_count}"
 
     def test_query_start_position(self):
         """Query on the empty board returns placement moves with |delta| ≤ 0.5."""
-        db = TrajectoryDB(pathlib.Path("data/games"))
+        db = TrajectoryDB(_GAME_DIR)
         db.load()
         b = BoardState.new_game()
         result = db.query(b, "W", min_samples=1)
@@ -210,7 +224,7 @@ class TestFullLoad:
 
     def test_frequencies_sum_to_one(self):
         """query_all_frequencies() at start returns frequencies summing to ~1.0."""
-        db = TrajectoryDB(pathlib.Path("data/games"))
+        db = TrajectoryDB(_GAME_DIR)
         db.load()
         b = BoardState.new_game()
         freq = db.query_all_frequencies(b, min_samples=1)

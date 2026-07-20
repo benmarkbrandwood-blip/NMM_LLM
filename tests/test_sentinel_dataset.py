@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import os
+from pathlib import Path
 
 import numpy as np
+import pytest
 
 from learned_ai.sentinel.dataset import (
     SentinelDataset,
@@ -13,23 +14,29 @@ from learned_ai.sentinel.dataset import (
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 from learned_ai.sentinel.feature_builder import FEATURE_DIM
 
-_GAME_DIR = "data/games"
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_GAME_DIR = _REPO_ROOT / "data" / "games"
 
 
 def _have_games():
-    return os.path.isdir(_GAME_DIR) and any(
-        f.endswith(".jsonl") for f in os.listdir(_GAME_DIR)
-    )
+    return _GAME_DIR.is_dir() and next(_GAME_DIR.rglob("*.jsonl"), None) is not None
 
 
+requires_game_logs = pytest.mark.skipif(
+    not _have_games(),
+    reason="requires local JSONL game logs under data/games",
+)
+
+
+@requires_game_logs
 def test_load_from_games_no_crash():
-    assert _have_games(), "expected game logs in data/games"
-    ds = SentinelDataset.load_from_games(_GAME_DIR, db=ExternalSolvedDB(""), limit=20)
+    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=20)
     assert len(ds) > 0
 
 
+@requires_game_logs
 def test_item_shape_and_targets():
-    ds = SentinelDataset.load_from_games(_GAME_DIR, db=ExternalSolvedDB(""), limit=10)
+    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=10)
     feat, label = ds[0]
     assert tuple(feat.shape) == (FEATURE_DIM,)
     # label is (quality: float, weight: float, wdl_cls: int)
@@ -39,14 +46,16 @@ def test_item_shape_and_targets():
     assert wdl_cls in (-1, 0, 1, 2)
 
 
+@requires_game_logs
 def test_dataset_length_positive_per_game():
     # A handful of games should each yield at least one example.
-    ds = SentinelDataset.load_from_games(_GAME_DIR, db=ExternalSolvedDB(""), limit=5)
+    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=5)
     assert len(ds) >= 5
 
 
+@requires_game_logs
 def test_save_load_roundtrip(tmp_path):
-    ds = SentinelDataset.load_from_games(_GAME_DIR, db=ExternalSolvedDB(""), limit=10)
+    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=10)
     path = str(tmp_path / "ds.npz")
     ds.save_to_disk(path)
     ds2 = SentinelDataset.load_from_disk(path)
@@ -58,8 +67,9 @@ def test_save_load_roundtrip(tmp_path):
     assert abs(float(w1) - float(w2)) < 1e-5
 
 
+@requires_game_logs
 def test_quality_distribution_has_multiple_types():
-    ds = SentinelDataset.load_from_games(_GAME_DIR, db=ExternalSolvedDB(""), limit=60)
+    ds = SentinelDataset.load_from_games(str(_GAME_DIR), db=ExternalSolvedDB(""), limit=60)
     dist = ds.quality_distribution()
     assert len(dist) >= 2        # at least win + loss buckets
     assert sum(dist.values()) == len(ds)
