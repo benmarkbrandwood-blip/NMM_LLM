@@ -70,6 +70,15 @@ from learned_ai.training.generalist_run_manifest import (
     build_generalist_run_manifest,
     command_for_manifest,
     publish_initial_run_contract,
+    utc_now_text,
+)
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointDescriptor,
+    CheckpointPayload,
+    capture_rng_state,
+    is_checkpoint_envelope,
+    load_checkpoint,
+    save_checkpoint,
 )
 
 # ── Opening book ──────────────────────────────────────────────────────────────
@@ -224,6 +233,11 @@ N_HISTORY             = 3    # last N moves appended to value input as context
 HIST_FLOATS_PER_MOVE  = 3    # from_idx_norm, to_idx_norm, capture_idx_norm
 # Value input layout: [23 encoder base | 9 history | 48 raw-board one-hot] = 80 floats
 VALUE_INPUT_DIM_WITH_HISTORY = VALUE_INPUT_DIM + N_HISTORY * HIST_FLOATS_PER_MOVE + 48  # 80
+FEATURE_SCHEMA_VERSION = (
+    f"s-gen-v2-move-{MOVE_FEAT_DIM_WITH_LOOKAHEAD}-value-"
+    f"{VALUE_INPUT_DIM_WITH_HISTORY}"
+)
+LABEL_SCHEMA_VERSION = "sector-corrected-v1"
 
 LOG_EVERY    = 50
 LR_SCALE_WIN = 0.35
@@ -324,6 +338,74 @@ class GameDiag:
     bucket_opening:          int
     bucket_midgame:          int
     bucket_endgame:          int
+
+
+def _make_checkpoint_payload(
+    *,
+    model: ScaffoldedPolicyNet,
+    optimizer: torch.optim.Optimizer,
+    game_rng: random.Random,
+    game_count: int,
+    batch_count: int,
+    update_count: int,
+    difficulty: int,
+    temperature: float,
+    win_history: deque,
+    win_history_heuristic: deque,
+    diag_buffer: list[GameDiag],
+    games_at_level: int,
+    best_win_rate: float,
+    best_win_rate_at_diff: float,
+    branch_bucket_history: deque,
+    frozen_model: ScaffoldedPolicyNet,
+    games_since_target_update: int,
+    recovery_grace: int,
+    pending_steps: list[ScaffoldedStep],
+    last_update_losses: tuple[Optional[float], Optional[float], Optional[float]],
+    source_checkpoint: str,
+    checkpoint_sequence: int,
+) -> CheckpointPayload:
+    """Capture every mutable state element needed for exact continuation."""
+    return CheckpointPayload(
+        model_state=model.state_dict(),
+        optimizer_state=optimizer.state_dict(),
+        scheduler_state=None,
+        scaler_state=None,
+        rng_state=capture_rng_state({"game": game_rng.getstate()}),
+        trainer_state={
+            "game_count": game_count,
+            "batch_count": batch_count,
+            "update_count": update_count,
+            "difficulty": difficulty,
+            "temperature": temperature,
+            "rolling_metrics": {
+                "win_history": list(win_history),
+                "win_history_heuristic": list(win_history_heuristic),
+                "diag_buffer": [asdict(item) for item in diag_buffer],
+                "best_win_rate": best_win_rate,
+                "best_win_rate_at_diff": best_win_rate_at_diff,
+            },
+            "curriculum": {"games_at_level": games_at_level},
+            "target_network": {
+                "games_since_update": games_since_target_update,
+                "model_state": frozen_model.state_dict(),
+            },
+            "recovery_state": {
+                "grace": recovery_grace,
+                "pending_steps": list(pending_steps),
+                "last_update_losses": last_update_losses,
+                "source_checkpoint": source_checkpoint,
+                "checkpoint_sequence": checkpoint_sequence,
+            },
+            "model_config": model.get_config(),
+        },
+        data_state={
+            "cursor": {"completed_games": game_count},
+            "consumed_snapshots": [],
+            "cache": {},
+            "buckets": {"branch_history": list(branch_bucket_history)},
+        },
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -547,8 +629,19 @@ def _load_model(
     if resume_path is None or not Path(resume_path).exists():
         return _fresh()
 
-    ckpt   = torch.load(resume_path, map_location=device, weights_only=False)
-    cfg    = ckpt.get("model_config", {})
+    if is_checkpoint_envelope(resume_path):
+        envelope = load_checkpoint(resume_path, map_location=device)
+        cfg = dict(envelope.payload.trainer_state["model_config"])
+        model_state = envelope.payload.model_state
+        checkpoint_state = envelope.payload.trainer_state
+        is_mine = envelope.descriptor.implementation.get("trainer") == STAGE_TAG
+    else:
+        ckpt = torch.load(resume_path, map_location=device, weights_only=False)
+        cfg = ckpt.get("model_config", {})
+        state_key = "model" if "model" in ckpt else "state_dict"
+        model_state = ckpt[state_key]
+        checkpoint_state = ckpt
+        is_mine = ckpt.get("stage", "unknown") == STAGE_TAG
 
     # If the requested architecture differs from the checkpoint, start fresh.
     ckpt_hidden = tuple(cfg.get("policy_hidden", (512, 256, 128)))
@@ -559,22 +652,28 @@ def _load_model(
     cfg["move_feat_dim"]   = feat_dim
     cfg["value_input_dim"] = VALUE_INPUT_DIM_WITH_HISTORY
     model  = ScaffoldedPolicyNet.from_config(cfg).to(device)
-    sd_key = "model" if "model" in ckpt else "state_dict"
     try:
-        model.load_state_dict(ckpt[sd_key])
+        model.load_state_dict(model_state)
     except RuntimeError:
-        pol_state = {k: v for k, v in ckpt[sd_key].items() if k.startswith("policy_mlp")}
+        pol_state = {
+            key: value
+            for key, value in model_state.items()
+            if key.startswith("policy_mlp")
+        }
         try:
             model.load_state_dict(pol_state, strict=False)
             print("[s_gen_v2] Warning: value_mlp shape mismatch — policy weights loaded, value head reinitialized")
         except RuntimeError:
             print(f"[s_gen_v2] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
             return _fresh()
-    stage      = ckpt.get("stage", "unknown")
-    is_mine    = (stage == STAGE_TAG)
-    start_game = int(ckpt.get("game_count",    0))         if is_mine else 0
-    best_wr    = float(ckpt.get("best_win_rate", 0.0))     if is_mine else 0.0
-    difficulty = int(ckpt.get("difficulty",   DIFF_START)) if is_mine else DIFF_START
+    metrics = checkpoint_state.get("rolling_metrics", checkpoint_state)
+    start_game = int(checkpoint_state.get("game_count", 0)) if is_mine else 0
+    best_wr = float(metrics.get("best_win_rate", 0.0)) if is_mine else 0.0
+    difficulty = (
+        int(checkpoint_state.get("difficulty", DIFF_START))
+        if is_mine
+        else DIFF_START
+    )
     return model, start_game, best_wr, difficulty, str(resume_path)
 
 
@@ -1272,8 +1371,72 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     diag_buffer: list[GameDiag] = []
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
+    batch_count = 0
+    update_count = 0
+    checkpoint_sequence = 0
+    parent_checkpoint_id: Optional[str] = None
+    run_manifest = getattr(args, "_run_manifest", None)
+    if run_manifest is None:
+        raise RuntimeError("contract-backed launch did not provide a RunManifest")
+
+    def _save_runtime_checkpoint(path: Path, *, role: str, reason: str) -> str:
+        nonlocal checkpoint_sequence, parent_checkpoint_id
+        checkpoint_sequence += 1
+        checkpoint_id = f"{run_manifest.run_id}:checkpoint:{checkpoint_sequence:08d}"
+        descriptor = CheckpointDescriptor(
+            checkpoint_id=checkpoint_id,
+            run_id=run_manifest.run_id,
+            experiment_id=run_manifest.experiment_id,
+            parent_checkpoint_id=parent_checkpoint_id,
+            role=role,
+            save_reason=reason,
+            created_at_utc=utc_now_text(),
+            config_sha256=run_manifest.config_sha256,
+            feature_schema_version=FEATURE_SCHEMA_VERSION,
+            label_schema_version=LABEL_SCHEMA_VERSION,
+            database_schema_versions={
+                "specialist_db": LABEL_SCHEMA_VERSION,
+                "human_db_malom_columns": "masked-unversioned",
+            },
+            asset_identities={
+                asset.logical_name: asset.identity for asset in run_manifest.assets
+            },
+            implementation={
+                "trainer": STAGE_TAG,
+                "framework": "pytorch",
+                "pytorch": str(torch.__version__),
+            },
+        )
+        payload = _make_checkpoint_payload(
+            model=model,
+            optimizer=opt,
+            game_rng=rng,
+            game_count=game_count,
+            batch_count=batch_count,
+            update_count=update_count,
+            difficulty=difficulty,
+            temperature=temperature,
+            win_history=win_history,
+            win_history_heuristic=win_history_heuristic,
+            diag_buffer=diag_buffer,
+            games_at_level=games_at_level,
+            best_win_rate=best_win_rate,
+            best_win_rate_at_diff=best_win_rate_at_diff,
+            branch_bucket_history=branch_bucket_history,
+            frozen_model=frozen_opp._model,
+            games_since_target_update=games_since_target_update,
+            recovery_grace=recovery_grace,
+            pending_steps=ep_steps,
+            last_update_losses=(last_update_pl, last_update_vl, last_update_ent),
+            source_checkpoint=source_checkpoint,
+            checkpoint_sequence=checkpoint_sequence,
+        )
+        save_checkpoint(path, descriptor, payload)
+        parent_checkpoint_id = checkpoint_id
+        return checkpoint_id
 
     while game_count < args.max_games:
+        batch_count += 1
         temperature = _compute_temperature(
             game_count, args.max_games, args.temp_start
         )
@@ -1545,6 +1708,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 last_update_pl, last_update_vl, last_update_ent = update_fn(
                     model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef
                 )
+                update_count += 1
                 upd_entry = {
                     "game":        game_count,
                     "policy_loss": None if last_update_pl  is None else float(last_update_pl),
@@ -1581,13 +1745,18 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     else:
                         best_ckpt = out_dir / f"best{difficulty}.pt"
                         if best_ckpt.exists():
-                            ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
+                            checkpoint = load_checkpoint(best_ckpt, map_location=device)
+                            model_state = checkpoint.payload.model_state
                             _loaded_recovery = False
                             try:
-                                model.load_state_dict(ckpt_r["model"])
+                                model.load_state_dict(model_state)
                                 _loaded_recovery = True
                             except RuntimeError:
-                                pol_state = {k: v for k, v in ckpt_r["model"].items() if k.startswith("policy_mlp")}
+                                pol_state = {
+                                    key: value
+                                    for key, value in model_state.items()
+                                    if key.startswith("policy_mlp")
+                                }
                                 try:
                                     model.load_state_dict(pol_state, strict=False)
                                     _loaded_recovery = True
@@ -1631,18 +1800,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         f"[op={bc.get('opening',0)} mid={bc.get('midgame',0)} end={bc.get('endgame',0)}]"
                     )
 
-                ckpt = {
-                    "model":             model.state_dict(),
-                    "model_config":      model.get_config(),
-                    "stage":             STAGE_TAG,
-                    "game_count":        game_count,
-                    "best_win_rate":     best_win_rate,
-                    "difficulty":        difficulty,
-                    "source_checkpoint": source_checkpoint,
-                    "lr":                float(opt.param_groups[0]["lr"]),
-                    "temperature":       float(temperature),
-                }
-                torch.save(ckpt, out_dir / "latest.pt")
+                _save_runtime_checkpoint(
+                    out_dir / "latest.pt", role="latest", reason="periodic"
+                )
 
                 if _should_save_best_checkpoint(
                     win_rate,
@@ -1650,11 +1810,18 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     len(win_history_heuristic),
                 ):
                     best_win_rate_at_diff = win_rate
-                    ckpt["best_win_rate"] = best_win_rate_at_diff
-                    torch.save(ckpt, out_dir / f"best{difficulty}.pt")
-                    torch.save(ckpt, out_dir / "best.pt")
                     if win_rate > best_win_rate:
                         best_win_rate = win_rate
+                    _save_runtime_checkpoint(
+                        out_dir / f"best{difficulty}.pt",
+                        role="best_train",
+                        reason="training_metric_improved",
+                    )
+                    _save_runtime_checkpoint(
+                        out_dir / "best.pt",
+                        role="best_train",
+                        reason="training_metric_improved",
+                    )
                     print(f"[s_gen_v2]  → best diff-{difficulty} win rate: {best_win_rate_at_diff:.3f}")
 
             # ── Difficulty advancement (Sanmill superiority-probability) ──────
@@ -1684,25 +1851,23 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
                 prev_best = out_dir / f"best{prev_diff}.pt"
                 if not prev_best.exists():
-                    _adv_ckpt = {
-                        "model":             model.state_dict(),
-                        "model_config":      model.get_config(),
-                        "stage":             STAGE_TAG,
-                        "game_count":        game_count,
-                        "best_win_rate":     wr,
-                        "difficulty":        prev_diff,
-                        "source_checkpoint": source_checkpoint,
-                        "lr":                float(opt.param_groups[0]["lr"]),
-                        "temperature":       float(temperature),
-                    }
-                    torch.save(_adv_ckpt, prev_best)
+                    _save_runtime_checkpoint(
+                        prev_best,
+                        role="best_train",
+                        reason="difficulty_advanced",
+                    )
                     print(f"[s_gen_v2] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
                 if prev_best.exists():
-                    ckpt_prev = torch.load(str(prev_best), map_location=device, weights_only=False)
+                    checkpoint = load_checkpoint(prev_best, map_location=device)
+                    model_state = checkpoint.payload.model_state
                     try:
-                        model.load_state_dict(ckpt_prev["model"])
+                        model.load_state_dict(model_state)
                     except RuntimeError:
-                        pol_state = {k: v for k, v in ckpt_prev["model"].items() if k.startswith("policy_mlp")}
+                        pol_state = {
+                            key: value
+                            for key, value in model_state.items()
+                            if key.startswith("policy_mlp")
+                        }
                         try:
                             model.load_state_dict(pol_state, strict=False)
                             print(f"[s_gen_v2] Advance-load: value_mlp shape mismatch — policy weights loaded, value head kept")
@@ -1720,24 +1885,23 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     # ── Final flush ────────────────────────────────────────────────────────────
     if ep_steps:
-        update_fn(model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef)
+        last_update_pl, last_update_vl, last_update_ent = update_fn(
+            model,
+            opt,
+            ep_steps,
+            device,
+            gamma=args.gamma_td,
+            entropy_coef=args.entropy_coef,
+        )
+        update_count += 1
+        ep_steps.clear()
     if diag_buffer:
         with open(log_path, "a", encoding="utf-8") as f:
             for d in diag_buffer:
                 f.write(json.dumps(asdict(d)) + "\n")
+        diag_buffer.clear()
 
-    ckpt = {
-        "model":             model.state_dict(),
-        "model_config":      model.get_config(),
-        "stage":             STAGE_TAG,
-        "game_count":        game_count,
-        "best_win_rate":     best_win_rate,
-        "difficulty":        difficulty,
-        "source_checkpoint": source_checkpoint,
-        "lr":                float(opt.param_groups[0]["lr"]),
-        "temperature":       float(temperature),
-    }
-    torch.save(ckpt, out_dir / "latest.pt")
+    _save_runtime_checkpoint(out_dir / "latest.pt", role="latest", reason="final")
     print(f"\n[s_gen_v2] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
     _report_final_checkpoints(out_dir)
 
@@ -1914,6 +2078,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         experiment_id=args.experiment_id,
         parent_run_id=args.parent_run_id,
     )
+    setattr(args, "_run_manifest", manifest)
     publish_initial_run_contract(args.out_dir, manifest)
     append_run_lifecycle_event(
         args.out_dir,

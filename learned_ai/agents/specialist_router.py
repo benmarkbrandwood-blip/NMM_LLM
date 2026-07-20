@@ -35,6 +35,10 @@ import torch
 
 from game.board import BoardState
 from game.rules import get_game_phase
+from learned_ai.training.checkpoint_envelope import (
+    is_checkpoint_envelope,
+    load_checkpoint,
+)
 
 log = logging.getLogger("nmm.specialist_router")
 
@@ -49,10 +53,15 @@ def _load_spec_model(path: Path):
         return None, {}
     try:
         from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
-        ckpt  = torch.load(str(path), map_location="cpu", weights_only=False)
-        cfg   = ckpt.get("model_config", {})
+        if is_checkpoint_envelope(path):
+            envelope = load_checkpoint(path)
+            cfg = dict(envelope.payload.trainer_state["model_config"])
+            state = envelope.payload.model_state
+        else:
+            ckpt = torch.load(str(path), map_location="cpu", weights_only=False)
+            cfg = ckpt.get("model_config", {})
+            state = ckpt.get("model") or ckpt
         model = ScaffoldedPolicyNet.from_config(cfg)
-        state = ckpt.get("model") or ckpt
         model.load_state_dict(state)
         model.eval()
         return model, cfg

@@ -49,9 +49,10 @@ _TRAINER_STATE_FIELDS = {
     "curriculum",
     "target_network",
     "recovery_state",
+    "model_config",
 }
 _DATA_STATE_FIELDS = {"cursor", "consumed_snapshots", "cache", "buckets"}
-_RNG_STATE_FIELDS = {"python", "numpy", "torch_cpu", "torch_cuda"}
+_RNG_STATE_FIELDS = {"python", "numpy", "torch_cpu", "torch_cuda", "components"}
 
 
 class CheckpointError(RuntimeError):
@@ -285,17 +286,24 @@ class CheckpointEnvelope:
     payload: CheckpointPayload
 
 
-def capture_rng_state() -> dict[str, Any]:
+def capture_rng_state(
+    component_states: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Capture Python, NumPy, PyTorch CPU, and all available CUDA RNG states."""
     return {
         "python": random.getstate(),
         "numpy": np.random.get_state(),
         "torch_cpu": torch.get_rng_state(),
         "torch_cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else [],
+        "components": dict(component_states or {}),
     }
 
 
-def restore_rng_state(state: Mapping[str, Any]) -> None:
+def restore_rng_state(
+    state: Mapping[str, Any],
+    *,
+    component_rngs: Mapping[str, Any] | None = None,
+) -> None:
     """Restore every captured RNG state or fail rather than partially resume."""
     if not isinstance(state, Mapping) or set(state) != _RNG_STATE_FIELDS:
         raise CheckpointFormatError("RNG state is incomplete or has unknown fields")
@@ -304,11 +312,28 @@ def restore_rng_state(state: Mapping[str, Any]) -> None:
         raise CheckpointCompatibilityError(
             "checkpoint contains CUDA RNG state but CUDA is unavailable"
         )
+    expected_components = state["components"]
+    if not isinstance(expected_components, Mapping):
+        raise CheckpointFormatError("checkpoint component RNG states must be a mapping")
+    provided_components = dict(component_rngs or {})
+    if set(expected_components) != set(provided_components):
+        raise CheckpointCompatibilityError(
+            "checkpoint component RNG identities do not match the trainer"
+        )
+    for name, component_state in expected_components.items():
+        generator = provided_components[name]
+        if not hasattr(generator, "setstate"):
+            raise CheckpointCompatibilityError(
+                f"component RNG {name!r} does not support setstate"
+            )
     random.setstate(state["python"])
     np.random.set_state(tuple(state["numpy"]))
     torch.set_rng_state(state["torch_cpu"])
     if cuda_states:
         torch.cuda.set_rng_state_all(cuda_states)
+    for name, component_state in expected_components.items():
+        generator = provided_components[name]
+        generator.setstate(component_state)
 
 
 def _hash_stream(handle: Any, *, length: int | None = None) -> str:
@@ -393,6 +418,15 @@ def inspect_checkpoint(
             return descriptor, expected_hash, payload_size
     except OSError as exc:
         raise CheckpointError(f"cannot inspect checkpoint: {checkpoint}") from exc
+
+
+def is_checkpoint_envelope(path: str | Path) -> bool:
+    """Return whether a file declares the v2 magic without validating its content."""
+    try:
+        with Path(path).open("rb") as handle:
+            return handle.read(len(_MAGIC)) == _MAGIC
+    except OSError:
+        return False
 
 
 def load_checkpoint(

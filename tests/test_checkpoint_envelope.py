@@ -64,6 +64,7 @@ def _payload(model: torch.nn.Module, optimizer: torch.optim.Optimizer):
             "curriculum": {"games_at_level": 7},
             "target_network": {"age": 7},
             "recovery_state": {"grace": 0},
+            "model_config": {"policy_hidden": [16, 8]},
         },
         data_state={
             "cursor": {"next_game": 8},
@@ -227,13 +228,25 @@ def test_rng_capture_and_restore_replays_all_cpu_generators() -> None:
     random.seed(17)
     np.random.seed(17)
     torch.manual_seed(17)
-    state = capture_rng_state()
-    expected = (random.random(), float(np.random.rand()), float(torch.rand(())))
+    component_rng = random.Random(23)
+    state = capture_rng_state({"game": component_rng.getstate()})
+    expected = (
+        random.random(),
+        float(np.random.rand()),
+        float(torch.rand(())),
+        component_rng.random(),
+    )
 
     random.random()
     np.random.rand()
     torch.rand(())
-    restore_rng_state(state)
+    component_rng.random()
+    restore_rng_state(state, component_rngs={"game": component_rng})
 
-    actual = (random.random(), float(np.random.rand()), float(torch.rand(())))
+    actual = (
+        random.random(),
+        float(np.random.rand()),
+        float(torch.rand(())),
+        component_rng.random(),
+    )
     assert actual == pytest.approx(expected)
