@@ -2553,14 +2553,29 @@ class GameAI:
                     )
                     for m in moves
                 }
-                raw_moves = [(frm, to, cap, s) for frm, to, cap, s in raw_moves
-                             if (frm, to, cap) in allowed_idx]
-                if not raw_moves:
-                    if node_limit is not None:
-                        raise RuntimeError(
-                            "fixed-node search returned no allowed move"
+                filtered = [
+                    (frm, to, cap, s)
+                    for frm, to, cap, s in raw_moves
+                    if (frm, to, cap) in allowed_idx
+                ]
+                if not filtered:
+                    if node_limit is None:
+                        return None
+                    # Fixed-node mid-root abort can omit the only Python-allowed
+                    # candidates (e.g. mandatory mill blocks). Recover by
+                    # treating the caller allowlist as equal-score options so
+                    # training stays fail-closed without inventing illegal moves.
+                    raw_moves = [
+                        (
+                            _POS_TO_IDX.get(m["from"]) if m.get("from") else None,
+                            _POS_TO_IDX[m["to"]],
+                            _POS_TO_IDX.get(m["capture"]) if m.get("capture") else None,
+                            0,
                         )
-                    return None
+                        for m in moves
+                    ]
+                else:
+                    raw_moves = filtered
 
             # Convert surviving Rust (from_idx, to_idx, cap_idx, score) tuples to (move_dict, score).
             scored: list[tuple[dict, int]] = [

@@ -20,7 +20,7 @@ use crate::db_probe;
 use crate::heuristics::{evaluate_v2, EvalScale, INF};
 use crate::hash::{TranspositionTable, TtEntry, Zobrist, EXACT, LOWER_BOUND, UPPER_BOUND};
 use crate::movegen::legal_moves;
-use crate::tactics::{immediate_mill_threats, move_forms_mill};
+use crate::tactics::move_forms_mill;
 use crate::types::{Board, Color, Move, Phase, FULL_MASK};
 
 pub struct SearchResult {
@@ -146,54 +146,6 @@ fn is_structurally_rare(mv: &Move, board: &Board, color: Color) -> bool {
         .any(|&mi| (own_after & MILL_MASKS[mi as usize]) == MILL_MASKS[mi as usize])
 }
 
-/// Phase 2: true if `mv` for `color` creates a reachable two-config after it lands.
-///
-/// A two-config is 2 own pieces + 1 empty closing square in a mill line.
-/// "Reachable" means the closing square can be occupied by own next turn:
-///   - Placement phase (still pieces to place after this move): any empty closing sq.
-///   - Fly phase (own_after ≤ 3 pieces): any empty closing sq (can jump anywhere).
-///   - Move phase: an own piece not already in the mill line is adjacent to the closing sq.
-///
-/// Only checks SQUARE_MILLS[mv.to] — lines affected by the landing square — which
-/// is exactly where new two-configs can be created by this move. O(2×3) = O(6).
-fn creates_reachable_two_config(board: &Board, color: Color, mv: &Move) -> bool {
-    use crate::mills::{MILL_MASKS, SQUARE_MILLS};
-    let to_sq = mv.to as usize;
-    let from_bit = mv.from.map_or(0u32, |f| 1u32 << f);
-    let to_bit   = 1u32 << to_sq;
-    let own      = board.bits(color);
-    let own_after = (own | to_bit) & !from_bit;
-
-    // Opponent bits after any capture — needed for computing occupied squares.
-    let cap_bit  = mv.capture.map_or(0u32, |c| 1u32 << c);
-    let opp_after = board.bits(color.opponent()) & !cap_bit;
-    let occupied_after = own_after | opp_after;
-
-    // Will we still be in placement phase AFTER this move completes?
-    let placed_after = match color {
-        Color::White => board.white_placed + if mv.from.is_none() { 1 } else { 0 },
-        Color::Black => board.black_placed + if mv.from.is_none() { 1 } else { 0 },
-    };
-    let still_placing = placed_after < 9;
-    // Fly phase: own has ≤ 3 pieces (can jump to any empty square).
-    let fly = own_after.count_ones() <= 3;
-
-    for &mi in &SQUARE_MILLS[to_sq] {
-        let mm = MILL_MASKS[mi as usize];
-        if (own_after & mm).count_ones() == 2 {
-            let closing = mm & !occupied_after;
-            if closing.count_ones() != 1 { continue; }
-            let closing_sq = closing.trailing_zeros() as usize;
-            // Check reachability for the next own move.
-            let reachable = still_placing
-                || fly
-                || (ADJACENCY[closing_sq] & own_after & !mm) != 0;
-            if reachable { return true; }
-        }
-    }
-    false
-}
-
 impl Searcher {
     fn enter_node(&mut self) -> bool {
         if self.aborted {
@@ -261,18 +213,20 @@ impl Searcher {
         moves
     }
 
-    // T-B4 / Phase 2: Quiescence search extended with forcing moves.
+    // T-B4 / Quiescence search.
     //
-    // Always extends: captures, mill-closing moves (original qsearch).
-    // Phase 2 extension (up to QS_FORCING_CAP extra plies):
-    //   - Reachable two-config creators: mv lands so own now has 2 pieces in a mill
-    //     line with a reachable closing square → threatens a mill next move.
-    //   - Forced blocks: mv.to is a square where the opponent can close a mill
-    //     (pre-computed as opp_threats via immediate_mill_threats). Playing there
-    //     blocks the threat; not playing there would let opp form a mill next move.
+    // Sanmill reference (tgf-search Searcher::qsearch_with_depth, Mill
+    // MaxQuiescenceDepth default 0, quiescence_kind_tag = Remove only;
+    // observed local checkout D:\Repo\Sanmill @ 6a64010 on branch next):
+    //   - default horizon is stand-pat only;
+    //   - when extended, Mill qsearch generates removal actions, not quiet
+    //     "two-config / forced-block" placement trees.
     //
-    // Tactical moves (capture/mill) never count against QS_FORCING_CAP.
-    // Forcing-only moves increment qs_ply → cap fires after 6 forcing extensions.
+    // NMM placement used to treat almost every two-config creator as forcing
+    // because still_placing makes every closing square "reachable", which
+    // burned fixed node budgets inside the first root move. Align with
+    // Sanmill: stand-pat in Place; elsewhere extend only capture/mill-close
+    // (the combined-move analogue of Remove), never Phase-2 quiet forcing.
     fn qsearch(&mut self, board: &Board, mut alpha: i64, beta: i64, qs_ply: u8) -> i64 {
         if !self.enter_node() {
             return ABORT_SCORE;
@@ -285,29 +239,25 @@ impl Searcher {
         if stand_pat >= beta { return beta; }
         if stand_pat > alpha { alpha = stand_pat; }
 
-        // Pre-compute opponent mill threats once — used for forced-block filter.
-        // Only pay this cost when the forcing cap has not been reached.
-        let can_force = qs_ply < QS_FORCING_CAP;
-        let opp_threats: u32 = if can_force { immediate_mill_threats(board) } else { 0 };
+        // Sanmill MaxQuiescenceDepth=0 analogue for the placement phase.
+        if get_phase(board, color) == Phase::Place {
+            return alpha;
+        }
 
         for mv in legal_moves(board).iter() {
+            // Capture or mill-close only — not quiet two-config / block forcing.
             let is_tactical = mv.capture.is_some()
                 || move_forms_mill(board, color, mv.from, mv.to);
-            // Phase 2: also extend reachable two-config creators and forced blocks.
-            let is_forcing = !is_tactical && can_force && (
-                (opp_threats & (1u32 << mv.to)) != 0
-                || creates_reachable_two_config(board, color, mv)
-            );
-            if !is_tactical && !is_forcing {
+            if !is_tactical {
+                continue;
+            }
+            // Bound tactical recursion so capture/mill chains cannot exhaust a
+            // fixed node budget the way the old uncapped path did.
+            if qs_ply >= QS_FORCING_CAP {
                 continue;
             }
             let nb = make_move(board, mv);
-            // Tactical moves don't consume the forcing budget; forcing-only moves do.
-            let next_qs = if is_tactical { qs_ply } else {
-                FORCING_EXT_COUNT.fetch_add(1, Ordering::Relaxed);
-                qs_ply + 1
-            };
-            let score = -self.qsearch(&nb, -beta, -alpha, next_qs);
+            let score = -self.qsearch(&nb, -beta, -alpha, qs_ply + 1);
             if self.aborted { return ABORT_SCORE; }
             if score >= beta { return beta; }
             if score > alpha { alpha = score; }
@@ -627,9 +577,8 @@ impl Searcher {
         result
     }
 
-    /// Score every root move with a static eval when a fixed node budget is
-    /// exhausted inside the first root move's quiescence search. Fixed-node
-    /// callers require a non-empty legal move list whenever legal moves exist.
+    /// Score every root move with a static eval. Used to fill gaps when a
+    /// fixed node budget aborts mid-root before every legal move is scored.
     fn root_static_scores(
         &self,
         board: &Board,
@@ -674,6 +623,27 @@ impl Searcher {
             result.push(RootMoveScore { mv: *mv, score });
         }
         result
+    }
+
+    /// Keep deeper mid-search scores and fill any missing legal root moves
+    /// with static eval so Python candidate filters cannot see a partial set.
+    fn complete_root_scores(
+        &self,
+        board: &Board,
+        preferred: &[(Option<u8>, u8, Option<u8>)],
+        existing: &[RootMoveScore],
+    ) -> Vec<RootMoveScore> {
+        let mut scored = std::collections::HashMap::<Move, i64>::new();
+        for rm in existing {
+            scored.insert(rm.mv, rm.score);
+        }
+        let mut completed = self.root_static_scores(board, preferred);
+        for rm in completed.iter_mut() {
+            if let Some(score) = scored.remove(&rm.mv) {
+                rm.score = score;
+            }
+        }
+        completed
     }
 }
 
@@ -808,10 +778,20 @@ pub fn iterative_deepening_scored(
         }
     }
     best.nodes = searcher.nodes;
-    // A fixed node budget can be exhausted inside the first root move's
-    // quiescence search before any root score is recorded. Callers that bind
-    // training to fixed work still require a legal move whenever one exists.
-    if best.scored_moves.is_empty() {
+    // Fixed-node searches may abort mid-root with a partial score list. Python
+    // GameAI then intersects that list with a narrower candidate set (e.g.
+    // mandatory mill blocks). Complete every legal root move so the
+    // intersection cannot spuriously become empty.
+    if node_limit.is_some() {
+        let legal_count = legal_moves(board).len();
+        if best.scored_moves.len() < legal_count {
+            best.scored_moves =
+                searcher.complete_root_scores(board, preferred, &best.scored_moves);
+            if best.depth_reached == 0 && !best.scored_moves.is_empty() {
+                best.depth_reached = 1;
+            }
+        }
+    } else if best.scored_moves.is_empty() {
         best.scored_moves = searcher.root_static_scores(board, preferred);
         if best.depth_reached == 0 && !best.scored_moves.is_empty() {
             best.depth_reached = 1;
@@ -989,9 +969,10 @@ mod tests {
 
     #[test]
     fn fixed_node_budget_still_returns_moves_when_qsearch_exhausts_first_root() {
-        // Captured from the managed smoke failure: after two placements each,
-        // depth-1 quiescence on the first ordered root move burned the entire
-        // 500k budget before any root score was recorded.
+        // Captured from the managed smoke failure FEN
+        // `...W.....W.B...........B|W|2|2`. Placement qsearch is Sanmill-aligned
+        // (stand-pat). Deeper iterative deepening may still spend the budget,
+        // but every legal root move must remain scored for Python filters.
         let board = Board {
             white: 520,
             black: 8_390_656,
@@ -999,7 +980,8 @@ mod tests {
             black_placed: 2,
             side_to_move: Color::White,
         };
-        assert!(!legal_moves(&board).is_empty());
+        let legal = legal_moves(&board);
+        assert!(!legal.is_empty());
         let limit = 500_000;
         let r = iterative_deepening_scored(
             &board,
@@ -1014,11 +996,39 @@ mod tests {
             EvalScale::default(),
             false,
         );
-        assert_eq!(r.nodes, limit);
-        assert!(
-            !r.scored_moves.is_empty(),
-            "fixed-node search must return a legal move when legal moves exist"
+        assert!(r.nodes > 0);
+        assert!(r.nodes <= limit);
+        assert_eq!(r.scored_moves.len(), legal.len());
+    }
+
+    #[test]
+    fn fixed_node_scores_every_root_move_under_mandatory_block_position() {
+        // Smoke v2 failure: Python mandatory-block allowlist was {g7} while a
+        // mid-root abort returned only non-blocking scores. Completing the
+        // root list keeps g7 (square index 2) available for the filter.
+        let board = Board {
+            white: (1 << 3) | (1 << 9),   // g4, d6
+            black: (1 << 0) | (1 << 1),   // a7, d7
+            white_placed: 2,
+            black_placed: 2,
+            side_to_move: Color::White,
+        };
+        let legal = legal_moves(&board);
+        assert!(legal.iter().any(|mv| mv.to == 2), "g7 must be legal");
+        let r = iterative_deepening_scored(
+            &board,
+            19,
+            1,
+            Some(25_000),
+            &[],
+            Arc::new(TranspositionTable::new()),
+            HashSet::new(),
+            None,
+            None,
+            EvalScale::default(),
+            false,
         );
-        assert_eq!(r.scored_moves.len(), legal_moves(&board).len());
+        assert_eq!(r.scored_moves.len(), legal.len());
+        assert!(r.scored_moves.iter().any(|rm| rm.mv.to == 2));
     }
 }

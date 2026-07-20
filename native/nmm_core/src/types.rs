@@ -60,7 +60,7 @@ impl Phase {
 
 /// A fully-specified move. `from = None` for placement; `capture = None` when no
 /// mill is formed. Indices are POSITIONS indices (0..24).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Move {
     pub from: Option<u8>,
     pub to: u8,
