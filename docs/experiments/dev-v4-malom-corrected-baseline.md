@@ -4,10 +4,10 @@
 
 Experiment ID: `dev-v4-malom-corrected-fresh-v1`
 
-The experiment is defined but has not started. Its first executable step is a
-one-game integration smoke using disposable output and SpecialistDB paths. A
-long-run game budget, concurrency, monitoring cadence, and stop criteria must
-still be frozen after that smoke.
+The one-game integration smoke completed on 20 July 2026 with status
+`passed_with_observation`. The long run has not started. Its update algorithm,
+opponent schedule, temperature start, game budget, concurrency, monitoring
+cadence, checkpoint/resume policy, and stop criteria still need to be frozen.
 
 This is a fresh-initialised, Malom-corrected **v4-style Generalist baseline**.
 It is not the v5 `reference_safe_baseline`, a release candidate, or evidence of
@@ -76,6 +76,7 @@ a new name rather than mixing evidence.
   --no-value-net `
   --no-gap-net `
   --temp-start 0.90 `
+  --seed 42 `
   --max-games 1 `
   --batch-games 1 `
   --max-ply 40 `
@@ -92,11 +93,64 @@ selected components, writers, and corrected label boundary initialise and
 complete one bounded game. It does not approve a long run or establish
 strength.
 
+## Smoke Result - 20 July 2026
+
+The smoke ran from clean `dev` commit
+`80f4a1fe525d98706b1b0913083f2c2067f8bf66`. Preflight reconfirmed that the
+disposable paths did not exist, the active baseline output directory did not
+exist, and the active SpecialistDB was an empty `sector-corrected-v1` database.
+Immediately before launch, the focused trainer tests reported `9 passed`; the
+Malom/provenance suite reported `102 passed, 498 subtests passed`.
+
+| Check | Result |
+| --- | --- |
+| Process | Exit code `0` after approximately 24.4 seconds |
+| Device | CUDA |
+| Lineage | `source_checkpoint=scratch`; no resume option |
+| Legacy learned inputs | Sentinel, ValueNet, and GapNet disabled by CLI |
+| Live data inputs | Malom and HumanDB loaded |
+| Game | One `vs_frozen` game, learner Black, 33 ply, outcome `-1.0` |
+| Schedule | Temperature `0.9` |
+| Training log | One row in `train_log.jsonl` |
+| Final checkpoint | `latest.pt`, stage `s_gen_v2`, game count `1` |
+| Smoke SpecialistDB | 32 positions, 10 Malom-labelled, no winning or preferred lines |
+| Active baseline DB | Unchanged: all three data tables and Malom-labelled count remain zero |
+| SQLite integrity | `ok` for both smoke and active baseline databases |
+
+The single-game outcome and diagnostic rates are integration observations only;
+they have no strength or acceptance authority. HumanDB emitted the expected
+warning that its historical Malom labels were masked because its label version
+is missing, while its human statistics remained available.
+
+The ignored local evidence is under:
+
+- `learned_ai/checkpoints/smoke/s_gen_v2_v4_malom_corrected_fresh_v1`;
+- `data/specialist_db.smoke.v4_malom_corrected_fresh_v1.sqlite`.
+
+That output directory contains `train_log.jsonl`, `latest.pt`, and the local
+`smoke_manifest.json` with the exact command and result. These generated files
+remain ignored and are not part of this documentation commit.
+
+### Checkpoint observation
+
+The trainer's final console message named the output path `best.pt`, but the
+one-game smoke produced only `latest.pt`; `best.pt` was absent. The checkpoint
+that exists is readable and records stage `s_gen_v2`, game count `1`,
+`source_checkpoint=scratch`, and temperature `0.9`.
+
+This discrepancy does not invalidate the bounded initialisation smoke, but the
+console claim is inaccurate and `--auto-resume-best` would not find this
+one-game result. Before relying on automatic continuation, either ensure the
+run has produced a real `best.pt` or use a reviewed explicit `--resume` path;
+correct the final message separately rather than treating it as checkpoint
+evidence. The one-game run also did not create `update_log.jsonl`, so it did not
+exercise periodic update-log or best-checkpoint cadence.
+
 ## Long-Run Launch Gate
 
-After the smoke, inspect its log, checkpoint metadata, and SpecialistDB
-metadata. Then freeze the long-run update algorithm, opponent schedule,
-temperature start, game budget, seed, concurrency, checkpoint cadence, monitor
-interval, and stop criteria. Re-run the preflight against the active empty
-SpecialistDB and dedicated long-run output immediately before launch. Do not
-reuse the disposable smoke DB or smoke checkpoint.
+The bounded smoke gate has passed with the checkpoint observation above. Before
+the long run, freeze the update algorithm, opponent schedule, temperature
+start, game budget, seed, concurrency, checkpoint cadence, resume policy,
+monitor interval, and stop criteria. Re-run the preflight against the active
+empty SpecialistDB and dedicated long-run output immediately before launch. Do
+not reuse the disposable smoke DB or smoke checkpoint.

@@ -10,8 +10,9 @@ started.
 The auto-resume and temperature-schedule defects have now been fixed and tested
 on local `dev`. The owner has defined the first experiment as a fresh,
 Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
-disabled. The next safe executable step is a bounded, isolated smoke test; a
-long monitored run remains gated on its result and a frozen run budget.
+disabled. Its bounded one-game smoke passed with a checkpoint observation; a
+long monitored run has not started and remains gated on frozen launch choices
+and an explicit checkpoint/resume policy.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -60,10 +61,11 @@ handover, both `dev` and `origin/dev` pointed to:
 `git rev-list --left-right --count dev...origin/dev` returned `0 0`. The
 handover commit `8751da4` was subsequently pushed and is now the recorded
 `origin/dev` tip. Local `dev` then added the independently tested auto-resume
-and temperature commits `5eadb4e` and `006715b`. Inspect the live graph rather
-than relying on this snapshot. The completed force-with-lease approval is not
-standing permission for a future push or history rewrite; obtain fresh
-authorisation when such an operation becomes necessary.
+and temperature commits `5eadb4e` and `006715b`, the component-disable commit
+`24be10b`, and the experiment-definition commit `80f4a1f`. Inspect the live
+graph rather than relying on this snapshot. The completed force-with-lease
+approval is not standing permission for a future push or history rewrite;
+obtain fresh authorisation when such an operation becomes necessary.
 
 ## Environment State
 
@@ -263,9 +265,22 @@ Sentinel, ValueNet, and GapNet. The trainer exposes `--no-sentinel`,
 `--no-value-net`, and `--no-gap-net` so this choice overrides machine-local
 configured paths rather than depending on missing files.
 
-The complete definition, preflight evidence, claim boundary, and isolated
-smoke command are in
+The complete definition, preflight evidence, claim boundary, isolated smoke
+command, and result are in
 [`docs/experiments/dev-v4-malom-corrected-baseline.md`](../experiments/dev-v4-malom-corrected-baseline.md).
+
+The smoke ran from clean commit
+`80f4a1fe525d98706b1b0913083f2c2067f8bf66`, completed one 33-ply game on CUDA,
+and exited successfully. It started from scratch, disabled all three legacy
+learned inputs, loaded Malom and HumanDB, wrote a trusted disposable
+SpecialistDB, and left the active empty baseline DB unchanged. This is
+integration evidence only, not strength evidence.
+
+The generated `latest.pt` is readable, but the final console message named
+`best.pt` even though no such file was produced by the one-game run. This does
+not invalidate the smoke. It does mean that the message is not checkpoint
+evidence and automatic continuation must not be assumed to work until a real
+`best.pt` exists or an explicit reviewed resume path is selected.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -363,23 +378,21 @@ database growth.
 
 ## Recommended Next Actions
 
-The workspace/root check, graph inspection, two trainer fixes, focused trainer
-tests, 102-test Malom/provenance rerun, and first-experiment component decision
-are complete. Proceed in this order:
+The workspace/root check, graph inspection, trainer fixes, focused tests,
+102-test Malom/provenance rerun, first-experiment component decision, and
+bounded smoke are complete. Proceed in this order:
 
-1. Pin a clean `dev` commit containing the explicit component-disable switches
-   and the experiment definition; record its exact SHA. Do not push without
-   explicit approval.
-2. Run focused checks for the Malom-enabled inference route exercised by the
-   smoke, then run one bounded smoke game using separate output and SpecialistDB
-   paths. Confirm that the selected Malom, HumanDB, legacy model inputs, GPU,
-   log writer, checkpoint writer, and versioned SpecialistDB initialise, and
-   record the exact decision route exercised.
-3. Inspect the smoke log and database metadata. If an endgame/fullgame asset is
-   enabled, validate its manifest and reader separately. Only then choose
-   long-run concurrency, monitoring intervals, and stop criteria.
+1. Resolve the checkpoint observation before relying on automatic
+   continuation: correct the inaccurate final message and establish when
+   `best.pt` must exist, or select a reviewed explicit-resume policy.
+2. Freeze the long-run update algorithm, opponent schedule, temperature start,
+   game budget, seed, concurrency, checkpoint cadence, monitor interval, and
+   stop criteria.
+3. Re-run the clean-worktree, path, active-DB, test, and component preflight
+   immediately before any long run. Do not push or start that run without the
+   corresponding explicit approval.
 
-A suitable isolated smoke command is:
+The executed isolated smoke command was:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
@@ -390,6 +403,7 @@ A suitable isolated smoke command is:
   --no-value-net `
   --no-gap-net `
   --temp-start 0.90 `
+  --seed 42 `
   --max-games 1 `
   --batch-games 1 `
   --max-ply 40 `
@@ -398,11 +412,10 @@ A suitable isolated smoke command is:
   --no-s1a-warmstart
 ```
 
-Do not add `--resume` or `--auto-resume-best` to this command. The smoke also
-omits `--ppo` to keep the integration check bounded; that does not decide the
-long-run update algorithm. This is not strength evidence or a test of recovery
-reheating. Keep its output and database separate from the intended long-run
-paths.
+The command intentionally omitted `--resume`, `--auto-resume-best`, and `--ppo`.
+It exited successfully in approximately 24.4 seconds. Its output and database
+remain ignored and separate from the intended long-run paths. The experiment
+document records their verified contents and the checkpoint observation.
 
 The original handover's 50,000-game PPO command should not be launched
 unchanged. PPO and the more complex opponent mixture are optional experiments
@@ -418,12 +431,13 @@ The following choices are recorded for the first `dev` experiment:
 
 The remaining decisions before a long run are its update algorithm, opponent
 schedule, temperature start, game budget, seed, concurrency,
-checkpoint/monitor cadence, and stop criteria. The local endgame/fullgame files
-also remain exploratory unless separately validated and promoted.
+checkpoint/monitor cadence, checkpoint/resume policy, and stop criteria. The
+local endgame/fullgame files also remain exploratory unless separately
+validated and promoted.
 
-Until the smoke and remaining launch choices are recorded, safe work consists
-of local inspection, tests, and the separate bounded smoke. It does not include
-a long training job, a push, or a history rewrite.
+Until the remaining launch choices are recorded, safe work consists of local
+inspection, tests, and focused checkpoint-policy work. It does not include a
+long training job, a push, or a history rewrite.
 
 ## Reference Material
 
