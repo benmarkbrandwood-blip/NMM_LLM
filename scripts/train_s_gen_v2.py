@@ -1648,6 +1648,20 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         args.max_games,
         game_count + (args.segment_games or args.max_games),
     )
+    if args.segment_stop_game is not None:
+        if args.segment_stop_game <= 0:
+            raise RuntimeError("segment_stop_game must be a positive integer")
+        if args.segment_stop_game > args.max_games:
+            raise RuntimeError("segment_stop_game must not exceed max_games")
+        if game_count > args.segment_stop_game:
+            raise RuntimeError(
+                "current game_count already exceeds segment_stop_game"
+            )
+        segment_stop_game = int(args.segment_stop_game)
+    print(
+        f"[s_gen_v2] Segment stop at game {segment_stop_game} "
+        f"(current={game_count})"
+    )
 
     def _save_runtime_checkpoint(path: Path, *, role: str, reason: str) -> str:
         nonlocal checkpoint_sequence, parent_checkpoint_id
@@ -2330,6 +2344,16 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Bound this process segment without changing the total schedule",
+    )
+    p.add_argument(
+        "--segment-stop-game",
+        type=int,
+        default=None,
+        help=(
+            "Absolute game_count stop for this process segment. When set, it "
+            "overrides game_count + --segment-games so mid-segment exact-resume "
+            "still ends on the managed schedule bound."
+        ),
     )
     p.add_argument("--seed",                type=int,   default=42)
     p.add_argument("--lr",                  type=float, default=LR)

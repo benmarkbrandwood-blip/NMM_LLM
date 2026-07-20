@@ -111,10 +111,12 @@ def test_segment_commands_only_allow_fresh_then_exact_resume(tmp_path: Path) -> 
         segment_index=1,
         previous_checkpoint=None,
         previous_run_id=None,
+        previous_completed_games=0,
         python_executable="python",
     )
     assert first[first.index("--start-mode") + 1] == "fresh"
     assert "--resume" not in first
+    assert first[first.index("--segment-stop-game") + 1] == "100"
 
     second = build_segment_command(
         plan,
@@ -123,12 +125,14 @@ def test_segment_commands_only_allow_fresh_then_exact_resume(tmp_path: Path) -> 
         segment_index=2,
         previous_checkpoint=tmp_path / "segment-0001" / "latest.pt",
         previous_run_id="managed-v4-test-segment-0001",
+        previous_completed_games=100,
         python_executable="python",
     )
     assert second[second.index("--start-mode") + 1] == "exact-resume"
     assert second[second.index("--parent-run-id") + 1] == (
         "managed-v4-test-segment-0001"
     )
+    assert second[second.index("--segment-stop-game") + 1] == "200"
 
 
 def test_launch_verification_rejects_wrong_semantics(tmp_path: Path) -> None:
@@ -153,6 +157,7 @@ def test_launch_verification_rejects_wrong_semantics(tmp_path: Path) -> None:
             out_dir=Path(plan.control_dir) / "segments" / "segment-0001",
             run_id="managed-v4-test-segment-0001",
             segment_games=plan.segment_games,
+            segment_stop_game=plan.segment_games,
             start_mode="fresh",
             resume="",
             parent_run_id=None,
@@ -181,6 +186,7 @@ def test_launch_verification_accepts_exact_authorized_segment(tmp_path: Path) ->
         out_dir=Path(plan.control_dir) / "segments" / "segment-0001",
         run_id="managed-v4-test-segment-0001",
         segment_games=plan.segment_games,
+        segment_stop_game=plan.segment_games,
         start_mode="fresh",
         resume="",
         parent_run_id=None,
@@ -346,6 +352,7 @@ def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
         out_dir=Path(plan.control_dir) / "segments" / "segment-0002",
         run_id="managed-v4-test-segment-0002",
         segment_games=plan.segment_games,
+        segment_stop_game=200,
         start_mode="exact-resume",
         resume=str(recovery.resolve()),
         parent_run_id="managed-v4-test-segment-0001",

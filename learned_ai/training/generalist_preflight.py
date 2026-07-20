@@ -550,6 +550,7 @@ _RESUME_CONFIG_EXCLUDED_FIELDS = {
     "resume",
     "run_id",
     "segment_games",
+    "segment_stop_game",
     "start_mode",
 }
 
@@ -743,6 +744,7 @@ def run_generalist_preflight(
                     out_dir=args.out_dir,
                     run_id=args.run_id,
                     segment_games=args.segment_games,
+                    segment_stop_game=getattr(args, "segment_stop_game", None),
                     start_mode=args.start_mode,
                     resume=args.resume,
                     parent_run_id=args.parent_run_id,

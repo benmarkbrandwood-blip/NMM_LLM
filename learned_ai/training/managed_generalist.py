@@ -50,6 +50,7 @@ _DYNAMIC_TRAINER_OPTIONS = frozenset(
         "--resume",
         "--out-dir",
         "--segment-games",
+        "--segment-stop-game",
         "--managed-plan",
         "--managed-authorization",
     }
@@ -793,10 +794,19 @@ def build_segment_command(
     segment_index: int,
     previous_checkpoint: Path | None,
     previous_run_id: str | None,
+    previous_completed_games: int,
     python_executable: str = sys.executable,
 ) -> list[str]:
     """Build one shell-free launch command owned by the supervisor."""
     _require_positive_int(segment_index, field="segment_index")
+    if previous_completed_games < 0:
+        raise ManagedContractError("previous_completed_games must be non-negative")
+    expected_stop = min(
+        previous_completed_games + plan.segment_games,
+        plan.max_games,
+    )
+    if expected_stop <= previous_completed_games:
+        raise ManagedContractError("segment schedule has no remaining games")
     run_id = _segment_run_id(plan, segment_index)
     output_dir = _segment_output_dir(plan, segment_index)
     command = [
@@ -810,6 +820,8 @@ def build_segment_command(
         str(output_dir),
         "--segment-games",
         str(plan.segment_games),
+        "--segment-stop-game",
+        str(expected_stop),
         "--managed-plan",
         str(Path(plan_path).resolve(strict=False)),
         "--managed-authorization",
@@ -851,6 +863,7 @@ def verify_managed_launch(
     resume: str,
     parent_run_id: str | None,
     experiment_id: str,
+    segment_stop_game: int | None = None,
 ) -> ManagedPlan:
     """Fail closed unless trainer arguments match one authorized segment."""
     plan = load_managed_plan(plan_path)
@@ -867,6 +880,20 @@ def verify_managed_launch(
     if not run_id.startswith(prefix) or not run_id[len(prefix):].isdigit():
         raise ManagedContractError("managed run ID is outside the plan")
     segment_index = int(run_id[len(prefix):])
+    completed_events = _completed_segment_events(plan)
+    if len(completed_events) != segment_index - 1:
+        raise ManagedContractError("managed segment index does not follow completions")
+    previous_completed_games = (
+        int(completed_events[-1].details["completed_games"]) if completed_events else 0
+    )
+    expected_stop = min(
+        previous_completed_games + plan.segment_games,
+        plan.max_games,
+    )
+    if segment_stop_game != expected_stop:
+        raise ManagedContractError(
+            "managed segment stop game does not match the schedule"
+        )
     if git_commit != plan.git_commit:
         if not (
             _plan_used_host_reboot_recovery(plan)
@@ -1059,12 +1086,44 @@ def run_next_segment(
         previous_checkpoint = Path(str(recovery["recovery_checkpoint"]))
         if previous_run_id is None and recovery.get("parent_run_id"):
             previous_run_id = str(recovery["parent_run_id"])
+        # Live SpecialistDB may have advanced past the recovery envelope identity
+        # during a failed mid-segment attempt; rebind before relaunch.
+        specialist_identity = _live_specialist_identity(
+            _specialist_db_path_for_plan(plan)
+        )
+        envelope = load_checkpoint(previous_checkpoint, map_location="cpu")
+        recorded = envelope.payload.data_state["mutable_assets"]["specialist_db"][
+            "sha256"
+        ]
+        if recorded != specialist_identity["sha256"]:
+            refreshed = previous_checkpoint.with_name(
+                f"{previous_checkpoint.stem}.refresh-{uuid4().hex}.pt"
+            )
+            _write_recovery_checkpoint(
+                previous_checkpoint,
+                refreshed,
+                specialist_identity=specialist_identity,
+            )
+            os.replace(refreshed, previous_checkpoint)
     output_dir = _segment_output_dir(plan, segment_index)
     if output_dir.exists():
-        raise ManagedContractError(
-            "next managed segment output already exists; run recover-interrupted "
-            "if a host reboot left an incomplete segment"
+        if recovery is None:
+            raise ManagedContractError(
+                "next managed segment output already exists; run recover-interrupted "
+                "if a host reboot left an incomplete segment"
+            )
+        # A previous recovery attempt may have overshot and been quarantined.
+        # Keep the recovery checkpoint, but clear the failed output directory.
+        stamp = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+        failed = (
+            Path(plan.control_dir)
+            / "quarantine"
+            / f"segment-{segment_index:04d}.failed-retry-{stamp}"
         )
+        failed.parent.mkdir(parents=True, exist_ok=True)
+        if failed.exists():
+            raise ManagedContractError("failed-retry quarantine target already exists")
+        output_dir.rename(failed)
     command = build_segment_command(
         plan,
         plan_path=plan_path,
@@ -1072,6 +1131,7 @@ def run_next_segment(
         segment_index=segment_index,
         previous_checkpoint=previous_checkpoint,
         previous_run_id=previous_run_id,
+        previous_completed_games=previous_completed_games,
         python_executable=python_executable,
     )
 
