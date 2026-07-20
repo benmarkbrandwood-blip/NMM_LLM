@@ -18,7 +18,6 @@ import argparse
 import copy
 import json
 import math
-import os
 import random
 import sys
 import time
@@ -57,6 +56,13 @@ from learned_ai.training.scaffolded_a2c import (
 from learned_ai.training.advance_stats import (
     check_advance as _sanmill_check_advance,
     advance_target,
+)
+from learned_ai.training.generalist_preflight import (
+    PreflightConfigurationError,
+    configure_generalist_paths,
+    load_training_settings,
+    run_generalist_preflight,
+    validate_generalist_configuration,
 )
 
 # ── Opening book ──────────────────────────────────────────────────────────────
@@ -315,83 +321,16 @@ class GameDiag:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _load_settings(paths_config: Optional[str] = None) -> dict:
-    """Load shared settings, then overlay per-machine training paths."""
-    settings: dict = {}
-    shared_path = _ROOT / "data" / "settings.json"
-    if shared_path.exists():
-        with open(shared_path, "r", encoding="utf-8") as f:
-            settings.update(json.load(f))
-
-    local_path = Path(paths_config).expanduser() if paths_config else (
-        _ROOT / "data" / "training_paths.local.json"
-    )
-    if not local_path.is_absolute():
-        local_path = _ROOT / local_path
-    if local_path.exists():
-        with open(local_path, "r", encoding="utf-8") as f:
-            local_settings = json.load(f)
-        if not isinstance(local_settings, dict):
-            raise ValueError(f"Training paths config must contain a JSON object: {local_path}")
-        settings.update(local_settings)
-        print(f"[s_gen_v2] Path config: {local_path}")
-    elif paths_config:
-        raise FileNotFoundError(f"Training paths config not found: {local_path}")
+def _configure_paths(args: argparse.Namespace) -> dict[str, str]:
+    """Apply CLI > environment > local/shared config > default precedence."""
+    settings = load_training_settings(_ROOT, args.paths_config)
+    if settings.local_config_path is not None:
+        print(f"[s_gen_v2] Path config: {settings.local_config_path}")
     else:
         print("[s_gen_v2] No local path config; using environment/shared/default paths")
-    return settings
-
-
-def _resolve_configured_path(value: Any) -> str:
-    """Expand a configured path and anchor relative paths at the repo root."""
-    if value is None or str(value).strip() == "":
-        return ""
-    expanded = os.path.expandvars(os.path.expanduser(str(value).strip()))
-    path = Path(expanded)
-    if not path.is_absolute():
-        path = _ROOT / path
-    return str(path)
-
-
-def _configure_paths(args: argparse.Namespace) -> None:
-    """Apply CLI > environment > local/shared config > default precedence."""
-    settings = _load_settings(args.paths_config)
-    specs = {
-        "out_dir": (
-            "NMM_GENERALIST_OUT_DIR", "generalist_output_dir",
-            _ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2",
-        ),
-        "sentinel": (
-            "NMM_SENTINEL_CHECKPOINT", "sentinel_checkpoint",
-            _ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt",
-        ),
-        "malom": ("NMM_MALOM_DB", "malom_db_path", ""),
-        "value_net": ("NMM_VALUE_NET", "value_net_path", _ROOT / "data" / "value_net.npz"),
-        "gap_net": ("NMM_GAP_NET", "gap_net_path", _ROOT / "data" / "gap_net.npz"),
-        "human_db": ("NMM_HUMAN_DB", "human_db_path", _ROOT / "data" / "human_db.sqlite"),
-        "specialist_db": (
-            "NMM_SPECIALIST_DB", "specialist_db_path", _ROOT / "data" / "specialist_db.sqlite",
-        ),
-    }
-    for attr, (env_name, setting_name, default) in specs.items():
-        cli_value = getattr(args, attr)
-        if cli_value is not None:
-            value = cli_value
-        elif env_name in os.environ:
-            value = os.environ[env_name]
-        elif setting_name in settings:
-            value = settings[setting_name]
-        else:
-            value = default
-        setattr(args, attr, _resolve_configured_path(value))
-
-    for attr, flag in (
-        ("sentinel", "no_sentinel"),
-        ("value_net", "no_value_net"),
-        ("gap_net", "no_gap_net"),
-    ):
-        if getattr(args, flag, False):
-            setattr(args, attr, "")
+    sources = configure_generalist_paths(args, root=_ROOT, settings=settings)
+    setattr(args, "_path_sources", sources)
+    return sources
 
 
 def _safe_mean(xs: list[float]) -> float:
@@ -1148,6 +1087,7 @@ def _build_game_diag(
 
 def run(args: argparse.Namespace) -> None:
     _configure_paths(args)
+    validate_generalist_configuration(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
     rng = random.Random(args.seed)
@@ -1809,8 +1749,27 @@ def _finite_positive_float(value: str) -> float:
     return parsed
 
 
-def main() -> None:
+def _policy_hidden_widths(value: str) -> tuple[int, ...]:
+    """Parse a non-empty comma-separated list of positive hidden widths."""
+    try:
+        widths = tuple(int(item.strip()) for item in value.split(","))
+    except (AttributeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be comma-separated positive integers"
+        ) from exc
+    if not widths or any(width <= 0 for width in widths):
+        raise argparse.ArgumentTypeError("must be comma-separated positive integers")
+    return widths
+
+
+def _build_argument_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
+    p.add_argument(
+        "--preflight",
+        choices=("smoke", "long-run"),
+        default=None,
+        help="Run read-only readiness checks and exit without training",
+    )
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
     p.add_argument("--paths-config", default=None, type=str,
@@ -1870,16 +1829,52 @@ def main() -> None:
                    help="LookaheadAdvisor simulation depth during training (default 5). "
                         "Feature width stays at 15-ply * 4 = 60 floats via padding, so inference "
                         "at full 15 plies matches. Big training speed-up.")
-    p.add_argument("--policy-hidden",       type=str,   default="256,128",
+    p.add_argument("--policy-hidden",       type=_policy_hidden_widths, default=(256, 128),
                    help="Comma-separated hidden layer widths for the policy MLP "
                         "(default '256,128'). Checkpoint is reset if this differs from the "
                         "saved architecture.")
     p.add_argument("--batch-games",          type=int,  default=1,
                    help="Number of games to run in parallel per batch (default 1 = sequential)")
-    args = p.parse_args()
-    args.policy_hidden = tuple(int(x) for x in args.policy_hidden.split(","))
+    return p
+
+
+def _reject_duplicate_cli_options(
+    parser: argparse.ArgumentParser, argv: list[str]
+) -> None:
+    """Reject repeated option names instead of silently accepting the last value."""
+    seen: set[str] = set()
+    supported = parser._option_string_actions
+    for token in argv:
+        option = token.split("=", 1)[0]
+        if option not in supported:
+            continue
+        canonical = supported[option].dest
+        if canonical in seen:
+            parser.error(f"option {option} was specified more than once")
+        seen.add(canonical)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    p = _build_argument_parser()
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    _reject_duplicate_cli_options(p, raw_argv)
+    args = p.parse_args(raw_argv)
+    if args.preflight is not None:
+        try:
+            path_sources = _configure_paths(args)
+            report = run_generalist_preflight(
+                args,
+                mode=args.preflight,
+                root=_ROOT,
+                path_sources=path_sources,
+            )
+        except (FileNotFoundError, PreflightConfigurationError) as exc:
+            p.error(str(exc))
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+        return 0 if report["verdict"] == "ready_for_smoke" else 2
     run(args)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

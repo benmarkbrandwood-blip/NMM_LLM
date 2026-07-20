@@ -5,12 +5,17 @@ from __future__ import annotations
 from argparse import Namespace
 
 from scripts import train_s_gen_v2 as trainer
+from learned_ai.training.generalist_preflight import LoadedTrainingSettings
 
 
 def test_disable_flags_override_configured_legacy_model_paths(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setattr(trainer, "_load_settings", lambda _path: {})
+    monkeypatch.setattr(
+        trainer,
+        "load_training_settings",
+        lambda _root, _path: LoadedTrainingSettings({}, {}, None),
+    )
     args = Namespace(
         paths_config=None,
         out_dir=str(tmp_path / "out"),
