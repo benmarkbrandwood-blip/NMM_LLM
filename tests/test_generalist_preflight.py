@@ -357,7 +357,7 @@ def test_exact_resume_preflight_binds_semantics_and_specialist_db(
         git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
     )
 
-    assert compatible["verdict"] == "needs_decision"
+    assert compatible["verdict"] == "ready_for_smoke"
     assert compatible["errors"] == []
 
     connection = sqlite3.connect(specialist_path)

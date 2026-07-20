@@ -153,6 +153,33 @@ def test_weights_only_manifest_records_source_checkpoint_lineage(
     assert source.trust_level == "lineage_labeled_weights_only"
 
 
+def test_exact_resume_manifest_records_full_state_continuation(tmp_path: Path) -> None:
+    args = _args(tmp_path)
+    args.start_mode = "exact-resume"
+    report = _report()
+    report["checks"]["checkpoint"] = {
+        "identity": "source-identity",
+        "format": "checkpoint-envelope-v2",
+    }
+
+    manifest = build_generalist_run_manifest(
+        args,
+        report=report,
+        root=tmp_path,
+        command=("python", "trainer.py"),
+        run_id="run-resume",
+        experiment_id="experiment",
+        created_at_utc="2026-07-20T09:00:00Z",
+        environment={"python": "3.13.1"},
+    )
+
+    source = next(
+        asset for asset in manifest.assets if asset.logical_name == "source_checkpoint"
+    )
+    assert source.trust_level == "integrity_verified_exact_resume"
+    assert source.intended_use == "complete_training_state_continuation"
+
+
 def test_initial_contract_publication_is_atomic_and_no_overwrite(
     tmp_path: Path,
 ) -> None:

@@ -5,7 +5,7 @@ phase (sentinel delta + heuristic delta + mill bonus).  No phase restriction.
 Malom reward = 0.  Gap net included in lookahead (12-ply × 6 signals).
 
 The CLI requires either a read-only preflight or a contract-backed launch.
-The corrected baseline currently permits fresh launches only.
+Fresh, weights-only, and fail-closed exact-resume launches are supported.
 
 Usage
 -----
@@ -79,6 +79,7 @@ from learned_ai.training.checkpoint_envelope import (
     capture_rng_state,
     is_checkpoint_envelope,
     load_checkpoint,
+    restore_rng_state,
     save_checkpoint,
 )
 
@@ -409,6 +410,93 @@ def _make_checkpoint_payload(
             "mutable_assets": {"specialist_db": dict(specialist_db_identity)},
         },
     )
+
+
+def _restore_exact_resume_payload(
+    payload: CheckpointPayload,
+    *,
+    optimizer: torch.optim.Optimizer,
+    game_rng: random.Random,
+    frozen_model: ScaffoldedPolicyNet,
+    rolling_win: int,
+    bucket_window: int,
+) -> dict[str, Any]:
+    """Validate and restore a complete Generalist continuation payload."""
+    trainer_state = payload.trainer_state
+    rolling = trainer_state["rolling_metrics"]
+    curriculum = trainer_state["curriculum"]
+    target = trainer_state["target_network"]
+    recovery = trainer_state["recovery_state"]
+    cursor = payload.data_state["cursor"]
+    buckets = payload.data_state["buckets"]
+    expected_nested_fields = (
+        (
+            "rolling_metrics",
+            rolling,
+            {
+                "win_history",
+                "win_history_heuristic",
+                "diag_buffer",
+                "best_win_rate",
+                "best_win_rate_at_diff",
+            },
+        ),
+        ("curriculum", curriculum, {"games_at_level"}),
+        ("target_network", target, {"games_since_update", "model_state"}),
+        (
+            "recovery_state",
+            recovery,
+            {
+                "grace",
+                "pending_steps",
+                "last_update_losses",
+                "source_checkpoint",
+                "checkpoint_sequence",
+            },
+        ),
+        ("cursor", cursor, {"completed_games"}),
+        ("buckets", buckets, {"branch_history"}),
+    )
+    for name, value, expected in expected_nested_fields:
+        if not isinstance(value, dict) or set(value) != expected:
+            raise RuntimeError(f"exact-resume {name} state is incomplete")
+    if cursor["completed_games"] != trainer_state["game_count"]:
+        raise RuntimeError("exact-resume data cursor disagrees with game_count")
+    if payload.optimizer_state is None:
+        raise RuntimeError("exact-resume checkpoint has no optimizer state")
+    if payload.scheduler_state is not None or payload.scaler_state is not None:
+        raise RuntimeError("exact-resume checkpoint uses unsupported trainer state")
+
+    diagnostics = [GameDiag(**dict(item)) for item in rolling["diag_buffer"]]
+    last_losses = tuple(recovery["last_update_losses"])
+    if len(last_losses) != 3:
+        raise RuntimeError("exact-resume loss state must contain three values")
+
+    optimizer.load_state_dict(payload.optimizer_state)
+    frozen_model.load_state_dict(target["model_state"])
+    restore_rng_state(payload.rng_state, component_rngs={"game": game_rng})
+    return {
+        "game_count": int(trainer_state["game_count"]),
+        "batch_count": int(trainer_state["batch_count"]),
+        "update_count": int(trainer_state["update_count"]),
+        "difficulty": int(trainer_state["difficulty"]),
+        "temperature": float(trainer_state["temperature"]),
+        "win_history": deque(rolling["win_history"], maxlen=rolling_win),
+        "win_history_heuristic": deque(
+            rolling["win_history_heuristic"], maxlen=rolling_win
+        ),
+        "diag_buffer": diagnostics,
+        "games_at_level": int(curriculum["games_at_level"]),
+        "best_win_rate": float(rolling["best_win_rate"]),
+        "best_win_rate_at_diff": float(rolling["best_win_rate_at_diff"]),
+        "branch_bucket_history": deque(
+            buckets["branch_history"], maxlen=bucket_window
+        ),
+        "games_since_target_update": int(target["games_since_update"]),
+        "recovery_grace": int(recovery["grace"]),
+        "pending_steps": list(recovery["pending_steps"]),
+        "last_update_losses": last_losses,
+    }
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1308,7 +1396,18 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         args.policy_hidden,
         start_mode=args.start_mode,
     )
-    difficulty = _apply_diff_start_override(difficulty, args)
+    exact_resume = None
+    if args.start_mode == "exact-resume":
+        if resume_path is None or not is_checkpoint_envelope(resume_path):
+            raise RuntimeError("exact-resume requires a CheckpointEnvelope v2 source")
+        exact_resume = load_checkpoint(resume_path, map_location=device)
+        checkpoint_specialist = exact_resume.payload.data_state["mutable_assets"][
+            "specialist_db"
+        ]["sha256"]
+        if specialist_db.checkpoint_identity()["sha256"] != checkpoint_specialist:
+            raise RuntimeError("SpecialistDB changed after exact-resume preflight")
+    else:
+        difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
         print("[s_gen_v2] No checkpoint found — starting from scratch")
     else:
@@ -1353,7 +1452,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
           f"max {args.max_branches_per_game} branches/game")
 
     # s1a warm-start: run once before RL if starting from game 0
-    if not args.no_s1a_warmstart and start_game == 0:
+    if (
+        not args.no_s1a_warmstart
+        and start_game == 0
+        and args.start_mode != "exact-resume"
+    ):
         print(f"[s_gen_v2] Running s1a warm-start (pre-RL imitation) from {args.s1a_data}")
         _run_s1b_refresher(model, device, args.s1a_data,
                            epochs=args.s1b_refresher_epochs,
@@ -1385,6 +1488,37 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
     batch_count = 0
     update_count = 0
+    if exact_resume is not None:
+        restored = _restore_exact_resume_payload(
+            exact_resume.payload,
+            optimizer=opt,
+            game_rng=rng,
+            frozen_model=frozen_opp._model,
+            rolling_win=args.rolling_win,
+            bucket_window=args.bucket_window,
+        )
+        game_count = restored["game_count"]
+        batch_count = restored["batch_count"]
+        update_count = restored["update_count"]
+        difficulty = restored["difficulty"]
+        temperature = restored["temperature"]
+        win_history = restored["win_history"]
+        win_history_heuristic = restored["win_history_heuristic"]
+        diag_buffer = restored["diag_buffer"]
+        games_at_level = restored["games_at_level"]
+        best_win_rate = restored["best_win_rate"]
+        best_win_rate_at_diff = restored["best_win_rate_at_diff"]
+        branch_bucket_history = restored["branch_bucket_history"]
+        games_since_target_update = restored["games_since_target_update"]
+        recovery_grace = restored["recovery_grace"]
+        ep_steps = restored["pending_steps"]
+        last_update_pl, last_update_vl, last_update_ent = restored[
+            "last_update_losses"
+        ]
+        print(
+            f"[s_gen_v2] Exact state restored at game {game_count}, "
+            f"batch {batch_count}, update {update_count}"
+        )
     checkpoint_sequence = 0
     parent_checkpoint_id: Optional[str] = getattr(
         args, "_source_checkpoint_id", None

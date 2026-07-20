@@ -7,6 +7,7 @@ import random
 from collections import deque
 from pathlib import Path
 
+import pytest
 import torch
 
 from learned_ai.agents.specialist_router import _load_spec_model
@@ -118,6 +119,71 @@ def test_weights_only_model_import_resets_all_training_counters(tmp_path: Path) 
     assert best_win_rate == 0.0
     assert difficulty == trainer.DIFF_START
     assert source == str(path)
+
+
+def test_exact_resume_restores_complete_mutable_state() -> None:
+    model = _model()
+    payload = _payload(model, game_count=11)
+    payload.trainer_state["batch_count"] = 6
+    payload.trainer_state["update_count"] = 4
+    payload.trainer_state["temperature"] = 0.42
+    payload.trainer_state["curriculum"]["games_at_level"] = 9
+    payload.trainer_state["target_network"]["games_since_update"] = 5
+    payload.trainer_state["recovery_state"]["grace"] = 2
+    payload.trainer_state["recovery_state"]["last_update_losses"] = (
+        0.4,
+        0.5,
+        0.6,
+    )
+    payload.data_state["buckets"]["branch_history"] = ["midgame", "endgame"]
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.5)
+    game_rng = random.Random(99)
+    frozen = copy.deepcopy(model)
+    for parameter in frozen.parameters():
+        parameter.data.zero_()
+    random.seed(999)
+    torch.manual_seed(999)
+
+    restored = trainer._restore_exact_resume_payload(
+        payload,
+        optimizer=optimizer,
+        game_rng=game_rng,
+        frozen_model=frozen,
+        rolling_win=40,
+        bucket_window=300,
+    )
+
+    assert restored["game_count"] == 11
+    assert restored["batch_count"] == 6
+    assert restored["update_count"] == 4
+    assert restored["temperature"] == 0.42
+    assert restored["games_at_level"] == 9
+    assert restored["games_since_target_update"] == 5
+    assert restored["recovery_grace"] == 2
+    assert restored["last_update_losses"] == (0.4, 0.5, 0.6)
+    assert list(restored["branch_bucket_history"]) == ["midgame", "endgame"]
+    assert optimizer.param_groups[0]["lr"] == 1e-4
+    assert game_rng.getstate() == payload.rng_state["components"]["game"]
+    assert random.getstate() == payload.rng_state["python"]
+    assert torch.equal(torch.get_rng_state(), payload.rng_state["torch_cpu"])
+    for name, tensor in model.state_dict().items():
+        assert torch.equal(frozen.state_dict()[name], tensor)
+
+
+def test_exact_resume_rejects_inconsistent_data_cursor() -> None:
+    model = _model()
+    payload = _payload(model, game_count=7)
+    payload.data_state["cursor"]["completed_games"] = 6
+
+    with pytest.raises(RuntimeError, match="cursor disagrees"):
+        trainer._restore_exact_resume_payload(
+            payload,
+            optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
+            game_rng=random.Random(99),
+            frozen_model=copy.deepcopy(model),
+            rolling_win=40,
+            bucket_window=300,
+        )
 
 
 def test_inference_loader_reads_v2_model_config_and_weights(tmp_path: Path) -> None:

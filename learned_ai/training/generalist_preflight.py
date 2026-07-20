@@ -653,12 +653,6 @@ def run_generalist_preflight(
             "long-run update, opponent, budget, cadence, and stop choices are not "
             "yet frozen in the experiment contract"
         )
-    if args.start_mode == "exact-resume":
-        decisions.append(
-            "exact resume remains disabled until mutable SpecialistDB state is "
-            "bound to the checkpoint"
-        )
-
     output = Path(args.out_dir)
     output_report = {
         "exists": output.exists(),

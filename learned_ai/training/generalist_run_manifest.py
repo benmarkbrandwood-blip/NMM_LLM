@@ -62,7 +62,9 @@ def collect_runtime_environment() -> dict[str, Any]:
     return environment
 
 
-def _asset_refs(report: Mapping[str, Any]) -> tuple[AssetManifestRef, ...]:
+def _asset_refs(
+    report: Mapping[str, Any], *, start_mode: str
+) -> tuple[AssetManifestRef, ...]:
     checks = report["checks"]
     malom = checks["malom"]
     specialist = checks["specialist_db"]
@@ -104,14 +106,23 @@ def _asset_refs(report: Mapping[str, Any]) -> tuple[AssetManifestRef, ...]:
     ]
     checkpoint = checks.get("checkpoint")
     if checkpoint is not None:
+        exact_resume = start_mode == "exact-resume"
         assets.append(
             AssetManifestRef(
                 logical_name="source_checkpoint",
                 role="weights_import",
                 identity=checkpoint["identity"],
                 schema_version=checkpoint["format"],
-                trust_level="lineage_labeled_weights_only",
-                intended_use="model_weights_only",
+                trust_level=(
+                    "integrity_verified_exact_resume"
+                    if exact_resume
+                    else "lineage_labeled_weights_only"
+                ),
+                intended_use=(
+                    "complete_training_state_continuation"
+                    if exact_resume
+                    else "model_weights_only"
+                ),
             )
         )
     return tuple(assets)
@@ -156,7 +167,7 @@ def build_generalist_run_manifest(
         config_sha256=config_sha256,
         environment=dict(environment or collect_runtime_environment()),
         seeds={"run": args.seed},
-        assets=_asset_refs(report),
+        assets=_asset_refs(report, start_mode=args.start_mode),
         components={
             "sentinel": not args.no_sentinel,
             "value_net": not args.no_value_net,
