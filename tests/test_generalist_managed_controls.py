@@ -105,3 +105,30 @@ def test_game_ai_passes_fixed_node_budget_to_native_search(
     assert move == {"from": None, "to": "a7", "capture": None}
     assert captured["node_limit"] == 25_000
     assert ai._nodes == 25_000
+
+
+def test_fixed_node_search_returns_move_when_qsearch_exhausts_budget() -> None:
+    """Regression for the managed smoke stop on a mid-placement position.
+
+    Depth-1 quiescence on the first ordered root move can burn the entire
+    fixed node budget before any root score is recorded. Native search must
+    still return a legal move for training opponents.
+    """
+    from ai.native_core import RUST_AVAILABLE
+
+    if not RUST_AVAILABLE:
+        pytest.skip("nmm_core is required for fixed-node search")
+
+    board = BoardState.from_fen_string("...W.....W.B...........B|W|2|2")
+    legal = get_all_legal_moves(board)
+    assert legal
+    ai = trainer._GA(
+        color="W",
+        difficulty=1,
+        override_node_budget=500_000,
+    )
+
+    move = ai.choose_move(board)
+
+    assert move in legal
+    assert ai._nodes == 500_000

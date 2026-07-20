@@ -626,6 +626,55 @@ impl Searcher {
         }
         result
     }
+
+    /// Score every root move with a static eval when a fixed node budget is
+    /// exhausted inside the first root move's quiescence search. Fixed-node
+    /// callers require a non-empty legal move list whenever legal moves exist.
+    fn root_static_scores(
+        &self,
+        board: &Board,
+        preferred: &[(Option<u8>, u8, Option<u8>)],
+    ) -> Vec<RootMoveScore> {
+        let mut moves = self.ordered_moves(board, None, 0, None);
+        if !preferred.is_empty() {
+            let preferred_set: std::collections::HashSet<(Option<u8>, u8, Option<u8>)> =
+                preferred.iter().cloned().collect();
+            moves.sort_by_key(|mv| {
+                if preferred_set.contains(&(mv.from, mv.to, mv.capture)) {
+                    0u8
+                } else {
+                    1u8
+                }
+            });
+        }
+        let color = board.side_to_move;
+        let in_placement = get_phase(board, color) == Phase::Place;
+        let mut result = Vec::with_capacity(moves.len());
+        for mv in moves.iter() {
+            let nb = make_move(board, mv);
+            let b64_penalty: i64 = if in_placement
+                && mv.from.is_none()
+                && !move_forms_mill(board, color, mv.from, mv.to)
+            {
+                let sq = mv.to as usize;
+                let occupied_after = nb.white | nb.black;
+                let free_after = (ADJACENCY[sq] & !occupied_after & FULL_MASK).count_ones();
+                if free_after == 0 {
+                    1500
+                } else if free_after == 1 {
+                    400
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            let opp = nb.side_to_move;
+            let score = -evaluate_v2(&nb, opp, self.eval_scale) - b64_penalty;
+            result.push(RootMoveScore { mv: *mv, score });
+        }
+        result
+    }
 }
 
 
@@ -759,6 +808,15 @@ pub fn iterative_deepening_scored(
         }
     }
     best.nodes = searcher.nodes;
+    // A fixed node budget can be exhausted inside the first root move's
+    // quiescence search before any root score is recorded. Callers that bind
+    // training to fixed work still require a legal move whenever one exists.
+    if best.scored_moves.is_empty() {
+        best.scored_moves = searcher.root_static_scores(board, preferred);
+        if best.depth_reached == 0 && !best.scored_moves.is_empty() {
+            best.depth_reached = 1;
+        }
+    }
     best.scored_moves.sort_by(|a, b| b.score.cmp(&a.score));
     best
 }
@@ -927,5 +985,40 @@ mod tests {
 
         assert_eq!(r.nodes, limit);
         assert!(!r.scored_moves.is_empty());
+    }
+
+    #[test]
+    fn fixed_node_budget_still_returns_moves_when_qsearch_exhausts_first_root() {
+        // Captured from the managed smoke failure: after two placements each,
+        // depth-1 quiescence on the first ordered root move burned the entire
+        // 500k budget before any root score was recorded.
+        let board = Board {
+            white: 520,
+            black: 8_390_656,
+            white_placed: 2,
+            black_placed: 2,
+            side_to_move: Color::White,
+        };
+        assert!(!legal_moves(&board).is_empty());
+        let limit = 500_000;
+        let r = iterative_deepening_scored(
+            &board,
+            19,
+            1,
+            Some(limit),
+            &[],
+            Arc::new(TranspositionTable::new()),
+            HashSet::new(),
+            None,
+            None,
+            EvalScale::default(),
+            false,
+        );
+        assert_eq!(r.nodes, limit);
+        assert!(
+            !r.scored_moves.is_empty(),
+            "fixed-node search must return a legal move when legal moves exist"
+        );
+        assert_eq!(r.scored_moves.len(), legal_moves(&board).len());
     }
 }
