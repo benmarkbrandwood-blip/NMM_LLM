@@ -166,9 +166,13 @@ The assets are present, but they are not all equally trustworthy:
   trained from corrected labels.
 - The original maintainer describes the endgame tables and `fullgame.bin` as
   outputs of their backwards solver. That is a provenance statement, not an
-  independent correctness check. Record hashes and run reader/differential
-  validation before using those files as authoritative labels or acceptance
-  evidence.
+  independent correctness check. A follow-up read-only inventory and sampling
+  audit found missing table coverage plus concentrated unknown entries in four
+  loaded tables; see
+  [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md).
+  That diagnostic is not a full differential proof. Record hashes and complete
+  the reviewed validation before using those files as authoritative labels or
+  acceptance evidence.
 - `gap_net_path` is deliberately blank in the local path configuration even
   though the files exist. Do not enable it until its label provenance is
   reviewed.
@@ -476,6 +480,10 @@ additional smoke, a long training job, a push, or a history rewrite.
 
 ## Reference Material
 
+- [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
+  read-only analysis of the reported 10/20 phase profile, the delivered
+  checkpoint boundary, provisional local WDL coverage evidence, and questions
+  for the original maintainer.
 - [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): target
   architecture, evidence boundaries, and staged acceptance plan.
 - [`docs/malom-fix.md`](../malom-fix.md): decoder investigation and correction
