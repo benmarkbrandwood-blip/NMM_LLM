@@ -756,9 +756,13 @@ def run_generalist_preflight(
         "kind": "run_directory",
         "isolated": not output.exists(),
     }
-    if output.exists():
+    if args.start_mode == "fresh" and output.exists():
         output_report["error"] = "fresh output path already exists"
         errors.append("fresh output path must not already exist")
+    elif output.exists() and args.start_mode == "exact-resume":
+        # Managed continuation always uses a new empty segment directory.
+        output_report["error"] = "exact-resume output path already exists"
+        errors.append("exact-resume output path must not already exist")
 
     malom_report = _probe_malom(
         Path(args.malom), Path(args.malom_manifest)

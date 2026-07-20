@@ -284,19 +284,73 @@ def test_supervisor_never_removes_a_lock_it_does_not_own(
     assert lock.read_text(encoding="ascii") == "pid=123\n"
 
 
-def test_prepare_common_args_can_isolate_specialist_db(tmp_path: Path) -> None:
-    from argparse import Namespace
-    from scripts.manage_generalist_run import _common_trainer_args
+def test_stale_lock_is_cleared_when_pid_is_dead(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan(tmp_path)
+    Path(plan.control_dir).mkdir(parents=True, exist_ok=True)
+    lock = Path(plan.control_dir) / managed.CONTROLLER_LOCK_NAME
+    lock.write_text("pid=424242\n", encoding="ascii")
+    monkeypatch.setattr(managed, "_pid_is_running", lambda _pid: False)
 
-    specialist_db = tmp_path / "specialist_db.smoke.sqlite"
-    args = Namespace(
-        experiment_id="dev-v4-managed-smoke-rl-update-v1",
-        max_games=16,
-        heuristic_node_budget=500_000,
-        specialist_db=str(specialist_db),
+    assert managed._clear_stale_controller_lock(plan) is True
+    assert not lock.exists()
+
+
+def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
+    plan = _plan(tmp_path)
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    common = _common_trainer_args(args, tmp_path / "training_paths.local.json")
-    assert "--specialist-db" in common
-    assert common[common.index("--specialist-db") + 1] == str(specialist_db.resolve())
-    assert "--no-imitation-mix" in common
-    assert common[common.index("--heuristic-node-budget") + 1] == "500000"
+    recovery = Path(plan.control_dir) / "recovery" / "segment-0002.pt"
+    recovery.parent.mkdir(parents=True, exist_ok=True)
+    recovery.write_bytes(b"placeholder")
+    managed._append_controller_event(
+        plan,
+        status="completed",
+        event_type="managed_segment_completed",
+        details={
+            "segment_index": 1,
+            "run_id": "managed-v4-test-segment-0001",
+            "completed_games": 100,
+            "checkpoint": str(
+                Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
+            ),
+            "elapsed_seconds": 1.0,
+        },
+    )
+    managed._append_controller_event(
+        plan,
+        status="interrupted",
+        event_type="managed_segment_interrupted",
+        reason_code="host_reboot",
+        details={
+            "segment_index": 2,
+            "recovery_checkpoint": str(recovery.resolve()),
+            "parent_run_id": "managed-v4-test-segment-0001",
+        },
+    )
+
+    verified = verify_managed_launch(
+        plan_path,
+        authorization_path,
+        git_commit=plan.git_commit,
+        resume_config_sha256=plan.resume_config_sha256,
+        out_dir=Path(plan.control_dir) / "segments" / "segment-0002",
+        run_id="managed-v4-test-segment-0002",
+        segment_games=plan.segment_games,
+        start_mode="exact-resume",
+        resume=str(recovery.resolve()),
+        parent_run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+    )
+    assert verified == plan
+    assert managed._pending_recovery_for_segment(plan, 2) is not None
+

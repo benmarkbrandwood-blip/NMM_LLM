@@ -6,17 +6,22 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import subprocess
 import sys
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar
 from uuid import uuid4
 
-from learned_ai.training.checkpoint_envelope import load_checkpoint
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointPayload,
+    load_checkpoint,
+    save_checkpoint,
+)
 from learned_ai.training.generalist_run_manifest import (
     RUN_EVENT_LEDGER_NAME,
     utc_now_text,
@@ -518,6 +523,268 @@ def _segment_output_dir(plan: ManagedPlan, segment_index: int) -> Path:
     return Path(plan.control_dir) / "segments" / f"segment-{segment_index:04d}"
 
 
+def _pid_is_running(pid: int) -> bool:
+    if pid <= 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
+def _parse_lock_pid(lock: Path) -> int | None:
+    if not lock.is_file():
+        return None
+    text = lock.read_text(encoding="ascii").strip()
+    if not text.startswith("pid="):
+        return None
+    try:
+        return int(text.removeprefix("pid=").strip())
+    except ValueError:
+        return None
+
+
+def _clear_stale_controller_lock(plan: ManagedPlan) -> bool:
+    """Remove a controller.lock only when its recorded PID is dead."""
+    lock = Path(plan.control_dir) / CONTROLLER_LOCK_NAME
+    if not lock.exists():
+        return False
+    pid = _parse_lock_pid(lock)
+    if pid is None:
+        raise ManagedContractError("managed control lock is malformed")
+    if _pid_is_running(pid):
+        raise ManagedContractError(
+            "another supervisor owns the managed control lock"
+        )
+    lock.unlink()
+    return True
+
+
+def _specialist_db_path_for_plan(plan: ManagedPlan) -> Path:
+    args = plan.common_trainer_args
+    if "--specialist-db" in args:
+        return Path(args[args.index("--specialist-db") + 1]).resolve(strict=True)
+    paths = json.loads(Path(plan.paths_config).read_text(encoding="utf-8"))
+    raw = paths.get("specialist_db_path")
+    if not isinstance(raw, str) or not raw.strip():
+        raise ManagedContractError("plan paths config lacks specialist_db_path")
+    return Path(raw).resolve(strict=True)
+
+
+def _live_specialist_identity(path: Path) -> dict[str, Any]:
+    from learned_ai.data.specialist_db import SpecialistDB
+
+    db = SpecialistDB(str(path))
+    try:
+        db.require_trusted_malom_labels()
+        return db.checkpoint_identity()
+    finally:
+        db.close()
+
+
+def _write_recovery_checkpoint(
+    source: Path,
+    destination: Path,
+    *,
+    specialist_identity: Mapping[str, Any],
+) -> Path:
+    """Publish a recovery envelope whose SpecialistDB identity matches live state."""
+    envelope = load_checkpoint(source, map_location="cpu")
+    payload_dict = envelope.payload.to_dict()
+    data_state = dict(payload_dict["data_state"])
+    mutable_assets = dict(data_state["mutable_assets"])
+    mutable_assets["specialist_db"] = dict(specialist_identity)
+    data_state["mutable_assets"] = mutable_assets
+    payload_dict["data_state"] = data_state
+    assets = dict(envelope.descriptor.asset_identities)
+    assets["specialist_db"] = str(specialist_identity["sha256"])
+    descriptor = replace(
+        envelope.descriptor,
+        checkpoint_id=f"{envelope.descriptor.checkpoint_id}:reboot-recovery",
+        save_reason="interrupted-host-reboot-recovery",
+        created_at_utc=utc_now_text(),
+        asset_identities=assets,
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise ManagedContractError("recovery checkpoint already exists")
+    save_checkpoint(destination, descriptor, CheckpointPayload.from_dict(payload_dict), previous_copies=0)
+    return destination.resolve(strict=True)
+
+
+def _pending_recovery_for_segment(
+    plan: ManagedPlan, segment_index: int
+) -> dict[str, Any] | None:
+    """Return host-reboot recovery details still pending for one segment index."""
+    ledger = Path(plan.control_dir) / CONTROLLER_LEDGER_NAME
+    if not ledger.exists():
+        return None
+    for event in reversed(load_run_events(ledger)):
+        details = dict(event.details)
+        if int(details.get("segment_index", -1)) != segment_index:
+            continue
+        if event.event_type == "managed_segment_completed":
+            return None
+        if (
+            event.event_type == "managed_segment_interrupted"
+            and event.reason_code == "host_reboot"
+            and details.get("recovery_checkpoint")
+        ):
+            return details
+    return None
+
+
+def _plan_used_host_reboot_recovery(plan: ManagedPlan) -> bool:
+    ledger = Path(plan.control_dir) / CONTROLLER_LEDGER_NAME
+    if not ledger.exists():
+        return False
+    return any(
+        event.event_type == "managed_segment_interrupted"
+        and event.reason_code == "host_reboot"
+        for event in load_run_events(ledger)
+    )
+
+
+def recover_interrupted_segment(
+    plan_path: str | Path,
+    authorization_path: str | Path,
+) -> dict[str, Any]:
+    """Quarantine a reboot-interrupted segment and publish a recovery checkpoint.
+
+    Incomplete mid-segment work is not accepted as completed evidence. The next
+    supervised segment exact-resumes from the interrupted latest.pt after the
+    live SpecialistDB identity is rebound into a dedicated recovery envelope.
+    """
+    plan_path = Path(plan_path).resolve(strict=False)
+    authorization_path = Path(authorization_path).resolve(strict=False)
+    plan = load_managed_plan(plan_path)
+    _verify_authorization(plan, authorization_path)
+    _assert_managed_git_state(plan, allow_recovery_descendant=True)
+    if _file_sha256(Path(plan.paths_config)) != plan.paths_config_sha256:
+        raise ManagedContractError("managed paths configuration has changed")
+
+    completed_events = _completed_segment_events(plan)
+    pending_index = len(completed_events) + 1
+    existing = _pending_recovery_for_segment(plan, pending_index)
+    if existing is not None:
+        return {
+            "state": "stopped_for_agent_review",
+            "summary": "Interrupted-segment recovery is already prepared.",
+            "recovery": existing,
+            "status": managed_status(plan_path, authorization_path),
+        }
+
+    _clear_stale_controller_lock(plan)
+
+    ledger_events = load_run_events(Path(plan.control_dir) / CONTROLLER_LEDGER_NAME)
+    if not ledger_events:
+        raise ManagedContractError("managed controller ledger is empty")
+    last = ledger_events[-1]
+    if last.event_type != "managed_segment_started" or last.status != "running":
+        raise ManagedContractError(
+            "managed recovery requires a running segment interrupted by host loss"
+        )
+
+    segment_index = int(last.details["segment_index"])
+    completed_events = _completed_segment_events(plan)
+    if segment_index != len(completed_events) + 1:
+        raise ManagedContractError("interrupted segment index does not follow completions")
+    previous_completed_games = (
+        int(completed_events[-1].details["completed_games"]) if completed_events else 0
+    )
+    expected_games = min(
+        previous_completed_games + plan.segment_games,
+        plan.max_games,
+    )
+    incomplete = _segment_output_dir(plan, segment_index)
+    if not incomplete.exists():
+        _append_controller_event(
+            plan,
+            status="interrupted",
+            event_type="managed_segment_interrupted",
+            reason_code="host_reboot",
+            details={
+                "segment_index": segment_index,
+                "incomplete_output": None,
+                "recovery_checkpoint": None,
+            },
+        )
+        return managed_status(plan_path, authorization_path)
+
+    latest = incomplete / "latest.pt"
+    if not latest.is_file():
+        raise ManagedContractError("interrupted segment has no latest.pt to recover")
+    envelope = load_checkpoint(latest, map_location="cpu")
+    game_count = int(envelope.payload.trainer_state["game_count"])
+    if envelope.descriptor.run_id != _segment_run_id(plan, segment_index):
+        raise ManagedContractError("interrupted checkpoint run identity differs")
+    if not previous_completed_games < game_count < expected_games:
+        raise ManagedContractError(
+            "interrupted checkpoint game_count is outside the recoverable window"
+        )
+
+    stamp = datetime.now().strftime("%Y%m%dT%H%M%SZ")
+    quarantine = (
+        Path(plan.control_dir)
+        / "quarantine"
+        / f"segment-{segment_index:04d}.interrupted-{stamp}"
+    )
+    quarantine.parent.mkdir(parents=True, exist_ok=True)
+    if quarantine.exists():
+        raise ManagedContractError("quarantine target already exists")
+    incomplete.rename(quarantine)
+
+    specialist_path = _specialist_db_path_for_plan(plan)
+    backup_dir = Path(plan.control_dir) / "quarantine" / f"specialist-db-{stamp}"
+    backup_dir.mkdir(parents=True, exist_ok=False)
+    for suffix in ("", "-wal", "-shm"):
+        src = Path(str(specialist_path) + suffix) if suffix else specialist_path
+        if src.exists():
+            shutil.copy2(src, backup_dir / src.name)
+    specialist_identity = _live_specialist_identity(specialist_path)
+    recovery_checkpoint = _write_recovery_checkpoint(
+        quarantine / "latest.pt",
+        Path(plan.control_dir) / "recovery" / f"segment-{segment_index:04d}.pt",
+        specialist_identity=specialist_identity,
+    )
+    details = {
+        "segment_index": segment_index,
+        "incomplete_output": str(quarantine.resolve(strict=False)),
+        "recovery_checkpoint": str(recovery_checkpoint),
+        "resume_game_count": game_count,
+        "expected_segment_end": expected_games,
+        "parent_run_id": (
+            None
+            if not completed_events
+            else str(completed_events[-1].details["run_id"])
+        ),
+        "specialist_db_backup": str(backup_dir.resolve(strict=False)),
+        "specialist_db_sha256": str(specialist_identity["sha256"]),
+    }
+    _append_controller_event(
+        plan,
+        status="interrupted",
+        event_type="managed_segment_interrupted",
+        reason_code="host_reboot",
+        details=details,
+    )
+    status = managed_status(plan_path, authorization_path)
+    return {
+        "state": status["state"],
+        "summary": (
+            "Interrupted segment quarantined; recovery checkpoint is ready for "
+            "exact-resume continuation."
+        ),
+        "recovery": details,
+        "status": status,
+    }
+
+
 def build_segment_command(
     plan: ManagedPlan,
     *,
@@ -588,8 +855,6 @@ def verify_managed_launch(
     """Fail closed unless trainer arguments match one authorized segment."""
     plan = load_managed_plan(plan_path)
     _verify_authorization(plan, authorization_path)
-    if git_commit != plan.git_commit:
-        raise ManagedContractError("managed plan Git commit does not match")
     if resume_config_sha256 != plan.resume_config_sha256:
         raise ManagedContractError("managed plan training semantics do not match")
     if experiment_id != plan.experiment_id:
@@ -602,6 +867,15 @@ def verify_managed_launch(
     if not run_id.startswith(prefix) or not run_id[len(prefix):].isdigit():
         raise ManagedContractError("managed run ID is outside the plan")
     segment_index = int(run_id[len(prefix):])
+    if git_commit != plan.git_commit:
+        if not (
+            _plan_used_host_reboot_recovery(plan)
+            or _pending_recovery_for_segment(plan, segment_index) is not None
+        ):
+            raise ManagedContractError("managed plan Git commit does not match")
+        root = _repository_root()
+        if not _git_is_ancestor(root, plan.git_commit, git_commit):
+            raise ManagedContractError("managed plan Git commit does not match")
     expected_output = _segment_output_dir(plan, segment_index).resolve(strict=False)
     if Path(out_dir).resolve(strict=False) != expected_output:
         raise ManagedContractError("managed output directory is outside the plan")
@@ -613,9 +887,15 @@ def verify_managed_launch(
         expected_resume = (
             _segment_output_dir(plan, segment_index - 1) / "latest.pt"
         ).resolve(strict=False)
+        allowed_resumes = {expected_resume}
+        recovery = _pending_recovery_for_segment(plan, segment_index)
+        if recovery is not None and recovery.get("recovery_checkpoint"):
+            allowed_resumes.add(
+                Path(str(recovery["recovery_checkpoint"])).resolve(strict=False)
+            )
         if start_mode != "exact-resume":
             raise ManagedContractError("managed continuation must use exact resume")
-        if Path(resume).resolve(strict=False) != expected_resume:
+        if Path(resume).resolve(strict=False) not in allowed_resumes:
             raise ManagedContractError("managed continuation checkpoint differs")
         if parent_run_id != expected_previous_run:
             raise ManagedContractError("managed continuation parent differs")
@@ -647,6 +927,37 @@ def _git_state(root: Path) -> tuple[str, bool]:
         ).stdout.strip()
     )
     return commit, dirty
+
+
+def _git_is_ancestor(root: Path, ancestor: str, commit: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, commit],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.returncode == 0
+
+
+def _assert_managed_git_state(
+    plan: ManagedPlan,
+    *,
+    allow_recovery_descendant: bool = False,
+) -> str:
+    """Require a clean worktree on the frozen plan commit, or a recovery descendant."""
+    root = _repository_root()
+    commit, dirty = _git_state(root)
+    if dirty:
+        raise ManagedContractError("managed training requires a clean Git worktree")
+    if commit == plan.git_commit:
+        return commit
+    if (
+        allow_recovery_descendant
+        and _git_is_ancestor(root, plan.git_commit, commit)
+    ):
+        return commit
+    raise ManagedContractError("managed training Git commit has changed")
 
 
 def _inspect_completed_segment(
@@ -715,18 +1026,21 @@ def run_next_segment(
         )
         raise ManagedContractError("managed wall-time resource limit is exhausted")
 
-    root = _repository_root()
-    commit, dirty = _git_state(root)
-    if dirty:
-        raise ManagedContractError("managed training requires a clean Git worktree")
-    if commit != plan.git_commit:
-        raise ManagedContractError("managed training Git commit has changed")
+    completed_preview = _completed_segment_events(plan)
+    pending_index = len(completed_preview) + 1
+    allow_descendant = (
+        _pending_recovery_for_segment(plan, pending_index) is not None
+        or _plan_used_host_reboot_recovery(plan)
+    )
+    _assert_managed_git_state(plan, allow_recovery_descendant=allow_descendant)
     if _file_sha256(Path(plan.paths_config)) != plan.paths_config_sha256:
         raise ManagedContractError("managed paths configuration has changed")
 
-    segment_index = len(completed_events) + 1
+    segment_index = pending_index
     previous_checkpoint = None
     previous_run_id = None
+    recovery = _pending_recovery_for_segment(plan, segment_index)
+    completed_events = completed_preview
     if completed_events:
         previous_checkpoint = Path(
             str(completed_events[-1].details["checkpoint"])
@@ -741,9 +1055,16 @@ def run_next_segment(
                 else 0
             ),
         )
+    if recovery is not None:
+        previous_checkpoint = Path(str(recovery["recovery_checkpoint"]))
+        if previous_run_id is None and recovery.get("parent_run_id"):
+            previous_run_id = str(recovery["parent_run_id"])
     output_dir = _segment_output_dir(plan, segment_index)
     if output_dir.exists():
-        raise ManagedContractError("next managed segment output already exists")
+        raise ManagedContractError(
+            "next managed segment output already exists; run recover-interrupted "
+            "if a host reboot left an incomplete segment"
+        )
     command = build_segment_command(
         plan,
         plan_path=plan_path,
@@ -754,6 +1075,7 @@ def run_next_segment(
         python_executable=python_executable,
     )
 
+    root = _repository_root()
     lock = Path(plan.control_dir) / CONTROLLER_LOCK_NAME
     lock.parent.mkdir(parents=True, exist_ok=True)
     owns_lock = False
@@ -773,6 +1095,12 @@ def run_next_segment(
             details={
                 "segment_index": segment_index,
                 "run_id": _segment_run_id(plan, segment_index),
+                "recovery": recovery is not None,
+                "resume_checkpoint": (
+                    None
+                    if previous_checkpoint is None
+                    else str(previous_checkpoint.resolve(strict=False))
+                ),
             },
         )
         started = time.monotonic()

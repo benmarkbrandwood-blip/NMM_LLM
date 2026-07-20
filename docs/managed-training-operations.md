@@ -142,6 +142,26 @@ wall time. It validates the child run ledger, checkpoint envelope, experiment
 identity, semantic hash, and expected game count before scheduling another
 segment.
 
+### 3b. Host-reboot recovery
+
+If the host reboots while a segment is marked `running`, do not treat the
+incomplete segment as completed. From a clean worktree that is the frozen plan
+commit or a descendant that only adds recovery tooling, run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\manage_generalist_run.py recover-interrupted `
+  --plan <control-directory>\plan.json `
+  --authorization <control-directory>\authorization.json
+```
+
+This clears a stale controller lock when its PID is dead, quarantines the
+incomplete segment directory, backs up the live SpecialistDB, publishes a
+recovery checkpoint whose SpecialistDB identity matches the live database, and
+records `managed_segment_interrupted` with `reason_code=host_reboot`. Then
+relaunch with `run-authorized` or `run-next`. The restarted segment
+exact-resumes from the recovery checkpoint and must still finish at the
+original segment game bound.
+
 ### 4. Agent reports product status
 
 ```powershell
