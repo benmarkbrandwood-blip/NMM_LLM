@@ -384,6 +384,14 @@ def _configure_paths(args: argparse.Namespace) -> None:
             value = default
         setattr(args, attr, _resolve_configured_path(value))
 
+    for attr, flag in (
+        ("sentinel", "no_sentinel"),
+        ("value_net", "no_value_net"),
+        ("gap_net", "no_gap_net"),
+    ):
+        if getattr(args, flag, False):
+            setattr(args, attr, "")
+
 
 def _safe_mean(xs: list[float]) -> float:
     return float(sum(xs) / len(xs)) if xs else 0.0
@@ -1122,13 +1130,15 @@ def run(args: argparse.Namespace) -> None:
     # ── Load components ────────────────────────────────────────────────────────
     sentinel = None
     sent_path = args.sentinel
-    if Path(sent_path).exists():
+    if getattr(args, "no_sentinel", False):
+        print("[s_gen_v2] Sentinel disabled by CLI")
+    elif sent_path and Path(sent_path).exists():
         sentinel = load_advisor(sent_path)
         if sentinel and sentinel.is_loaded():
             print(f"[s_gen_v2] Sentinel loaded: {sent_path}")
         else:
             sentinel = None
-    if sentinel is None:
+    if sentinel is None and not getattr(args, "no_sentinel", False):
         print("[s_gen_v2] Sentinel unavailable — sentinel reward = 0")
 
     db = None
@@ -1148,7 +1158,9 @@ def run(args: argparse.Namespace) -> None:
 
     value_net = None
     vn_path = args.value_net
-    if vn_path and Path(vn_path).exists():
+    if getattr(args, "no_value_net", False):
+        print("[s_gen_v2] Value net disabled by CLI")
+    elif vn_path and Path(vn_path).exists():
         try:
             from ai.value_net import ValueNet as _ValueNet
             value_net = _ValueNet.load(vn_path)
@@ -1160,7 +1172,9 @@ def run(args: argparse.Namespace) -> None:
 
     gap_net = None
     gap_path = args.gap_net
-    if gap_path and Path(gap_path).exists():
+    if getattr(args, "no_gap_net", False):
+        print("[s_gen_v2] Gap net disabled by CLI")
+    elif gap_path and Path(gap_path).exists():
         try:
             from ai.gap_net import GapNet as _GapNet
             gap_net = _GapNet.load(gap_path)
@@ -1757,9 +1771,15 @@ def main() -> None:
                    help="Per-machine JSON path config (default: data/training_paths.local.json when present)")
     p.add_argument("--out-dir",       default=None, type=str)
     p.add_argument("--sentinel",      default=None, type=str)
+    p.add_argument("--no-sentinel",   action="store_true",
+                   help="Disable Sentinel even when a path is configured")
     p.add_argument("--malom",         default=None, type=str)
     p.add_argument("--value-net",     default=None, type=str)
+    p.add_argument("--no-value-net",  action="store_true",
+                   help="Disable ValueNet even when a path is configured")
     p.add_argument("--gap-net",       default=None, type=str)
+    p.add_argument("--no-gap-net",    action="store_true",
+                   help="Disable GapNet even when a path is configured")
     p.add_argument("--human-db",      default=None, type=str)
     p.add_argument("--specialist-db", default=None, type=str)
     p.add_argument("--ppo",      action="store_true")
