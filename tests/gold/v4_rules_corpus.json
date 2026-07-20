@@ -1,0 +1,61 @@
+{
+  "schema_version": "nmm.v4-rules-gold.v1",
+  "cases": [
+    {
+      "id": "new-game",
+      "fen": "........................|W|0|0",
+      "expected": {
+        "terminal": false,
+        "winner": null,
+        "wdl_W": null,
+        "wdl_B": null,
+        "legal_count": 24,
+        "legal_signature": "d7ba320be529011dcd8b57849959ff867a61bfc478460cf8db32008fb0051998"
+      }
+    },
+    {
+      "id": "terminal-atomic-capture",
+      "fen": "WW.W..WBBB..............|W|9|9",
+      "probe_move": {"from": "g4", "to": "g7", "capture": "a4"},
+      "expected": {
+        "terminal": false,
+        "winner": null,
+        "wdl_W": null,
+        "wdl_B": null,
+        "legal_count": 7,
+        "legal_signature": "7131bd4a2834c8c9f062e3ab71881fa287c003ed9645a13223e0a56fa091ac19",
+        "probe_child": {
+          "fen": "WWW...W.BB..............|B|9|9",
+          "terminal": true,
+          "winner": "W",
+          "wdl_W": "W",
+          "wdl_B": "L"
+        }
+      }
+    },
+    {
+      "id": "blocked-side-to-move",
+      "fen": "WWWB..BW.B.....B........|W|9|9",
+      "expected": {
+        "terminal": true,
+        "winner": "B",
+        "wdl_W": "L",
+        "wdl_B": "W",
+        "legal_count": 0,
+        "legal_signature": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      }
+    },
+    {
+      "id": "fly-phase",
+      "fen": "WWW..B.B.......B.......B|W|9|9",
+      "expected": {
+        "terminal": false,
+        "winner": null,
+        "wdl_W": null,
+        "wdl_B": null,
+        "legal_count": 51,
+        "legal_signature": "d28e75cf2c8ac48dc413b510b8f807ee1258181c63e1ad28984f68f230fe911d"
+      }
+    }
+  ]
+}
