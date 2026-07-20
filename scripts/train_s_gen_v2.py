@@ -974,6 +974,16 @@ def _game_torch_generator(seed: int) -> torch.Generator:
     return generator
 
 
+def _initialize_training_rngs(seed: int) -> random.Random:
+    """Seed every trainer-global RNG and return the explicit scheduling RNG."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    return random.Random(seed)
+
+
 def _rollout(
     model:          ScaffoldedPolicyNet,
     device:         torch.device,
@@ -1327,11 +1337,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     validate_generalist_configuration(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
-    rng = random.Random(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(args.seed)
+    rng = _initialize_training_rngs(args.seed)
 
     # ── Load components ────────────────────────────────────────────────────────
     sentinel = None

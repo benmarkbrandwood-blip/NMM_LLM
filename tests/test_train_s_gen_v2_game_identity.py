@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import torch
+import random
 
 from scripts import train_s_gen_v2 as trainer
 
@@ -25,3 +26,13 @@ def test_game_torch_substream_is_independent_of_global_rng() -> None:
     repeated = torch.rand(8, generator=trainer._game_torch_generator(seed))
 
     assert torch.equal(first, repeated)
+
+
+def test_global_python_rng_can_be_replayed_at_a_segment_boundary() -> None:
+    trainer._initialize_training_rngs(42)
+    expected = [random.random() for _ in range(4)]
+    trainer._initialize_training_rngs(999)
+
+    trainer._initialize_training_rngs(42)
+
+    assert [random.random() for _ in range(4)] == expected
