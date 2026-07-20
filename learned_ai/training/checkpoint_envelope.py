@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import math
 import os
 import random
 import shutil
@@ -256,6 +257,7 @@ class CheckpointPayload:
                     f"{field} keys differ; unknown={sorted(actual - expected)}, "
                     f"missing={sorted(expected - actual)}"
                 )
+        _validate_finite_values(self.to_dict(), path="payload")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -280,6 +282,31 @@ class CheckpointPayload:
                 f"checkpoint payload keys differ; unknown={unknown}, missing={missing}"
             )
         return cls(**{field: value[field] for field in _PAYLOAD_FIELDS})
+
+
+def _validate_finite_values(value: Any, *, path: str) -> None:
+    """Reject non-finite persisted state before it can become a checkpoint."""
+    if isinstance(value, torch.Tensor):
+        if (value.is_floating_point() or value.is_complex()) and not bool(
+            torch.isfinite(value).all()
+        ):
+            raise CheckpointFormatError(f"{path} contains non-finite tensor values")
+        return
+    if isinstance(value, np.ndarray):
+        if np.issubdtype(value.dtype, np.inexact) and not bool(np.isfinite(value).all()):
+            raise CheckpointFormatError(f"{path} contains non-finite array values")
+        return
+    if isinstance(value, (float, np.floating)):
+        if not math.isfinite(float(value)):
+            raise CheckpointFormatError(f"{path} contains a non-finite number")
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            _validate_finite_values(item, path=f"{path}.{key}")
+        return
+    if isinstance(value, (tuple, list)):
+        for index, item in enumerate(value):
+            _validate_finite_values(item, path=f"{path}[{index}]")
 
 
 @dataclass(frozen=True)
@@ -542,6 +569,7 @@ def save_checkpoint(
     target = Path(path)
     if descriptor.role == "accepted" and target.exists():
         raise FileExistsError(f"accepted checkpoint already exists: {target}")
+    _validate_finite_values(payload.to_dict(), path="payload")
     target.parent.mkdir(parents=True, exist_ok=True)
     token = uuid4().hex
     payload_temp = target.with_name(f".{target.name}.{token}.payload.tmp")

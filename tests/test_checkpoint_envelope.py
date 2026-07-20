@@ -154,6 +154,29 @@ def test_checkpoint_payload_requires_complete_trainer_and_data_state() -> None:
         replace(payload, data_state=incomplete_data_state)
 
 
+@pytest.mark.parametrize("invalid", [float("nan"), float("inf"), float("-inf")])
+def test_checkpoint_payload_rejects_non_finite_state(invalid: float) -> None:
+    model = torch.nn.Linear(2, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    payload = _payload(model, optimizer)
+    trainer_state = dict(payload.trainer_state)
+    trainer_state["temperature"] = invalid
+
+    with pytest.raises(CheckpointFormatError, match="non-finite"):
+        replace(payload, trainer_state=trainer_state)
+
+
+def test_checkpoint_payload_rejects_non_finite_tensor() -> None:
+    model = torch.nn.Linear(2, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    state = dict(model.state_dict())
+    state["weight"] = state["weight"].clone()
+    state["weight"][0, 0] = float("nan")
+
+    with pytest.raises(CheckpointFormatError, match=r"model_state\.weight"):
+        replace(_payload(model, optimizer), model_state=state)
+
+
 def test_checkpoint_rotates_only_verified_previous_target(tmp_path: Path) -> None:
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
@@ -187,6 +210,35 @@ def test_checkpoint_refuses_to_replace_corrupt_current_target(tmp_path: Path) ->
         )
     assert path.read_bytes() == b"corrupt"
     assert not (tmp_path / "latest.prev0.pt").exists()
+
+
+def test_publication_interruption_leaves_current_checkpoint_readable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model = torch.nn.Linear(2, 1)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+    path = tmp_path / "latest.pt"
+    original = _descriptor()
+    save_checkpoint(path, original, _payload(model, optimizer))
+    real_replace = __import__("os").replace
+
+    def interrupt_final_publish(source: str | Path, destination: str | Path) -> None:
+        if Path(destination) == path and Path(source).name.endswith(".tmp"):
+            raise OSError("injected publication interruption")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(
+        "learned_ai.training.checkpoint_envelope.os.replace",
+        interrupt_final_publish,
+    )
+    with pytest.raises(OSError, match="injected publication interruption"):
+        save_checkpoint(
+            path,
+            replace(original, checkpoint_id="checkpoint-002"),
+            _payload(model, optimizer),
+        )
+
+    assert load_checkpoint(path).descriptor == original
 
 
 def test_accepted_checkpoint_is_immutable(tmp_path: Path) -> None:
