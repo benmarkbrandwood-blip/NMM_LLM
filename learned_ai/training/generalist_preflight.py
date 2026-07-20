@@ -19,7 +19,16 @@ from learned_ai.data.malom_label_provenance import (
     CURRENT_MALOM_LABEL_VERSION,
     read_malom_label_version,
 )
-from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
+from learned_ai.data.data_contract import (
+    DATASET_MANIFEST_SCHEMA,
+    load_dataset_manifest,
+    verify_dataset_snapshot,
+)
+from learned_ai.training.run_contract import (
+    ContractValidationError,
+    canonical_json_bytes,
+    canonical_sha256,
+)
 from learned_ai.training.checkpoint_envelope import (
     CheckpointError,
     is_checkpoint_envelope,
@@ -34,6 +43,7 @@ TRAINING_PATH_KEYS = frozenset(
         "generalist_output_dir",
         "sentinel_checkpoint",
         "malom_db_path",
+        "malom_manifest_path",
         "value_net_path",
         "gap_net_path",
         "human_db_path",
@@ -54,6 +64,11 @@ PATH_SPECS = {
         "learned_ai/sentinel/checkpoints/best.pt",
     ),
     "malom": ("NMM_MALOM_DB", "malom_db_path", ""),
+    "malom_manifest": (
+        "NMM_MALOM_MANIFEST",
+        "malom_manifest_path",
+        "data/manifests/malom-sector-corrected-v1.json",
+    ),
     "value_net": ("NMM_VALUE_NET", "value_net_path", "data/value_net.npz"),
     "gap_net": ("NMM_GAP_NET", "gap_net_path", "data/gap_net.npz"),
     "human_db": ("NMM_HUMAN_DB", "human_db_path", "data/human_db.sqlite"),
@@ -444,7 +459,7 @@ def _probe_human_db(path: Path) -> dict[str, Any]:
         connection.close()
 
 
-def _probe_malom(path: Path) -> dict[str, Any]:
+def _probe_malom(path: Path, manifest_path: Path) -> dict[str, Any]:
     report: dict[str, Any] = {
         "exists": path.exists(),
         "kind": "malom_directory",
@@ -453,6 +468,22 @@ def _probe_malom(path: Path) -> dict[str, Any]:
         report["error"] = "Malom path is not an existing directory"
         return report
     try:
+        manifest = load_dataset_manifest(manifest_path)
+        if manifest.logical_name != "malom_tablebase":
+            raise ContractValidationError("manifest is not for the Malom tablebase")
+        if manifest.trust_level != CURRENT_MALOM_LABEL_VERSION:
+            raise ContractValidationError("Malom manifest trust level is incompatible")
+        structural = verify_dataset_snapshot(path, manifest)
+        anchor = next(
+            (
+                component
+                for component in manifest.components
+                if component.relative_path == "std.secval"
+            ),
+            None,
+        )
+        if anchor is None or _file_sha256(path / "std.secval") != anchor.sha256:
+            raise ContractValidationError("Malom std.secval anchor hash has changed")
         from ai.malom_db import MalomDB
 
         database = MalomDB(path)
@@ -461,15 +492,11 @@ def _probe_malom(path: Path) -> dict[str, Any]:
         if not database.is_available():
             report["error"] = "MalomDB did not find a usable secval/sector set"
         else:
-            secval = path / "std.secval"
-            secval_hash = hashlib.sha256(secval.read_bytes()).hexdigest()
-            sectors = sorted(
-                (item.name, item.stat().st_size) for item in path.glob("std_*.sec2")
-            )
-            report["sector_file_count"] = len(sectors)
-            report["identity"] = canonical_sha256(
-                {"secval_sha256": secval_hash, "sectors": sectors}
-            )
+            report["manifest_schema"] = DATASET_MANIFEST_SCHEMA
+            report["manifest_path"] = str(manifest_path)
+            report["component_count"] = structural["component_count"]
+            report["size_bytes"] = structural["size_bytes"]
+            report["identity"] = manifest.manifest_sha256
     except Exception as exc:
         report["error"] = f"Malom read-only probe failed: {exc}"
     return report
@@ -663,7 +690,9 @@ def run_generalist_preflight(
         output_report["error"] = "fresh output path already exists"
         errors.append("fresh output path must not already exist")
 
-    malom_report = _probe_malom(Path(args.malom)) if args.malom else {
+    malom_report = _probe_malom(
+        Path(args.malom), Path(args.malom_manifest)
+    ) if args.malom else {
         "exists": False,
         "error": "Malom path is not configured",
     }

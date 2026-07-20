@@ -11,6 +11,7 @@ import pytest
 import torch
 
 from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
+from learned_ai.data.data_contract import publish_dataset_manifest
 from learned_ai.training.generalist_preflight import (
     GitState,
     PreflightConfigurationError,
@@ -28,6 +29,7 @@ from learned_ai.training.checkpoint_envelope import (
     save_checkpoint,
 )
 from scripts import train_s_gen_v2 as trainer
+from scripts.build_malom_dataset_manifest import build_manifest
 
 
 def _write_specialist_db(path: Path, version: str | None) -> None:
@@ -72,6 +74,7 @@ def _write_malom(path: Path) -> None:
         encoding="ascii",
     )
     (path / "std_test.sec2").write_bytes(b"")
+    publish_dataset_manifest(path.parent / "malom.manifest.json", build_manifest(path))
 
 
 def _smoke_args(tmp_path: Path):
@@ -84,6 +87,8 @@ def _smoke_args(tmp_path: Path):
             str(tmp_path / "new-output"),
             "--malom",
             str(tmp_path / "malom"),
+            "--malom-manifest",
+            str(tmp_path / "malom.manifest.json"),
             "--human-db",
             str(tmp_path / "human.sqlite"),
             "--specialist-db",
@@ -238,6 +243,25 @@ def test_smoke_preflight_rejects_existing_output_and_legacy_specialist_db(
     assert report["verdict"] == "fatal_stop"
     assert "fresh output path must not already exist" in report["errors"]
     assert any("trusted Malom label version" in error for error in report["errors"])
+
+
+def test_smoke_preflight_rejects_malom_inventory_drift(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+    (Path(args.malom) / "unexpected.sec2").write_bytes(b"")
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "fatal_stop"
+    assert any("component inventory has changed" in item for item in report["errors"])
 
 
 def test_weights_only_preflight_accepts_compatible_legacy_weights(

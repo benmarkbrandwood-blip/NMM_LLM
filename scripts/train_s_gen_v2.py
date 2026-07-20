@@ -2121,6 +2121,7 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-sentinel",   action="store_true",
                    help="Disable Sentinel even when a path is configured")
     p.add_argument("--malom",         default=None, type=str)
+    p.add_argument("--malom-manifest", default=None, type=str)
     p.add_argument("--value-net",     default=None, type=str)
     p.add_argument("--no-value-net",  action="store_true",
                    help="Disable ValueNet even when a path is configured")
