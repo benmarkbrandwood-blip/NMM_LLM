@@ -15,14 +15,38 @@ build/
 venv/
 env/
 
+# Test / type / lint caches and local temp workspaces
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.tmp/
+.tmp-pytest/
+
+# Rust build artefacts (repo-root or native crate)
+/target/
+native/target/
+
 # IDE / editor lock files
 .~lock.*
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # Claude Code local settings
 .claude/
 
 # Per-machine training paths (copy from training_paths.example.json)
 data/training_paths.local.json
+
+# Managed training control directories (plan, authorization, segment ledgers)
+data/managed_runs/
 
 # ChromaDB data (generated at runtime)
 data/chroma/
@@ -41,6 +65,10 @@ data/players/
 # LLM session narratives — personal data
 data/session_memory/
 
+# Local runtime logs under data/logs (keep directory via .gitkeep)
+data/logs/**
+!data/logs/.gitkeep
+
 # HumanDB — large SQLite files built locally
 data/human_db.sqlite
 data/human_db.sqlite-shm
@@ -48,6 +76,7 @@ data/human_db.sqlite-wal
 data/specialist_db*.sqlite
 data/specialist_db*.sqlite-shm
 data/specialist_db*.sqlite-wal
+*.sqlite-journal
 
 # Endgame retrograde tables and fullgame position DB — built locally, can be hundreds of MB
 data/endgame/*.wdl
@@ -68,6 +97,9 @@ data/value_net*.bak*
 data/value_net-*.npz
 
 # Learned AI artifacts (keep dirs via .gitkeep)
+# Smoke outputs, managed segments, and s_gen_v2_sector_corrected remain ignored
+# under the checkpoints/** rule below; only reviewed historical shareable
+# specialist/generalist *.pt trees are re-included.
 learned_ai/checkpoints/**
 !learned_ai/checkpoints/
 !learned_ai/checkpoints/.gitkeep
