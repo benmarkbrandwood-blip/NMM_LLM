@@ -21,8 +21,10 @@ Implementation status on 20 July 2026: Slices 1 through 6 are implemented and
 validated. Slice 7 completed its baseline probe, but its optimization trigger
 did not activate because the current online serial rollout has no persistent
 loader. P3 remains optional and was not executed. A long run remains subject
-to the owner-controlled experiment decisions listed in the evidence report;
-see
+to an immutable Agent-selected technical plan, a separate product decision on
+the objective and resource envelope, and a newly authorized final smoke. The
+managed authority boundary is documented in
+[`docs/managed-training-operations.md`](managed-training-operations.md); see
 [`docs/evidence/v4-infrastructure-hardening-2026-07-20.md`](evidence/v4-infrastructure-hardening-2026-07-20.md).
 
 ## Executive Priority Order
@@ -38,7 +40,8 @@ The shortest execution path is therefore:
 
 1. harden the current v4 run contract;
 2. run a bounded integration smoke and exact-resume checks;
-3. freeze the owner-controlled long-run choices;
+3. freeze the Agent-selected technical choices and obtain separate product
+   authorization for the objective and resource envelope;
 4. run the corrected v4 experiment on one machine and one GPU;
 5. evaluate saved candidates with a frozen local protocol;
 6. optimize the loader or activate later research only when evidence justifies
@@ -53,7 +56,8 @@ The first target remains the experiment already defined in
 
 - fresh/random model initialization;
 - the corrected v4-style Generalist path;
-- no automatic resume;
+- no unscoped automatic resume; managed continuation is explicit
+  `exact-resume` from the verified preceding segment;
 - Sentinel disabled;
 - ValueNet disabled;
 - GapNet disabled;
@@ -88,7 +92,7 @@ semantics, model architecture, curriculum, opponent mixture, temperature
 schedule, search budget, or promotion thresholds. Any such change is a named
 experiment with a frozen baseline and an isolated ablation.
 
-Before a long run, the owner still needs to freeze and record:
+Before a long run, the Agent must conservatively freeze and record:
 
 - update algorithm;
 - opponent schedule;
@@ -100,8 +104,11 @@ Before a long run, the owner still needs to freeze and record:
 - monitoring cadence;
 - stop and quarantine criteria.
 
-Infrastructure may validate and record these choices, but it must not invent
-them after results are visible.
+The product owner is not expected to choose these ML or infrastructure
+parameters. Infrastructure validates and records the Agent's choices, and the
+Agent must not revise them after results are visible. The product owner decides
+only the objective, total resource envelope, launch, later resource expansion,
+and publication or promotion.
 
 ## 2. What to Reuse from the Reference Projects
 
@@ -217,6 +224,20 @@ and `quarantined`. A status must never hide the underlying terminal reason.
   recollection or machine-local notes.
 - The manifest clearly states that the current experiment is corrected v4,
   not a completed v5 implementation.
+
+#### Managed authority gate
+
+Long-run readiness also requires an immutable managed plan and a separate
+authorization file bound to the exact plan SHA-256. The plan records the Git
+commit, path-config identity, resume-semantics hash, game and segment bounds,
+wall-time limit, safe exact-resume policy, and the prohibition on publication
+or promotion. Plan creation has no launch authority.
+
+The supervisor owns fresh first-segment construction, exact-resume lineage,
+subprocess time bounds, single-controller locking, run-ledger verification,
+checkpoint validation, and product-readable status. Technical failures route
+to Agent review. Only launch and resource-scope changes route to the product
+owner.
 
 ### P0-B. Checkpoint envelope v2 and explicit recovery semantics
 
@@ -938,7 +959,8 @@ algorithm experiment with infrastructure changes.
 - `1 game + exact resume + 1 game` versus continuous `2 games`;
 - fault injection for interruption, corruption, missing assets, and non-finite
   values;
-- owner review of the remaining long-run freeze choices.
+- Agent freeze of technical choices and product authorization of the objective
+  and resource envelope.
 
 ### Slice 6 — Bundle and local evaluation
 
@@ -1105,7 +1127,8 @@ freeze, the defaults are:
 - historical checkpoints: weights-only;
 - checkpoint promotion: training metrics may create a candidate, but frozen
   evaluation creates an accepted artifact;
-- P0 plus owner long-run freeze: required before a long run;
+- P0 plus an Agent-frozen plan and product launch authorization: required
+  before a long run;
 - P1: required before an accepted/release claim;
 - P2/P3: evidence-triggered and optional.
 
@@ -1128,7 +1151,8 @@ following are true:
    required components fail closed with preserved diagnostics.
 7. A bounded smoke and resume-parity test pass on the intended Windows/CUDA
    environment.
-8. The owner-controlled long-run choices are frozen before launch.
+8. Agent-selected technical choices are frozen in an immutable plan and the
+   product owner separately authorizes the objective and resource envelope.
 9. Saved candidates are packaged with self-describing semantics and evaluated
    against frozen baselines using immutable, recomputable paired evidence.
 10. No distributed, C++, or optional v5 complexity has been introduced without

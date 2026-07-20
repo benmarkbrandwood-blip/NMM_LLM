@@ -13,9 +13,11 @@ Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
 disabled. Its bounded one-game smoke passed with a checkpoint observation; a
 later `dev` commit corrected the inaccurate checkpoint report and records a
 conservative explicit-resume policy. A long monitored run has not started and
-remains gated on owner acceptance of the proposed launch choices, explicit
-imitation-mix and fixed-work controls, plus a newly authorised final smoke and
-preflight.
+remains gated on a newly authorized final smoke and readiness preflight. The
+product owner has delegated technical configuration and safe bounded-resume
+decisions to the Agent. Explicit imitation-mix disablement, fixed-node search,
+immutable managed plans, separate product authorization, and a segment
+supervisor are now implemented; this delegation is not launch authorization.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -70,7 +72,11 @@ and temperature commits `5eadb4e` and `006715b`, the component-disable commit
 infrastructure commits through `59a4cf9` add exact-resume hardening, bounded
 segments, checkpoint migration and validation, self-describing evaluation
 bundles, paired promotion evidence, and the first author-asset refresh. Inspect
-the live graph rather than relying on this snapshot. The completed
+the live graph rather than relying on that intermediate snapshot. Later local
+commits through `4893fb6` add fail-closed pure-RL controls,
+deterministic fixed-node heuristic work with actual-node evidence, and
+product-authorized managed training supervision. They have not been pushed.
+The completed
 force-with-lease approval is not standing permission for a future push or
 history rewrite; obtain fresh authorisation when such an operation becomes
 necessary.
@@ -96,6 +102,9 @@ without first defining a feature that requires them.
 
 Commit `06598c9` records successful `cargo check --locked`, editable
 installation of the CPython 3.13 extension, and fifteen native parity tests.
+The extension was rebuilt after the fixed-node API change; an end-to-end probe
+used exactly 25,000 requested nodes twice and selected the same move both
+times. The full Rust unit suite reported `24 passed`.
 The focused Python verification was re-run during this handover:
 
 ```text
@@ -410,11 +419,12 @@ snapshot; `best.pt` remains optional model-selection evidence. Subsequent
 infrastructure now emits a version-2 checkpoint envelope and has proved bounded
 exact-resume parity for model, optimiser, scheduler/scaler, counters, rolling
 histories, curriculum, target state, component RNGs, data cursor, log state,
-and SpecialistDB identity. Initial launch still uses explicit `fresh` mode and
-automatic continuation remains forbidden. A continuation must pass a separate
-preflight and name a compatible version-2 source in explicit `exact-resume`
-mode. Legacy checkpoints, including every author-`main` file, remain
-weights-only and cannot satisfy that gate.
+and SpecialistDB identity. Initial launch still uses explicit `fresh` mode.
+Unscoped automatic resume remains forbidden. Within one separately authorized
+immutable managed plan, the supervisor may start a new isolated segment only
+from the verified `latest.pt` of the immediately preceding completed segment,
+using explicit `exact-resume`. Legacy checkpoints, including every
+author-`main` file, remain weights-only and cannot satisfy that gate.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -532,32 +542,31 @@ database growth.
 The workspace/root check, graph inspection, earlier trainer fixes, focused
 tests, 102-test Malom/provenance rerun, first-experiment component decision,
 bounded smoke, and checkpoint-policy correction are complete. The author
-bundle and proposed pure-RL definition expose additional gates. Proceed in this
-order:
+bundle and pure-RL definition exposed additional gates that are now closed in
+code. Proceed in this order:
 
-1. Accept or revise the proposed long-run choices recorded in the experiment
-   document: A2C, no imitation warm-start or RL mixing, a 50/50 frozen/heuristic
-   schedule, full depth-5 rollout, temperature `0.90` to `0.20`, 5,000 games,
-   seed 42, single-game batching, and 250-game exact-resume segments.
-2. Add an explicit `--no-imitation-mix` switch. Prove that it prevents loading
-   and applying `human_imitation2.npz`, and include its state in preflight,
-   launch-contract, log, and exact-resume compatibility tests.
-3. Make the proposed fixed-work opponent contract expressible and observable.
-   Current negative `--time-budget` values select an automatic wall-clock
-   budget; they do not disable wall-clock search. Record effective work in the
-   run evidence instead of inferring it from difficulty labels.
-4. Keep the first baseline on A2C and omit `--ppo`. Separately add a
-   deterministic test for temperature-consistent PPO old/new log probabilities
-   before considering a PPO fix or experiment.
-5. After the required controls exist, rerun the training-readiness workflow and
-   request approval for a disposable smoke that reaches at least one RL update.
-   Then repeat the clean-worktree, path, DB, test, and component preflight
-   immediately before any long run.
+1. Keep the first baseline on A2C and omit `--ppo`. The Agent owns technical
+   defaults; do not ask the product owner to choose ML parameters. Separately
+   add a deterministic test for temperature-consistent PPO old/new log
+   probabilities before considering a PPO experiment.
+2. Invoke the training-readiness workflow on the intended clean commit. Verify
+   the rebuilt native fixed-node interface, empty corrected SpecialistDB,
+   isolated disposable paths, component exclusions, and focused tests.
+3. Prepare an immutable managed smoke plan. Present only its objective, maximum
+   games, wall-time envelope, and claim boundary to the product owner. Plan
+   creation is not authorization.
+4. After explicit product authorization, run a disposable smoke that reaches
+   at least one RL update and prove that imitation remained disabled, actual
+   heuristic node work was recorded, the run ledger completed, and the
+   checkpoint is exact-resume compatible.
+5. If the smoke passes, prepare a new long-run plan on the final clean commit
+   and request a separate launch authorization. The supervisor may chain only
+   verified 250-game exact-resume segments within that authorization.
 6. Before examining a candidate for promotion, freeze the inference route,
    baseline bundle, phase-stratified starting corpus, paired colour-swapped
    workload, interval rule, and maximum-ply draw rule. This evaluation freeze
-   is not needed to implement the two launch controls, but it is required for a
-   strength or promotion claim.
+   is not required for the integration smoke or baseline training, but it is
+   required for a strength or promotion claim.
 
 The previously executed isolated smoke command was:
 
@@ -600,18 +609,25 @@ The following choices are recorded for the first `dev` experiment:
 - use the corrected v4-style Generalist path, not claim the staged v5 baseline;
 - exclude legacy Sentinel, ValueNet, and GapNet from the first run.
 
-The checkpoint roles and interruption policy are recorded above. A complete
-recommended long-run configuration is now written down, but it remains a
-proposal until the owner accepts or revises it. Even after acceptance, the
-current CLI cannot yet express two parts of the proposal: disabling ongoing
-imitation mixing and using a measured fixed-work heuristic search instead of a
-wall-clock cutoff. The local endgame/fullgame files also remain exploratory
-unless separately validated and promoted.
+The product owner has also delegated routine technical choices to the Agent.
+The Agent-selected managed default is A2C, no imitation warm-start or mixing,
+50/50 frozen/heuristic opponents, 500,000 native nodes per heuristic move,
+full depth-5 rollout, temperature `0.90` to `0.20`, 5,000 games, seed 42,
+single-game batching, and 250-game exact-resume segments. An actual run freezes
+these values in `plan.json`; the separate `authorization.json` records the
+product launch decision.
 
-Until those launch controls and choices are recorded and verified, safe work
-consists of local inspection, implementation, tests, and launch-contract
-review. It does not include an additional smoke, a long training job, a push,
-or a history rewrite.
+The product owner should be asked only about the objective, total game or
+wall-time envelope, launch, later resource expansion, and publication or
+promotion. Technical failures remain Agent diagnosis. The local
+endgame/fullgame files also remain exploratory unless separately validated and
+promoted.
+
+No managed plan or authorization has yet been published. Safe work currently
+includes inspection, tests, readiness review, and preparation of a proposed
+plan. It does not include an additional smoke or long training job without
+explicit product launch authorization, nor a push or history rewrite without
+separate authorization.
 
 ## Reference Material
 
@@ -624,6 +640,9 @@ or a history rewrite.
   author-`main` checkpoints, logs, screenshots, and related database claims.
 - [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): target
   architecture, evidence boundaries, and staged acceptance plan.
+- [`docs/managed-training-operations.md`](../managed-training-operations.md):
+  durable Agent/product authority boundary, managed contracts, commands,
+  status model, and stop policy.
 - [`docs/malom-fix.md`](../malom-fix.md): decoder investigation and correction
   background.
 - [`docs/specialist-db-fix.md`](../specialist-db-fix.md): legacy SpecialistDB

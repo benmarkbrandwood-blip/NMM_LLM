@@ -2,15 +2,18 @@
 
 ## Status and Claim Boundary
 
-Experiment ID: `dev-v4-malom-corrected-fresh-v1`
+Historical smoke experiment ID: `dev-v4-malom-corrected-fresh-v1`
+
+Managed long-run experiment ID: `dev-v4-managed-baseline-v1`
 
 The one-game integration smoke completed on 20 July 2026 with status
 `passed_with_observation`; the checkpoint-reporting observation has since been
 resolved on `dev`. The long run has not started. A complete recommended
-configuration is recorded below, but the owner has not yet accepted or revised
-it. Two parts of that proposal also cannot be expressed safely by the current
-CLI: disabling ongoing imitation mixing and selecting measured fixed search
-work instead of a wall-clock opponent cutoff.
+configuration is recorded below. The product owner has delegated its technical
+selection and routine safe-resume decisions to the Agent, but has not
+authorized a new smoke or long run. The CLI can now explicitly disable ongoing
+imitation mixing, use deterministic fixed-node opponent search, and bind any
+long-run launch to a separately authorized immutable managed plan.
 
 This is a fresh-initialised, Malom-corrected **v4-style Generalist baseline**.
 It is not the v5 `reference_safe_baseline`, a release candidate, or evidence of
@@ -36,9 +39,11 @@ labelled legacy comparison.
 | Checkpoint roles | `latest.pt` is the continuation snapshot; `best.pt` is an optional, evaluation-gated model-selection snapshot |
 | Interruption | Never resume automatically; only a separately preflighted explicit `exact-resume` from a compatible v2 envelope may continue the baseline |
 
-The intended long-run paths are:
+The intended long-run path boundary is:
 
-- output: `learned_ai/checkpoints/scaffolded/s_gen_v2_sector_corrected`;
+- control/output base: a new ignored directory under
+  `learned_ai/checkpoints/scaffolded/s_gen_v2_sector_corrected`, with one
+  isolated `segments/segment-NNNN` directory per process;
 - SpecialistDB: `data/specialist_db.sector_corrected.sqlite`.
 
 On 20 July 2026, the SpecialistDB above was verified read-only with zero rows
@@ -46,11 +51,13 @@ in `positions`, `winning_lines`, and `preferred_plays`, and metadata
 `malom_label_version=sector-corrected-v1`. Verify those facts again immediately
 before the long run. Do not use the active baseline DB for the smoke.
 
-## Recommended Long-Run Definition - Not Yet Frozen
+## Agent-Managed Long-Run Definition
 
-The following is the recommended corrected v4-style baseline. Recording it
-does not approve a smoke or long run, and it does not silently convert the
-proposal into an owner decision.
+The following is the Agent-selected corrected v4-style default. An actual run
+freezes these values, the exact Git commit, local path-config identity, and
+resource bounds in `plan.json`. Recording this default does not approve a
+smoke or long run. Launch authorization remains a separate product decision in
+`authorization.json`.
 
 | Choice | Recommended value |
 | --- | --- |
@@ -58,12 +65,12 @@ proposal into an owner decision.
 | Imitation | No S1A warm-start and no imitation mini-step during RL |
 | Opponents | 50% frozen target and 50% heuristic; refresh target every 50 games; adaptive difficulty 1 through 20 |
 | Rollout | Complete rollout, `sim_ply_depth=5`, no branch rollouts, `max_ply=60` |
-| Search work | Fixed measured work per move; no wall-clock search cutoff |
+| Search work | 500,000 native search nodes per heuristic move; single-threaded and no wall-clock search cutoff |
 | Temperature | Start `0.90`; linearly reach `0.20` at 80% total progress |
 | Game budget | 5,000 |
 | Seed | 42 |
 | Concurrency | `batch_games=1` |
-| Process segments | End every 250 games and continue only by explicit `exact-resume` |
+| Process segments | End every 250 games; the supervisor may continue only from the verified preceding `latest.pt` by explicit `exact-resume` |
 | Checkpoints | Save `latest.pt` every 50 games through `--log-every=50` |
 | Monitoring | Record every 50 games; audit integrity and resources at each 250-game boundary |
 | Ordinary stopping | Do not stop for an intermediate win-rate result |
@@ -72,20 +79,26 @@ proposal into an owner decision.
 The author-`main` bundle does not alter any row in this table. Its model and
 logs are not warm-start material, a target model, or a formal baseline.
 
-### Launch-control gaps
+### Launch-control closure
 
-The proposal is not yet smoke-ready for two independent reasons:
+The two previously identified launch-control gaps are closed in code and
+focused tests:
 
-1. `--no-s1a-warmstart` disables only the pre-RL warm-start. The trainer still
-   loads `human_imitation2.npz` when present and applies an imitation mini-step
-   after RL updates. Add `--no-imitation-mix`, make the disabled state visible
-   in preflight/log/contract evidence, and test launch plus exact-resume
-   compatibility. That file is absent from the current Windows checkout, but
-   absence is not an experiment control and must not substitute for the flag.
-2. A negative `--time-budget` currently selects the trainer's automatic
-   per-difficulty wall-clock seconds. It does not mean unlimited or fixed-work
-   search. Add a deterministic work-budget control and log the effective work,
-   or explicitly revise this proposed row before readiness review.
+1. `--no-imitation-mix` is independent of `--no-s1a-warmstart`. Disabled
+   mixing never reads the dataset. Enabled mixing fails closed when its
+   required dataset is missing, corrupt, empty, or inconsistent. Both controls
+   are visible in preflight, run manifests, and exact-resume semantics.
+2. `--heuristic-node-budget` selects a deterministic per-move native search
+   cap and is mutually exclusive with an explicit time budget. Fixed-work mode
+   requires one Rust search thread and fails closed if the native backend
+   cannot honor the contract. Per-game logs record the configured node budget,
+   search-call count, and actual cumulative nodes.
+
+The 500,000-node default is an Agent-owned starting choice, not a strength
+claim. It was selected conservatively from a local release-build throughput
+probe in which the former 0.1-second minimum budget completed about 420,000
+nodes on an empty-board search. The immutable plan, not this calibration note,
+is authoritative for an actual run.
 
 PPO is not a launch blocker for this A2C baseline, but it is quarantined for a
 separate reason: sampled old log probabilities use temperature-scaled logits,
@@ -252,15 +265,20 @@ separate readiness gate and launch authorisation.
 ## Long-Run Launch Gate
 
 The bounded initialisation smoke passed, and its checkpoint observation is
-resolved in code and tests. Before another smoke, the owner must accept or
-revise the recommended definition, the explicit imitation-mix disable control
-must exist, and the fixed-work search row must be implemented or deliberately
-changed. The new smoke must use the hardened launch contract, disposable paths,
-and enough work to exercise an RL update while proving that imitation stayed
-disabled.
+resolved in code and tests. The two technical launch controls are implemented,
+but no managed plan or product authorization has been published and no new
+training has started.
 
-Before the long run, rerun readiness on the intended clean launch commit, then
-re-check the empty corrected SpecialistDB, new output directory, resolved work
-budget, component manifest, and quarantine rules immediately before launch. Do
-not reuse the original smoke DB, smoke checkpoint, or any author-`main`
-checkpoint.
+Before another smoke or long run, use the managed supervisor to freeze an
+immutable plan on the intended clean commit. The plan must bind the resolved
+training semantics, local path-config hash, game and segment bounds, wall-time
+envelope, component exclusions, and fixed-node work. The product owner then
+approves only the objective and resource envelope through the separate
+authorization contract. Plan creation alone never authorizes launch.
+
+Immediately before launch, rerun the training-readiness workflow and re-check
+the empty corrected SpecialistDB, new output directory, resolved work budget,
+component manifest, native fixed-work probe, and quarantine rules. A new
+disposable smoke must reach at least one RL update and prove that imitation
+stayed disabled. Do not reuse the original smoke DB, smoke checkpoint, or any
+author-`main` checkpoint.
