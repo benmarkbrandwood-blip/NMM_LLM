@@ -75,8 +75,8 @@ bundles, paired promotion evidence, and the first author-asset refresh. Inspect
 the live graph rather than relying on that intermediate snapshot. Later local
 commits through `4893fb6` add fail-closed pure-RL controls,
 deterministic fixed-node heuristic work with actual-node evidence, and
-product-authorized managed training supervision. They have not been pushed.
-The completed
+product-authorized managed training supervision. Inspect the live local and
+remote graph before making synchronization claims. The completed
 force-with-lease approval is not standing permission for a future push or
 history rewrite; obtain fresh authorisation when such an operation becomes
 necessary.
