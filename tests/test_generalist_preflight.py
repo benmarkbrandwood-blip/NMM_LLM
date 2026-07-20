@@ -188,6 +188,16 @@ def test_configuration_rejects_unproven_parallel_rollouts(tmp_path: Path) -> Non
         validate_generalist_configuration(args)
 
 
+def test_segment_boundary_does_not_change_resume_semantics(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    args.max_games = 2
+    args.segment_games = 1
+    segmented = resume_config_sha256(args)
+    args.segment_games = 2
+
+    assert resume_config_sha256(args) == segmented
+
+
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:
     with pytest.raises(SystemExit) as raised:
         trainer.main(["--max-games", "1", "--max-games=2"])

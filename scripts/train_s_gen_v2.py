@@ -1563,6 +1563,10 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     run_manifest = getattr(args, "_run_manifest", None)
     if run_manifest is None:
         raise RuntimeError("contract-backed launch did not provide a RunManifest")
+    segment_stop_game = min(
+        args.max_games,
+        game_count + (args.segment_games or args.max_games),
+    )
 
     def _save_runtime_checkpoint(path: Path, *, role: str, reason: str) -> str:
         nonlocal checkpoint_sequence, parent_checkpoint_id
@@ -1623,7 +1627,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         parent_checkpoint_id = checkpoint_id
         return checkpoint_id
 
-    while game_count < args.max_games:
+    while game_count < segment_stop_game:
         batch_count += 1
         temperature = _compute_temperature(
             game_count, args.max_games, args.temp_start
@@ -2211,6 +2215,12 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--specialist-db", default=None, type=str)
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
+    p.add_argument(
+        "--segment-games",
+        type=int,
+        default=None,
+        help="Bound this process segment without changing the total schedule",
+    )
     p.add_argument("--seed",                type=int,   default=42)
     p.add_argument("--lr",                  type=float, default=LR)
     p.add_argument("--gamma-td",            type=float, default=GAMMA_TD)

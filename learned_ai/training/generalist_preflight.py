@@ -280,6 +280,13 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             "batch_games must remain 1 until shared rollout state is removed"
         )
+    segment_games = getattr(args, "segment_games", None)
+    if segment_games is not None:
+        _positive_integer(segment_games, field="segment_games")
+        if segment_games > args.max_games:
+            raise PreflightConfigurationError(
+                "segment_games must not exceed max_games"
+            )
     if not args.policy_hidden or any(
         isinstance(width, bool) or not isinstance(width, int) or width <= 0
         for width in args.policy_hidden
@@ -530,6 +537,7 @@ _RESUME_CONFIG_EXCLUDED_FIELDS = {
     "preflight",
     "resume",
     "run_id",
+    "segment_games",
     "start_mode",
 }
 
@@ -681,8 +689,9 @@ def run_generalist_preflight(
     if args.ppo:
         errors.append("corrected fresh baseline must not enable PPO")
     if mode == "smoke":
-        if args.max_games != 1:
-            errors.append("smoke preflight requires max_games=1")
+        bounded_games = getattr(args, "segment_games", None) or args.max_games
+        if bounded_games not in {1, 2}:
+            errors.append("smoke preflight requires a one- or two-game segment")
         if args.batch_games != 1:
             errors.append("smoke preflight requires batch_games=1")
     else:
