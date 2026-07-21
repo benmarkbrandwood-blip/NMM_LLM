@@ -11,13 +11,14 @@ playing-strength or promotion evidence. No further training run is authorized.
 
 The next proposed step, `dev-v4-formal-paired-eval-v1`, is under
 **fatal stop**. Expert review rejected the 64-position corpus and synthetic
-one-endpoint-per-named-line alternative, found a draw-lifecycle and
-partial-ledger restart defect in the paired runner, and established that
-`policy-argmax-v1` zeroes a lookahead feature block used during training.
-After repair and review, the only current proposal is a 109-start,
-placement-only Stage-0 training-signal diagnostic against scratch
-initialization. It is not a formal strength or promotion gate. Freeze and run
-remain unauthorized.
+one-endpoint-per-named-line alternative and established that
+`policy-argmax-v1` zeroes a lookahead feature block used during training. The
+draw-lifecycle and partial-ledger restart defects found in the paired runner
+are now repaired and covered by focused tests. The only current proposal is a
+109-start, placement-only Stage-0 training-signal diagnostic against scratch
+initialization. Its corpus, review, freeze state, readiness evidence, and new
+authorization remain incomplete, so it is not a formal strength or promotion
+gate and freeze/run remain unauthorized.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -444,12 +445,17 @@ The final candidate source is
 architecture-matched scratch-init evaluation bundles have both passed CPU
 verification.
 
-The first formal paired-evaluation proposal is nevertheless under fatal stop:
+The paired-runner prerequisites identified by expert review are repaired.
+Repetition and 50-move transitions now stop on `engine.finished` and retain the
+engine's draw reason. In-progress evidence is fsynced to `<output>.partial`;
+same-spec ordered hash-valid prefixes resume only missing games, malformed
+prefixes fail closed, and complete evidence is recomputed before atomic final
+publication. `python -m pytest tests/test_paired_evaluation.py -q` reports
+`7 passed`.
 
-- the paired runner mishandles engine-level repetition and 50-move draws with
-  `winner=None`, then attempts another move and raises an error;
-- its exclusive-create games ledger can leave a crash artifact that blocks a
-  same-path retry, so lifecycle and restart semantics must be fixed together;
+The first formal paired-evaluation proposal nevertheless remains under fatal
+stop because:
+
 - pure argmax plus modulo start selection makes repeated starts exact copies,
   invalidating the old 64-start / 256-pair nominal sample size;
 - 49 of 107 named lines have 2–42 legal endpoints because removal choices are
@@ -459,14 +465,13 @@ The first formal paired-evaluation proposal is nevertheless under fatal stop:
 - the proposed `policy-argmax-v1` route zeroes the 72-feature lookahead block
   supplied during training.
 
-The proposed post-repair Stage-0 diagnostic is 109 unique Oracle-projected
-starts, one colour-swapped pair per start, for 218 games against the verified
-scratch-init control. Sanmill documents the Oracle as independently
-engine-derived, but 28 of 109 positions overlap named-line trajectories and
-all positions are early placement. It is not demonstrated held-out or
-training-disjoint. Stage 0 therefore tests only whether a training signal is
-visible under a placement-only feature ablation; it is not a strength or
-promotion gate.
+The proposed Stage-0 diagnostic is 109 unique Oracle-projected starts, one
+colour-swapped pair per start, for 218 games against the verified scratch-init
+control. Sanmill documents the Oracle as independently engine-derived, but 28
+of 109 positions overlap named-line trajectories and all positions are early
+placement. It is not demonstrated held-out or training-disjoint. Stage 0
+therefore tests only whether a training signal is visible under a
+placement-only feature ablation; it is not a strength or promotion gate.
 
 The controlling records are:
 
@@ -599,19 +604,15 @@ Proceed in this order:
 
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
-2. Repair the paired runner's repetition/50-move draw transition and define
-   recoverable or explicitly restartable partial-ledger behavior.
-3. Add focused regression tests for both engine-level draw paths and the
-   selected ledger retry semantics.
-4. Generate and review a freeze-compatible list of exactly 109 unique playable
+2. Generate and review a freeze-compatible list of exactly 109 unique playable
    Oracle-projected positions. Record phase counts, symmetry uniqueness,
    provenance, overlap, and a new corpus SHA-256.
-5. Reconcile the owning documents and artifact in a clean tracked commit, then
+3. Reconcile the owning documents and artifact in a clean tracked commit, then
    repeat the focused evaluation/readiness checks.
-6. Request an explicit product authorization before freezing or running the
+4. Request an explicit product authorization before freezing or running the
    Stage-0 diagnostic. Use 109 pairs / 218 games with no start reuse, and do
    not treat acceptance as promotion evidence.
-7. Specify a separate route-aligned and phase-covered evaluation before making
+5. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
 
@@ -672,10 +673,10 @@ promoted.
 
 The managed plan completed, but the formal evaluation is under fatal stop and
 has no freeze/run authorization. Safe work currently includes inspection,
-documentation, focused defect repair and tests, replacement-corpus
-construction, and readiness review. It does not include an evaluation run, an
-additional smoke or long training job, promotion/publication, a push, or a
-history rewrite without the applicable separate authorization.
+documentation, replacement-corpus construction, focused verification, and
+readiness review. It does not include an evaluation run, an additional smoke
+or long training job, promotion/publication, a push, or a history rewrite
+without the applicable separate authorization.
 
 ## Reference Material
 

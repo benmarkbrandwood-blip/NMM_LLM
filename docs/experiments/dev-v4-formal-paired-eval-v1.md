@@ -16,6 +16,14 @@ Expert review has since established hard blockers and materially narrowed the
 claim. The earlier 64-start freeze defaults and the one-endpoint-per-named-line
 alternative are superseded.
 
+The paired-runner prerequisites identified by that review are now repaired:
+engine-level repetition and 50-move draws end the game, while an interrupted
+run retains a validated `.partial` ledger and resumes only its missing games.
+Malformed or mismatched partial evidence fails closed. The focused evaluation
+suite passes all seven tests. The fatal stop remains because the replacement
+corpus, owner review, clean freeze state, readiness evidence, and new product
+authorization are still outstanding.
+
 No `EvaluationSpec` may be frozen, no paired games may be run, and no
 promotion or publication decision may be made from this experiment until the
 prerequisites in this document are complete and the product owner gives a new
@@ -42,7 +50,7 @@ Related contracts:
 | Scratch-init bundle identity | `058145238ac03f006779689e14af35eac1d3128921d4b2cddfb698d457fdd86f` |
 
 Both bundles passed CPU verification, including zero canary difference. Their
-verification does not clear the runner or corpus blockers.
+verification does not clear the corpus, freeze, or authorization blockers.
 
 Artifact root:
 
@@ -61,7 +69,7 @@ Stage-0 contract is:
 | Phase coverage | Placement 109 / movement 0 / flying 0 |
 | Pairs / games | `109` pairs / `218` games; exactly one pair per unique start |
 | Seed | `42`, recorded for provenance but not used by deterministic move selection |
-| `max_ply` | `200`; overflow scored as a draw after draw lifecycle is repaired |
+| `max_ply` | `200`; overflow scored as a draw |
 | Route name | `policy-argmax-v1` |
 | Work budget | `{"lookahead_rollouts_per_move": 0}` |
 | Components | Sentinel, ValueNet, GapNet, HumanDB override, and SpecialistDB override absent |
@@ -102,22 +110,24 @@ early-placement distribution nevertheless mean it is not demonstrated
 held-out or training-disjoint. It must be described as a
 source-overlapping, in-distribution-adjacent convenience corpus.
 
-## Fatal blockers
+## Prerequisite and blocker status
 
-| Blocker | Evidence and required disposition |
-| --- | --- |
-| Engine-level draws crash the runner | Repetition and 50-move draws can set `finished=True, winner=None`. The runner does not exit and the next move raises `ValueError: Game is already over.` Repair and focused regression tests are mandatory. |
-| A crash can strand the ledger | The games ledger is opened with exclusive creation. Define and test partial-ledger cleanup, quarantine, or explicit resume/restart semantics. |
-| Deterministic start reuse falsifies the nominal sample size | Pure argmax plus modulo start selection repeats identical pairs. Set `pairs == unique starts`; never reuse starts to narrow the interval. |
-| Named-line endpoints are ambiguous | 49 of 107 lines have 2–42 legal endpoints because removal choices are omitted; one line fails replay and one endpoint is terminal. Do not freeze synthetic one-per-line endpoints. |
-| The 64-start draft is invalidated | It has 64 FENs but 63 symmetry orbits and was an arbitrary narrow slice. Preserve only as rejected historical evidence. |
-| Oracle facts were overstated | 110 raw keys project to 109 unique playable FENs, all placement phase. Generate and review the exact replacement corpus. |
-| Route is not training-aligned | The 72 lookahead features are zeroed at evaluation. Keep the claim at Stage 0 and build a separately frozen aligned evaluator for strength. |
-| Freeze state was not reproducible at review time | The audit began with the branch ahead of `origin/dev` and relevant documents and draft artifacts uncommitted. Recheck the live state and freeze only from a clean, tracked commit. |
+| Item | Status | Evidence and required disposition |
+| --- | --- | --- |
+| Engine-level draws crash the runner | Cleared in the current change | The runner now exits on `engine.finished`, preserves `winner=None`, and records the engine's repetition or 50-move draw reason. Both paths have focused regressions. |
+| A crash can strand the ledger | Cleared in the current change | Games are written and fsynced to `<output>.partial`. A same-spec, ordered, hash-valid prefix resumes only missing games; a complete ledger is recomputed and atomically published. Malformed evidence is retained and rejected. |
+| Deterministic start reuse falsifies the nominal sample size | Contract disposition recorded; corpus pending | Pure argmax plus modulo start selection repeats identical pairs. Set `pairs == unique starts`; never reuse starts to narrow the interval. |
+| Named-line endpoints are ambiguous | Rejected as a corpus source | 49 of 107 lines have 2–42 legal endpoints because removal choices are omitted; one line fails replay and one endpoint is terminal. Do not freeze synthetic one-per-line endpoints. |
+| The 64-start draft is invalidated | Rejected historical evidence | It has 64 FENs but 63 symmetry orbits and was an arbitrary narrow slice. Preserve only as rejected historical evidence. |
+| Oracle facts were overstated | Replacement artifact pending | 110 raw keys project to 109 unique playable FENs, all placement phase. Generate and review the exact replacement corpus. |
+| Route is not training-aligned | Stage-0 claim boundary recorded | The 72 lookahead features are zeroed at evaluation. Keep the claim at Stage 0 and build a separately frozen aligned evaluator for strength. |
+| Freeze state was not reproducible at review time | Still open | Recheck the live state and freeze only from a clean, tracked commit containing the accepted corpus and owning records. |
 
-The existing focused bundle/evaluation/lifecycle tests pass, but they do not
-exercise the engine-level draw transition or ledger retry behavior and
-therefore do not clear the fatal stop.
+The focused command
+`python -m pytest tests/test_paired_evaluation.py -q` now reports `7 passed`,
+covering both engine-level draw transitions, valid partial-ledger resume and
+atomic publication, and fail-closed malformed partial evidence. This clears
+the runner prerequisites only; it does not authorize a spec freeze or run.
 
 ## Statistical interpretation
 
@@ -149,18 +159,18 @@ sample.
 
 ## Mandatory sequence before any freeze or run
 
-1. Repair draw completion and ledger restart/recovery behavior.
-2. Add focused tests for repetition draw, 50-move draw, and partial-ledger
-   retry semantics.
-3. Generate an Oracle-only list of exactly 109 unique playable positions.
-4. Validate exact uniqueness, 16-way orbit uniqueness, playability, phase
+Runner repair and its focused regression tests are complete in the current
+change. The remaining mandatory sequence is:
+
+1. Generate an Oracle-only list of exactly 109 unique playable positions.
+2. Validate exact uniqueness, 16-way orbit uniqueness, playability, phase
    counts, provenance, and overlap; record a new
    `start_positions_sha256`.
-5. Complete owner review of the exact list.
-6. Record the final route, corpus, bundle identities, work budget, interval
+3. Complete owner review of the exact list.
+4. Record the final route, corpus, bundle identities, work budget, interval
    interpretation, and non-claims in a clean tracked commit.
-7. Re-run the focused verification required by the readiness workflow.
-8. Request a new explicit product authorization for freeze and run.
+5. Re-run the focused verification required by the readiness workflow.
+6. Request a new explicit product authorization for freeze and run.
 
 Only after those steps may an immutable `EvaluationSpec` be created. The
 current document intentionally contains no approved freeze or run command.

@@ -73,7 +73,7 @@ first four placements from a sampled opening in 50% of games, but the log does
 not record the selected opening identifier. Exact exposure frequency cannot be
 reconstructed.
 
-## Proposed replacement after runner repair
+## Proposed replacement
 
 The next reviewable Stage-0 artifact should project the 110 raw Sanmill
 move-oracle keys into NMM FEN and deduplicate after projection:
@@ -101,21 +101,21 @@ training-disjoint claim. Review material must call it a
 
 ## Replacement acceptance checklist
 
-The final replacement artifact has not yet been generated. Before it can be
-accepted:
+The paired runner's engine-level draw and partial-ledger retry defects are
+fixed in the current change and covered by the seven-test focused evaluation
+suite. The final replacement artifact has not yet been generated. Before it
+can be accepted:
 
-1. The paired runner's engine-level draw and partial-ledger retry defects must
-   be fixed and covered by focused tests.
-2. The artifact must be a freeze-compatible list of exactly 109 NMM FENs.
-3. Exact uniqueness, 16-way orbit uniqueness, legality, non-terminal
+1. The artifact must be a freeze-compatible list of exactly 109 NMM FENs.
+2. Exact uniqueness, 16-way orbit uniqueness, legality, non-terminal
    playability, and the 109/0/0 phase count must be recomputed.
-4. Each entry must retain enough source metadata to reproduce the Oracle-key
+3. Each entry must retain enough source metadata to reproduce the Oracle-key
    conversion and the one projected duplicate.
-5. The 28/109 and 23/109 overlap measurements and the non-held-out claim
+4. The 28/109 and 23/109 overlap measurements and the non-held-out claim
    boundary must accompany owner review.
-6. A new `start_positions_sha256` must be recorded only after the exact list
+5. A new `start_positions_sha256` must be recorded only after the exact list
    is approved.
-7. The approved artifact and owning documents must be tracked in a clean
+6. The approved artifact and owning documents must be tracked in a clean
    commit before freeze authorization is requested.
 
 If accepted later, use exactly one colour-swapped pair per unique start:

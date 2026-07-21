@@ -6,7 +6,9 @@ Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
 Audience: product owner, evaluation reviewer, and domain expert
 
-Status: **fatal stop; freeze and run are not authorized**
+Status: **fatal stop; freeze and run are not authorized**. The runner repair
+prerequisites are complete in the current change; corpus freeze, review, and
+authorization prerequisites remain open.
 
 Related:
 
@@ -17,15 +19,17 @@ Related:
 ## Decision
 
 The original 64-start proposal and the later one-endpoint-per-named-line
-proposal are both rejected. The current runner also has a draw-lifecycle defect
-that can abort a valid game and leave a non-restartable partial ledger.
-Therefore no current corpus may be frozen and no paired evaluation may run.
+proposal are both rejected. At review time, the runner also had a
+draw-lifecycle defect that could abort a valid game and leave a
+non-restartable partial ledger. Those runner defects and their focused
+regressions are now repaired. No current corpus may be frozen and no paired
+evaluation may run because the replacement corpus and the remaining freeze
+prerequisites are not complete.
 
-After the runner defect and retry semantics are fixed and tested, the next
-reviewable experiment may use the 109 unique, playable positions obtained by
-projecting the 110 raw Sanmill move-oracle keys into NMM FEN. That experiment
-is a **Stage-0 placement-opening training-signal diagnostic**, not a formal
-playing-strength or promotion gate.
+The next reviewable experiment may use the 109 unique, playable positions
+obtained by projecting the 110 raw Sanmill move-oracle keys into NMM FEN. That
+experiment is a **Stage-0 placement-opening training-signal diagnostic**, not
+a formal playing-strength or promotion gate.
 
 | Decision item | Recorded decision |
 | --- | --- |
@@ -125,19 +129,27 @@ training-disjoint. The correct description is a
 
 ## Runner and statistical audit
 
-### Fatal draw-lifecycle defect
+### Resolved draw and partial-ledger defects
 
-The paired runner exits a game only when `winner is not None`. The game engine
-can end through repetition or the 50-move rule with
-`finished=True, winner=None`. The runner's board-only terminal check does not
-observe that engine state. It then attempts another move and raises
+At review time, the paired runner exited a game only when `winner is not
+None`. The game engine can end through repetition or the 50-move rule with
+`finished=True, winner=None`. The runner's board-only terminal check did not
+observe that engine state, so it attempted another move and raised
 `ValueError: Game is already over.`
 
 A deterministic no-capture replay reaches this state at ply 117, within the
-proposed `max_ply=200`. The failure is loud, but the runner opens the games
-ledger with exclusive creation. A crash can therefore leave a partial ledger
-that blocks a same-path retry. The fix must cover both game lifecycle and
-partial-ledger recovery semantics, with focused regression tests.
+proposed `max_ply=200`. The old runner also opened the final games ledger with
+exclusive creation, so a crash could leave a partial final ledger that blocked
+a same-path retry.
+
+The runner now stops whenever `engine.finished` is true, preserves a draw as
+`winner=None`, and records the engine's `draw_reason`. It writes incomplete
+evidence to `<output>.partial`; a retry accepts only a same-spec, ordered,
+hash-valid completed prefix and plays only missing games. A malformed or
+mismatched prefix fails closed and is left untouched. A complete ledger is
+recomputed before atomic publication to the immutable final output. The
+focused evaluation suite reports `7 passed`, including repetition, 50-move,
+valid retry, atomic publication, and malformed-prefix rejection.
 
 ### Repeated starts add no information
 
@@ -170,24 +182,23 @@ training-route-aligned evaluator.
 
 ## Required prerequisites before a new freeze decision
 
-All of the following are mandatory:
+Runner draw handling, recoverable valid-prefix resume, fail-closed malformed
+evidence, and their focused tests are complete in the current change. The
+following remain mandatory:
 
-1. Fix engine-level draw handling in the paired runner.
-2. Define recoverable or explicitly restartable partial-ledger behavior.
-3. Add focused tests for repetition draw, 50-move draw, and retry behavior.
-4. Generate a new Oracle-only list containing exactly 109 unique playable NMM
+1. Generate a new Oracle-only list containing exactly 109 unique playable NMM
    FENs; do not reuse the rejected 64-position draft.
-5. Record conversion provenance, overlap results, phase counts, orbit
+2. Record conversion provenance, overlap results, phase counts, orbit
    uniqueness, playability validation, and a new
    `start_positions_sha256`.
-6. Have the owner review the exact 109-position artifact.
-7. Freeze from a clean, tracked commit. At review time the branch was ahead of
+3. Have the owner review the exact 109-position artifact.
+4. Freeze from a clean, tracked commit. At review time the branch was ahead of
    `origin/dev` and the experiment documents and draft artifacts were
    uncommitted; the live state must be rechecked rather than inferred from this
    historical observation.
-8. Obtain a new explicit product decision authorizing freeze and run.
+5. Obtain a new explicit product decision authorizing freeze and run.
 
-Until all eight are complete, no exact freeze or run command is approved.
+Until all five are complete, no exact freeze or run command is approved.
 
 ## Inconclusive-result governance
 
@@ -204,6 +215,7 @@ provided:
 
 ## Final authorization state
 
-Candidate and scratch bundles have passed CPU verification, but that does not
-clear the fatal stop. Freeze, paired execution, promotion, and publication
-remain forbidden pending the prerequisites and a new product authorization.
+Candidate and scratch bundles have passed CPU verification, and the runner
+repair prerequisites are now complete. That does not clear the fatal stop.
+Freeze, paired execution, promotion, and publication remain forbidden pending
+the corpus and freeze prerequisites and a new product authorization.

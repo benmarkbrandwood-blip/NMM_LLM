@@ -12,9 +12,9 @@ resolved on `dev`. The authorized managed long run
 `managed-v4-baseline-v1` reached `managed_plan_completed` with
 `completed_games=5000` / `completed_segments=20` on 21 July 2026 (UTC). Training
 completion is not playing-strength evidence and does not authorize promotion.
-The next evaluation proposal is under fatal stop pending runner repair,
-replacement-corpus review, a clean freeze point, and new product authorization;
-see
+The paired-runner repair is complete, but the next evaluation proposal remains
+under fatal stop pending replacement-corpus review, a clean freeze point,
+readiness verification, and new product authorization; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -116,15 +116,18 @@ exist. See
 Formal evaluation remains separate from training completion. The candidate and
 architecture-matched scratch-init bundles have been exported and CPU-verified,
 but expert review invalidated the original 64-start / 256-pair freeze proposal
-and found a fatal draw-lifecycle defect in the paired runner. Freeze, execution,
-promotion, and publication remain unauthorized. The controlling record is
+and found draw-lifecycle and partial-ledger defects in the paired runner. Those
+runner prerequisites are now repaired and covered by focused tests. Freeze,
+execution, promotion, and publication remain unauthorized because the
+replacement corpus, freeze evidence, and new authorization are outstanding.
+The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
 [`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md).
 
-After runner repair, focused draw/retry tests, corpus generation and review,
-and a clean tracked freeze point, the next proposed experiment is only a
-Stage-0 training-signal diagnostic:
+After corpus generation and review, a clean tracked freeze point, readiness
+verification, and new product authorization, the next proposed experiment is
+only a Stage-0 training-signal diagnostic:
 
 - 109 unique playable positions projected from 110 raw Sanmill move-oracle
   keys;

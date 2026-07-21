@@ -149,6 +149,83 @@ def _game_id(spec: EvaluationSpec, pair: int, game: int) -> str:
     )
 
 
+def _game_seed(spec: EvaluationSpec, pair: int, game: int) -> int:
+    digest = hashlib.sha256(f"{spec.seed}:{pair}:{game}".encode()).digest()
+    return int.from_bytes(digest[:8], "big")
+
+
+def _expected_game_identity(
+    spec: EvaluationSpec,
+    pair: int,
+    game: int,
+) -> dict[str, Any]:
+    return {
+        "pair": pair,
+        "game": game,
+        "game_id": _game_id(spec, pair, game),
+        "seed": _game_seed(spec, pair, game),
+        "start_fen": spec.start_positions[pair % len(spec.start_positions)],
+        "candidate_color": "W" if game == 0 else "B",
+    }
+
+
+def _load_partial_prefix(
+    spec: EvaluationSpec,
+    path: Path,
+) -> tuple[int, str | None]:
+    """Validate and return the completed length and tail hash of a strict prefix."""
+    completed = 0
+    previous_hash: str | None = None
+    expected_games = spec.pairs * 2
+    with path.open("r", encoding="utf-8") as handle:
+        for line_number, line in enumerate(handle, 1):
+            if not line.endswith("\n"):
+                raise EvaluationError(
+                    f"malformed game record at line {line_number}: missing newline"
+                )
+            try:
+                wrapper = json.loads(line)
+                record = wrapper["record"]
+                record_hash = wrapper["record_sha256"]
+            except (json.JSONDecodeError, KeyError, TypeError) as exc:
+                raise EvaluationError(
+                    f"malformed game record at line {line_number}"
+                ) from exc
+            if not isinstance(record, dict) or not isinstance(record_hash, str):
+                raise EvaluationError(f"malformed game record at line {line_number}")
+            if completed >= expected_games:
+                raise EvaluationError(
+                    f"partial ledger has an unexpected game at line {line_number}"
+                )
+            if (
+                record.get("schema_version") != GAME_RECORD_SCHEMA
+                or record.get("spec_identity") != spec.spec_identity
+            ):
+                raise EvaluationError(f"wrong schema or spec at line {line_number}")
+            if (
+                canonical_sha256(record) != record_hash
+                or record.get("previous_record_sha256") != previous_hash
+            ):
+                raise EvaluationError(
+                    f"record integrity chain failed at line {line_number}"
+                )
+            pair, game = divmod(completed, 2)
+            expected_identity = _expected_game_identity(spec, pair, game)
+            if any(record.get(key) != value for key, value in expected_identity.items()):
+                raise EvaluationError(
+                    f"partial ledger is not the expected ordered prefix at line {line_number}"
+                )
+            if record.get("complete") is not True or record.get(
+                "candidate_score"
+            ) not in (0.0, 0.5, 1.0):
+                raise EvaluationError(
+                    f"incomplete or invalid game at line {line_number}"
+                )
+            completed += 1
+            previous_hash = record_hash
+    return completed, previous_hash
+
+
 def run_paired_evaluation(
     spec_path: str | Path,
     candidate_path: str | Path,
@@ -159,18 +236,31 @@ def run_paired_evaluation(
 ) -> dict[str, Any]:
     """Run candidate and baseline serially with roles swapped within each pair."""
     spec = load_evaluation_spec(spec_path)
+    target = Path(output)
+    if target.exists():
+        raise FileExistsError(f"evaluation records exist: {target}")
+    partial = Path(f"{target}.partial")
+    if partial.exists():
+        completed_games, previous_hash = _load_partial_prefix(spec, partial)
+        open_mode = "a"
+    else:
+        completed_games = 0
+        previous_hash = None
+        open_mode = "x"
     candidate_model, candidate_manifest = load_bundle_model(candidate_path, device=device)
     baseline_model, baseline_manifest = load_bundle_model(baseline_path, device=device)
     if candidate_manifest["bundle_identity"] != spec.candidate_bundle or baseline_manifest["bundle_identity"] != spec.baseline_bundle:
         raise EvaluationError("bundle paths do not match the frozen evaluation spec")
-    target = Path(output)
     target.parent.mkdir(parents=True, exist_ok=True)
-    previous_hash: str | None = None
-    with target.open("x", encoding="utf-8", newline="\n") as handle:
+    with partial.open(open_mode, encoding="utf-8", newline="\n") as handle:
         for pair in range(spec.pairs):
             fen = spec.start_positions[pair % len(spec.start_positions)]
             for game in range(2):
-                candidate_color = "W" if game == 0 else "B"
+                game_index = pair * 2 + game
+                if game_index < completed_games:
+                    continue
+                identity = _expected_game_identity(spec, pair, game)
+                candidate_color = identity["candidate_color"]
                 policies = {
                     candidate_color: _BundlePolicy(candidate_model, device),
                     "B" if candidate_color == "W" else "W": _BundlePolicy(baseline_model, device),
@@ -189,9 +279,9 @@ def run_paired_evaluation(
                         terminal_reason = "no_legal_move"
                         break
                     engine.apply_move(move)
-                    winner = engine.winner
-                    if winner is not None:
-                        terminal_reason = "rules_terminal"
+                    if engine.finished:
+                        winner = engine.winner
+                        terminal_reason = engine.draw_reason or "rules_terminal"
                         break
                 else:
                     winner = None
@@ -199,9 +289,7 @@ def run_paired_evaluation(
                 score = 0.5 if winner is None else (1.0 if winner == candidate_color else 0.0)
                 record = {
                     "schema_version": GAME_RECORD_SCHEMA, "spec_identity": spec.spec_identity,
-                    "pair": pair, "game": game, "game_id": _game_id(spec, pair, game),
-                    "seed": int.from_bytes(hashlib.sha256(f"{spec.seed}:{pair}:{game}".encode()).digest()[:8], "big"),
-                    "start_fen": fen, "candidate_color": candidate_color, "winner": winner,
+                    **identity, "winner": winner,
                     "candidate_score": score, "ply": ply + 1, "terminal_reason": terminal_reason,
                     "complete": True, "previous_record_sha256": previous_hash,
                 }
@@ -210,7 +298,11 @@ def run_paired_evaluation(
                 handle.flush()
                 os.fsync(handle.fileno())
                 previous_hash = record_hash
-    return recompute_evaluation(spec_path, target)
+    result = recompute_evaluation(spec_path, partial)
+    if target.exists():
+        raise FileExistsError(f"evaluation records exist: {target}")
+    os.replace(partial, target)
+    return result
 
 
 def recompute_evaluation(spec_path: str | Path, records_path: str | Path) -> dict[str, Any]:
