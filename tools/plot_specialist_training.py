@@ -1,6 +1,6 @@
-"""tools/plot_specialist_training.py — Live training dashboard for three v2 specialists.
+"""tools/plot_specialist_training.py — Live training dashboard for specialist(s).
 
-Reads train_log.jsonl from each specialist's checkpoint folder and plots:
+Reads train_log.jsonl from each specified checkpoint folder and plots:
   Row 1: malom_win_move_rate         (50-game smoothed)
   Row 2: heuristic_top1_rate  vs  policy_top1_rate  (50-game smoothed)
   Row 3: best_win_rate  vs  win_rate_200  (50-game smoothed)
@@ -9,13 +9,18 @@ Reads train_log.jsonl from each specialist's checkpoint folder and plots:
   Row 5: update_policy_loss  vs  update_value_loss
          (should both decrease; flat/rising value_loss = baseline not learning)
 
-One column per specialist (open / mid / end).
+One column per specialist.  Defaults to open/mid/end/generalist when no folders given.
 Refreshes every 20 minutes.
 
 Usage:
     .venv/bin/python tools/plot_specialist_training.py
+    .venv/bin/python tools/plot_specialist_training.py learned_ai/checkpoints/scaffolded/s_gen_v2
+    .venv/bin/python tools/plot_specialist_training.py s_open_v2 s_mid_v2
     .venv/bin/python tools/plot_specialist_training.py --interval 5   # minutes
     .venv/bin/python tools/plot_specialist_training.py --no-loop      # single render
+
+Folder arguments can be absolute paths or relative to the repo root or to
+learned_ai/checkpoints/scaffolded/ — whichever exists first.
 """
 from __future__ import annotations
 
@@ -33,7 +38,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 CKPT_BASE = ROOT / "learned_ai" / "checkpoints" / "scaffolded"
 
-SPECIALISTS = [
+DEFAULT_SPECIALISTS = [
     ("Opening",    CKPT_BASE / "s_open_v2"),
     ("Midgame",    CKPT_BASE / "s_mid_v2"),
     ("Endgame",    CKPT_BASE / "s_end_v2"),
@@ -41,6 +46,23 @@ SPECIALISTS = [
 ]
 
 SMOOTH = 50   # rolling window
+
+
+def _resolve_folder(arg: str) -> Path:
+    """Resolve a folder argument to an absolute path.
+
+    Tries in order: absolute, relative to cwd, relative to repo root,
+    relative to learned_ai/checkpoints/scaffolded/.
+    """
+    p = Path(arg)
+    if p.is_absolute() and p.is_dir():
+        return p
+    for base in (Path.cwd(), ROOT, CKPT_BASE):
+        candidate = base / p
+        if candidate.is_dir():
+            return candidate.resolve()
+    # Return best guess even if it doesn't exist yet (will show as empty)
+    return (CKPT_BASE / p).resolve()
 
 
 def _load(path: Path) -> list[dict]:
@@ -141,8 +163,8 @@ def _plot_series(ax, xs, ys, label, color, window=SMOOTH, alpha_raw=0.15):
     ax.plot(xs, smoothed, color=color, linewidth=1.6, label=label)
 
 
-def draw(fig, axes):
-    for col, (name, ckpt_dir) in enumerate(SPECIALISTS):
+def draw(fig, axes, specialists):
+    for col, (name, ckpt_dir) in enumerate(specialists):
         rows = _load(ckpt_dir)
 
         ax_malom = axes[0][col]
@@ -239,20 +261,33 @@ def draw(fig, axes):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("folders", nargs="*",
+                        help="Checkpoint folder(s) containing train_log.jsonl. "
+                             "Can be absolute, relative to repo root, or just the "
+                             "folder name under learned_ai/checkpoints/scaffolded/. "
+                             "Defaults to open/mid/end/generalist.")
     parser.add_argument("--interval", type=float, default=20.0,
                         help="Refresh interval in minutes (default 20)")
     parser.add_argument("--no-loop", action="store_true",
                         help="Render once and exit")
     args = parser.parse_args()
 
-    fig, axes = plt.subplots(
-        5, 4,
-        figsize=(18, 15),
-        sharex=False,
-    )
+    if args.folders:
+        specialists = []
+        for f in args.folders:
+            path = _resolve_folder(f)
+            specialists.append((path.name, path))
+    else:
+        specialists = DEFAULT_SPECIALISTS
+
+    n_cols = len(specialists)
+    fig_w = max(6, 4.5 * n_cols)
+    fig, axes = plt.subplots(5, n_cols, figsize=(fig_w, 15), sharex=False)
+    if n_cols == 1:
+        axes = [[ax] for ax in axes]   # normalise to 2-D list
 
     plt.ion()
-    draw(fig, axes)
+    draw(fig, axes, specialists)
 
     if args.no_loop:
         plt.ioff()
@@ -265,7 +300,7 @@ def main():
             deadline = time.time() + interval_s
             while time.time() < deadline:
                 plt.pause(1.0)   # keeps the window responsive
-            draw(fig, axes)
+            draw(fig, axes, specialists)
     except KeyboardInterrupt:
         pass
 
