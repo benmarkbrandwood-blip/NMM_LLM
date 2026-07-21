@@ -159,35 +159,52 @@ The v2 value net is trained on a **next-move prediction** task using human game 
 `human_db.sqlite`, rather than the v1 approach of predicting final game outcome from JSONL records.
 
 **Training approach:**
-- For each unique board state in the human DB where the move played was Malom-neutral or
-  Malom-winning (`malom_wdl_after IN ('L', 'D')` — the next player is losing or drawing, meaning
-  the human's move was good), enumerate all legal moves from that position.
-- Apply each legal move to get a set of successor board states.
-- Train with a ranking loss: the value net must score the successor resulting from the human's
-  actual move **higher** than all other successors.
-- All unique qualifying positions are used as the training set.  Repeat across epochs (the same
-  positions are re-presented each epoch); continue training until validation next-move accuracy
-  stops improving rather than for a fixed epoch count.
+- For each unique board state in the human DB, apply a **per-position quality filter** to avoid
+  training the value net to prefer drawn successors when winning successors were available.  Group
+  all move records by `state_key`; for each group:
+  - If **any** move recorded from this position has `malom_wdl_after = 'L'` (a winning move was
+    played at least once from this state in the DB), only include records from this position where
+    the human's chosen move **also** has `malom_wdl_after = 'L'`.
+  - If no winning move appears for this `state_key` in the DB, accept records where the human's
+    chosen move has `malom_wdl_after = 'D'` (draw was the best observed option from this state).
+  - Skip any record where `malom_wdl_after = 'W'` (human played a losing move), regardless of
+    what else is available.
+- For each qualifying (position, chosen-move) pair, enumerate all legal moves from that position,
+  apply each to get a set of successor board states, and extract 79-float features for each.
+- Train with a **pairwise sigmoid BCE (Bradley-Terry) ranking loss**: for each (positive, negative)
+  successor pair, minimise −log σ(v(human_successor) − v(other_successor)).  A margin ranking loss
+  max(0, margin − (v(human) − v(other))) is an acceptable alternative, but pairwise sigmoid BCE
+  gives smoother gradients and is preferred.
+- All unique qualifying positions form the training set.  Repeat across epochs; stop via early
+  stopping when validation next-move accuracy plateaus (see `--patience` below).
 
 **New training script required:** `tools/train_value_net_v2.py` (or `scripts/train_value_net_human.py`).
-The existing `tools/train_value_net.py` reads JSONL records with final-outcome labels and cannot
-be used directly.  The new script must:
+The existing `tools/train_value_net.py` reads JSONL records with final-outcome labels and uses a
+**numpy MLP with L2 loss — it cannot support a pairwise ranking loss without a significant
+rewrite**.  The new script should use PyTorch (or rewrite the MLP with a pairwise loss function)
+and must:
 
-1. Query `human_db.sqlite` for all positions where `malom_wdl_after IN ('L', 'D')`, deduplicating
-   by `state_key`.
-2. For each position, reconstruct the board from `state_key` (canonical FEN, reversible).
+1. Query `human_db.sqlite`, grouping move records by `state_key` and applying the per-position
+   filter above.
+2. For each qualifying position, reconstruct the board from `state_key` (canonical FEN, reversible).
 3. Enumerate all legal moves, apply each to get successor boards, extract 79-float features for
    each successor using `board_to_features()`.
-4. Use a contrastive/ranking loss (e.g. pairwise BCE or margin ranking) to push the value of the
-   human's chosen successor above the others.
-5. Track validation next-move accuracy (% of positions where the net ranks the human's successor
-   highest) and stop training when it plateaus.
+4. Train with pairwise sigmoid BCE ranking loss to push the value of the human's chosen successor
+   above all alternatives.
+5. Track **validation next-move accuracy** (% of positions where the net ranks the human's
+   successor highest) on a held-out **game-level** split; stop training when accuracy does not
+   improve by ≥0.5pp for `--patience` consecutive epochs.
+
+Note: the ranking loss trains only relative ordering, not absolute scalar magnitudes.  The v2 VN
+output scale may differ from the v1 VN (which was trained with L2 regression to a [−1, 1] final
+outcome).  This does not make v2 unusable for VN blending, but the blend % may need re-calibration
+— verify with the game bench in Step 4c before settling on a blend %.
 
 ```bash
 .venv/bin/python tools/train_value_net_v2.py \
   --db data/human_db.sqlite \
   --output data/value_net_v2.npz \
-  --patience 10
+  --patience 10   # stops if val next-move accuracy does not improve ≥0.5pp for 10 epochs
 ```
 
 ---
@@ -275,29 +292,49 @@ the net with higher next-move accuracy — this is the primary value net success
   --out eval_vn_v2_nextmove.json
 ```
 
-Use a dedicated test split (positions not seen during v2 training) for a fair comparison.
+Use a dedicated test split for a fair comparison.  The split **must be at the game level** — hold
+out whole games, not individual positions.  Position-level splits leak board states that appear in
+multiple games and will inflate reported next-move accuracy.
+
+**Sanity check — v2 VN game bench:** Because the ranking loss may shift the VN output scale
+relative to v1 (which used L2 regression), run a brief game bench to confirm the v2 VN is still
+useful when blended with the heuristic:
+
+```bash
+.venv/bin/python tools/bench_trajectory_value_net.py \
+  --vn-path data/value_net_v2.npz \
+  --blends 30 60 \
+  --games 40
+```
+
+The v2 VN30 agent should achieve a win rate ≥50% vs the base heuristic.  If not, the output scale
+has shifted adversely — re-scale or re-normalise v2 VN outputs before using it in Step 4d or
+promoting to production.
 
 ### 4d. Gap net eval — beats heuristic + high VN blend
 
 The gap net's job is to correct a heuristic AI that is leaning heavily on the value net (and
 therefore susceptible to Malom-detectable blunders in the blender's shadow).  The test opponent
-is **heuristic AI at VN blend 60–80%** (a player that is strong but exploitable).
+is **heuristic AI using `value_net_v2.npz` at VN blend 60–80%** — this is a stronger, more
+relevant baseline than v1 VN, and ensures the gap net is not being compared against an already-
+outdated opponent.
 
 Run each gap net (old v1 and new v2) against this opponent:
 
 ```bash
-# Old gap net vs heuristic+VN80
+# Old gap net vs heuristic+VN80 (v2 value net opponent)
+# (requires --vn-path flag in bench_sentinel.py — add before running)
 .venv/bin/python scripts/bench_sentinel.py \
   --games 40 --difficulty 5 \
   --white-gap-net \
-  --black-value-net --vn-blend 80
+  --black-value-net --vn-path data/value_net_v2.npz --vn-blend 80
 
-# New gap net vs heuristic+VN80
-# (requires --gap-net-path flag in bench_sentinel.py — add before running)
+# New gap net vs heuristic+VN80 (v2 value net opponent)
+# (requires --gap-net-path and --vn-path flags in bench_sentinel.py — add before running)
 .venv/bin/python scripts/bench_sentinel.py \
   --games 40 --difficulty 5 \
   --white-gap-net --gap-net-path data/gap_net_v2.npz \
-  --black-value-net --vn-blend 80
+  --black-value-net --vn-path data/value_net_v2.npz --vn-blend 80
 ```
 
 The winning gap net is the one that achieves a higher win rate against the VN-blend opponent.
@@ -316,7 +353,8 @@ Promote a v2 model to replace v1 production only if **all three** conditions hol
 |---|---|
 | Sentinel | Malom correlation eval (4a): `win_acc` improves ≥3pp AND `top1_win_rate` improves ≥3pp vs v1 |
 | Sentinel | Game bench (4b): NewS20 vs Base ≥50% win rate, and NewS20 beats or matches OldS20 within noise (±3pp) |
-| Value net | Next-move accuracy eval (4c): v2 next-move accuracy ≥ v1 next-move accuracy on the test split |
+| Value net | Next-move accuracy eval (4c): v2 next-move accuracy ≥ v1 + 2pp on the game-level test split |
+| Value net | Game bench (4c sanity check): v2 VN30 win rate vs base heuristic ≥ 50% |
 | Gap net | Gap net vs VN80 bench (4d): new gap net win rate vs VN80 opponent ≥ old gap net win rate vs same |
 
 If any model fails its criteria, investigate before promoting.  A v2 that performs identically to
@@ -386,3 +424,10 @@ iteration.
   checkpoint metadata before running Stage 5.
 - `build_gap_dataset.py` may not yet accept `--sentinel-ckpt` as a CLI argument.  Verify and add
   the flag if needed before running Step 1.
+- **Pre-flight: malom_wdl_after semantics.** The Step 2 training filter depends on 'L' meaning the
+  next player loses (i.e. the human's move was winning) and 'W' meaning the human played a losing
+  move.  Spot-check a sample of `human_db.sqlite` move records before writing
+  `train_value_net_v2.py` to confirm this convention is correct.
+- **Pre-flight: bench_sentinel.py VN path.** Step 4d requires the opponent to use
+  `value_net_v2.npz`.  Add a `--vn-path` CLI argument to `bench_sentinel.py` alongside
+  `--gap-net-path` before running Step 4d.
