@@ -230,6 +230,9 @@ LR_SCALE_MIN = 0.50
 LR_SCALE_MAX = 2.00
 RECOVERY_THRESHOLD  = 0.12
 RECOVERY_MIN_GAMES  = 30
+TEMP_BOOST_DECAY       = 0.97   # per-iteration decay for advancement/recovery temperature boost
+ENTROPY_BOOST_DECAY    = 0.97   # per-iteration decay for advancement/recovery entropy boost
+HOT_EXPLORE_TEMP_SCALE = 1.3    # hot-explore temperature = temp_start * this multiplier
 
 UPDATE_TARGET_EVERY   = 50
 SELF_PLAY_RATIO       = 0.5
@@ -1268,7 +1271,13 @@ def run(args: argparse.Namespace) -> None:
     last_update_vl  = None
     last_update_ent = None
     best_win_rate_at_diff = 0.0
-    recovery_grace: int   = 0   # games remaining where draw penalty is suppressed post-recovery
+    recovery_grace: int          = 0    # games remaining where draw penalty is suppressed post-recovery
+    temp_boost:              float = 0.0  # decaying additive temperature bonus (advancement/hot-explore)
+    entropy_boost:           float = 0.0  # decaying additive entropy-coef bonus (advancement/hot-explore)
+    hot_explore_remaining:   int   = 0    # batches left in stage-1 recovery (elevated temp, no reload)
+    hot_explore_triggered:   bool  = False  # True once stage-1 has fired; arms stage-2 reload
+    advance_rehearsal_remaining: int = 0  # batches left with expanded lower-diff opponent ratio
+    _effective_entropy_coef: float = args.entropy_coef  # updated each iteration with entropy_boost
 
     branch_bucket_history: deque[str] = deque(maxlen=args.bucket_window)
 
@@ -1327,7 +1336,25 @@ def run(args: argparse.Namespace) -> None:
 
     while game_count < segment_stop:
         batch_count += 1
-        temperature = _compute_temperature(game_count, args.max_games, args.temp_start)
+        _scheduled_temp = _compute_temperature(game_count, args.max_games, args.temp_start)
+        # Decay ongoing boosts
+        if temp_boost > 1e-4:
+            temp_boost *= TEMP_BOOST_DECAY
+        if entropy_boost > 1e-4:
+            entropy_boost *= ENTROPY_BOOST_DECAY
+        _effective_entropy_coef = args.entropy_coef + entropy_boost
+        # Apply temperature boost; cap at 1.5× temp_start to avoid runaway exploration
+        temperature = min(args.temp_start * 1.5, _scheduled_temp + temp_boost)
+        if hot_explore_remaining > 0:
+            hot_explore_remaining -= 1
+            temperature = max(temperature, args.temp_start * HOT_EXPLORE_TEMP_SCALE)
+            if hot_explore_remaining == 0:
+                print(f"[s_gen_v2a] Hot-explore phase complete at game {game_count} — armed for full recovery if still failing")
+        # Rehearsal: expand lower-diff opponent ratio for N iterations after advancement
+        _use_rehearsal = advance_rehearsal_remaining > 0
+        if _use_rehearsal:
+            advance_rehearsal_remaining -= 1
+        _lower_diff_hi = 0.10 + (args.advance_rehearsal_prob if _use_rehearsal else 0.20)
 
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
@@ -1357,22 +1384,22 @@ def run(args: argparse.Namespace) -> None:
                 _h._inner = _make_ga(_oc, _gd)
                 _opp, _gt = _h, "vs_heuristic_hard"
 
-            elif _roll < 0.30:
-                # Lower difficulty — diverse strength, still counts for advancement
+            elif _roll < _lower_diff_hi:
+                # Lower difficulty — diverse strength; slot expands during advance rehearsal
                 _gd  = int(rng.randint(1, max(1, difficulty - 1))) if difficulty > 1 else 1
                 _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _make_ga(_oc, _gd)
                 _opp, _gt = _h, "vs_heuristic_easy"
 
-            elif _roll < 0.40:
+            elif _roll < _lower_diff_hi + 0.10:
                 # Blundering heuristic — teaches exploitation of errors
                 _gd  = difficulty
                 _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _make_ga(_oc, _gd, blunder_probability=0.25)
                 _opp, _gt = _h, "vs_heuristic_blunder"
 
-            elif _roll < 0.50:
-                # Blended special (10% total): opponent uses value_net+gap_net+sentinel
+            elif _roll < _lower_diff_hi + 0.20:
+                # Blended special: opponent uses value_net+gap_net+sentinel
                 # blend ratios: value_net 10%, gap_net 30%, sentinel fires 20% of moves
                 _gd   = difficulty
                 _h    = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
@@ -1646,7 +1673,7 @@ def run(args: argparse.Namespace) -> None:
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
                 last_update_pl, last_update_vl, last_update_ent = update_fn(
-                    model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef
+                    model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=_effective_entropy_coef
                 )
                 upd_entry = {
                     "game":        game_count,
@@ -1681,7 +1708,13 @@ def run(args: argparse.Namespace) -> None:
                     _is_improving = _second_wr > _first_wr + 0.02
                     if _is_improving:
                         print(f"[s_gen_v2a] Recovery skipped: AI is improving ({_first_wr:.3f} → {_second_wr:.3f})")
-                    else:
+                        if hot_explore_triggered and hot_explore_remaining == 0:
+                            hot_explore_triggered = False
+                            print(f"[s_gen_v2a] Hot-explore recovery successful — flags cleared")
+                    elif hot_explore_triggered and hot_explore_remaining > 0:
+                        pass  # Still in hot-explore phase; let it run
+                    elif hot_explore_triggered and hot_explore_remaining == 0:
+                        # Stage 2: hot-explore didn't fix it — full checkpoint restore
                         best_ckpt = out_dir / f"best{difficulty}.pt"
                         if best_ckpt.exists():
                             ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
@@ -1703,10 +1736,54 @@ def run(args: argparse.Namespace) -> None:
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
-                                temperature = args.temp_start
+                                temp_boost   = 0.0
+                                entropy_boost = 0.0
+                                temperature  = args.temp_start
                                 recovery_grace = 100
-                                print(f"[s_gen_v2a] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                                hot_explore_triggered = False
+                                print(f"[s_gen_v2a] Recovery Stage 2: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
                                 print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
+                    else:
+                        # Stage 1: first sign of trouble — hot-explore phase
+                        if args.hot_explore_games > 0:
+                            hot_explore_remaining = args.hot_explore_games
+                            hot_explore_triggered = True
+                            _sched = _compute_temperature(game_count, args.max_games, args.temp_start)
+                            temp_boost    = max(temp_boost,    args.advance_temp_boost_frac * (args.temp_start - _sched))
+                            entropy_boost = max(entropy_boost, args.advance_entropy_boost_frac * args.entropy_coef)
+                            recovery_grace = args.hot_explore_games
+                            print(f"[s_gen_v2a] Recovery Stage 1: hot-explore for ~{args.hot_explore_games} iters "
+                                  f"(W={win_rate:.2f} L={loss_rate:.2f}) temp_boost+{temp_boost:.3f} "
+                                  f"ent_boost+{entropy_boost:.4f}")
+                        else:
+                            # --hot-explore-games 0: skip Stage 1, go straight to checkpoint restore
+                            best_ckpt = out_dir / f"best{difficulty}.pt"
+                            if best_ckpt.exists():
+                                ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
+                                _loaded_recovery = False
+                                try:
+                                    model.load_state_dict(ckpt_r["model"])
+                                    _loaded_recovery = True
+                                except RuntimeError:
+                                    pol_state = {k: v for k, v in ckpt_r["model"].items() if k.startswith("policy_mlp")}
+                                    try:
+                                        model.load_state_dict(pol_state, strict=False)
+                                        _loaded_recovery = True
+                                        print(f"[s_gen_v2a] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
+                                    except RuntimeError:
+                                        print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible (old feat_dim) — keeping current weights")
+                                if _loaded_recovery:
+                                    model.to(device)
+                                    opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+                                    frozen_opp.refresh(model)
+                                    win_history.clear()
+                                    win_history_heuristic.clear()
+                                    temp_boost    = 0.0
+                                    entropy_boost = 0.0
+                                    temperature   = args.temp_start
+                                    recovery_grace = 100
+                                    print(f"[s_gen_v2a] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                                    print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
                 branch_diags = [d for d in diag_buffer if d.is_branch]
@@ -1814,13 +1891,24 @@ def run(args: argparse.Namespace) -> None:
                 best_win_rate_at_diff = 0.0
                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
                 frozen_opp.refresh(model)
+                # Decaying temperature + entropy boost to ease the transition to the new difficulty
+                _sched_adv = _compute_temperature(game_count, args.max_games, args.temp_start)
+                temp_boost    = args.advance_temp_boost_frac * (args.temp_start - _sched_adv)
+                entropy_boost = args.advance_entropy_boost_frac * args.entropy_coef
+                # Rehearsal: expand lower-diff opponent ratio for the first N iterations
+                advance_rehearsal_remaining = args.advance_rehearsal_games
+                # Reset hot-explore state — new level is a fresh start
+                hot_explore_triggered = False
+                hot_explore_remaining = 0
+                print(f"[s_gen_v2a] Advancement boosts: temp+{temp_boost:.3f} "
+                      f"ent+{entropy_boost:.4f} rehearsal={args.advance_rehearsal_games}iters")
 
         if _advance_done:
             break
 
     # ── Final flush ────────────────────────────────────────────────────────────
     if ep_steps:
-        update_fn(model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef)
+        update_fn(model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=_effective_entropy_coef)
     if diag_buffer:
         with open(log_path, "a", encoding="utf-8") as f:
             for d in diag_buffer:
@@ -1905,6 +1993,20 @@ def main() -> None:
                    help="Fixed node budget per heuristic move (deterministic; overrides --time-budget)")
     p.add_argument("--segment-games",        type=int, default=None,
                    help="Stop after this many games from the resume point (bounded run support)")
+    p.add_argument("--advance-temp-boost-frac",   type=float, default=0.5,
+                   help="On difficulty advancement (or hot-explore trigger), add this fraction of "
+                        "(temp_start - scheduled_temp) as a decaying temperature boost (default 0.5)")
+    p.add_argument("--advance-entropy-boost-frac", type=float, default=0.5,
+                   help="On advancement/hot-explore, add this fraction of entropy_coef as a decaying "
+                        "entropy bonus to encourage exploration at the new difficulty (default 0.5)")
+    p.add_argument("--advance-rehearsal-games",   type=int,   default=0,
+                   help="After each difficulty advancement, run this many extra iterations with the "
+                        "lower-diff opponent slot expanded (0=disabled; default 0)")
+    p.add_argument("--advance-rehearsal-prob",    type=float, default=0.45,
+                   help="Lower-diff opponent probability during rehearsal window (default 0.45 vs standard 0.20)")
+    p.add_argument("--hot-explore-games",         type=int,   default=75,
+                   help="Stage-1 recovery: run this many iterations at elevated temperature before "
+                        "reloading the best checkpoint (0=skip Stage 1, go straight to reload; default 75)")
     args = p.parse_args()
     args.policy_hidden = tuple(int(x) for x in args.policy_hidden.split(","))
     run(args)
