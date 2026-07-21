@@ -8,12 +8,16 @@ Managed long-run experiment ID: `dev-v4-managed-baseline-v1`
 
 The one-game integration smoke completed on 20 July 2026 with status
 `passed_with_observation`; the checkpoint-reporting observation has since been
-resolved on `dev`. The long run has not started. A complete recommended
-configuration is recorded below. The product owner has delegated its technical
-selection and routine safe-resume decisions to the Agent, but has not
-authorized a new smoke or long run. The CLI can now explicitly disable ongoing
-imitation mixing, use deterministic fixed-node opponent search, and bind any
-long-run launch to a separately authorized immutable managed plan.
+resolved on `dev`. The authorized managed long run
+`managed-v4-baseline-v1` reached `managed_plan_completed` with
+`completed_games=5000` / `completed_segments=20` on 21 July 2026 (UTC). Training
+completion is not playing-strength evidence and does not authorize promotion.
+The next evaluation proposal is under fatal stop pending runner repair,
+replacement-corpus review, a clean freeze point, and new product authorization;
+see
+[`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
+complete recommended training configuration remains recorded below for
+lineage.
 
 This is a fresh-initialised, Malom-corrected **v4-style Generalist baseline**.
 It is not the v5 `reference_safe_baseline`, a release candidate, or evidence of
@@ -96,7 +100,7 @@ focused tests:
 
 The 500,000-node default is an Agent-owned starting choice, not a strength
 claim. Fixed-node heuristic search must follow
-[`docs/fixed-node-heuristic-search.md`](fixed-node-heuristic-search.md)
+[`docs/fixed-node-heuristic-search.md`](../fixed-node-heuristic-search.md)
 (Sanmill-aligned stand-pat leaves, same candidate set in and out). The
 immutable plan, not this calibration note, is authoritative for an actual run.
 
@@ -107,23 +111,39 @@ until a deterministic ratio-at-collection regression test and reviewed fix
 exist. See
 [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
 
-### Formal evaluation proposal - also not frozen
+### Formal evaluation status — fatal stop
 
-Formal evaluation is not required to implement the launch controls or run a
-disposable infrastructure smoke. It must be frozen before candidate results
-are inspected or used for promotion. The current proposal is:
+Formal evaluation remains separate from training completion. The candidate and
+architecture-matched scratch-init bundles have been exported and CPU-verified,
+but expert review invalidated the original 64-start / 256-pair freeze proposal
+and found a fatal draw-lifecycle defect in the paired runner. Freeze, execution,
+promotion, and publication remain unauthorized. The controlling record is
+[`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
+the evidence and decision rationale in
+[`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md).
 
-- a compatible immutable baseline bundle, still to be selected;
-- 64 reviewed, training-disjoint starts spanning placement, movement, and
-  flying phases;
-- 256 colour-swapped pairs, for 512 games total;
-- fixed work per move and `max_ply=200`, with overflow scored as a draw;
-- accept only when the 95% confidence-interval lower bound is above zero,
-  reject only when its upper bound is below zero, otherwise report
-  `inconclusive`.
+After runner repair, focused draw/retry tests, corpus generation and review,
+and a clean tracked freeze point, the next proposed experiment is only a
+Stage-0 training-signal diagnostic:
 
-The existing random smoke bundle and three infrastructure positions are not a
-formal baseline or evaluation corpus.
+- 109 unique playable positions projected from 110 raw Sanmill move-oracle
+  keys;
+- placement 109 / movement 0 / flying 0;
+- exactly 109 colour-swapped pairs / 218 games, with no deterministic start
+  reuse;
+- `policy-argmax-v1` versus the verified scratch-init control;
+- the normal interval described only as variation across the fixed convenience
+  corpus.
+
+The Oracle is separately engine-derived rather than a direct training-book
+export, but 28 of 109 positions overlap named-line trajectories and the full
+set is early placement. It is therefore not demonstrated held-out or
+training-disjoint. The evaluation also zeroes the 72-feature lookahead block
+used during training, so even an accepted result is ablation evidence, not a
+training-route-aligned strength or promotion result.
+
+The existing random smoke bundle, the three infrastructure positions, and the
+rejected 64-position draft are not formal evaluation corpora.
 
 ## Required Preflight Evidence
 
@@ -265,11 +285,12 @@ separate readiness gate and launch authorisation.
 ## Long-Run Launch Gate
 
 The bounded initialisation smoke passed, and its checkpoint observation is
-resolved in code and tests. The two technical launch controls are implemented,
-but no managed plan or product authorization has been published and no new
-training has started.
+resolved in code and tests. The authorized managed long run
+`managed-v4-baseline-v1` later completed at 5000 games. Further training still
+requires a **new** immutable plan and a **new** product authorization; the
+completed plan remains immutable and does not extend itself.
 
-Before another smoke or long run, use the managed supervisor to freeze an
+Before another smoke or long run, use the managed supervisor to freeze a new
 immutable plan on the intended clean commit. The plan must bind the resolved
 training semantics, local path-config hash, game and segment bounds, wall-time
 envelope, component exclusions, and fixed-node work. The product owner then
@@ -277,8 +298,8 @@ approves only the objective and resource envelope through the separate
 authorization contract. Plan creation alone never authorizes launch.
 
 Immediately before launch, rerun the training-readiness workflow and re-check
-the empty corrected SpecialistDB, new output directory, resolved work budget,
-component manifest, native fixed-work probe, and quarantine rules. A new
-disposable smoke must reach at least one RL update and prove that imitation
+the corrected SpecialistDB identity, new output directory, resolved work
+budget, component manifest, native fixed-work probe, and quarantine rules. A
+new disposable smoke must reach at least one RL update and prove that imitation
 stayed disabled. Do not reuse the original smoke DB, smoke checkpoint, or any
 author-`main` checkpoint.

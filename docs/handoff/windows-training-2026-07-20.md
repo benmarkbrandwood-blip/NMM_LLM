@@ -1,23 +1,23 @@
-# Windows Training Handover - 20 July 2026
+# Windows Training Handover — 20 July 2026 (updated 21 July 2026)
 
 ## Executive Summary
 
-The repository is now usable on the Windows 11 host, the downloaded databases
-and existing model artefacts are in their intended locations, and the focused
-Malom/provenance suite is green. A long corrected training run has not been
-started.
+The repository is usable on the Windows 11 host, the downloaded databases and
+existing model artifacts are in their intended locations, and the focused
+Malom/provenance suite is green. The authorized corrected-v4 managed plan
+`managed-v4-baseline-v1` completed 5,000 games in 20 verified segments on
+21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
+playing-strength or promotion evidence. No further training run is authorized.
 
-The auto-resume and temperature-schedule defects have now been fixed and tested
-on local `dev`. The owner has defined the first experiment as a fresh,
-Malom-corrected v4-style baseline with legacy Sentinel, ValueNet, and GapNet
-disabled. Its bounded one-game smoke passed with a checkpoint observation; a
-later `dev` commit corrected the inaccurate checkpoint report and records a
-conservative explicit-resume policy. A long monitored run has not started and
-remains gated on a newly authorized final smoke and readiness preflight. The
-product owner has delegated technical configuration and safe bounded-resume
-decisions to the Agent. Explicit imitation-mix disablement, fixed-node search,
-immutable managed plans, separate product authorization, and a segment
-supervisor are now implemented; this delegation is not launch authorization.
+The next proposed step, `dev-v4-formal-paired-eval-v1`, is under
+**fatal stop**. Expert review rejected the 64-position corpus and synthetic
+one-endpoint-per-named-line alternative, found a draw-lifecycle and
+partial-ledger restart defect in the paired runner, and established that
+`policy-argmax-v1` zeroes a lookahead feature block used during training.
+After repair and review, the only current proposal is a 109-start,
+placement-only Stage-0 training-signal diagnostic against scratch
+initialization. It is not a formal strength or promotion gate. Freeze and run
+remain unauthorized.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -80,6 +80,12 @@ remote graph before making synchronization claims. The completed
 force-with-lease approval is not standing permission for a future push or
 history rewrite; obtain fresh authorisation when such an operation becomes
 necessary.
+
+At the 21 July formal-evaluation review, local `dev` was at
+`bc92d3346c8da55b6cdf1d56b20b7cab10317c75`, one commit ahead of
+`origin/dev`, with modified and untracked experiment documents and draft
+artifacts. That is not a clean reproducible evaluation freeze point. Recheck
+the live graph and working tree before relying on this snapshot.
 
 ## Environment State
 
@@ -426,6 +432,52 @@ from the verified `latest.pt` of the immediately preceding completed segment,
 using explicit `exact-resume`. Legacy checkpoints, including every
 author-`main` file, remain weights-only and cannot satisfy that gate.
 
+## Managed Run Completion and Formal Evaluation Stop
+
+The separately authorized managed plan `managed-v4-baseline-v1` later
+completed `completed_games=5000` and `completed_segments=20`. Its frozen
+training commit is `9ee3543195255456b2b3832f8371a8f64d25a6af`, and its plan
+SHA-256 is
+`3f696e60c508a972dc42c79f630e90ad20e870001190321a13f0c3a12a4251c1`.
+The final candidate source is
+`managed_v4_baseline_v1/segments/segment-0020/latest.pt`. The candidate and
+architecture-matched scratch-init evaluation bundles have both passed CPU
+verification.
+
+The first formal paired-evaluation proposal is nevertheless under fatal stop:
+
+- the paired runner mishandles engine-level repetition and 50-move draws with
+  `winner=None`, then attempts another move and raises an error;
+- its exclusive-create games ledger can leave a crash artifact that blocks a
+  same-path retry, so lifecycle and restart semantics must be fixed together;
+- pure argmax plus modulo start selection makes repeated starts exact copies,
+  invalidating the old 64-start / 256-pair nominal sample size;
+- 49 of 107 named lines have 2–42 legal endpoints because removal choices are
+  omitted, one line fails replay, and one successful endpoint is terminal;
+- 110 raw Sanmill Oracle keys project to 109 unique playable NMM positions,
+  all in placement phase;
+- the proposed `policy-argmax-v1` route zeroes the 72-feature lookahead block
+  supplied during training.
+
+The proposed post-repair Stage-0 diagnostic is 109 unique Oracle-projected
+starts, one colour-swapped pair per start, for 218 games against the verified
+scratch-init control. Sanmill documents the Oracle as independently
+engine-derived, but 28 of 109 positions overlap named-line trajectories and
+all positions are early placement. It is not demonstrated held-out or
+training-disjoint. Stage 0 therefore tests only whether a training signal is
+visible under a placement-only feature ablation; it is not a strength or
+promotion gate.
+
+The controlling records are:
+
+- [blocked evaluation contract](../experiments/dev-v4-formal-paired-eval-v1.md)
+- [expert decision record](../experiments/dev-v4-formal-paired-eval-v1-decision-brief.md)
+- [rejected corpus and replacement requirements](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
+
+No freeze or run command is approved. A later inconclusive v1 may be followed
+by a separately preregistered and frozen v2, but the observations must not be
+pooled or represented as one prespecified sample.
+
 ## Live Malom and Legacy-model Boundary
 
 The old note says `specialist_router.py` was a temporary containment against a
@@ -541,32 +593,27 @@ database growth.
 
 The workspace/root check, graph inspection, earlier trainer fixes, focused
 tests, 102-test Malom/provenance rerun, first-experiment component decision,
-bounded smoke, and checkpoint-policy correction are complete. The author
-bundle and pure-RL definition exposed additional gates that are now closed in
-code. Proceed in this order:
+bounded smoke, managed-plan hardening, and the 5,000-game managed run are
+complete. Do not launch more training merely because the managed run ended.
+Proceed in this order:
 
-1. Keep the first baseline on A2C and omit `--ppo`. The Agent owns technical
-   defaults; do not ask the product owner to choose ML parameters. Separately
-   add a deterministic test for temperature-consistent PPO old/new log
-   probabilities before considering a PPO experiment.
-2. Invoke the training-readiness workflow on the intended clean commit. Verify
-   the rebuilt native fixed-node interface, empty corrected SpecialistDB,
-   isolated disposable paths, component exclusions, and focused tests.
-3. Prepare an immutable managed smoke plan. Present only its objective, maximum
-   games, wall-time envelope, and claim boundary to the product owner. Plan
-   creation is not authorization.
-4. After explicit product authorization, run a disposable smoke that reaches
-   at least one RL update and prove that imitation remained disabled, actual
-   heuristic node work was recorded, the run ledger completed, and the
-   checkpoint is exact-resume compatible.
-5. If the smoke passes, prepare a new long-run plan on the final clean commit
-   and request a separate launch authorization. The supervisor may chain only
-   verified 250-game exact-resume segments within that authorization.
-6. Before examining a candidate for promotion, freeze the inference route,
-   baseline bundle, phase-stratified starting corpus, paired colour-swapped
-   workload, interval rule, and maximum-ply draw rule. This evaluation freeze
-   is not required for the integration smoke or baseline training, but it is
-   required for a strength or promotion claim.
+1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
+   and scratch-init bundle under their recorded identities.
+2. Repair the paired runner's repetition/50-move draw transition and define
+   recoverable or explicitly restartable partial-ledger behavior.
+3. Add focused regression tests for both engine-level draw paths and the
+   selected ledger retry semantics.
+4. Generate and review a freeze-compatible list of exactly 109 unique playable
+   Oracle-projected positions. Record phase counts, symmetry uniqueness,
+   provenance, overlap, and a new corpus SHA-256.
+5. Reconcile the owning documents and artifact in a clean tracked commit, then
+   repeat the focused evaluation/readiness checks.
+6. Request an explicit product authorization before freezing or running the
+   Stage-0 diagnostic. Use 109 pairs / 218 games with no start reuse, and do
+   not treat acceptance as promotion evidence.
+7. Specify a separate route-aligned and phase-covered evaluation before making
+   a formal strength claim. If Stage 0 is inconclusive, preregister v2
+   independently and do not pool its observations with v1.
 
 The previously executed isolated smoke command was:
 
@@ -609,13 +656,13 @@ The following choices are recorded for the first `dev` experiment:
 - use the corrected v4-style Generalist path, not claim the staged v5 baseline;
 - exclude legacy Sentinel, ValueNet, and GapNet from the first run.
 
-The product owner has also delegated routine technical choices to the Agent.
-The Agent-selected managed default is A2C, no imitation warm-start or mixing,
-50/50 frozen/heuristic opponents, 500,000 native nodes per heuristic move,
-full depth-5 rollout, temperature `0.90` to `0.20`, 5,000 games, seed 42,
-single-game batching, and 250-game exact-resume segments. An actual run freezes
-these values in `plan.json`; the separate `authorization.json` records the
-product launch decision.
+The product owner delegated routine technical choices for the authorized
+managed baseline to the Agent. The resulting immutable plan used A2C, no
+imitation warm-start or mixing, 50/50 frozen/heuristic opponents, 500,000
+native nodes per heuristic move, full depth-5 rollout, temperature `0.90` to
+`0.20`, 5,000 games, seed 42, single-game batching, and 250-game exact-resume
+segments. That plan and its authorization are complete historical contracts;
+they are not authority for another run.
 
 The product owner should be asked only about the objective, total game or
 wall-time envelope, launch, later resource expansion, and publication or
@@ -623,11 +670,12 @@ promotion. Technical failures remain Agent diagnosis. The local
 endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
-No managed plan or authorization has yet been published. Safe work currently
-includes inspection, tests, readiness review, and preparation of a proposed
-plan. It does not include an additional smoke or long training job without
-explicit product launch authorization, nor a push or history rewrite without
-separate authorization.
+The managed plan completed, but the formal evaluation is under fatal stop and
+has no freeze/run authorization. Safe work currently includes inspection,
+documentation, focused defect repair and tests, replacement-corpus
+construction, and readiness review. It does not include an evaluation run, an
+additional smoke or long training job, promotion/publication, a push, or a
+history rewrite without the applicable separate authorization.
 
 ## Reference Material
 

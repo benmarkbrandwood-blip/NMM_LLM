@@ -1,0 +1,682 @@
+{
+  "conversion": {
+    "named_lines": "replay lineMoves on NMM_LLM GameEngine",
+    "oracle_fen": "Sanmill Mill FEN -> NMM via NMM_POSITION_ORDER_NODES"
+  },
+  "counts_by_origin": {
+    "named-line": 64
+  },
+  "counts_by_side_to_move_phase": {
+    "move": 12,
+    "place": 52
+  },
+  "counts_by_source": {
+    "book": 24,
+    "learned": 40
+  },
+  "entries": [
+    {
+      "family": "Battle Lines",
+      "fen": "........................|W|0|0",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 0,
+      "source": "book"
+    },
+    {
+      "family": "Corner Gambit",
+      "fen": "W.......................|B|1|0",
+      "opening_id": "corner-gambit",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 1,
+      "source": "book"
+    },
+    {
+      "family": "Inverted Mill Rush",
+      "fen": ".W......................|B|1|0",
+      "opening_id": "inverted-mill-rush-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 1,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": ".........B.WWW.B........|B|3|2",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 5,
+      "source": "book"
+    },
+    {
+      "family": "Z Mill",
+      "fen": ".........B...W.........W|B|2|1",
+      "opening_id": "z-mill-closed",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 3,
+      "source": "book"
+    },
+    {
+      "family": "Early Game",
+      "fen": "................W.......|B|1|0",
+      "opening_id": "book-00-287755",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 1,
+      "source": "learned"
+    },
+    {
+      "family": "Man-to-Man Marking",
+      "fen": ".........W.W.BWB........|B|3|2",
+      "opening_id": "book-22-7cd89e",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 5,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": "..........W.............|B|1|0",
+      "opening_id": "novel-003932a3",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 1,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": "..........W...B.........|W|1|1",
+      "opening_id": "novel-003932a3",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 2,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": "..........W..WB.........|B|2|1",
+      "opening_id": "novel-003932a3",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 3,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": "..........W..WB......B..|W|2|2",
+      "opening_id": "novel-003932a3",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 4,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": "...W......W..WB......B..|B|3|2",
+      "opening_id": "novel-003932a3",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 5,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": ".W.......B..............|W|1|1",
+      "opening_id": "novel-03c5f5dc",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 2,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": ".W.......B....W.........|B|2|1",
+      "opening_id": "novel-03c5f5dc",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 3,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": ".W.......B..B.W.........|W|2|2",
+      "opening_id": "novel-03c5f5dc",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 4,
+      "source": "learned"
+    },
+    {
+      "family": "novel",
+      "fen": ".W.......B..BWW.........|B|3|2",
+      "opening_id": "novel-03c5f5dc",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 5,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": ".........W.W.B.B.B.B.W.W|W|4|4",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "........BBWW.W.B........|W|3|3",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 6,
+      "source": "book"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "........BBWWWW..........|B|4|3",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 7,
+      "source": "book"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "........BBWWWWB.........|W|4|4",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".....W..BBWWWWB.........|B|5|4",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 9,
+      "source": "book"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B...W..BBWWWWB.........|W|5|5",
+      "opening_id": "battle-lines",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 10,
+      "source": "book"
+    },
+    {
+      "family": "Corner Gambit",
+      "fen": "W.W...W.BB.....B........|W|3|3",
+      "opening_id": "corner-gambit",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 6,
+      "source": "book"
+    },
+    {
+      "family": "Corner Gambit",
+      "fen": "W.W.W.W.BB.....B........|B|4|3",
+      "opening_id": "corner-gambit",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 7,
+      "source": "book"
+    },
+    {
+      "family": "Corner Gambit",
+      "fen": "W.W.W.W.BB.B...B........|W|4|4",
+      "opening_id": "corner-gambit",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Inverted Mill Rush",
+      "fen": ".W...B..B.WW...B........|W|3|3",
+      "opening_id": "inverted-mill-rush-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 6,
+      "source": "book"
+    },
+    {
+      "family": "Inverted Mill Rush",
+      "fen": ".W...B..B.WWW...........|B|4|3",
+      "opening_id": "inverted-mill-rush-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 7,
+      "source": "book"
+    },
+    {
+      "family": "Inverted Mill Rush",
+      "fen": ".W...B..B.WWW.B.........|W|4|4",
+      "opening_id": "inverted-mill-rush-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Inverted Mill Rush",
+      "fen": ".W...B..B.WWW..........B|W|4|4",
+      "opening_id": "inverted-mill-rush-perpendicular",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": ".........BBWWW.B........|W|3|3",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 6,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": ".........BBWWWW.........|B|4|3",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 7,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": "B........BBWWWW.........|W|4|4",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": "B.W......BBWWWW.........|B|5|4",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 9,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": "B.W.....BBB.WWW.........|W|5|5",
+      "opening_id": "mill-rush-extended-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 10,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": "........BBB.WWW.........|W|4|4",
+      "opening_id": "mill-rush-parallel",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Mill Rush",
+      "fen": ".......B.BBWWWW.........|W|4|4",
+      "opening_id": "mill-rush-parallel-alt",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 8,
+      "source": "book"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "...B....WWW.BBB......WBW|W|6|6",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 12,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "...B...WWWW.BBB......WBW|B|7|6",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 13,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "...B...WWWW.BBBB.....WBW|W|7|7",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 14,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "..WB...WWWW.BBBB.....WBW|B|8|7",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 15,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".BWB...WWWW.BBBB.....WBW|W|8|8",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 16,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".BWB...WWWW.BBBB..W..WBW|B|9|8",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 17,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B.B....WWW.BBB....W.W..|W|6|6",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 12,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B.B....WWW.BBB....WWW..|B|7|6",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 13,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B.B..B.WWW.BBB....WWW..|W|7|7",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 14,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B.B....WWW.BBB...WWWW..|B|8|7",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 15,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".B.BB...WWW.BBB...WWWW..|W|8|8",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 16,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": "...BB...WWW.BBB...WWWWW.|B|9|8",
+      "opening_id": "book-38-fc8361",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 17,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": "...B.W.W.W.W.BBB.B.B.W.W|W|6|6",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 12,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": "...B.W.W.W.WWBBB.B.B.W.W|B|7|6",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 13,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": "...B.W.W.WBWWBBB.B.B.W.W|W|7|7",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 14,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": "...B.W.WWWBWWBBB.B.B.W.W|B|8|7",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "place",
+      "ply": 15,
+      "source": "learned"
+    },
+    {
+      "family": "Battle Lines",
+      "fen": ".BWB...WWWW.BBBB.BW..WBW|W|9|9",
+      "opening_id": "book-37-e4eb5c",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Black Diamond",
+      "fen": "...B.W..WWBWWBBBBBBBWW.W|W|9|9",
+      "opening_id": "book-23-5f1cc8",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": "WBWBWB.BWB.WBW.B.WWB..BW|W|9|9",
+      "opening_id": "book-03-572229",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": "BW.WBWWBBW.BWB.W.BBW.BW.|W|9|9",
+      "opening_id": "book-06-2971b5",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": "BBB.....WWWWBB.B..WBWWBW|W|9|9",
+      "opening_id": "book-07-a33845",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": ".WB.BWBWBW.BWB.WWB.WBW.B|W|9|9",
+      "opening_id": "book-10-5ce37b",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": "WWB.....BBBWBWWBWWBBWB..|W|9|9",
+      "opening_id": "book-11-04f0dc",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Early Game",
+      "fen": ".BBW.W..WWBWWBBBBWBBW..W|W|9|9",
+      "opening_id": "book-14-b4b5b3",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Man-to-Man Marking",
+      "fen": "WB.WBW.B.WBW.BWBB.WBW.BW|W|9|9",
+      "opening_id": "book-22-7cd89e",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Z Mill",
+      "fen": ".B..W.B.WWWWBBWBBBB.WW..|W|9|9",
+      "opening_id": "book-40-658b81",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Z Mill",
+      "fen": ".B.W..B.WWWWBBWBB..BWWBW|W|9|9",
+      "opening_id": "book-44-2f8c37",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    },
+    {
+      "family": "Z Mill",
+      "fen": "...W.WB.WWWWBB.BWBBBW.BW|W|9|9",
+      "opening_id": "book-48-5c1df5",
+      "origin": "named-line",
+      "phase": "move",
+      "ply": 18,
+      "source": "learned"
+    }
+  ],
+  "evaluation_id": "dev-v4-formal-paired-eval-v1",
+  "generator": "sanmill-nmm-opening-book",
+  "not_frozen": true,
+  "phase_policy": {
+    "fly_from_opening_book": false,
+    "note": "Sanmill opening book is placing-phase oriented; fly positions are not supplied by the book. This draft uses place + early move (completed-placement) positions only."
+  },
+  "sanmill_book_path": "D:/Repo/Sanmill/src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
+  "sanmill_book_sha256": "d304434a46a812a6ecbd5fe1779baf853025516082dee7e50de09969bd270a6b",
+  "sanmill_commit": "6a64010aed7ea4193502ea17c242f68e09fe576a",
+  "schema_version": "nmm.eval-corpus-draft.v1",
+  "selection_stats": {
+    "named_line_replay_fail": 1,
+    "named_line_replay_ok": 106,
+    "oracle_convert_fail": 0,
+    "oracle_convert_ok": 110,
+    "unique_candidates": 1277
+  },
+  "start_positions": [
+    "........................|W|0|0",
+    "W.......................|B|1|0",
+    ".W......................|B|1|0",
+    ".........B.WWW.B........|B|3|2",
+    ".........B...W.........W|B|2|1",
+    "................W.......|B|1|0",
+    ".........W.W.BWB........|B|3|2",
+    "..........W.............|B|1|0",
+    "..........W...B.........|W|1|1",
+    "..........W..WB.........|B|2|1",
+    "..........W..WB......B..|W|2|2",
+    "...W......W..WB......B..|B|3|2",
+    ".W.......B..............|W|1|1",
+    ".W.......B....W.........|B|2|1",
+    ".W.......B..B.W.........|W|2|2",
+    ".W.......B..BWW.........|B|3|2",
+    ".........W.W.B.B.B.B.W.W|W|4|4",
+    "........BBWW.W.B........|W|3|3",
+    "........BBWWWW..........|B|4|3",
+    "........BBWWWWB.........|W|4|4",
+    ".....W..BBWWWWB.........|B|5|4",
+    ".B...W..BBWWWWB.........|W|5|5",
+    "W.W...W.BB.....B........|W|3|3",
+    "W.W.W.W.BB.....B........|B|4|3",
+    "W.W.W.W.BB.B...B........|W|4|4",
+    ".W...B..B.WW...B........|W|3|3",
+    ".W...B..B.WWW...........|B|4|3",
+    ".W...B..B.WWW.B.........|W|4|4",
+    ".W...B..B.WWW..........B|W|4|4",
+    ".........BBWWW.B........|W|3|3",
+    ".........BBWWWW.........|B|4|3",
+    "B........BBWWWW.........|W|4|4",
+    "B.W......BBWWWW.........|B|5|4",
+    "B.W.....BBB.WWW.........|W|5|5",
+    "........BBB.WWW.........|W|4|4",
+    ".......B.BBWWWW.........|W|4|4",
+    "...B....WWW.BBB......WBW|W|6|6",
+    "...B...WWWW.BBB......WBW|B|7|6",
+    "...B...WWWW.BBBB.....WBW|W|7|7",
+    "..WB...WWWW.BBBB.....WBW|B|8|7",
+    ".BWB...WWWW.BBBB.....WBW|W|8|8",
+    ".BWB...WWWW.BBBB..W..WBW|B|9|8",
+    ".B.B....WWW.BBB....W.W..|W|6|6",
+    ".B.B....WWW.BBB....WWW..|B|7|6",
+    ".B.B..B.WWW.BBB....WWW..|W|7|7",
+    ".B.B....WWW.BBB...WWWW..|B|8|7",
+    ".B.BB...WWW.BBB...WWWW..|W|8|8",
+    "...BB...WWW.BBB...WWWWW.|B|9|8",
+    "...B.W.W.W.W.BBB.B.B.W.W|W|6|6",
+    "...B.W.W.W.WWBBB.B.B.W.W|B|7|6",
+    "...B.W.W.WBWWBBB.B.B.W.W|W|7|7",
+    "...B.W.WWWBWWBBB.B.B.W.W|B|8|7",
+    ".BWB...WWWW.BBBB.BW..WBW|W|9|9",
+    "...B.W..WWBWWBBBBBBBWW.W|W|9|9",
+    "WBWBWB.BWB.WBW.B.WWB..BW|W|9|9",
+    "BW.WBWWBBW.BWB.W.BBW.BW.|W|9|9",
+    "BBB.....WWWWBB.B..WBWWBW|W|9|9",
+    ".WB.BWBWBW.BWB.WWB.WBW.B|W|9|9",
+    "WWB.....BBBWBWWBWWBBWB..|W|9|9",
+    ".BBW.W..WWBWWBBBBWBBW..W|W|9|9",
+    "WB.WBW.B.WBW.BWBB.WBW.BW|W|9|9",
+    ".B..W.B.WWWWBBWBBBB.WW..|W|9|9",
+    ".B.W..B.WWWWBBWBB..BWWBW|W|9|9",
+    "...W.WB.WWWWBB.BWBBBW.BW|W|9|9"
+  ],
+  "start_positions_sha256": "720e82367556ed0e50ec834edc54f85881adc2abf83b0b67eb2a87dfb0cfe2b0",
+  "status": "draft_for_owner_review",
+  "training_disjoint_claim": "Positions come from Sanmill's shipped standard NMM opening-book asset (named lines + oracle keys), converted/replayed into NMM_LLM FEN. They were not sampled from managed training logs."
+}
