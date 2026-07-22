@@ -58,7 +58,15 @@ def _resolve_folder(arg: str) -> Path:
     p = Path(arg)
     if p.is_absolute() and p.is_dir():
         return p
-    for base in (Path.cwd(), ROOT, CKPT_BASE):
+    bases = (Path.cwd(), ROOT, CKPT_BASE)
+    # First pass: prefer a candidate that actually contains train_log.jsonl,
+    # so an empty stub directory can't mask the real run.
+    for base in bases:
+        candidate = base / p
+        if (candidate / "train_log.jsonl").is_file():
+            return candidate.resolve()
+    # Second pass: fall back to any matching directory.
+    for base in bases:
         candidate = base / p
         if candidate.is_dir():
             return candidate.resolve()
