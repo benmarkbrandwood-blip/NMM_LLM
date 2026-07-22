@@ -25,13 +25,22 @@ import torch.nn.functional as F
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
 from learned_ai.agents.heuristic_agent import get_heuristic_evaluate as _get_heuristic_evaluate
-from learned_ai.models.lookahead_advisor import LookaheadAdvisor
-from learned_ai.models.overseer_extras import build_overseer_extras
-from learned_ai.models.scaffolded_encoder import encode_position_with_lookahead
+from learned_ai.models.lookahead_advisor import (
+    LOOKAHEAD_SIGNALS_PER_PLY,
+    LookaheadAdvisor,
+)
+from learned_ai.models.overseer_extras import (
+    OVERSEER_EXTRA_DIM,
+    build_overseer_extras,
+)
+from learned_ai.models.scaffolded_encoder import (
+    MOVE_FEAT_DIM,
+    encode_position_with_lookahead,
+)
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 
 
-SENTINEL_LOOKAHEAD_S_EST = 0.5   # rough estimate of 15-ply lookahead cost per position
+SENTINEL_LOOKAHEAD_S_EST = 0.5   # rough lookahead cost per position
 
 def specialist_target_time_s(heuristic_time_s: float,
                              sentinel_lookahead_s: float = SENTINEL_LOOKAHEAD_S_EST) -> float:
@@ -39,7 +48,7 @@ def specialist_target_time_s(heuristic_time_s: float,
 
     Rule: specialist_time >= max(2 * heuristic_time, 1 s + sentinel_lookahead).
     The specialist's actual forward pass is instant; its cost is dominated by the
-    15-ply sentinel lookahead inside encode_position_with_lookahead().  Callers
+    model-compatible sentinel lookahead inside the encoder.  Callers
     should size the heuristic opponent so this ratio holds."""
     return max(2.0 * heuristic_time_s, 1.0 + sentinel_lookahead_s)
 
@@ -48,7 +57,7 @@ def specialist_target_time_s(heuristic_time_s: float,
 class ScaffoldedDecision:
     """Trace of the most recent move for trainers / loggers."""
 
-    move_features:  np.ndarray     # (k, 62) for all legal moves at this step
+    move_features:  np.ndarray     # (k, model.move_feat_dim) rows scored this step
     value_input:    np.ndarray     # (23,)
     chosen_idx:     int            # index into legal_moves
     legal_moves:    list           # full list of legal move dicts
@@ -125,9 +134,32 @@ class ScaffoldedAgent:
         else:
             self._gen.seed()
 
+        extra_dim = OVERSEER_EXTRA_DIM if self._is_overseer else 0
+        self._lookahead_dim = self.model.move_feat_dim - MOVE_FEAT_DIM - extra_dim
+        if self._lookahead_dim < 0:
+            raise ValueError(
+                "model move feature width is smaller than the required base "
+                f"width: model={self.model.move_feat_dim}, "
+                f"base={MOVE_FEAT_DIM}, extras={extra_dim}"
+            )
+
         if lookahead_advisor is not None:
+            advisor_dim = getattr(lookahead_advisor, "feat_dim", None)
+            if advisor_dim != self._lookahead_dim:
+                raise ValueError(
+                    "lookahead feature width does not match the model: "
+                    f"advisor={advisor_dim}, expected={self._lookahead_dim}"
+                )
             self.lookahead_advisor = lookahead_advisor
+        elif self._lookahead_dim == 0:
+            self.lookahead_advisor = None
         else:
+            if self._lookahead_dim % LOOKAHEAD_SIGNALS_PER_PLY != 0:
+                raise ValueError(
+                    "model lookahead width is incompatible with the current "
+                    f"{LOOKAHEAD_SIGNALS_PER_PLY}-signal schema: "
+                    f"lookahead={self._lookahead_dim}"
+                )
             _evaluate_fn = _get_heuristic_evaluate()
             self.lookahead_advisor = LookaheadAdvisor(
                 sentinel=sentinel_advisor,
@@ -135,7 +167,7 @@ class ScaffoldedAgent:
                 evaluate_fn=_evaluate_fn,
                 gap_net=gap_net,
                 use_sentinel=True,
-                ply_depth=15,
+                ply_depth=self._lookahead_dim // LOOKAHEAD_SIGNALS_PER_PLY,
             )
 
         self.last_decision: Optional[ScaffoldedDecision] = None
@@ -172,6 +204,7 @@ class ScaffoldedAgent:
             db=self.db,
             value_net=self.value_net,
             lookahead_advisor=self.lookahead_advisor,
+            lookahead_dim=self._lookahead_dim,
         )
         if enc is None or len(enc.legal_moves) == 0:
             return {}
@@ -186,6 +219,19 @@ class ScaffoldedAgent:
         else:
             feat_matrix = enc.feat_matrix
 
+        if feat_matrix.shape[1] != self.model.move_feat_dim:
+            raise ValueError(
+                "encoded move feature width does not match the model: "
+                f"encoded={feat_matrix.shape[1]}, "
+                f"model={self.model.move_feat_dim}"
+            )
+        if enc.value_input.shape[0] != self.model.value_input_dim:
+            raise ValueError(
+                "encoded value input width does not match the model: "
+                f"encoded={enc.value_input.shape[0]}, "
+                f"model={self.model.value_input_dim}"
+            )
+
         feat_t = torch.tensor(feat_matrix, dtype=torch.float32).to(self.device)
         vi_t   = torch.tensor(enc.value_input,  dtype=torch.float32).to(self.device)
 
@@ -197,7 +243,7 @@ class ScaffoldedAgent:
         chosen_idx, log_prob = self._select(logits)
 
         self.last_decision = ScaffoldedDecision(
-            move_features=enc.feat_matrix,
+            move_features=feat_matrix,
             value_input=enc.value_input,
             chosen_idx=chosen_idx,
             legal_moves=enc.legal_moves,

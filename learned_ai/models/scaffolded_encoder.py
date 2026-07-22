@@ -69,13 +69,13 @@ LOOKAHEAD_FEAT_DIM:           int = LOOKAHEAD_PLIES * LOOKAHEAD_SIGNALS   # 72
 MOVE_FEAT_DIM_WITH_LOOKAHEAD: int = MOVE_FEAT_DIM + LOOKAHEAD_FEAT_DIM  # 134
 
 # ── Top-K search-informed extension (v3, 2026-07-16) ──────────────────────────
-# Per-candidate row on top of the 122-float base+lookahead:
+# Per-candidate row on top of the 134-float base+lookahead:
 #   [0] ab_score_norm : alpha-beta root score, min-max scaled to [0, 1] across the K candidates
 #   [1] ab_rank_norm  : (K - rank) / (K - 1)  →  1.0 for #1, 0.0 for #K
 #   [2] human_freq    : probability human plays this move (from HumanDB/TrajectoryDB/N-gram, or 0)
 #   [3] human_rank    : normalised rank among human choices — 1.0 for most-played, 0.0 for absent
 TOPK_EXTRA_DIM: int = 4
-MOVE_FEAT_DIM_WITH_TOPK: int = MOVE_FEAT_DIM_WITH_LOOKAHEAD + TOPK_EXTRA_DIM  # 126
+MOVE_FEAT_DIM_WITH_TOPK: int = MOVE_FEAT_DIM_WITH_LOOKAHEAD + TOPK_EXTRA_DIM  # 138
 
 
 # ── heuristic evaluate import (avoids ai/__init__ heavy imports) ───────────────
@@ -408,11 +408,11 @@ def encode_position_with_lookahead(
 
     When lookahead_advisor is provided, calls score_moves_matrix() and appends
     its (k, N) result to the base (k, 62) feat_matrix.  N = advisor.feat_dim
-    (e.g. 15 for 5-ply specialists, 36 for 12-ply Overseer).
+    (72 for the current 12-ply, 6-signal specialist schema).
 
     When lookahead_advisor is None, a zero block is appended whose width is:
       - lookahead_dim  if explicitly provided (e.g. OVERSEER_LOOKAHEAD_DIM=36)
-      - LOOKAHEAD_FEAT_DIM (15)  otherwise — backward-compatible default
+      - LOOKAHEAD_FEAT_DIM (72)  otherwise
 
     All other fields of EncodedPosition are identical to encode_position().
     specialist_db: SpecialistDB instance — populates counterfactual slots [40:58]
@@ -517,15 +517,15 @@ def encode_top_k_candidates(
     game_notations: Optional[List[str]] = None,
     ab_preserve_tt: bool = False,
 ) -> Optional[Any]:
-    """Encode the ``top_k`` alpha-beta-best candidates as a (K, MOVE_FEAT_DIM_WITH_TOPK) matrix.
+    """Encode the ``top_k`` alpha-beta-best candidates as a (K, 138) matrix.
 
     The specialist is only ever asked to re-rank the classical engine's top K moves,
     not to score every legal move from scratch.  This mirrors how strong players work:
     narrow to a promising short-list, then evaluate deeply.
 
-    Per-candidate feature row (126 floats):
+    Per-candidate feature row (138 floats):
       * 62 base features         (same as encode_position)
-      * 60 lookahead features    (same as encode_position_with_lookahead)
+      * 72 lookahead features    (same as encode_position_with_lookahead)
       * 4  top-K extras          (ab_score_norm, ab_rank_norm, human_freq, human_rank)
 
     Steps:
@@ -537,7 +537,7 @@ def encode_top_k_candidates(
       5. Concatenate the 4 extra floats onto each row.
 
     Returns an EncodedPosition-like object with:
-        feat_matrix: (K, MOVE_FEAT_DIM_WITH_TOPK)
+        feat_matrix: (K, 138)
         value_input: (23,)
         legal_moves: the K candidate move dicts, in alpha-beta rank order
 
@@ -602,7 +602,7 @@ def encode_top_k_candidates(
             pass
 
     # 2. Base encoding only — 62-float rows for all legal moves.  We defer
-    #    the expensive 15-ply lookahead until AFTER we've filtered to top-K
+    #    the expensive lookahead until AFTER we've filtered to top-K
     #    (~3-4× speedup vs the previous "encode all then discard" pattern).
     base_enc = encode_position(
         board, player,
@@ -689,7 +689,7 @@ def encode_top_k_candidates(
         human_freq_arr,
         human_rank_arr,
     ]).astype(np.float32)                                  # (K, 4)
-    feat_final = np.concatenate([feat_base, extras], axis=1).astype(np.float32)  # (K, 126)
+    feat_final = np.concatenate([feat_base, extras], axis=1).astype(np.float32)  # (K, 138)
 
     # 6. Return an EncodedPosition-like object.  Reuse the base's other fields but
     #    filter the per-move lists to the top-K.

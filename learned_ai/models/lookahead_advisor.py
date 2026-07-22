@@ -28,6 +28,9 @@ from game.board import BoardState
 from game.rules import get_all_legal_moves, is_terminal
 
 
+LOOKAHEAD_SIGNALS_PER_PLY = 6
+
+
 def _static_best_move(board: BoardState, color: str, evaluate_fn) -> Optional[dict]:
     """Pick the move that maximises static heuristic eval for `color`."""
     moves = get_all_legal_moves(board)
@@ -50,7 +53,7 @@ def _static_best_move(board: BoardState, color: str, evaluate_fn) -> Optional[di
 class LookaheadAdvisor:
     """N-ply heuristic lookahead scoring for each legal move.
 
-    Returns a (k, ply_depth*5) ndarray — one row per candidate move.
+    Returns a (k, ply_depth*6) ndarray — one row per candidate move.
 
     Parameters
     ----------
@@ -91,7 +94,7 @@ class LookaheadAdvisor:
         self._sim_ply_depth = int(sim_ply_depth) if sim_ply_depth is not None else ply_depth
         self._frozen_model  = frozen_model
         self._frozen_device = frozen_device
-        self.feat_dim       = ply_depth * 6   # e.g. 12 × 6 = 72
+        self.feat_dim       = ply_depth * LOOKAHEAD_SIGNALS_PER_PLY
 
     def set_frozen_model(self, model, device=None) -> None:
         """Update the frozen-model snapshot used to pick learner-side moves in lookahead."""
@@ -138,7 +141,7 @@ class LookaheadAdvisor:
         moves_subset=None,
         sim_ply_depth: Optional[int] = None,
     ) -> np.ndarray:
-        """Return per-move lookahead feature block.  Shape: (k, ply_depth*5).
+        """Return per-move lookahead feature block.  Shape: (k, ply_depth*6).
 
         ``moves_subset`` — if provided, only simulate for those moves (speedup).
         ``sim_ply_depth`` — overrides self._sim_ply_depth for this call only,

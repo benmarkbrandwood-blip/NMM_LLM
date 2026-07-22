@@ -23,6 +23,7 @@ from learned_ai.models.scaffolded_encoder import (
     build_value_input,
     encode_position,
 )
+from learned_ai.models.lookahead_advisor import LOOKAHEAD_SIGNALS_PER_PLY
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.training.scaffolded_a2c import ScaffoldedStep, scaffolded_a2c_update
 
@@ -201,6 +202,30 @@ class TestScaffoldedAgent:
         agent.choose_move(board)
         assert agent.last_decision is not None
         assert agent.last_decision.chosen_idx >= 0
+        assert agent.last_decision.move_features.shape[1] == agent.model.move_feat_dim
+
+    def test_model_width_drives_default_lookahead_depth(self):
+        from learned_ai.agents.scaffolded_agent import ScaffoldedAgent
+
+        model = ScaffoldedPolicyNet(
+            move_feat_dim=MOVE_FEAT_DIM + 2 * LOOKAHEAD_SIGNALS_PER_PLY
+        )
+        agent = ScaffoldedAgent(color="W", model=model, device="cpu")
+
+        assert agent.lookahead_advisor is not None
+        assert agent.lookahead_advisor.feat_dim == 2 * LOOKAHEAD_SIGNALS_PER_PLY
+
+    def test_rejects_mismatched_explicit_lookahead(self):
+        from learned_ai.agents.scaffolded_agent import ScaffoldedAgent
+
+        advisor = type("Advisor", (), {"feat_dim": LOOKAHEAD_SIGNALS_PER_PLY})()
+        with pytest.raises(ValueError, match="lookahead feature width"):
+            ScaffoldedAgent(
+                color="W",
+                model=ScaffoldedPolicyNet(),
+                lookahead_advisor=advisor,
+                device="cpu",
+            )
 
 
 # ── scaffolded_a2c ─────────────────────────────────────────────────────────────
