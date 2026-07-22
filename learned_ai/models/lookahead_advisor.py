@@ -31,7 +31,13 @@ from game.rules import get_all_legal_moves, is_terminal
 LOOKAHEAD_SIGNALS_PER_PLY = 6
 
 
-def _static_best_move(board: BoardState, color: str, evaluate_fn) -> Optional[dict]:
+def _static_best_move(
+    board: BoardState,
+    color: str,
+    evaluate_fn,
+    *,
+    strict: bool = False,
+) -> Optional[dict]:
     """Pick the move that maximises static heuristic eval for `color`."""
     moves = get_all_legal_moves(board)
     if not moves:
@@ -46,7 +52,8 @@ def _static_best_move(board: BoardState, color: str, evaluate_fn) -> Optional[di
                 best_score = score
                 best_move  = mv
         except Exception:
-            pass
+            if strict:
+                raise
     return best_move
 
 
@@ -66,6 +73,8 @@ class LookaheadAdvisor:
     ply_depth     : number of half-plies in output (default 12)
     sim_ply_depth : plies to actually simulate (default = ply_depth); training scripts
                     set this to 5 for speed, with padding to fill the full output width
+    strict        : propagate dependency and simulation failures instead of
+                    substituting legacy neutral/fallback values
     """
 
     def __init__(
@@ -82,6 +91,7 @@ class LookaheadAdvisor:
         frozen_model=None,
         frozen_device=None,
         sim_ply_depth: Optional[int] = None,
+        strict: bool = False,
     ) -> None:
         self._sentinel      = sentinel
         self._evaluate      = evaluate_fn
@@ -94,6 +104,7 @@ class LookaheadAdvisor:
         self._sim_ply_depth = int(sim_ply_depth) if sim_ply_depth is not None else ply_depth
         self._frozen_model  = frozen_model
         self._frozen_device = frozen_device
+        self._strict        = bool(strict)
         self.feat_dim       = ply_depth * LOOKAHEAD_SIGNALS_PER_PLY
 
     def set_frozen_model(self, model, device=None) -> None:
@@ -120,6 +131,7 @@ class LookaheadAdvisor:
                 db=None,
                 value_net=None,
                 lookahead_advisor=None,
+                strict=self._strict,
             )
             if enc is None or not enc.legal_moves:
                 return None
@@ -131,6 +143,8 @@ class LookaheadAdvisor:
                 idx = int(torch.argmax(logits).item())
             return enc.legal_moves[idx]
         except Exception:
+            if self._strict:
+                raise
             return None
 
     def score_moves_matrix(
@@ -203,7 +217,12 @@ class LookaheadAdvisor:
                     if mv is None and actor != learner_color and self._human_db is not None:
                         mv = self._human_db_best_move(b, actor)
                     if mv is None:
-                        mv = _static_best_move(b, actor, self._evaluate)
+                        mv = _static_best_move(
+                            b,
+                            actor,
+                            self._evaluate,
+                            strict=self._strict,
+                        )
                     if mv is None:
                         for fill in range(depth_idx, self._ply_depth):
                             result[fill * 6 : fill * 6 + 6] = (*last_sig, 0.0)
@@ -233,7 +252,8 @@ class LookaheadAdvisor:
                                 result[fill * 6 : fill * 6 + 6] = (val, val, val, val, val, 0.0)
                             return result
                     except Exception:
-                        pass
+                        if self._strict:
+                            raise
 
                 # Record 5 signals + was_simulated=1.0
                 sig = self._record_signals(b, learner_color)
@@ -246,6 +266,8 @@ class LookaheadAdvisor:
                     result[fill * 6 : fill * 6 + 6] = (*last_sig, 0.0)
 
         except Exception:
+            if self._strict:
+                raise
             pass   # partial result stays; remaining slots keep 0.5/0.0
 
         return result
@@ -257,7 +279,12 @@ class LookaheadAdvisor:
         try:
             from learned_ai.models.scaffolded_encoder import _human_prior_freqs, _move_notation
             from game.rules import get_all_legal_moves as _legal
-            freqs = _human_prior_freqs(board, color, human_db=self._human_db)
+            freqs = _human_prior_freqs(
+                board,
+                color,
+                human_db=self._human_db,
+                strict=self._strict,
+            )
             if not freqs:
                 return None
             legal = _legal(board)
@@ -273,6 +300,8 @@ class LookaheadAdvisor:
                     best_move = mv
             return best_move if best_freq > 0.0 else None
         except Exception:
+            if self._strict:
+                raise
             return None
 
     def _record_signals(
@@ -296,7 +325,8 @@ class LookaheadAdvisor:
             h = float(self._evaluate(board, learner_color))
             h_norm = max(0.0, min(1.0, (h + 1.0) / 2.0))
         except Exception:
-            pass
+            if self._strict:
+                raise
 
         # learner_sent / opp_sent — split by whose turn it is
         learner_sent = 0.5
@@ -314,7 +344,8 @@ class LookaheadAdvisor:
                         else:
                             opp_sent = m
             except Exception:
-                pass
+                if self._strict:
+                    raise
 
         # vn_norm — value net from learner's perspective
         vn_norm = 0.5
@@ -323,7 +354,8 @@ class LookaheadAdvisor:
                 v = float(self._value_net.predict(board, learner_color))
                 vn_norm = max(0.0, min(1.0, (v + 1.0) / 2.0))
             except Exception:
-                pass
+                if self._strict:
+                    raise
 
         # gap_norm — opponent blunder probability at current position
         gap_norm = 0.5
@@ -332,6 +364,7 @@ class LookaheadAdvisor:
                 g = float(self._gap_net.predict(board, current_player))
                 gap_norm = max(0.0, min(1.0, (g + 1.0) / 2.0))
             except Exception:
-                pass
+                if self._strict:
+                    raise
 
         return h_norm, learner_sent, opp_sent, vn_norm, gap_norm

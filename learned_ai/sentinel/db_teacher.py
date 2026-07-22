@@ -58,8 +58,14 @@ except ImportError:
 class ExternalSolvedDB:
     """Read-only adapter for the Malom ultra-strong NMM database."""
 
-    def __init__(self, db_path: str = "", enabled: bool = True) -> None:
-        """Open the Malom DB at db_path. Never raises.
+    def __init__(
+        self,
+        db_path: str = "",
+        enabled: bool = True,
+        *,
+        strict: bool = False,
+    ) -> None:
+        """Open the Malom DB at db_path.
 
         Parameters
         ----------
@@ -68,9 +74,12 @@ class ExternalSolvedDB:
                   Empty string => unavailable.
         enabled : when False the adapter is forced unavailable regardless of path
                   (used to honour ``external_db_enabled: false`` in config).
+        strict  : when True, propagate probe and decoder failures. The default
+                  preserves the historical best-effort behavior.
         """
         self.db_path: str = db_path or ""
         self._enabled = bool(enabled)
+        self._strict = bool(strict)
         self._warned = False
         self._malom: Optional[_MalomDB] = None  # type: ignore[type-arg]
         self.db_dir: Optional[Path] = None
@@ -78,7 +87,9 @@ class ExternalSolvedDB:
 
         try:
             self._probe()
-        except Exception as exc:  # absolutely never fatal
+        except Exception as exc:
+            if self._strict:
+                raise
             logger.warning("[ExternalSolvedDB] probe failed (non-fatal): %s", exc)
 
     # ── Probing ──────────────────────────────────────────────────────────────
@@ -141,6 +152,8 @@ class ExternalSolvedDB:
             result = self._malom.query(board)
             return result["outcome"] if result else None
         except Exception as exc:
+            if self._strict:
+                raise
             logger.debug("[ExternalSolvedDB] lookup error: %s", exc)
             return None
 

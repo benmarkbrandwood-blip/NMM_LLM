@@ -118,7 +118,7 @@ def _get_evaluate():
 _evaluate_fn = None
 
 
-def _heuristic_eval(board, player: str) -> float:
+def _heuristic_eval(board, player: str, *, strict: bool = False) -> float:
     """evaluate(board, player, strength_mode=True) → float in [-1, 1]."""
     global _evaluate_fn
     if _evaluate_fn is None:
@@ -126,6 +126,8 @@ def _heuristic_eval(board, player: str) -> float:
     try:
         return float(_evaluate_fn(board, player, strength_mode=True))
     except Exception:
+        if strict:
+            raise
         return 0.0
 
 
@@ -225,6 +227,7 @@ def encode_position(
     specialist_db=None,
     sdb_min_samples: int = 5,
     wdl_db=None,
+    strict: bool = False,
 ) -> Optional[EncodedPosition]:
     """Encode all legal moves at ``board`` into the scaffolded feature format.
 
@@ -256,12 +259,14 @@ def encode_position(
             advice = sentinel_advisor.advise(board, legal_moves, player)
             sentinel_scores = advice.move_scores if advice else [0.5] * k
         except Exception:
+            if strict:
+                raise
             sentinel_scores = [0.5] * k
     else:
         sentinel_scores = [0.5] * k
 
     # ── Heuristic + Value-net 1-ply evaluations (single loop) ─────────────────
-    h_before = _heuristic_eval(board, player)
+    h_before = _heuristic_eval(board, player, strict=strict)
     vn_before = float(value_net.predict(board, player)) if value_net is not None else 0.0
 
     h_scores_abs: List[float] = []
@@ -270,12 +275,16 @@ def encode_position(
     for mv in legal_moves:
         try:
             board_after = board.apply_move(mv)
-            h_scores_abs.append(_heuristic_eval(board_after, player))
+            h_scores_abs.append(
+                _heuristic_eval(board_after, player, strict=strict)
+            )
             if value_net is not None:
                 vn_scores_abs.append(float(value_net.predict(board_after, player)))
             else:
                 vn_scores_abs.append(0.0)
         except Exception:
+            if strict:
+                raise
             h_scores_abs.append(h_before)
             vn_scores_abs.append(vn_before)
 
@@ -297,6 +306,8 @@ def encode_position(
         try:
             db_moves = db.query_all_moves(board, player) or []
         except Exception:
+            if strict:
+                raise
             db_moves = []
 
     # ── SpecialistDB lookup — per candidate, query the resulting position ───────
@@ -322,7 +333,8 @@ def encode_position(
                     sdb_all_moves.append({"move": _sdb_mv, "wdl": _slbl, "dtm": None})
                     _sdb_covered.add(id(_sdb_mv))
             except Exception:
-                pass
+                if strict:
+                    raise
 
     # ── Endgame WDL DB — fills counterfactual slots for moves not in SpecialistDB ─
     # wdl_db.query(board_after) returns W/L/D from the *next player's* perspective
@@ -344,7 +356,8 @@ def encode_position(
                     continue
                 sdb_all_moves.append({"move": _wdl_mv, "wdl": _wlbl, "dtm": None})
             except Exception:
-                pass
+                if strict:
+                    raise
 
     # ── Build feature matrix ───────────────────────────────────────────────────
     # Malom DB data stays in db_moves (reward-only — not available at inference).
@@ -403,6 +416,7 @@ def encode_position_with_lookahead(
     specialist_db=None,
     sdb_min_samples: int = 5,
     wdl_db=None,
+    strict: bool = False,
 ) -> Optional[EncodedPosition]:
     """Encode legal moves with a lookahead block appended.
 
@@ -417,8 +431,19 @@ def encode_position_with_lookahead(
     All other fields of EncodedPosition are identical to encode_position().
     specialist_db: SpecialistDB instance — populates counterfactual slots [40:58]
     from self-play experience; available at both training and inference.
+    strict: propagate dependency failures instead of zero/neutral fallback.
     """
-    enc = encode_position(board, player, sentinel_advisor, db, value_net, specialist_db, sdb_min_samples, wdl_db)
+    enc = encode_position(
+        board,
+        player,
+        sentinel_advisor,
+        db,
+        value_net,
+        specialist_db,
+        sdb_min_samples,
+        wdl_db,
+        strict=strict,
+    )
     if enc is None:
         return None
 
@@ -427,6 +452,8 @@ def encode_position_with_lookahead(
         try:
             la_block = lookahead_advisor.score_moves_matrix(board, enc, player)
         except Exception:
+            if strict:
+                raise
             _dim = getattr(lookahead_advisor, "feat_dim", LOOKAHEAD_FEAT_DIM)
             la_block = np.zeros((k, _dim), dtype=np.float32)
     else:
@@ -464,6 +491,7 @@ def _human_prior_freqs(
     trajectory_db=None,          # ai.trajectory_db.TrajectoryDB (fallback)
     ngram_model=None,            # ai.ngram_opponent_model.NGramOpponentModel (last resort)
     game_notations: Optional[List[str]] = None,   # required for ngram fallback
+    strict: bool = False,
 ) -> Dict[str, float]:
     """Return {notation: probability} for the next move by `color`.
 
@@ -476,7 +504,8 @@ def _human_prior_freqs(
             if freqs:
                 return freqs
         except Exception:
-            pass
+            if strict:
+                raise
 
     # 2. TrajectoryDB — position-based frequency
     if trajectory_db is not None:
@@ -485,7 +514,8 @@ def _human_prior_freqs(
             if freqs:
                 return freqs
         except Exception:
-            pass
+            if strict:
+                raise
 
     # 3. N-gram fallback — sequence-based; needs game_notations
     if ngram_model is not None and game_notations is not None:
@@ -494,7 +524,8 @@ def _human_prior_freqs(
             if freqs:
                 return freqs
         except Exception:
-            pass
+            if strict:
+                raise
 
     return {}
 
