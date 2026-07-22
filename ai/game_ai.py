@@ -1484,6 +1484,12 @@ class GameAI:
         Failures are silently swallowed — thinking is decorative.
         """
         try:
+            # The V2 evaluator intentionally omits V1 tactical explanations,
+            # but this label describes an objective candidate restriction rather
+            # than a heuristic contribution.  Preserve it on the default V2 path.
+            if _forced_block and _is_dead_placement(board, move):
+                self.last_thinking = "Forced block (dead square — unavoidable)"
+                return
             if self.use_v2_heuristics:
                 self.last_thinking = ""
                 return
