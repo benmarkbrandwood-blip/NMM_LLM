@@ -40,6 +40,9 @@ from game.rules import is_terminal
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from learned_ai.agents.heuristic_agent import GameAI as _GA
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
+from learned_ai.models.training_rollout_heuristic import (
+    training_rollout_evaluate,
+)
 from learned_ai.models.scaffolded_encoder import (
     encode_position_with_lookahead,
     MOVE_FEAT_DIM_WITH_LOOKAHEAD,
@@ -136,35 +139,9 @@ def _build_raw_board_features(board) -> np.ndarray:
 
 # ── Simplified rollout heuristic (no extended tactical search) ────────────────
 
-def _simple_evaluate(board: BoardState, color: str) -> float:
-    """Fast heuristic for rollout move selection: mills + mobility + blocked."""
-    import math as _math
-    terminal, winner = is_terminal(board)
-    if terminal:
-        return 1.0 if winner == color else -1.0
-    opp = "B" if color == "W" else "W"
-    from game.board import ADJACENCY
-    our_mills = sum(1 for m in MILLS if all(board.positions.get(p) == color for p in m))
-    opp_mills = sum(1 for m in MILLS if all(board.positions.get(p) == opp for p in m))
-    our_mob = sum(
-        1 for pos, piece in board.positions.items()
-        if piece == color
-        for adj in ADJACENCY.get(pos, [])
-        if board.positions.get(adj) is None
-    )
-    opp_mob = sum(
-        1 for pos, piece in board.positions.items()
-        if piece == opp
-        for adj in ADJACENCY.get(pos, [])
-        if board.positions.get(adj) is None
-    )
-    blocked = sum(
-        1 for pos, piece in board.positions.items()
-        if piece == opp
-        and all(board.positions.get(adj) is not None for adj in ADJACENCY.get(pos, []))
-    )
-    raw = float(500 * (our_mills - opp_mills) + 10 * (our_mob - opp_mob) + 50 * blocked)
-    return _math.tanh(raw / 1500.0)
+# Keep the private name used by existing trainer code and tests while sharing
+# the exact route with evaluation tooling.
+_simple_evaluate = training_rollout_evaluate
 
 
 # ── Difficulty / history helpers ─────────────────────────────────────────────
