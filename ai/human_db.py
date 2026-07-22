@@ -68,10 +68,11 @@ class PositionStats:
 
 
 class HumanDB:
-    """Read/write adapter for the pre-built human-game SQLite database."""
+    """Adapter for the pre-built human-game SQLite database."""
 
-    def __init__(self, db_path: Path | str) -> None:
+    def __init__(self, db_path: Path | str, *, read_only: bool = False) -> None:
         self._path = Path(db_path)
+        self._read_only = bool(read_only)
         self._conn: Optional[sqlite3.Connection] = None
         self._available = False
         self._game_count: int = 0
@@ -84,9 +85,19 @@ class HumanDB:
             return
 
         try:
-            self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
-            self._conn.execute("PRAGMA journal_mode=WAL")
-            self._conn.execute("PRAGMA synchronous=NORMAL")
+            if self._read_only:
+                uri = f"file:{self._path.resolve().as_posix()}?mode=ro"
+                self._conn = sqlite3.connect(
+                    uri,
+                    uri=True,
+                    check_same_thread=False,
+                )
+            else:
+                self._conn = sqlite3.connect(
+                    str(self._path), check_same_thread=False
+                )
+                self._conn.execute("PRAGMA journal_mode=WAL")
+                self._conn.execute("PRAGMA synchronous=NORMAL")
             self._conn.row_factory = sqlite3.Row
             self._malom_label_version = read_malom_label_version(self._conn)
             self._malom_labels_trusted = (
@@ -362,6 +373,11 @@ class HumanDB:
 
     # ── Incremental update ────────────────────────────────────────────────────
 
+    def require_writable(self) -> None:
+        """Reject mutations through a read-only evidence snapshot."""
+        if self._read_only:
+            raise RuntimeError("HumanDB is read-only; updates are disabled")
+
     def add_game(self, record: dict) -> None:
         """Incrementally add one completed game to the SQLite DB.
 
@@ -369,6 +385,7 @@ class HumanDB:
         performed at runtime (too slow); malom_wdl/dtw columns stay NULL for
         newly added positions until the next --update build run.
         """
+        self.require_writable()
         if not self.is_available():
             return
         try:

@@ -249,6 +249,27 @@ def test_human_db_exposes_current_labels(tmp_path: Path) -> None:
         db.close()
 
 
+def test_human_db_read_only_mode_queries_without_allowing_updates(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "read-only-human.sqlite"
+    board = _create_human_db(path, label_version=CURRENT_MALOM_LABEL_VERSION)
+    before = path.read_bytes()
+
+    db = HumanDB(path, read_only=True)
+    try:
+        assert db.is_available()
+        assert db.query_all_frequencies(board, min_samples=1) == {"a1": 1.0}
+        with pytest.raises(RuntimeError, match="read-only"):
+            db.add_game({"moves": []})
+    finally:
+        db.close()
+
+    assert path.read_bytes() == before
+    assert not Path(f"{path}-wal").exists()
+    assert not Path(f"{path}-shm").exists()
+
+
 def test_builder_requires_rebuild_before_annotating_legacy_labels(
     tmp_path: Path,
 ) -> None:
