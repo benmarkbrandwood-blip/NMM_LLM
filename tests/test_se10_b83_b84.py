@@ -49,10 +49,11 @@ class TestSE10OwnForkSetup(unittest.TestCase):
         black = ["d6", "b6", "f6", "a1", "g7", "e3"]
         return _board(white, black)
 
-    def test_se10_score_matches_expected_weight(self):
-        """f4→f2 (fork square, no 2-config) total score equals SE-10 weight (72) — no other bonuses."""
-        # In this position f4→f2 creates no 2-config and has no other tactical value,
-        # so its entire score comes from SE-10.  Expected: 80% of fork_anticipation (90) = 72.
+    def test_se10_contribution_matches_expected_weight(self):
+        """f4→f2 records the configured SE-10 contribution of 72."""
+        # Later cycling-safety rules also apply to this move.  Inspect the
+        # feature contribution rather than assuming the combined tactical
+        # score contains no other terms.
         white = ["a7", "d7", "b4", "f4", "d1", "g1"]
         black = ["d6", "b6", "f6", "a1", "g7", "e3"]
         b = _board(white, black)
@@ -63,10 +64,16 @@ class TestSE10OwnForkSetup(unittest.TestCase):
         m = next((m for m in moves if m.get("from") == "f4" and m.get("to") == "f2"), None)
         self.assertIsNotNone(m, "f4→f2 must be legal")
 
-        score = tactical_move_bonus(b, b.apply_move(m), "W", DEFAULT_WEIGHTS)
+        result = tactical_move_bonus(
+            b,
+            b.apply_move(m),
+            "W",
+            DEFAULT_WEIGHTS,
+            return_breakdown=True,
+        )
         expected = int(DEFAULT_WEIGHTS.fork_anticipation * 0.80)
-        self.assertEqual(score, expected,
-                         f"f4→f2 score should be exactly SE-10 weight={expected}, got {score}")
+        terms = dict(result["top_terms"])
+        self.assertEqual(terms["Own fork setup (SE-10)"], expected)
 
     def test_se10_bonus_is_top_term_on_pure_fork_move(self):
         """When a move lands on a fork square but creates no 2-config, SE-10 is the top bonus."""
