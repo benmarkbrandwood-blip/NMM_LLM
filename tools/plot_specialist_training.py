@@ -277,7 +277,6 @@ def draw(fig, _axes_unused, specialists):
         _plot_wr(ax_wr, xs_b, ys_b, "best win rate", "#E91E63")
         _plot_wr(ax_wr, xs_w, ys_w, "win rate 200",  "#9C27B0")
         _plot_wr(ax_wr, xs_d, ys_d, "draw rate",     "#FF9800")
-        _draw_recovery_events(ax_wr, rec_events)
         ax_wr.set_ylim(0, 1.05)
         ax_wr.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
 
@@ -339,9 +338,12 @@ def draw(fig, _axes_unused, specialists):
         ax_ret.legend(fontsize=6, loc="lower right")
         _caption(ax_ret, "retro↑ = winning outcome reward;  retro↓ = losing;  near 0 = draws / mixed")
 
-        # ── Advancement markers on all panels ─────────────────────────────
+        # ── Advancement + recovery markers on all panels ──────────────────
         advances = _get_advances(rows)
-        _draw_advances([ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret], advances)
+        _all_axes = [ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret]
+        _draw_advances(_all_axes, advances)
+        for _ax in _all_axes:
+            _draw_recovery_events(_ax, rec_events)
 
         for ax in (ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret):
             ax.tick_params(labelsize=6)
