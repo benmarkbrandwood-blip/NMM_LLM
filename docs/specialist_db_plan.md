@@ -1,138 +1,80 @@
-# Specialist DB — Malom Label Fix Plan
+# SpecialistDB Malom-Label Migration
 
-## Current state
+## Status
 
-```
-data/specialist_db.sqlite
-  total positions  : 2,112,817
-  malom_label rows : 364,262   (W: 209,451 / D: 41,548 / L: 113,263)
-  malom_label_version (meta) : None   ← no version tag written
-```
+This document was imported from the maintainer's `main` branch on 22 July
+2026. Its original in-place command is superseded. Repository policy forbids
+modifying or relabelling the isolated legacy SpecialistDB, and the active
+corrected baseline database must not be replaced by an implicit migration.
 
-The 364,262 Malom labels were written by the **old buggy decoder** (sector offset not
-applied before W/D/L classification — many wins and losses were reported as draws).
-The new `SpecialistDB` code checks `meta.malom_label_version == "sector-corrected-v1"`
-on open; because the tag is missing (`None`), `malom_labels_trusted = False` and
-`require_trusted_malom_labels()` will block any training run that tries to consume or
-append Malom labels.
+The maintainer has also supplied a rebuilt candidate in the sibling `Mills`
+staging directory. A read-only audit found:
 
-The self-play WDL counts (`wins`, `draws`, `losses` columns) are **unaffected** — they
-are empirical game results with no Malom involvement.  Only `malom_label` is corrupt.
+| Property | Observed value |
+| --- | --- |
+| SHA-256 | `DF269D692E43815B88373F54B5AB1287022BC6736ECC8A5B95C7FB8A97FCD629` |
+| SQLite `quick_check` | `ok` |
+| Positions | 2,112,951 |
+| Winning lines | 60,117 |
+| Preferred plays | 30 |
+| Persisted Malom labels | 0 |
+| Malom label version | `sector-corrected-v1` |
 
-## Why we cannot re-label in-place
+That file is an inactive candidate. It preserves a large empirical self-play
+history and is therefore not equivalent to the empty SpecialistDB used by the
+completed fresh `dev` baseline. Activating it requires a separately frozen
+experiment decision; it must not silently replace the current database.
 
-`pos_hash` is SHA-1 of the D4-canonical FEN string.  SHA-1 is not reversible, and the
-original board objects are not stored in the DB, so we cannot reconstruct each position
-to re-query Malom.  Re-labelling would require replaying every training game from the
-original trajectory logs — impractical given volume.
+## Contamination Boundary
 
-## Fix strategy: clear labels, stamp version, re-accumulate
+The legacy database's non-null `malom_label` values were written before the
+sector-offset decoder correction. Its empirical `wins`, `draws`, `losses`,
+`winning_lines`, and `preferred_plays` do not become Malom labels and may be
+preserved for a separately defined experiment.
 
-Clearing all `malom_label` values leaves the DB in a state equivalent to a self-play-only
-database that has never seen Malom.  The new `SpecialistDB` constructor auto-adopts
-`sector-corrected-v1` when the label count is zero, so the DB becomes immediately trusted.
-New correct labels accumulate naturally during the next training run via
-`label_position_malom()` (called by `db_teacher.py`).
+The `pos_hash` key is a SHA-1 digest of a canonical state and is not reversible.
+Consequently, the old label rows cannot be reconstructed and re-queried in
+place. A migration can only clear them and allow newly encountered positions
+to acquire corrected labels later.
 
-## Migration steps
+## Safe Copy Migration
 
-### 1. Back up
-```bash
-cp data/specialist_db.sqlite "data/specialist_db.sqlite.pre-malom-fix-$(date +%Y%m%d).bak"
-```
+The migration utility never edits its source. It requires all three of:
 
-### 2. Run migration script (see below)
-```bash
-.venv/bin/python scripts/fix_specialist_db_malom_labels.py
-```
+- an explicit source path;
+- a new, non-existing output path;
+- the expected SHA-256 identity of the source.
 
-### 3. Verify
-```bash
-.venv/bin/python -c "
-import sqlite3
-conn = sqlite3.connect('data/specialist_db.sqlite')
-print('positions total :', conn.execute('SELECT COUNT(*) FROM positions').fetchone()[0])
-print('malom labels    :', conn.execute('SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL').fetchone()[0])
-print('version tag     :', conn.execute('SELECT value FROM meta WHERE key=\"malom_label_version\"').fetchone())
-conn.close()
-"
+Example with deliberately unspecified machine-local values:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\fix_specialist_db_malom_labels.py `
+  --source <reviewed-legacy-copy> `
+  --output <new-corrected-copy> `
+  --expected-sha256 <reviewed-source-sha256>
 ```
 
-Expected output:
-```
-positions total : 2,112,817   (unchanged)
-malom labels    : 0
-version tag     : ('sector-corrected-v1',)
-```
+The utility opens the source read-only, checks its identity and SQLite
+integrity, copies it through SQLite's backup API, clears Malom labels only in
+the new output, writes `malom_label_version=sector-corrected-v1`, and verifies
+that position counts and database integrity remain intact. It refuses:
 
-## Migration script to create: scripts/fix_specialist_db_malom_labels.py
+- identical source and output paths;
+- an existing output;
+- a source hash mismatch;
+- a source already carrying current label provenance;
+- an unknown non-empty label-version value.
 
-```python
-"""Clear corrupt pre-sector-corrected Malom labels from specialist_db.sqlite.
+The resulting database has trusted provenance for labels written after the
+migration, but initially has no Malom labels. Its retained self-play statistics
+must still be identified as legacy empirical data in any run manifest.
 
-Self-play WDL counts are preserved.  New correct labels will accumulate
-during the next training run using the fixed decoder.
-"""
-import sqlite3
-from pathlib import Path
+## Non-Negotiable Boundaries
 
-from learned_ai.data.malom_label_provenance import (
-    CURRENT_MALOM_LABEL_VERSION,
-    write_current_malom_label_version,
-)
-
-DB_PATH = Path("data/specialist_db.sqlite")
-
-conn = sqlite3.connect(str(DB_PATH))
-conn.execute("PRAGMA journal_mode=WAL")
-conn.execute("PRAGMA synchronous=NORMAL")
-
-version_row = conn.execute(
-    "SELECT value FROM meta WHERE key='malom_label_version'"
-).fetchone()
-existing_version = version_row[0] if version_row else None
-
-if existing_version == CURRENT_MALOM_LABEL_VERSION:
-    print("DB already has sector-corrected-v1 labels — nothing to do.")
-    conn.close()
-    raise SystemExit(0)
-
-before = conn.execute(
-    "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
-).fetchone()[0]
-print(f"Clearing {before:,} Malom labels (version={existing_version!r}) ...")
-
-with conn:
-    conn.execute("UPDATE positions SET malom_label = NULL WHERE malom_label IS NOT NULL")
-    # Remove stale version tag if present, then write current
-    conn.execute("DELETE FROM meta WHERE key='malom_label_version'")
-    write_current_malom_label_version(conn)
-
-after = conn.execute(
-    "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
-).fetchone()[0]
-new_version = conn.execute(
-    "SELECT value FROM meta WHERE key='malom_label_version'"
-).fetchone()[0]
-
-print(f"Done.  Labels remaining: {after}  |  version tag: {new_version!r}")
-conn.close()
-```
-
-## After migration
-
-- Training can resume immediately; `require_trusted_malom_labels()` will pass.
-- `db_teacher.py` (now using the corrected Malom decoder) will re-populate
-  `malom_label` on newly encountered positions over time.
-- The Win/Draw/Loss ratio will likely shift compared to the old labels: the old
-  decoder over-reported draws, so expect more W and L labels going forward.
-
-## Notes
-
-- The `data/human_db.sqlite` is a separate database and has its own Malom label
-  columns (`positions.malom_wdl` and `moves.malom_wdl_after`).  Check its status
-  separately using `malom_label_provenance.human_db_has_malom_labels()` before
-  any human-db annotation run.
-- The `data/specialist_db.sqlite.pre-fix-backup` that exists in the repo already
-  predates this plan and was taken before a different fix; use the new timestamped
-  backup from step 1 as the restore point.
+- Never run a write operation against either legacy snapshot recorded in
+  `docs/local-training-layout.md`.
+- Never copy a migrated or downloaded database over the active corrected
+  baseline path without a new experiment contract and recoverable backup.
+- Never describe retained empirical rows as retrained after the decoder fix.
+- Verify the exact database hash, label version, label count, and intended role
+  during training preflight.
