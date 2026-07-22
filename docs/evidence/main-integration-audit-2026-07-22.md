@@ -118,19 +118,20 @@ formal baselines, or evidence of corrected retraining.
 
 The maintainer's `docs/retrain_v2_plan.md` is a useful proposal, not a frozen
 run contract. Local implementation work can resolve its flag mismatches,
-fail-open loaders, database activation, game-level split, fixed-work benchmark,
-and evidence-ledger requirements. Three intended model contracts still need
-maintainer confirmation before architecture or targets are frozen:
+fail-open loaders, database activation, fixed-work benchmark, and
+evidence-ledger requirements. Follow-up comparison with current code and the
+v5 design resolves the three apparent model ambiguities without requiring the
+maintainer to restate them:
 
-1. If Sentinel is a compact live substitute for Malom, must every oracle input
-   slot remain masked at training and inference? The proposed Stage 5 exposes
-   those slots while the proposed evaluation masks them.
-2. Is ValueNet still an outcome/value estimator, or should v2 deliberately
-   become a human next-move preference ranker? The proposed pairwise target
-   changes its semantics and output calibration.
-3. Should GapNet predict the probability and location of a future human
-   blunder, or the current builder's heuristic/Sentinel quality gap averaged
-   over observed human moves? These are different supervised targets.
+1. Sentinel is the documented DB-free runtime advisor. Malom may generate
+   supervision, but every oracle-derived input slot remains masked in training
+   and inference. The proposed oracle-exposed Stage 5 is rejected.
+2. The existing ValueNet remains an outcome/value estimator. The imported
+   next-move ranking proposal is a HumanPolicy research path and cannot reuse
+   the ValueNet name, checkpoint, calibration, or promotion path.
+3. GapNet retains its implemented current-position target: best composite
+   quality minus frequency-weighted observed-human quality. A future temporal
+   blunder-hazard model would be a separate experiment.
 
 The aggregate HumanDB has no per-game membership in its `positions` and
 `moves` tables, so it cannot by itself produce the plan's required game-level
@@ -169,19 +170,15 @@ were repeated against merge `4593034`; both passed and the launch guard remains
 in place. No broader suite was repeated because that upstream delta affects
 only quarantined source and the focused boundary test passed.
 
-## Remaining Maintainer Confirmations
+## Remaining External Evidence
 
-Before any imported model is described as corrected or any v2 retraining
-contract is frozen, ask the maintainer for:
+The seven updated checkpoints do not contain enough state to reconstruct their
+exact code and database lineage. Keep them as maintainer-`main`, weights-only
+history without asking the maintainer to reconstruct details now. Additional
+lineage becomes necessary only if a future experiment proposes to adopt one or
+describe it as corrected.
 
-- the exact code commit and database/checkpoint lineage of the seven updated
-  tracked checkpoints, including whether each run started before or after the
-  sector correction and which uploaded databases it used;
-- the Sentinel, ValueNet, and GapNet target decisions above;
-- completion of the 107-position Oracle review, including the still-open
-  source intent for start 101.
-
-These questions do not block the Git merge or local safety fixes. They block
-corrected-retraining claims, adoption of the proposed model contracts, and
-freezing the Oracle evaluation corpus. A message to the maintainer can wait
-until this audit is committed; no earlier draft needs to be sent.
+The remaining active maintainer input is completion of the 107-position Oracle
+review, including the still-open source intent for start 101. That review gates
+only the separate Stage-0 corpus freeze. It does not block local safety fixes,
+the Git integration, or the contract dispositions above.

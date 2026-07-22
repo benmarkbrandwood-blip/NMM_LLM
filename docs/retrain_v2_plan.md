@@ -10,26 +10,30 @@ active database selected by `data/training_paths.local.json`.
 A read-only audit verified both staged SQLite files, their
 `sector-corrected-v1` metadata, and 30 deterministic HumanDB labels against the
 current corrected Malom adapter. The audit does not establish the lineage of
-the seven updated model checkpoints or freeze the three proposed model
-contracts. Exact hashes, counts, and open questions are in
+the seven updated model checkpoints or authorize a retraining run. Exact
+hashes, counts, and evidence boundaries are in
 [`docs/evidence/main-integration-audit-2026-07-22.md`](evidence/main-integration-audit-2026-07-22.md).
 
-Before implementation, distinguish local engineering prerequisites from
-maintainer decisions:
+Current code and the written plan are sufficient to resolve the apparent model
+contract ambiguities without asking the maintainer to restate them:
 
-| Type | Unresolved item |
+| Type | Disposition |
 | --- | --- |
 | Local | Activate a reviewed copy rather than replacing the active HumanDB or fresh-baseline SpecialistDB implicitly |
 | Local | Build a game-level split from source games; aggregate HumanDB rows do not retain game membership |
 | Local | Make required Sentinel/data loads fail closed and use the actual `--sentinel` gap-builder flag |
 | Local | Replace raw-rate 40-game promotion claims with a frozen paired protocol and uncertainty rule |
-| Maintainer | Confirm whether Sentinel must be DB-free at runtime; the proposed Stage 5 exposes oracle slots while evaluation masks them |
-| Maintainer | Confirm whether ValueNet v2 is an outcome value or a human next-move preference ranker |
-| Maintainer | Confirm whether GapNet predicts future human-blunder propensity or the current position-quality gap target |
+| Resolved contract | Sentinel is a DB-free board/move model; Malom is a label teacher only, and oracle-derived input slots stay masked in every training and inference path |
+| Resolved contract | The existing ValueNet remains an outcome-value estimator; the imported next-move ranking proposal is a separate HumanPolicy research path, not a replacement ValueNet checkpoint |
+| Resolved contract | GapNet retains its implemented current-position target: best composite move quality minus frequency-weighted human-play quality |
+| Conditional evidence | The seven imported checkpoints need additional maintainer lineage only if a future experiment proposes to adopt or describe them as corrected inputs |
+| External review | The 107-position Oracle review, especially source intent for start 101, gates only the separate Stage-0 diagnostic freeze |
 
-Do not begin Stage 0 until the applicable maintainer contract is answered and a
-new experiment document records inputs, output isolation, fixed work, tests,
-checkpoint roles, and authorization.
+Do not begin any retraining stage until a new experiment document records
+inputs, output isolation, fixed work, tests, checkpoint roles, and explicit
+product authorization. The contract dispositions above do not themselves
+authorize training. The Oracle review belongs to the separate Stage-0
+evaluation proposal and does not block local retraining safety work.
 
 ## Motivation
 
@@ -52,9 +56,11 @@ rebuilt *after* the sentinel v2 checkpoint is available, to get the best possibl
 The sentinel's dataset reads from the Malom DB at feature-build time; retraining from scratch means
 all examples are now correctly labelled.
 
-The value net trains from game-outcome JSONL files (final win/loss outcome, no Malom labels), so
-it does not directly benefit from the DB fix.  It is retrained as v2 to establish a clean baseline
-under the same naming convention, and to optionally incorporate a richer game-file mix.
+The existing value net trains from game-outcome JSONL files (final win/loss
+outcome, no Malom labels), so it does not directly benefit from the DB fix.
+The imported proposal later changes the target to human next-move ranking.
+That is a different behavioural model and is retained below only as historical
+design input; it must not be saved or promoted as `value_net_v2.npz`.
 
 ---
 
@@ -67,13 +73,15 @@ work without any changes.
 | Artifact | During training (v2 name) | After promotion (production name) |
 |---|---|---|
 | Sentinel checkpoint | `learned_ai/sentinel/checkpoints/v2/best.pt` | `learned_ai/sentinel/checkpoints/best.pt` |
-| Sentinel stage dirs | `checkpoints/v2_stage{1,2,4,5}/` | *(staging only, not referenced by runtime)* |
-| Value net | `data/value_net_v2.npz` | `data/value_net.npz` |
+| Sentinel stage dirs | `checkpoints/v2_stage{1,2,4}/` | *(staging only, not referenced by runtime)* |
+| HumanPolicy research candidate | Not frozen by this plan | No production mapping |
 | Gap net | `data/gap_net_v2.npz` | `data/gap_net.npz` |
 | Gap net training data | `data/gap_net_training_v2.npz` | *(build artefact, not referenced at runtime)* |
 
-Avoid `value_net_human_v2.npz` — that name is already taken by an earlier experiment.  Use
-`value_net_v2.npz` for the new production net.
+Do not create or promote `data/value_net_v2.npz` from the next-move ranking
+proposal. A future HumanPolicy experiment must choose its own versioned name,
+schema, raw-game split manifest, calibration contract, and runtime adapter in
+the experiment that owns it.
 
 **Do not overwrite production files** (`best.pt`, `value_net.npz`, `gap_net.npz`) during training
 or testing.  Renaming into production is a deliberate final step described in Step 6.
@@ -87,9 +95,10 @@ signal in Step 1.
 
 Stage 3 is permanently archived (feature leakage); do not run it.
 
-The `v2/` checkpoint directory already exists from a prior partial run.  Use `v2_stage{N}`
-sub-directories to avoid overwriting anything already there.  If a usable Stage 5 checkpoint
-already exists at `checkpoints/v2/best.pt`, evaluate it first (Step 4) before retraining.
+The `v2/` checkpoint directory already exists from a prior partial run. Use
+`v2_stage{N}` sub-directories to avoid overwriting anything already there. Any
+existing Stage 5 checkpoint has oracle-exposed lineage and may be inventoried
+only as a historical ablation; it is not a candidate for the DB-free Sentinel.
 
 ### Stage 1 — Structural foundation
 
@@ -139,26 +148,25 @@ Resume from Stage 2.  DB labels with `--drop-db-features`.  Human game data incl
   --device cpu
 ```
 
-### Stage 5 — Blocked runtime-contract decision
+### Stage 5 — Rejected for the DB-free runtime contract
 
-Do not run the former DB-feature fine-tune command yet. The stated Sentinel
+Do not run the former DB-feature fine-tune command. The stated Sentinel
 goal is a compact live approximation of Malom, and the proposed evaluation
 zeroes DB feature slots to match inference. Training Stage 5 with those oracle
 slots visible would introduce a train/inference mismatch and could teach the
 network to depend on the database it is meant to replace.
 
-The maintainer must first confirm the runtime contract. If Sentinel is DB-free
-at runtime, retain `--drop-db-features` in every training stage and use Malom
-only as the supervised teacher. If live inference intentionally supplies the
-same oracle slots, document that dependency and storage goal explicitly before
-restoring a Stage 5 command.
+The current inference wrapper is explicitly DB-free, the evaluation masks the
+oracle slots, and Stages 1, 2, and 4 already request the same mask. Retain that
+mask in every Sentinel training stage and use Malom only as the supervised
+teacher. A future model that intentionally consumes live oracle fields would
+be a separately named architecture and experiment, not a restored Stage 5.
 
 Stage 6 (AIDB + contrastive) is out of scope for this retrain cycle.
 
 After the final approved Sentinel stage passes its own validation, record its
 source hash and copy it into the v2 staging slot. No source stage or promotion
-command is frozen while the Stage 5 contract remains unresolved. Do not
-overwrite production `best.pt`.
+command is frozen by this proposal. Do not overwrite production `best.pt`.
 
 ---
 
@@ -180,66 +188,27 @@ must change that path to fail closed before this command is approved.
 
 ---
 
-## Step 2 — Train value net v2
+## Step 2 — Archived next-move ranking proposal
 
-The v2 value net is trained on a **next-move prediction** task using human game positions from
-`human_db.sqlite`, rather than the v1 approach of predicting final game outcome from JSONL records.
+The imported Step 2 changes the supervision unit from final board outcome to
+observed human move preference. That is not ValueNet retraining: it is a
+HumanPolicy problem. Reusing the ValueNet class, filename, blend percentage,
+or promotion path would silently change the meaning and calibration of an
+existing production interface.
 
-**Training approach:**
-- For each unique board state in the human DB, apply a **per-position quality filter** to avoid
-  training the value net to prefer drawn successors when winning successors were available.  Group
-  all move records by `state_key`; for each group:
-  - If **any** move recorded from this position has `malom_wdl_after = 'L'` (a winning move was
-    played at least once from this state in the DB), only include records from this position where
-    the human's chosen move **also** has `malom_wdl_after = 'L'`.
-  - If no winning move appears for this `state_key` in the DB, accept records where the human's
-    chosen move has `malom_wdl_after = 'D'` (draw was the best observed option from this state).
-  - Skip any record where `malom_wdl_after = 'W'` (human played a losing move), regardless of
-    what else is available.
-- For each qualifying (position, chosen-move) pair, enumerate all legal moves from that position,
-  apply each to get a set of successor board states, and extract 79-float features for each.
-- Train with a **pairwise sigmoid BCE (Bradley-Terry) ranking loss**: for each (positive, negative)
-  successor pair, minimise −log σ(v(human_successor) − v(other_successor)).  A margin ranking loss
-  max(0, margin − (v(human) − v(other))) is an acceptable alternative, but pairwise sigmoid BCE
-  gives smoother gradients and is preferred.
-- All unique qualifying positions form the training set.  Repeat across epochs; stop via early
-  stopping when validation next-move accuracy plateaus (see `--patience` below).
+Do not implement the aggregate-table pairwise proposal as
+`tools/train_value_net_v2.py`, and do not create `data/value_net_v2.npz` from
+it. The aggregate `positions` and `moves` tables have already discarded game
+and player membership and cannot support the required leakage-safe split or a
+complete observed choice-set likelihood.
 
-**New training script required:** `tools/train_value_net_v2.py` (or `scripts/train_value_net_human.py`).
-The existing `tools/train_value_net.py` reads JSONL records with final-outcome labels and uses a
-**numpy MLP with L2 loss — it cannot support a pairwise ranking loss without a significant
-rewrite**.  The new script should use PyTorch (or rewrite the MLP with a pairwise loss function)
-and must:
-
-1. Query `human_db.sqlite`, grouping move records by `state_key` and applying the per-position
-   filter above.
-2. For each qualifying position, reconstruct the board from `state_key` (canonical FEN, reversible).
-3. Enumerate all legal moves, apply each to get successor boards, extract 79-float features for
-   each successor using `board_to_features()`.
-4. Train with pairwise sigmoid BCE ranking loss to push the value of the human's chosen successor
-   above all alternatives.
-5. Track **validation next-move accuracy** (% of positions where the net ranks the human's
-   successor highest) on a held-out **game-level** split; stop training when accuracy does not
-   improve by ≥0.5pp for `--patience` consecutive epochs.
-
-The aggregate `positions` and `moves` tables do not retain game membership, so
-the script cannot create this game-level split by querying HumanDB alone. Split
-the source game files first, replay each split, and join canonical state keys
-to the versioned HumanDB labels, or build a new intermediate dataset that
-retains a stable game identifier. A position-level split is not an acceptable
-fallback.
-
-Note: the ranking loss trains only relative ordering, not absolute scalar magnitudes.  The v2 VN
-output scale may differ from the v1 VN (which was trained with L2 regression to a [−1, 1] final
-outcome).  This does not make v2 unusable for VN blending, but the blend % may need re-calibration
-— verify with the game bench in Step 4c before settling on a blend %.
-
-```bash
-.venv/bin/python tools/train_value_net_v2.py \
-  --db data/human_db.sqlite \
-  --output data/value_net_v2.npz \
-  --patience 10   # stops if val next-move accuracy does not improve ≥0.5pp for 10 epochs
-```
+Any future HumanPolicy implementation is owned by the data and model contract
+in [`docs/v5-specialist-plan.md`](v5-specialist-plan.md). It must start from
+the raw JSONL records, preserve stable game and available player identity,
+split before aggregation, represent the complete legal choice set for each
+observed decision, and define calibration, OOD, and abstention evidence. That
+work requires a separate experiment and authorization; it is not a prerequisite
+for Sentinel or GapNet safety fixes.
 
 ---
 
@@ -299,86 +268,26 @@ give a promotion-grade uncertainty bound. Freeze a paired, colour-swapped
 workload and confidence-interval decision rule before treating the result as
 accept/reject evidence.
 
-### 4c. Value net eval — next-move accuracy on human DB positions
+### 4c. HumanPolicy evaluation — outside this retrain cycle
 
-**New eval script required:** `scripts/eval_value_net_human.py`.
-
-For each unique position in `human_db.sqlite` where `malom_wdl_after IN ('L', 'D')` (the same
-set used for v2 training, or a held-out test split):
-
-1. Reconstruct the board from `state_key`.
-2. Enumerate all legal moves; apply each to get successor boards and their 79-float features.
-3. Run the value net over all successors; record whether the human's actual move produces the
-   highest-valued successor.
-4. Report **next-move accuracy** (% correct) broken down by game phase.
-
-Run identically for v1 (`data/value_net.npz`) and v2 (`data/value_net_v2.npz`).  The winner is
-the net with higher next-move accuracy — this is the primary value net success criterion.
-
-```bash
-# Evaluate old value net
-.venv/bin/python scripts/eval_value_net_human.py \
-  --db data/human_db.sqlite \
-  --net data/value_net.npz \
-  --out eval_vn_v1_nextmove.json
-
-# Evaluate new value net
-.venv/bin/python scripts/eval_value_net_human.py \
-  --db data/human_db.sqlite \
-  --net data/value_net_v2.npz \
-  --out eval_vn_v2_nextmove.json
-```
-
-Use a dedicated test split for a fair comparison.  The split **must be at the game level** — hold
-out whole games, not individual positions.  Position-level splits leak board states that appear in
-multiple games and will inflate reported next-move accuracy.
-
-**Sanity check — v2 VN game bench:** Because the ranking loss may shift the VN output scale
-relative to v1 (which used L2 regression), run a brief game bench to confirm the v2 VN is still
-useful when blended with the heuristic:
-
-```bash
-.venv/bin/python tools/bench_trajectory_value_net.py \
-  --vn-path data/value_net_v2.npz \
-  --blends 30 60 \
-  --games 40
-```
-
-The v2 VN30 agent should achieve a win rate ≥50% vs the base heuristic.  If not, the output scale
-has shifted adversely — re-scale or re-normalise v2 VN outputs before using it in Step 4d or
-promoting to production.
+Do not compare the existing outcome ValueNet and a human-choice model under a
+single “next-move accuracy” promotion rule. A future HumanPolicy evaluation
+must use a frozen raw-game split with player/game isolation, multiclass choice
+likelihood and calibration, support/OOD slices, and a separately named
+checkpoint. The v5 plan owns those requirements.
 
 ### 4d. Gap net eval — beats heuristic + high VN blend
 
-The gap net's job is to correct a heuristic AI that is leaning heavily on the value net (and
-therefore susceptible to Malom-detectable blunders in the blender's shadow).  The test opponent
-is **heuristic AI using `value_net_v2.npz` at VN blend 60–80%** — this is a stronger, more
-relevant baseline than v1 VN, and ensures the gap net is not being compared against an already-
-outdated opponent.
+GapNet v2 retains the implemented current-position target: the difference
+between the best composite move quality and the frequency-weighted quality of
+observed human moves. “Anticipating blunders” describes the intended use of
+that current-position risk signal; it does not create a future-event label.
 
-Run each gap net (old v1 and new v2) against this opponent:
-
-```bash
-# Old gap net vs heuristic+VN80 (v2 value net opponent)
-# (requires --vn-path flag in bench_sentinel.py — add before running)
-.venv/bin/python scripts/bench_sentinel.py \
-  --games 40 --difficulty 5 \
-  --white-gap-net \
-  --black-value-net --vn-path data/value_net_v2.npz --vn-blend 80
-
-# New gap net vs heuristic+VN80 (v2 value net opponent)
-# (requires --gap-net-path and --vn-path flags in bench_sentinel.py — add before running)
-.venv/bin/python scripts/bench_sentinel.py \
-  --games 40 --difficulty 5 \
-  --white-gap-net --gap-net-path data/gap_net_v2.npz \
-  --black-value-net --vn-path data/value_net_v2.npz --vn-blend 80
-```
-
-The winning gap net is the one that achieves a higher win rate against the VN-blend opponent.
-That winner is then promoted (Step 6).
-
-Note: `bench_sentinel.py` hard-codes `data/gap_net.npz`.  Add a `--gap-net-path` CLI argument
-before running the v2 comparison.
+Evaluate target calibration and ranking on a leakage-safe held-out source
+before any game benchmark. A later game benchmark must compare old and new
+GapNet against the same frozen, explicitly named opponent and fixed work. It
+must not depend on the nonexistent `value_net_v2.npz`. Forty games remain a
+diagnostic only, and no promotion command is frozen here.
 
 ---
 
@@ -394,9 +303,7 @@ conditions hold:
 |---|---|
 | Sentinel | Malom correlation eval (4a): `win_acc` improves ≥3pp AND `top1_win_rate` improves ≥3pp vs v1 |
 | Sentinel | Game bench (4b): NewS20 vs Base ≥50% win rate, and NewS20 beats or matches OldS20 within noise (±3pp) |
-| Value net | Next-move accuracy eval (4c): v2 next-move accuracy ≥ v1 + 2pp on the game-level test split |
-| Value net | Game bench (4c sanity check): v2 VN30 win rate vs base heuristic ≥ 50% |
-| Gap net | Gap net vs VN80 bench (4d): new gap net win rate vs VN80 opponent ≥ old gap net win rate vs same |
+| Gap net | Improve frozen held-out target metrics and pass a separately frozen paired game benchmark against the same named opponent; thresholds remain to be preregistered |
 
 If any model fails its criteria, investigate before promoting.  A v2 that performs identically to
 v1 is not worth the disruption — only promote if there is a real improvement.
@@ -405,12 +312,13 @@ v1 is not worth the disruption — only promote if there is a real improvement.
 
 ## Step 6 — Promotion (not authorized)
 
-Only after a separately recorded acceptance and product authorization may the
-v2 files be moved into the standard production paths. No executable promotion
-command is recorded while the candidates and acceptance protocol are
-undefined. Before any replacement, bind source and destination hashes, make a
-recoverable backup, prove rollback, and use the repository's destructive-action
-review rather than ad-hoc copy or rename commands.
+Only after a separately recorded acceptance and product authorization may an
+accepted Sentinel or GapNet v2 file be moved into its standard production
+path. HumanPolicy has no production mapping in this plan. No executable
+promotion command is recorded while the candidates and acceptance protocol
+are undefined. Before any replacement, bind source and destination hashes,
+make a recoverable backup, prove rollback, and use the repository's
+destructive-action review rather than ad-hoc copy or rename commands.
 
 After renaming:
 - The Flask server picks up `best.pt` on restart (no config change).
@@ -441,22 +349,24 @@ iteration.
   whether the DB also stores a raw FEN or board representation that `eval_sentinel_db.py` can use.
   If not, the specialist_db correlation eval must be done via JSONL game replay (same as
   `eval_sentinel.py`) rather than direct DB sampling.
-- The `v2/` checkpoint directory already contains a partial earlier attempt.  Inspect before
-  starting Stage 1 training; if it contains a usable Stage 5 checkpoint, evaluate it first rather
-  than retraining from scratch.
+- The `v2/` checkpoint directory already contains a partial earlier attempt.
+  Inventory it before starting Stage 1, but do not adopt a Stage 5 checkpoint
+  whose inputs exposed oracle fields.
 - `bench_sentinel.py` hard-codes `data/gap_net.npz`.  Add a `--gap-net-path` CLI argument before
   running the gap net v2 comparison (Step 4d).
-- Two new scripts are required before testing can begin: `tools/train_value_net_v2.py` (Step 2)
-  and `scripts/eval_value_net_human.py` (Step 4c).  Neither exists yet.
-- Sentinel Stage 5 is blocked on the runtime oracle-feature contract; no epoch
-  value should be selected before that decision.
+- The imported `tools/train_value_net_v2.py` and
+  `scripts/eval_value_net_human.py` ideas are not approved implementation
+  tasks. HumanPolicy work belongs to the v5 raw-game data contract.
+- Sentinel Stage 5 is rejected for the DB-free runtime contract. Do not select
+  an epoch or checkpoint from that lineage for v2 promotion.
 - `build_gap_dataset.py` accepts `--sentinel`, but its required-sentinel path
   still needs to fail closed for this experiment.
-- **Pre-flight: malom_wdl_after semantics.** The Step 2 training filter depends on 'L' meaning the
-  next player loses (i.e. the human's move was winning) and 'W' meaning the human played a losing
-  move. Fifteen staged successor rows matched the corrected Malom adapter for
+- **Pre-flight: malom_wdl_after semantics.** The GapNet category filter depends
+  on 'L' meaning the next player loses (i.e. the human's move was winning) and
+  'W' meaning the human played a losing move. Fifteen staged successor rows
+  matched the corrected Malom adapter for
   W/D/L and DTW. Preserve this convention in focused dataset tests rather than
   relying only on the audit sample.
-- **Pre-flight: bench_sentinel.py VN path.** Step 4d requires the opponent to use
-  `value_net_v2.npz`.  Add a `--vn-path` CLI argument to `bench_sentinel.py` alongside
-  `--gap-net-path` before running Step 4d.
+- **Pre-flight: frozen opponent identity.** A future GapNet game benchmark
+  must name and hash the same opponent for old/new comparisons. It must not
+  infer an opponent from a default production path.

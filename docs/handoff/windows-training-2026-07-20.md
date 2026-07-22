@@ -128,9 +128,13 @@ This supports the staged candidate but does not replace the active HumanDB or
 change the completed baseline. The staged SpecialistDB's retained empirical
 history also makes it a different experiment input from the fresh baseline DB.
 
-The imported retraining plan remains a proposal. Checkpoint corrected-data
-lineage and the intended Sentinel, ValueNet, and GapNet target contracts still
-require maintainer confirmation before any retraining definition is frozen.
+The imported retraining plan remains a proposal. Current code and the v5 design
+resolve its apparent model-contract ambiguity locally: Sentinel stays DB-free
+with oracle slots masked, the proposed next-move ranker is a separate
+HumanPolicy path rather than ValueNet v2, and GapNet retains its implemented
+current-position quality-gap target. The imported checkpoints still lack
+corrected-data lineage, but no maintainer reconstruction is needed unless a
+future experiment proposes to adopt them.
 See
 [`docs/evidence/main-integration-audit-2026-07-22.md`](../evidence/main-integration-audit-2026-07-22.md)
 for exact hashes, counts, conflict policy, and question boundaries. The prior
@@ -674,9 +678,9 @@ Proceed in this order:
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
 2. Keep both rebuilt databases staged and keep every imported checkpoint out of
-   the `dev` resume lineage. Obtain the maintainer's exact checkpoint/data
-   lineage and intended Sentinel, ValueNet, and GapNet contracts before
-   freezing a retraining plan.
+   the `dev` resume lineage. Ask for additional checkpoint lineage only if a
+   future experiment proposes to adopt one; use the locally resolved Sentinel,
+   ValueNet/HumanPolicy, and GapNet boundaries recorded in the retraining plan.
 3. Let the maintainer finish the generated 107-position and PNG review. Start
    101 remains open for source intent; the withdrawn concern about 83 is not a
    corpus defect.
