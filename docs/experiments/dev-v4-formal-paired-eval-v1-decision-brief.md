@@ -6,10 +6,9 @@ Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
 Audience: product owner, evaluation reviewer, and domain expert
 
-Status: **authorized for the exact CPU Stage-0 freeze and 212-game run**.
-Runner repair, owner corpus review, clean-state verification, repeated
-readiness evidence, and the product decision are complete. No promotion or
-publication authority is implied.
+Status: **completed; protocol decision `accepted`; no promotion or publication
+authority**. Runner repair, owner corpus review, readiness, authorization,
+execution, and independent recomputation are complete.
 
 Related:
 
@@ -17,6 +16,7 @@ Related:
 - [corpus review record](dev-v4-formal-paired-eval-v1-corpus-review.md)
 - [training experiment](dev-v4-malom-corrected-baseline.md)
 - [readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
+- [result evidence](../evidence/dev-v4-stage0-result-2026-07-23.md)
 
 ## Decision
 
@@ -46,7 +46,7 @@ or promotion gate.
 | D — workload | Exactly **106 colour-swapped pairs / 212 games**: one pair per unique start. No modulo reuse. |
 | E — inference route | `policy-argmax-v1` is allowed only as a Stage-0 **lookahead-feature ablation** diagnostic. It is not training-route-aligned strength evidence. |
 | F — opponent | Keep the architecture-matched scratch-init bundle as a training-gain control. It is not a product-strength baseline. |
-| Freeze + run | **Authorized on 23 July 2026** for one immutable CPU specification and its resumable 212-game ledger. |
+| Freeze + run | **Completed on 23 July 2026.** The one-run authorization is consumed; the immutable spec and final ledger must be preserved together. |
 
 ## Purpose and claim boundary
 
@@ -54,14 +54,14 @@ The managed corrected-v4 run `managed-v4-baseline-v1` completed 5,000 games
 and 20 segments. Its metrics prove neither playing strength nor promotion
 readiness.
 
-The narrow question that the proposed Stage-0 diagnostic may answer is:
+The narrow question answered by the completed Stage-0 diagnostic was:
 
 > Under a deterministic zero-lookahead policy-argmax ablation, does the
 > trained candidate score above an architecture-matched scratch
 > initialization on this fixed, placement-only, source-overlapping convenience
 > corpus?
 
-Even an accepted result would not establish:
+The accepted result does not establish:
 
 - strength under the training-time LookaheadAdvisor route;
 - strength under fixed-node search, Sanmill search, or browser routing;
@@ -204,7 +204,7 @@ For that reason `policy-argmax-v1` is Stage-0 diagnostic evidence only. A
 formal strength or promotion gate requires a separately implemented and frozen
 training-route-aligned evaluator.
 
-## Required prerequisite before a new freeze decision
+## Execution disposition
 
 Runner correctness, deterministic-start enforcement, runtime binding, owner
 review, clean-state verification, output isolation, bundle verification, and
@@ -213,9 +213,15 @@ focused readiness tests are complete. The audit ran from clean commit
 report.
 
 The product owner supplied the remaining decision on 23 July 2026 by
-instructing Codex to start Stage 0. Repeat the clean-state and absent-output
-checks after committing this record, then execute only the reviewed CPU
-command. Any changed parameter or second run requires a new decision.
+instructing Codex to start Stage 0. The clean-state and absent-output checks
+were repeated after the authorization commit, one CPU spec was frozen, and
+the 212-game ledger completed. Independent recomputation matched the runner:
+193 wins, 8 draws, 11 losses, pair-score-difference mean
+`0.8584905660377359`, interval
+`[0.7972174156720373, 0.9197637164034345]`, and decision `accepted`.
+
+Any changed parameter, second run, promotion, or publication action requires
+a new decision.
 
 ## Inconclusive-result governance
 
@@ -233,7 +239,7 @@ provided:
 ## Final authorization state
 
 Candidate and scratch bundles have passed CPU verification, and the runner
-and freeze prerequisites are now complete. The readiness verdict is
-`ready_for_long_run`, scoped to this fixed Stage-0 evaluation rather than
-training. Freeze and paired execution are authorized once; promotion and
-publication remain outside this contract regardless of its eventual result.
+and freeze prerequisites completed. The one-run authorization has been
+consumed, and the protocol decision is `accepted`. That decision remains
+scoped to this fixed Stage-0 ablation rather than training-route-aligned
+strength. Promotion and publication remain outside the contract.

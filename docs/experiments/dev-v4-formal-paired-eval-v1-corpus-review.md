@@ -3,15 +3,17 @@
 Status: **the 64-position draft is rejected and superseded**. The owner
 completed review of the 107 generated candidates, requested removal of original
 review position 101, and accepted the rest. The resulting 106-position package
-is `owner_review_complete_not_frozen`. Technical readiness now passes, but
-corpus freeze and execution remain unauthorized pending an explicit product
-decision.
+was frozen into Stage-0 spec identity
+`26f80c14d70320aa025c85319791c625e821babb2e542095aeb4711d4c11d48b`.
+The 212-game run completed on 23 July 2026; the corpus remains inadequate for a
+formal strength or promotion claim.
 
 Related:
 
 - [expert decision record](dev-v4-formal-paired-eval-v1-decision-brief.md)
 - [evaluation contract](dev-v4-formal-paired-eval-v1.md)
 - [readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
+- [result evidence](../evidence/dev-v4-stage0-result-2026-07-23.md)
 
 ## Rejected historical draft
 
@@ -205,17 +207,16 @@ pending-removal projection, ring16 identity, the known illegal source
 recommendation, complete corpus reproduction, and every review-image manifest
 entry.
 
-## Remaining freeze checklist
+## Freeze disposition
 
 The generator and regression tests now reproduce action-state handling, the
 owner exclusion, exact and ring16 uniqueness, legality, playability,
 provenance, overlap, list binding, and every PNG hash and dimension. Owner
-review, clean-state verification, and focused readiness checks are complete,
-but the replacement is still not frozen. A new explicit product authorization
-is required before an immutable `EvaluationSpec` is frozen or any paired game
-is run. The authorized turn must repeat the clean-state and absent-output
-checks before freezing.
+review, clean-state verification, and focused readiness checks completed. The
+106-position list is now frozen only through the recorded Stage-0 spec
+identity. The one-run authorization has been consumed; do not regenerate,
+refreeze, or rerun it without a new decision.
 
-If authorized later, use exactly one colour-swapped pair per unique start:
-106 pairs / 212 games. This corpus remains Stage-0 diagnostic evidence and is
-not adequate phase coverage for a formal strength or promotion claim.
+The completed run used exactly one colour-swapped pair per unique start: 106
+pairs / 212 games. This corpus remains Stage-0 diagnostic evidence and is not
+adequate phase coverage for a formal strength or promotion claim.

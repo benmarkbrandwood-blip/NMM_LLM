@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 22 July 2026)
+# Windows Training Handover — 20 July 2026 (updated 23 July 2026)
 
 ## Executive Summary
 
@@ -10,9 +10,9 @@ corrected-v4 managed plan
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
 
-The next proposed step, `dev-v4-formal-paired-eval-v1`, now has a scoped
-**ready_for_long_run** readiness verdict. Expert review rejected the 64-position
-corpus and synthetic
+The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
+23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
+the 64-position corpus and synthetic
 one-endpoint-per-named-line alternative and established that
 `policy-argmax-v1` zeroes a lookahead feature block used during training. The
 draw-lifecycle and partial-ledger restart defects found in the paired runner
@@ -26,8 +26,11 @@ initialization. Its replacement corpus and PNG package are regenerated and
 audited. A clean read-only audit reverified the corpus, bundles, isolated
 targets, runtime identity, and in-memory specification; 28 focused readiness
 tests pass. On 23 July 2026, the product owner explicitly authorized the exact
-CPU freeze and 212-game run. It is not a formal strength or promotion gate,
-and it does not authorize training, promotion, or publication.
+CPU freeze and 212-game run. Independent recomputation verified 193 candidate
+wins, 8 draws, 11 losses, pair-score-difference mean `0.8584905660377359`,
+and interval `[0.7972174156720373, 0.9197637164034345]`. This is not a formal
+strength or promotion result, and it does not authorize training, a rerun,
+promotion, or publication.
 
 The maintainer's latest `main` history and 21/22 July staged upload have now
 been integrated and audited without activating their databases or checkpoints.
@@ -531,7 +534,7 @@ from the verified `latest.pt` of the immediately preceding completed segment,
 using explicit `exact-resume`. Legacy checkpoints, including every
 author-`main` file, remain weights-only and cannot satisfy that gate.
 
-## Managed Run Completion and Stage-0 Evaluation Readiness
+## Managed Run and Stage-0 Evaluation Completion
 
 The separately authorized managed plan `managed-v4-baseline-v1` later
 completed `completed_games=5000` and `completed_segments=20`. Its frozen
@@ -568,7 +571,7 @@ The first formal paired-evaluation proposal was narrowed because:
 - the proposed `policy-argmax-v1` route zeroes the 72-feature lookahead block
   supplied during training.
 
-The proposed Stage-0 diagnostic is 106 owner-accepted unique stable
+The completed Stage-0 diagnostic used 106 owner-accepted unique stable
 Oracle-projected starts, one colour-swapped pair per start, for 212 games
 against the verified scratch-init control. Sanmill documents the Oracle as
 independently engine-derived, but 28 of 106 selected positions overlap
@@ -580,8 +583,10 @@ promotion gate.
 
 The generated freeze-compatible list has canonical `start_positions_sha256`
 `04bc5782ab79ebeba34d0ff91bcd40fe05e823d539b16ba234b5eedcd123bb9d`.
-The audit artifact is `owner_review_complete_not_frozen`; it links 106
-individual PNGs and nine contact sheets. Automated replay found 438 legal
+The review artifact's pre-freeze status was
+`owner_review_complete_not_frozen`; the selected list is now frozen by spec
+identity `26f80c14d70320aa025c85319791c625e821babb2e542095aeb4711d4c11d48b`.
+It links 106 individual PNGs and nine contact sheets. Automated replay found 438 legal
 source recommendations and one illegal `c3` recommendation. The associated
 source candidate is the owner-excluded original position 101 and remains only
 as provenance. Codex inspected every regenerated contact sheet, the
@@ -595,12 +600,13 @@ The controlling records are:
 - [expert decision record](../experiments/dev-v4-formal-paired-eval-v1-decision-brief.md)
 - [rejected corpus and generated replacement review](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
 - [Stage-0 readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
+- [Stage-0 result evidence](../evidence/dev-v4-stage0-result-2026-07-23.md)
 
-The readiness verdict is `ready_for_long_run`, scoped only to the exact CPU
-Stage-0 evaluation authorized on 23 July 2026. A later inconclusive v1 may be
-followed
-by a separately preregistered and frozen v2, but the observations must not be
-pooled or represented as one prespecified sample.
+The authorized run is complete and its one-run authorization is consumed. Its
+`accepted` decision means only that a training signal is visible against
+random initialization under the placement-only zero-lookahead ablation. Any
+route-aligned or phase-covered v2 must be separately preregistered and
+authorized; observations may not be pooled as one prespecified sample.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -731,11 +737,10 @@ training merely because the managed run ended. Proceed in this order:
 3. Preserve the completed owner review: original review position 101 is
    excluded, the other 106 are accepted, and the withdrawn concern about 83 is
    not a corpus defect.
-4. Preserve the completed `ready_for_long_run` readiness record, exact CPU
-   command, route/lookahead claim boundary, and bundle identities.
-5. Under the recorded one-run authorization, repeat the clean state and output
-   checks, freeze one specification, and run 106 pairs / 212 games with no
-   start reuse. Do not treat acceptance as promotion evidence.
+4. Preserve the completed Stage-0 spec and final ledger together under their
+   recorded hashes; the one-run authorization is consumed.
+5. Preserve the `accepted` result as ablation-only training-signal evidence.
+   Do not rerun it or treat acceptance as promotion evidence.
 6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
@@ -795,11 +800,12 @@ promotion. Technical failures remain Agent diagnosis. The local
 endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
-The managed plan completed, and the Stage-0 evaluation has a scoped
-`ready_for_long_run` verdict plus one-run authorization. Safe work now includes
-freezing and running only that exact CPU contract. It does not include an
-additional evaluation, smoke or long training job, promotion/publication, a
-push, or a history rewrite without the applicable separate authorization.
+The managed plan and its Stage-0 evaluation are complete. The evaluation's
+one-run authorization is consumed. Safe work now includes inspection,
+documentation, preservation, and design of a separately reviewed next
+experiment. It does not include an additional evaluation, smoke or long
+training job, promotion/publication, a push, or a history rewrite without the
+applicable separate authorization.
 
 ## Reference Material
 

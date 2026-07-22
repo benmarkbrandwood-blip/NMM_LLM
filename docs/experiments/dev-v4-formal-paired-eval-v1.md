@@ -1,11 +1,11 @@
-# Dev v4 Formal Paired Evaluation v1 — Stage-0 Readiness Record
+# Dev v4 Formal Paired Evaluation v1 — Stage-0 Execution Record
 
 ## Status and claim boundary
 
 Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
-Status: **authorized for the exact CPU Stage-0 freeze and 212-game run; the
-immutable specification has not yet been created**.
+Status: **completed; protocol decision `accepted`; no strength or promotion
+claim**.
 
 The managed training plan `managed-v4-baseline-v1` completed 5,000 games and
 20 segments on 21 July 2026 (UTC). That is infrastructure and lineage evidence
@@ -23,7 +23,9 @@ run retains a validated `.partial` ledger and resumes only its missing games.
 Malformed or mismatched partial evidence fails closed. The focused evaluation
 suite passes all 15 tests. The owner reviewed the 107 generated candidates,
 requested removal of original review position 101, and accepted the remaining
-106. The regenerated package is `owner_review_complete_not_frozen`.
+106. The regenerated review package carried
+`owner_review_complete_not_frozen` before the selected list was bound into the
+immutable Stage-0 spec.
 
 A read-only audit from clean commit `b92d62e` reverified the corpus and both
 bundles, confirmed isolated output targets, and constructed the complete
@@ -34,11 +36,12 @@ fails closed on drift. Legacy unbound specifications remain readable and
 recomputable but cannot create new game evidence. The combined focused
 readiness suite passes 28 tests. On 23 July 2026, the product owner explicitly
 instructed Codex to start the Stage-0 evaluation. The technical and product
-launch gates therefore pass for this contract only.
+launch gates therefore passed for this contract only. The immutable spec was
+frozen from commit `a45b44e`, and all 212 games completed with a verified final
+ledger.
 
-The authorization permits one immutable specification and its resumable
-212-game ledger. It does not authorize training, a changed evaluation, or any
-promotion or publication decision.
+The one-run authorization has been consumed. It does not authorize training,
+a rerun, a changed evaluation, or any promotion or publication decision.
 
 Related contracts:
 
@@ -48,6 +51,25 @@ Related contracts:
 - [managed operations](../managed-training-operations.md)
 - [evaluation and promotion design](../v4-infrastructure-hardening-plan.md)
 - [readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
+- [completed result evidence](../evidence/dev-v4-stage0-result-2026-07-23.md)
+
+## Completed Stage-0 result
+
+The frozen spec identity is
+`26f80c14d70320aa025c85319791c625e821babb2e542095aeb4711d4c11d48b`.
+Independent ledger recomputation reports 193 candidate wins, 8 draws, and 11
+losses over 212 games. The pair-score-difference mean is
+`0.8584905660377359`, with the frozen interval
+`[0.7972174156720373, 0.9197637164034345]`; the protocol decision is
+`accepted`.
+
+The final ledger SHA-256 is
+`6800d95ca8e968e2b7ded3f02b87451e1a84c7f47a068a72e36d53bcd1978848`,
+and the result identity is
+`0280a4a8eee8ee39506dcef0816a3265bc64229985699c63a3420e34978bbc99`.
+The `.partial` file was atomically removed. This is only positive
+training-signal evidence under the documented ablation and random-init
+control; it is not formal playing-strength evidence.
 
 ## Candidate and baseline artifacts
 
@@ -187,20 +209,21 @@ sample.
    clean code, device, runtime, route, component, and feature contracts.
 7. The read-only readiness audit reverified both bundles, the corpus, output
    isolation, runtime identity, and the complete in-memory specification.
+8. The authorized spec was frozen, all 212 games completed, and independent
+   recomputation reproduced the runner's result and evidence identities.
 
-## Mandatory sequence before any freeze or run
+## Completed execution and post-run boundary
 
-Runner repair, the final technical contract, the read-only readiness audit,
-and product authorization are complete. The mandatory execution sequence is:
+The mandatory sequence completed without a stop condition:
 
-1. Repeat the clean-state and absent-output checks after this authorization
-   record is committed.
-2. Freeze exactly one immutable specification with the command in the linked
-   readiness evidence.
-3. Run or validly resume only that specification and ledger.
+1. The post-authorization tree was clean and every target was absent.
+2. One immutable specification was frozen on CPU.
+3. Its 212-game ledger completed and was atomically published.
+4. Independent recomputation reproduced the same result.
 
-No parameter substitution or second run is authorized. Stop and preserve the
-evidence on any identity, bundle, runtime, or ledger failure.
+No parameter substitution, second run, promotion, or publication is
+authorized. Preserve the spec and ledger together under their recorded
+identities.
 
 ## Explicit non-claims
 

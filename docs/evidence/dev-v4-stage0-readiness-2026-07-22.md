@@ -9,6 +9,10 @@ evaluation). That authorizes the exact freeze and run below. It does not
 authorize training, a different evaluation contract, promotion, or
 publication.
 
+Execution update: the authorized run completed on 23 July 2026. See the
+[result evidence](dev-v4-stage0-result-2026-07-23.md). The readiness verdict is
+retained as the pre-execution gate, not as a second launch authorization.
+
 ## Reviewed launch contract
 
 The proposed action is one deterministic Stage-0 diagnostic on CPU:
@@ -79,7 +83,7 @@ run. A valid partial ledger may resume only under the same frozen
 specification and runtime. Failed or suspect evidence remains separate for
 diagnosis and must not be promoted.
 
-## Reviewed and authorized commands
+## Reviewed and executed commands
 
 Freeze, after one final clean-state check:
 

@@ -14,9 +14,8 @@ resolved on `dev`. The authorized managed long run
 completion is not playing-strength evidence and does not authorize promotion.
 The paired-runner repair is complete. The owner reviewed the 107 generated
 candidates, removed original position 101, and accepted the resulting
-106-start package. The next evaluation has a scoped `ready_for_long_run`
-verdict, and the product owner authorized its exact CPU Stage-0 freeze and run
-on 23 July 2026; see
+106-start package. The exact CPU Stage-0 evaluation completed on 23 July 2026
+with protocol decision `accepted`; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -117,7 +116,7 @@ until a deterministic ratio-at-collection regression test and reviewed fix
 exist. See
 [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
 
-### Formal evaluation status — authorized Stage 0
+### Formal evaluation status — completed Stage 0
 
 Formal evaluation remains separate from training completion. The candidate and
 architecture-matched scratch-init bundles have been exported and CPU-verified,
@@ -128,18 +127,19 @@ reviewed all 107 generated candidates, excluded original position 101, and
 accepted the other 106. Deterministic start reuse is rejected, and the runtime
 contract now binds the clean code, device, environment, route, components, and
 feature ablation. A clean read-only audit reverified the corpus, both bundles,
-isolated targets, and an in-memory specification. Freeze and execution remain
-authorized for one immutable CPU specification and its resumable 212-game
-ledger; promotion and publication are outside this Stage-0 contract.
+isolated targets, and an in-memory specification. The authorized immutable CPU
+specification and 212-game ledger completed and independently recomputed to
+`accepted`; promotion and publication are outside this Stage-0 contract.
 The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
 [`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md)
 and the readiness result in
 [`dev-v4-stage0-readiness-2026-07-22.md`](../evidence/dev-v4-stage0-readiness-2026-07-22.md).
+The aggregate, hashes, and interpretation boundary are in
+[`dev-v4-stage0-result-2026-07-23.md`](../evidence/dev-v4-stage0-result-2026-07-23.md).
 
-After the required repeated clean-state/output check, the authorized experiment
-is only a Stage-0 training-signal diagnostic:
+The completed experiment is only a Stage-0 training-signal diagnostic:
 
 - 106 owner-accepted unique playable stable positions selected from 107 FENs
   projected from 108 Sanmill `action=p` keys, with original review position 101
