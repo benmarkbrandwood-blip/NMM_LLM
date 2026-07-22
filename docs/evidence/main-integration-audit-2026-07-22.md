@@ -2,19 +2,25 @@
 
 ## Scope and Claim Boundary
 
-This record audits the maintainer's `main` tip `b9a13ce` and the separately
-downloaded `Mills` bundle before either is used by `dev`. It records repository
-integration and read-only provenance checks only. It does not authorize a
+This record audits the maintainer's `main` history through `67af016` and the
+separately downloaded `Mills` bundle before either is used by `dev`. It records
+repository integration and read-only provenance checks only. It does not authorize a
 smoke, retraining run, resume, evaluation, model promotion, database
 replacement, push, or publication.
 
-The source branch was merged on the temporary integration branch by commit
-`8717f1c`. Seventeen conflicts came from `main`'s one-parent import of an older
-`dev` snapshot. The newer `dev` side was retained for all seventeen because the
+The initially observed tip `b9a13ce` was merged on the temporary integration
+branch by commit `8717f1c`. Seventeen conflicts came from `main`'s one-parent
+import of an older `dev` snapshot. The newer `dev` side was retained for all seventeen because the
 other side removed later fixed-node candidate, quiescence, managed-segment,
 exact-resume, paired-evaluation, and provenance safeguards. The merge still
 imported the maintainer's non-conflicting plans, openings, settings,
 checkpoints, plotting changes, and Generalist v2a source.
+
+During final verification, `main` advanced once more to `67af016`. Merge
+commit `4593034` imports its v2a `best_win_rate_at_diff` persistence while
+retaining the dev quarantine. That field prevents one class of legacy
+best-checkpoint regression, but it does not add optimizer, RNG, target-model,
+recovery, rehearsal, database-identity, or exact-resume state.
 
 ## Staged Database Bundle
 
@@ -94,9 +100,11 @@ formal baselines, or evidence of corrected retraining.
   change that corpus's identity or expert-review status.
 - The downloaded `Mills/train_s_gen_v2a.py` has SHA-256
   `EDB0E4D35981900414A1DC6E870E36F44F23D77EE2693C7D56C4C2ACDC566F79`.
-  The later `main` version imported by Git had SHA-256
+  The `b9a13ce` version first imported by Git had SHA-256
   `FF5760F5D08A9D48B4A5E5E72CF51F74AD6E45EE11B861B388BA231299BE9BB5`.
-  Therefore the repository version, not the earlier downloaded copy, is the
+  The final upstream `67af016` version has SHA-256
+  `4DC873E86F5C7B94D6BFC412CDBCAC404D97E4199AAAB97A35E9F77DB4AE8F9B`.
+  Therefore the repository history, not the earlier downloaded copy, is the
   relevant review source.
 - The v2a fork is 1,011 lines behind the current `dev` trainer and lacks the
   current managed preflight and exact-resume contract. It also silently
@@ -155,6 +163,11 @@ intended. The Rust suite emits existing unused-code/import warnings but no test
 failure. No full-suite-clean claim is made because the repository handover
 still records unrelated collection/interface failures outside these focused
 groups.
+
+After `main` advanced to `67af016`, the v2a quarantine test and CLI parse probe
+were repeated against merge `4593034`; both passed and the launch guard remains
+in place. No broader suite was repeated because that upstream delta affects
+only quarantined source and the focused boundary test passed.
 
 ## Remaining Maintainer Confirmations
 

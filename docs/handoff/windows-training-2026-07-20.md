@@ -100,12 +100,18 @@ the live graph and working tree before relying on this snapshot.
 
 ## 22 July Main Integration and Upload Audit
 
-The maintainer's active `main` tip was `b9a13ce`. Its history was not compared
-to `dev` by a blind tip diff: commit-graph inspection showed that `9d09851` was
-a one-parent import close to older `dev` commit `0ad5991`, followed by the
+The maintainer's active `main` tip was initially `b9a13ce` and advanced during
+verification to `67af016`. Its history was not compared to `dev` by a blind
+tip diff: commit-graph inspection showed that `9d09851` was a one-parent
+import close to older `dev` commit `0ad5991`, followed by the
 maintainer's plans, assets, and v2a work. Merge commit `8717f1c` records the
 integration. All seventeen snapshot conflicts retained the newer `dev` side;
 the non-conflicting maintainer artifacts were preserved for audit.
+
+Final merge commit `4593034` imports `67af016`'s v2a per-difficulty
+best-rate persistence while retaining the quarantine. It fixes one legacy
+best-save threshold across restarts but does not provide the complete `dev`
+exact-resume state and therefore does not authorize running v2a.
 
 Two independent safety commits follow that merge:
 
