@@ -155,11 +155,12 @@ source commit and asset SHA-256, and refuses to overwrite an existing package.
 
 The package contains 107 individual 720×840 PNGs and nine 4×3 contact sheets.
 On 21 and 22 July 2026, Codex inspected all nine full contact sheets and
-full-size entries 001 (empty board), 040, 048, 057, 076, 083, 084, 101 (the red
-`c3` source warning), and 107 (the maximum-placement end of the ordered corpus).
-Piece colours, coordinates, counts, turn labels, ordering, warning visibility,
-and sheet coverage showed no visual anomaly. This is supporting review
-evidence, not owner acceptance by itself.
+full-size entries 001 (empty board), 040, 048, 055, 056, 057, 060, 065, 067,
+076, 079, 083, 084, 092, 095, 101 (the red `c3` source warning), and 107 (the
+maximum-placement end of the ordered corpus). Piece colours, coordinates,
+counts, turn labels, ordering, warning visibility, and sheet coverage showed no
+visual anomaly. This is supporting review evidence, not owner acceptance by
+itself.
 
 Owner review is in progress. The owner's initial comments identified starts
 040, 048, 057, 076, and 084 as unfamiliar or noteworthy rather than invalid.
@@ -168,9 +169,26 @@ clarified that the contrary observation came from recreating the position with
 one piece wrong. Start 101 remains an open owner question about its Black-piece
 count. The generated panel records `placed W/B 8/7` and `on-board 8/6`, exactly
 reproduces the pinned source key, and remains playable, so no source correction
-is inferred locally. The owner must confirm whether the source itself is
-intended before accepting or freezing the corpus. None of these preliminary
-comments constitutes corpus acceptance.
+is inferred locally.
+
+The owner's next review pass questioned how starts 055 and 056 could arise and
+described 056 as winning for Black. The owner assessed 060 as winning for
+White, 067 as a good Black position, 065 as a nice trick, and 092 as an
+interesting position in which White has a chance. Start 079 was described as a
+very good mill wrap in which Black wins unless White plays `d5`; this agrees
+with the source Oracle's sole recommendation, `d5`. Start 095 was described as
+unlikely and as requiring Black to place at `c4` to avoid losing. Its source
+Oracle recommends eight other moves and does not include `c4`, so move quality
+for this start remains a specific review conflict rather than a locally
+resolved correction. The owner also described the package as a good overall
+spread, including some unlikely and already-losing positions.
+
+These are preliminary expert observations, not a request to discard every
+unusual or losing start and not corpus acceptance. In particular, automated
+playability does not prove natural reachability from an empty board. Starts
+055 and 056 still need a reachability/naturalness decision, start 095 needs the
+Oracle disagreement resolved, and the owner must provide a final keep/remove
+decision before the corpus is accepted or frozen.
 
 The focused corpus, paired-runner, model-bundle, and candidate-lifecycle
 regression command reports `20 passed`. Six of those tests specifically cover
