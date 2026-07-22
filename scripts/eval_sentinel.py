@@ -58,22 +58,18 @@ from learned_ai.sentinel.dataset import (
 )
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 from learned_ai.sentinel.feature_builder import FEATURE_DIM, build_move_features
+from learned_ai.sentinel.feature_contract import (
+    DB_FEATURE_SLOTS,
+    db_free_numpy_mask,
+)
 from learned_ai.sentinel.labels import dtm_quality, WDL_QUALITY, BAD_MOVE_DTM_THRESHOLD
 from learned_ai.sentinel.model import SentinelNet
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# DB-derived feature slots zeroed to replicate inference conditions.
-_DB_FEATURE_SLOTS = list(range(41, 46)) + list(range(48, 58))
-_DB_MASK: Optional[np.ndarray] = None  # built once in main()
-
-
 def _build_db_mask() -> np.ndarray:
-    mask = np.ones(FEATURE_DIM, dtype=np.float32)
-    for s in _DB_FEATURE_SLOTS:
-        mask[s] = 0.0
-    return mask
+    return db_free_numpy_mask()
 
 
 def _db_quality(wdl: Optional[str], dtm: Optional[int]) -> Optional[float]:
@@ -422,7 +418,10 @@ def main() -> int:
 
     # ── Feature mask ────────────────────────────────────────────────────────────
     db_mask = _build_db_mask()
-    print(f"DB feature slots zeroed for inference-realistic eval: {_DB_FEATURE_SLOTS}")
+    print(
+        "DB feature slots zeroed for inference-realistic eval: "
+        f"{list(DB_FEATURE_SLOTS)}"
+    )
 
     # ── Collect game files ───────────────────────────────────────────────────────
     import glob

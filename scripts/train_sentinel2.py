@@ -30,12 +30,11 @@ from torch.utils.data import DataLoader, random_split
 from learned_ai.sentinel.config import load_config
 from learned_ai.sentinel.dataset import SentinelDataset, ContrastiveSentinelDataset, collate_examples
 from learned_ai.sentinel.db_teacher import ExternalSolvedDB
-from learned_ai.sentinel.feature_builder import FEATURE_DIM
+from learned_ai.sentinel.feature_contract import (
+    DB_FEATURE_SLOTS,
+    db_free_torch_mask,
+)
 from learned_ai.sentinel.model import SentinelNet, sentinel_loss, contrastive_ranking_loss
-
-# DB-derived feature slots zeroed when --drop-db-features is active.
-# Keeps structural slots [0-40, 46-47] but zeros the DB indicator / DTM slots.
-_DB_FEATURE_SLOTS = list(range(41, 46)) + list(range(48, 58))
 
 
 def _set_seed(seed: int) -> None:
@@ -43,7 +42,12 @@ def _set_seed(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def _eval_metrics(model, loader, device, lambda_wdl=0.0, db_mask=None):
+def _required_db_feature_mask(device):
+    """Build the mandatory DB-free Sentinel input mask."""
+    return db_free_torch_mask(device=device)
+
+
+def _eval_metrics(model, loader, device, lambda_wdl=0.0, *, db_mask):
     """Mean loss plus accuracy and a win/draw/loss breakdown over a loader."""
     model.eval()
     total_loss = 0.0
@@ -52,9 +56,7 @@ def _eval_metrics(model, loader, device, lambda_wdl=0.0, db_mask=None):
     buckets = {"win": [0, 0], "draw": [0, 0], "loss": [0, 0]}  # [correct, count]
     with torch.no_grad():
         for feats, quality, weight, wdl_cls in loader:
-            feats = feats.to(device)
-            if db_mask is not None:
-                feats = feats * db_mask
+            feats = feats.to(device) * db_mask
             quality = quality.to(device)
             weight = weight.to(device)
             wdl_cls = wdl_cls.to(device)
@@ -114,8 +116,8 @@ def main() -> int:
     p.add_argument("--lambda-wdl", type=float, default=0.3,
                    help="Weight for auxiliary WDL loss term (default 0.3)")
     p.add_argument("--drop-db-features", action="store_true",
-                   help="Zero DB-indicator feature slots during training so the model "
-                        "cannot shortcut on oracle features unavailable at inference time")
+                   help="Compatibility/provenance marker; DB-only feature slots are "
+                        "always zeroed because they are unavailable at inference time")
     p.add_argument("--trajectory-weight", action="store_true",
                    help="Boost training weight of the played move based on game outcome "
                         "(Stage 3 curriculum: win-played moves get 3x, loss-played 2x)")
@@ -140,6 +142,11 @@ def main() -> int:
         config.epochs = args.epochs
     _set_seed(config.seed)
     device = torch.device(args.device)
+    db_mask = _required_db_feature_mask(device)
+    print(
+        "DB feature slots always zeroed (runtime contract): "
+        f"{list(DB_FEATURE_SLOTS)}"
+    )
 
     os.makedirs(config.checkpoint_dir, exist_ok=True)
     os.makedirs(config.log_dir, exist_ok=True)
@@ -172,8 +179,6 @@ def main() -> int:
         extra_dirs = [d for d in [args.human_game_dir, args.ai_game_dir] if d]
         if extra_dirs:
             print(f"Extra game dirs: {extra_dirs}")
-        if args.drop_db_features:
-            print(f"DB feature slots zeroed (--drop-db-features): {_DB_FEATURE_SLOTS}")
         if args.trajectory_weight:
             print("Trajectory weighting active: played moves get win/loss outcome boost")
         # Game-level split: whole game files go to either train or val,
@@ -248,13 +253,6 @@ def main() -> int:
     lambda_wdl = args.lambda_wdl if use_aux else 0.0
     lambda_contrastive = args.lambda_contrastive if args.contrastive else 0.0
 
-    # Build DB-feature mask (applied each batch when --drop-db-features is set).
-    db_mask = None
-    if args.drop_db_features:
-        db_mask = torch.ones(FEATURE_DIM, dtype=torch.float32, device=device)
-        for s in _DB_FEATURE_SLOTS:
-            db_mask[s] = 0.0
-
     # ── Contrastive loader ───────────────────────────────────────────────────────
     contrastive_loader = None
     contrastive_iter = None
@@ -325,9 +323,7 @@ def main() -> int:
             n_batches = 0
 
             for feats, quality, weight, wdl_cls in train_loader:
-                feats = feats.to(device)
-                if db_mask is not None:
-                    feats = feats * db_mask
+                feats = feats.to(device) * db_mask
                 quality = quality.to(device)
                 weight = weight.to(device)
                 wdl_cls = wdl_cls.to(device)
@@ -348,11 +344,8 @@ def main() -> int:
                     pair_batch = _get_contrastive_iter()
                     if pair_batch is not None:
                         feat_g, feat_b = pair_batch
-                        feat_g = feat_g.to(device)
-                        feat_b = feat_b.to(device)
-                        if db_mask is not None:
-                            feat_g = feat_g * db_mask
-                            feat_b = feat_b * db_mask
+                        feat_g = feat_g.to(device) * db_mask
+                        feat_b = feat_b.to(device) * db_mask
                         scores_g = model(feat_g)
                         scores_b = model(feat_b)
                         c_loss = contrastive_ranking_loss(scores_g, scores_b)

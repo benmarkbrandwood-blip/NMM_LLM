@@ -100,10 +100,15 @@ The `v2/` checkpoint directory already exists from a prior partial run. Use
 existing Stage 5 checkpoint has oracle-exposed lineage and may be inventoried
 only as a historical ablation; it is not a candidate for the DB-free Sentinel.
 
+The shared Sentinel feature contract now makes DB-only slots unavailable in
+both training entry points and in offline evaluation. `--drop-db-features` is
+retained in the commands as an explicit provenance marker, but it is no longer
+an opt-in safety switch: omitting it does not expose the oracle slots.
+
 ### Stage 1 — Structural foundation
 
-No DB labels.  `--drop-db-features` zeroes oracle slots so the model learns pure structural
-patterns.
+No DB labels. The mandatory feature contract zeroes oracle slots so the model
+learns pure structural patterns.
 
 ```bash
 .venv/bin/python scripts/train_sentinel.py \
@@ -117,8 +122,9 @@ patterns.
 
 ### Stage 2 — DB calibration
 
-Resume from Stage 1.  DB provides strong WDL + DTM labels; `--drop-db-features` still zeroes
-oracle indicator slots so weights update toward ground truth without memorising the oracle path.
+Resume from Stage 1. DB provides strong WDL + DTM labels; the mandatory mask
+still zeroes oracle indicator slots so weights update toward ground truth
+without memorising the oracle path.
 
 ```bash
 .venv/bin/python scripts/train_sentinel.py \
@@ -134,7 +140,8 @@ oracle indicator slots so weights update toward ground truth without memorising 
 
 ### Stage 4 — Corrected full training
 
-Resume from Stage 2.  DB labels with `--drop-db-features`.  Human game data included.
+Resume from Stage 2. DB supplies labels while the mandatory feature contract
+keeps its oracle input slots masked. Human game data is included.
 
 ```bash
 .venv/bin/python scripts/train_sentinel.py \
@@ -156,11 +163,11 @@ zeroes DB feature slots to match inference. Training Stage 5 with those oracle
 slots visible would introduce a train/inference mismatch and could teach the
 network to depend on the database it is meant to replace.
 
-The current inference wrapper is explicitly DB-free, the evaluation masks the
-oracle slots, and Stages 1, 2, and 4 already request the same mask. Retain that
-mask in every Sentinel training stage and use Malom only as the supervised
-teacher. A future model that intentionally consumes live oracle fields would
-be a separately named architecture and experiment, not a restored Stage 5.
+The current inference wrapper is explicitly DB-free, and a shared contract now
+enforces the same oracle-slot mask in both trainers and evaluation. Use Malom
+only as the supervised teacher. A future model that intentionally consumes live
+oracle fields would be a separately named architecture and experiment, not a
+restored Stage 5.
 
 Stage 6 (AIDB + contrastive) is out of scope for this retrain cycle.
 
@@ -361,6 +368,9 @@ iteration.
   tasks. HumanPolicy work belongs to the v5 raw-game data contract.
 - Sentinel Stage 5 is rejected for the DB-free runtime contract. Do not select
   an epoch or checkpoint from that lineage for v2 promotion.
+- Both Sentinel trainers and the offline evaluator now share and enforce the
+  same DB-only feature-slot mask. The legacy `--drop-db-features` flag is a
+  provenance marker rather than an opt-in safety boundary.
 - `build_gap_dataset.py` now treats `--sentinel` as required and fails closed
   both at load/probe time and during per-position scoring.
 - **Pre-flight: malom_wdl_after semantics.** The GapNet category filter depends
