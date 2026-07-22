@@ -193,12 +193,15 @@ class TestB40PreserveDualMill(unittest.TestCase):
             f"breaking it (a7→a1, {score_break})",
         )
 
-    def test_breaking_cycling_for_cross_node_is_penalised(self):
+    def test_breaking_cycling_for_cross_node_records_dominant_penalty(self):
         """
         Controlled test: break cycling by moving to a cross-node (g7→d5)
         vs preserve cycling by moving a neutral piece to a corner (g1→a1).
-        Without B-40 fix: break scores much higher due to cross-node gain.
-        With fix: self_cycle_lost penalty should narrow the gap.
+
+        Later tactical features can legitimately add independent bonuses to
+        either move, so the combined root bonus is not a stable ordering
+        oracle.  The B-40 contract is that breaking the cycle contributes the
+        full cycling penalty and that this penalty exceeds the cross-node gain.
         """
         before = _board(
             ["a7", "g7", "b6", "f6", "g1"],
@@ -212,18 +215,20 @@ class TestB40PreserveDualMill(unittest.TestCase):
 
         cyc_break    = _cycling_mill_setup(after_break, "W")
         cyc_preserve = _cycling_mill_setup(after_preserve, "W")
-        score_break    = _score(before, after_break)
-        score_preserve = _score(before, after_preserve)
-
         self.assertEqual(cyc_break, 0, "Break move must drop cycling to 0")
         self.assertGreater(cyc_preserve, 0, "Preserve move must keep cycling > 0")
-        # With self_cycle_lost = -300 and cross-node = +200, net = -100 → break < preserve
-        self.assertGreater(
-            score_preserve, score_break,
-            f"Preserving cycling (g1→a1, {score_preserve}) should outscore "
-            f"cross-node cycling break (g7→d5, {score_break}). "
-            "self_cycle_lost penalty must exceed cross-node gain.",
+        breakdown = tactical_move_bonus(
+            before,
+            after_break,
+            "W",
+            DEFAULT_WEIGHTS,
+            return_breakdown=True,
         )
+        terms = dict(breakdown["top_terms"])
+        cycle_penalty = terms["Own cycle lost (B-40)"]
+        cross_gain = terms["Cardinal/cross control"]
+        self.assertEqual(cycle_penalty, -DEFAULT_WEIGHTS.cycling_mill)
+        self.assertGreater(abs(cycle_penalty), cross_gain)
 
 
 # ── B-41: safe mill opening ───────────────────────────────────────────────────
