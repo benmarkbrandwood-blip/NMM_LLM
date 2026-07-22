@@ -5,7 +5,8 @@ Reads train_log.jsonl from each specified checkpoint folder and plots:
   Row 1: malom_win_move_rate + heuristic_top1_rate + policy_top1_rate
   Row 2: best_win_rate + win_rate_200 + draw rate  /  ply on rhs axis
   Row 3: sentinel_chosen_mean vs sentinel_mean + gap shaded
-  Row 4: reward breakdown (total/sentinel/heuristic/retro)  /  LR on rhs axis
+  Row 4: reward breakdown (total/sentinel/heuristic)  /  LR on rhs axis
+  Row 5: retro reward (outcome signal)
 
 Recovery event markers on win-rate panel:
   black  dashed — hot-explore triggered (Stage 1)
@@ -77,7 +78,18 @@ def _load(path: Path) -> list[dict]:
                     rows.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
-    return rows
+    # Strip entries from old/smoke-test runs: find last significant backwards
+    # jump in game numbering and discard everything before it.
+    last_reset = 0
+    max_game   = -1
+    for i, r in enumerate(rows):
+        g = r.get("game")
+        if isinstance(g, int):
+            if g < max_game - 10:
+                last_reset = i
+            if g > max_game:
+                max_game = g
+    return rows[last_reset:]
 
 
 def _smooth(values: list[float], window: int) -> np.ndarray:
@@ -201,7 +213,7 @@ def draw(fig, _axes_unused, specialists):
     """Rebuild all panels from scratch on each refresh (handles twinx cleanly)."""
     n_cols = len(specialists)
     fig.clf()
-    raw = fig.subplots(5, n_cols, sharex=False)
+    raw = fig.subplots(6, n_cols, sharex=False)
     # Normalise to list-of-lists regardless of shape
     if n_cols == 1:
         axes = [[ax] for ax in raw]
@@ -217,6 +229,7 @@ def draw(fig, _axes_unused, specialists):
         ax_wr   = axes[2][col]   # win rates  (ply rhs)
         ax_sent = axes[3][col]   # sentinel signal
         ax_rew  = axes[4][col]   # reward breakdown  (LR rhs)
+        ax_ret  = axes[5][col]   # retro reward
 
         subtitle = f"{name}  (n={n_games})"
 
@@ -243,13 +256,28 @@ def draw(fig, _axes_unused, specialists):
         _caption(ax_top1, "malom↑ = Malom-optimal moves;  policy≈heuristic = copying;  gap widening = diverging")
 
         # ── Row 2: win / draw rates  +  ply (rhs) ────────────────────────
+        rec_events = _get_recovery_events(rows)
+        reset_games = {g for g, _ in rec_events["recovery_stage2"] + rec_events["resurrection"]}
+
+        def _plot_wr(ax, xs, ys, label, color):
+            """Like _plot_series but inserts NaN gaps in smoothed line at recovery resets."""
+            if not ys:
+                return
+            sm = _smooth(ys, SMOOTH).copy()
+            if reset_games:
+                for i, x in enumerate(xs):
+                    if any(rg <= x <= rg + SMOOTH for rg in reset_games):
+                        sm[i] = float("nan")
+            ax.plot(xs, ys,  color=color, alpha=0.15, linewidth=0.6)
+            ax.plot(xs, sm,  color=color, linewidth=1.6, label=label)
+
         xs_b, ys_b = _get(rows, "best_win_rate")
         xs_w, ys_w = _get(rows, "win_rate_200")
         xs_d, ys_d = _get_draw_rate(rows)
-        _plot_series(ax_wr, xs_b, ys_b, "best win rate", "#E91E63")
-        _plot_series(ax_wr, xs_w, ys_w, "win rate 200",  "#9C27B0")
-        _plot_series(ax_wr, xs_d, ys_d, "draw rate",     "#FF9800")
-        _draw_recovery_events(ax_wr, _get_recovery_events(rows))
+        _plot_wr(ax_wr, xs_b, ys_b, "best win rate", "#E91E63")
+        _plot_wr(ax_wr, xs_w, ys_w, "win rate 200",  "#9C27B0")
+        _plot_wr(ax_wr, xs_d, ys_d, "draw rate",     "#FF9800")
+        _draw_recovery_events(ax_wr, rec_events)
         ax_wr.set_ylim(0, 1.05)
         ax_wr.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
 
@@ -283,18 +311,15 @@ def draw(fig, _axes_unused, specialists):
         ax_sent.legend(fontsize=6, loc="lower right")
         _caption(ax_sent, "teal gap (chosen>mean) = model using sentinel signal;  flat gap = ignoring it")
 
-        # ── Row 4: reward breakdown  +  LR (rhs, scaled ×1e5) ───────────
+        # ── Row 4: total/sentinel/heuristic rewards  +  LR (rhs) ────────
         xs_rt, ys_rt = _get(rows, "reward_total_mean")
         xs_rs, ys_rs = _get(rows, "reward_sentinel_mean")
         xs_rh, ys_rh = _get(rows, "reward_heuristic_mean")
-        xs_rr, ys_rr = _get(rows, "reward_retro_mean")
         _plot_series(ax_rew, xs_rt, ys_rt, "total",     "#FFEB3B", alpha_raw=0.20)
         _plot_series(ax_rew, xs_rs, ys_rs, "sentinel",  "#00BCD4", alpha_raw=0.20)
         _plot_series(ax_rew, xs_rh, ys_rh, "heuristic", "#FF9800", alpha_raw=0.20)
-        _plot_series(ax_rew, xs_rr, ys_rr, "retro",     "#4CAF50", alpha_raw=0.20)
         ax_rew.axhline(0, color="white", alpha=0.20, linewidth=0.7, linestyle="--")
 
-        # LR scaled ×1e5 so values read as clean decimals (0.5–1.0 = 5e-5–1e-4)
         ax_rew2 = _twin_rhs(ax_rew, "#F44336", "LR ×10⁻⁵")
         xs_lr, ys_lr = _get(rows, "lr")
         if ys_lr:
@@ -305,13 +330,20 @@ def draw(fig, _axes_unused, specialists):
         h1, l1 = ax_rew.get_legend_handles_labels()
         h2, l2 = ax_rew2.get_legend_handles_labels()
         ax_rew.legend(h1 + h2, l1 + l2, fontsize=6, loc="lower right")
-        _caption(ax_rew, "game  ·  retro dominant = outcome-driven;  LR at min (0.5) = model losing")
+        _caption(ax_rew, "sentinel/heur near 0 = reward mostly from retro (outcome);  LR at min (0.5) = model losing")
+
+        # ── Row 5: retro reward ────────────────────────────────────────────
+        xs_rr, ys_rr = _get(rows, "reward_retro_mean")
+        _plot_series(ax_ret, xs_rr, ys_rr, "retro", "#4CAF50", alpha_raw=0.20)
+        ax_ret.axhline(0, color="white", alpha=0.20, linewidth=0.7, linestyle="--")
+        ax_ret.legend(fontsize=6, loc="lower right")
+        _caption(ax_ret, "retro↑ = winning outcome reward;  retro↓ = losing;  near 0 = draws / mixed")
 
         # ── Advancement markers on all panels ─────────────────────────────
         advances = _get_advances(rows)
-        _draw_advances([ax_ent, ax_top1, ax_wr, ax_sent, ax_rew], advances)
+        _draw_advances([ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret], advances)
 
-        for ax in (ax_ent, ax_top1, ax_wr, ax_sent, ax_rew):
+        for ax in (ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret):
             ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3, linewidth=0.4)
 
@@ -321,6 +353,7 @@ def draw(fig, _axes_unused, specialists):
         "Win rates",
         "Sentinel signal",
         "Rewards / LR",
+        "Retro reward",
     ]
     for row, label in enumerate(row_labels):
         axes[row][0].set_ylabel(label, fontsize=7)
@@ -356,7 +389,7 @@ def main():
 
     n_cols = len(specialists)
     fig_w  = max(6, 4.5 * n_cols)
-    fig    = plt.figure(figsize=(fig_w, 15))
+    fig    = plt.figure(figsize=(fig_w, 18))
 
     plt.ion()
     draw(fig, None, specialists)
