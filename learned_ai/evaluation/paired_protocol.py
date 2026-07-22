@@ -6,6 +6,9 @@ import hashlib
 import json
 import math
 import os
+import platform
+import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar
@@ -22,10 +25,137 @@ from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha
 
 EVALUATION_SPEC_SCHEMA = "nmm.paired-evaluation.v1"
 GAME_RECORD_SCHEMA = "nmm.evaluation-game.v1"
+RUNTIME_CONTRACT_SCHEMA = "nmm.paired-runtime.v1"
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_RUNTIME_FIELDS = {
+    "schema_version",
+    "git_commit",
+    "git_tree",
+    "platform",
+    "pytorch",
+    "device",
+    "device_index",
+    "device_name",
+    "precision",
+    "route",
+    "components",
+    "lookahead_features",
+}
+_POLICY_ROUTE = "policy-argmax-v1"
+_COMPONENT_CONTRACT = (
+    "sentinel=off,value_net=off,gap_net=off,"
+    "human_db=off,specialist_db=off"
+)
+_LOOKAHEAD_CONTRACT = "zeroed-72"
 
 
 class EvaluationError(RuntimeError):
     """Raised when an evaluation contract or record set is invalid."""
+
+
+def _validate_runtime_contract(runtime: dict[str, str]) -> bool:
+    """Validate a bound runtime, while retaining old unbound v1 specs."""
+    if not isinstance(runtime, dict):
+        raise EvaluationError("runtime contract must be an object")
+    if "schema_version" not in runtime:
+        return False
+    if set(runtime) != _RUNTIME_FIELDS:
+        raise EvaluationError("runtime contract fields are unknown or incomplete")
+    if runtime["schema_version"] != RUNTIME_CONTRACT_SCHEMA:
+        raise EvaluationError("unsupported runtime contract schema")
+    if any(not isinstance(value, str) or not value for value in runtime.values()):
+        raise EvaluationError("runtime contract values must be non-empty strings")
+    if not re.fullmatch(r"[0-9a-f]{40}", runtime["git_commit"]):
+        raise EvaluationError("runtime contract Git commit is invalid")
+    if runtime["git_tree"] != "clean":
+        raise EvaluationError("runtime contract requires a clean Git tree")
+    if runtime["device"] not in {"cpu", "cuda"}:
+        raise EvaluationError("runtime contract device is unsupported")
+    if runtime["device"] == "cpu" and runtime["device_index"] != "none":
+        raise EvaluationError("CPU runtime contract must not name a device index")
+    if runtime["device"] == "cuda" and not runtime["device_index"].isdigit():
+        raise EvaluationError("CUDA runtime contract device index is invalid")
+    expected = {
+        "precision": "float32",
+        "route": _POLICY_ROUTE,
+        "components": _COMPONENT_CONTRACT,
+        "lookahead_features": _LOOKAHEAD_CONTRACT,
+    }
+    changed = sorted(key for key, value in expected.items() if runtime[key] != value)
+    if changed:
+        raise EvaluationError(
+            "runtime contract has unsupported fixed fields: " + ", ".join(changed)
+        )
+    return True
+
+
+def _git_output(*args: str) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=_REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise EvaluationError("could not inspect Git state for runtime identity") from exc
+    return result.stdout.strip()
+
+
+def build_runtime_identity(device: str) -> dict[str, str]:
+    """Build the clean-code and execution-route identity frozen into a spec."""
+    if device not in {"cpu", "cuda"}:
+        raise EvaluationError(f"unsupported evaluation device: {device}")
+    commit = _git_output("rev-parse", "HEAD")
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise EvaluationError("could not resolve a full Git commit identity")
+    if _git_output("status", "--short", "--untracked-files=all"):
+        raise EvaluationError("runtime identity requires a clean Git tree")
+
+    if device == "cuda":
+        if not torch.cuda.is_available():
+            raise EvaluationError("CUDA was selected but is not available")
+        device_index = str(torch.cuda.current_device())
+        device_name = torch.cuda.get_device_name(int(device_index))
+    else:
+        device_index = "none"
+        device_name = platform.processor() or platform.machine() or "unknown-cpu"
+
+    runtime = {
+        "schema_version": RUNTIME_CONTRACT_SCHEMA,
+        "git_commit": commit,
+        "git_tree": "clean",
+        "platform": platform.platform(),
+        "pytorch": str(torch.__version__),
+        "device": device,
+        "device_index": device_index,
+        "device_name": device_name,
+        "precision": "float32",
+        "route": _POLICY_ROUTE,
+        "components": _COMPONENT_CONTRACT,
+        "lookahead_features": _LOOKAHEAD_CONTRACT,
+    }
+    _validate_runtime_contract(runtime)
+    return runtime
+
+
+def _verify_runtime_identity(runtime: dict[str, str], device: str) -> None:
+    if not _validate_runtime_contract(runtime):
+        return
+    if runtime["device"] != device:
+        raise EvaluationError(
+            f"requested device {device!r} differs from frozen device "
+            f"{runtime['device']!r}"
+        )
+    observed = build_runtime_identity(device)
+    changed = sorted(key for key in _RUNTIME_FIELDS if observed[key] != runtime[key])
+    if changed:
+        raise EvaluationError(
+            "runtime identity differs from the frozen spec in fields: "
+            + ", ".join(changed)
+        )
 
 
 @dataclass(frozen=True)
@@ -67,6 +197,7 @@ class EvaluationSpec:
             raise EvaluationError("work budget must use fixed lookahead rollouts")
         if self.work_budget["lookahead_rollouts_per_move"] != 0:
             raise EvaluationError("v1 runner supports the frozen zero-rollout policy budget")
+        _validate_runtime_contract(self.runtime)
         expected = canonical_sha256(self._identity_body())
         if self.spec_identity and self.spec_identity != expected:
             raise EvaluationError("evaluation spec identity mismatch")
@@ -240,6 +371,7 @@ def run_paired_evaluation(
 ) -> dict[str, Any]:
     """Run candidate and baseline serially with roles swapped within each pair."""
     spec = load_evaluation_spec(spec_path)
+    _verify_runtime_identity(spec.runtime, device)
     target = Path(output)
     if target.exists():
         raise FileExistsError(f"evaluation records exist: {target}")

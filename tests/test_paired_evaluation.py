@@ -10,14 +10,35 @@ from learned_ai.evaluation.paired_protocol import EvaluationError, EvaluationSpe
 from learned_ai.training.run_contract import canonical_sha256
 
 
-def _spec() -> EvaluationSpec:
+def _spec(*, runtime: dict[str, str] | None = None) -> EvaluationSpec:
     return EvaluationSpec(
         evaluation_id="eval-1", candidate_bundle="a" * 64, baseline_bundle="b" * 64,
         start_positions=("........................|W|0|0",), pairs=1, seed=7,
         work_budget={"lookahead_rollouts_per_move": 0}, max_ply=10,
         rules_version="nmm-v4-corrected", confidence_z=1.96,
-        acceptance_margin=0.0, rejection_margin=0.0, runtime={"device": "single"},
+        acceptance_margin=0.0, rejection_margin=0.0,
+        runtime={"device": "single"} if runtime is None else runtime,
     )
+
+
+def _bound_runtime(*, device: str = "cpu", commit: str = "c" * 40) -> dict[str, str]:
+    return {
+        "schema_version": "nmm.paired-runtime.v1",
+        "git_commit": commit,
+        "git_tree": "clean",
+        "platform": "test-platform",
+        "pytorch": "test-pytorch",
+        "device": device,
+        "device_index": "none" if device == "cpu" else "0",
+        "device_name": "test-device",
+        "precision": "float32",
+        "route": "policy-argmax-v1",
+        "components": (
+            "sentinel=off,value_net=off,gap_net=off,"
+            "human_db=off,specialist_db=off"
+        ),
+        "lookahead_features": "zeroed-72",
+    }
 
 
 def _records(path: Path, spec: EvaluationSpec) -> None:
@@ -102,6 +123,38 @@ def test_spec_rejects_duplicate_start_positions() -> None:
         )
 
 
+def test_spec_rejects_unknown_bound_runtime_fields() -> None:
+    runtime = {**_bound_runtime(), "unexpected": "value"}
+    with pytest.raises(EvaluationError, match="runtime contract fields"):
+        EvaluationSpec(
+            evaluation_id="eval", candidate_bundle="a" * 64,
+            baseline_bundle="b" * 64,
+            start_positions=("........................|W|0|0",),
+            pairs=1, seed=1,
+            work_budget={"lookahead_rollouts_per_move": 0}, max_ply=10,
+            rules_version="v4", confidence_z=1.96,
+            acceptance_margin=0.0, rejection_margin=0.0,
+            runtime=runtime,
+        )
+
+
+def test_build_runtime_identity_rejects_dirty_worktree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    outputs = {
+        ("rev-parse", "HEAD"): "c" * 40,
+        ("status", "--short", "--untracked-files=all"): " M tracked.py",
+    }
+    monkeypatch.setattr(
+        paired_protocol,
+        "_git_output",
+        lambda *args: outputs[args],
+    )
+
+    with pytest.raises(EvaluationError, match="clean Git tree"):
+        paired_protocol.build_runtime_identity("cpu")
+
+
 def _patch_runner_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     spec: EvaluationSpec,
@@ -116,6 +169,108 @@ def _patch_runner_dependencies(
     monkeypatch.setattr(paired_protocol, "_BundlePolicy", policy_type)
     monkeypatch.setattr(paired_protocol, "GameEngine", engine_type)
     monkeypatch.setattr(paired_protocol, "is_terminal", lambda _board: (False, None))
+
+
+def test_run_rejects_bound_device_mismatch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec = _spec(runtime=_bound_runtime(device="cpu"))
+    spec_path = tmp_path / "spec.json"
+    records_path = tmp_path / "games.jsonl"
+    freeze_evaluation_spec(spec_path, spec)
+
+    class EmptyPolicy:
+        def __init__(self, _model, _device: str) -> None:
+            pass
+
+        def choose_move(self, _board) -> dict:
+            return {}
+
+    class MinimalEngine:
+        def __init__(self, *, human_color) -> None:
+            self.board = None
+            self.finished = False
+            self.winner = None
+            self.draw_reason = None
+
+    _patch_runner_dependencies(monkeypatch, spec, EmptyPolicy, MinimalEngine)
+
+    with pytest.raises(EvaluationError, match="device.*frozen"):
+        paired_protocol.run_paired_evaluation(
+            spec_path,
+            "candidate",
+            "baseline",
+            records_path,
+            device="cuda",
+        )
+
+
+def test_run_rejects_bound_runtime_drift(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _bound_runtime(device="cpu")
+    spec = _spec(runtime=runtime)
+    spec_path = tmp_path / "spec.json"
+    freeze_evaluation_spec(spec_path, spec)
+    monkeypatch.setattr(
+        paired_protocol,
+        "build_runtime_identity",
+        lambda _device: {**runtime, "pytorch": "changed-pytorch"},
+    )
+
+    with pytest.raises(EvaluationError, match="frozen spec.*pytorch"):
+        paired_protocol.run_paired_evaluation(
+            spec_path,
+            "candidate",
+            "baseline",
+            tmp_path / "games.jsonl",
+            device="cpu",
+        )
+
+
+def test_run_accepts_matching_bound_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = _bound_runtime(device="cpu")
+    spec = _spec(runtime=runtime)
+    spec_path = tmp_path / "spec.json"
+    records_path = tmp_path / "games.jsonl"
+    freeze_evaluation_spec(spec_path, spec)
+
+    class EmptyPolicy:
+        def __init__(self, _model, _device: str) -> None:
+            pass
+
+        def choose_move(self, _board) -> dict:
+            return {}
+
+    class MinimalEngine:
+        def __init__(self, *, human_color) -> None:
+            self.board = None
+            self.finished = False
+            self.winner = None
+            self.draw_reason = None
+
+    _patch_runner_dependencies(monkeypatch, spec, EmptyPolicy, MinimalEngine)
+    monkeypatch.setattr(
+        paired_protocol,
+        "build_runtime_identity",
+        lambda _device: runtime,
+    )
+
+    result = paired_protocol.run_paired_evaluation(
+        spec_path,
+        "candidate",
+        "baseline",
+        records_path,
+        device="cpu",
+    )
+
+    assert result["games"] == 2
+    assert records_path.exists()
 
 
 @pytest.mark.parametrize("draw_reason", ("repetition", "50-move rule"))

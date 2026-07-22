@@ -5,18 +5,21 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import sys
 from pathlib import Path
-
-import torch
 
 _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from learned_ai.delivery.model_bundle import verify_model_bundle
-from learned_ai.evaluation.paired_protocol import EvaluationSpec, freeze_evaluation_spec, recompute_evaluation, run_paired_evaluation
+from learned_ai.evaluation.paired_protocol import (
+    EvaluationSpec,
+    build_runtime_identity,
+    freeze_evaluation_spec,
+    recompute_evaluation,
+    run_paired_evaluation,
+)
 
 
 def main() -> int:
@@ -33,19 +36,21 @@ def main() -> int:
     freeze.add_argument("--max-ply", type=int, default=200)
     freeze.add_argument("--acceptance-margin", type=float, default=0.0)
     freeze.add_argument("--rejection-margin", type=float, default=0.0)
+    freeze.add_argument("--device", choices=("cpu", "cuda"), required=True)
     run = commands.add_parser("run")
     run.add_argument("spec")
     run.add_argument("candidate")
     run.add_argument("baseline")
     run.add_argument("output")
-    run.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    run.add_argument("--device", choices=("cpu", "cuda"), required=True)
     recompute = commands.add_parser("recompute")
     recompute.add_argument("spec")
     recompute.add_argument("records")
     args = parser.parse_args()
     if args.command == "freeze":
-        candidate = verify_model_bundle(args.candidate)
-        baseline = verify_model_bundle(args.baseline)
+        runtime = build_runtime_identity(args.device)
+        candidate = verify_model_bundle(args.candidate, device=args.device)
+        baseline = verify_model_bundle(args.baseline, device=args.device)
         positions = tuple(json.loads(Path(args.corpus).read_text(encoding="utf-8")))
         spec = EvaluationSpec(
             evaluation_id=args.evaluation_id, candidate_bundle=candidate["bundle_identity"],
@@ -53,7 +58,7 @@ def main() -> int:
             pairs=args.pairs, seed=args.seed, work_budget={"lookahead_rollouts_per_move": 0},
             max_ply=args.max_ply, rules_version="nmm-v4-corrected", confidence_z=1.96,
             acceptance_margin=args.acceptance_margin, rejection_margin=args.rejection_margin,
-            runtime={"platform": platform.platform(), "pytorch": torch.__version__, "device": "single-exclusive"},
+            runtime=runtime,
         )
         freeze_evaluation_spec(args.output, spec)
         result = spec.to_dict()
