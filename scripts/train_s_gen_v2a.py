@@ -1364,7 +1364,8 @@ def run(args: argparse.Namespace) -> None:
     diag_buffer: list[GameDiag] = []
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
 
-    batch_count = 0
+    batch_count   = 0
+    _last_log_game = start_game   # threshold-based log gate; avoids modulo skip when game_count jumps
     segment_stop = min(args.max_games, game_count + args.segment_games) if args.segment_games else args.max_games
 
     while game_count < segment_stop:
@@ -1379,9 +1380,9 @@ def run(args: argparse.Namespace) -> None:
         # Apply temperature boost; cap at 1.5× temp_start to avoid runaway exploration
         temperature = min(args.temp_start * 1.5, _scheduled_temp + temp_boost)
         if hot_explore_remaining > 0:
-            hot_explore_remaining -= 1
+            hot_explore_remaining = max(0, hot_explore_remaining - args.batch_games)
             temperature = max(temperature, args.temp_start * HOT_EXPLORE_TEMP_SCALE)
-            if hot_explore_remaining == 0:
+            if hot_explore_remaining <= 0:
                 print(f"[s_gen_v2a] Hot-explore phase complete at game {game_count} — armed for full recovery if still failing")
         # Rehearsal: expand lower-diff opponent ratio for N iterations after advancement
         _use_rehearsal = advance_rehearsal_remaining > 0
@@ -1479,13 +1480,14 @@ def run(args: argparse.Namespace) -> None:
         # ── Draw penalty scale (suppressed during post-recovery grace period) ──
         _draw_scale = 0.0 if recovery_grace > 0 else 1.0
         if recovery_grace > 0:
-            recovery_grace -= 1
-            if recovery_grace % 10 == 0 and recovery_grace > 0:
+            recovery_grace = max(0, recovery_grace - args.batch_games)
+            # Print a progress report roughly every 25 primary games during grace
+            if 0 < recovery_grace and recovery_grace % 25 < args.batch_games:
                 _grace_h = list(win_history_heuristic)
                 _grace_wr = sum(1 for x in _grace_h if x == 1.0) / max(len(_grace_h), 1)
                 print(f"[s_gen_v2a] Recovery in progress ({_current_recovery_state}): "
                       f"game {game_count} wr={_grace_wr:.3f} grace_remaining={recovery_grace}")
-            if recovery_grace == 0:
+            if recovery_grace <= 0:
                 _post_h  = list(win_history_heuristic)
                 _post_wr = sum(1 for x in _post_h if x == 1.0) / max(len(_post_h), 1)
                 if _current_recovery_state == "grace" and _post_wr < recovery_baseline_win_rate + 0.05:
@@ -1769,7 +1771,7 @@ def run(args: argparse.Namespace) -> None:
                     _imitation_mix_step(model, device, _imitation_data, opt)
 
             # ── Periodic log + checkpoint ──────────────────────────────────────
-            if game_count % args.log_every == 0 and diag_buffer:
+            if game_count - _last_log_game >= args.log_every and diag_buffer:
                 recent_h     = list(win_history_heuristic)
                 win_rate     = sum(1 for x in recent_h if x == 1.0) / max(len(recent_h), 1)
                 draw_rate    = sum(1 for x in recent_h if x == 0.5) / max(len(recent_h), 1)
@@ -1787,13 +1789,13 @@ def run(args: argparse.Namespace) -> None:
                     _is_improving = _second_wr > _first_wr + 0.02
                     if _is_improving:
                         print(f"[s_gen_v2a] Recovery skipped: AI is improving ({_first_wr:.3f} → {_second_wr:.3f})")
-                        if hot_explore_triggered and hot_explore_remaining == 0:
+                        if hot_explore_triggered and hot_explore_remaining <= 0:
                             hot_explore_triggered = False
                             _current_recovery_state = ""
                             print(f"[s_gen_v2a] Hot-explore recovery successful — flags cleared")
                     elif hot_explore_triggered and hot_explore_remaining > 0:
                         pass  # Still in hot-explore phase; let it run
-                    elif hot_explore_triggered and hot_explore_remaining == 0:
+                    elif hot_explore_triggered and hot_explore_remaining <= 0:
                         # Stage 2: hot-explore didn't fix it — full checkpoint restore
                         best_ckpt = out_dir / f"best{difficulty}.pt"
                         # Always clear Stage 1 flag regardless of whether checkpoint exists
@@ -1902,6 +1904,7 @@ def run(args: argparse.Namespace) -> None:
                     for d in diag_buffer:
                         f.write(json.dumps(asdict(d)) + "\n")
                 diag_buffer.clear()
+                _last_log_game = game_count
 
                 last_main = next((d for d in reversed(main_diags) if main_diags), None)
                 if last_main:
@@ -2131,8 +2134,10 @@ def main() -> None:
     p.add_argument("--advance-rehearsal-prob",    type=float, default=0.45,
                    help="Lower-diff opponent probability during rehearsal window (default 0.45 vs standard 0.20)")
     p.add_argument("--hot-explore-games",         type=int,   default=75,
-                   help="Stage-1 recovery: run this many iterations at elevated temperature before "
-                        "reloading the best checkpoint (0=skip Stage 1, go straight to reload; default 75)")
+                   help="Stage-1 recovery: run this many PRIMARY games at elevated temperature before "
+                        "reloading the best checkpoint. Counter decrements by batch_games per batch, "
+                        "so wall-clock batches ≈ hot_explore_games / batch_games. "
+                        "(0=skip Stage 1, go straight to reload; default 75)")
     args = p.parse_args()
     args.policy_hidden = tuple(int(x) for x in args.policy_hidden.split(","))
     run(args)
