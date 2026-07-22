@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import tempfile
 import unittest
 from unittest.mock import MagicMock
 
@@ -17,13 +16,7 @@ from ai.memory_manager import MemoryManager
 
 def _offline_llm() -> MillsLLM:
     """Return a MillsLLM whose Ollama client is None (offline)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        mem = MemoryManager(
-            chroma_path=f"{tmp}/chroma",
-            games_path=f"{tmp}/games",
-            session_path=f"{tmp}/session",
-            use_ollama_embeddings=False,
-        )
+    mem = MagicMock(spec=MemoryManager)
     llm = MillsLLM(memory=mem, model="")
     llm._client = None
     return llm

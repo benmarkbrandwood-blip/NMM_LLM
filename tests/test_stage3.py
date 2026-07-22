@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import hashlib
+import math
+import re
 import tempfile
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
+from chromadb.api.types import Documents, EmbeddingFunction, Embeddings, Space
 
 from game.board import BoardState
 from ai.memory_manager import MemoryManager
@@ -15,12 +20,55 @@ from ai.game_ai import GameAI
 
 # ── Helper ────────────────────────────────────────────────────────────────────
 
+class _DeterministicEmbeddingFunction(EmbeddingFunction[Documents]):
+    """Small local embedding used to keep memory tests offline and stable."""
+
+    def __init__(self, dimensions: int = 256) -> None:
+        self._dimensions = dimensions
+
+    @staticmethod
+    def name() -> str:
+        return "nmm-test-hash"
+
+    @staticmethod
+    def build_from_config(config: dict) -> "_DeterministicEmbeddingFunction":
+        return _DeterministicEmbeddingFunction(dimensions=config["dimensions"])
+
+    def get_config(self) -> dict:
+        return {"dimensions": self._dimensions}
+
+    def default_space(self) -> Space:
+        return "cosine"
+
+    @staticmethod
+    def _stem(word: str) -> str:
+        for suffix in ("ment", "ing", "ed", "es", "s"):
+            if word.endswith(suffix) and len(word) > len(suffix) + 3:
+                return word[: -len(suffix)]
+        return word
+
+    def __call__(self, input: Documents) -> Embeddings:
+        embeddings: Embeddings = []
+        for document in input:
+            vector = [0.0] * self._dimensions
+            words = re.findall(r"[a-z0-9]+", document.lower())
+            terms = {self._stem(word) for word in words}
+            for term in terms:
+                digest = hashlib.sha256(term.encode("utf-8")).digest()
+                index = int.from_bytes(digest[:4], "big") % self._dimensions
+                vector[index] = 1.0
+            norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+            embeddings.append([value / norm for value in vector])
+        return embeddings
+
+
 def _make_memory(tmp_dir: str) -> MemoryManager:
     return MemoryManager(
         chroma_path=f"{tmp_dir}/chroma",
         games_path=f"{tmp_dir}/games",
         session_path=f"{tmp_dir}/session",
         use_ollama_embeddings=False,
+        embedding_function=_DeterministicEmbeddingFunction(),
     )
 
 
@@ -28,20 +76,20 @@ def _make_memory(tmp_dir: str) -> MemoryManager:
 
 class TestStrategySeeding(unittest.TestCase):
     def test_strategy_collection_has_10_entries(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             count = mem._strategy.count()
             self.assertEqual(count, 10, "Strategy collection must have exactly 10 seeded entries")
 
     def test_seeding_is_idempotent(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            _make_memory(tmp)
-            mem2 = _make_memory(tmp)
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            _make_memory(tmp),
+            _make_memory(tmp) as mem2,
+        ):
             self.assertEqual(mem2._strategy.count(), 10)
 
     def test_retrieve_mill_abandonment(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             results = mem.retrieve_strategy("I abandoned my mill to gain mobility", n=1)
             self.assertTrue(len(results) > 0)
             self.assertIn("abandonment", results[0].lower())
@@ -49,8 +97,7 @@ class TestStrategySeeding(unittest.TestCase):
 
 class TestBadMoveMemory(unittest.TestCase):
     def test_store_and_retrieve(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             board = BoardState.new_game()
             fen = board.to_fen_string()
             move = {"from": None, "to": "d2", "capture": None}
@@ -60,8 +107,7 @@ class TestBadMoveMemory(unittest.TestCase):
             self.assertIn("d2", results[0]["document"])
 
     def test_retrieve_empty_returns_empty(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             board = BoardState.new_game()
             results = mem.retrieve_similar_positions(board.to_fen_string())
             self.assertEqual(results, [])
@@ -69,8 +115,7 @@ class TestBadMoveMemory(unittest.TestCase):
 
 class TestGameRecords(unittest.TestCase):
     def test_save_and_load_game(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             record = {
                 "session_id": "test-123",
                 "date": "2026-05-16T10:00:00",
@@ -86,8 +131,7 @@ class TestGameRecords(unittest.TestCase):
 
 class TestSessionNarratives(unittest.TestCase):
     def test_save_and_retrieve_narrative(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            mem = _make_memory(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
             mem.save_session_narrative("Human played aggressively and won with a double mill.")
             results = mem.retrieve_relevant_narratives("double mill", n=1)
             self.assertEqual(len(results), 1)
@@ -99,15 +143,14 @@ class TestSessionNarratives(unittest.TestCase):
 class TestMillsLLMNoOllama(unittest.TestCase):
     """Tests for MillsLLM when Ollama is unavailable (graceful degradation)."""
 
-    def _make_llm(self, tmp: str) -> MillsLLM:
-        mem = _make_memory(tmp)
+    def _make_llm(self, mem: MemoryManager) -> MillsLLM:
         llm = MillsLLM(memory=mem, ollama_url="http://localhost:9999", model="llama3.2")
         llm._client = None  # force offline
         return llm
 
     def test_evaluate_human_move_returns_none_for_small_delta(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm(mem)
             board = BoardState.new_game()
             result = llm.evaluate_human_move(
                 board_before=board,
@@ -119,8 +162,8 @@ class TestMillsLLMNoOllama(unittest.TestCase):
             self.assertIsNone(result)
 
     def test_evaluate_human_move_returns_none_when_offline(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm(mem)
             board = BoardState.new_game()
             result = llm.evaluate_human_move(
                 board_before=board,
@@ -133,8 +176,8 @@ class TestMillsLLMNoOllama(unittest.TestCase):
             self.assertIsNone(result)
 
     def test_ask_for_move_opinion_returns_empty_when_offline(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm(mem)
             board = BoardState.new_game()
             text, notation = llm.ask_for_move_opinion(board, [], {"to": "d2"})
             self.assertEqual(text, "")
@@ -144,8 +187,9 @@ class TestMillsLLMNoOllama(unittest.TestCase):
 class TestMillsLLMWithMock(unittest.TestCase):
     """Tests for MillsLLM using a mocked Ollama client."""
 
-    def _make_llm_mocked(self, tmp: str, reply: str = "test reply") -> MillsLLM:
-        mem = _make_memory(tmp)
+    def _make_llm_mocked(
+        self, mem: MemoryManager, reply: str = "test reply"
+    ) -> MillsLLM:
         llm = MillsLLM(memory=mem)
         mock_response = MagicMock()
         mock_response.message.content = reply
@@ -155,8 +199,10 @@ class TestMillsLLMWithMock(unittest.TestCase):
         return llm
 
     def test_evaluate_human_move_large_delta_returns_comment(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm_mocked(tmp, reply="That move weakened your position.")
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm_mocked(
+                mem, reply="That move weakened your position."
+            )
             board = BoardState.new_game()
             result = llm.evaluate_human_move(
                 board_before=board,
@@ -169,8 +215,10 @@ class TestMillsLLMWithMock(unittest.TestCase):
             self.assertIn("weakened", result)
 
     def test_ask_for_move_opinion_returns_tuple(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm_mocked(tmp, reply="MOVE: d2\nREASON: Central control.")
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm_mocked(
+                mem, reply="MOVE: d2\nREASON: Central control."
+            )
             board = BoardState.new_game()
             from game.rules import get_all_legal_moves
             legal = get_all_legal_moves(board)
@@ -186,8 +234,8 @@ class TestMillsLLMWithMock(unittest.TestCase):
                 self.assertIn(notation, notations)
 
     def test_record_human_feedback_stores_bad_move(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            llm = self._make_llm_mocked(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            llm = self._make_llm_mocked(mem)
             board = BoardState.new_game()
             move = {"from": None, "to": "d2", "capture": None}
             llm.record_human_feedback(board, move, "Left centre open")
@@ -198,8 +246,9 @@ class TestMillsLLMWithMock(unittest.TestCase):
 # ── Coordinator tests ─────────────────────────────────────────────────────────
 
 class TestCoordinator(unittest.TestCase):
-    def _make_coordinator(self, tmp: str) -> tuple[Coordinator, MillsLLM]:
-        mem = _make_memory(tmp)
+    def _make_coordinator(
+        self, mem: MemoryManager
+    ) -> tuple[Coordinator, MillsLLM]:
         game_ai = GameAI(color="W", difficulty=1)
         llm = MillsLLM(memory=mem)
         llm._client = None  # offline
@@ -207,8 +256,8 @@ class TestCoordinator(unittest.TestCase):
         return coord, llm
 
     def test_deliberate_returns_legal_move(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            coord, _ = self._make_coordinator(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            coord, _ = self._make_coordinator(mem)
             coord.on_game_start()
             board = BoardState.new_game()
             from game.rules import get_all_legal_moves
@@ -217,8 +266,8 @@ class TestCoordinator(unittest.TestCase):
             self.assertIn(move, legal)
 
     def test_deliberate_emits_gameai_line(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            coord, _ = self._make_coordinator(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            coord, _ = self._make_coordinator(mem)
             coord.on_game_start()
             board = BoardState.new_game()
             coord.deliberate(board)
@@ -226,8 +275,8 @@ class TestCoordinator(unittest.TestCase):
             self.assertTrue(any("[GameAI]" in l for l in lines))
 
     def test_react_to_human_move_no_comment_small_delta(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            coord, _ = self._make_coordinator(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            coord, _ = self._make_coordinator(mem)
             coord.on_game_start()
             board = BoardState.new_game()
             move = {"from": None, "to": "d2", "capture": None}
@@ -237,8 +286,8 @@ class TestCoordinator(unittest.TestCase):
             self.assertFalse(any("[MillsLLM]" in l for l in lines))
 
     def test_on_game_start_resets_state(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            coord, _ = self._make_coordinator(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            coord, _ = self._make_coordinator(mem)
             coord._poor_move_count = 3
             coord._turn_num = 10
             coord.on_game_start()
@@ -246,8 +295,8 @@ class TestCoordinator(unittest.TestCase):
             self.assertEqual(coord._turn_num, 0)
 
     def test_build_game_record(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            coord, _ = self._make_coordinator(tmp)
+        with tempfile.TemporaryDirectory() as tmp, _make_memory(tmp) as mem:
+            coord, _ = self._make_coordinator(mem)
             coord.on_game_start()
             board = BoardState.new_game()
             coord.deliberate(board)

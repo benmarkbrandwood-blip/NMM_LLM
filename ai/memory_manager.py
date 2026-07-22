@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 import chromadb
+from chromadb.api.types import Documents, EmbeddingFunction
 from chromadb.utils.embedding_functions import OllamaEmbeddingFunction, DefaultEmbeddingFunction
 
 _STRATEGY_SEEDS = [
@@ -115,6 +116,7 @@ class MemoryManager:
         ollama_url: str = "http://localhost:11434",
         ollama_model: str = "llama3.1:8b",
         use_ollama_embeddings: bool = True,
+        embedding_function: EmbeddingFunction[Documents] | None = None,
     ) -> None:
         self._games_path = Path(games_path)
         self._session_path = Path(session_path)
@@ -123,24 +125,43 @@ class MemoryManager:
 
         self._client = chromadb.PersistentClient(path=chroma_path)
 
-        if use_ollama_embeddings:
-            self._embed_fn = self._make_embed_fn(ollama_url, ollama_model)
-        else:
-            self._embed_fn = DefaultEmbeddingFunction()
+        try:
+            if embedding_function is not None:
+                self._embed_fn = embedding_function
+            elif use_ollama_embeddings:
+                self._embed_fn = self._make_embed_fn(ollama_url, ollama_model)
+            else:
+                self._embed_fn = DefaultEmbeddingFunction()
 
-        self._bad_moves = self._client.get_or_create_collection(
-            name="bad_moves",
-            embedding_function=self._embed_fn,
-        )
-        self._narratives = self._client.get_or_create_collection(
-            name="game_narratives",
-            embedding_function=self._embed_fn,
-        )
-        self._strategy = self._client.get_or_create_collection(
-            name="strategy_knowledge",
-            embedding_function=self._embed_fn,
-        )
-        self._seed_strategy()
+            self._bad_moves = self._client.get_or_create_collection(
+                name="bad_moves",
+                embedding_function=self._embed_fn,
+            )
+            self._narratives = self._client.get_or_create_collection(
+                name="game_narratives",
+                embedding_function=self._embed_fn,
+            )
+            self._strategy = self._client.get_or_create_collection(
+                name="strategy_knowledge",
+                embedding_function=self._embed_fn,
+            )
+            self._seed_strategy()
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self) -> None:
+        """Release the persistent Chroma client and its SQLite handles."""
+        client = getattr(self, "_client", None)
+        if client is not None:
+            client.close()
+            self._client = None
+
+    def __enter__(self) -> "MemoryManager":
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.close()
 
     @staticmethod
     def _make_embed_fn(ollama_url: str, ollama_model: str):
