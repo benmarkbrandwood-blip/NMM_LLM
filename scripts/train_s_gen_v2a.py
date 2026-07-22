@@ -1271,7 +1271,18 @@ def run(args: argparse.Namespace) -> None:
     games_at_level            = 0   # for Sanmill time-of-flight target relaxation
 
     out_dir   = Path(args.out_dir)
+    if getattr(args, "run_name", None):
+        out_dir = out_dir / args.run_name
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Save a timestamped snapshot of all args so every run is reproducible.
+    import datetime as _dt
+    _args_ts   = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    _args_file = out_dir / f"args_{_args_ts}.json"
+    with open(_args_file, "w", encoding="utf-8") as _af:
+        json.dump(vars(args), _af, indent=2, default=str)
+    print(f"[s_gen_v2a] Args saved → {_args_file.name}")
+
     opt       = torch.optim.Adam(model.parameters(), lr=args.lr)
     update_fn = scaffolded_ppo_update if args.ppo else scaffolded_a2c_update
 
@@ -2048,7 +2059,10 @@ def main() -> None:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
-    p.add_argument("--out-dir",  default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2a"))
+    p.add_argument("--out-dir",   default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2a"))
+    p.add_argument("--run-name",  default="", type=str,
+                   help="Optional subfolder under --out-dir, e.g. 'exp1'. "
+                        "Keeps each experiment's checkpoints and logs separate.")
     p.add_argument("--sentinel", default=str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"))
     p.add_argument("--malom",    default="", type=str)
     p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
