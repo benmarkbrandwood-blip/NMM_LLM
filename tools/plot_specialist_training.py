@@ -148,10 +148,27 @@ def _get_recovery_events(rows: list[dict]) -> dict[str, list[tuple[int, dict]]]:
         "recovery_stage2": [],
         "resurrection":    [],
     }
+    # Collect explicit event rows (stage2 + resurrection are reliably logged this way)
     for r in rows:
         ev = r.get("event")
         if ev in events:
             events[ev].append((r.get("game", 0), r))
+
+    # Detect hot-explore start from per-game hot_explore_remaining field (0 → N transition).
+    # This catches stage1 even when _log_event missed the log_every boundary.
+    prev_her = 0
+    stage1_games = {g for g, _ in events["recovery_stage1"]}
+    for r in rows:
+        if "event" in r:
+            continue
+        her = r.get("hot_explore_remaining") or 0
+        g   = r.get("game", 0)
+        if her > 0 and prev_her == 0 and g not in stage1_games:
+            events["recovery_stage1"].append((g, r))
+            stage1_games.add(g)
+        prev_her = her
+
+    events["recovery_stage1"].sort(key=lambda t: t[0])
     return events
 
 

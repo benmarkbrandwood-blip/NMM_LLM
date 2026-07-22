@@ -330,6 +330,7 @@ class GameDiag:
     opponent_search_calls:   int = 0
     opponent_node_budget:    Optional[int] = None
     recovery_state:          str = ""
+    hot_explore_remaining:   int = 0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1094,7 +1095,8 @@ def _build_game_diag(
     branch_ply_start: int,
     target_age:      int,
     bucket_counts:   Counter,
-    recovery_state:  str = "",
+    recovery_state:        str = "",
+    hot_explore_remaining: int = 0,
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
@@ -1143,6 +1145,7 @@ def _build_game_diag(
         opponent_search_calls  =result.opponent_search_calls,
         opponent_node_budget   =result.opponent_node_budget,
         recovery_state         =recovery_state,
+        hot_explore_remaining  =hot_explore_remaining,
     )
 
 
@@ -1608,6 +1611,7 @@ def run(args: argparse.Namespace) -> None:
                 branch_ply_start=0, target_age=games_since_target_update,
                 bucket_counts=bucket_counts,
                 recovery_state=_current_recovery_state,
+                hot_explore_remaining=hot_explore_remaining,
             )
             diag_buffer.append(_diag)
 
@@ -1721,6 +1725,7 @@ def run(args: argparse.Namespace) -> None:
                         branch_ply_start=branch_ply, target_age=games_since_target_update,
                         bucket_counts=bucket_counts,
                         recovery_state=_current_recovery_state,
+                        hot_explore_remaining=hot_explore_remaining,
                     ))
 
                     if game_count % 10 == 0:
