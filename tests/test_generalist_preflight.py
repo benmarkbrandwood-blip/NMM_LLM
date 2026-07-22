@@ -507,6 +507,7 @@ def test_authorized_managed_long_run_is_ready(tmp_path: Path) -> None:
     args.experiment_id = "dev-v4-managed-baseline-v1"
     args.max_games = 5_000
     args.segment_games = 250
+    args.segment_stop_game = 250
     args.heuristic_node_budget = 500_000
     control_dir = tmp_path / "control"
     args.out_dir = str(control_dir / "segments" / "segment-0001")
