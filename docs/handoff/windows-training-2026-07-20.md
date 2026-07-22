@@ -3,8 +3,9 @@
 ## Executive Summary
 
 The repository is usable on the Windows 11 host, the downloaded databases and
-existing model artifacts are in their intended locations, and the focused
-Malom/provenance suite is green. The authorized corrected-v4 managed plan
+existing model artifacts are in their intended locations, and both the focused
+Malom/provenance suite and the complete Python suite are green. The authorized
+corrected-v4 managed plan
 `managed-v4-baseline-v1` completed 5,000 games in 20 verified segments on
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
@@ -159,8 +160,8 @@ The current local environment was checked as follows:
 `python -m pip check` reports no broken installed requirements. Modules such as
 `sentence_transformers`, `faiss`, and `sklearn` are not installed, but they are
 not declared by the repository's two requirements files and did not cause the
-current test-collection failures. Do not call them missing project dependencies
-without first defining a feature that requires them.
+now-resolved test-collection failures. Do not call them missing project
+dependencies without first defining a feature that requires them.
 
 Commit `06598c9` records successful `cargo check --locked`, editable
 installation of the CPython 3.13 extension, and fifteen native parity tests.
@@ -203,46 +204,54 @@ The first complete run made possible by those collection fixes reports:
 47 failed, 878 passed, 498 subtests passed in 3023.67s (0:50:23)
 ```
 
-This is a credible failing baseline, not a clean-suite claim. Thirty-five
-failures are the Stage 3/6 Chroma fixture family: the nominally offline fixture
-selects Chroma's downloading default embedding, attempts to use the user cache,
-and leaves persistent SQLite clients alive across Windows temporary-directory
-cleanup. It needs a deterministic local embedding fixture and an explicit
-resource-lifetime contract; downloading the model is not an acceptable way to
-make those tests green.
+That result remains the first credible failing baseline. The failures were then
+resolved against their owning contracts rather than skipped, weakened, or made
+dependent on network downloads:
 
-The remaining twelve failures expose fewer independent dispositions:
+- `9e3bda7` gives Stage 3/6 a deterministic local embedding, explicit Chroma
+  client lifetime, and a declared Chroma version with public close support;
+- `3a57564` derives scaffolded lookahead width from the loaded model width and
+  rejects incompatible explicit advisors before tensor execution;
+- `39cf56e` preserves a training sample when ValueNet receives a singleton or
+  very small dataset;
+- `becfe17` and `c56f03a` assert the B-40 and SE-10 feature contributions
+  directly instead of assuming no later tactical term also applies;
+- `cee5e45` preserves the objective forced-dead-block label on the default V2
+  path while continuing to suppress V1 score explanations;
+- `901909a` replaces the B-78 pseudo-quiet fixture with an actually legal quiet
+  full-game-DB move;
+- `f13e9e9` gives the exact B-66 move regressions deterministic node budgets;
+- `799a944` checks the B-22 defensive postcondition over all opponent replies;
+- `c4c3454` isolates the documented contested-mill late-game contribution; and
+- `08e8c33` compares WDL distributions by turn bit, the colour-symmetry
+  invariant appropriate for side-to-move table values.
 
-- five old tactical expectations (B-40, B-66, SE-10, contested mills, and
-  B-22) require focused revalidation against the intended v2 heuristic;
-- B-68 expects a v1 thinking label although the default v2 path deliberately
-  leaves `last_thinking` empty;
-- the B-78 fixture calls `d1-d2` quiet, but every such legal move in that board
-  is a mill-closing capture, so the documented capture guard correctly declines
-  the forced full-game-DB notation;
-- the 3v3 endgame test incorrectly infers equal WIN and LOSS counts from colour
-  symmetry even though colour swapping preserves side-to-move WDL;
-- three `ScaffoldedAgent` cases reproduce the real 62-versus-152 feature-width
-  mismatch already recorded below; and
-- `ValueNet.train()` assigns its sole sample to validation, leaves the training
-  split empty, and therefore cannot move its prediction toward the target.
+After the Chroma, scaffolded-width, and ValueNet changes, the intermediate
+complete run had only the eight independently diagnosed tactical/endgame
+failures: `8 failed, 919 passed, 498 subtests passed`. The affected non-solver
+files then reported `97 passed`, and the complete 3v3 builder file reported
+`13 passed` in 22 minutes 44 seconds.
 
-These runtime failures are now the boundary on full-suite health. They must not
-be hidden, weakened, or confused with the clean focused training and Malom
-verification above.
+A final clean-working-tree run at code HEAD `08e8c33` is the current complete
+Python baseline:
+
+```text
+927 passed, 498 subtests passed in 3098.55s (0:51:38)
+```
+
+There are no remaining collection or runtime failures in that suite. This does
+not change the separate experiment freeze, provenance, or training-authorization
+gates.
 
 This author-bundle review reran the current trainer contract, preflight,
 checkpoint-envelope, exact-resume, launch, temperature, data-contract, and
 paired-evaluation tests at code HEAD `59a4cf9`: `113 passed`. The mandatory
 Malom/provenance group again reported `102 passed, 498 subtests passed`.
-Adding the older `tests/test_scaffolded_policy.py` interface tests produced
-`22 passed, 3 failed`: a default `ScaffoldedAgent` builds a 62-feature model
-while its default 15-ply lookahead encoder emits 152 features. No production
-call site outside documentation currently instantiates that wrapper, so this
-does not invalidate the focused Generalist-trainer results. It remains a real
-internal-interface failure and blocks describing that inference wrapper or the
-complete suite as healthy. That test file also has no regression covering the
-temperature consistency of PPO old/new log probabilities.
+The earlier `tests/test_scaffolded_policy.py` result of `22 passed, 3 failed`
+identified the real feature-width mismatch fixed by `3a57564`; it is historical,
+not a current interface failure. The absence of a regression for PPO old/new
+log-probability temperature consistency remains a separate coverage observation,
+not a failing test.
 
 ## Data and Model State
 
@@ -696,8 +705,9 @@ database growth.
 The workspace/root check, graph inspection, earlier trainer fixes, focused
 tests, 102-test Malom/provenance rerun, first-experiment component decision,
 bounded smoke, managed-plan hardening, and the 5,000-game managed run are
-complete. Do not launch more training merely because the managed run ended.
-Proceed in this order:
+complete. The owner-reviewed 106-position package is committed, its focused
+checks pass, and the complete Python baseline is also clean. Do not launch more
+training merely because the managed run ended. Proceed in this order:
 
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
@@ -708,11 +718,13 @@ Proceed in this order:
 3. Preserve the completed owner review: original review position 101 is
    excluded, the other 106 are accepted, and the withdrawn concern about 83 is
    not a corpus defect.
-4. Reconcile the owner-reviewed freeze artifacts in a clean tracked commit and
-   repeat focused evaluation/readiness checks.
-5. Request an explicit product authorization before freezing or running the
-   Stage-0 diagnostic. Use 106 pairs / 212 games with no start reuse, and do
-   not treat acceptance as promotion evidence.
+4. Keep the corpus at `owner_review_complete_not_frozen` while performing a
+   read-only Stage-0 readiness audit. Reconcile the exact route, lookahead
+   ablation, command, manifest, output isolation, and freeze evidence before
+   proposing a launch lock.
+5. Request explicit product authorization before changing the corpus to frozen
+   or running the Stage-0 diagnostic. Use 106 pairs / 212 games with no start
+   reuse, and do not treat acceptance as promotion evidence.
 6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
