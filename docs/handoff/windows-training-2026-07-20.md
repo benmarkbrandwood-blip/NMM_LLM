@@ -180,33 +180,54 @@ The command was:
   tests/test_malom_label_provenance.py -q
 ```
 
-`scripts/train_s_gen_v2.py --help` also completes successfully. A fresh full
-collection found 705 tests and stopped on four repository-interface errors:
+`scripts/train_s_gen_v2.py --help` also completes successfully. Follow-up
+maintenance on `dev` recalibrated two stale GameAI tactical fixtures against a
+legal terminal-mill position and replaced tests that depended on an untracked
+`data/games` corpus with deterministic JSONL fixtures. The current Sentinel and
+TrajectoryDB loader tests therefore execute rather than skip when that local
+directory is absent.
 
-- `tests/test_legal_moves.py` imports the absent
-  `learned_ai.models.action_encoder` module;
-- `tests/test_sentinel_feature_builder.py` imports the absent
-  `learned_ai.models.state_encoder` module;
-- `tests/test_sentinel_labels.py` imports the absent historical symbol
-  `DEFAULT_BACKWARD_DECAY`;
-- `tests/test_sentinel_model.py` imports the absent historical symbol
-  `SentinelOutput`.
+The four historical collection errors were stale tests rather than missing
+active production interfaces. Commits `08507e0`, `c12b935`, `cc07a81`, and
+`af17232` align, respectively, the legal-move, Sentinel feature-builder,
+Sentinel label, and Sentinel model tests with the current contracts. A fresh
+collection at `af17232` reports `925 tests collected`; the updated files and
+their adjacent contract chains report `67 passed`. The mandatory
+Malom/provenance rerun again reports `102 passed, 498 subtests passed`.
 
-These are missing/stale internal interfaces, not third-party dependency errors.
-The complete suite is therefore not a clean project baseline. Do not hide the
-four collection errors, but do not confuse them with the focused Malom result
-either.
+The first complete run made possible by those collection fixes reports:
 
-Follow-up maintenance on local `dev` recalibrated the two stale GameAI tactical
-fixtures against a legal terminal-mill position. It also replaced tests that
-depended on an untracked `data/games` corpus with deterministic JSONL fixtures;
-the current Sentinel and TrajectoryDB loader tests therefore execute rather
-than skip when that local directory is absent. The four unrelated collection
-errors above remain unresolved and continue to bound any full-suite claim. The
-combined Generalist, GameAI, Sentinel-dataset, and TrajectoryDB verification
-reported `58 passed`; the mandatory Malom/provenance rerun again reported
-`102 passed, 498 subtests passed`. A fresh collection-only check still stopped
-on exactly the same four interface errors listed above.
+```text
+47 failed, 878 passed, 498 subtests passed in 3023.67s (0:50:23)
+```
+
+This is a credible failing baseline, not a clean-suite claim. Thirty-five
+failures are the Stage 3/6 Chroma fixture family: the nominally offline fixture
+selects Chroma's downloading default embedding, attempts to use the user cache,
+and leaves persistent SQLite clients alive across Windows temporary-directory
+cleanup. It needs a deterministic local embedding fixture and an explicit
+resource-lifetime contract; downloading the model is not an acceptable way to
+make those tests green.
+
+The remaining twelve failures expose fewer independent dispositions:
+
+- five old tactical expectations (B-40, B-66, SE-10, contested mills, and
+  B-22) require focused revalidation against the intended v2 heuristic;
+- B-68 expects a v1 thinking label although the default v2 path deliberately
+  leaves `last_thinking` empty;
+- the B-78 fixture calls `d1-d2` quiet, but every such legal move in that board
+  is a mill-closing capture, so the documented capture guard correctly declines
+  the forced full-game-DB notation;
+- the 3v3 endgame test incorrectly infers equal WIN and LOSS counts from colour
+  symmetry even though colour swapping preserves side-to-move WDL;
+- three `ScaffoldedAgent` cases reproduce the real 62-versus-152 feature-width
+  mismatch already recorded below; and
+- `ValueNet.train()` assigns its sole sample to validation, leaves the training
+  split empty, and therefore cannot move its prediction toward the target.
+
+These runtime failures are now the boundary on full-suite health. They must not
+be hidden, weakened, or confused with the clean focused training and Malom
+verification above.
 
 This author-bundle review reran the current trainer contract, preflight,
 checkpoint-envelope, exact-resume, launch, temperature, data-contract, and
