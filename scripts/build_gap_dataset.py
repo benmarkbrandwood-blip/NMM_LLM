@@ -389,11 +389,10 @@ def _generate_synthetic_positions(n_games: int, value_net_path: Path) -> list[Bo
 
 def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
                   n_per_category: int, dtw_threshold: int) -> tuple[np.ndarray, np.ndarray]:
-    sentinel_advisor = _load_required_sentinel(sentinel_path)
-
     conn = sqlite3.connect(str(db_path))
     try:
         require_current_human_db_malom_labels(conn, db_path)
+        sentinel_advisor = _load_required_sentinel(sentinel_path)
         rng = np.random.default_rng(42)
 
         print("Querying categories...")
