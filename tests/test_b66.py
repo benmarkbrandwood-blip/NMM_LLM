@@ -21,6 +21,7 @@ from ai.game_ai import GameAI, _immediate_mill_threats
 from ai.heuristics import HeuristicWeights
 
 _ROOT = Path(__file__).resolve().parent.parent
+_REGRESSION_NODE_BUDGET = 20_000
 _B66_MOVES = [
     "d2", "d6", "d7", "g4", "d1", "d3", "b4", "a1", "a4", "c4",
     "f6", "g1", "g7", "a7", "f4", "f2", "d5", "c5", "d2-b2",
@@ -66,7 +67,12 @@ class TestB66MillCloseVsBlock(unittest.TestCase):
 
     def test_aggressive_black_closes_c_line_mill(self):
         board = _replay(_B66_MOVES)
-        ai = GameAI(color="B", difficulty=5, weights=_aggressive_weights())
+        ai = GameAI(
+            color="B",
+            difficulty=5,
+            weights=_aggressive_weights(),
+            override_node_budget=_REGRESSION_NODE_BUDGET,
+        )
         move = ai.choose_move(board)
         self.assertEqual(move.get("from"), "d3")
         self.assertEqual(move["to"], "c3")
@@ -104,7 +110,11 @@ class TestMillCloseVsPassiveSlide(unittest.TestCase):
 
     def test_choose_move_closes_b_line_mill(self):
         board = _replay(_TACTICAL_MOVES)
-        ai = GameAI(color="B", difficulty=4)
+        ai = GameAI(
+            color="B",
+            difficulty=4,
+            override_node_budget=_REGRESSION_NODE_BUDGET,
+        )
         move = ai.choose_move(board)
         self.assertEqual(move.get("from"), "d2")
         self.assertEqual(move["to"], "b2")
