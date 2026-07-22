@@ -2,14 +2,15 @@
 
 Date: 23 July 2026
 
-Status: **technical preparation complete up to the product choices; no
-specification is frozen and no execution is authorized**.
+Status: **the next baseline direction is recorded, but no formal evaluation
+specification or candidate-versus-baseline execution is authorized**.
 
 Related:
 
 - [completed Stage-0 result](../evidence/dev-v4-stage0-result-2026-07-23.md)
 - [phase-corpus review record](dev-v4-phase-covered-corpus-v1-review.md)
 - [managed training experiment](dev-v4-malom-corrected-baseline.md)
+- [authorized Sanmill bridge smoke](sanmill-strict-uci-bridge-smoke-v1.md)
 
 ## What is now locally resolved
 
@@ -48,40 +49,27 @@ route name.
 The 64-position phase-covered corpus is also generated and mechanically
 audited. It is not yet domain-approved or frozen.
 
-## Product decisions now required
+## Recorded baseline direction
 
 ### 1. Competent baseline
 
-Recommended: use the current corrected-rules `GameAI` with deterministic
-alpha-beta/PVS search, `use_mcts=false`, difficulty 10, no optional database or
-learned-network components, and an explicit 500,000-node ceiling per move.
+The current `GameAI` is deferred as the formal baseline. Its search can be
+made deterministic, but the surrounding compact position and game lifecycle
+do not yet carry the full repetition and no-capture history required of the
+formal referee.
 
-The frozen constructor and call contract should also state the currently
-implicit defaults: `blunder_probability=0`, `search_threads=1`, `top_n=1`,
-default `HeuristicWeights`, and no opening recognition, forced book move,
-trajectory hint, game notation, endgame-state hint, position ban, star-square
-mode, fork-variety mode, or n-gram search. In particular, the runner must call
-`choose_move` without a recognition object. The default weights have
-`opening_adherence=50`, but opening-book bonuses are inactive only when no
-recognition or trajectory context is supplied.
+The selected next step is a strict bridge to pinned Sanmill commit
+`da922965946ab87b3b3f9eed5b170f3e01d6c473`. Sanmill owns the action history,
+standard-rule lifecycle, and terminal outcome. The bridge disables shuffling,
+uses one thread, a fixed seed, and a fixed-node command, and fails rather than
+using Sanmill's release-mode random recovery path. Optional databases,
+patches, traps, and non-rule draw heuristics are disabled. The exact contract
+and bounded authorization are recorded in the linked bridge-smoke document.
 
-Reasons for the recommendation:
-
-- it is a competent non-random opponent rather than another training-gain
-  control;
-- a node ceiling is reproducible across machines, unlike wall-clock search;
-- 500,000 nodes is the fixed budget used for the managed run's heuristic
-  opponents, so the comparison has an existing operational reference;
-- the native search disables its clock deadline when a node limit is present,
-  and any unavailable or failed native backend is a hard failure rather than a
-  Python fallback;
-- it avoids assigning corrected-data lineage to a legacy maintainer
-  checkpoint whose training state and route are incomplete.
-
-The tradeoff is runtime. Before freeze, the implementation should benchmark
-this exact baseline on representative placement, movement, and flying starts
-and report the projected 128-game envelope. If that envelope is too large,
-choose a smaller fixed node count before observing evaluation outcomes.
+The bridge report must establish rule consistency, semantic replay
+reproducibility, and representative fixed-node performance before Sanmill can
+be proposed as the formal baseline. The node budget is deliberately not yet
+selected.
 
 Not recommended:
 
@@ -89,7 +77,9 @@ Not recommended:
   training-signal question;
 - a maintainer-`main` weights-only checkpoint, because its corrected-data
   lineage, full trainer state, and inference route are not established;
-- a wall-clock baseline, because host load changes the effective work.
+- a wall-clock baseline, because host load changes the effective work;
+- the current `GameAI` as formal referee until its historical-rule state is
+  either replaced or independently corrected and verified.
 
 ### 2. Corpus review and freeze
 
@@ -112,8 +102,8 @@ Recommended initial contract, subject to corpus exclusions:
 | Pairs | One colour-role-swapped pair per accepted unique start |
 | Current draft size | 64 pairs / 128 games |
 | Candidate route | Exact `s-gen-v2-training-aligned-v1`, policy argmax |
-| Baseline | Fixed-node GameAI contract selected above |
-| Maximum length | 200 ply; overflow is a draw |
+| Baseline | Not frozen; strict fixed-node Sanmill bridge under validation |
+| Maximum length | Not frozen; 60 complete turns is smoke-only and is not a rules draw |
 | Random seed | 42 for provenance; neither policy may use random move choice |
 | Result summary | Pair-score difference and a fixed-corpus engineering interval |
 | Decision rule | Lower bound `> 0`: accept; upper bound `< 0`: reject; otherwise inconclusive |
@@ -125,22 +115,23 @@ must not be counted as additional observations.
 
 ### 4. Launch authority
 
-Do not grant launch authority as part of a vague approval. After the three
-choices above, the remaining local work is to implement and test the new
-paired runner, benchmark the fixed workload, freeze the reviewed corpus and
-runtime contract, and publish a read-only readiness report. Starting the run
-then requires a separate explicit instruction against that exact frozen spec.
+The currently authorized work is only the strict Sanmill bridge and its rule,
+reproducibility, and performance report. After that evidence is reviewed, the
+remaining product choices include the formal node budget, history-bearing
+start representation, accepted corpus, game count, and rules-compliant match
+termination contract. Starting candidate-versus-baseline games requires a
+separate explicit instruction against a later frozen specification.
 
 ## Current stop conditions
 
-No original-maintainer technical clarification is required: code, checkpoint,
-database, and fixture evidence resolve the route facts above. Work is paused
-at product choices because changing the baseline, corpus-review requirement,
-or workload changes the question being answered.
+No original-maintainer technical clarification is currently required: code,
+checkpoint, database, and fixture evidence resolve the route facts above. The
+bounded Sanmill bridge validation may proceed, but formal evaluation remains
+stopped at the later product gates.
 
 Until those choices are recorded:
 
-- do not freeze a new evaluation specification;
+- do not freeze a formal evaluation specification;
 - do not run a benchmark that records candidate-versus-baseline outcomes;
 - do not start another evaluation or training run;
 - do not reinterpret the Stage-0 `accepted` decision as promotion evidence.
