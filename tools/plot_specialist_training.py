@@ -190,6 +190,11 @@ def _twin_rhs(ax, color: str, ylabel: str):
     return ax2
 
 
+def _caption(ax, text: str) -> None:
+    """Add a small italic grey caption below the x-axis."""
+    ax.set_xlabel(text, fontsize=5.5, color="#909090", style="italic", labelpad=4)
+
+
 # ── Main draw ─────────────────────────────────────────────────────────────────
 
 def draw(fig, _axes_unused, specialists):
@@ -223,6 +228,7 @@ def draw(fig, _axes_unused, specialists):
         _plot_series(ax_ent, xs_cp,  ys_cp,  "chosen prob", "#4CAF50")
         ax_ent.set_ylim(bottom=0)
         ax_ent.legend(fontsize=6, loc="upper right")
+        _caption(ax_ent, "entropy→0 = policy collapsed / stuck;  chosen prob↑ = model more decisive")
 
         # ── Row 1: malom + heuristic_top1 + policy_top1 ──────────────────
         xs_m, ys_m = _get(rows, "malom_win_move_rate")
@@ -234,6 +240,7 @@ def draw(fig, _axes_unused, specialists):
         ax_top1.set_ylim(0, 1.05)
         ax_top1.legend(fontsize=6, loc="lower right")
         ax_top1.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))
+        _caption(ax_top1, "malom↑ = Malom-optimal moves;  policy≈heuristic = copying;  gap widening = diverging")
 
         # ── Row 2: win / draw rates  +  ply (rhs) ────────────────────────
         xs_b, ys_b = _get(rows, "best_win_rate")
@@ -256,6 +263,7 @@ def draw(fig, _axes_unused, specialists):
         h1, l1 = ax_wr.get_legend_handles_labels()
         h2, l2 = ax_wr2.get_legend_handles_labels()
         ax_wr.legend(h1 + h2, l1 + l2, fontsize=6, loc="lower right")
+        _caption(ax_wr, "win↑ good;  draw↑ = passive play;  ply↑ = longer / more drawn games")
 
         # ── Row 3: sentinel chosen vs mean + gap ──────────────────────────
         xs_sc, ys_sc = _get(rows, "sentinel_chosen_mean")
@@ -273,8 +281,9 @@ def draw(fig, _axes_unused, specialists):
                                  alpha=0.25, color="#FF5722")
         ax_sent.set_ylim(0, 1.05)
         ax_sent.legend(fontsize=6, loc="lower right")
+        _caption(ax_sent, "teal gap (chosen>mean) = model using sentinel signal;  flat gap = ignoring it")
 
-        # ── Row 4: reward breakdown  +  LR (rhs) ─────────────────────────
+        # ── Row 4: reward breakdown  +  LR (rhs, scaled ×1e5) ───────────
         xs_rt, ys_rt = _get(rows, "reward_total_mean")
         xs_rs, ys_rs = _get(rows, "reward_sentinel_mean")
         xs_rh, ys_rh = _get(rows, "reward_heuristic_mean")
@@ -284,23 +293,24 @@ def draw(fig, _axes_unused, specialists):
         _plot_series(ax_rew, xs_rh, ys_rh, "heuristic", "#FF9800", alpha_raw=0.20)
         _plot_series(ax_rew, xs_rr, ys_rr, "retro",     "#4CAF50", alpha_raw=0.20)
         ax_rew.axhline(0, color="white", alpha=0.20, linewidth=0.7, linestyle="--")
-        ax_rew.set_xlabel("game", fontsize=7)
 
-        ax_rew2 = _twin_rhs(ax_rew, "#F44336", "LR")
+        # LR scaled ×1e5 so values read as clean decimals (0.5–1.0 = 5e-5–1e-4)
+        ax_rew2 = _twin_rhs(ax_rew, "#F44336", "LR ×10⁻⁵")
         xs_lr, ys_lr = _get(rows, "lr")
         if ys_lr:
-            ax_rew2.plot(xs_lr, ys_lr, color="#F44336", linewidth=0.9, alpha=0.85, label="LR")
-            ax_rew2.ticklabel_format(style="sci", axis="y", scilimits=(0, 0))
+            ys_lr_scaled = [v * 1e5 for v in ys_lr]
+            ax_rew2.plot(xs_lr, ys_lr_scaled, color="#F44336", linewidth=0.9, alpha=0.85, label="LR")
+            ax_rew2.set_ylim(bottom=0)
 
         h1, l1 = ax_rew.get_legend_handles_labels()
         h2, l2 = ax_rew2.get_legend_handles_labels()
         ax_rew.legend(h1 + h2, l1 + l2, fontsize=6, loc="lower right")
+        _caption(ax_rew, "game  ·  retro dominant = outcome-driven;  LR at min (0.5) = model losing")
 
         # ── Advancement markers on all panels ─────────────────────────────
         advances = _get_advances(rows)
         _draw_advances([ax_ent, ax_top1, ax_wr, ax_sent, ax_rew], advances)
 
-        ax_sent.set_xlabel("game", fontsize=7)
         for ax in (ax_ent, ax_top1, ax_wr, ax_sent, ax_rew):
             ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3, linewidth=0.4)
@@ -319,7 +329,7 @@ def draw(fig, _axes_unused, specialists):
         f"Specialist training  ·  {SMOOTH}-game smoothed  ·  {time.strftime('%H:%M:%S')}",
         fontsize=10,
     )
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.tight_layout(rect=[0, 0, 1, 0.96], h_pad=2.5)
     fig.canvas.draw()
     fig.canvas.flush_events()
 
