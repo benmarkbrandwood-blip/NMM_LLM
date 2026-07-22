@@ -10,19 +10,24 @@ corrected-v4 managed plan
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
 
-The next proposed step, `dev-v4-formal-paired-eval-v1`, is under
-**fatal stop**. Expert review rejected the 64-position corpus and synthetic
+The next proposed step, `dev-v4-formal-paired-eval-v1`, now has a
+**needs_decision** readiness verdict. Expert review rejected the 64-position
+corpus and synthetic
 one-endpoint-per-named-line alternative and established that
 `policy-argmax-v1` zeroes a lookahead feature block used during training. The
 draw-lifecycle and partial-ledger restart defects found in the paired runner
-are now repaired and covered by focused tests. The owner reviewed all 107
-generated candidates, requested removal of original review position 101, and
-accepted the remaining 106. The only current proposal is therefore a
+are repaired; deterministic start reuse is now rejected; and new specifications
+bind the clean Git commit, runtime, device, route, components, and feature
+contract. The owner reviewed all 107 generated candidates, requested removal
+of original review position 101, and accepted the remaining 106. The only
+current proposal is therefore a
 106-start, placement-only Stage-0 training-signal diagnostic against scratch
 initialization. Its replacement corpus and PNG package are regenerated and
-audited, but a clean freeze state, readiness evidence, and new authorization
-remain incomplete. It is not a formal strength or promotion gate, and
-freeze/run remain unauthorized.
+audited. A clean read-only audit reverified the corpus, bundles, isolated
+targets, runtime identity, and in-memory specification; 28 focused readiness
+tests pass. No technical blocker remains, but a new explicit authorization is
+still required. It is not a formal strength or promotion gate, and freeze/run
+remain unauthorized.
 
 The maintainer's latest `main` history and 21/22 July staged upload have now
 been integrated and audited without activating their databases or checkpoints.
@@ -526,7 +531,7 @@ from the verified `latest.pt` of the immediately preceding completed segment,
 using explicit `exact-resume`. Legacy checkpoints, including every
 author-`main` file, remain weights-only and cannot satisfy that gate.
 
-## Managed Run Completion and Formal Evaluation Stop
+## Managed Run Completion and Stage-0 Evaluation Readiness
 
 The separately authorized managed plan `managed-v4-baseline-v1` later
 completed `completed_games=5000` and `completed_segments=20`. Its frozen
@@ -543,11 +548,15 @@ Repetition and 50-move transitions now stop on `engine.finished` and retain the
 engine's draw reason. In-progress evidence is fsynced to `<output>.partial`;
 same-spec ordered hash-valid prefixes resume only missing games, malformed
 prefixes fail closed, and complete evidence is recomputed before atomic final
-publication. `python -m pytest tests/test_paired_evaluation.py -q` reports
-`7 passed`.
+publication. The specification also rejects duplicate starts and any pair
+count above the unique corpus size. New freeze records bind a clean Git commit,
+selected CPU/CUDA device, platform, PyTorch, float32, the policy route,
+disabled components, and zeroed lookahead features; execution fails closed on
+runtime drift. Legacy unbound specifications remain readable and recomputable
+but cannot create new game evidence. `python -m pytest
+tests/test_paired_evaluation.py -q` reports `15 passed`.
 
-The first formal paired-evaluation proposal nevertheless remains under fatal
-stop because:
+The first formal paired-evaluation proposal was narrowed because:
 
 - pure argmax plus modulo start selection makes repeated starts exact copies,
   invalidating the old 64-start / 256-pair nominal sample size;
@@ -577,15 +586,19 @@ source recommendations and one illegal `c3` recommendation. The associated
 source candidate is the owner-excluded original position 101 and remains only
 as provenance. Codex inspected every regenerated contact sheet, the
 post-exclusion boundary images, and the excluded panel. The combined
-corpus/evaluation focused suite reports `20 passed`; owner review is complete.
+corpus/evaluation focused suite reports `28 passed`; owner review and read-only
+readiness verification are complete.
 
 The controlling records are:
 
-- [blocked evaluation contract](../experiments/dev-v4-formal-paired-eval-v1.md)
+- [evaluation contract](../experiments/dev-v4-formal-paired-eval-v1.md)
 - [expert decision record](../experiments/dev-v4-formal-paired-eval-v1-decision-brief.md)
 - [rejected corpus and generated replacement review](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
+- [Stage-0 readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
 
-No freeze or run command is approved. A later inconclusive v1 may be followed
+The readiness verdict is `needs_decision`: technical gates pass, but no freeze
+or run command is authorized without a new explicit product decision. A later
+inconclusive v1 may be followed
 by a separately preregistered and frozen v2, but the observations must not be
 pooled or represented as one prespecified sample.
 
@@ -718,13 +731,12 @@ training merely because the managed run ended. Proceed in this order:
 3. Preserve the completed owner review: original review position 101 is
    excluded, the other 106 are accepted, and the withdrawn concern about 83 is
    not a corpus defect.
-4. Keep the corpus at `owner_review_complete_not_frozen` while performing a
-   read-only Stage-0 readiness audit. Reconcile the exact route, lookahead
-   ablation, command, manifest, output isolation, and freeze evidence before
-   proposing a launch lock.
+4. Preserve the completed `needs_decision` readiness record, exact CPU command,
+   route/lookahead claim boundary, bundle identities, and absent output targets.
 5. Request explicit product authorization before changing the corpus to frozen
-   or running the Stage-0 diagnostic. Use 106 pairs / 212 games with no start
-   reuse, and do not treat acceptance as promotion evidence.
+   or running the Stage-0 diagnostic. On that authorized turn, repeat the clean
+   state and output checks, use 106 pairs / 212 games with no start reuse, and
+   do not treat acceptance as promotion evidence.
 6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
@@ -784,12 +796,12 @@ promotion. Technical failures remain Agent diagnosis. The local
 endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
-The managed plan completed, but the formal evaluation is under fatal stop and
-has no freeze/run authorization. Safe work currently includes inspection,
-documentation, replacement-corpus construction, focused verification, and
-readiness review. It does not include an evaluation run, an additional smoke
-or long training job, promotion/publication, a push, or a history rewrite
-without the applicable separate authorization.
+The managed plan completed, and the Stage-0 evaluation now passes technical
+readiness with verdict `needs_decision`, but it has no freeze/run authorization.
+Safe work currently includes inspection, documentation, and verification. It
+does not include an evaluation run, an additional smoke or long training job,
+promotion/publication, a push, or a history rewrite without the applicable
+separate authorization.
 
 ## Reference Material
 

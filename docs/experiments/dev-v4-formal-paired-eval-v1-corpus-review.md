@@ -3,13 +3,15 @@
 Status: **the 64-position draft is rejected and superseded**. The owner
 completed review of the 107 generated candidates, requested removal of original
 review position 101, and accepted the rest. The resulting 106-position package
-is `owner_review_complete_not_frozen`. Corpus freeze, readiness evidence, and
-freeze/run authorization remain under fatal stop.
+is `owner_review_complete_not_frozen`. Technical readiness now passes, but
+corpus freeze and execution remain unauthorized pending an explicit product
+decision.
 
 Related:
 
 - [expert decision record](dev-v4-formal-paired-eval-v1-decision-brief.md)
-- [blocked evaluation contract](dev-v4-formal-paired-eval-v1.md)
+- [evaluation contract](dev-v4-formal-paired-eval-v1.md)
+- [readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
 
 ## Rejected historical draft
 
@@ -197,7 +199,7 @@ The decision does not prove natural reachability, make the corpus held out, or
 authorize a freeze or run.
 
 The focused corpus, paired-runner, model-bundle, and candidate-lifecycle
-regression command reports `20 passed`. Six of those tests specifically cover
+regression command reports `28 passed`. Six of those tests specifically cover
 pinned-source reconstruction after the Sanmill checkout advances,
 pending-removal projection, ring16 identity, the known illegal source
 recommendation, complete corpus reproduction, and every review-image manifest
@@ -208,14 +210,11 @@ entry.
 The generator and regression tests now reproduce action-state handling, the
 owner exclusion, exact and ring16 uniqueness, legality, playability,
 provenance, overlap, list binding, and every PNG hash and dimension. Owner
-review is complete, but the replacement is still not frozen. Before it can be
-frozen:
-
-1. The artifacts, generator, tests, and owning documents must be committed at a
-   clean tracked point.
-2. The focused evaluation/readiness checks must be repeated from that point.
-3. A new explicit product authorization is required before an immutable
-   `EvaluationSpec` is frozen or any paired game is run.
+review, clean-state verification, and focused readiness checks are complete,
+but the replacement is still not frozen. A new explicit product authorization
+is required before an immutable `EvaluationSpec` is frozen or any paired game
+is run. The authorized turn must repeat the clean-state and absent-output
+checks before freezing.
 
 If authorized later, use exactly one colour-swapped pair per unique start:
 106 pairs / 212 games. This corpus remains Stage-0 diagnostic evidence and is

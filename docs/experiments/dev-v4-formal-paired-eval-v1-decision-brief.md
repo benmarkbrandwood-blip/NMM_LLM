@@ -6,15 +6,17 @@ Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
 Audience: product owner, evaluation reviewer, and domain expert
 
-Status: **fatal stop; freeze and run are not authorized**. Runner repair and
-owner corpus review are complete; a clean tracked freeze state, repeated
-readiness evidence, and new authorization remain open.
+Status: **needs_decision; technical readiness passes, but freeze and run are
+not authorized**. Runner repair, owner corpus review, clean-state verification,
+and repeated readiness evidence are complete. A new explicit authorization is
+the only open gate.
 
 Related:
 
 - [evaluation contract](dev-v4-formal-paired-eval-v1.md)
 - [corpus review record](dev-v4-formal-paired-eval-v1-corpus-review.md)
 - [training experiment](dev-v4-malom-corrected-baseline.md)
+- [readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
 
 ## Decision
 
@@ -24,9 +26,9 @@ draw-lifecycle defect that could abort a valid game and leave a
 non-restartable partial ledger. Those runner defects and their focused
 regressions are now repaired. The owner reviewed the corrected 107-candidate
 package, requested removal of original review position 101, and accepted the
-other 106. The owner-reviewed package is generated, but no corpus may be frozen
-and no paired evaluation may run until the remaining freeze prerequisites are
-complete.
+other 106. The owner-reviewed package is generated, and the technical freeze
+prerequisites now pass. No corpus may be frozen and no paired evaluation may
+run until the product owner explicitly authorizes that action.
 
 The next reviewable experiment may use 106 unique, playable stable positions
 selected from the 107 FENs obtained from the 108 Sanmill `action=p`
@@ -44,7 +46,7 @@ or promotion gate.
 | D — workload | Exactly **106 colour-swapped pairs / 212 games**: one pair per unique start. No modulo reuse. |
 | E — inference route | `policy-argmax-v1` is allowed only as a Stage-0 **lookahead-feature ablation** diagnostic. It is not training-route-aligned strength evidence. |
 | F — opponent | Keep the architecture-matched scratch-init bundle as a training-gain control. It is not a product-strength baseline. |
-| Freeze + run | **Deferred under fatal stop.** A new explicit product authorization is required after every prerequisite below is complete. |
+| Freeze + run | **Deferred under `needs_decision`.** Technical readiness passes; a new explicit product authorization is required. |
 
 ## Purpose and claim boundary
 
@@ -167,8 +169,11 @@ evidence to `<output>.partial`; a retry accepts only a same-spec, ordered,
 hash-valid completed prefix and plays only missing games. A malformed or
 mismatched prefix fails closed and is left untouched. A complete ledger is
 recomputed before atomic publication to the immutable final output. The
-focused evaluation suite reports `7 passed`, including repetition, 50-move,
-valid retry, atomic publication, and malformed-prefix rejection.
+focused paired-evaluation suite reports `15 passed`, including repetition,
+50-move, valid retry, atomic publication, malformed-prefix rejection,
+deterministic-start constraints, bound-runtime enforcement, and rejection of
+legacy unbound execution. The combined candidate-lifecycle, corpus, runner,
+and bundle suite reports `28 passed`.
 
 ### Repeated starts add no information
 
@@ -199,20 +204,18 @@ For that reason `policy-argmax-v1` is Stage-0 diagnostic evidence only. A
 formal strength or promotion gate requires a separately implemented and frozen
 training-route-aligned evaluator.
 
-## Required prerequisites before a new freeze decision
+## Required prerequisite before a new freeze decision
 
-Runner draw handling, recoverable valid-prefix resume, fail-closed malformed
-evidence, and their focused tests are complete in the current change. The
-following remain mandatory:
+Runner correctness, deterministic-start enforcement, runtime binding, owner
+review, clean-state verification, output isolation, bundle verification, and
+focused readiness tests are complete. The audit ran from clean commit
+`b92d62e`; the exact commands and evidence are recorded in the readiness
+report.
 
-1. Freeze from a clean, tracked commit. At review time the branch was ahead of
-   `origin/dev` and the experiment documents and draft artifacts were
-   uncommitted; the live state must be rechecked rather than inferred from this
-   historical observation.
-2. Repeat the focused evaluation/readiness verification from that commit.
-3. Obtain a new explicit product decision authorizing freeze and run.
-
-Until all three are complete, no exact freeze or run command is approved.
+The sole remaining prerequisite is a new explicit product decision authorizing
+the reviewed CPU freeze and 212-game run. On that authorized turn, repeat the
+clean-state and absent-output checks before executing the reviewed command.
+Until then, no freeze or run command is authorized.
 
 ## Inconclusive-result governance
 
@@ -230,7 +233,8 @@ provided:
 ## Final authorization state
 
 Candidate and scratch bundles have passed CPU verification, and the runner
-repair prerequisites are now complete. That does not clear the fatal stop.
-Freeze, paired execution, promotion, and publication remain forbidden pending
-the clean freeze state, repeated readiness evidence, and a new product
-authorization.
+and freeze prerequisites are now complete. The readiness verdict is
+`needs_decision`, not `fatal_stop`: no technical blocker remains, but freeze
+and paired execution remain forbidden pending a new product authorization.
+Promotion and publication remain outside this Stage-0 contract regardless of
+its eventual result.

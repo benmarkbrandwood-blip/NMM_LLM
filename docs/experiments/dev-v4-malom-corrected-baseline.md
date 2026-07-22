@@ -14,9 +14,9 @@ resolved on `dev`. The authorized managed long run
 completion is not playing-strength evidence and does not authorize promotion.
 The paired-runner repair is complete. The owner reviewed the 107 generated
 candidates, removed original position 101, and accepted the resulting
-106-start package. The next evaluation proposal remains under fatal stop
-pending a clean freeze point, readiness verification, and new product
-authorization; see
+106-start package. The next evaluation proposal has a `needs_decision`
+readiness verdict: its technical gates pass, while a new explicit product
+authorization remains open; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -117,7 +117,7 @@ until a deterministic ratio-at-collection regression test and reviewed fix
 exist. See
 [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
 
-### Formal evaluation status — fatal stop
+### Formal evaluation status — needs decision
 
 Formal evaluation remains separate from training completion. The candidate and
 architecture-matched scratch-init bundles have been exported and CPU-verified,
@@ -125,17 +125,21 @@ but expert review invalidated the original 64-start / 256-pair freeze proposal
 and found draw-lifecycle and partial-ledger defects in the paired runner. Those
 runner prerequisites are now repaired and covered by focused tests. The owner
 reviewed all 107 generated candidates, excluded original position 101, and
-accepted the other 106. Freeze, execution, promotion, and publication remain
-unauthorized because a clean freeze state, readiness evidence, and new
-authorization are outstanding.
+accepted the other 106. Deterministic start reuse is rejected, and the runtime
+contract now binds the clean code, device, environment, route, components, and
+feature ablation. A clean read-only audit reverified the corpus, both bundles,
+isolated targets, and an in-memory specification. Freeze and execution remain
+unauthorized only because a new explicit product authorization is outstanding;
+promotion and publication are outside this Stage-0 contract.
 The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
-[`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md).
+[`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md)
+and the readiness result in
+[`dev-v4-stage0-readiness-2026-07-22.md`](../evidence/dev-v4-stage0-readiness-2026-07-22.md).
 
-After a clean tracked freeze point, readiness verification, and new product
-authorization, the next proposed experiment is only a Stage-0 training-signal
-diagnostic:
+After a new product authorization and a repeated clean-state/output check, the
+next proposed experiment is only a Stage-0 training-signal diagnostic:
 
 - 106 owner-accepted unique playable stable positions selected from 107 FENs
   projected from 108 Sanmill `action=p` keys, with original review position 101
