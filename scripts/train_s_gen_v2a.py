@@ -1254,8 +1254,13 @@ def run(args: argparse.Namespace) -> None:
     difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
         print("[s_gen_v2a] No checkpoint found — starting from scratch")
+        _resume_ckpt: dict = {}
     else:
         print(f"[s_gen_v2a] Resuming from ({source_tag}): {resume_path}  best_wr_at_diff={best_win_rate_at_diff:.3f}")
+        try:
+            _resume_ckpt = torch.load(str(resume_path), map_location="cpu", weights_only=False)
+        except Exception:
+            _resume_ckpt = {}
     print(f"[s_gen_v2a] feat_dim={MOVE_FEAT_DIM_WITH_LOOKAHEAD}, starting game={start_game}, diff={difficulty}")
 
     frozen_opp = FrozenModelOpponent(model, device, sentinel=sentinel, value_net=value_net)
@@ -1280,15 +1285,16 @@ def run(args: argparse.Namespace) -> None:
     last_update_vl  = None
     last_update_ent = None
     # best_win_rate_at_diff restored from checkpoint — prevents regression saves on restart
-    recovery_grace: int          = 0    # games remaining where draw penalty is suppressed post-recovery
-    temp_boost:              float = 0.0  # decaying additive temperature bonus (advancement/hot-explore)
-    entropy_boost:           float = 0.0  # decaying additive entropy-coef bonus (advancement/hot-explore)
-    hot_explore_remaining:   int   = 0    # batches left in stage-1 recovery (elevated temp, no reload)
-    hot_explore_triggered:   bool  = False  # True once stage-1 has fired; arms stage-2 reload
-    advance_rehearsal_remaining: int = 0  # batches left with expanded lower-diff opponent ratio
-    _effective_entropy_coef: float = args.entropy_coef  # updated each iteration with entropy_boost
-    recovery_baseline_win_rate: float = 0.0  # win-rate snapshot taken when Stage 1 recovery fires
-    _current_recovery_state: str = ""        # "" | "hot_explore" | "grace"
+    # Recovery state is also restored so a mid-recovery restart doesn't lose context.
+    recovery_grace:           int   = int(_resume_ckpt.get("recovery_grace",            0))
+    hot_explore_remaining:    int   = int(_resume_ckpt.get("hot_explore_remaining",     0))
+    hot_explore_triggered:    bool  = bool(_resume_ckpt.get("hot_explore_triggered",    False))
+    recovery_baseline_win_rate: float = float(_resume_ckpt.get("recovery_baseline_win_rate", 0.0))
+    _current_recovery_state:  str   = str(_resume_ckpt.get("recovery_state",            ""))
+    temp_boost:               float = 0.0  # not persisted — safe to reset; decays quickly
+    entropy_boost:            float = 0.0
+    advance_rehearsal_remaining: int = 0
+    _effective_entropy_coef:  float = args.entropy_coef
 
     branch_bucket_history: deque[str] = deque(maxlen=args.bucket_window)
 
@@ -1904,16 +1910,21 @@ def run(args: argparse.Namespace) -> None:
                     )
 
                 ckpt = {
-                    "model":                 model.state_dict(),
-                    "model_config":          model.get_config(),
-                    "stage":                 STAGE_TAG,
-                    "game_count":            game_count,
-                    "best_win_rate":         best_win_rate,
-                    "best_win_rate_at_diff": best_win_rate_at_diff,
-                    "difficulty":            difficulty,
-                    "source_checkpoint":     source_checkpoint,
-                    "lr":                    float(opt.param_groups[0]["lr"]),
-                    "temperature":           float(temperature),
+                    "model":                     model.state_dict(),
+                    "model_config":              model.get_config(),
+                    "stage":                     STAGE_TAG,
+                    "game_count":                game_count,
+                    "best_win_rate":             best_win_rate,
+                    "best_win_rate_at_diff":     best_win_rate_at_diff,
+                    "difficulty":                difficulty,
+                    "source_checkpoint":         source_checkpoint,
+                    "lr":                        float(opt.param_groups[0]["lr"]),
+                    "temperature":               float(temperature),
+                    "hot_explore_remaining":     hot_explore_remaining,
+                    "hot_explore_triggered":     hot_explore_triggered,
+                    "recovery_grace":            recovery_grace,
+                    "recovery_state":            _current_recovery_state,
+                    "recovery_baseline_win_rate": recovery_baseline_win_rate,
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -2010,16 +2021,21 @@ def run(args: argparse.Namespace) -> None:
                 f.write(json.dumps(asdict(d)) + "\n")
 
     ckpt = {
-        "model":                 model.state_dict(),
-        "model_config":          model.get_config(),
-        "stage":                 STAGE_TAG,
-        "game_count":            game_count,
-        "best_win_rate":         best_win_rate,
-        "best_win_rate_at_diff": best_win_rate_at_diff,
-        "difficulty":            difficulty,
-        "source_checkpoint":     source_checkpoint,
-        "lr":                    float(opt.param_groups[0]["lr"]),
-        "temperature":           float(temperature),
+        "model":                     model.state_dict(),
+        "model_config":              model.get_config(),
+        "stage":                     STAGE_TAG,
+        "game_count":                game_count,
+        "best_win_rate":             best_win_rate,
+        "best_win_rate_at_diff":     best_win_rate_at_diff,
+        "difficulty":                difficulty,
+        "source_checkpoint":         source_checkpoint,
+        "lr":                        float(opt.param_groups[0]["lr"]),
+        "temperature":               float(temperature),
+        "hot_explore_remaining":     hot_explore_remaining,
+        "hot_explore_triggered":     hot_explore_triggered,
+        "recovery_grace":            recovery_grace,
+        "recovery_state":            _current_recovery_state,
+        "recovery_baseline_win_rate": recovery_baseline_win_rate,
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2a] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
