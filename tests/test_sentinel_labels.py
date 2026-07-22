@@ -1,128 +1,120 @@
-"""Tests for learned_ai/sentinel/labels.py (backward label propagation)."""
+"""Tests for move-level Sentinel quality labels and weights."""
 
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from game.board import BoardState
 from learned_ai.sentinel.feature_builder import FEATURE_DIM
 from learned_ai.sentinel.labels import (
-    DEFAULT_BACKWARD_DECAY,
-    LABEL_TYPES,
-    LabelledExample,
-    backward_label_trajectory,
+    BAD_MOVE_DTM_THRESHOLD,
+    BAD_MOVE_WEIGHT,
+    DRAW_WEIGHT,
+    WEAK_LABEL_WEIGHT,
+    MoveExample,
+    dtm_quality,
+    label_move,
+    quality_from_wdl,
 )
 
 
-class _FakeDB:
-    """A stub teacher that resolves only specified plies to a given WDL."""
-
-    def __init__(self, resolved):
-        # resolved: dict {ply_index: "W"|"L"|"D"}
-        self._resolved = resolved
-        self._states = None
-
-    def is_available(self):
-        return True
-
-    def query_trajectory(self, states):
-        return [self._resolved.get(i) for i in range(len(states))]
-
-
-def _trajectory(n):
-    states = [BoardState.new_game() for _ in range(n)]
-    feats = [np.zeros(FEATURE_DIM, dtype=np.float32) for _ in range(n)]
-    ctxs = [{"color": "W" if i % 2 == 0 else "B"} for i in range(n)]
-    return states, feats, ctxs
+@pytest.mark.parametrize(
+    ("wdl", "expected"),
+    [
+        ("win", 1.0),
+        ("draw", 0.5),
+        ("loss", 0.0),
+        ("unknown", None),
+        (None, None),
+    ],
+)
+def test_quality_from_wdl_uses_mover_perspective(wdl, expected):
+    assert quality_from_wdl(wdl) == expected
 
 
-def test_label_backward_propagation_weights():
-    # Turning point resolved at ply 10; check decayed weights at 9,8,7,6.
-    n = 11
-    states, feats, ctxs = _trajectory(n)
-    db = _FakeDB({10: "W"})
-    record = {"winner": "W"}
-    examples = backward_label_trajectory(record, states, feats, ctxs, db=db)
-    assert len(examples) == n
-    # ply 10 is direct (distance 0 -> weight 1.0)
-    assert examples[10].supervision_source == "direct_solved"
-    assert examples[10].training_weight == DEFAULT_BACKWARD_DECAY[0]
-    # plies 9..6 are backward-propagated with decreasing weights
-    assert examples[9].supervision_source == "backward_propagated"
-    assert examples[9].training_weight == DEFAULT_BACKWARD_DECAY[1]
-    assert examples[8].training_weight == DEFAULT_BACKWARD_DECAY[2]
-    assert examples[7].training_weight == DEFAULT_BACKWARD_DECAY[3]
-    assert examples[6].training_weight == DEFAULT_BACKWARD_DECAY[4]
+@pytest.mark.parametrize(
+    ("wdl", "dtm", "expected"),
+    [
+        ("win", 1, 0.99),
+        ("win", 100, 0.55),
+        ("win", 1000, 0.55),
+        ("loss", 1, 0.01),
+        ("loss", 100, 0.45),
+        ("loss", 1000, 0.45),
+        ("draw", 25, 0.5),
+    ],
+)
+def test_dtm_quality_is_bounded_and_directional(wdl, dtm, expected):
+    assert dtm_quality(wdl, dtm) == pytest.approx(expected)
 
 
-def test_game_outcome_proxy_when_db_unavailable():
-    n = 6
-    states, feats, ctxs = _trajectory(n)
-    record = {"winner": "W"}
-    examples = backward_label_trajectory(record, states, feats, ctxs, db=None)
-    assert len(examples) == n
-    # No DB => every example is a proxy (trajectory_outcome or weak_proxy).
-    for ex in examples:
-        assert ex.supervision_source in ("trajectory_outcome", "weak_proxy")
-    # White mover (even plies) gets a positive proxy value when White wins.
-    assert examples[0].value_delta >= 0.0
+def test_draw_label_uses_reduced_solved_weight():
+    quality, weight, source = label_move("draw")
+
+    assert quality == 0.5
+    assert weight == DRAW_WEIGHT
+    assert source == "solved_db"
 
 
-def test_direct_supervision_takes_priority():
-    n = 4
-    states, feats, ctxs = _trajectory(n)
-    # DB says ply 1 is resolved; the game winner proxy would say otherwise.
-    db = _FakeDB({1: "L"})
-    record = {"winner": "W"}
-    examples = backward_label_trajectory(record, states, feats, ctxs, db=db)
-    assert examples[1].supervision_source == "direct_solved"
-    # The resolved value (L => -1) overrides the would-be proxy.
-    assert examples[1].value_delta < 0.0
+def test_dtm_label_preserves_solved_provenance():
+    quality, weight, source = label_move("win", dtm=4)
+
+    assert quality == pytest.approx(dtm_quality("win", 4))
+    assert weight == 1.0
+    assert source == "solved_db_dtm"
 
 
-def test_blunder_flags_turning_point():
-    n = 4
-    states, feats, ctxs = _trajectory(n)
-    ctxs[2]["was_blunder"] = True
-    record = {"winner": "B"}
-    examples = backward_label_trajectory(record, states, feats, ctxs, db=None)
-    assert examples[2].turning_point_confidence >= 0.8
-    assert examples[2].mistake_risk >= 0.8
+def test_imminent_solved_loss_receives_extra_weight():
+    quality, weight, source = label_move(
+        "loss",
+        dtm=BAD_MOVE_DTM_THRESHOLD,
+    )
+
+    assert quality == pytest.approx(
+        dtm_quality("loss", BAD_MOVE_DTM_THRESHOLD)
+    )
+    assert weight == BAD_MOVE_WEIGHT
+    assert source == "solved_db_dtm"
 
 
-def test_all_label_types_reachable():
-    # Synthetic trajectory crafted so the labeller emits every category at least
-    # once. Multi-candidate context drives the missed_opportunity branch.
-    n = 6
-    states, feats, ctxs = _trajectory(n)
-    record = {"winner": "W"}
-    # ply with a strong missed opportunity for the eventual WINNER (so the
-    # position is not losing and the missed_opportunity branch is reachable):
-    # ply 2 is a White mover (even index) and White wins this game.
-    ctxs[2].update({
-        "candidates": [{"score": 5.0}, {"score": 1.0}, {"score": 0.5}],
-        "chosen_rank": 2,
-    })
-    # ply flagged as a logged blunder => mistake / turning point signal
-    ctxs[3]["was_blunder"] = True
-    examples = backward_label_trajectory(record, states, feats, ctxs, db=None)
-    labels = {e.label for e in examples}
-    # Every produced label must be a valid type.
-    assert labels.issubset(set(LABEL_TYPES))
-    # missed_opportunity must be reachable from the crafted candidate context.
-    assert "missed_opportunity" in labels
+def test_non_imminent_solved_loss_keeps_normal_weight():
+    _, weight, source = label_move(
+        "loss",
+        dtm=BAD_MOVE_DTM_THRESHOLD + 1,
+    )
+
+    assert weight == 1.0
+    assert source == "solved_db_dtm"
 
 
-def test_returns_labelled_example_instances():
-    n = 3
-    states, feats, ctxs = _trajectory(n)
-    examples = backward_label_trajectory({"winner": "D"}, states, feats, ctxs)
-    assert all(isinstance(e, LabelledExample) for e in examples)
-    for e in examples:
-        td = e.target_dict()
-        assert set(td.keys()) == {
-            "mistake_risk", "opportunity_score",
-            "trajectory_value_delta", "turning_point_confidence", "weight",
-        }
-        assert 0.0 <= td["mistake_risk"] <= 1.0
-        assert -1.0 <= td["trajectory_value_delta"] <= 1.0
+@pytest.mark.parametrize(
+    ("heuristic_score", "expected"),
+    [(-3.0, 0.0), (0.25, 0.25), (4.0, 1.0)],
+)
+def test_unknown_wdl_falls_back_to_clamped_weak_label(
+    heuristic_score,
+    expected,
+):
+    quality, weight, source = label_move(
+        None,
+        heuristic_score_norm=heuristic_score,
+    )
+
+    assert quality == expected
+    assert weight == WEAK_LABEL_WEIGHT
+    assert source == "heuristic_weak"
+
+
+def test_move_example_exposes_scalar_target():
+    example = MoveExample(
+        features=np.zeros(FEATURE_DIM, dtype=np.float32),
+        move_quality=0.75,
+        training_weight=1.0,
+        supervision_source="solved_db",
+        ply=12,
+        move_notation="a7-d7",
+        position_key="example-position",
+    )
+
+    assert example.target() == 0.75
+    assert isinstance(example.target(), float)
