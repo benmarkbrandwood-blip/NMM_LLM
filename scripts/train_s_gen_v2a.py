@@ -532,7 +532,7 @@ def _load_model(
     device: torch.device,
     resume_path: Optional[Path],
     policy_hidden: tuple[int, ...] = (512, 256, 128),
-) -> tuple[ScaffoldedPolicyNet, int, float, int, str]:
+) -> tuple[ScaffoldedPolicyNet, int, float, float, int, str]:
     feat_dim = MOVE_FEAT_DIM_WITH_LOOKAHEAD
 
     def _fresh():
@@ -540,7 +540,7 @@ def _load_model(
             move_feat_dim=feat_dim,
             value_input_dim=VALUE_INPUT_DIM_WITH_HISTORY,
             policy_hidden=policy_hidden,
-        ).to(device), 0, 0.0, DIFF_START, "scratch"
+        ).to(device), 0, 0.0, 0.0, DIFF_START, "scratch"
 
     if resume_path is None or not Path(resume_path).exists():
         return _fresh()
@@ -568,12 +568,15 @@ def _load_model(
         except RuntimeError:
             print(f"[s_gen_v2a] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
             return _fresh()
-    stage      = ckpt.get("stage", "unknown")
-    is_mine    = (stage == STAGE_TAG)
-    start_game = int(ckpt.get("game_count",    0))         if is_mine else 0
-    best_wr    = float(ckpt.get("best_win_rate", 0.0))     if is_mine else 0.0
-    difficulty = int(ckpt.get("difficulty",   DIFF_START)) if is_mine else DIFF_START
-    return model, start_game, best_wr, difficulty, str(resume_path)
+    stage          = ckpt.get("stage", "unknown")
+    is_mine        = (stage == STAGE_TAG)
+    start_game     = int(ckpt.get("game_count",           0))         if is_mine else 0
+    best_wr        = float(ckpt.get("best_win_rate",      0.0))       if is_mine else 0.0
+    # Fall back to best_win_rate for old checkpoints (best.pt stored them equal)
+    best_wr_at_dif = float(ckpt.get("best_win_rate_at_diff",
+                                     ckpt.get("best_win_rate", 0.0))) if is_mine else 0.0
+    difficulty     = int(ckpt.get("difficulty",       DIFF_START))    if is_mine else DIFF_START
+    return model, start_game, best_wr, best_wr_at_dif, difficulty, str(resume_path)
 
 
 def _apply_diff_start_override(difficulty: int, args: argparse.Namespace) -> int:
@@ -1247,12 +1250,12 @@ def run(args: argparse.Namespace) -> None:
 
     # ── Load model ─────────────────────────────────────────────────────────────
     resume_path, source_tag = _choose_resume_path(args)
-    model, start_game, best_win_rate, difficulty, source_checkpoint = _load_model(device, resume_path, args.policy_hidden)
+    model, start_game, best_win_rate, best_win_rate_at_diff, difficulty, source_checkpoint = _load_model(device, resume_path, args.policy_hidden)
     difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
         print("[s_gen_v2a] No checkpoint found — starting from scratch")
     else:
-        print(f"[s_gen_v2a] Resuming from ({source_tag}): {resume_path}")
+        print(f"[s_gen_v2a] Resuming from ({source_tag}): {resume_path}  best_wr_at_diff={best_win_rate_at_diff:.3f}")
     print(f"[s_gen_v2a] feat_dim={MOVE_FEAT_DIM_WITH_LOOKAHEAD}, starting game={start_game}, diff={difficulty}")
 
     frozen_opp = FrozenModelOpponent(model, device, sentinel=sentinel, value_net=value_net)
@@ -1276,7 +1279,7 @@ def run(args: argparse.Namespace) -> None:
     last_update_pl  = None
     last_update_vl  = None
     last_update_ent = None
-    best_win_rate_at_diff = 0.0
+    # best_win_rate_at_diff restored from checkpoint — prevents regression saves on restart
     recovery_grace: int          = 0    # games remaining where draw penalty is suppressed post-recovery
     temp_boost:              float = 0.0  # decaying additive temperature bonus (advancement/hot-explore)
     entropy_boost:           float = 0.0  # decaying additive entropy-coef bonus (advancement/hot-explore)
@@ -1899,20 +1902,22 @@ def run(args: argparse.Namespace) -> None:
                     )
 
                 ckpt = {
-                    "model":             model.state_dict(),
-                    "model_config":      model.get_config(),
-                    "stage":             STAGE_TAG,
-                    "game_count":        game_count,
-                    "best_win_rate":     best_win_rate,
-                    "difficulty":        difficulty,
-                    "source_checkpoint": source_checkpoint,
-                    "lr":                float(opt.param_groups[0]["lr"]),
-                    "temperature":       float(temperature),
+                    "model":                 model.state_dict(),
+                    "model_config":          model.get_config(),
+                    "stage":                 STAGE_TAG,
+                    "game_count":            game_count,
+                    "best_win_rate":         best_win_rate,
+                    "best_win_rate_at_diff": best_win_rate_at_diff,
+                    "difficulty":            difficulty,
+                    "source_checkpoint":     source_checkpoint,
+                    "lr":                    float(opt.param_groups[0]["lr"]),
+                    "temperature":           float(temperature),
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
                 if _should_save_best_checkpoint(win_rate, best_win_rate_at_diff, len(win_history_heuristic)):
                     best_win_rate_at_diff = win_rate
+                    ckpt["best_win_rate_at_diff"] = best_win_rate_at_diff
                     ckpt["best_win_rate"] = best_win_rate_at_diff
                     torch.save(ckpt, out_dir / f"best{difficulty}.pt")
                     torch.save(ckpt, out_dir / "best.pt")
@@ -1949,15 +1954,16 @@ def run(args: argparse.Namespace) -> None:
                 prev_best = out_dir / f"best{prev_diff}.pt"
                 if not prev_best.exists():
                     _adv_ckpt = {
-                        "model":             model.state_dict(),
-                        "model_config":      model.get_config(),
-                        "stage":             STAGE_TAG,
-                        "game_count":        game_count,
-                        "best_win_rate":     wr,
-                        "difficulty":        prev_diff,
-                        "source_checkpoint": source_checkpoint,
-                        "lr":                float(opt.param_groups[0]["lr"]),
-                        "temperature":       float(temperature),
+                        "model":                 model.state_dict(),
+                        "model_config":          model.get_config(),
+                        "stage":                 STAGE_TAG,
+                        "game_count":            game_count,
+                        "best_win_rate":         wr,
+                        "best_win_rate_at_diff": wr,
+                        "difficulty":            prev_diff,
+                        "source_checkpoint":     source_checkpoint,
+                        "lr":                    float(opt.param_groups[0]["lr"]),
+                        "temperature":           float(temperature),
                     }
                     torch.save(_adv_ckpt, prev_best)
                     print(f"[s_gen_v2a] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
@@ -2002,15 +2008,16 @@ def run(args: argparse.Namespace) -> None:
                 f.write(json.dumps(asdict(d)) + "\n")
 
     ckpt = {
-        "model":             model.state_dict(),
-        "model_config":      model.get_config(),
-        "stage":             STAGE_TAG,
-        "game_count":        game_count,
-        "best_win_rate":     best_win_rate,
-        "difficulty":        difficulty,
-        "source_checkpoint": source_checkpoint,
-        "lr":                float(opt.param_groups[0]["lr"]),
-        "temperature":       float(temperature),
+        "model":                 model.state_dict(),
+        "model_config":          model.get_config(),
+        "stage":                 STAGE_TAG,
+        "game_count":            game_count,
+        "best_win_rate":         best_win_rate,
+        "best_win_rate_at_diff": best_win_rate_at_diff,
+        "difficulty":            difficulty,
+        "source_checkpoint":     source_checkpoint,
+        "lr":                    float(opt.param_groups[0]["lr"]),
+        "temperature":           float(temperature),
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2a] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
