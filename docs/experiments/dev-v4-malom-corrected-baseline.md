@@ -14,9 +14,9 @@ resolved on `dev`. The authorized managed long run
 completion is not playing-strength evidence and does not authorize promotion.
 The paired-runner repair is complete. The owner reviewed the 107 generated
 candidates, removed original position 101, and accepted the resulting
-106-start package. The next evaluation proposal has a `needs_decision`
-readiness verdict: its technical gates pass, while a new explicit product
-authorization remains open; see
+106-start package. The next evaluation has a scoped `ready_for_long_run`
+verdict, and the product owner authorized its exact CPU Stage-0 freeze and run
+on 23 July 2026; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -117,7 +117,7 @@ until a deterministic ratio-at-collection regression test and reviewed fix
 exist. See
 [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md).
 
-### Formal evaluation status — needs decision
+### Formal evaluation status — authorized Stage 0
 
 Formal evaluation remains separate from training completion. The candidate and
 architecture-matched scratch-init bundles have been exported and CPU-verified,
@@ -129,8 +129,8 @@ accepted the other 106. Deterministic start reuse is rejected, and the runtime
 contract now binds the clean code, device, environment, route, components, and
 feature ablation. A clean read-only audit reverified the corpus, both bundles,
 isolated targets, and an in-memory specification. Freeze and execution remain
-unauthorized only because a new explicit product authorization is outstanding;
-promotion and publication are outside this Stage-0 contract.
+authorized for one immutable CPU specification and its resumable 212-game
+ledger; promotion and publication are outside this Stage-0 contract.
 The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
@@ -138,8 +138,8 @@ the evidence and decision rationale in
 and the readiness result in
 [`dev-v4-stage0-readiness-2026-07-22.md`](../evidence/dev-v4-stage0-readiness-2026-07-22.md).
 
-After a new product authorization and a repeated clean-state/output check, the
-next proposed experiment is only a Stage-0 training-signal diagnostic:
+After the required repeated clean-state/output check, the authorized experiment
+is only a Stage-0 training-signal diagnostic:
 
 - 106 owner-accepted unique playable stable positions selected from 107 FENs
   projected from 108 Sanmill `action=p` keys, with original review position 101

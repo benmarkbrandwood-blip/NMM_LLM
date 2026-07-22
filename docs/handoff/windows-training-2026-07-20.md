@@ -10,8 +10,8 @@ corrected-v4 managed plan
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
 
-The next proposed step, `dev-v4-formal-paired-eval-v1`, now has a
-**needs_decision** readiness verdict. Expert review rejected the 64-position
+The next proposed step, `dev-v4-formal-paired-eval-v1`, now has a scoped
+**ready_for_long_run** readiness verdict. Expert review rejected the 64-position
 corpus and synthetic
 one-endpoint-per-named-line alternative and established that
 `policy-argmax-v1` zeroes a lookahead feature block used during training. The
@@ -25,9 +25,9 @@ current proposal is therefore a
 initialization. Its replacement corpus and PNG package are regenerated and
 audited. A clean read-only audit reverified the corpus, bundles, isolated
 targets, runtime identity, and in-memory specification; 28 focused readiness
-tests pass. No technical blocker remains, but a new explicit authorization is
-still required. It is not a formal strength or promotion gate, and freeze/run
-remain unauthorized.
+tests pass. On 23 July 2026, the product owner explicitly authorized the exact
+CPU freeze and 212-game run. It is not a formal strength or promotion gate,
+and it does not authorize training, promotion, or publication.
 
 The maintainer's latest `main` history and 21/22 July staged upload have now
 been integrated and audited without activating their databases or checkpoints.
@@ -596,9 +596,9 @@ The controlling records are:
 - [rejected corpus and generated replacement review](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
 - [Stage-0 readiness evidence](../evidence/dev-v4-stage0-readiness-2026-07-22.md)
 
-The readiness verdict is `needs_decision`: technical gates pass, but no freeze
-or run command is authorized without a new explicit product decision. A later
-inconclusive v1 may be followed
+The readiness verdict is `ready_for_long_run`, scoped only to the exact CPU
+Stage-0 evaluation authorized on 23 July 2026. A later inconclusive v1 may be
+followed
 by a separately preregistered and frozen v2, but the observations must not be
 pooled or represented as one prespecified sample.
 
@@ -731,12 +731,11 @@ training merely because the managed run ended. Proceed in this order:
 3. Preserve the completed owner review: original review position 101 is
    excluded, the other 106 are accepted, and the withdrawn concern about 83 is
    not a corpus defect.
-4. Preserve the completed `needs_decision` readiness record, exact CPU command,
-   route/lookahead claim boundary, bundle identities, and absent output targets.
-5. Request explicit product authorization before changing the corpus to frozen
-   or running the Stage-0 diagnostic. On that authorized turn, repeat the clean
-   state and output checks, use 106 pairs / 212 games with no start reuse, and
-   do not treat acceptance as promotion evidence.
+4. Preserve the completed `ready_for_long_run` readiness record, exact CPU
+   command, route/lookahead claim boundary, and bundle identities.
+5. Under the recorded one-run authorization, repeat the clean state and output
+   checks, freeze one specification, and run 106 pairs / 212 games with no
+   start reuse. Do not treat acceptance as promotion evidence.
 6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
@@ -796,12 +795,11 @@ promotion. Technical failures remain Agent diagnosis. The local
 endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
-The managed plan completed, and the Stage-0 evaluation now passes technical
-readiness with verdict `needs_decision`, but it has no freeze/run authorization.
-Safe work currently includes inspection, documentation, and verification. It
-does not include an evaluation run, an additional smoke or long training job,
-promotion/publication, a push, or a history rewrite without the applicable
-separate authorization.
+The managed plan completed, and the Stage-0 evaluation has a scoped
+`ready_for_long_run` verdict plus one-run authorization. Safe work now includes
+freezing and running only that exact CPU contract. It does not include an
+additional evaluation, smoke or long training job, promotion/publication, a
+push, or a history rewrite without the applicable separate authorization.
 
 ## Reference Material
 

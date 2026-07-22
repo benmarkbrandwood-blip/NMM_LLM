@@ -4,8 +4,8 @@
 
 Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
-Status: **needs_decision; technical readiness passes, but freeze and run are
-not authorized**.
+Status: **authorized for the exact CPU Stage-0 freeze and 212-game run; the
+immutable specification has not yet been created**.
 
 The managed training plan `managed-v4-baseline-v1` completed 5,000 games and
 20 segments on 21 July 2026 (UTC). That is infrastructure and lineage evidence
@@ -32,13 +32,13 @@ the clean Git commit, selected device, platform and PyTorch identity, float32
 precision, route, disabled components, and zeroed lookahead block; execution
 fails closed on drift. Legacy unbound specifications remain readable and
 recomputable but cannot create new game evidence. The combined focused
-readiness suite passes 28 tests.
-The only open gate is a new explicit product authorization.
+readiness suite passes 28 tests. On 23 July 2026, the product owner explicitly
+instructed Codex to start the Stage-0 evaluation. The technical and product
+launch gates therefore pass for this contract only.
 
-No `EvaluationSpec` may be frozen, no paired games may be run, and no
-promotion or publication decision may be made from this experiment until the
-prerequisites in this document are complete and the product owner gives a new
-explicit authorization.
+The authorization permits one immutable specification and its resumable
+212-game ledger. It does not authorize training, a changed evaluation, or any
+promotion or publication decision.
 
 Related contracts:
 
@@ -72,8 +72,8 @@ Artifact root:
 
 ## Expert-reviewed decision
 
-Subject to a clean tracked freeze, repeated readiness verification, and a new
-authorization, the proposed Stage-0 contract is:
+Subject to the final clean-state and absent-output checks at execution time,
+the authorized Stage-0 contract is:
 
 | Field | Proposed post-repair Stage-0 contract |
 | --- | --- |
@@ -142,7 +142,7 @@ source-overlapping, in-distribution-adjacent convenience corpus.
 | Route is not training-aligned | Stage-0 claim boundary recorded | The 72 lookahead features are zeroed at evaluation. Keep the claim at Stage 0 and build a separately frozen aligned evaluator for strength. |
 | Freeze state was not reproducible at review time | Cleared by read-only audit | Commit `b92d62e` was clean when corpus, bundles, targets, runtime identity, and an in-memory specification were reverified. The freeze command repeats the clean check and binds its then-current commit. |
 | Runtime identity and route were descriptive only | Cleared in contract and code | New specifications bind clean Git, CPU/CUDA identity, platform, PyTorch, float32, route, disabled components, and the zeroed lookahead block. A run fails before model loading or evidence writes on drift; a legacy unbound specification cannot run. |
-| Product launch decision | Open | A new explicit authorization is still required to freeze the immutable specification and run 212 games. |
+| Product launch decision | Cleared | The product owner explicitly instructed Codex to start this exact Stage-0 evaluation on 23 July 2026. |
 
 The focused command
 `python -m pytest tests/test_paired_evaluation.py -q` now reports `15 passed`,
@@ -190,17 +190,17 @@ sample.
 
 ## Mandatory sequence before any freeze or run
 
-Runner repair, the final technical contract, and the read-only readiness audit
-are complete. The remaining mandatory sequence is:
+Runner repair, the final technical contract, the read-only readiness audit,
+and product authorization are complete. The mandatory execution sequence is:
 
-1. Obtain a new explicit product authorization for the reviewed CPU Stage-0
-   freeze and run.
-2. On that authorized turn, repeat the clean-state and absent-output checks,
-   then use only the exact commands in the linked readiness evidence.
+1. Repeat the clean-state and absent-output checks after this authorization
+   record is committed.
+2. Freeze exactly one immutable specification with the command in the linked
+   readiness evidence.
+3. Run or validly resume only that specification and ledger.
 
-Only after authorization may an immutable `EvaluationSpec` be created. The
-commands are reviewed but intentionally not approved for execution by this
-document alone.
+No parameter substitution or second run is authorized. Stop and preserve the
+evidence on any identity, bundle, runtime, or ledger failure.
 
 ## Explicit non-claims
 

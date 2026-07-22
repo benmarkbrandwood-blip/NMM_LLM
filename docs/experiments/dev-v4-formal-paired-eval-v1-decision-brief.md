@@ -6,10 +6,10 @@ Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
 Audience: product owner, evaluation reviewer, and domain expert
 
-Status: **needs_decision; technical readiness passes, but freeze and run are
-not authorized**. Runner repair, owner corpus review, clean-state verification,
-and repeated readiness evidence are complete. A new explicit authorization is
-the only open gate.
+Status: **authorized for the exact CPU Stage-0 freeze and 212-game run**.
+Runner repair, owner corpus review, clean-state verification, repeated
+readiness evidence, and the product decision are complete. No promotion or
+publication authority is implied.
 
 Related:
 
@@ -46,7 +46,7 @@ or promotion gate.
 | D — workload | Exactly **106 colour-swapped pairs / 212 games**: one pair per unique start. No modulo reuse. |
 | E — inference route | `policy-argmax-v1` is allowed only as a Stage-0 **lookahead-feature ablation** diagnostic. It is not training-route-aligned strength evidence. |
 | F — opponent | Keep the architecture-matched scratch-init bundle as a training-gain control. It is not a product-strength baseline. |
-| Freeze + run | **Deferred under `needs_decision`.** Technical readiness passes; a new explicit product authorization is required. |
+| Freeze + run | **Authorized on 23 July 2026** for one immutable CPU specification and its resumable 212-game ledger. |
 
 ## Purpose and claim boundary
 
@@ -212,10 +212,10 @@ focused readiness tests are complete. The audit ran from clean commit
 `b92d62e`; the exact commands and evidence are recorded in the readiness
 report.
 
-The sole remaining prerequisite is a new explicit product decision authorizing
-the reviewed CPU freeze and 212-game run. On that authorized turn, repeat the
-clean-state and absent-output checks before executing the reviewed command.
-Until then, no freeze or run command is authorized.
+The product owner supplied the remaining decision on 23 July 2026 by
+instructing Codex to start Stage 0. Repeat the clean-state and absent-output
+checks after committing this record, then execute only the reviewed CPU
+command. Any changed parameter or second run requires a new decision.
 
 ## Inconclusive-result governance
 
@@ -234,7 +234,6 @@ provided:
 
 Candidate and scratch bundles have passed CPU verification, and the runner
 and freeze prerequisites are now complete. The readiness verdict is
-`needs_decision`, not `fatal_stop`: no technical blocker remains, but freeze
-and paired execution remain forbidden pending a new product authorization.
-Promotion and publication remain outside this Stage-0 contract regardless of
-its eventual result.
+`ready_for_long_run`, scoped to this fixed Stage-0 evaluation rather than
+training. Freeze and paired execution are authorized once; promotion and
+publication remain outside this contract regardless of its eventual result.
