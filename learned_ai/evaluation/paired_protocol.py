@@ -59,6 +59,10 @@ class EvaluationSpec:
             raise EvaluationError("evaluation size and start positions must be positive")
         for fen in self.start_positions:
             BoardState.from_fen_string(fen)
+        if len(set(self.start_positions)) != len(self.start_positions):
+            raise EvaluationError("start positions must be unique")
+        if self.pairs > len(self.start_positions):
+            raise EvaluationError("pair count cannot exceed unique starts")
         if set(self.work_budget) != {"lookahead_rollouts_per_move"}:
             raise EvaluationError("work budget must use fixed lookahead rollouts")
         if self.work_budget["lookahead_rollouts_per_move"] != 0:

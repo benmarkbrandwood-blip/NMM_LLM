@@ -74,6 +74,34 @@ def test_spec_rejects_non_frozen_work_budget() -> None:
         )
 
 
+def test_spec_rejects_more_pairs_than_unique_starts() -> None:
+    with pytest.raises(EvaluationError, match="cannot exceed unique starts"):
+        EvaluationSpec(
+            evaluation_id="eval", candidate_bundle="a" * 64,
+            baseline_bundle="b" * 64,
+            start_positions=("........................|W|0|0",),
+            pairs=2, seed=1,
+            work_budget={"lookahead_rollouts_per_move": 0}, max_ply=10,
+            rules_version="v4", confidence_z=1.96,
+            acceptance_margin=0.0, rejection_margin=0.0,
+            runtime={},
+        )
+
+
+def test_spec_rejects_duplicate_start_positions() -> None:
+    fen = "........................|W|0|0"
+    with pytest.raises(EvaluationError, match="start positions must be unique"):
+        EvaluationSpec(
+            evaluation_id="eval", candidate_bundle="a" * 64,
+            baseline_bundle="b" * 64,
+            start_positions=(fen, fen), pairs=1, seed=1,
+            work_budget={"lookahead_rollouts_per_move": 0}, max_ply=10,
+            rules_version="v4", confidence_z=1.96,
+            acceptance_margin=0.0, rejection_margin=0.0,
+            runtime={},
+        )
+
+
 def _patch_runner_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     spec: EvaluationSpec,
