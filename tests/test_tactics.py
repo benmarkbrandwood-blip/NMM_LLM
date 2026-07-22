@@ -567,20 +567,33 @@ class TestB22EmergencyBlock(unittest.TestCase):
             "guarded position must score higher than unguarded position")
 
     def test_ai_counters_b2_b4_b6_mill_threat(self):
-        # B-22 regression: AI must counter Black's b2-b4-b6 mill threat.
-        # Accepted responses:
-        #   • fly to b6 (pure block)
-        #   • fly to g7 closing a7-d7-g7 mill and capture b4 (removes mill member,
-        #     strictly better: White gains a mill AND Black enters fly phase) — B-66
+        # B-22 regression: after White's move, Black must not be able to close
+        # b2-b4-b6 immediately.  Check the resulting position instead of
+        # enumerating selected move spellings: closing White's mill and
+        # capturing either b2 or b4 is as valid as occupying b6 directly.
         from ai.game_ai import GameAI
+        from game.rules import get_all_legal_moves
+
         b = self._b22_board()
-        ai = GameAI(difficulty=5, color="W")
+        ai = GameAI(
+            difficulty=5,
+            color="W",
+            override_node_budget=20_000,
+        )
         move = ai.choose_move(b)
-        dest    = move.get("to")
-        capture = move.get("capture")
-        counters_threat = dest == "b6" or capture == "b4"
-        self.assertTrue(counters_threat,
-            f"AI must block b6 or capture b4 to counter Black's mill; chose {move}")
+        after = b.apply_move(move)
+        black_can_close_b_line = any(
+            reply.get("to") == "b6"
+            and all(
+                after.apply_move(reply).positions[sq] == "B"
+                for sq in ("b2", "b4", "b6")
+            )
+            for reply in get_all_legal_moves(after)
+        )
+        self.assertFalse(
+            black_can_close_b_line,
+            f"AI must neutralise Black's immediate b-line mill; chose {move}",
+        )
 
 
 class TestB36CardinalMillBlock(unittest.TestCase):
