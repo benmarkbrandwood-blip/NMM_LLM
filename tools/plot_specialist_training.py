@@ -188,12 +188,12 @@ def _get_recovery_events(rows: list[dict]) -> dict[str, list[tuple[int, dict]]]:
 
 # ── Drawing helpers ───────────────────────────────────────────────────────────
 
-def _plot_series(ax, xs, ys, label, color, window=SMOOTH, alpha_raw=0.15):
+def _plot_series(ax, xs, ys, label, color, window=SMOOTH, alpha_raw=0.15, linestyle="-"):
     if not ys:
         return
     smoothed = _smooth(ys, window)
     ax.plot(xs, ys, color=color, alpha=alpha_raw, linewidth=0.6)
-    ax.plot(xs, smoothed, color=color, linewidth=1.6, label=label)
+    ax.plot(xs, smoothed, color=color, linewidth=1.6, label=label, linestyle=linestyle)
 
 
 def _draw_advances(axes_col: list, advances: list[tuple[int, int]]) -> None:
@@ -345,7 +345,7 @@ def draw(fig, _axes_unused, specialists):
         xs_rt, ys_rt = _get(rows, "reward_total_mean")
         xs_rs, ys_rs = _get(rows, "reward_sentinel_mean")
         xs_rh, ys_rh = _get(rows, "reward_heuristic_mean")
-        _plot_series(ax_rew, xs_rt, ys_rt, "total",     "#FFEB3B", alpha_raw=0.20)
+        _plot_series(ax_rew, xs_rt, ys_rt, "total",     "#FFEB3B", alpha_raw=0.20, linestyle="--")
         _plot_series(ax_rew, xs_rs, ys_rs, "sentinel",  "#00BCD4", alpha_raw=0.20)
         _plot_series(ax_rew, xs_rh, ys_rh, "heuristic", "#FF9800", alpha_raw=0.20)
         ax_rew.axhline(0, color="white", alpha=0.20, linewidth=0.7, linestyle="--")
