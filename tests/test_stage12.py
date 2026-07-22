@@ -284,8 +284,12 @@ class TestValueNetTrain(unittest.TestCase):
         board = _new_game()
         X = board_to_features(board, "W").reshape(1, -1).astype(np.float32)
         y = np.array([1.0], dtype=np.float32)
-        net.train(X, y, epochs=100, batch_size=1, lr=0.01)
+        before = net.predict_batch(X)[0]
+        losses = net.train(X, y, epochs=100, batch_size=1, lr=0.01)
         pred = net.predict_batch(X)[0]
+        self.assertEqual(len(losses), 100)
+        self.assertGreater(losses[0], 0.0, "Singleton training must run an update")
+        self.assertGreater(pred, before, "Output should move toward the +1 target")
         self.assertGreater(pred, 0.0, "After training toward +1, output should be positive")
 
 

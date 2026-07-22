@@ -128,7 +128,10 @@ class ValueNet:
         N   = len(X)
 
         # Train / val split (shuffle once before splitting)
-        n_val = max(1, int(N * val_frac)) if (val_frac > 0 and patience > 0) else 0
+        if N > 1 and val_frac > 0 and patience > 0:
+            n_val = min(N - 1, max(1, int(N * val_frac)))
+        else:
+            n_val = 0
         order = rng.permutation(N)
         X, y  = X[order], y[order]
         if n_val > 0:
