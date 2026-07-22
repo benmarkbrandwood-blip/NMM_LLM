@@ -38,6 +38,7 @@ _STARTS = (
     / "experiments"
     / "dev-v4-formal-paired-eval-v1-start-positions.json"
 )
+_OWNER_EXCLUDED_FEN = ".BB..B.WBWBW.BWWW....WW.|B|8|7"
 
 
 def _git(root: Path, *args: str) -> str:
@@ -136,12 +137,45 @@ def test_generated_oracle_corpus_reproduces_all_projection_evidence() -> None:
     audit = validate_corpus_artifact(payload)
 
     assert audit == {
-        "starts": 107,
-        "ring16_orbits": 107,
-        "direct_sources": 108,
+        "starts": 106,
+        "ring16_orbits": 106,
+        "direct_sources": 107,
+        "excluded_starts": 1,
         "pending_removals": 2,
     }
-    assert payload["status"] == "generated_for_owner_review"
+    assert payload["status"] == "owner_review_complete_not_frozen"
+    assert payload["owner_review"] == {
+        "status": "complete",
+        "decision_date": "2026-07-22",
+        "reviewed_start_count": 107,
+        "accepted_start_count": 106,
+        "excluded_starts": [
+            {
+                "original_review_index": 101,
+                "disposition": "remove",
+                "fen": _OWNER_EXCLUDED_FEN,
+                "ring16_canonical_fen": (
+                    "....W.WW.WBWBWWB..BB.W.B|B|8|7"
+                ),
+                "sources": [
+                    {
+                        "action": "p",
+                        "nmm_illegal_oracle_moves": ["c3"],
+                        "nmm_legal_oracle_moves": [],
+                        "oracle_moves": ["c3"],
+                        "raw_key": (
+                            "****OO*O/O@O*@OO@/@@**@*O* b p p 8 1 6 2 0 0 "
+                            "-1 -1 -1 -1 0 0 8 ids:nodes"
+                        ),
+                        "raw_key_sha256": EXPECTED_INVALID_ORACLE_MOVE[
+                            "raw_key_sha256"
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    assert _OWNER_EXCLUDED_FEN not in starts
     assert starts == payload["start_positions"]
     assert hashlib.sha256(_STARTS.read_bytes()).hexdigest() == payload[
         "start_positions_artifact"
@@ -151,7 +185,7 @@ def test_generated_oracle_corpus_reproduces_all_projection_evidence() -> None:
         "review_assets"
     ]["manifest_file_sha256"]
     assert payload["automated_audit"]["phase_counts"] == {
-        "placement": 107,
+        "placement": 106,
         "movement": 0,
         "flying": 0,
     }
@@ -164,6 +198,6 @@ def test_generated_oracle_corpus_reproduces_all_projection_evidence() -> None:
 
 def test_generated_review_images_match_their_manifest() -> None:
     assert validate_review_manifest(_ASSETS) == {
-        "individual_images": 107,
+        "individual_images": 106,
         "contact_sheets": 9,
     }

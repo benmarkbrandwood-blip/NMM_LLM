@@ -1,14 +1,14 @@
 # Formal Paired Evaluation v1 — Expert Decision Record
 
-Date: 21 July 2026
+Date: 21 July 2026; owner review updated 22 July 2026
 
 Evaluation ID: `dev-v4-formal-paired-eval-v1`
 
 Audience: product owner, evaluation reviewer, and domain expert
 
-Status: **fatal stop; freeze and run are not authorized**. The runner repair
-prerequisites are complete in the current change; corpus freeze, review, and
-authorization prerequisites remain open.
+Status: **fatal stop; freeze and run are not authorized**. Runner repair and
+owner corpus review are complete; a clean tracked freeze state, repeated
+readiness evidence, and new authorization remain open.
 
 Related:
 
@@ -22,23 +22,26 @@ The original 64-start proposal and the later one-endpoint-per-named-line
 proposal are both rejected. At review time, the runner also had a
 draw-lifecycle defect that could abort a valid game and leave a
 non-restartable partial ledger. Those runner defects and their focused
-regressions are now repaired. A corrected 107-start replacement and its PNG
-review package are generated, but no current corpus may be frozen and no paired
-evaluation may run because owner acceptance and the remaining freeze
-prerequisites are not complete.
+regressions are now repaired. The owner reviewed the corrected 107-candidate
+package, requested removal of original review position 101, and accepted the
+other 106. The owner-reviewed package is generated, but no corpus may be frozen
+and no paired evaluation may run until the remaining freeze prerequisites are
+complete.
 
-The next reviewable experiment may use the 107 unique, playable stable
-positions obtained from the 108 Sanmill `action=p` move-oracle keys. The other
-two of 110 raw keys are pending removals and are retained only as successor
-provenance. That experiment is a **Stage-0 placement-opening training-signal
-diagnostic**, not a formal playing-strength or promotion gate.
+The next reviewable experiment may use 106 unique, playable stable positions
+selected from the 107 FENs obtained from the 108 Sanmill `action=p`
+move-oracle keys. Original review position 101 is retained only as excluded
+provenance. The other two of 110 raw keys are pending removals and are retained
+only as successor provenance. That experiment is a **Stage-0
+placement-opening training-signal diagnostic**, not a formal playing-strength
+or promotion gate.
 
 | Decision item | Recorded decision |
 | --- | --- |
-| A — start definition | Use the **107 unique playable stable Oracle positions** for the proposed repaired Stage-0 diagnostic. Reject pending-removal keys and one synthetic endpoint per named line as direct starts. |
+| A — start definition | Use the **106 owner-accepted unique playable stable Oracle positions** for the proposed repaired Stage-0 diagnostic. Exclude original review position 101; reject pending-removal keys and one synthetic endpoint per named line as direct starts. |
 | B — source scope | Oracle-only for Stage 0. Named lines remain audit evidence, not the frozen start set. |
-| C — phase coverage | All 107 starts are placement phase. There are no movement- or flying-phase starts. This is an explicit non-claim, not adequate release coverage. |
-| D — workload | Exactly **107 colour-swapped pairs / 214 games**: one pair per unique start. No modulo reuse. |
+| C — phase coverage | All 106 starts are placement phase. There are no movement- or flying-phase starts. This is an explicit non-claim, not adequate release coverage. |
+| D — workload | Exactly **106 colour-swapped pairs / 212 games**: one pair per unique start. No modulo reuse. |
 | E — inference route | `policy-argmax-v1` is allowed only as a Stage-0 **lookahead-feature ablation** diagnostic. It is not training-route-aligned strength evidence. |
 | F — opponent | Keep the architecture-matched scratch-init bundle as a training-gain control. It is not a product-strength baseline. |
 | Freeze + run | **Deferred under fatal stop.** A new explicit product authorization is required after every prerequisite below is complete. |
@@ -105,7 +108,7 @@ It was a deterministic approximately five-percent slice of the available
 book-derived orbit pool. It must not be relabelled or frozen as the final
 corpus.
 
-### Oracle projection is 107 stable starts, not 109
+### Oracle projection yields 107 candidates; owner review selects 106
 
 Sanmill provides 110 raw move-oracle keys: 108 stable placement
 (`action=p`) keys and two pending-removal (`action=r`) keys. NMM compact FEN
@@ -115,26 +118,28 @@ their successors duplicate selected starts exactly or under ring16.
 
 The 108 stable keys produce exactly **107** unique NMM FENs because one pair
 differs only in a trailing counter that NMM FEN does not encode. The 107 FENs
-also occupy 107 ring16 orbits and are all playable.
+also occupy 107 ring16 orbits and are all playable. The owner excluded original
+review position 101 and accepted the other 106, which remain exact/ring16
+unique.
 
-All 107 starts are placement phase, with total placed-piece count from 0
-through 16. There are **zero movement starts and zero flying starts**.
+All 106 selected starts are placement phase, with total placed-piece count from
+0 through 16. There are **zero movement starts and zero flying starts**.
 Games may later enter those phases, but that does not replace controlled
 movement- or flying-start coverage.
 
 Of 439 source move recommendations, 438 match NMM legal moves. One record
-recommends occupied `c3`; the corresponding start itself has 17 legal moves.
-The corpus uses Oracle positions, not Oracle recommendations, so that start is
-retained with an explicit source warning. The defect prevents a blanket claim
-that all Oracle recommendations are valid.
+recommends occupied `c3`; the corresponding source candidate itself has 17
+legal moves but is original review position 101. It is excluded from the
+selected corpus and retained only as audit provenance. The defect prevents a
+blanket claim that all source Oracle recommendations are valid.
 
 Sanmill documentation describes the Oracle as its own engine-derived table,
 not as a direct export of the NMM_LLM training opening book. It would therefore
 be inaccurate to call every Oracle key the same artifact as the training book.
 However, the overlap audit found:
 
-- **28 of 107** Oracle orbits on a named-line trajectory;
-- **23 of 107** Oracle orbits on the first eight plies of a named line.
+- **28 of 106** selected Oracle orbits on a named-line trajectory;
+- **23 of 106** selected Oracle orbits on the first eight plies of a named line.
 
 Combined with the early-placement-only distribution and the named-line source
 overlap, this corpus has not been demonstrated to be held out or
@@ -175,7 +180,7 @@ colour-swapped pair.
 The old 64-start / 256-pair proposal copied each deterministic result four
 times. Treating those copies as 256 observations would artificially narrow the
 reported interval. For this route, `pairs` must equal the number of unique
-starts: 107 pairs and 214 games.
+starts: 106 pairs and 212 games.
 
 The normal interval is an engineering summary of variation across the fixed
 start corpus. It must not be described as a population confidence interval
@@ -200,15 +205,14 @@ Runner draw handling, recoverable valid-prefix resume, fail-closed malformed
 evidence, and their focused tests are complete in the current change. The
 following remain mandatory:
 
-1. Have the owner review the generated 107-position list and PNG package.
-2. Freeze from a clean, tracked commit. At review time the branch was ahead of
+1. Freeze from a clean, tracked commit. At review time the branch was ahead of
    `origin/dev` and the experiment documents and draft artifacts were
    uncommitted; the live state must be rechecked rather than inferred from this
    historical observation.
-3. Repeat the focused evaluation/readiness verification from that commit.
-4. Obtain a new explicit product decision authorizing freeze and run.
+2. Repeat the focused evaluation/readiness verification from that commit.
+3. Obtain a new explicit product decision authorizing freeze and run.
 
-Until all four are complete, no exact freeze or run command is approved.
+Until all three are complete, no exact freeze or run command is approved.
 
 ## Inconclusive-result governance
 
@@ -228,4 +232,5 @@ provided:
 Candidate and scratch bundles have passed CPU verification, and the runner
 repair prerequisites are now complete. That does not clear the fatal stop.
 Freeze, paired execution, promotion, and publication remain forbidden pending
-the corpus and freeze prerequisites and a new product authorization.
+the clean freeze state, repeated readiness evidence, and a new product
+authorization.

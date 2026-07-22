@@ -22,7 +22,7 @@
       "trajectory_ring16_orbit_count": 1810
     },
     "oracle_move_legality": {
-      "disposition": "retain the playable start position; source moves are provenance only and are not evaluation actions",
+      "disposition": "the sole invalid recommendation belongs to the start excluded by owner review; source moves remain provenance only",
       "invalid_records": [
         {
           "action": "p",
@@ -35,22 +35,23 @@
       "invalid_source_moves": 1,
       "valid_source_moves": 438
     },
+    "owner_excluded_starts": 1,
     "pending_action_r_keys": 2,
     "phase_counts": {
       "flying": 0,
       "movement": 0,
-      "placement": 107
+      "placement": 106
     },
-    "playable_starts": 107,
+    "playable_starts": 106,
     "raw_oracle_keys": 110,
-    "selected_ring16_orbits": 107,
+    "selected_ring16_orbits": 106,
     "stable_action_p_keys": 108,
     "starts_without_legal_moves": 0,
     "terminal_starts": 0,
     "total_placed_max": 16,
     "total_placed_min": 0
   },
-  "corpus_identity": "ce1e424db158ef4605e8ecbb76984b42f63d8ad74fe86841f980746e4d748224",
+  "corpus_identity": "ed4c86899f9ea5605c8129ca7d3585ccca9363ef7842f39ecd5c453c7248eeb0",
   "entries": [
     {
       "fen": "........................|W|0|0",
@@ -4215,43 +4216,8 @@
       "terminal": false
     },
     {
-      "fen": ".BB..B.WBWBW.BWWW....WW.|B|8|7",
-      "index": 101,
-      "legal_move_count": 17,
-      "named_line_overlap": {
-        "any_trajectory": false,
-        "first_eight_plies": false
-      },
-      "phase": "place",
-      "pieces": {
-        "black_on_board": 6,
-        "black_placed": 7,
-        "total_placed": 15,
-        "white_on_board": 8,
-        "white_placed": 8
-      },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-101.png",
-      "ring16_canonical_fen": "....W.WW.WBWBWWB..BB.W.B|B|8|7",
-      "side_to_move": "B",
-      "sources": [
-        {
-          "action": "p",
-          "nmm_illegal_oracle_moves": [
-            "c3"
-          ],
-          "nmm_legal_oracle_moves": [],
-          "oracle_moves": [
-            "c3"
-          ],
-          "raw_key": "****OO*O/O@O*@OO@/@@**@*O* b p p 8 1 6 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
-          "raw_key_sha256": "904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1"
-        }
-      ],
-      "terminal": false
-    },
-    {
       "fen": "BW.B.BWB.BWWBWBW.....W.W|B|8|7",
-      "index": 102,
+      "index": 101,
       "legal_move_count": 9,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4265,7 +4231,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-102.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-101.png",
       "ring16_canonical_fen": ".....W.W.BWWBWBWBW.B.BWB|B|8|7",
       "side_to_move": "B",
       "sources": [
@@ -4286,7 +4252,7 @@
     },
     {
       "fen": "WB.B.BW.BW.WBWWB...B.W.W|B|8|7",
-      "index": 103,
+      "index": 102,
       "legal_move_count": 9,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4300,7 +4266,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-103.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-102.png",
       "ring16_canonical_fen": "...B.W.WBW.WBWWBWB.B.BW.|B|8|7",
       "side_to_move": "B",
       "sources": [
@@ -4321,7 +4287,7 @@
     },
     {
       "fen": "WWBBWB..WB.W.WBB...B.W.W|B|8|7",
-      "index": 104,
+      "index": 103,
       "legal_move_count": 9,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4335,7 +4301,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-104.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-103.png",
       "ring16_canonical_fen": "...B.W.WWB.W.WBBWWBBWB..|B|8|7",
       "side_to_move": "B",
       "sources": [
@@ -4360,7 +4326,7 @@
     },
     {
       "fen": "...B.B.BWWB.WBBWW...BWWW|W|8|8",
-      "index": 105,
+      "index": 104,
       "legal_move_count": 9,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4374,7 +4340,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-105.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-104.png",
       "ring16_canonical_fen": "...B.B.BBWWWBBW...WWWWB.|W|8|8",
       "side_to_move": "W",
       "sources": [
@@ -4397,7 +4363,7 @@
     },
     {
       "fen": ".W.B.W.BWWBWBBWB.B.B.W.W|W|8|8",
-      "index": 106,
+      "index": 105,
       "legal_move_count": 8,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4411,7 +4377,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-106.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-105.png",
       "ring16_canonical_fen": ".B.B.W.WBWBWWBWB.B.W.B.W|W|8|8",
       "side_to_move": "W",
       "sources": [
@@ -4434,7 +4400,7 @@
     },
     {
       "fen": ".WWB.B.B.BWWBWBWW....BWB|W|8|8",
-      "index": 107,
+      "index": 106,
       "legal_move_count": 15,
       "named_line_overlap": {
         "any_trajectory": false,
@@ -4448,7 +4414,7 @@
         "white_on_board": 8,
         "white_placed": 8
       },
-      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-107.png",
+      "review_png": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus/positions/oracle-106.png",
       "ring16_canonical_fen": "....WBWBBWWB.WBW.BWW.B.B|W|8|8",
       "side_to_move": "W",
       "sources": [
@@ -4469,10 +4435,38 @@
     }
   ],
   "evaluation_id": "dev-v4-formal-paired-eval-v1",
+  "owner_review": {
+    "accepted_start_count": 106,
+    "decision_date": "2026-07-22",
+    "excluded_starts": [
+      {
+        "disposition": "remove",
+        "fen": ".BB..B.WBWBW.BWWW....WW.|B|8|7",
+        "original_review_index": 101,
+        "ring16_canonical_fen": "....W.WW.WBWBWWB..BB.W.B|B|8|7",
+        "sources": [
+          {
+            "action": "p",
+            "nmm_illegal_oracle_moves": [
+              "c3"
+            ],
+            "nmm_legal_oracle_moves": [],
+            "oracle_moves": [
+              "c3"
+            ],
+            "raw_key": "****OO*O/O@O*@OO@/@@**@*O* b p p 8 1 6 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+            "raw_key_sha256": "904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1"
+          }
+        ]
+      }
+    ],
+    "reviewed_start_count": 107,
+    "status": "complete"
+  },
   "projection_contract": {
     "board_mapping": "Sanmill node-id Mill FEN via NMM_POSITION_ORDER_NODES",
     "pending_removal_disposition": "apply the sole Oracle removal for provenance, then require the successor to match an already selected ring16 orbit",
-    "selection_order": "total placed pieces ascending, then NMM FEN",
+    "selection_order": "total placed pieces ascending, then NMM FEN; apply the recorded owner-review exclusion; reindex contiguously",
     "stable_start_action": "p",
     "symmetry": "D4 x inner/outer-ring swap (ring16)"
   },
@@ -4525,12 +4519,12 @@
   "review_assets": {
     "contact_sheet_count": 9,
     "directory": "assets/dev-v4-formal-paired-eval-v1-oracle-corpus",
-    "individual_image_count": 107,
+    "individual_image_count": 106,
     "manifest": "manifest.json",
-    "manifest_file_sha256": "0ff082e4eb7c4a3b41c3ff4708deaa3c4c2a95f2fafe56976ec2af06b36e0ab0",
-    "manifest_identity": "350224dcfd00932975c5164a1df7bad95ec70ba708b477fc5a56f86006e16d88"
+    "manifest_file_sha256": "4a3a229ffc18f4fd91aba5014347c733cf1f0f0e356c43e84ac268070c225918",
+    "manifest_identity": "5fc96de3dd63adb2d366c3bf249c6a7548347c7e3653041f65ad3e2cc45f0c81"
   },
-  "schema_version": "nmm.oracle-start-corpus.v1",
+  "schema_version": "nmm.oracle-start-corpus.v2",
   "source": {
     "asset_path": "src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
     "asset_schema_version": 1,
@@ -4641,7 +4635,6 @@
     ".W.B.W.BWBBWWB.WB....W.B|W|7|7",
     "BW.B..WWWBBWWWBB.......B|W|7|7",
     "W....BWWBB.BWWWW.......B|W|7|7",
-    ".BB..B.WBWBW.BWWW....WW.|B|8|7",
     "BW.B.BWB.BWWBWBW.....W.W|B|8|7",
     "WB.B.BW.BW.WBWWB...B.W.W|B|8|7",
     "WWBBWB..WB.W.WBB...B.W.W|B|8|7",
@@ -4650,9 +4643,9 @@
     ".WWB.B.B.BWWBWBWW....BWB|W|8|8"
   ],
   "start_positions_artifact": {
-    "file_sha256": "2175d5ee5fdb555fff1fc4ee5b4495ed9f65fa369c8682d5d1d678b6cd6b588a",
+    "file_sha256": "80c8502f9b4d13ef4aa749200f6b59530de8b5d4e28d8fb10222a15dd40398d7",
     "path": "dev-v4-formal-paired-eval-v1-start-positions.json"
   },
-  "start_positions_sha256": "87065c99a38109d081459151a5e5700f233d5a6489071fa0ef54fd38c55b03ab",
-  "status": "generated_for_owner_review"
+  "start_positions_sha256": "04bc5782ab79ebeba34d0ff91bcd40fe05e823d539b16ba234b5eedcd123bb9d",
+  "status": "owner_review_complete_not_frozen"
 }

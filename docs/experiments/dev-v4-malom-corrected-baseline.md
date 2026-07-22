@@ -12,10 +12,11 @@ resolved on `dev`. The authorized managed long run
 `managed-v4-baseline-v1` reached `managed_plan_completed` with
 `completed_games=5000` / `completed_segments=20` on 21 July 2026 (UTC). Training
 completion is not playing-strength evidence and does not authorize promotion.
-The paired-runner repair is complete and a corrected 107-start replacement
-package is generated, but the next evaluation proposal remains under fatal
-stop pending owner corpus acceptance, a clean freeze point, readiness
-verification, and new product authorization; see
+The paired-runner repair is complete. The owner reviewed the 107 generated
+candidates, removed original position 101, and accepted the resulting
+106-start package. The next evaluation proposal remains under fatal stop
+pending a clean freeze point, readiness verification, and new product
+authorization; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -122,30 +123,33 @@ Formal evaluation remains separate from training completion. The candidate and
 architecture-matched scratch-init bundles have been exported and CPU-verified,
 but expert review invalidated the original 64-start / 256-pair freeze proposal
 and found draw-lifecycle and partial-ledger defects in the paired runner. Those
-runner prerequisites are now repaired and covered by focused tests. Freeze,
-execution, promotion, and publication remain unauthorized because owner corpus
-acceptance, freeze evidence, and new authorization are outstanding.
+runner prerequisites are now repaired and covered by focused tests. The owner
+reviewed all 107 generated candidates, excluded original position 101, and
+accepted the other 106. Freeze, execution, promotion, and publication remain
+unauthorized because a clean freeze state, readiness evidence, and new
+authorization are outstanding.
 The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
 [`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md).
 
-After owner corpus acceptance, a clean tracked freeze point, readiness
-verification, and new product authorization, the next proposed experiment is
-only a Stage-0 training-signal diagnostic:
+After a clean tracked freeze point, readiness verification, and new product
+authorization, the next proposed experiment is only a Stage-0 training-signal
+diagnostic:
 
-- 107 unique playable stable positions from 108 Sanmill `action=p` keys, with
-  two pending-removal keys retained only as successor provenance;
-- placement 107 / movement 0 / flying 0;
-- exactly 107 colour-swapped pairs / 214 games, with no deterministic start
+- 106 owner-accepted unique playable stable positions selected from 107 FENs
+  projected from 108 Sanmill `action=p` keys, with original review position 101
+  excluded and two pending-removal keys retained only as successor provenance;
+- placement 106 / movement 0 / flying 0;
+- exactly 106 colour-swapped pairs / 212 games, with no deterministic start
   reuse;
 - `policy-argmax-v1` versus the verified scratch-init control;
 - the normal interval described only as variation across the fixed convenience
   corpus.
 
 The Oracle is separately engine-derived rather than a direct training-book
-export, but 28 of 107 positions overlap named-line trajectories and the full
-set is early placement. It is therefore not demonstrated held-out or
+export, but 28 of 106 selected positions overlap named-line trajectories and
+the full set is early placement. It is therefore not demonstrated held-out or
 training-disjoint. The evaluation also zeroes the 72-feature lookahead block
 used during training, so even an accepted result is ablation evidence, not a
 training-route-aligned strength or promotion result.

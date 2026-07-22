@@ -27,7 +27,7 @@ contract ambiguities without asking the maintainer to restate them:
 | Resolved contract | The existing ValueNet remains an outcome-value estimator; the imported next-move ranking proposal is a separate HumanPolicy research path, not a replacement ValueNet checkpoint |
 | Resolved contract | GapNet retains its implemented current-position target: best composite move quality minus frequency-weighted human-play quality |
 | Conditional evidence | The seven imported checkpoints need additional maintainer lineage only if a future experiment proposes to adopt or describe them as corrected inputs |
-| External review | The 107-position Oracle review, especially source intent for start 101, gates only the separate Stage-0 diagnostic freeze |
+| External review | Complete: the owner excluded original Oracle position 101 and accepted the remaining 106; the resulting package still gates only the separate Stage-0 diagnostic freeze |
 
 Do not begin any retraining stage until a new experiment document records
 inputs, output isolation, fixed work, tests, checkpoint roles, and explicit

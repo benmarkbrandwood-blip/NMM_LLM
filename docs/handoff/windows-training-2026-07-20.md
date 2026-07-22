@@ -14,12 +14,14 @@ The next proposed step, `dev-v4-formal-paired-eval-v1`, is under
 one-endpoint-per-named-line alternative and established that
 `policy-argmax-v1` zeroes a lookahead feature block used during training. The
 draw-lifecycle and partial-ledger restart defects found in the paired runner
-are now repaired and covered by focused tests. The only current proposal is a
-107-start, placement-only Stage-0 training-signal diagnostic against scratch
-initialization. Its replacement corpus and PNG package are generated and
-audited, but owner acceptance, a clean freeze state, readiness evidence, and
-new authorization remain incomplete. It is not a formal strength or promotion
-gate, and freeze/run remain unauthorized.
+are now repaired and covered by focused tests. The owner reviewed all 107
+generated candidates, requested removal of original review position 101, and
+accepted the remaining 106. The only current proposal is therefore a
+106-start, placement-only Stage-0 training-signal diagnostic against scratch
+initialization. Its replacement corpus and PNG package are regenerated and
+audited, but a clean freeze state, readiness evidence, and new authorization
+remain incomplete. It is not a formal strength or promotion gate, and
+freeze/run remain unauthorized.
 
 The maintainer's latest `main` history and 21/22 July staged upload have now
 been integrated and audited without activating their databases or checkpoints.
@@ -548,24 +550,25 @@ stop because:
 - the proposed `policy-argmax-v1` route zeroes the 72-feature lookahead block
   supplied during training.
 
-The proposed Stage-0 diagnostic is 107 unique stable Oracle-projected starts,
-one colour-swapped pair per start, for 214 games against the verified
-scratch-init control. Sanmill documents the Oracle as independently
-engine-derived, but 28 of 107 positions overlap named-line trajectories and all
-positions are early placement. It is not demonstrated held-out or
-training-disjoint. Stage 0 therefore tests only whether a training signal is
+The proposed Stage-0 diagnostic is 106 owner-accepted unique stable
+Oracle-projected starts, one colour-swapped pair per start, for 212 games
+against the verified scratch-init control. Sanmill documents the Oracle as
+independently engine-derived, but 28 of 106 selected positions overlap
+named-line trajectories and all positions are early placement. It is neither
+demonstrated held out nor training-disjoint. Stage 0 therefore tests only
+whether a training signal is
 visible under a placement-only feature ablation; it is not a strength or
 promotion gate.
 
 The generated freeze-compatible list has canonical `start_positions_sha256`
-`87065c99a38109d081459151a5e5700f233d5a6489071fa0ef54fd38c55b03ab`.
-The audit artifact remains `generated_for_owner_review`; it links 107
+`04bc5782ab79ebeba34d0ff91bcd40fe05e823d539b16ba234b5eedcd123bb9d`.
+The audit artifact is `owner_review_complete_not_frozen`; it links 106
 individual PNGs and nine contact sheets. Automated replay found 438 legal
 source recommendations and one illegal `c3` recommendation. The associated
-start itself is playable, so it remains in the corpus with a red source
-warning. Codex inspected every contact sheet plus representative full-size
-images. The combined corpus/evaluation focused suite reports `20 passed`;
-owner acceptance is still required.
+source candidate is the owner-excluded original position 101 and remains only
+as provenance. Codex inspected every regenerated contact sheet, the
+post-exclusion boundary images, and the excluded panel. The combined
+corpus/evaluation focused suite reports `20 passed`; owner review is complete.
 
 The controlling records are:
 
@@ -702,13 +705,13 @@ Proceed in this order:
    the `dev` resume lineage. Ask for additional checkpoint lineage only if a
    future experiment proposes to adopt one; use the locally resolved Sentinel,
    ValueNet/HumanPolicy, and GapNet boundaries recorded in the retraining plan.
-3. Let the maintainer finish the generated 107-position and PNG review. Start
-   101 remains open for source intent; the withdrawn concern about 83 is not a
-   corpus defect.
-4. After owner corpus acceptance, reconcile the freeze artifacts in a clean
-   tracked commit and repeat focused evaluation/readiness checks.
+3. Preserve the completed owner review: original review position 101 is
+   excluded, the other 106 are accepted, and the withdrawn concern about 83 is
+   not a corpus defect.
+4. Reconcile the owner-reviewed freeze artifacts in a clean tracked commit and
+   repeat focused evaluation/readiness checks.
 5. Request an explicit product authorization before freezing or running the
-   Stage-0 diagnostic. Use 107 pairs / 214 games with no start reuse, and do
+   Stage-0 diagnostic. Use 106 pairs / 212 games with no start reuse, and do
    not treat acceptance as promotion evidence.
 6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2

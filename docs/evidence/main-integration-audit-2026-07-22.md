@@ -178,7 +178,8 @@ history without asking the maintainer to reconstruct details now. Additional
 lineage becomes necessary only if a future experiment proposes to adopt one or
 describe it as corrected.
 
-The remaining active maintainer input is completion of the 107-position Oracle
-review, including the still-open source intent for start 101. That review gates
-only the separate Stage-0 corpus freeze. It does not block local safety fixes,
-the Git integration, or the contract dispositions above.
+The 107-position Oracle review is now complete. The owner recommended removing
+original review position 101 and accepted the remaining 106. That disposition
+has been recorded in the regenerated corpus package; it does not by itself
+authorize the separate Stage-0 corpus freeze or run. The seven checkpoint
+lineage conditions above remain conditional on future adoption.

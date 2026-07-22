@@ -1,9 +1,10 @@
 # Corpus Review Record — `dev-v4-formal-paired-eval-v1`
 
-Status: **the 64-position draft is rejected and superseded**. A 107-position
-replacement and PNG review package have been generated and audited, but the
-replacement remains `generated_for_owner_review`. Owner acceptance, corpus
-freeze, and freeze/run authorization remain under fatal stop.
+Status: **the 64-position draft is rejected and superseded**. The owner
+completed review of the 107 generated candidates, requested removal of original
+review position 101, and accepted the rest. The resulting 106-position package
+is `owner_review_complete_not_frozen`. Corpus freeze, readiness evidence, and
+freeze/run authorization remain under fatal stop.
 
 Related:
 
@@ -75,7 +76,7 @@ first four placements from a sampled opening in 50% of games, but the log does
 not record the selected opening identifier. Exact exposure frequency cannot be
 reconstructed.
 
-## Generated replacement
+## Generated replacement and owner-reviewed selection
 
 The replacement deliberately preserves Sanmill's staged action state. Its
 compact key has 108 stable placement (`action=p`) records and two pending
@@ -85,32 +86,37 @@ captures were applied for provenance; one successor exactly matches a selected
 start and the other matches a selected ring16 orbit.
 
 The 108 stable records project to 107 exact NMM FENs because one pair differs
-only in a source counter that NMM FEN does not encode. Those 107 FENs are also
-unique under Sanmill's ring16 contract. The earlier 109 count incorrectly
-dropped the pending-removal action state before projection and is superseded.
+only in a source counter that NMM FEN does not encode. Those 107 source
+candidates are also unique under Sanmill's ring16 contract. The earlier 109
+count incorrectly dropped the pending-removal action state before projection
+and is superseded. Owner review then excluded original review position 101, so
+the accepted diagnostic corpus contains 106 exact/ring16-unique FENs.
 
 | Required property | Audited value |
 | --- | --- |
 | Raw Oracle keys | 110 |
 | Stable `action=p` keys | 108 |
 | Pending `action=r` keys | 2, retained as successor evidence only |
-| Unique stable NMM FENs | 107 |
-| Unique 16-way symmetry orbits | 107 |
-| Playable starts | 107 |
-| Phase mix | placement 107 / movement 0 / flying 0 |
+| Unique stable source-candidate NMM FENs | 107 |
+| Owner exclusions | 1 (original review position 101) |
+| Selected unique 16-way symmetry orbits | 106 |
+| Playable selected starts | 106 |
+| Phase mix | placement 106 / movement 0 / flying 0 |
 | Total placed-piece range | 0–16 |
 | Starts without a legal move / terminal starts | 0 / 0 |
-| Overlap with any named-line trajectory | 28 / 107 |
-| Overlap within the first eight named-line plies | 23 / 107 |
+| Overlap with any named-line trajectory | 28 / 106 |
+| Overlap within the first eight named-line plies | 23 / 106 |
 
 The Oracle contains 439 recorded move recommendations. NMM legality replay
 matched 438. One stable key recommends placement at occupied `c3`; its key
 SHA-256 is
 `904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1`.
-The corresponding start itself is playable and has 17 legal moves. Oracle
-moves are provenance annotations, not forced evaluation actions, so the start
-is retained and its image carries a red source-warning banner. This defect
-further limits any claim about Oracle move quality.
+The corresponding source candidate itself is playable and has 17 legal moves,
+but it is original review position 101 and is excluded by the owner's final
+decision. The invalid source recommendation remains recorded as excluded
+provenance; none of the 106 selected entries has an invalid Oracle
+recommendation. This source defect still limits any blanket claim about Oracle
+move quality.
 
 Sanmill documents the move Oracle as independently engine-derived; it is not
 accurate to call it a direct export of the NMM_LLM training book. The measured
@@ -123,7 +129,7 @@ training-disjoint claim. Review material must call it a
 
 All repository links below are relative to this document:
 
-- [freeze-compatible 107-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json)
+- [freeze-compatible 106-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json)
 - [projection and audit artifact](dev-v4-formal-paired-eval-v1-oracle-corpus.json)
 - [PNG manifest](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/manifest.json)
 
@@ -137,7 +143,7 @@ Contact sheets:
 - [061–072](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-06.png)
 - [073–084](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-07.png)
 - [085–096](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-08.png)
-- [097–107](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-09.png)
+- [097–106](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-09.png)
 
 The package was generated from the repository root with
 `python scripts/build_formal_eval_oracle_corpus.py`. The builder resolves the
@@ -146,30 +152,29 @@ source commit and asset SHA-256, and refuses to overwrite an existing package.
 
 | Identity | SHA-256 |
 | --- | --- |
-| Canonical `start_positions` | `87065c99a38109d081459151a5e5700f233d5a6489071fa0ef54fd38c55b03ab` |
-| Freeze-compatible list file | `2175d5ee5fdb555fff1fc4ee5b4495ed9f65fa369c8682d5d1d678b6cd6b588a` |
-| Corpus artifact identity | `ce1e424db158ef4605e8ecbb76984b42f63d8ad74fe86841f980746e4d748224` |
-| Corpus artifact file | `a831defbfd8d586c9e0b93db1da0707e2b4e55dbc9ab70efb16283914bf107f1` |
-| PNG manifest identity | `350224dcfd00932975c5164a1df7bad95ec70ba708b477fc5a56f86006e16d88` |
-| PNG manifest file | `0ff082e4eb7c4a3b41c3ff4708deaa3c4c2a95f2fafe56976ec2af06b36e0ab0` |
+| Canonical `start_positions` | `04bc5782ab79ebeba34d0ff91bcd40fe05e823d539b16ba234b5eedcd123bb9d` |
+| Freeze-compatible list file | `80c8502f9b4d13ef4aa749200f6b59530de8b5d4e28d8fb10222a15dd40398d7` |
+| Corpus artifact identity | `ed4c86899f9ea5605c8129ca7d3585ccca9363ef7842f39ecd5c453c7248eeb0` |
+| Corpus artifact file | `6fd7e109fca06b735dd126b8f6fa6c4f1cc40adfb085977998afa4a9b3fcafb3` |
+| PNG manifest identity | `5fc96de3dd63adb2d366c3bf249c6a7548347c7e3653041f65ad3e2cc45f0c81` |
+| PNG manifest file | `4a3a229ffc18f4fd91aba5014347c733cf1f0f0e356c43e84ac268070c225918` |
 
-The package contains 107 individual 720×840 PNGs and nine 4×3 contact sheets.
-On 21 and 22 July 2026, Codex inspected all nine full contact sheets and
-full-size entries 001 (empty board), 040, 048, 055, 056, 057, 060, 065, 067,
-076, 079, 083, 084, 092, 095, 101 (the red `c3` source warning), and 107 (the
-maximum-placement end of the ordered corpus). Piece colours, coordinates,
-counts, turn labels, ordering, warning visibility, and sheet coverage showed no
-visual anomaly. This is supporting review evidence, not owner acceptance by
-itself.
+The package contains 106 individual 720×840 PNGs and nine 4×3 contact sheets.
+On 22 July 2026, Codex inspected all nine regenerated full contact sheets and
+full-size entries 100, 101 (the former 102), and 106 (the former 107), alongside
+the excluded original 101 panel. The selected images consistently show `/106`,
+sheet 09 covers 097–106, the excluded red `c3` source-warning panel is absent,
+and the post-exclusion renumbering is correct. Piece colours, coordinates,
+counts, turn labels, ordering, and sheet coverage showed no visual anomaly.
+This supplements the earlier inspection of the 107-candidate review package.
 
-Owner review is in progress. The owner's initial comments identified starts
-040, 048, 057, 076, and 084 as unfamiliar or noteworthy rather than invalid.
-Start 083 was initially questioned as already losing for Black; the owner then
-clarified that the contrary observation came from recreating the position with
-one piece wrong. Start 101 remains an open owner question about its Black-piece
-count. The generated panel records `placed W/B 8/7` and `on-board 8/6`, exactly
-reproduces the pinned source key, and remains playable, so no source correction
-is inferred locally.
+The owner's initial comments identified starts 040, 048, 057, 076, and 084 as
+unfamiliar or noteworthy rather than invalid. Start 083 was initially
+questioned as already losing for Black; the owner then clarified that the
+contrary observation came from recreating the position with one piece wrong.
+Start 101 raised a question about its Black-piece count. The generated panel
+records `placed W/B 8/7` and `on-board 8/6`, exactly reproduces the pinned source
+key, and remains playable, so no source correction is inferred locally.
 
 The owner's next review pass questioned how starts 055 and 056 could arise and
 described 056 as winning for Black. The owner assessed 060 as winning for
@@ -183,12 +188,13 @@ for this start remains a specific review conflict rather than a locally
 resolved correction. The owner also described the package as a good overall
 spread, including some unlikely and already-losing positions.
 
-These are preliminary expert observations, not a request to discard every
-unusual or losing start and not corpus acceptance. In particular, automated
-playability does not prove natural reachability from an empty board. Starts
-055 and 056 still need a reachability/naturalness decision, start 095 needs the
-Oracle disagreement resolved, and the owner must provide a final keep/remove
-decision before the corpus is accepted or frozen.
+After reviewing all 107 candidates, the owner reported no further observations.
+When asked for an explicit keep/remove disposition, the owner recommended
+removing original review position 101 and said the rest were fine. This closes
+the domain-review decision: positions 055, 056, and 095 remain selected with
+their annotations, while original 101 is retained only as excluded provenance.
+The decision does not prove natural reachability, make the corpus held out, or
+authorize a freeze or run.
 
 The focused corpus, paired-runner, model-bundle, and candidate-lifecycle
 regression command reports `20 passed`. Six of those tests specifically cover
@@ -197,21 +203,20 @@ pending-removal projection, ring16 identity, the known illegal source
 recommendation, complete corpus reproduction, and every review-image manifest
 entry.
 
-## Remaining acceptance checklist
+## Remaining freeze checklist
 
-The generator and regression tests now reproduce action-state handling, exact
-and ring16 uniqueness, legality, playability, provenance, overlap, list binding,
-and every PNG hash and dimension. The replacement is still not frozen. Before
-it can be accepted:
+The generator and regression tests now reproduce action-state handling, the
+owner exclusion, exact and ring16 uniqueness, legality, playability,
+provenance, overlap, list binding, and every PNG hash and dimension. Owner
+review is complete, but the replacement is still not frozen. Before it can be
+frozen:
 
-1. The owner must review the exact 107-position list and PNG package and record
-   acceptance or requested changes.
-2. The artifacts, generator, tests, and owning documents must be committed at a
+1. The artifacts, generator, tests, and owning documents must be committed at a
    clean tracked point.
-3. The focused evaluation/readiness checks must be repeated from that point.
-4. A new explicit product authorization is required before an immutable
+2. The focused evaluation/readiness checks must be repeated from that point.
+3. A new explicit product authorization is required before an immutable
    `EvaluationSpec` is frozen or any paired game is run.
 
-If accepted later, use exactly one colour-swapped pair per unique start:
-107 pairs / 214 games. This corpus remains Stage-0 diagnostic evidence and is
+If authorized later, use exactly one colour-swapped pair per unique start:
+106 pairs / 212 games. This corpus remains Stage-0 diagnostic evidence and is
 not adequate phase coverage for a formal strength or promotion claim.

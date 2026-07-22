@@ -20,10 +20,11 @@ The paired-runner prerequisites identified by that review are now repaired:
 engine-level repetition and 50-move draws end the game, while an interrupted
 run retains a validated `.partial` ledger and resumes only its missing games.
 Malformed or mismatched partial evidence fails closed. The focused evaluation
-suite passes all seven tests. The 107-start replacement corpus and PNG package
-are generated and audited, but remain `generated_for_owner_review`. The fatal
-stop remains because owner acceptance, a clean tracked freeze state, readiness
-evidence, and new product authorization are still outstanding.
+suite passes all seven tests. The owner reviewed the 107 generated candidates,
+requested removal of original review position 101, and accepted the remaining
+106. The regenerated package is `owner_review_complete_not_frozen`. The fatal
+stop remains because a clean tracked freeze state, readiness evidence, and new
+product authorization are still outstanding.
 
 No `EvaluationSpec` may be frozen, no paired games may be run, and no
 promotion or publication decision may be made from this experiment until the
@@ -59,16 +60,16 @@ Artifact root:
 
 ## Expert-reviewed decision
 
-Subject to repair, regeneration, review, and a new authorization, the proposed
-Stage-0 contract is:
+Subject to a clean tracked freeze, repeated readiness verification, and a new
+authorization, the proposed Stage-0 contract is:
 
 | Field | Proposed post-repair Stage-0 contract |
 | --- | --- |
 | Purpose | Training-signal diagnostic under a deterministic feature ablation |
 | Protocol | Fixed-N paired colour swap; schema `nmm.paired-evaluation.v1` |
-| Starts | 107 unique playable stable NMM FENs from 108 `action=p` keys; two `action=r` keys retained only as successor provenance |
-| Phase coverage | Placement 107 / movement 0 / flying 0 |
-| Pairs / games | `107` pairs / `214` games; exactly one pair per unique start |
+| Starts | 106 owner-accepted unique playable stable NMM FENs selected from 107 FENs projected from 108 `action=p` keys; original review position 101 excluded; two `action=r` keys retained only as successor provenance |
+| Phase coverage | Placement 106 / movement 0 / flying 0 |
+| Pairs / games | `106` pairs / `212` games; exactly one pair per unique start |
 | Seed | `42`, recorded for provenance but not used by deterministic move selection |
 | `max_ply` | `200`; overflow scored as a draw |
 | Route name | `policy-argmax-v1` |
@@ -79,7 +80,7 @@ Stage-0 contract is:
 | Result rule | Lower interval bound `> 0`: accept; upper bound `< 0`: reject; otherwise inconclusive |
 
 This table is a review target, not a frozen spec or launch authorization. The
-[107-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json) and
+[106-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json) and
 [audit/PNG record](dev-v4-formal-paired-eval-v1-corpus-review.md) now exist;
 their status is not an accepted freeze.
 
@@ -102,10 +103,10 @@ The proposed Oracle corpus is also narrow:
 
 - all starts are placement phase, with 0–16 pieces placed;
 - there are no movement or flying starts;
-- 28 of 107 Oracle orbits overlap a Sanmill named-line trajectory;
-- 23 of 107 overlap within the first eight plies;
-- one of 439 source move recommendations is illegal after projection, while
-  the corresponding start itself remains playable;
+- 28 of 106 selected Oracle orbits overlap a Sanmill named-line trajectory;
+- 23 of 106 overlap within the first eight plies;
+- one of 439 source move recommendations is illegal after projection; its
+  playable source candidate is the owner-excluded original position 101;
 - 100 of 107 Sanmill named lines exactly match the local training opening
   pool, and all 11 curated lines match.
 
@@ -124,7 +125,8 @@ source-overlapping, in-distribution-adjacent convenience corpus.
 | Deterministic start reuse falsifies the nominal sample size | Contract disposition and corpus recorded | Pure argmax plus modulo start selection repeats identical pairs. Set `pairs == unique starts`; never reuse starts to narrow the interval. |
 | Named-line endpoints are ambiguous | Rejected as a corpus source | 49 of 107 lines have 2–42 legal endpoints because removal choices are omitted; one line fails replay and one endpoint is terminal. Do not freeze synthetic one-per-line endpoints. |
 | The 64-start draft is invalidated | Rejected historical evidence | It has 64 FENs but 63 symmetry orbits and was an arbitrary narrow slice. Preserve only as rejected historical evidence. |
-| Oracle facts were overstated | Corrected artifact generated; owner acceptance pending | Of 110 raw keys, 108 are stable `action=p` keys yielding 107 exact/ring16-unique starts. Two `action=r` keys are pending removals whose stable successors duplicate selected starts. |
+| Oracle facts were overstated | Corrected and owner-reviewed artifact generated | Of 110 raw keys, 108 are stable `action=p` keys yielding 107 exact/ring16-unique candidates. The owner excluded original position 101 and accepted 106; two `action=r` keys are pending removals whose stable successors duplicate selected starts. |
+| Owner corpus review | Cleared | The owner completed all 107 candidates, recommended removing original 101, and accepted the other 106. The exclusion and its source identity are part of the reproducible artifact. |
 | Route is not training-aligned | Stage-0 claim boundary recorded | The 72 lookahead features are zeroed at evaluation. Keep the claim at Stage 0 and build a separately frozen aligned evaluator for strength. |
 | Freeze state was not reproducible at review time | Still open | Recheck the live state and freeze only from a clean, tracked commit containing the accepted corpus and owning records. |
 
@@ -141,7 +143,7 @@ colour-swapped pair contains no new information. The earlier 64-start /
 256-pair proposal copied every result four times and would have understated
 uncertainty.
 
-For Stage 0, use one pair for each of the 107 unique starts. The normal
+For Stage 0, use one pair for each of the 106 unique starts. The normal
 interval over pair-score differences is an engineering summary of variation
 across this fixed convenience corpus. It is not automatically a population
 confidence interval; any stronger interpretation requires separately justified
@@ -161,19 +163,19 @@ sample.
 4. Named-line endpoint ambiguity, Oracle projection, phase coverage, corpus
    overlap, runner determinism, draw lifecycle, and feature-route mismatch
    were independently checked.
-5. The 107-position replacement, freeze-compatible list, 107 individual PNGs,
-   nine contact sheets, and hash manifest were generated and audited.
+5. The owner-reviewed 106-position replacement, freeze-compatible list, 106
+   individual PNGs, nine contact sheets, and hash manifest were regenerated and
+   audited after excluding original review position 101.
 
 ## Mandatory sequence before any freeze or run
 
 Runner repair and its focused regression tests are complete in the current
 change. The remaining mandatory sequence is:
 
-1. Complete owner review of the exact 107-position list and PNG package.
-2. Record the final route, corpus, bundle identities, work budget, interval
+1. Record the final route, corpus, bundle identities, work budget, interval
    interpretation, and non-claims in a clean tracked commit.
-3. Re-run the focused verification required by the readiness workflow.
-4. Request a new explicit product authorization for freeze and run.
+2. Re-run the focused verification required by the readiness workflow.
+3. Request a new explicit product authorization for freeze and run.
 
 Only after those steps may an immutable `EvaluationSpec` be created. The
 current document intentionally contains no approved freeze or run command.

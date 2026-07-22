@@ -24,7 +24,7 @@ from game.rules import get_all_legal_moves, is_terminal
 from learned_ai.training.run_contract import canonical_sha256
 
 
-CORPUS_SCHEMA = "nmm.oracle-start-corpus.v1"
+CORPUS_SCHEMA = "nmm.oracle-start-corpus.v2"
 REVIEW_MANIFEST_SCHEMA = "nmm.oracle-review-assets.v1"
 EVALUATION_ID = "dev-v4-formal-paired-eval-v1"
 EXPECTED_SANMILL_COMMIT = "6a64010aed7ea4193502ea17c242f68e09fe576a"
@@ -35,6 +35,13 @@ EXPECTED_INVALID_ORACLE_MOVE = {
     ),
     "action": "p",
     "moves": ["c3"],
+}
+OWNER_REVIEW_DECISION_DATE = "2026-07-22"
+OWNER_REVIEW_EXCLUSION = {
+    "original_review_index": 101,
+    "fen": ".BB..B.WBWBW.BWWW....WW.|B|8|7",
+    "ring16_canonical_fen": "....W.WW.WBWBWWB..BB.W.B|B|8|7",
+    "raw_key_sha256": EXPECTED_INVALID_ORACLE_MOVE["raw_key_sha256"],
 }
 SOURCE_ASSET = PurePosixPath(
     "src/ui/flutter_app/assets/opening_books/nmm/opening_book.json"
@@ -492,7 +499,7 @@ def build_corpus_payload(
     *,
     review_asset_directory: str | PurePosixPath,
 ) -> dict[str, Any]:
-    """Build the 107-orbit review payload from the pinned Sanmill asset."""
+    """Build the 106-start owner-reviewed payload from the pinned asset."""
     if (
         book.get("schemaVersion") != 1
         or book.get("variant") != "nmm"
@@ -545,9 +552,20 @@ def build_corpus_payload(
             item[0],
         ),
     )
+    exclusion_index = int(OWNER_REVIEW_EXCLUSION["original_review_index"])
+    exclusion_fen = str(OWNER_REVIEW_EXCLUSION["fen"])
+    if ordered_groups[exclusion_index - 1][0] != exclusion_fen:
+        raise OracleCorpusError("owner-review exclusion no longer has index 101")
+    excluded_sources = ordered_groups[exclusion_index - 1][1]
+    excluded_source_hashes = [source.raw_key_sha256 for source in excluded_sources]
+    if excluded_source_hashes != [OWNER_REVIEW_EXCLUSION["raw_key_sha256"]]:
+        raise OracleCorpusError("owner-review exclusion source identity changed")
+    selected_groups = [
+        (fen, sources) for fen, sources in ordered_groups if fen != exclusion_fen
+    ]
     entries = [
         _entry_for_group(index, fen, sources, asset_directory, named_audit)
-        for index, (fen, sources) in enumerate(ordered_groups, 1)
+        for index, (fen, sources) in enumerate(selected_groups, 1)
     ]
     orbits = [entry["ring16_canonical_fen"] for entry in entries]
     if len(set(orbits)) != len(entries):
@@ -614,10 +632,24 @@ def build_corpus_payload(
             "selected_overlap_first_eight_plies": overlap_early,
         }
     )
+    owner_exclusion = {
+        "original_review_index": exclusion_index,
+        "disposition": "remove",
+        "fen": exclusion_fen,
+        "ring16_canonical_fen": ring16_canonical_fen(exclusion_fen),
+        "sources": [source.source_record() for source in excluded_sources],
+    }
     return {
         "schema_version": CORPUS_SCHEMA,
         "evaluation_id": EVALUATION_ID,
-        "status": "generated_for_owner_review",
+        "status": "owner_review_complete_not_frozen",
+        "owner_review": {
+            "status": "complete",
+            "decision_date": OWNER_REVIEW_DECISION_DATE,
+            "reviewed_start_count": len(groups),
+            "accepted_start_count": len(entries),
+            "excluded_starts": [owner_exclusion],
+        },
         "source": dict(source),
         "projection_contract": {
             "board_mapping": "Sanmill node-id Mill FEN via NMM_POSITION_ORDER_NODES",
@@ -626,14 +658,18 @@ def build_corpus_payload(
                 "apply the sole Oracle removal for provenance, then require the "
                 "successor to match an already selected ring16 orbit"
             ),
-            "selection_order": "total placed pieces ascending, then NMM FEN",
+            "selection_order": (
+                "total placed pieces ascending, then NMM FEN; apply the "
+                "recorded owner-review exclusion; reindex contiguously"
+            ),
             "symmetry": "D4 x inner/outer-ring swap (ring16)",
         },
         "automated_audit": {
             "raw_oracle_keys": len(projections),
             "stable_action_p_keys": len(direct),
             "pending_action_r_keys": len(removals),
-            "exact_action_p_fens": len(entries),
+            "exact_action_p_fens": len(groups),
+            "owner_excluded_starts": 1,
             "selected_ring16_orbits": len(set(orbits)),
             "playable_starts": len(entries),
             "phase_counts": {"placement": len(entries), "movement": 0, "flying": 0},
@@ -650,8 +686,8 @@ def build_corpus_payload(
                 ),
                 "invalid_records": invalid_source_moves,
                 "disposition": (
-                    "retain the playable start position; source moves are provenance "
-                    "only and are not evaluation actions"
+                    "the sole invalid recommendation belongs to the start excluded "
+                    "by owner review; source moves remain provenance only"
                 ),
             },
             "named_line_trajectory": named_summary,
@@ -907,8 +943,10 @@ def validate_corpus_artifact(payload: Mapping[str, Any]) -> dict[str, int]:
     starts = payload.get("start_positions")
     if not isinstance(entries, Sequence) or not isinstance(starts, Sequence):
         raise OracleCorpusError("corpus entries and starts must be arrays")
-    if len(entries) != 107 or len(starts) != 107:
-        raise OracleCorpusError("the reviewed corpus must contain 107 starts")
+    if len(entries) != 106 or len(starts) != 106:
+        raise OracleCorpusError("the owner-reviewed corpus must contain 106 starts")
+    if payload.get("status") != "owner_review_complete_not_frozen":
+        raise OracleCorpusError("owner-reviewed corpus has the wrong lifecycle status")
     if list(starts) != [entry.get("fen") for entry in entries]:
         raise OracleCorpusError("entry order differs from start_positions")
     if canonical_sha256(list(starts)) != payload.get("start_positions_sha256"):
@@ -957,8 +995,52 @@ def validate_corpus_artifact(payload: Mapping[str, Any]) -> dict[str, int]:
             if source != projection.source_record():
                 raise OracleCorpusError("direct source audit fields do not reproduce")
             direct_source_keys.add(projection.raw_key)
-    if len(exact) != 107 or len(orbits) != 107 or len(direct_source_keys) != 108:
+    if len(exact) != 106 or len(orbits) != 106 or len(direct_source_keys) != 107:
         raise OracleCorpusError("exact, ring16, or direct-source uniqueness failed")
+
+    owner_review = payload.get("owner_review")
+    if not isinstance(owner_review, Mapping):
+        raise OracleCorpusError("owner-review decision is missing")
+    if (
+        owner_review.get("status") != "complete"
+        or owner_review.get("decision_date") != OWNER_REVIEW_DECISION_DATE
+        or owner_review.get("reviewed_start_count") != 107
+        or owner_review.get("accepted_start_count") != 106
+    ):
+        raise OracleCorpusError("owner-review decision metadata is inconsistent")
+    excluded_items = owner_review.get("excluded_starts")
+    if not isinstance(excluded_items, Sequence) or len(excluded_items) != 1:
+        raise OracleCorpusError("owner review must contain exactly one exclusion")
+    excluded_item = excluded_items[0]
+    if not isinstance(excluded_item, Mapping):
+        raise OracleCorpusError("owner-review exclusion is malformed")
+    for key in ("original_review_index", "fen", "ring16_canonical_fen"):
+        if excluded_item.get(key) != OWNER_REVIEW_EXCLUSION[key]:
+            raise OracleCorpusError(f"owner-review exclusion changed field {key}")
+    if excluded_item.get("disposition") != "remove":
+        raise OracleCorpusError("owner-review exclusion disposition changed")
+    excluded_fen = str(excluded_item["fen"])
+    if ring16_canonical_fen(excluded_fen) != excluded_item[
+        "ring16_canonical_fen"
+    ]:
+        raise OracleCorpusError("owner-review exclusion has wrong ring16 identity")
+    if excluded_fen in exact:
+        raise OracleCorpusError("owner-excluded start remains in the selected corpus")
+    excluded_source_keys: set[str] = set()
+    excluded_sources = excluded_item.get("sources")
+    if not isinstance(excluded_sources, Sequence) or len(excluded_sources) != 1:
+        raise OracleCorpusError("owner-review exclusion source evidence is incomplete")
+    for source in excluded_sources:
+        projection = project_oracle_source(source["raw_key"], source["oracle_moves"])
+        if projection.action != "p" or projection.direct_fen != excluded_fen:
+            raise OracleCorpusError("owner-review exclusion does not reproduce")
+        if source != projection.source_record():
+            raise OracleCorpusError("owner-review exclusion source fields changed")
+        if projection.raw_key_sha256 != OWNER_REVIEW_EXCLUSION["raw_key_sha256"]:
+            raise OracleCorpusError("owner-review exclusion source identity changed")
+        excluded_source_keys.add(projection.raw_key)
+    if direct_source_keys & excluded_source_keys:
+        raise OracleCorpusError("owner-excluded source remains selected")
 
     removal_keys: set[str] = set()
     removal_items = payload.get("projection_evidence", {}).get(
@@ -991,14 +1073,16 @@ def validate_corpus_artifact(payload: Mapping[str, Any]) -> dict[str, int]:
         if not matches:
             raise OracleCorpusError("pending-removal relation is incorrect")
         removal_keys.add(projection.raw_key)
-    if len(removal_keys) != 2 or direct_source_keys & removal_keys:
+    selected_or_excluded = direct_source_keys | excluded_source_keys
+    if len(removal_keys) != 2 or selected_or_excluded & removal_keys:
         raise OracleCorpusError("pending-removal source coverage is wrong")
-    if len(direct_source_keys | removal_keys) != 110:
+    if len(direct_source_keys | excluded_source_keys | removal_keys) != 110:
         raise OracleCorpusError("raw Oracle source coverage is incomplete")
     return {
         "starts": len(starts),
         "ring16_orbits": len(orbits),
         "direct_sources": len(direct_source_keys),
+        "excluded_starts": len(excluded_items),
         "pending_removals": len(removal_keys),
     }
 
@@ -1021,8 +1105,10 @@ def validate_review_manifest(asset_root: str | Path) -> dict[str, int]:
         raise OracleCorpusError("review manifest identity mismatch")
     individuals = manifest.get("individual_images", [])
     sheets = manifest.get("contact_sheets", [])
-    if len(individuals) != 107 or len(sheets) != 9:
+    if len(individuals) != 106 or len(sheets) != 9:
         raise OracleCorpusError("review image counts are incomplete")
+    if [item.get("index") for item in individuals] != list(range(1, 107)):
+        raise OracleCorpusError("review image indices are not contiguous")
     for record in [*individuals, *sheets]:
         path = root / record["path"]
         if _sha256_file(path) != record["sha256"]:
@@ -1045,7 +1131,7 @@ def write_review_package(
     asset_root: str | Path,
     review_asset_directory: str | PurePosixPath,
 ) -> dict[str, Any]:
-    """Create an immutable first review package; existing targets are refused."""
+    """Create an immutable owner-reviewed package; refuse existing targets."""
     output = Path(output_path)
     starts_output = Path(start_positions_path)
     assets = Path(asset_root)
