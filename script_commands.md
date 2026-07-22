@@ -664,108 +664,21 @@ Speed flags: `--sim-ply-depth 5` (~3× lookahead speed-up during training; infer
 - Advance-check log line format: `[s_open_v2] advance-check @ diff 3: P=0.982 ≥ 0.95 (target=0.545, score=0.760)`. When the P-value stays < 0.5 for 5000+ games at a level, more games won't help — the model has plateaued.
 
 
-## Learned AI — Generalist v2a (train_s_gen_v2a.py)
+## Learned AI — Generalist v2a (quarantined main-lineage source)
 
-Full-game generalist that plays from `new_game()` through placement, midgame, and endgame in a single model. Uses a diversified opponent schedule to prevent overfitting to any one difficulty.
+`scripts/train_s_gen_v2a.py` is retained to review the maintainer's diversified
+opponent, rehearsal, and recovery ideas. It is not a runnable `dev` command.
+The fork predates the current managed preflight and exact-resume state, silently
+degrades when required nets or Malom fail to load, and uses a fixed
+SpecialistDB path. Its recovery and curriculum state are also absent from its
+checkpoint payload.
 
-**Opponent schedule (per batch iteration):**
-
-| Slot | Normal | Rehearsal | Description |
-| --- | --- | --- | --- |
-| 10% | 10% | 10% | Next-higher-difficulty (anti-overfit) |
-| 20% | `_lower_diff_hi` | expanded | Random lower difficulty |
-| 10% | 10% | 10% | Blundering heuristic (25% blunder rate) |
-| 10% | 10% | 10% | Blended (VN 10% + gap 30% + sentinel 20%) |
-| 50% | remainder | compressed | Standard (self-play or current-diff heuristic) |
-
-**Recommended run:**
-
-```
-.venv/bin/python scripts/train_s_gen_v2a.py \
-  --max-games 50000 \
-  --temp-start 1.2 \
-  --sim-ply-depth 12 \
-  --self-play-ratio 0.05 \
-  --ppo \
-  --advance-temp-boost-frac 0.5 \
-  --advance-entropy-boost-frac 0.5 \
-  --advance-rehearsal-games 50 \
-  --hot-explore-games 75 \
-  --auto-resume-best
-```
-
-**Resume from checkpoint:**
-
-```
-.venv/bin/python scripts/train_s_gen_v2a.py --auto-resume-best \
-  --max-games 50000 --temp-start 1.2 --sim-ply-depth 12 \
-  --self-play-ratio 0.05 --ppo \
-  --advance-temp-boost-frac 0.5 --advance-entropy-boost-frac 0.5 \
-  --advance-rehearsal-games 50 --hot-explore-games 75
-```
-
-**Smoke test (3 games, no warm-start, no nets):**
-
-```
-.venv/bin/python scripts/train_s_gen_v2a.py --max-games 3 \
-  --no-s1a-warmstart --no-sentinel --no-value-net --no-gap-net --no-imitation-mix
-```
-
-### Flags table
-
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--max-games N` | 5000 | Total games to train |
-| `--temp-start F` | 0.90 | Starting temperature; anneals to 0.20 over 80% of run |
-| `--sim-ply-depth N` | 5 | LookaheadAdvisor simulation depth during training (12 recommended; inference stays at 15-ply) |
-| `--self-play-ratio F` | 0.5 | Fraction of standard-slot games vs frozen model (0.05 recommended — mostly vs heuristic) |
-| `--ppo` | off | Use PPO update; otherwise A2C |
-| `--auto-resume-best` | off | Resume from `s_gen_v2a/best.pt` automatically |
-| `--resume PATH` | — | Resume from explicit checkpoint path |
-| `--out-dir PATH` | `learned_ai/checkpoints/scaffolded/s_gen_v2a` | Checkpoint output directory |
-| `--diff-start N` | 1 | Override starting difficulty |
-| `--diff-max N` | 20 | Maximum difficulty level |
-| `--lr F` | 1e-4 | Base learning rate (scaled by win-rate LR adaptation each log interval) |
-| `--entropy-coef F` | 0.01 | Base entropy regularisation coefficient (boosted during advancement/hot-explore) |
-| `--update-every N` | 64 | Policy update batch size (steps) |
-| `--rolling-win N` | 40 | Rolling window for win/loss history |
-| `--log-every N` | 50 | Games between log + checkpoint + recovery check |
-| `--update-target-every N` | 50 | Games between frozen opponent refreshes |
-| `--sentinel PATH` | `sentinel/best.pt` | Sentinel checkpoint |
-| `--value-net PATH` | `data/value_net.npz` | Value net checkpoint |
-| `--gap-net PATH` | `data/gap_net.npz` | Gap net checkpoint |
-| `--malom PATH` | — | Malom DB directory |
-| `--no-sentinel` | off | Disable sentinel |
-| `--no-value-net` | off | Disable value net |
-| `--no-gap-net` | off | Disable gap net |
-| `--batch-games N` | 1 | Parallel game rollouts per iteration |
-| `--max-ply N` | 60 | Max plies per primary game |
-| `--max-ply-branch N` | 60 | Max plies per branch game |
-| `--minimal-rollouts` | off | Skip retry + confirm rollouts (~3× throughput, lower sample efficiency) |
-| `--no-s1a-warmstart` | off | Skip pre-RL imitation warm-start |
-| `--no-imitation-mix` | off | Disable AlphaZero-style imitation mini-steps during RL |
-| `--heuristic-node-budget N` | — | Fixed node budget per heuristic move (deterministic; overrides time budget) |
-| `--segment-games N` | — | Stop after N games from resume point (bounded-run support) |
-| `--seed N` | 42 | Random seed |
-
-### Advancement and recovery flags (new in v2a)
-
-| Flag | Default | Description |
-| --- | --- | --- |
-| `--advance-temp-boost-frac F` | 0.5 | On difficulty advancement (or Stage-1 recovery trigger), add `F × (temp_start − scheduled_temp)` as a decaying temperature bonus. Decays at 0.97/iter. |
-| `--advance-entropy-boost-frac F` | 0.5 | On advancement/hot-explore, add `F × entropy_coef` as a decaying entropy bonus to encourage exploration at the new difficulty. Decays at 0.97/iter. |
-| `--advance-rehearsal-games N` | 0 | After each difficulty advancement, expand the lower-diff opponent slot from 20% to `--advance-rehearsal-prob` for N iterations. 0 = disabled. 50 recommended. |
-| `--advance-rehearsal-prob F` | 0.45 | Lower-diff opponent probability during rehearsal window (vs standard 0.20). |
-| `--hot-explore-games N` | 75 | **Stage-1 recovery:** run N elevated-temperature iterations before reloading a checkpoint. While `hot_explore_remaining > 0` the scheduled temperature is floored at `temp_start × 1.3`. Set 0 to skip Stage 1 and go straight to checkpoint restore. |
-
-### Two-stage recovery
-
-Recovery triggers at each `--log-every` checkpoint when `loss_rate > win_rate` and the model is **not improving** (second half of rolling window ≤ first half + 2pp):
-
-1. **Stage 1 (hot-explore):** Boosts temperature and entropy coefficient, runs `--hot-explore-games` iterations without loading any checkpoint. If the model recovers naturally, flags are cleared.
-2. **Stage 2 (checkpoint restore):** If still failing after Stage 1 completes, loads `best{difficulty}.pt`, resets the optimiser, clears histories, and suppresses the draw penalty for 100 games. All boosts are cleared.
-
-Setting `--hot-explore-games 0` skips Stage 1 entirely (original behaviour).
+The entry point therefore fails immediately with a quarantine error. Do not
+use its former smoke, resume, PPO, or long-run examples. Adopt a feature only
+by porting it into `train_s_gen_v2.py`, adding deterministic focused tests,
+extending the v2 checkpoint envelope when state is persistent, and freezing a
+new experiment contract. The completed corrected-v4 baseline does not enable
+recovery reheating.
 
 
 ## Learned AI — Specialist Benchmark (bench_scaffolded.py)
@@ -924,5 +837,4 @@ Uses Malom DB path from `data/settings.json`.
 | `--attempts N` | 5000 | Positions sampled per puzzle attempt |
 | `--out PATH` | `data/puzzles/` | Output directory |
 | `--print` | off | Print each puzzle JSON to stdout |
-
 

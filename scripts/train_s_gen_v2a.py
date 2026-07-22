@@ -1,10 +1,11 @@
-"""scripts/train_s_gen_v2a.py — Generalist v2a: full-game + opponent variety.
+"""Quarantined main-lineage Generalist v2a source for design review.
 
 Extends train_s_gen_v2.py with a diversified opponent schedule (harder/easier
 heuristic, blundering, and blended net opponents) to reduce overfitting.
-Incorporates Calcitem dev-branch fixes: auto-resume path, temperature schedule,
---no-sentinel/value-net/gap-net disable flags, --heuristic-node-budget,
---segment-games, _derive_game_identity, and node-budget diagnostics.
+It was developed from an older trainer snapshot and does not contain the
+current dev preflight, managed-run, or exact-resume contract.  The source is
+retained so individual ideas can be reviewed and ported with focused tests;
+its runtime entry point is deliberately quarantined.
 
 Opponent schedule (per game):
   10% — next higher difficulty (anti-overfit)
@@ -13,12 +14,8 @@ Opponent schedule (per game):
   10% — blended nets (VN 10% + gap 30% + sentinel 20%)
   50% — standard (self-play or current-difficulty heuristic)
 
-Resume chain: explicit --resume → <out-dir>/best.pt → scratch
-
-Usage
------
-.venv/bin/python scripts/train_s_gen_v2a.py --max-games 20
-.venv/bin/python scripts/train_s_gen_v2a.py --auto-resume-best
+Do not use this file for smoke, long-run, or resume commands.  Use the reviewed
+``train_s_gen_v2.py`` path and its owning experiment contract.
 """
 
 from __future__ import annotations
@@ -1146,6 +1143,12 @@ def _build_game_diag(
 # ── Main training loop ────────────────────────────────────────────────────────
 
 def run(args: argparse.Namespace) -> None:
+    raise RuntimeError(
+        "train_s_gen_v2a.py is quarantined main-lineage source, not an "
+        "approved dev training entry point; port reviewed changes into "
+        "train_s_gen_v2.py before use"
+    )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2a] Device: {device}")
     rng = _initialize_training_rngs(args.seed)
@@ -2017,7 +2020,9 @@ def run(args: argparse.Namespace) -> None:
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
+    p = argparse.ArgumentParser(
+        description="Quarantined main-lineage Generalist v2a review source"
+    )
     p.add_argument("--resume",             default="",   type=str)
     p.add_argument("--auto-resume-best",   action="store_true")
     p.add_argument("--out-dir",  default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2a"))
