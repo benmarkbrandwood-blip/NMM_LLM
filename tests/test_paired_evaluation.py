@@ -155,6 +155,32 @@ def test_build_runtime_identity_rejects_dirty_worktree(
         paired_protocol.build_runtime_identity("cpu")
 
 
+def test_run_rejects_legacy_unbound_runtime_before_loading_bundles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    spec_path = tmp_path / "spec.json"
+    freeze_evaluation_spec(spec_path, _spec())
+
+    def unexpected_bundle_load(*_args, **_kwargs):
+        raise AssertionError("legacy run reached bundle loading")
+
+    monkeypatch.setattr(
+        paired_protocol,
+        "load_bundle_model",
+        unexpected_bundle_load,
+    )
+
+    with pytest.raises(EvaluationError, match="legacy.*runtime"):
+        paired_protocol.run_paired_evaluation(
+            spec_path,
+            "candidate",
+            "baseline",
+            tmp_path / "games.jsonl",
+            device="cpu",
+        )
+
+
 def _patch_runner_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     spec: EvaluationSpec,
@@ -169,6 +195,11 @@ def _patch_runner_dependencies(
     monkeypatch.setattr(paired_protocol, "_BundlePolicy", policy_type)
     monkeypatch.setattr(paired_protocol, "GameEngine", engine_type)
     monkeypatch.setattr(paired_protocol, "is_terminal", lambda _board: (False, None))
+    monkeypatch.setattr(
+        paired_protocol,
+        "build_runtime_identity",
+        lambda _device: spec.runtime,
+    )
 
 
 def test_run_rejects_bound_device_mismatch(
@@ -255,12 +286,6 @@ def test_run_accepts_matching_bound_runtime(
             self.draw_reason = None
 
     _patch_runner_dependencies(monkeypatch, spec, EmptyPolicy, MinimalEngine)
-    monkeypatch.setattr(
-        paired_protocol,
-        "build_runtime_identity",
-        lambda _device: runtime,
-    )
-
     result = paired_protocol.run_paired_evaluation(
         spec_path,
         "candidate",
@@ -279,7 +304,7 @@ def test_run_stops_on_engine_level_draw(
     monkeypatch: pytest.MonkeyPatch,
     draw_reason: str,
 ) -> None:
-    spec = _spec()
+    spec = _spec(runtime=_bound_runtime())
     spec_path = tmp_path / "spec.json"
     records_path = tmp_path / "games.jsonl"
     freeze_evaluation_spec(spec_path, spec)
@@ -322,7 +347,7 @@ def test_run_resumes_valid_partial_ledger_and_publishes_atomically(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    spec = _spec()
+    spec = _spec(runtime=_bound_runtime())
     spec_path = tmp_path / "spec.json"
     records_path = tmp_path / "games.jsonl"
     partial_path = Path(f"{records_path}.partial")
@@ -378,7 +403,7 @@ def test_run_rejects_malformed_partial_ledger(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    spec = _spec()
+    spec = _spec(runtime=_bound_runtime())
     spec_path = tmp_path / "spec.json"
     records_path = tmp_path / "games.jsonl"
     partial_path = Path(f"{records_path}.partial")

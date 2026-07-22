@@ -143,7 +143,10 @@ def build_runtime_identity(device: str) -> dict[str, str]:
 
 def _verify_runtime_identity(runtime: dict[str, str], device: str) -> None:
     if not _validate_runtime_contract(runtime):
-        return
+        raise EvaluationError(
+            "legacy evaluation specifications have no bound runtime and "
+            "cannot run"
+        )
     if runtime["device"] != device:
         raise EvaluationError(
             f"requested device {device!r} differs from frozen device "
