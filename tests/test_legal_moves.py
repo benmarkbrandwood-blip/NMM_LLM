@@ -1,40 +1,39 @@
-"""tests/test_legal_moves.py — integration with the existing move generator.
+"""Integration between the scaffolded encoder and the move generator.
 
 The learned-AI subsystem must never enumerate legal moves itself; the only
-authority is game.rules.get_all_legal_moves. These checks make sure the
-encoder's masks line up with the engine's enumeration across phases.
+authority is :func:`game.rules.get_all_legal_moves`. These checks make sure
+the current per-candidate encoder preserves that enumeration across phases.
 """
 
-import os
-import sys
 import unittest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from game.board import BoardState, POSITIONS
 from game.rules import get_all_legal_moves
-from learned_ai.models.action_encoder import (
-    CAPTURE_OFFSET,
-    encode_action,
-    get_legal_mask,
-)
+from learned_ai.models.scaffolded_encoder import encode_position
 
 
-def primary_indices_from_legal(board):
-    return {encode_action(mv)[0] for mv in get_all_legal_moves(board)}
+def _move_key(move):
+    return move.get("from"), move.get("to"), move.get("capture")
+
+
+def _assert_encoder_matches_engine(testcase, board):
+    engine_moves = get_all_legal_moves(board)
+    encoded = encode_position(board, board.turn, sentinel_advisor=None, db=None)
+
+    testcase.assertIsNotNone(encoded)
+    testcase.assertEqual(
+        [_move_key(move) for move in encoded.legal_moves],
+        [_move_key(move) for move in engine_moves],
+    )
+    testcase.assertEqual(encoded.feat_matrix.shape[0], len(engine_moves))
 
 
 class TestLegalMoves(unittest.TestCase):
-    def test_opening_legal_set_matches_mask(self):
+    def test_opening_encoder_matches_authoritative_moves(self):
         board = BoardState.new_game()
-        legal_primaries = primary_indices_from_legal(board)
-        mask = get_legal_mask(board)
-        mask_primaries = {
-            i for i in range(CAPTURE_OFFSET) if bool(mask[i].item())
-        }
-        self.assertEqual(legal_primaries, mask_primaries)
+        _assert_encoder_matches_engine(self, board)
 
-    def test_movement_phase_mask_matches(self):
+    def test_movement_encoder_matches_authoritative_moves(self):
         board = BoardState.from_setup(
             positions={
                 "a7": "W", "d7": "W", "g7": "B", "g4": "B",
@@ -43,12 +42,7 @@ class TestLegalMoves(unittest.TestCase):
             turn="W",
             phase="move",
         )
-        legal_primaries = primary_indices_from_legal(board)
-        mask = get_legal_mask(board)
-        mask_primaries = {
-            i for i in range(CAPTURE_OFFSET) if bool(mask[i].item())
-        }
-        self.assertEqual(legal_primaries, mask_primaries)
+        _assert_encoder_matches_engine(self, board)
 
     def test_fly_phase_allows_non_adjacent(self):
         # White flying: 3 pieces only, all placed.
@@ -64,8 +58,9 @@ class TestLegalMoves(unittest.TestCase):
         )
         legal = get_all_legal_moves(board)
         # Flying white can move any of its 3 pieces to any empty square.
-        empties = sum(1 for v in board.positions.values() if v == "")
-        self.assertEqual(len(legal), 3 * empties + 0)
+        empties = sum(1 for value in board.positions.values() if value == "")
+        self.assertEqual(len(legal), 3 * empties)
+        _assert_encoder_matches_engine(self, board)
 
 
 if __name__ == "__main__":
