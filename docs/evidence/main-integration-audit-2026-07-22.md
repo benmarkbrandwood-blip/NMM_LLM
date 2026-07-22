@@ -130,6 +130,32 @@ train/validation split. A compliant implementation must split source games
 first, replay them, and join their canonical state keys to the versioned DB, or
 rebuild a dataset that retains game identity.
 
+## Post-Merge Verification
+
+The integrated code tip `0d01f31` was verified before this evidence-only
+update:
+
+| Scope | Result |
+| --- | --- |
+| New migration/quarantine plus Oracle, paired, bundle, and lifecycle tests | 24 passed |
+| Required Malom, DB-teacher, and label-provenance suite | 102 passed, 498 subtests passed |
+| Generalist launch, managed control, preflight, manifest, checkpoint, path, resume, segment, identity, and temperature tests | 86 passed |
+| GameAI, search-enhancement, and heuristic-parity tests | 65 passed |
+| Native Rust unit suite | 26 passed |
+
+The one initial Generalist failure was a stale ready-case fixture that omitted
+the now-required absolute first-segment stop. Preflight correctly returned
+`fatal_stop`; commit `0d01f31` supplies `segment_stop_game=250` to the fixture
+without weakening the gate, after which all 86 tests passed.
+
+All seven imported checkpoint tensor sets are finite. The merged opening data
+loads as 169 learned entries alongside 11 canonical book entries. JSON and
+Python syntax probes pass, and the v2a entry point fails before runtime setup as
+intended. The Rust suite emits existing unused-code/import warnings but no test
+failure. No full-suite-clean claim is made because the repository handover
+still records unrelated collection/interface failures outside these focused
+groups.
+
 ## Remaining Maintainer Confirmations
 
 Before any imported model is described as corrected or any v2 retraining
