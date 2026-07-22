@@ -182,9 +182,11 @@ better sentinel signal:
   --samples-per-category 20000
 ```
 
-The current builder accepts `--sentinel`. It presently falls back to
-heuristics if the required checkpoint fails to load; the retraining workflow
-must change that path to fail closed before this command is approved.
+The builder accepts `--sentinel` and now fails closed before database sampling
+when that checkpoint is missing, incompatible, unavailable after load, or
+returns malformed/non-finite scores. It also fails closed if Sentinel inference
+breaks while labels are being generated. This clears the loader behaviour only;
+the command remains unauthorized until its experiment inputs are frozen.
 
 ---
 
@@ -359,8 +361,8 @@ iteration.
   tasks. HumanPolicy work belongs to the v5 raw-game data contract.
 - Sentinel Stage 5 is rejected for the DB-free runtime contract. Do not select
   an epoch or checkpoint from that lineage for v2 promotion.
-- `build_gap_dataset.py` accepts `--sentinel`, but its required-sentinel path
-  still needs to fail closed for this experiment.
+- `build_gap_dataset.py` now treats `--sentinel` as required and fails closed
+  both at load/probe time and during per-position scoring.
 - **Pre-flight: malom_wdl_after semantics.** The GapNet category filter depends
   on 'L' meaning the next player loses (i.e. the human's move was winning) and
   'W' meaning the human played a losing move. Fifteen staged successor rows

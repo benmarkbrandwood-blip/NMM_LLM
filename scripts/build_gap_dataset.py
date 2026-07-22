@@ -51,6 +51,84 @@ SENTINEL_WEIGHT = 0.6    # fraction of composite quality from sentinel (rest fro
 MAX_SYNTHETIC_GAMES = 200  # games to self-play if LOSING category under-represented
 
 
+class RequiredSentinelError(RuntimeError):
+    """The GapNet teacher cannot use its required Sentinel signal."""
+
+
+def _required_sentinel_scores(advice, expected_count: int) -> list[float]:
+    """Validate one required Sentinel response without a neutral fallback."""
+    if advice is None:
+        raise RequiredSentinelError("required Sentinel returned no advice")
+
+    raw_scores = getattr(advice, "move_scores", None)
+    if raw_scores is None:
+        raise RequiredSentinelError(
+            "required Sentinel advice has no move_scores"
+        )
+
+    try:
+        scores = [float(score) for score in raw_scores]
+    except (TypeError, ValueError) as exc:
+        raise RequiredSentinelError(
+            "required Sentinel returned non-numeric move scores"
+        ) from exc
+
+    if len(scores) != expected_count:
+        raise RequiredSentinelError(
+            "required Sentinel returned "
+            f"{len(scores)} scores for {expected_count} legal moves"
+        )
+    if not np.all(np.isfinite(scores)):
+        raise RequiredSentinelError(
+            "required Sentinel returned non-finite move scores"
+        )
+    if any(score < 0.0 or score > 1.0 for score in scores):
+        raise RequiredSentinelError(
+            "required Sentinel returned a move score outside [0, 1]"
+        )
+    return scores
+
+
+def _load_required_sentinel(sentinel_path: Path):
+    """Load and probe the Sentinel required by the GapNet label contract."""
+    if not sentinel_path.is_file():
+        raise FileNotFoundError(
+            f"required Sentinel checkpoint not found: {sentinel_path}"
+        )
+
+    try:
+        from learned_ai.sentinel.infer import SentinelAdvisor
+
+        advisor = SentinelAdvisor(checkpoint_path=str(sentinel_path))
+        if not advisor.is_loaded():
+            raise RequiredSentinelError(
+                "required Sentinel did not report a loaded model"
+            )
+
+        probe_board = BoardState.new_game()
+        probe_moves = list(get_all_legal_moves(probe_board))[:1]
+        if not probe_moves:
+            raise RequiredSentinelError(
+                "could not construct the required Sentinel load probe"
+            )
+        advice = advisor.advise(
+            probe_board,
+            probe_moves,
+            probe_board.turn,
+            played_move_idx=0,
+        )
+        _required_sentinel_scores(advice, len(probe_moves))
+    except RequiredSentinelError:
+        raise
+    except Exception as exc:
+        raise RequiredSentinelError(
+            f"required Sentinel checkpoint is unusable: {sentinel_path}: {exc}"
+        ) from exc
+
+    print("Sentinel loaded from", sentinel_path)
+    return advisor
+
+
 # ── Board reconstruction ──────────────────────────────────────────────────────
 
 def _board_from_state_key(state_key: str) -> BoardState | None:
@@ -149,15 +227,22 @@ def _score_moves(board: BoardState, legal_moves: list[dict],
     else:
         h_norms = [(h - h_min) / span for h in h_scores]
 
-    # Sentinel scores for each move
-    s_scores = [0.5] * len(legal_moves)
-    if sentinel_advisor is not None:
-        try:
-            advice = sentinel_advisor.advise(board, legal_moves, board.turn, played_move_idx=0)
-            if advice is not None and len(advice.move_scores) == len(legal_moves):
-                s_scores = list(advice.move_scores)
-        except Exception:
-            pass
+    if sentinel_advisor is None:
+        raise RequiredSentinelError(
+            "required Sentinel advisor is absent during GapNet scoring"
+        )
+    try:
+        advice = sentinel_advisor.advise(
+            board,
+            legal_moves,
+            board.turn,
+            played_move_idx=0,
+        )
+    except Exception as exc:
+        raise RequiredSentinelError(
+            "required Sentinel failed during GapNet scoring"
+        ) from exc
+    s_scores = _required_sentinel_scores(advice, len(legal_moves))
 
     composite = {}
     for i, m in enumerate(legal_moves):
@@ -304,52 +389,44 @@ def _generate_synthetic_positions(n_games: int, value_net_path: Path) -> list[Bo
 
 def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
                   n_per_category: int, dtw_threshold: int) -> tuple[np.ndarray, np.ndarray]:
+    sentinel_advisor = _load_required_sentinel(sentinel_path)
+
     conn = sqlite3.connect(str(db_path))
     try:
         require_current_human_db_malom_labels(conn, db_path)
-    except Exception:
+        rng = np.random.default_rng(42)
+
+        print("Querying categories...")
+        losing_keys, winning_keys, neutral_keys = _query_categories(
+            conn,
+            dtw_threshold,
+            n_per_category,
+        )
+        print(
+            f"  Losing: {len(losing_keys)}, Winning: {len(winning_keys)}, "
+            f"Neutral: {len(neutral_keys)}"
+        )
+
+        # Sample down to n_per_category each
+        def _sample(keys, n):
+            if len(keys) <= n:
+                return keys
+            idx = rng.choice(len(keys), size=n, replace=False)
+            return [keys[i] for i in idx]
+
+        n_target = min(n_per_category, len(losing_keys))
+        losing_keys = _sample(losing_keys, n_target)
+        winning_keys = _sample(winning_keys, n_target)
+        neutral_keys = _sample(neutral_keys, n_target)
+        print(
+            f"  Sampled: {len(losing_keys)} per category = "
+            f"{3 * len(losing_keys)} total"
+        )
+
+        all_keys = losing_keys + winning_keys + neutral_keys
+        played_moves_map = _fetch_played_moves(conn, all_keys)
+    finally:
         conn.close()
-        raise
-
-    # Load sentinel
-    sentinel_advisor = None
-    if sentinel_path.exists():
-        try:
-            from learned_ai.sentinel.infer import SentinelAdvisor
-            sentinel_advisor = SentinelAdvisor(checkpoint_path=str(sentinel_path))
-            # Trigger lazy load
-            board_tmp = BoardState.new_game()
-            _dummy = [{'from': None, 'to': 'a1', 'capture': None}]
-            sentinel_advisor.advise(board_tmp, _dummy, board_tmp.turn, played_move_idx=0)
-            print("Sentinel loaded from", sentinel_path)
-        except Exception as e:
-            print(f"Sentinel load failed ({e}) — using heuristics only")
-            sentinel_advisor = None
-    else:
-        print(f"Sentinel checkpoint not found at {sentinel_path} — using heuristics only")
-
-    rng = np.random.default_rng(42)
-
-    print("Querying categories...")
-    losing_keys, winning_keys, neutral_keys = _query_categories(conn, dtw_threshold, n_per_category)
-    print(f"  Losing: {len(losing_keys)}, Winning: {len(winning_keys)}, Neutral: {len(neutral_keys)}")
-
-    # Sample down to n_per_category each
-    def _sample(keys, n):
-        if len(keys) <= n:
-            return keys
-        idx = rng.choice(len(keys), size=n, replace=False)
-        return [keys[i] for i in idx]
-
-    n_target = min(n_per_category, len(losing_keys))
-    losing_keys  = _sample(losing_keys, n_target)
-    winning_keys = _sample(winning_keys, n_target)
-    neutral_keys = _sample(neutral_keys, n_target)
-    print(f"  Sampled: {len(losing_keys)} per category = {3*len(losing_keys)} total")
-
-    all_keys = losing_keys + winning_keys + neutral_keys
-    played_moves_map = _fetch_played_moves(conn, all_keys)
-    conn.close()
 
     # Score each position
     X_list, y_list = [], []
@@ -450,8 +527,16 @@ def main():
         print(f"ERROR: DB not found at {db_path}")
         sys.exit(1)
 
-    X, y = build_dataset(db_path, sentinel_path, vn_path,
-                         args.samples_per_category, args.dtw_threshold)
+    try:
+        X, y = build_dataset(
+            db_path,
+            sentinel_path,
+            vn_path,
+            args.samples_per_category,
+            args.dtw_threshold,
+        )
+    except (FileNotFoundError, RequiredSentinelError) as exc:
+        parser.error(str(exc))
     np.savez(str(out_path), X=X, y=y)
     print(f"Saved {len(X)} samples → {out_path}")
 
