@@ -85,8 +85,8 @@ control; it is not formal playing-strength evidence.
 
 Both bundles passed CPU verification, including zero canary difference. Their
 verification alone did not clear the corpus or freeze gates; the later
-readiness audit reverified them as part of the complete contract. It does not
-clear the remaining authorization gate.
+readiness audit reverified them as part of the complete contract. The later
+explicit authorization was consumed by the completed run.
 
 Artifact root:
 
@@ -94,10 +94,10 @@ Artifact root:
 
 ## Expert-reviewed decision
 
-Subject to the final clean-state and absent-output checks at execution time,
-the authorized Stage-0 contract is:
+After the final clean-state and absent-output checks passed, the completed
+Stage-0 contract was:
 
-| Field | Proposed post-repair Stage-0 contract |
+| Field | Completed Stage-0 contract |
 | --- | --- |
 | Purpose | Training-signal diagnostic under a deterministic feature ablation |
 | Protocol | Fixed-N paired colour swap; schema `nmm.paired-evaluation.v1` |
@@ -113,10 +113,10 @@ the authorized Stage-0 contract is:
 | Rules | `nmm-v4-corrected` |
 | Result rule | Lower interval bound `> 0`: accept; upper bound `< 0`: reject; otherwise inconclusive |
 
-This table is a review target, not a frozen spec or launch authorization. The
+This table records the consumed contract; it is not authority for a rerun. The
 [106-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json) and
-[audit/PNG record](dev-v4-formal-paired-eval-v1-corpus-review.md) now exist;
-their status is not an accepted freeze.
+[audit/PNG record](dev-v4-formal-paired-eval-v1-corpus-review.md) are bound by
+the immutable Stage-0 spec identity recorded above.
 
 ## Why this is Stage 0, not a formal strength gate
 
@@ -172,8 +172,8 @@ covering both engine-level draw transitions, valid partial-ledger resume and
 atomic publication, fail-closed malformed partial evidence, deterministic
 start reuse, and runtime binding. The combined candidate-lifecycle, corpus,
 paired-runner, and bundle command reports `28 passed`. This clears the
-technical runner and freeze prerequisites only; it does not authorize a spec
-freeze or run.
+technical runner and freeze prerequisites. The separate product authorization
+was later recorded, consumed by one run, and cannot be reused.
 
 ## Statistical interpretation
 

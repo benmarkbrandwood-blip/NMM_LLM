@@ -19,11 +19,11 @@ draw-lifecycle and partial-ledger restart defects found in the paired runner
 are repaired; deterministic start reuse is now rejected; and new specifications
 bind the clean Git commit, runtime, device, route, components, and feature
 contract. The owner reviewed all 107 generated candidates, requested removal
-of original review position 101, and accepted the remaining 106. The only
-current proposal is therefore a
-106-start, placement-only Stage-0 training-signal diagnostic against scratch
-initialization. Its replacement corpus and PNG package are regenerated and
-audited. A clean read-only audit reverified the corpus, bundles, isolated
+of original review position 101, and accepted the remaining 106. The resulting
+run was a 106-start, placement-only Stage-0 training-signal diagnostic against
+scratch initialization. Its replacement corpus and PNG package were
+regenerated and audited. A clean read-only audit reverified the corpus,
+bundles, isolated
 targets, runtime identity, and in-memory specification; 28 focused readiness
 tests pass. On 23 July 2026, the product owner explicitly authorized the exact
 CPU freeze and 212-game run. Independent recomputation verified 193 candidate
@@ -31,6 +31,17 @@ wins, 8 draws, 11 losses, pair-score-difference mean `0.8584905660377359`,
 and interval `[0.7972174156720373, 0.9197637164034345]`. This is not a formal
 strength or promotion result, and it does not authorize training, a rerun,
 promotion, or publication.
+
+Post-Stage-0 preparation is now complete up to new product choices. A strict
+training-route bundle preserves the final policy, its six-game-old frozen
+target, HumanDB continuation, final SpecialistDB counterfactual features,
+corrected Malom early termination, and the historical rollout evaluator. A
+real read-only load verified all four artifact identities. A separate
+64-position draft covers placement/movement/side-to-move flying as 22/21/21,
+is White/Black balanced 32/32, has no exact HumanDB or final SpecialistDB
+matches, and includes 64 individual PNGs plus six inspected contact sheets.
+The source is seeded legal TGF rules replay, not expert play. The corpus remains
+unfrozen and unapproved; no post-Stage-0 game has been run.
 
 The maintainer's latest `main` history and 21/22 July staged upload have now
 been integrated and audited without activating their databases or checkpoints.
@@ -608,6 +619,12 @@ random initialization under the placement-only zero-lookahead ablation. Any
 route-aligned or phase-covered v2 must be separately preregistered and
 authorized; observations may not be pooled as one prespecified sample.
 
+The next-evaluation preparation records are:
+
+- [training-aligned product decision brief](../experiments/dev-v4-training-aligned-evaluation-v1-decision-brief.md)
+- [phase-corpus review record](../experiments/dev-v4-phase-covered-corpus-v1-review.md)
+- [phase-corpus artifact](../experiments/dev-v4-phase-covered-corpus-v1.json)
+
 ## Live Malom and Legacy-model Boundary
 
 The old note says `specialist_router.py` was a temporary containment against a
@@ -635,12 +652,16 @@ globally loaded Sentinel, ValueNet, GapNet, HumanDB, and SpecialistDB objects;
 unchecked UI boxes are not an auditable component-disable contract for those
 features.
 
-Before formal evaluation, either align inference deliberately with the frozen
-training route or record the difference as a separate experiment. Emit the
-checkpoint hash, route name, component-presence flags, data identities, Malom
-availability, and fixed search work for every evaluation. Until then, the
-maintainer's manual endgame assessment is a useful replay lead, not evidence
-that an endgame database or new specialist should be enabled.
+The candidate side can now be reconstructed as the separately named
+`s-gen-v2-training-aligned-v1` route. The route bundle contains both final and
+frozen-target weights and binds component flags, HumanDB, final SpecialistDB,
+Malom, and fixed depth. Required resources are opened read-only and failures
+propagate. The route deliberately retains the trainer's historical
+empty-square comparison bug; silently correcting it would define another
+experiment. A new paired protocol and competent baseline are not yet frozen,
+so this preparation is not execution authority. Every future evaluation must
+still emit checkpoint, route, component, data, Malom, and fixed-work
+identities.
 
 ## Mixed-opponent Handover Copy
 
@@ -741,9 +762,19 @@ training merely because the managed run ended. Proceed in this order:
    recorded hashes; the one-run authorization is consumed.
 5. Preserve the `accepted` result as ablation-only training-signal evidence.
    Do not rerun it or treat acceptance as promotion evidence.
-6. Specify a separate route-aligned and phase-covered evaluation before making
-   a formal strength claim. If Stage 0 is inconclusive, preregister v2
-   independently and do not pool its observations with v1.
+6. Record the product choice of competent baseline. The recommendation is
+   corrected-rules GameAI at difficulty 10, no optional learned/database
+   components, `use_mcts=false`, and a fixed 500,000-node ceiling per move.
+   Freeze single-threaded native search, deterministic top-1, default weights,
+   and no opening recognition/book forcing, trajectory context, or UI variety
+   modes; native-search failure must stop the evaluation.
+7. Decide whether all 64 phase-covered panels require Mill-domain approval.
+   They are mechanically valid and visually audited but come from seeded
+   rules replay rather than expert games.
+8. Approve or change the proposed one-pair-per-start workload, 200-ply draw
+   ceiling, and fixed-corpus interval rule. Then implement and audit a new
+   paired runner; request launch separately after its immutable readiness
+   report. Do not pool any result with Stage 0.
 
 The previously executed isolated smoke command was:
 
@@ -802,10 +833,10 @@ promoted.
 
 The managed plan and its Stage-0 evaluation are complete. The evaluation's
 one-run authorization is consumed. Safe work now includes inspection,
-documentation, preservation, and design of a separately reviewed next
-experiment. It does not include an additional evaluation, smoke or long
-training job, promotion/publication, a push, or a history rewrite without the
-applicable separate authorization.
+documentation, preservation, and implementation after the product choices in
+the next-evaluation decision brief. It does not include an additional
+evaluation, smoke or long training job, promotion/publication, or history
+rewrite without the applicable separate authorization.
 
 ## Reference Material
 
