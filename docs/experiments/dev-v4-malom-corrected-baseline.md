@@ -12,9 +12,10 @@ resolved on `dev`. The authorized managed long run
 `managed-v4-baseline-v1` reached `managed_plan_completed` with
 `completed_games=5000` / `completed_segments=20` on 21 July 2026 (UTC). Training
 completion is not playing-strength evidence and does not authorize promotion.
-The paired-runner repair is complete, but the next evaluation proposal remains
-under fatal stop pending replacement-corpus review, a clean freeze point,
-readiness verification, and new product authorization; see
+The paired-runner repair is complete and a corrected 107-start replacement
+package is generated, but the next evaluation proposal remains under fatal
+stop pending owner corpus acceptance, a clean freeze point, readiness
+verification, and new product authorization; see
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md). A
 complete recommended training configuration remains recorded below for
 lineage.
@@ -118,28 +119,28 @@ architecture-matched scratch-init bundles have been exported and CPU-verified,
 but expert review invalidated the original 64-start / 256-pair freeze proposal
 and found draw-lifecycle and partial-ledger defects in the paired runner. Those
 runner prerequisites are now repaired and covered by focused tests. Freeze,
-execution, promotion, and publication remain unauthorized because the
-replacement corpus, freeze evidence, and new authorization are outstanding.
+execution, promotion, and publication remain unauthorized because owner corpus
+acceptance, freeze evidence, and new authorization are outstanding.
 The controlling record is
 [`dev-v4-formal-paired-eval-v1.md`](dev-v4-formal-paired-eval-v1.md), with
 the evidence and decision rationale in
 [`dev-v4-formal-paired-eval-v1-decision-brief.md`](dev-v4-formal-paired-eval-v1-decision-brief.md).
 
-After corpus generation and review, a clean tracked freeze point, readiness
+After owner corpus acceptance, a clean tracked freeze point, readiness
 verification, and new product authorization, the next proposed experiment is
 only a Stage-0 training-signal diagnostic:
 
-- 109 unique playable positions projected from 110 raw Sanmill move-oracle
-  keys;
-- placement 109 / movement 0 / flying 0;
-- exactly 109 colour-swapped pairs / 218 games, with no deterministic start
+- 107 unique playable stable positions from 108 Sanmill `action=p` keys, with
+  two pending-removal keys retained only as successor provenance;
+- placement 107 / movement 0 / flying 0;
+- exactly 107 colour-swapped pairs / 214 games, with no deterministic start
   reuse;
 - `policy-argmax-v1` versus the verified scratch-init control;
 - the normal interval described only as variation across the fixed convenience
   corpus.
 
 The Oracle is separately engine-derived rather than a direct training-book
-export, but 28 of 109 positions overlap named-line trajectories and the full
+export, but 28 of 107 positions overlap named-line trajectories and the full
 set is early placement. It is therefore not demonstrated held-out or
 training-disjoint. The evaluation also zeroes the 72-feature lookahead block
 used during training, so even an accepted result is ablation evidence, not a

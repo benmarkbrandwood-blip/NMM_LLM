@@ -1,7 +1,9 @@
 # Corpus Review Record — `dev-v4-formal-paired-eval-v1`
 
-Status: **the 64-position draft is rejected and superseded**. No replacement
-corpus is frozen, and freeze/run authorization remains under fatal stop.
+Status: **the 64-position draft is rejected and superseded**. A 107-position
+replacement and PNG review package have been generated and audited, but the
+replacement remains `generated_for_owner_review`. Owner acceptance, corpus
+freeze, and freeze/run authorization remain under fatal stop.
 
 Related:
 
@@ -18,7 +20,7 @@ traceable:
 | Exact positions | 64 |
 | Distinct 16-way symmetry orbits | 63 |
 | Generator | Sanmill standard NMM opening-book draft builder |
-| Sanmill book | `D:/Repo/Sanmill/src/ui/flutter_app/assets/opening_books/nmm/opening_book.json` |
+| Sanmill book | Resolve `sanmill_checkout` through the ignored local path registry, then use `src/ui/flutter_app/assets/opening_books/nmm/opening_book.json` |
 | Sanmill commit | `6a64010aed7ea4193502ea17c242f68e09fe576a` |
 | Phase mix | placement 52 / movement 12 / flying 0 |
 | Origins | named-line 64 / Oracle 0 |
@@ -73,24 +75,42 @@ first four placements from a sampled opening in 50% of games, but the log does
 not record the selected opening identifier. Exact exposure frequency cannot be
 reconstructed.
 
-## Proposed replacement
+## Generated replacement
 
-The next reviewable Stage-0 artifact should project the 110 raw Sanmill
-move-oracle keys into NMM FEN and deduplicate after projection:
+The replacement deliberately preserves Sanmill's staged action state. Its
+compact key has 108 stable placement (`action=p`) records and two pending
+removal (`action=r`) records. NMM's compact FEN represents only stable turn
+boundaries, so the two pending removals are not direct starts. Their specified
+captures were applied for provenance; one successor exactly matches a selected
+start and the other matches a selected ring16 orbit.
+
+The 108 stable records project to 107 exact NMM FENs because one pair differs
+only in a source counter that NMM FEN does not encode. Those 107 FENs are also
+unique under Sanmill's ring16 contract. The earlier 109 count incorrectly
+dropped the pending-removal action state before projection and is superseded.
 
 | Required property | Audited value |
 | --- | --- |
 | Raw Oracle keys | 110 |
-| Unique projected NMM FENs | 109 |
-| Unique 16-way symmetry orbits | 109 |
-| Playable starts | 109 |
-| Phase mix | placement 109 / movement 0 / flying 0 |
+| Stable `action=p` keys | 108 |
+| Pending `action=r` keys | 2, retained as successor evidence only |
+| Unique stable NMM FENs | 107 |
+| Unique 16-way symmetry orbits | 107 |
+| Playable starts | 107 |
+| Phase mix | placement 107 / movement 0 / flying 0 |
 | Total placed-piece range | 0–16 |
-| Overlap with any named-line trajectory | 28 / 109 |
-| Overlap within the first eight named-line plies | 23 / 109 |
+| Starts without a legal move / terminal starts | 0 / 0 |
+| Overlap with any named-line trajectory | 28 / 107 |
+| Overlap within the first eight named-line plies | 23 / 107 |
 
-Two raw Oracle keys differ only in a trailing counter that NMM FEN does not
-encode, explaining the 110-to-109 projection.
+The Oracle contains 439 recorded move recommendations. NMM legality replay
+matched 438. One stable key recommends placement at occupied `c3`; its key
+SHA-256 is
+`904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1`.
+The corresponding start itself is playable and has 17 legal moves. Oracle
+moves are provenance annotations, not forced evaluation actions, so the start
+is retained and its image carries a red source-warning banner. This defect
+further limits any claim about Oracle move quality.
 
 Sanmill documents the move Oracle as independently engine-derived; it is not
 accurate to call it a direct export of the NMM_LLM training book. The measured
@@ -99,25 +119,81 @@ the all-placement distribution nevertheless prevent a held-out or
 training-disjoint claim. Review material must call it a
 **source-overlapping, in-distribution-adjacent placement corpus**.
 
-## Replacement acceptance checklist
+## Generated artifacts and identities
 
-The paired runner's engine-level draw and partial-ledger retry defects are
-fixed in the current change and covered by the seven-test focused evaluation
-suite. The final replacement artifact has not yet been generated. Before it
-can be accepted:
+All repository links below are relative to this document:
 
-1. The artifact must be a freeze-compatible list of exactly 109 NMM FENs.
-2. Exact uniqueness, 16-way orbit uniqueness, legality, non-terminal
-   playability, and the 109/0/0 phase count must be recomputed.
-3. Each entry must retain enough source metadata to reproduce the Oracle-key
-   conversion and the one projected duplicate.
-4. The 28/109 and 23/109 overlap measurements and the non-held-out claim
-   boundary must accompany owner review.
-5. A new `start_positions_sha256` must be recorded only after the exact list
-   is approved.
-6. The approved artifact and owning documents must be tracked in a clean
-   commit before freeze authorization is requested.
+- [freeze-compatible 107-FEN list](dev-v4-formal-paired-eval-v1-start-positions.json)
+- [projection and audit artifact](dev-v4-formal-paired-eval-v1-oracle-corpus.json)
+- [PNG manifest](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/manifest.json)
+
+Contact sheets:
+
+- [001–012](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-01.png)
+- [013–024](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-02.png)
+- [025–036](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-03.png)
+- [037–048](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-04.png)
+- [049–060](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-05.png)
+- [061–072](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-06.png)
+- [073–084](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-07.png)
+- [085–096](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-08.png)
+- [097–107](assets/dev-v4-formal-paired-eval-v1-oracle-corpus/contact-sheets/sheet-09.png)
+
+The package was generated from the repository root with
+`python scripts/build_formal_eval_oracle_corpus.py`. The builder resolves the
+Sanmill checkout only through `data/training_paths.local.json`, pins both the
+source commit and asset SHA-256, and refuses to overwrite an existing package.
+
+| Identity | SHA-256 |
+| --- | --- |
+| Canonical `start_positions` | `87065c99a38109d081459151a5e5700f233d5a6489071fa0ef54fd38c55b03ab` |
+| Freeze-compatible list file | `2175d5ee5fdb555fff1fc4ee5b4495ed9f65fa369c8682d5d1d678b6cd6b588a` |
+| Corpus artifact identity | `ce1e424db158ef4605e8ecbb76984b42f63d8ad74fe86841f980746e4d748224` |
+| Corpus artifact file | `a831defbfd8d586c9e0b93db1da0707e2b4e55dbc9ab70efb16283914bf107f1` |
+| PNG manifest identity | `350224dcfd00932975c5164a1df7bad95ec70ba708b477fc5a56f86006e16d88` |
+| PNG manifest file | `0ff082e4eb7c4a3b41c3ff4708deaa3c4c2a95f2fafe56976ec2af06b36e0ab0` |
+
+The package contains 107 individual 720×840 PNGs and nine 4×3 contact sheets.
+On 21 and 22 July 2026, Codex inspected all nine full contact sheets and
+full-size entries 001 (empty board), 040, 048, 057, 076, 083, 084, 101 (the red
+`c3` source warning), and 107 (the maximum-placement end of the ordered corpus).
+Piece colours, coordinates, counts, turn labels, ordering, warning visibility,
+and sheet coverage showed no visual anomaly. This is supporting review
+evidence, not owner acceptance by itself.
+
+Owner review is in progress. The owner's initial comments identified starts
+040, 048, 057, 076, and 084 as unfamiliar or noteworthy rather than invalid.
+Start 083 was initially questioned as already losing for Black; the owner then
+clarified that the contrary observation came from recreating the position with
+one piece wrong. Start 101 remains an open owner question about its Black-piece
+count. The generated panel records `placed W/B 8/7` and `on-board 8/6`, exactly
+reproduces the pinned source key, and remains playable, so no source correction
+is inferred locally. The owner must confirm whether the source itself is
+intended before accepting or freezing the corpus. None of these preliminary
+comments constitutes corpus acceptance.
+
+The focused corpus, paired-runner, model-bundle, and candidate-lifecycle
+regression command reports `20 passed`. Six of those tests specifically cover
+pinned-source reconstruction after the Sanmill checkout advances,
+pending-removal projection, ring16 identity, the known illegal source
+recommendation, complete corpus reproduction, and every review-image manifest
+entry.
+
+## Remaining acceptance checklist
+
+The generator and regression tests now reproduce action-state handling, exact
+and ring16 uniqueness, legality, playability, provenance, overlap, list binding,
+and every PNG hash and dimension. The replacement is still not frozen. Before
+it can be accepted:
+
+1. The owner must review the exact 107-position list and PNG package and record
+   acceptance or requested changes.
+2. The artifacts, generator, tests, and owning documents must be committed at a
+   clean tracked point.
+3. The focused evaluation/readiness checks must be repeated from that point.
+4. A new explicit product authorization is required before an immutable
+   `EvaluationSpec` is frozen or any paired game is run.
 
 If accepted later, use exactly one colour-swapped pair per unique start:
-109 pairs / 218 games. This corpus remains Stage-0 diagnostic evidence and is
+107 pairs / 214 games. This corpus remains Stage-0 diagnostic evidence and is
 not adequate phase coverage for a formal strength or promotion claim.

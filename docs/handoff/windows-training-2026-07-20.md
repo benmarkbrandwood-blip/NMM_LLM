@@ -15,10 +15,11 @@ one-endpoint-per-named-line alternative and established that
 `policy-argmax-v1` zeroes a lookahead feature block used during training. The
 draw-lifecycle and partial-ledger restart defects found in the paired runner
 are now repaired and covered by focused tests. The only current proposal is a
-109-start, placement-only Stage-0 training-signal diagnostic against scratch
-initialization. Its corpus, review, freeze state, readiness evidence, and new
-authorization remain incomplete, so it is not a formal strength or promotion
-gate and freeze/run remain unauthorized.
+107-start, placement-only Stage-0 training-signal diagnostic against scratch
+initialization. Its replacement corpus and PNG package are generated and
+audited, but owner acceptance, a clean freeze state, readiness evidence, and
+new authorization remain incomplete. It is not a formal strength or promotion
+gate, and freeze/run remain unauthorized.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -460,24 +461,36 @@ stop because:
   invalidating the old 64-start / 256-pair nominal sample size;
 - 49 of 107 named lines have 2–42 legal endpoints because removal choices are
   omitted, one line fails replay, and one successful endpoint is terminal;
-- 110 raw Sanmill Oracle keys project to 109 unique playable NMM positions,
-  all in placement phase;
+- 110 raw Sanmill Oracle keys contain 108 stable placement keys that project
+  to 107 unique playable NMM positions; the other two are pending removals and
+  are retained only as successor provenance;
 - the proposed `policy-argmax-v1` route zeroes the 72-feature lookahead block
   supplied during training.
 
-The proposed Stage-0 diagnostic is 109 unique Oracle-projected starts, one
-colour-swapped pair per start, for 218 games against the verified scratch-init
-control. Sanmill documents the Oracle as independently engine-derived, but 28
-of 109 positions overlap named-line trajectories and all positions are early
-placement. It is not demonstrated held-out or training-disjoint. Stage 0
-therefore tests only whether a training signal is visible under a
-placement-only feature ablation; it is not a strength or promotion gate.
+The proposed Stage-0 diagnostic is 107 unique stable Oracle-projected starts,
+one colour-swapped pair per start, for 214 games against the verified
+scratch-init control. Sanmill documents the Oracle as independently
+engine-derived, but 28 of 107 positions overlap named-line trajectories and all
+positions are early placement. It is not demonstrated held-out or
+training-disjoint. Stage 0 therefore tests only whether a training signal is
+visible under a placement-only feature ablation; it is not a strength or
+promotion gate.
+
+The generated freeze-compatible list has canonical `start_positions_sha256`
+`87065c99a38109d081459151a5e5700f233d5a6489071fa0ef54fd38c55b03ab`.
+The audit artifact remains `generated_for_owner_review`; it links 107
+individual PNGs and nine contact sheets. Automated replay found 438 legal
+source recommendations and one illegal `c3` recommendation. The associated
+start itself is playable, so it remains in the corpus with a red source
+warning. Codex inspected every contact sheet plus representative full-size
+images. The combined corpus/evaluation focused suite reports `20 passed`;
+owner acceptance is still required.
 
 The controlling records are:
 
 - [blocked evaluation contract](../experiments/dev-v4-formal-paired-eval-v1.md)
 - [expert decision record](../experiments/dev-v4-formal-paired-eval-v1-decision-brief.md)
-- [rejected corpus and replacement requirements](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
+- [rejected corpus and generated replacement review](../experiments/dev-v4-formal-paired-eval-v1-corpus-review.md)
 
 No freeze or run command is approved. A later inconclusive v1 may be followed
 by a separately preregistered and frozen v2, but the observations must not be
@@ -604,13 +617,11 @@ Proceed in this order:
 
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
-2. Generate and review a freeze-compatible list of exactly 109 unique playable
-   Oracle-projected positions. Record phase counts, symmetry uniqueness,
-   provenance, overlap, and a new corpus SHA-256.
-3. Reconcile the owning documents and artifact in a clean tracked commit, then
+2. Have the owner review the generated 107-position list and PNG package.
+3. Reconcile the owning documents and artifacts in a clean tracked commit, then
    repeat the focused evaluation/readiness checks.
 4. Request an explicit product authorization before freezing or running the
-   Stage-0 diagnostic. Use 109 pairs / 218 games with no start reuse, and do
+   Stage-0 diagnostic. Use 107 pairs / 214 games with no start reuse, and do
    not treat acceptance as promotion evidence.
 5. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2

@@ -22,21 +22,23 @@ The original 64-start proposal and the later one-endpoint-per-named-line
 proposal are both rejected. At review time, the runner also had a
 draw-lifecycle defect that could abort a valid game and leave a
 non-restartable partial ledger. Those runner defects and their focused
-regressions are now repaired. No current corpus may be frozen and no paired
-evaluation may run because the replacement corpus and the remaining freeze
+regressions are now repaired. A corrected 107-start replacement and its PNG
+review package are generated, but no current corpus may be frozen and no paired
+evaluation may run because owner acceptance and the remaining freeze
 prerequisites are not complete.
 
-The next reviewable experiment may use the 109 unique, playable positions
-obtained by projecting the 110 raw Sanmill move-oracle keys into NMM FEN. That
-experiment is a **Stage-0 placement-opening training-signal diagnostic**, not
-a formal playing-strength or promotion gate.
+The next reviewable experiment may use the 107 unique, playable stable
+positions obtained from the 108 Sanmill `action=p` move-oracle keys. The other
+two of 110 raw keys are pending removals and are retained only as successor
+provenance. That experiment is a **Stage-0 placement-opening training-signal
+diagnostic**, not a formal playing-strength or promotion gate.
 
 | Decision item | Recorded decision |
 | --- | --- |
-| A — start definition | Use the **109 unique playable projected Oracle positions** for the proposed repaired Stage-0 diagnostic. Reject one synthetic endpoint per named line. |
+| A — start definition | Use the **107 unique playable stable Oracle positions** for the proposed repaired Stage-0 diagnostic. Reject pending-removal keys and one synthetic endpoint per named line as direct starts. |
 | B — source scope | Oracle-only for Stage 0. Named lines remain audit evidence, not the frozen start set. |
-| C — phase coverage | All 109 starts are placement phase. There are no movement- or flying-phase starts. This is an explicit non-claim, not adequate release coverage. |
-| D — workload | Exactly **109 colour-swapped pairs / 218 games**: one pair per unique start. No modulo reuse. |
+| C — phase coverage | All 107 starts are placement phase. There are no movement- or flying-phase starts. This is an explicit non-claim, not adequate release coverage. |
+| D — workload | Exactly **107 colour-swapped pairs / 214 games**: one pair per unique start. No modulo reuse. |
 | E — inference route | `policy-argmax-v1` is allowed only as a Stage-0 **lookahead-feature ablation** diagnostic. It is not training-route-aligned strength evidence. |
 | F — opponent | Keep the architecture-matched scratch-init bundle as a training-gain control. It is not a product-strength baseline. |
 | Freeze + run | **Deferred under fatal stop.** A new explicit product authorization is required after every prerequisite below is complete. |
@@ -103,24 +105,36 @@ It was a deterministic approximately five-percent slice of the available
 book-derived orbit pool. It must not be relabelled or frozen as the final
 corpus.
 
-### Oracle projection is 109, not 110
+### Oracle projection is 107 stable starts, not 109
 
-Sanmill provides 110 raw move-oracle keys. Two keys differ only in a trailing
-counter that NMM FEN does not encode, so projection produces exactly **109**
-unique NMM FENs and 109 symmetry orbits. All 109 are playable.
+Sanmill provides 110 raw move-oracle keys: 108 stable placement
+(`action=p`) keys and two pending-removal (`action=r`) keys. NMM compact FEN
+does not represent a pending staged removal, so treating all 110 as direct
+starts loses game state. The two removals were instead applied for provenance;
+their successors duplicate selected starts exactly or under ring16.
 
-All 109 starts are placement phase, with total placed-piece count from 0
+The 108 stable keys produce exactly **107** unique NMM FENs because one pair
+differs only in a trailing counter that NMM FEN does not encode. The 107 FENs
+also occupy 107 ring16 orbits and are all playable.
+
+All 107 starts are placement phase, with total placed-piece count from 0
 through 16. There are **zero movement starts and zero flying starts**.
 Games may later enter those phases, but that does not replace controlled
 movement- or flying-start coverage.
+
+Of 439 source move recommendations, 438 match NMM legal moves. One record
+recommends occupied `c3`; the corresponding start itself has 17 legal moves.
+The corpus uses Oracle positions, not Oracle recommendations, so that start is
+retained with an explicit source warning. The defect prevents a blanket claim
+that all Oracle recommendations are valid.
 
 Sanmill documentation describes the Oracle as its own engine-derived table,
 not as a direct export of the NMM_LLM training opening book. It would therefore
 be inaccurate to call every Oracle key the same artifact as the training book.
 However, the overlap audit found:
 
-- **28 of 109** Oracle orbits on a named-line trajectory;
-- **23 of 109** Oracle orbits on the first eight plies of a named line.
+- **28 of 107** Oracle orbits on a named-line trajectory;
+- **23 of 107** Oracle orbits on the first eight plies of a named line.
 
 Combined with the early-placement-only distribution and the named-line source
 overlap, this corpus has not been demonstrated to be held out or
@@ -161,7 +175,7 @@ colour-swapped pair.
 The old 64-start / 256-pair proposal copied each deterministic result four
 times. Treating those copies as 256 observations would artificially narrow the
 reported interval. For this route, `pairs` must equal the number of unique
-starts: 109 pairs and 218 games.
+starts: 107 pairs and 214 games.
 
 The normal interval is an engineering summary of variation across the fixed
 start corpus. It must not be described as a population confidence interval
@@ -186,19 +200,15 @@ Runner draw handling, recoverable valid-prefix resume, fail-closed malformed
 evidence, and their focused tests are complete in the current change. The
 following remain mandatory:
 
-1. Generate a new Oracle-only list containing exactly 109 unique playable NMM
-   FENs; do not reuse the rejected 64-position draft.
-2. Record conversion provenance, overlap results, phase counts, orbit
-   uniqueness, playability validation, and a new
-   `start_positions_sha256`.
-3. Have the owner review the exact 109-position artifact.
-4. Freeze from a clean, tracked commit. At review time the branch was ahead of
+1. Have the owner review the generated 107-position list and PNG package.
+2. Freeze from a clean, tracked commit. At review time the branch was ahead of
    `origin/dev` and the experiment documents and draft artifacts were
    uncommitted; the live state must be rechecked rather than inferred from this
    historical observation.
-5. Obtain a new explicit product decision authorizing freeze and run.
+3. Repeat the focused evaluation/readiness verification from that commit.
+4. Obtain a new explicit product decision authorizing freeze and run.
 
-Until all five are complete, no exact freeze or run command is approved.
+Until all four are complete, no exact freeze or run command is approved.
 
 ## Inconclusive-result governance
 

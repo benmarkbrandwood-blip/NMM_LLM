@@ -599,9 +599,10 @@
     "fly_from_opening_book": false,
     "note": "Sanmill opening book is placing-phase oriented; fly positions are not supplied by the book. This draft uses place + early move (completed-placement) positions only."
   },
-  "sanmill_book_path": "D:/Repo/Sanmill/src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
+  "sanmill_book_asset": "src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
   "sanmill_book_sha256": "d304434a46a812a6ecbd5fe1779baf853025516082dee7e50de09969bd270a6b",
   "sanmill_commit": "6a64010aed7ea4193502ea17c242f68e09fe576a",
+  "sanmill_path_lookup_key": "sanmill_checkout",
   "schema_version": "nmm.eval-corpus-draft.v1",
   "selection_stats": {
     "named_line_replay_fail": 1,

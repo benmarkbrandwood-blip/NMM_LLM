@@ -52,12 +52,16 @@ workspace roots, runtime dependencies, or sources of authoritative labels.
 - Local lookup: read `sanmill_checkout` from the ignored
   `data/training_paths.local.json`. This is a documentation/reference lookup
   key, not a trainer input.
-- Observed revision on 20 July 2026: branch `next`, commit
-  `535c85e409509e4ed71ad05ef3977b1098e01dba`
-- Observed worktree state: `crates/tgf-frb/src/frb_generated.rs` has an
-  unrelated local modification. The reference areas listed below are clean at
-  the recorded commit. Preserve the local modification and do not alter this
-  checkout from an NMM_LLM task.
+- Observed revision on 22 July 2026: branch `next`, commit
+  `ab9cccb9da65c0d784b982f532e7d1cedc8bea19`, two commits ahead of
+  `origin/next`.
+- Observed worktree state: `play_area.dart` and its human-database statistics
+  test have unrelated local modifications. The NMM opening-book asset used
+  below is tracked, clean, and byte-identical to the reviewed blob at commit
+  `6a64010aed7ea4193502ea17c242f68e09fe576a`. The Oracle corpus builder reads
+  that pinned Git blob rather than requiring this reference checkout to remain
+  at the historical commit. Preserve all unrelated changes and do not alter
+  this checkout from an NMM_LLM task.
 - Licence: AGPL-3.0-or-later. NMM_LLM is also AGPL-3.0, but copied code must
   still retain source attribution and licence provenance.
 - API stability: the relevant crates are version `0.1.0`. At the observed
@@ -71,6 +75,8 @@ Useful paths relative to the Sanmill checkout root are:
 - `crates/tgf-mill/src/human_db_codec.rs`: already defines NMM_LLM's exact
   24-point order and converts one combined move-plus-capture turn into TGF's
   staged base and removal actions;
+- `src/ui/flutter_app/assets/opening_books/nmm/opening_book.json`: pinned
+  ring16 named-line and Oracle source for the Stage-0 evaluation-corpus review;
 - `crates/tgf-mill/src/rules/` and
   `crates/tgf-mill/testdata/legacy_oracle/`: independent rule, history, and
   regression references;
