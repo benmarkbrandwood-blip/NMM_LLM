@@ -1,0 +1,3 @@
+startup args 22/07/2026 AM
+.venv/bin/python scripts/train_s_gen_v2a.py   --max-games 50000 --temp-start 0.9   --sim-ply-depth 12 --self-play-ratio 0.05 --ppo --batch-games 6  --advance-temp-boost-frac 0.5  --advance-entropy-boost-frac 0.5 --advance-rehearsal-games 50 --hot-explore-games 75 
+

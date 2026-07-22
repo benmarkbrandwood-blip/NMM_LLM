@@ -85,6 +85,8 @@ learned_ai/checkpoints/**
 !learned_ai/checkpoints/scaffolded/s_end_v2/*.pt
 !learned_ai/checkpoints/scaffolded/s_gen_v2/
 !learned_ai/checkpoints/scaffolded/s_gen_v2/*.pt
+!learned_ai/checkpoints/scaffolded/s_gen_v2a/
+!learned_ai/checkpoints/scaffolded/s_gen_v2a/**
 learned_ai/logs/*
 !learned_ai/logs/.gitkeep
 learned_ai/self_play_games/*
