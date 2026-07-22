@@ -78,18 +78,27 @@ def _load(path: Path) -> list[dict]:
                     rows.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
-    # Strip entries from old/smoke-test runs: find last significant backwards
-    # jump in game numbering and discard everything before it.
+    # Discard data from old/smoke-test runs by detecting fresh-run starts:
+    # a game number that drops to near-zero (< 10) after a real run has begun.
+    # Intra-run restarts (e.g. 1500→1302 from checkpoint mismatch) are NOT
+    # stripped — only fresh starts are. Event rows are always preserved so
+    # recovery markers are never lost even if they predate last_reset.
     last_reset = 0
     max_game   = -1
     for i, r in enumerate(rows):
+        if "event" in r:          # event rows have high game numbers; exclude from scan
+            continue
         g = r.get("game")
         if isinstance(g, int):
-            if g < max_game - 10:
+            if g < 10 and max_game > 50:   # fresh-run start, not an intra-run restart
                 last_reset = i
             if g > max_game:
                 max_game = g
-    return rows[last_reset:]
+    result = []
+    for i, r in enumerate(rows):
+        if i >= last_reset or "event" in r:
+            result.append(r)
+    return result
 
 
 def _smooth(values: list[float], window: int) -> np.ndarray:
@@ -156,16 +165,21 @@ def _get_recovery_events(rows: list[dict]) -> dict[str, list[tuple[int, dict]]]:
 
     # Detect hot-explore start from per-game hot_explore_remaining field (0 → N transition).
     # This catches stage1 even when _log_event missed the log_every boundary.
-    prev_her = 0
-    stage1_games = {g for g, _ in events["recovery_stage1"]}
+    # seen_zero_her guard: after a checkpoint restore hot_explore_remaining may start >0,
+    # so we only fire the transition once we've seen at least one her==0 row first.
+    prev_her      = 0
+    seen_zero_her = False
+    stage1_games  = {g for g, _ in events["recovery_stage1"]}
     for r in rows:
         if "event" in r:
             continue
         her = r.get("hot_explore_remaining") or 0
         g   = r.get("game", 0)
-        if her > 0 and prev_her == 0 and g not in stage1_games:
+        if her > 0 and prev_her == 0 and seen_zero_her and g not in stage1_games:
             events["recovery_stage1"].append((g, r))
             stage1_games.add(g)
+        if her == 0:
+            seen_zero_her = True
         prev_her = her
 
     events["recovery_stage1"].sort(key=lambda t: t[0])
