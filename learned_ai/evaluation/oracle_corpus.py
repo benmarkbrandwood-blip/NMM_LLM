@@ -736,9 +736,10 @@ def render_position_image(
     index = int(entry["index"])
     board = BoardState.from_fen_string(str(entry["fen"]))
     pieces = entry["pieces"]
+    title_prefix = str(entry.get("review_title_prefix", "Oracle start"))
     draw.text(
         (28, 20),
-        f"Oracle start {index:03d}/{total:03d}",
+        f"{title_prefix} {index:03d}/{total:03d}",
         fill="#2b2722",
         font=fonts["title"],
     )
@@ -749,11 +750,24 @@ def render_position_image(
     )
     draw.text((29, 61), meta, fill="#3f3931", font=fonts["body"])
     draw.text((29, 90), str(entry["fen"]), fill="#51493f", font=fonts["small"])
-    source_moves = sorted(
-        {move for source in entry["sources"] for move in source["oracle_moves"]}
-    )
-    moves_text = "Oracle moves: " + " ".join(source_moves)
-    for line_number, line in enumerate(textwrap.wrap(moves_text, width=82)[:2]):
+    review_details = entry.get("review_detail_lines")
+    if review_details is None:
+        source_moves = sorted(
+            {
+                move
+                for source in entry["sources"]
+                for move in source["oracle_moves"]
+            }
+        )
+        detail_lines = ["Oracle moves: " + " ".join(source_moves)]
+    else:
+        detail_lines = [str(line) for line in review_details]
+    wrapped_details = [
+        wrapped
+        for detail in detail_lines
+        for wrapped in textwrap.wrap(detail, width=82)
+    ]
+    for line_number, line in enumerate(wrapped_details[:2]):
         draw.text((29, 116 + line_number * 20), line, fill="#51493f", font=fonts["small"])
     illegal_moves = sorted(
         {
@@ -809,12 +823,15 @@ def render_position_image(
         label_fill = "#a33a2c" if piece else "#4c443a"
         draw.text((x + 10, y - 19), position, fill=label_fill, font=fonts["node"])
 
-    overlap = entry["named_line_overlap"]
-    overlap_text = (
-        f"named-line overlap: any={'yes' if overlap['any_trajectory'] else 'no'}, "
-        f"first-8={'yes' if overlap['first_eight_plies'] else 'no'}"
-    )
-    draw.text((29, 778), overlap_text, fill="#3f3931", font=fonts["small"])
+    review_footer = entry.get("review_footer")
+    if review_footer is None:
+        overlap = entry["named_line_overlap"]
+        review_footer = (
+            "named-line overlap: "
+            f"any={'yes' if overlap['any_trajectory'] else 'no'}, "
+            f"first-8={'yes' if overlap['first_eight_plies'] else 'no'}"
+        )
+    draw.text((29, 778), str(review_footer), fill="#3f3931", font=fonts["small"])
     draw.text(
         (29, 804),
         f"start_positions_sha256 {start_positions_sha256[:20]}…",
@@ -844,13 +861,18 @@ def render_review_assets(
     start_hash = str(payload["start_positions_sha256"])
     rendered: list[tuple[Mapping[str, Any], Any, Path]] = []
     individual_manifest: list[dict[str, Any]] = []
+    image_prefix = str(payload.get("image_prefix", "oracle"))
+    evaluation_id = str(payload.get("evaluation_id", EVALUATION_ID))
+    sheet_title = str(payload.get("review_sheet_title", "Oracle starts"))
     for entry in entries:
         image = render_position_image(
             entry,
             total=len(entries),
             start_positions_sha256=start_hash,
         )
-        relative = Path("positions") / f"oracle-{int(entry['index']):03d}.png"
+        relative = Path("positions") / (
+            f"{image_prefix}-{int(entry['index']):03d}.png"
+        )
         target = root / relative
         _save_png(image, target)
         rendered.append((entry, image, relative))
@@ -880,7 +902,8 @@ def render_review_assets(
         last_index = int(page[-1][0]["index"])
         sheet_draw.text(
             (24, 9),
-            f"{EVALUATION_ID} — Oracle starts {first_index:03d}–{last_index:03d}",
+            f"{evaluation_id} — {sheet_title} "
+            f"{first_index:03d}–{last_index:03d}",
             fill="#2b2722",
             font=sheet_font,
         )
@@ -906,7 +929,7 @@ def render_review_assets(
 
     manifest_body = {
         "schema_version": REVIEW_MANIFEST_SCHEMA,
-        "evaluation_id": EVALUATION_ID,
+        "evaluation_id": evaluation_id,
         "start_positions_sha256": start_hash,
         "renderer": {
             "name": "learned_ai.evaluation.oracle_corpus",
@@ -1087,7 +1110,12 @@ def validate_corpus_artifact(payload: Mapping[str, Any]) -> dict[str, int]:
     }
 
 
-def validate_review_manifest(asset_root: str | Path) -> dict[str, int]:
+def validate_review_manifest(
+    asset_root: str | Path,
+    *,
+    expected_individuals: int = 106,
+    expected_sheets: int = 9,
+) -> dict[str, int]:
     """Verify every PNG hash and dimension recorded in the review manifest."""
     from PIL import Image
 
@@ -1105,9 +1133,14 @@ def validate_review_manifest(asset_root: str | Path) -> dict[str, int]:
         raise OracleCorpusError("review manifest identity mismatch")
     individuals = manifest.get("individual_images", [])
     sheets = manifest.get("contact_sheets", [])
-    if len(individuals) != 106 or len(sheets) != 9:
+    if (
+        len(individuals) != expected_individuals
+        or len(sheets) != expected_sheets
+    ):
         raise OracleCorpusError("review image counts are incomplete")
-    if [item.get("index") for item in individuals] != list(range(1, 107)):
+    if [item.get("index") for item in individuals] != list(
+        range(1, expected_individuals + 1)
+    ):
         raise OracleCorpusError("review image indices are not contiguous")
     for record in [*individuals, *sheets]:
         path = root / record["path"]

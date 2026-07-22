@@ -1,0 +1,2801 @@
+{
+  "claim_boundaries": [
+    "draft-not-frozen",
+    "requires-human-board-review",
+    "requires-baseline-and-work-budget-decision",
+    "not-expert-play",
+    "not-strength-or-promotion-evidence"
+  ],
+  "corpus_id": "dev-v4-phase-covered-corpus-v1",
+  "corpus_identity": "cc5477b777cf38ea59c5f20af4bb7b6019b0d12b328ac139b2a8e7d9f2df0bc8",
+  "entries": [
+    {
+      "fen": "......WB.....B..W.....W.|B|3|2",
+      "human_db_exact_overlap": false,
+      "index": 1,
+      "legal_move_count": 19,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 2,
+        "black_placed": 2,
+        "white_on_board": 3,
+        "white_placed": 3
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 3 step 6",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-001.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "......WB.....B..W.....W.|B|3|2",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 19,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "d6",
+          "ply": 5,
+          "side_to_move": 2,
+          "source_identity": "ce41d0aefa7cb1cbc25668c411914abd198c360f4aa19f04875a26177dd9293f",
+          "step_index": 6,
+          "tgf_fen": "*****O*O/****@***/*****O@* b p p 3 6 2 7 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BW..W.B.WW.BW.WB.W..BB..|W|7|7",
+      "human_db_exact_overlap": false,
+      "index": 2,
+      "legal_move_count": 21,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 6,
+        "black_placed": 7,
+        "white_on_board": 7,
+        "white_placed": 7
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 6 step 16",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-002.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...BB..WWBW.WB.WB.B.W..W|W|7|7",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 11,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "g4",
+          "ply": 15,
+          "side_to_move": 1,
+          "source_identity": "6ed14ea81cf7111d7ad2b24d343ed382ae18ff6e04a27513a09f32339b9bad90",
+          "step_index": 16,
+          "tgf_fen": "O**@@***/O*@O*O@O/O**O*@*@ w p p 7 2 6 2 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "WW...BWBW..B.WBB...WBW.B|B|8|7",
+      "human_db_exact_overlap": false,
+      "index": 3,
+      "legal_move_count": 10,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 7,
+        "white_on_board": 7,
+        "white_placed": 8
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 1 step 17",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-003.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B.WBW..WBBW.B.WWBWB..|B|8|7",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 10,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "f6",
+          "ply": 16,
+          "side_to_move": 2,
+          "source_identity": "6b82c04d24af410f9f5b9e88b947b502762564ab82dac9ab632d8b136d796b47",
+          "step_index": 17,
+          "tgf_fen": "**O@O*@*/**@*O@@O/O***@O@O b p p 7 1 7 2 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BW..W.B..W....WB.W...B..|W|5|5",
+      "human_db_exact_overlap": false,
+      "index": 4,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 5,
+        "white_on_board": 5,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 6 step 12",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-004.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B...W....WB.W..W.B.BW|W|5|5",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 15,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "b6",
+          "ply": 11,
+          "side_to_move": 1,
+          "source_identity": "75dceeea960d28e4584191b4e66dbe6993b398e9ccf21987acda48abd121edae",
+          "step_index": 12,
+          "tgf_fen": "O***@***/O****O@*/O**O*@*@ w p p 5 4 4 4 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BBBW..W.WW.B.B.B..W.W.BW|B|8|7",
+      "human_db_exact_overlap": false,
+      "index": 5,
+      "legal_move_count": 10,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 7,
+        "white_on_board": 7,
+        "white_placed": 8
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 2 step 17",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-005.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..W.BBBW.B.BWW.BW.BW..W.|B|8|7",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 10,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "f2",
+          "ply": 16,
+          "side_to_move": 2,
+          "source_identity": "b687600f52df8c850d2263f126f5cf47f926bd079241caa9692693188c415d3d",
+          "step_index": 17,
+          "tgf_fen": "*O*O*@O*/O*@*@*@O/@@O**O*@ b p p 7 1 7 2 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "WBW.B.WBBB.WWB..W..BW.W.|B|8|7",
+      "human_db_exact_overlap": false,
+      "index": 6,
+      "legal_move_count": 23,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 7,
+        "white_on_board": 8,
+        "white_placed": 8
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 3 step 16",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-006.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..W.W.WB.BB..BWWWBWBW.B.|B|8|7",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "g4",
+          "ply": 15,
+          "side_to_move": 2,
+          "source_identity": "ff408b2aba4563de46083cb9f17011c377e78a0c0d92436e278666c0880b1492",
+          "step_index": 16,
+          "tgf_fen": "**@O*O*O/@*OO@**@/@O*@*O@O b p p 8 1 7 2 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "..WWWWB....B.....BWB..WB|W|6|6",
+      "human_db_exact_overlap": false,
+      "index": 7,
+      "legal_move_count": 13,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 6,
+        "white_on_board": 6,
+        "white_placed": 6
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 7 step 14",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-007.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWWWW......B...BW..BWB|W|6|6",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 13,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "a7",
+          "ply": 13,
+          "side_to_move": 1,
+          "source_identity": "305ca468069b4d4dd0666ff25718a935ce5adb6c5912946f11c41f8d430ff0ca",
+          "step_index": 14,
+          "tgf_fen": "@O@**O@*/**@*****/*OOOO@** w p p 6 3 5 3 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BW..W.B.WW....WB.W...B..|B|6|5",
+      "human_db_exact_overlap": false,
+      "index": 8,
+      "legal_move_count": 16,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 5,
+        "white_on_board": 6,
+        "white_placed": 6
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 6 step 13",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-008.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B...W....WBWW..W.B.BW|B|6|5",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 14,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "f4",
+          "ply": 12,
+          "side_to_move": 2,
+          "source_identity": "33eb57679deeb7e343a3811eb6e91db226f27b7c1d181b2f15af1059e468022a",
+          "step_index": 13,
+          "tgf_fen": "O***@***/O****O@O/O**O*@*@ b p p 6 3 4 4 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "W.B....B.B..........W.WW|B|4|3",
+      "human_db_exact_overlap": false,
+      "index": 9,
+      "legal_move_count": 17,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 3,
+        "white_on_board": 4,
+        "white_placed": 4
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 4 step 8",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-009.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....B.WB.....B..W.W....W|B|4|3",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 17,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "e5",
+          "ply": 7,
+          "side_to_move": 2,
+          "source_identity": "e2884cacd780bed3dabad63b024733a35d6b84ea295c1e1a7dc09906718211d8",
+          "step_index": 8,
+          "tgf_fen": "***O*OO*/@*******/*@****@O b p p 4 5 3 6 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 4,
+          "trajectory_seed": 11936128518282650884
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".......WBW..........B...|W|2|2",
+      "human_db_exact_overlap": false,
+      "index": 10,
+      "legal_move_count": 20,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 2,
+        "black_placed": 2,
+        "white_on_board": 2,
+        "white_placed": 2
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 8 step 5",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-010.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......W.....WB...B.....|W|2|2",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 20,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "f2",
+          "ply": 4,
+          "side_to_move": 1,
+          "source_identity": "6bb6c131657773be2b65c6c8725fcee2333740eba75827dc7465ae5714f265bb",
+          "step_index": 5,
+          "tgf_fen": "***@****/O******@/******O* w p p 2 7 2 7 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "WBWBB.WBBB.WWB..W..BW.W.|W|8|8",
+      "human_db_exact_overlap": false,
+      "index": 11,
+      "legal_move_count": 29,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 8,
+        "white_on_board": 8,
+        "white_placed": 8
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 3 step 17",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-011.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..W.W.WB.BB..BWWWBWBW.BB|W|8|8",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "d1",
+          "ply": 16,
+          "side_to_move": 1,
+          "source_identity": "f9594958e97a7bb227d40a959e8480e4c1dee099bd066e49711c0859700109b6",
+          "step_index": 17,
+          "tgf_fen": "**@O*O*O/@*OO@**@/@O@@*O@O w p p 8 1 8 1 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "..W...W...B..BW.BWB.WB..|W|5|5",
+      "human_db_exact_overlap": false,
+      "index": 12,
+      "legal_move_count": 14,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 5,
+        "white_on_board": 5,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 5 step 11",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-012.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWB.WBW...B..BW...W...|W|5|5",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 14,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "g1",
+          "ply": 10,
+          "side_to_move": 1,
+          "source_identity": "8f055832e5f08cecd9aca305ad5ea28966942d1b7ed205fc35c35ca0a19974a6",
+          "step_index": 11,
+          "tgf_fen": "O@*O@**@/*@**@O**/*O***O** w p p 5 4 5 4 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 5,
+          "trajectory_seed": 11936128518282650885
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".B....WWBW..W..BB...BW..|W|5|5",
+      "human_db_exact_overlap": false,
+      "index": 13,
+      "legal_move_count": 18,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 5,
+        "white_on_board": 5,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 8 step 11",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-013.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....WW.B..W..BBW..BW..B.|W|5|5",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 14,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "e5",
+          "ply": 10,
+          "side_to_move": 1,
+          "source_identity": "5251cc3a8eca0ab097c3215d4204c0771df9a12e0d925eebd00a32922a2ea0be",
+          "step_index": 11,
+          "tgf_fen": "***@O**@/O**O**@@/@****OO* w p p 5 4 5 4 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".B....WWBW..W...B...BW..|B|5|4",
+      "human_db_exact_overlap": false,
+      "index": 14,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 4,
+        "white_on_board": 5,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 8 step 10",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-014.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....WW.B..W...BW..BW..B.|B|5|4",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 15,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "b4",
+          "ply": 9,
+          "side_to_move": 2,
+          "source_identity": "e76640f57aec4fdd5aa89948804557e110c6f743557fc7b218f8ac32a6fdf844",
+          "step_index": 10,
+          "tgf_fen": "***@O**@/O**O***@/@****OO* b p p 5 4 4 5 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".BB...WWWW.....B......B.|W|4|4",
+      "human_db_exact_overlap": false,
+      "index": 15,
+      "legal_move_count": 22,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 4,
+        "white_on_board": 4,
+        "white_placed": 4
+      },
+      "review_detail_lines": [
+        "phase placement | Malom W | trajectory 2 step 9",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-015.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "......B....WWB....BB.WW.|W|4|4",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 16,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "e3",
+          "ply": 8,
+          "side_to_move": 1,
+          "source_identity": "1021c8d88869683ef0833c75218715268f546495430de827f5e86ad3ec50703f",
+          "step_index": 9,
+          "tgf_fen": "*****@**/O*****@O/@@***OO* w p p 4 5 4 5 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BBBW..W.WW.BBB.B..W.W.BW|W|8|8",
+      "human_db_exact_overlap": false,
+      "index": 16,
+      "legal_move_count": 17,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 8,
+        "white_on_board": 7,
+        "white_placed": 8
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 2 step 18",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-016.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..W.BBBWBB.BWW.BW.BW..W.|W|8|8",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "d5",
+          "ply": 17,
+          "side_to_move": 1,
+          "source_identity": "647fe7ea965aec427804af0299a3c40044bc169464ca32056d0ace6321a3fc12",
+          "step_index": 18,
+          "tgf_fen": "*O*O*@O*/O*@@@*@O/@@O**O*@ w p p 7 1 8 1 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "..B.................W.W.|B|2|1",
+      "human_db_exact_overlap": false,
+      "index": 17,
+      "legal_move_count": 21,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 1,
+        "black_placed": 1,
+        "white_on_board": 2,
+        "white_placed": 2
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 4 step 4",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-017.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "......B...........W.W...|B|2|1",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 21,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "a4",
+          "ply": 3,
+          "side_to_move": 2,
+          "source_identity": "1e4d57a0b392a939fb8100a4443caad41ed1b5b62b7e6cfda7314e17bcb816e7",
+          "step_index": 4,
+          "tgf_fen": "***O*O**/********/*@****** b p p 2 7 1 8 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 4,
+          "trajectory_seed": 11936128518282650884
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BBBW..W.WW...B.B..W.W.B.|B|7|6",
+      "human_db_exact_overlap": false,
+      "index": 18,
+      "legal_move_count": 12,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 6,
+        "black_placed": 6,
+        "white_on_board": 6,
+        "white_placed": 7
+      },
+      "review_detail_lines": [
+        "phase placement | Malom D | trajectory 2 step 15",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-018.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B.W.W.WB.B...WB.W..WBB|B|7|6",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 12,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "f4",
+          "ply": 14,
+          "side_to_move": 2,
+          "source_identity": "8b3904920d3d01859d03caa09509c2a49153f535cb2bff23768500d7f5460015",
+          "step_index": 15,
+          "tgf_fen": "*O*O*@**/O***@*@O/@@O**O*@ b p p 6 2 6 3 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "W......BW....WBB.......B|W|4|4",
+      "human_db_exact_overlap": false,
+      "index": 19,
+      "legal_move_count": 17,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 4,
+        "white_on_board": 3,
+        "white_placed": 4
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 1 step 10",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-019.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......BBW....WB......WB|W|4|4",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 17,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "a1",
+          "ply": 9,
+          "side_to_move": 1,
+          "source_identity": "85036af975a01021360e5c6fffcd870d26dda0e80617a4505b2d878bb7a71e5e",
+          "step_index": 10,
+          "tgf_fen": "******@*/****O@@O/******@O w p p 3 5 4 5 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "W.....WBW..B.WBB.......B|W|5|5",
+      "human_db_exact_overlap": false,
+      "index": 20,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 5,
+        "white_on_board": 4,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 1 step 12",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-020.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......BBW.B..WBW.....WB|W|5|5",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 15,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "e4",
+          "ply": 11,
+          "side_to_move": 1,
+          "source_identity": "844d0e1c62c0ce1c064b417feca8de742230c4cd3b3f59f35dd887689e85151f",
+          "step_index": 12,
+          "tgf_fen": "******@*/**@*O@@O/*****O@O w p p 4 4 5 4 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BW..W.B..W....WB.W......|B|5|4",
+      "human_db_exact_overlap": false,
+      "index": 21,
+      "legal_move_count": 17,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 4,
+        "white_on_board": 5,
+        "white_placed": 5
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 6 step 11",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-021.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......W....WB.W..W.B.BW|B|5|4",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 16,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "d3",
+          "ply": 10,
+          "side_to_move": 2,
+          "source_identity": "8b34920c656d38a37ed07273bda865912a4673847c36d3c4a86a7d169636a227",
+          "step_index": 11,
+          "tgf_fen": "O*******/O****O@*/O**O*@*@ b p p 5 4 3 5 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BW.WWWB.WW.BW.WB.W.BBB..|B|9|8",
+      "human_db_exact_overlap": false,
+      "index": 22,
+      "legal_move_count": 23,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 8,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase placement | Malom L | trajectory 6 step 19",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-022.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...BBB.WWBW.WB.WB.BWWW.W|B|9|8",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 2,
+          "picked_uci": "c4",
+          "ply": 18,
+          "side_to_move": 2,
+          "source_identity": "e6904f25911b4a3618aa30f99834de60bdd8527f10bb5587b1d75c9982414d2c",
+          "step_index": 19,
+          "tgf_fen": "O*@@@***/O*@O*O@O/O*OOO@*@ b p p 9 0 7 1 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BBWBB.W.BB..WBBW.WBW....|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 23,
+      "legal_move_count": 8,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 3 step 46",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-023.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".....WBWBWBBW..BB.W.BBWB|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e4-f4",
+          "ply": 45,
+          "side_to_move": 1,
+          "source_identity": "cc059b8ade8a06990b53a357e95e12e74bf6780e4f3d1cd80c22136202eb2413",
+          "step_index": 46,
+          "tgf_fen": "O@O*****/@**O@@O@/@O@@*O*@ w m s 6 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BBWBBB.W..W..BWBWB..B..W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 24,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 3 step 91",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-024.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B..BWWWB..W..B.BBBWBBW|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 10,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e3-e4",
+          "ply": 90,
+          "side_to_move": 2,
+          "source_identity": "e3cf21ef3dc3c49b729034606c848929b732431f67de67846e1eaf5fa368af02",
+          "step_index": 91,
+          "tgf_fen": "@**@**OO/*O**@O@*/@O@@@*O@ b m s 6 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "WBWWW.B.B.BBW..W.BWB..WB|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 25,
+      "legal_move_count": 25,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 7 step 26",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-025.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..WB.BWBW..WB.BBW.B.WBWW|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f6-d6",
+          "ply": 25,
+          "side_to_move": 2,
+          "source_identity": "463d9ef2685b9bfa73aeb9c979c091a508231e9f0eb04a5fa3ff75b3265d40cb",
+          "step_index": 26,
+          "tgf_fen": "@O@**O@*/*@@O**O@/@OOO*@*O b m s 8 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "B.BWWBWWW.B.B.W.BBW.BB..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 26,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 7,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 5 step 59",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-026.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BBW.BBW.W.B.B.WWB.BWWB|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 7,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b2-d2",
+          "ply": 58,
+          "side_to_move": 1,
+          "source_identity": "a61fd67f2e2e8c88abf5b98833da68b75e48dc109cacfaefa6434f4bd6435582",
+          "step_index": 59,
+          "tgf_fen": "@O*@@**@/*@*@*O*O/*@OO@OO@ w m s 7 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 5,
+          "trajectory_seed": 11936128518282650885
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "B..WWBWW.BBB.BWW.WBW.B.B|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 27,
+      "legal_move_count": 16,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 5 step 37",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-027.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWWBWWBB.WWB.BBW.B.B.W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d2-f2",
+          "ply": 36,
+          "side_to_move": 2,
+          "source_identity": "0681041ab86b5527de84d3d6c83d6faed85ff7a4180a5aeddb85a522b8e26f06",
+          "step_index": 37,
+          "tgf_fen": "O@O*@*@*/@@@*@OO*/**OO@OO@ b m s 8 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 5,
+          "trajectory_seed": 11936128518282650885
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "B.WBBBWBBB.WWB...W.B...W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 28,
+      "legal_move_count": 9,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 3 step 77",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-028.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B.W.W.BWW.BB.WBBBW.BB|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b6-b4",
+          "ply": 76,
+          "side_to_move": 2,
+          "source_identity": "b5c7e63e58669e2fb244488eedc2cc11ec44e9688c3d0f3c2e5d876886599b97",
+          "step_index": 77,
+          "tgf_fen": "O*@***O*/@*OO@**@/*O@@@O@@ b m s 6 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BW.W.WB..BBB.WWW.WWW.B.B|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 29,
+      "legal_move_count": 9,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 8 step 191",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-029.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".B.B.WWW.WWW.BBB.WB.BW.W|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d5-c5",
+          "ply": 190,
+          "side_to_move": 1,
+          "source_identity": "e79900f3540755d6ef01bd1d4f95e6ff0c15aee949e684efbe0702bcf594bda4",
+          "step_index": 191,
+          "tgf_fen": "OOO*@*@*/@@@*OOO*/O*O*O@*@ w m s 9 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".BWBW.BW.WB.W.WBB.WBBW.W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 30,
+      "legal_move_count": 15,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 8 step 67",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-030.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".BWBW.BW.WB.W.WBB.WBBW.W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 7,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "c5-d5",
+          "ply": 66,
+          "side_to_move": 2,
+          "source_identity": "7a853d42f24c649766a7af4a01a7ffbfaeb6c66eb9498fcdef31432dd5187886",
+          "step_index": 67,
+          "tgf_fen": "*O@@O*O@/O@*O*O@*/@O@O*@O* b m s 9 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".WBW.B..B.WWBWWBWW..BB.W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 31,
+      "legal_move_count": 6,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 8 step 162",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-031.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B.WBWBBWWBWW.WW.BB..W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 6,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d3-c3",
+          "ply": 161,
+          "side_to_move": 2,
+          "source_identity": "b03d944741d7cdd84ac2eac20ddd72fc7763e5539953f9bee5482393611c47ec",
+          "step_index": 162,
+          "tgf_fen": "O**@@*OO/*OO@OO@@/O@O*@*** b m s 9 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "..W.WWBBBW.BB.WWW.WW.B.B|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 32,
+      "legal_move_count": 8,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 8 step 180",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-032.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..W.WWBBBW.BB.WWW.WW.B.B|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f4-f6",
+          "ply": 179,
+          "side_to_move": 2,
+          "source_identity": "bd568aac3e3dd0ea81e03f36cf395cfa891935d4768ea5c715ebca51f74df51d",
+          "step_index": 180,
+          "tgf_fen": "*OO*@*@O/O*@@*OO@/*O*OO@@* b m s 9 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BBB...W....B..WW..W..B.W|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 33,
+      "legal_move_count": 10,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 9,
+        "white_on_board": 5,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 3 step 165",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-033.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BBB.W..B...WW...W..W.B|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 9,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b2-d2",
+          "ply": 164,
+          "side_to_move": 1,
+          "source_identity": "5efcf49ae08fc11776589145b35acdd1110b155ff3d646ab8452d01874e3d075",
+          "step_index": 165,
+          "tgf_fen": "*O**@*O*/**@**OO*/@@***O*@ w m s 5 0 5 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "B.WW.W..BBBW..WBB...W...|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 34,
+      "legal_move_count": 8,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 6,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 7 step 54",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-034.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B...W.BBBBW..WW.B..W.W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "a7-d7",
+          "ply": 53,
+          "side_to_move": 2,
+          "source_identity": "4f6a514f1a604091d3a2b5d91197af1ae45dd7682a950b025c9a1ef3f2f8c913",
+          "step_index": 54,
+          "tgf_fen": "***O***@/@@O**O@@/*OO*O**@ b m s 6 0 6 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "B...BWBWBWBW...WBWWW..BW|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 35,
+      "legal_move_count": 6,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 8 step 97",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-035.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWBWB.BW...WBWWW..BWBW|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 6,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d1-d2",
+          "ply": 96,
+          "side_to_move": 1,
+          "source_identity": "06f79926d1c9bdaff0615b419f336b349f217f7387da9096f832b53f03d61dc0",
+          "step_index": 97,
+          "tgf_fen": "OOO**@O@/O@O***O@/***@O@O@ w m s 9 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "WBWWWWB.B.BBW.W..BWB..WB|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 36,
+      "legal_move_count": 13,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom W | trajectory 7 step 20",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-036.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..WB.BWBW.W.B.BBWWB.WBWW|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 6,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b2-b4",
+          "ply": 19,
+          "side_to_move": 1,
+          "source_identity": "76001ea6667d844976796e987e6384cc8cd61336b16e2fd6acabb5970bf33fe0",
+          "step_index": 20,
+          "tgf_fen": "@O@**O@*/*@@O*O*@/@OOOO@*O w m s 9 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BB....BW....BWWWW....B.W|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 37,
+      "legal_move_count": 4,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 3 step 138",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-037.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....BWBB..BWWW.....B.WW.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 4,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "c5-d5",
+          "ply": 137,
+          "side_to_move": 1,
+          "source_identity": "38d8aec1d76a49f6ca0620d7143278276d2ed6225f93de7832fa6d24363a42c1",
+          "step_index": 138,
+          "tgf_fen": "****@*OO/***@OOO*/@****@O@ w m s 6 0 5 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".BBW.B.WBWWWBWW.W.W.B.B.|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 38,
+      "legal_move_count": 8,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 9,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 8 step 134",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-038.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".B.W.BBWBWW.BWWWB.B.W.W.|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d1-g1",
+          "ply": 133,
+          "side_to_move": 2,
+          "source_identity": "35b4ac6376746937b146445c674be79331e5f38cfc2dbc2123c5c651e536d37a",
+          "step_index": 134,
+          "tgf_fen": "*O*@*@*O/OOO@OO*@/@@O*@*O* b m s 9 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 8,
+          "trajectory_seed": 11936128518282650888
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "B..W.BWWWB.BWBW.BWBBWB..|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 39,
+      "legal_move_count": 7,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 5 step 23",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-039.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWBBWBW.WB.BWBWWB..W.B|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 7,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "c5-c4",
+          "ply": 22,
+          "side_to_move": 2,
+          "source_identity": "8080acf6cc696c9a27a84bddb58d497001ea48900a22629bee6b80b87810aee7",
+          "step_index": 23,
+          "tgf_fen": "O@@O@**@/@*@O@O*O/**O*@OO@ b m s 8 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 5,
+          "trajectory_seed": 11936128518282650885
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "B.B..WB.W.B...WWW..B.B.W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 40,
+      "legal_move_count": 13,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 6,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 3 step 130",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-040.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B.B.BW..B.WWW..B..WW.B|B|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 13,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f6-d6",
+          "ply": 129,
+          "side_to_move": 2,
+          "source_identity": "a79a99d3ad31fe31315d18a4550a5564e29e215771baa08ea5244fe70869b7fe",
+          "step_index": 130,
+          "tgf_fen": "**@*@*OO/*@***OOO/*@**O@*@ b m s 6 0 6 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "..W...B.BWWW..WBWBB.BBB.|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 41,
+      "legal_move_count": 8,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom L | trajectory 6 step 51",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-041.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B...W...WBBWWWBBB.WBB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 8,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f4-g4",
+          "ply": 50,
+          "side_to_move": 1,
+          "source_identity": "348d2ed4922654f6da3d945ef89ecd9ffa87e9c5f945b361043b7746bc26474e",
+          "step_index": 51,
+          "tgf_fen": "@@*@@@*O/OOO**O@@/*O***@** w m s 6 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "BB...WBW..B.BW.W.W.BB..W|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 42,
+      "legal_move_count": 10,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 7,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 3 step 122",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-042.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...BBWBWB.B..W.WBB.W.W..|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 10,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d2-b2",
+          "ply": 121,
+          "side_to_move": 1,
+          "source_identity": "bac444bcd3bb0fa8cda987c3764f99196a433fc2222f12e9f578f5171b962af0",
+          "step_index": 122,
+          "tgf_fen": "O*@@**O*/*@*@O*O*/@***O@O@ w m s 6 0 7 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 3,
+          "trajectory_seed": 11936128518282650883
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "W.BWBB...BBBB..W.WB.WW..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 43,
+      "legal_move_count": 10,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 6,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase movement | Malom D | trajectory 4 step 55",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-043.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...WB.WW.W.BBBB...W.BWBB|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 10,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d3-d2",
+          "ply": 54,
+          "side_to_move": 1,
+          "source_identity": "a97d204ded5401235872c8bd62b9b9df47e4b5eb784b65d617adcd856da75f96",
+          "step_index": 55,
+          "tgf_fen": "O@*OO***/@@@@**O*/*@O@@**O w m s 6 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 4,
+          "trajectory_seed": 11936128518282650884
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "W.BBW.B.....BB...WB.B.BB|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 44,
+      "legal_move_count": 36,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 1 step 81",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-044.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".BB.B.BW...BB...W.B.WBB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 36,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "g1-f4",
+          "ply": 80,
+          "side_to_move": 1,
+          "source_identity": "933d5f2a62f202353990d31ec1d09ab8680e8177a36858a42e3d3f202679f071",
+          "step_index": 81,
+          "tgf_fen": "O@*@*@@*/***@@***/*@@O*@*O w m s 3 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".BW.BWB...BBB.BW.......B|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 45,
+      "legal_move_count": 39,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 8,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 4 step 122",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-045.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......B..BBB.BW.BW.BWB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b4-a7",
+          "ply": 121,
+          "side_to_move": 1,
+          "source_identity": "e81bcf45c40f2dffa4900f7884ff244163ac7e1d573e2da7b53af04a8896ae4e",
+          "step_index": 122,
+          "tgf_fen": "******@*/*@@@*@O*/@O*@O@** w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 4,
+          "trajectory_seed": 11936128518282650884
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".......W..B.BB...WWW....|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 46,
+      "legal_move_count": 57,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 4,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 170",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-046.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......W..B.BB...WWW....|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f2-e3",
+          "ply": 169,
+          "side_to_move": 1,
+          "source_identity": "5c31ffbf8003509f41de228f42c4f18280024f52abb9d5ee72424ffec1a45084",
+          "step_index": 170,
+          "tgf_fen": "@@@*****/*O*OO***/******@* w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".WBBW.B......B.W..B.BBBB|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 47,
+      "legal_move_count": 36,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 1 step 77",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-047.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B.BBBB.....B.W.WBBW.B.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 36,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d7-d5",
+          "ply": 76,
+          "side_to_move": 1,
+          "source_identity": "8a5531dbfeef90dc879c6dfd9adb27f448a8e4be4e18b73ffe3ef6be375e8aa2",
+          "step_index": 77,
+          "tgf_fen": "*@*@@@@*/****@*O*/O@@O*@** w m s 3 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".WBB.B.......B.W..BWBBBB|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 48,
+      "legal_move_count": 36,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 1 step 75",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-048.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B.BBW.W.B.....BBBBWB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 36,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e4-g1",
+          "ply": 74,
+          "side_to_move": 1,
+          "source_identity": "d1c5c84dab19dd12affc2a50a903c4c28225317e90dd76cba6963779d2e95c8b",
+          "step_index": 75,
+          "tgf_fen": "*@O@@@@*/****@*O*/O@@*@*** w m s 3 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "W.BB..B..W..BB..BWB.BB..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 49,
+      "legal_move_count": 44,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 9,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 1 step 85",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-049.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B.W.BBBB...W..BB..BWB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 36,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "a7-c3",
+          "ply": 84,
+          "side_to_move": 1,
+          "source_identity": "b98e1afc218df5888867c912054ab95085cfa8612b67f8e4a919dcaf0f73b9f4",
+          "step_index": 85,
+          "tgf_fen": "O@*@@**@/O**@@***/*@@**@*O w m s 3 0 9 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 1,
+          "trajectory_seed": 11936128518282650881
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".WB...W..W.B.....W.BW...|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 50,
+      "legal_move_count": 49,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 5,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 141",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-050.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....WB.W.....B.W..W...BW|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 48,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e4-f6",
+          "ply": 140,
+          "side_to_move": 1,
+          "source_identity": "297f4365204e67139a0509f67391a244c014df37980c76957d7de4a93c299f30",
+          "step_index": 141,
+          "tgf_fen": "@*O@****/@*O*****/@O***@** w m s 3 0 5 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "...BW........WB.B...WB..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 51,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 190",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-051.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "......WB....BW....B..BW.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d2-c4",
+          "ply": 189,
+          "side_to_move": 1,
+          "source_identity": "d6fa3e95e5a6e6e067bd5aea3705f40711817f4263095b2a857bead049512230",
+          "step_index": 190,
+          "tgf_fen": "***O@**@/****O@**/**@O**** w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".......B.BW.......BWBW..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 52,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 166",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-052.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......B....WB...WBWB...|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e4-f2",
+          "ply": 165,
+          "side_to_move": 1,
+          "source_identity": "f7558e9ccf2a6b7b0b38509f797d4572c6878da04a4b69f919070babeb724f42",
+          "step_index": 166,
+          "tgf_fen": "*@O@O***/@O******/******@* w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".BW..WW...W.WW.B.B..WW..|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 53,
+      "legal_move_count": 43,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 2 step 90",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-053.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "...B..WW.B..W.WWW..BW..W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "b4-c3",
+          "ply": 89,
+          "side_to_move": 1,
+          "source_identity": "7895c67c35597c561300d643703f6b0a05c0372f0ea034473e8dbdd3775ac3f0",
+          "step_index": 90,
+          "tgf_fen": "O**@@***/*@*@@*O*/O@**@@** w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".......B.BW.W.....BB.W..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 54,
+      "legal_move_count": 54,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 168",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-054.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......B..W.WB...W.BB...|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d3-d2",
+          "ply": 167,
+          "side_to_move": 1,
+          "source_identity": "a136cff5ed7a537afa9941ecc2bcf328df0a72c643ba961a54aad55e3de0ecb0",
+          "step_index": 168,
+          "tgf_fen": "*@@*O***/@O*O****/******@* w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "W.WB....W....WBWW.WBW...|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 55,
+      "legal_move_count": 46,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 6 step 118",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-055.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....W.WB.WBWW...W...W.WB|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e4-g1",
+          "ply": 117,
+          "side_to_move": 1,
+          "source_identity": "39a3b909df8f43a0554ae5748df41dd44a6332864434eda31242378563e34c29",
+          "step_index": 118,
+          "tgf_fen": "*@O@***@/****@O@@/*@O****@ w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".BW...W..B.......BW.W...|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 56,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 4,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 160",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-056.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....W.WB.......B..W...WB|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d7-f6",
+          "ply": 159,
+          "side_to_move": 1,
+          "source_identity": "895c613cd8bbe148cca1a87f45f9827eabcc226cd31f68a89a768a9c39bbfc85",
+          "step_index": 160,
+          "tgf_fen": "O@*@****/O*******/O@***@** w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".BW.W.W...W.WW...B..WWB.|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 57,
+      "legal_move_count": 46,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 2 step 92",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-057.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..BWW..B...WW.W...W.W.WB|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "d7-a7",
+          "ply": 91,
+          "side_to_move": 1,
+          "source_identity": "ff5d7d935c6d0ba70764e2ad9e35c654905218eb937d3614f36a4020d56e614b",
+          "step_index": 92,
+          "tgf_fen": "O**@@O**/*@*@@***/O@*@*@** w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 2,
+          "trajectory_seed": 11936128518282650882
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": ".WB...B.BW..W.....B..B..|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 58,
+      "legal_move_count": 52,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 5,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 157",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-058.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....B..B..BW..W.B..WB...|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 48,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f2-d5",
+          "ply": 156,
+          "side_to_move": 1,
+          "source_identity": "8f7969ebc0838542970c0b987a39920955c268281c314f5733a94e3ec8f72343",
+          "step_index": 157,
+          "tgf_fen": "*@**@***/O**O***@/O@***@** w m s 3 0 5 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "B..W...W..B..B...WW.....|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 59,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 4,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom D | trajectory 7 step 174",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-059.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "......WW...B..B.BW...W..|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "f6-e3",
+          "ply": 173,
+          "side_to_move": 1,
+          "source_identity": "69b3d1d5891caa7f05388e3b97bf0e05edbcf00b14fe32ab919c49ac6c1f81ae",
+          "step_index": 174,
+          "tgf_fen": "@@******/*O**O***/**@***@O w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "W.W...B.W.....BWW.WBWW..|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 60,
+      "legal_move_count": 39,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 6 step 116",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-060.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "..B.W.W...BWW...WW..W.WB|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "a1-g4",
+          "ply": 115,
+          "side_to_move": 1,
+          "source_identity": "1a5e50a0253e0d14521caaa828a83453a8b3d7c36fa209bcaf202772933f132e",
+          "step_index": 116,
+          "tgf_fen": "*@O@@**@/*****O@@/*@***O*@ w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 6,
+          "trajectory_seed": 11936128518282650886
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "BWB.W.W.W..WW.W...B....W|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 61,
+      "legal_move_count": 39,
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 8,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom L | trajectory 4 step 126",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-061.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....B..WW.WW..W.W.W.BWB.|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 39,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e5-d1",
+          "ply": 125,
+          "side_to_move": 1,
+          "source_identity": "7b24eef32e82d14c8244d9faedf591376696b49779f2299d83e55e73cca9888a",
+          "step_index": 126,
+          "tgf_fen": "*O****@*/**@@*@*@/@O*@*@*O w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 4,
+          "trajectory_seed": 11936128518282650884
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    },
+    {
+      "fen": "W..B.........W.B.BB.W...|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 62,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom W | trajectory 7 step 176",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-062.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....W..B.W.B....W....BB.|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e3-d6",
+          "ply": 175,
+          "side_to_move": 1,
+          "source_identity": "6c441b546bc3a1658f25614de07f1c0ffea506a7a57ea6caf9a54b922bc1d7c5",
+          "step_index": 176,
+          "tgf_fen": "@@*O****/****O*@*/**@****O w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": ".......B..WB.W...BB.W...|W|9|9",
+      "human_db_exact_overlap": false,
+      "index": 63,
+      "legal_move_count": 51,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 4,
+        "black_placed": 9,
+        "white_on_board": 3,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom W | trajectory 7 step 172",
+        "transform identity | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-063.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": ".......B..WB.W...BB.W...|W|9|9",
+      "sources": [
+        {
+          "color_transform": "identity",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "e3-a7",
+          "ply": 171,
+          "side_to_move": 1,
+          "source_identity": "f128dbeb090edbb49c44f0fb229b907a35153ea7b8d09328e4fe3146ff11b766",
+          "step_index": 172,
+          "tgf_fen": "@@*O****/*O@*O***/******@* w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "W"
+    },
+    {
+      "fen": "B..W...B.....BW.W.W.....|B|9|9",
+      "human_db_exact_overlap": false,
+      "index": 64,
+      "legal_move_count": 54,
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "flying",
+      "pieces": {
+        "black_on_board": 3,
+        "black_placed": 9,
+        "white_on_board": 4,
+        "white_placed": 9
+      },
+      "review_detail_lines": [
+        "phase flying | Malom W | trajectory 7 step 180",
+        "transform swap-colors-and-turn | HumanDB/SpecialistDB exact overlap no/no"
+      ],
+      "review_footer": "DRAFT ONLY \u2014 legal seeded replay, not expert play",
+      "review_png": "assets/dev-v4-phase-covered-corpus-v1/positions/phase-064.png",
+      "review_title_prefix": "Phase candidate",
+      "ring16_canonical_fen": "....W.W..BW........BB..W|B|9|9",
+      "sources": [
+        {
+          "color_transform": "swap-colors-and-turn",
+          "legal_uci_count": 51,
+          "nmm_illegal_oracle_moves": [],
+          "oracle_moves": [],
+          "phase_tag": 3,
+          "picked_uci": "a7-d7",
+          "ply": 179,
+          "side_to_move": 1,
+          "source_identity": "fff8396b36fb4b8d2b136f97c4dbe347d62f5eab61059fb4fb943663f704d1ef",
+          "step_index": 180,
+          "tgf_fen": "*@*****@/****O@**/**@***OO w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+          "trajectory_index": 7,
+          "trajectory_seed": 11936128518282650887
+        }
+      ],
+      "specialist_db_exact_overlap": false,
+      "turn": "B"
+    }
+  ],
+  "evaluation_id": "dev-v4-training-aligned-paired-eval-v1-draft",
+  "image_prefix": "phase",
+  "pool_audit": {
+    "duplicate_ring16_count": 19,
+    "eligible_variant_count": 1040,
+    "opponent_only_flying_skipped": 70,
+    "pending_removal_count": 60,
+    "phase_pool_counts": {
+      "flying": 71,
+      "movement": 789,
+      "placement": 133
+    },
+    "raw_step_count": 1142,
+    "stable_step_count": 1082,
+    "terminal_or_unplayable_count": 0,
+    "trajectory_count": 8,
+    "unique_stable_ring16_count": 1063
+  },
+  "resource_identities": {
+    "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db": "1203fc73cd7d0a06e2dd1ffaced5b031dff8bd704e22b34ba02182ff3865614d"
+  },
+  "review_assets": {
+    "contact_sheet_count": 6,
+    "directory": "assets/dev-v4-phase-covered-corpus-v1",
+    "individual_image_count": 64,
+    "manifest": "manifest.json",
+    "manifest_file_sha256": "c19680a1e01e0ca8b2ef164343ae070592b55d8478cdd53ebe9cf56769f6f8ce",
+    "manifest_identity": "470d38a1e1ac311fb043b2ab31da20a2b413931947d63d33ddd24c5c0b20e4ab"
+  },
+  "review_sheet_title": "phase candidates",
+  "route_bundle_identity": "316c345e918575b11efab3e0cfd618c1ab0e8411ff4a78c06512781af8764aed",
+  "schema_version": "nmm.phase-covered-corpus.v1",
+  "selection_contract": {
+    "algorithm": "sha256-stratified-first-v1",
+    "color_transform": "flying candidates may swap both colors and the side to move",
+    "flying_definition": "side-to-move-has-exactly-three-pieces",
+    "phase_counts": {
+      "flying": 21,
+      "movement": 21,
+      "placement": 22
+    },
+    "quotas": {
+      "flying": {
+        "B-D": 5,
+        "B-L": 4,
+        "B-W": 1,
+        "W-D": 4,
+        "W-L": 5,
+        "W-W": 2
+      },
+      "movement": {
+        "B-D": 3,
+        "B-L": 4,
+        "B-W": 4,
+        "W-D": 4,
+        "W-L": 3,
+        "W-W": 3
+      },
+      "placement": {
+        "B-D": 4,
+        "B-L": 3,
+        "B-W": 4,
+        "W-D": 4,
+        "W-L": 3,
+        "W-W": 4
+      }
+    },
+    "required_db_overlap": "absent-from-HumanDB-and-final-SpecialistDB",
+    "turn_counts": {
+      "B": 32,
+      "W": 32
+    }
+  },
+  "source": {
+    "asset_path": "crates/tgf-mill/testdata/legacy_oracle/0.json",
+    "asset_sha256": "4b0ffc4e0d754e9cf2b3275726c366109173d303b1fa2dc0965c76d2db2b1f03",
+    "fixture_generator_git_sha": "3b7b52390",
+    "fixture_version": 1,
+    "git_blob": "a12eb55c32b5b6ccda0e1fbbde3761d384b453af",
+    "path_lookup_key": "sanmill_checkout",
+    "rule_idx": 0,
+    "rule_name": "Nine Men's Morris",
+    "sanmill_commit": "f8be034d10ba7b293f9c10d661b1cfd81e9be096"
+  },
+  "source_characterization": {
+    "expert_quality": false,
+    "purpose": "deterministic standard-NMM rules-replay fixture",
+    "selection_signal": "seeded picked legal actions",
+    "strength_oracle": false
+  },
+  "start_positions": [
+    "......WB.....B..W.....W.|B|3|2",
+    "BW..W.B.WW.BW.WB.W..BB..|W|7|7",
+    "WW...BWBW..B.WBB...WBW.B|B|8|7",
+    "BW..W.B..W....WB.W...B..|W|5|5",
+    "BBBW..W.WW.B.B.B..W.W.BW|B|8|7",
+    "WBW.B.WBBB.WWB..W..BW.W.|B|8|7",
+    "..WWWWB....B.....BWB..WB|W|6|6",
+    "BW..W.B.WW....WB.W...B..|B|6|5",
+    "W.B....B.B..........W.WW|B|4|3",
+    ".......WBW..........B...|W|2|2",
+    "WBWBB.WBBB.WWB..W..BW.W.|W|8|8",
+    "..W...W...B..BW.BWB.WB..|W|5|5",
+    ".B....WWBW..W..BB...BW..|W|5|5",
+    ".B....WWBW..W...B...BW..|B|5|4",
+    ".BB...WWWW.....B......B.|W|4|4",
+    "BBBW..W.WW.BBB.B..W.W.BW|W|8|8",
+    "..B.................W.W.|B|2|1",
+    "BBBW..W.WW...B.B..W.W.B.|B|7|6",
+    "W......BW....WBB.......B|W|4|4",
+    "W.....WBW..B.WBB.......B|W|5|5",
+    "BW..W.B..W....WB.W......|B|5|4",
+    "BW.WWWB.WW.BW.WB.W.BBB..|B|9|8",
+    "BBWBB.W.BB..WBBW.WBW....|W|9|9",
+    "BBWBBB.W..W..BWBWB..B..W|B|9|9",
+    "WBWWW.B.B.BBW..W.BWB..WB|B|9|9",
+    "B.BWWBWWW.B.B.W.BBW.BB..|W|9|9",
+    "B..WWBWW.BBB.BWW.WBW.B.B|B|9|9",
+    "B.WBBBWBBB.WWB...W.B...W|B|9|9",
+    "BW.W.WB..BBB.WWW.WWW.B.B|W|9|9",
+    ".BWBW.BW.WB.W.WBB.WBBW.W|B|9|9",
+    ".WBW.B..B.WWBWWBWW..BB.W|B|9|9",
+    "..W.WWBBBW.BB.WWW.WW.B.B|B|9|9",
+    "BBB...W....B..WW..W..B.W|W|9|9",
+    "B.WW.W..BBBW..WBB...W...|B|9|9",
+    "B...BWBWBWBW...WBWWW..BW|W|9|9",
+    "WBWWWWB.B.BBW.W..BWB..WB|W|9|9",
+    "BB....BW....BWWWW....B.W|W|9|9",
+    ".BBW.B.WBWWWBWW.W.W.B.B.|B|9|9",
+    "B..W.BWWWB.BWBW.BWBBWB..|B|9|9",
+    "B.B..WB.W.B...WWW..B.B.W|B|9|9",
+    "..W...B.BWWW..WBWBB.BBB.|W|9|9",
+    "BB...WBW..B.BW.W.W.BB..W|W|9|9",
+    "W.BWBB...BBBB..W.WB.WW..|W|9|9",
+    "W.BBW.B.....BB...WB.B.BB|W|9|9",
+    ".BW.BWB...BBB.BW.......B|W|9|9",
+    ".......W..B.BB...WWW....|B|9|9",
+    ".WBBW.B......B.W..B.BBBB|W|9|9",
+    ".WBB.B.......B.W..BWBBBB|W|9|9",
+    "W.BB..B..W..BB..BWB.BB..|W|9|9",
+    ".WB...W..W.B.....W.BW...|B|9|9",
+    "...BW........WB.B...WB..|W|9|9",
+    ".......B.BW.......BWBW..|W|9|9",
+    ".BW..WW...W.WW.B.B..WW..|B|9|9",
+    ".......B.BW.W.....BB.W..|W|9|9",
+    "W.WB....W....WBWW.WBW...|B|9|9",
+    ".BW...W..B.......BW.W...|B|9|9",
+    ".BW.W.W...W.WW...B..WWB.|B|9|9",
+    ".WB...B.BW..W.....B..B..|W|9|9",
+    "B..W...W..B..B...WW.....|B|9|9",
+    "W.W...B.W.....BWW.WBWW..|B|9|9",
+    "BWB.W.W.W..WW.W...B....W|B|9|9",
+    "W..B.........W.B.BB.W...|W|9|9",
+    ".......B..WB.W...BB.W...|W|9|9",
+    "B..W...B.....BW.W.W.....|B|9|9"
+  ],
+  "start_positions_artifact": {
+    "file_sha256": "ef94caa9c0dc71e93f86c1d0948cc2b62e97a5a3bc833fc29696dc6264fc4f36",
+    "path": "dev-v4-phase-covered-corpus-v1-start-positions.json"
+  },
+  "start_positions_sha256": "19e6d5f3083e7f023213c465e21d821c31a0ec58b40aa86116fd037694f5410a",
+  "status": "draft_for_owner_and_product_review_not_frozen"
+}
