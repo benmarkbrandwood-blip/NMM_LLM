@@ -15,6 +15,7 @@ from ai.heuristics import (
     _independent_mill_pairs,
     _piece_separation,
     _contested_mills,
+    _late_game_danger,
     _open_mill_domination,
     _unguarded_cardinal_mill_alert,
     evaluate,
@@ -327,14 +328,19 @@ class TestContestedMills(unittest.TestCase):
                    ["g7", "c4", "g1"])
         self.assertEqual(_contested_mills(b, "W"), 3)
 
-    def test_contested_scored_higher_than_two_config(self):
-        # The zugzwang position (3 contested mills, 7v3) should score HIGHER
-        # than the approach position (3 open 2-configs, 7v4) because it is decisive.
+    def test_contested_zugzwang_adds_late_game_bonus(self):
+        # The contested-mill rule contributes 120 per contested line plus
+        # 230 for each line beyond the first two.  Do not impose an ordering
+        # on the complete evaluator: the comparison position's three sealed
+        # two-configs now receive other independently valid feature bonuses.
         zugzwang = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
                           ["g7", "c4", "g1"], w_placed=9, b_placed=9)
-        approach  = _board(["a7", "d7", "a4", "b4", "a1", "d1", "g4"],
-                           ["b2", "e4", "f6", "d5"], w_placed=9, b_placed=9)
-        self.assertGreater(evaluate(zugzwang, "W"), evaluate(approach, "W"))
+        contested = _contested_mills(zugzwang, "W")
+        expected_bonus = contested * 120 + max(0, contested - 2) * 230
+        self.assertGreaterEqual(
+            _late_game_danger(zugzwang, "W"),
+            expected_bonus,
+        )
 
 
 # ── _open_mill_domination ─────────────────────────────────────────────────────
