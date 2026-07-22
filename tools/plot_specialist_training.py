@@ -5,7 +5,7 @@ Reads train_log.jsonl from each specified checkpoint folder and plots:
   Row 1: malom_win_move_rate + heuristic_top1_rate + policy_top1_rate
   Row 2: best_win_rate + win_rate_200 + draw rate  /  ply on rhs axis
   Row 3: sentinel_chosen_mean vs sentinel_mean + gap shaded
-  Row 4: reward breakdown (total/sentinel/heuristic)  /  LR on rhs axis
+  Row 4: reward breakdown (sentinel/heuristic)  /  LR on rhs axis
   Row 5: retro reward (outcome signal)
 
 Recovery event markers on win-rate panel:
@@ -349,11 +349,9 @@ def draw(fig, _axes_unused, specialists):
         ax_sent.legend(fontsize=6, loc="lower right")
         _caption(ax_sent, "teal gap (chosen>mean) = model using sentinel signal;  flat gap = ignoring it")
 
-        # ── Row 4: total/sentinel/heuristic rewards  +  LR (rhs) ────────
-        xs_rt, ys_rt = _get(rows, "reward_total_mean")
+        # ── Row 4: sentinel/heuristic rewards  +  LR (rhs) ────────
         xs_rs, ys_rs = _get(rows, "reward_sentinel_mean")
         xs_rh, ys_rh = _get(rows, "reward_heuristic_mean")
-        _plot_series(ax_rew, xs_rt, ys_rt, "total",     "#FFEB3B", alpha_raw=0.20, linestyle="--")
         _plot_series(ax_rew, xs_rs, ys_rs, "sentinel",  "#00BCD4", alpha_raw=0.20)
         _plot_series(ax_rew, xs_rh, ys_rh, "heuristic", "#FF9800", alpha_raw=0.20)
         ax_rew.axhline(0, color="white", alpha=0.20, linewidth=0.7, linestyle="--")
