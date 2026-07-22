@@ -49,22 +49,26 @@
     "opening_adherence": 90
   },
   "search_depth": {
-    "min": 3,
-    "max": 11
+    "min": 4,
+    "max": 22
   },
   "search_threads": 2,
   "ui_prefs": {
     "sel-opponent": "ai",
-    "sel-human-color": "R",
-    "sel-game-personality": "scholar",
-    "sel-difficulty": "5",
+    "sel-human-color": "W",
+    "sel-game-personality": "aggressive",
+    "sel-difficulty": "8",
     "chk-llm": false,
-    "chk-sentinel": true,
-    "sel-sentinel-mode": "score_adjust",
-    "rng-sentinel-gap": "35",
-    "chk-gap-net": true,
-    "chk-ext-qsearch": true,
-    "chk-ngram": true,
+    "chk-sentinel": false,
+    "sel-sentinel-mode": "advisory",
+    "rng-sentinel-gap": "20",
+    "chk-gap-net": false,
+    "rng-gap-net-blend": "30",
+    "chk-value-net": false,
+    "rng-value-net-blend": "10",
+    "chk-ext-qsearch": false,
+    "chk-star-square": false,
+    "chk-ngram": false,
     "chk-perfect-db": false
   }
 }
