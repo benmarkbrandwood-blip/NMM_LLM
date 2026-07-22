@@ -115,13 +115,18 @@ class TestSolver3v3Properties(unittest.TestCase):
         n_loss = sum(1 for i in range(TABLE_SIZE_3_3) if get_wdl(self.table, i) == WDL_LOSS)
         self.assertGreater(n_loss, 0)
 
-    def test_win_equals_loss_by_symmetry(self):
-        # In a symmetric game, by color-swap symmetry the number of positions
-        # where W-to-move wins should equal B-to-move wins.  Since the table
-        # stores WDL from STM's perspective, WIN count == LOSS count overall.
-        n_win = sum(1 for i in range(TABLE_SIZE_3_3) if get_wdl(self.table, i) == WDL_WIN)
-        n_loss = sum(1 for i in range(TABLE_SIZE_3_3) if get_wdl(self.table, i) == WDL_LOSS)
-        self.assertEqual(n_win, n_loss, "WIN and LOSS counts should be equal by NMM symmetry")
+    def test_wdl_distribution_is_color_symmetric(self):
+        # Swapping the piece colours and the side to move maps every W-to-move
+        # position to a B-to-move position with the SAME result from the side-
+        # to-move perspective.  It does not exchange WIN and LOSS.  Therefore
+        # each WDL bucket must have the same population for both turn bits.
+        counts_by_turn = {
+            0: {WDL_WIN: 0, WDL_LOSS: 0, WDL_DRAW: 0, WDL_UNKNOWN: 0},
+            1: {WDL_WIN: 0, WDL_LOSS: 0, WDL_DRAW: 0, WDL_UNKNOWN: 0},
+        }
+        for pos_id in range(TABLE_SIZE_3_3):
+            counts_by_turn[pos_id & 1][get_wdl(self.table, pos_id)] += 1
+        self.assertEqual(counts_by_turn[0], counts_by_turn[1])
 
     def test_totals_sum_to_table_size(self):
         counts = {WDL_WIN: 0, WDL_LOSS: 0, WDL_DRAW: 0, WDL_UNKNOWN: 0}
