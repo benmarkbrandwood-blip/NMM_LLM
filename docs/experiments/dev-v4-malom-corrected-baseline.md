@@ -53,8 +53,12 @@ The intended long-run path boundary is:
 
 On 20 July 2026, the SpecialistDB above was verified read-only with zero rows
 in `positions`, `winning_lines`, and `preferred_plays`, and metadata
-`malom_label_version=sector-corrected-v1`. Verify those facts again immediately
-before the long run. Do not use the active baseline DB for the smoke.
+`malom_label_version=sector-corrected-v1`. That was the historical pre-launch
+state, not its current state. The completed managed run populated the database;
+on 22 July it had 132,182 positions, 41,904 current-version Malom labels, 916
+winning lines, no preferred plays, and lineage root
+`managed-v4-baseline-v1-segment-0001`. Do not reuse it as the empty input to a
+new fresh experiment, and do not replace it with the staged maintainer DB.
 
 ## Agent-Managed Long-Run Definition
 

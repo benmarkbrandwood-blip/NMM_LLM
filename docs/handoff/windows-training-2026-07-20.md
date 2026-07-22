@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 21 July 2026)
+# Windows Training Handover — 20 July 2026 (updated 22 July 2026)
 
 ## Executive Summary
 
@@ -20,6 +20,15 @@ initialization. Its replacement corpus and PNG package are generated and
 audited, but owner acceptance, a clean freeze state, readiness evidence, and
 new authorization remain incomplete. It is not a formal strength or promotion
 gate, and freeze/run remain unauthorized.
+
+The maintainer's latest `main` history and 21/22 July staged upload have now
+been integrated and audited without activating their databases or checkpoints.
+The rebuilt HumanDB has current label metadata and matched 30 deterministic
+Malom probes; the rebuilt SpecialistDB has current metadata and zero Malom
+labels but retains 2.1 million empirical positions. Seven updated checkpoints
+remain weights-only maintainer-`main` artifacts with unknown corrected-data
+lineage. The older v2a trainer fork is preserved but quarantined on `dev`, and
+the imported in-place SpecialistDB clearing tool has been made non-destructive.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -88,6 +97,39 @@ At the 21 July formal-evaluation review, local `dev` was at
 `origin/dev`, with modified and untracked experiment documents and draft
 artifacts. That is not a clean reproducible evaluation freeze point. Recheck
 the live graph and working tree before relying on this snapshot.
+
+## 22 July Main Integration and Upload Audit
+
+The maintainer's active `main` tip was `b9a13ce`. Its history was not compared
+to `dev` by a blind tip diff: commit-graph inspection showed that `9d09851` was
+a one-parent import close to older `dev` commit `0ad5991`, followed by the
+maintainer's plans, assets, and v2a work. Merge commit `8717f1c` records the
+integration. All seventeen snapshot conflicts retained the newer `dev` side;
+the non-conflicting maintainer artifacts were preserved for audit.
+
+Two independent safety commits follow that merge:
+
+- `f7c5b19` makes SpecialistDB label clearing an explicit, source-hash-bound
+  copy migration and adds three regression tests;
+- `76f3ff3` quarantines the older main-lineage v2a runtime entry point and
+  removes its unsafe smoke/resume examples while retaining the source for
+  reviewed feature porting.
+
+The staged rebuilt databases are intact and remain under `../Mills`. The
+HumanDB sidecar hash matches, both SQLite quick checks pass, and 30 sampled
+HumanDB labels match the current corrected Malom adapter for W/D/L and DTW.
+This supports the staged candidate but does not replace the active HumanDB or
+change the completed baseline. The staged SpecialistDB's retained empirical
+history also makes it a different experiment input from the fresh baseline DB.
+
+The imported retraining plan remains a proposal. Checkpoint corrected-data
+lineage and the intended Sentinel, ValueNet, and GapNet target contracts still
+require maintainer confirmation before any retraining definition is frozen.
+See
+[`docs/evidence/main-integration-audit-2026-07-22.md`](../evidence/main-integration-audit-2026-07-22.md)
+for exact hashes, counts, conflict policy, and question boundaries. The prior
+draft message to the maintainer can wait; a shorter evidence-based question set
+should be sent only after this integration audit is complete.
 
 ## Environment State
 
@@ -191,8 +233,9 @@ The assets are present, but they are not all equally trustworthy:
 
 - HumanDB human frequencies, outcomes, and counts remain useful.
 - HumanDB's unversioned historical Malom columns are masked by current readers.
-- `data/specialist_db.sector_corrected.sqlite` is trusted and deliberately
-  empty. It is the active SpecialistDB for a corrected run.
+- `data/specialist_db.sector_corrected.sqlite` is trusted completed-run state.
+  It began empty, but the 5,000-game managed baseline populated it; do not
+  describe or reuse it as an empty input for another fresh experiment.
 - Both legacy SpecialistDB deliveries are isolated in the ignored backup
   directory and must remain read-only.
 - Historical checkpoints and nets pre-date the corrected decoder/provenance
@@ -248,8 +291,12 @@ It has the following intended behaviour:
 
 The active HumanDB has 1,560,069 labelled position rows and 1,691,422 labelled
 move rows but no label-version key, so its Malom fields are intentionally
-untrusted. The active corrected SpecialistDB has zero positions, winning lines,
-or preferred plays.
+untrusted. The active corrected SpecialistDB began empty. After the completed
+managed run, a 22 July read-only audit found SHA-256
+`1203FC73CD7D0A06E2DD1FFACED5B031DFF8BD704E22B34BA02182FF3865614D`,
+SQLite `quick_check=ok`, 132,182 positions, 41,904 current-version Malom
+labels, 916 winning lines, no preferred plays, and lineage root
+`managed-v4-baseline-v1-segment-0001`.
 
 The 20 July author update added 406 valid human-game JSONL files. Their content
 matches `human_games_94559.zip`, and the import manifest grew from 94,134 to
@@ -271,8 +318,11 @@ therefore no trusted label version. It is quarantined as
 `data/backups/drive_import_20260720/specialist_db.sqlite.legacy-author-update-20260720`
 with SHA-256
 `5C6A4EA1ACFB90BF05248580A07DAE7CF4645C09E5A4A69E2EC89EA9EE41811B`.
-The active corrected database was not replaced and retains SHA-256
-`CB4153A14752357587890EB5F8B655AB04AF8242E43BE1C80D4847A11D101A94`.
+The active corrected database was not replaced by that author update. The
+recorded pre-run SHA-256
+`CB4153A14752357587890EB5F8B655AB04AF8242E43BE1C80D4847A11D101A94`
+was subsequently superseded by legitimate managed-run writes; its current
+identity and counts are recorded above.
 
 The downloaded `build_endgame_db.py` and `build_fullgame_db.py` are byte-for-byte
 identical to the repository copies. The downloaded `build_human_db_sha.py` is
@@ -617,13 +667,19 @@ Proceed in this order:
 
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
-2. Have the owner review the generated 107-position list and PNG package.
-3. Reconcile the owning documents and artifacts in a clean tracked commit, then
-   repeat the focused evaluation/readiness checks.
-4. Request an explicit product authorization before freezing or running the
+2. Keep both rebuilt databases staged and keep every imported checkpoint out of
+   the `dev` resume lineage. Obtain the maintainer's exact checkpoint/data
+   lineage and intended Sentinel, ValueNet, and GapNet contracts before
+   freezing a retraining plan.
+3. Let the maintainer finish the generated 107-position and PNG review. Start
+   101 remains open for source intent; the withdrawn concern about 83 is not a
+   corpus defect.
+4. After owner corpus acceptance, reconcile the freeze artifacts in a clean
+   tracked commit and repeat focused evaluation/readiness checks.
+5. Request an explicit product authorization before freezing or running the
    Stage-0 diagnostic. Use 107 pairs / 214 games with no start reuse, and do
    not treat acceptance as promotion evidence.
-5. Specify a separate route-aligned and phase-covered evaluation before making
+6. Specify a separate route-aligned and phase-covered evaluation before making
    a formal strength claim. If Stage 0 is inconclusive, preregister v2
    independently and do not pool its observations with v1.
 
@@ -698,6 +754,13 @@ without the applicable separate authorization.
 - [`docs/evidence/author-main-generalist-audit-2026-07-20.md`](../evidence/author-main-generalist-audit-2026-07-20.md):
   hashes and reproducible diagnostic findings for the newly supplied
   author-`main` checkpoints, logs, screenshots, and related database claims.
+- [`docs/evidence/main-integration-audit-2026-07-22.md`](../evidence/main-integration-audit-2026-07-22.md):
+  commit-graph-aware `main` integration, staged rebuilt-database validation,
+  updated checkpoint identities, v2a boundary, and remaining maintainer
+  confirmations.
+- [`docs/retrain_v2_plan.md`](../retrain_v2_plan.md): maintainer proposal for
+  Sentinel, ValueNet, and GapNet v2 work; useful design input but not a frozen
+  or authorized run contract.
 - [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): target
   architecture, evidence boundaries, and staged acceptance plan.
 - [`docs/managed-training-operations.md`](../managed-training-operations.md):

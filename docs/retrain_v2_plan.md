@@ -1,16 +1,48 @@
 # Retrain v2 Plan — Sentinel, Value Net, Gap Net
 
+## Integration Status — Proposal, Not Launch Contract
+
+This maintainer-authored plan was imported from `main` on 22 July 2026. It is
+valuable design input, but no retraining run or promotion is authorized. The
+staged rebuilt databases remain under `../Mills`; neither has replaced the
+active database selected by `data/training_paths.local.json`.
+
+A read-only audit verified both staged SQLite files, their
+`sector-corrected-v1` metadata, and 30 deterministic HumanDB labels against the
+current corrected Malom adapter. The audit does not establish the lineage of
+the seven updated model checkpoints or freeze the three proposed model
+contracts. Exact hashes, counts, and open questions are in
+[`docs/evidence/main-integration-audit-2026-07-22.md`](evidence/main-integration-audit-2026-07-22.md).
+
+Before implementation, distinguish local engineering prerequisites from
+maintainer decisions:
+
+| Type | Unresolved item |
+| --- | --- |
+| Local | Activate a reviewed copy rather than replacing the active HumanDB or fresh-baseline SpecialistDB implicitly |
+| Local | Build a game-level split from source games; aggregate HumanDB rows do not retain game membership |
+| Local | Make required Sentinel/data loads fail closed and use the actual `--sentinel` gap-builder flag |
+| Local | Replace raw-rate 40-game promotion claims with a frozen paired protocol and uncertainty rule |
+| Maintainer | Confirm whether Sentinel must be DB-free at runtime; the proposed Stage 5 exposes oracle slots while evaluation masks them |
+| Maintainer | Confirm whether ValueNet v2 is an outcome value or a human next-move preference ranker |
+| Maintainer | Confirm whether GapNet predicts future human-blunder propensity or the current position-quality gap target |
+
+Do not begin Stage 0 until the applicable maintainer contract is answered and a
+new experiment document records inputs, output isolation, fixed work, tests,
+checkpoint roles, and authorization.
+
 ## Motivation
 
 The v1 sentinel, value net, and gap net were trained before the Malom sector-offset decoder bug was
 fixed.  Specifically:
 
-- **Specialist DB** had 364,262 Malom labels written by the old decoder.  Many wins/losses were
-  misclassified as draws.  All labels have been cleared (`sector-corrected-v1` provenance now
-  stamped); correct labels will accumulate as training runs.
-- **Human DB** had Malom WDL suppressed (missing version tag).  A full `--rebuild` with the
-  corrected decoder completed 2026-07-21; all 2,167,498 positions now have correct labels
-  (100% Malom coverage, 0 unknowns).
+- **Legacy Specialist DB** had 364,262 unversioned Malom labels written by the old decoder. The
+  staged rebuilt candidate has `sector-corrected-v1`, 2,112,951 retained empirical positions,
+  and zero Malom labels. It is not the empty fresh-baseline database and is not active.
+- **Active Human DB** still has its historical unversioned label columns masked. The staged
+  21 July rebuild has `sector-corrected-v1`; all 2,167,498 positions have labels and sampled
+  position/successor labels match the corrected adapter. It remains a candidate until activation
+  and lineage are recorded.
 
 The gap net training dataset (`data/gap_net_training.npz`) reads `malom_wdl_after` directly from
 `human_db.sqlite`, so it was built on corrupt labels and must be regenerated.  The gap dataset
@@ -48,7 +80,7 @@ or testing.  Renaming into production is a deliberate final step described in St
 
 ---
 
-## Step 0 — Train sentinel v2 (Stages 1 → 2 → 4 → 5)
+## Step 0 — Train sentinel v2 (Stages 1 → 2 → 4; Stage 5 blocked)
 
 **Sentinel must be trained first** so the gap net dataset can be built with the correct sentinel
 signal in Step 1.
@@ -84,7 +116,7 @@ oracle indicator slots so weights update toward ground truth without memorising 
   --config configs/sentinel_stage2.yaml \
   --game-dir data/games \
   --human-game-dir data/human_games \
-  --db-path /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
+  --db-path <malom_db_path-from-local-registry> \
   --drop-db-features \
   --resume learned_ai/sentinel/checkpoints/v2_stage1/best.pt \
   --out-dir learned_ai/sentinel/checkpoints/v2_stage2 \
@@ -100,39 +132,33 @@ Resume from Stage 2.  DB labels with `--drop-db-features`.  Human game data incl
   --config configs/sentinel_stage4.yaml \
   --game-dir data/games \
   --human-game-dir data/human_games \
-  --db-path /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
+  --db-path <malom_db_path-from-local-registry> \
   --drop-db-features \
   --resume learned_ai/sentinel/checkpoints/v2_stage2/best.pt \
   --out-dir learned_ai/sentinel/checkpoints/v2_stage4 \
   --device cpu
 ```
 
-### Stage 5 — DB feature fine-tune
+### Stage 5 — Blocked runtime-contract decision
 
-Resume from Stage 4.  DB feature slots now **visible** (no `--drop-db-features`).  Very low LR.
-Set `--epochs` to Stage 4's best epoch + 8 (check the Stage 4 checkpoint or log).
+Do not run the former DB-feature fine-tune command yet. The stated Sentinel
+goal is a compact live approximation of Malom, and the proposed evaluation
+zeroes DB feature slots to match inference. Training Stage 5 with those oracle
+slots visible would introduce a train/inference mismatch and could teach the
+network to depend on the database it is meant to replace.
 
-```bash
-.venv/bin/python scripts/train_sentinel.py \
-  --config configs/sentinel_stage5.yaml \
-  --game-dir data/games \
-  --human-game-dir data/human_games \
-  --db-path /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted \
-  --resume learned_ai/sentinel/checkpoints/v2_stage4/best.pt \
-  --out-dir learned_ai/sentinel/checkpoints/v2_stage5 \
-  --epochs <stage4_best_epoch + 8> \
-  --device cpu
-```
+The maintainer must first confirm the runtime contract. If Sentinel is DB-free
+at runtime, retain `--drop-db-features` in every training stage and use Malom
+only as the supervised teacher. If live inference intentionally supplies the
+same oracle slots, document that dependency and storage goal explicitly before
+restoring a Stage 5 command.
 
 Stage 6 (AIDB + contrastive) is out of scope for this retrain cycle.
 
-After Stage 5 completes, copy the best checkpoint to the v2 slot but **do not** overwrite the
-production `best.pt` yet:
-
-```bash
-cp learned_ai/sentinel/checkpoints/v2_stage5/best.pt \
-   learned_ai/sentinel/checkpoints/v2/best.pt
-```
+After the final approved Sentinel stage passes its own validation, record its
+source hash and copy it into the v2 staging slot. No source stage or promotion
+command is frozen while the Stage 5 contract remains unresolved. Do not
+overwrite production `best.pt`.
 
 ---
 
@@ -143,13 +169,14 @@ better sentinel signal:
 
 ```bash
 .venv/bin/python scripts/build_gap_dataset.py \
-  --sentinel-ckpt learned_ai/sentinel/checkpoints/v2/best.pt \
+  --sentinel learned_ai/sentinel/checkpoints/v2/best.pt \
   --out data/gap_net_training_v2.npz \
   --samples-per-category 20000
 ```
 
-(Check whether `build_gap_dataset.py` accepts a `--sentinel-ckpt` argument; if not, temporarily
-point the hard-coded sentinel path at `v2/best.pt`, or add the flag before running.)
+The current builder accepts `--sentinel`. It presently falls back to
+heuristics if the required checkpoint fails to load; the retraining workflow
+must change that path to fail closed before this command is approved.
 
 ---
 
@@ -194,6 +221,13 @@ and must:
 5. Track **validation next-move accuracy** (% of positions where the net ranks the human's
    successor highest) on a held-out **game-level** split; stop training when accuracy does not
    improve by ≥0.5pp for `--patience` consecutive epochs.
+
+The aggregate `positions` and `moves` tables do not retain game membership, so
+the script cannot create this game-level split by querying HumanDB alone. Split
+the source game files first, replay each split, and join canonical state keys
+to the versioned HumanDB labels, or build a new intermediate dataset that
+retains a stable game identifier. A position-level split is not an acceptable
+fallback.
 
 Note: the ranking loss trains only relative ordering, not absolute scalar magnitudes.  The v2 VN
 output scale may differ from the v1 VN (which was trained with L2 regression to a [−1, 1] final
@@ -259,8 +293,11 @@ NewS30 in a round-robin — point `--new-ckpt` at the new v2 checkpoint:
   --out eval_sentinel_v2_roundrobin.json
 ```
 
-This tests sentinel correcting the heuristic at 20% and 30% minimum gap thresholds.  40 games/pair
-(20 per colour) gives enough statistical separation for a clear ±5pp verdict.
+This tests sentinel correcting the heuristic at 20% and 30% minimum gap
+thresholds. Forty games per pair is a diagnostic only; it does not by itself
+give a promotion-grade uncertainty bound. Freeze a paired, colour-swapped
+workload and confidence-interval decision rule before treating the result as
+accept/reject evidence.
 
 ### 4c. Value net eval — next-move accuracy on human DB positions
 
@@ -345,9 +382,13 @@ before running the v2 comparison.
 
 ---
 
-## Step 5 — Success criteria for promotion
+## Step 5 — Draft success criteria, pending frozen evaluation
 
-Promote a v2 model to replace v1 production only if **all three** conditions hold:
+The thresholds below are maintainer proposals. Do not promote until they are
+embedded in a preregistered paired protocol with fixed positions, work per
+move, sample size, confidence rule, candidate identities, and an inconclusive
+outcome. After that freeze, promote a v2 model only if all applicable
+conditions hold:
 
 | Model | Condition |
 |---|---|
@@ -362,24 +403,14 @@ v1 is not worth the disruption — only promote if there is a real improvement.
 
 ---
 
-## Step 6 — Promotion
+## Step 6 — Promotion (not authorized)
 
-When v2 is confirmed better, the v2 files are **renamed into the standard production paths** so
-that all existing code, training scripts, and web server continue to work without any changes.
-
-```bash
-# Back up v1 production files
-cp learned_ai/sentinel/checkpoints/best.pt \
-   learned_ai/sentinel/checkpoints/best-v1-$(date +%Y%m%d).pt
-cp data/value_net.npz  data/value_net_v1_$(date +%Y%m%d).npz
-cp data/gap_net.npz    data/gap_net_v1_$(date +%Y%m%d).npz
-
-# Rename v2 into production (overwrites previous production files)
-mv learned_ai/sentinel/checkpoints/v2/best.pt \
-   learned_ai/sentinel/checkpoints/best.pt
-mv data/value_net_v2.npz  data/value_net.npz
-mv data/gap_net_v2.npz    data/gap_net.npz
-```
+Only after a separately recorded acceptance and product authorization may the
+v2 files be moved into the standard production paths. No executable promotion
+command is recorded while the candidates and acceptance protocol are
+undefined. Before any replacement, bind source and destination hashes, make a
+recoverable backup, prove rollback, and use the repository's destructive-action
+review rather than ad-hoc copy or rename commands.
 
 After renaming:
 - The Flask server picks up `best.pt` on restart (no config change).
@@ -393,14 +424,11 @@ Restart the Flask server to pick up the new sentinel checkpoint.
 
 ## Step 7 — Rollback
 
-If production regressions appear, restore the dated backups:
-
-```bash
-mv learned_ai/sentinel/checkpoints/best-v1-YYYYMMDD.pt \
-   learned_ai/sentinel/checkpoints/best.pt
-mv data/value_net_v1_YYYYMMDD.npz  data/value_net.npz
-mv data/gap_net_v1_YYYYMMDD.npz    data/gap_net.npz
-```
+Before promotion, create a rollback manifest containing the production and
+candidate identities, backup locations, and verification command. If a
+post-promotion regression appears, restore only through that reviewed manifest.
+There is no generic rollback command because the exact artifact identities and
+backup names do not yet exist.
 
 The `v2_stage{N}/` checkpoint directories and the v2 training datasets remain for continued
 iteration.
@@ -420,14 +448,15 @@ iteration.
   running the gap net v2 comparison (Step 4d).
 - Two new scripts are required before testing can begin: `tools/train_value_net_v2.py` (Step 2)
   and `scripts/eval_value_net_human.py` (Step 4c).  Neither exists yet.
-- Sentinel Stage 5's `--epochs` value depends on Stage 4's best epoch.  Check the Stage 4 log or
-  checkpoint metadata before running Stage 5.
-- `build_gap_dataset.py` may not yet accept `--sentinel-ckpt` as a CLI argument.  Verify and add
-  the flag if needed before running Step 1.
+- Sentinel Stage 5 is blocked on the runtime oracle-feature contract; no epoch
+  value should be selected before that decision.
+- `build_gap_dataset.py` accepts `--sentinel`, but its required-sentinel path
+  still needs to fail closed for this experiment.
 - **Pre-flight: malom_wdl_after semantics.** The Step 2 training filter depends on 'L' meaning the
   next player loses (i.e. the human's move was winning) and 'W' meaning the human played a losing
-  move.  Spot-check a sample of `human_db.sqlite` move records before writing
-  `train_value_net_v2.py` to confirm this convention is correct.
+  move. Fifteen staged successor rows matched the corrected Malom adapter for
+  W/D/L and DTW. Preserve this convention in focused dataset tests rather than
+  relying only on the audit sample.
 - **Pre-flight: bench_sentinel.py VN path.** Step 4d requires the opponent to use
   `value_net_v2.npz`.  Add a `--vn-path` CLI argument to `bench_sentinel.py` alongside
   `--gap-net-path` before running Step 4d.

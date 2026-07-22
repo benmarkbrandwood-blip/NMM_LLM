@@ -32,7 +32,7 @@ repository merely to describe its children.
 | `../human_database` | Human-game source archives and database-building source material | Never add to Git |
 | `../opening_book` | Source opening-book material | Keep outside Git unless deliberately imported as reviewed source data |
 | `../notes` | Original handover (`Notes.md`), its images, the unfinished archived trainer copy, and the 20 July author-`main` diagnostic bundle | Historical reference only; independently verify claims, never use these files as `dev` resume/input evidence, and do not execute or merge the draft blindly |
-| `../Mills` | Temporary import staging directory | Currently empty; safe to reuse as staging |
+| `../Mills` | Temporary import staging directory | Holds the maintainer's 21/22 July candidate HumanDB, SpecialistDB, retraining plan, and earlier v2a script; read-only audit input, not active training data |
 | `../.cargo-target` | Optional external Rust build cache | Currently empty; not project source |
 
 The empty `../.git` and `../.agents` directories are Codex workspace
@@ -107,19 +107,22 @@ candidate-set principles in
 
 ## Repository-local Data Inventory
 
-This inventory was measured on 20 July 2026.
+The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
+22 July supersede that start-of-run snapshot.
 
 | Asset | Current location and state |
 | --- | --- |
 | HumanDB | `data/human_db.sqlite`, 738,091,008 bytes; 94,429 games, 2,152,889 positions, and 2,516,356 move rows |
+| Staged rebuilt HumanDB | `../Mills/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
-| Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; metadata is `sector-corrected-v1`; all three data tables are currently empty |
+| Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
+| Staged rebuilt SpecialistDB | `../Mills/specialist_db.sqlite`, 290,820,096 bytes; versioned empirical-history candidate only, not active |
 | Legacy SpecialistDB snapshots | Two ignored, read-only snapshots under `data/backups/drive_import_20260720`; neither is an active training database |
 | Endgame databases | `data/endgame`, fourteen `.wdl` files plus `fullgame.bin` at 571,683,560 bytes |
 | Malom tablebase | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted`; 512 files and 83,582,223,577 bytes |
 | Sentinel | `learned_ai/sentinel/checkpoints/best.pt` |
-| Generalist checkpoints | `learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt` and `best1.pt` through `best6.pt` |
+| Generalist checkpoints | `learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt` and `best1.pt` through `best6.pt`; `main` updated `best.pt` and `best6.pt`, but both remain maintainer-`main` weights-only history |
 | Author `main` diagnostics | `../notes/best (copy).pt`, `best6.pt`, `train_log.jsonl`, and `update_log.jsonl`; reference-only and not part of the `dev` checkpoint lineage |
 | Specialist checkpoints | Opening: two; midgame: four; endgame: two, all under `learned_ai/checkpoints/scaffolded` |
 | Value nets | `data/value_net.npz` and the tracked human, phase, and trajectory variants |
@@ -157,10 +160,41 @@ Those columns were produced before the sector correction and are therefore
 untrusted. Current readers mask those fields while retaining human move
 frequency, result, and game-count statistics.
 
-The clean SpecialistDB is intentionally empty. It is safe for a corrected run
-because it carries `malom_label_version=sector-corrected-v1`; the trainer can
-add empirical game statistics and freshly decoded Malom labels without mixing
-them with legacy labels.
+The corrected SpecialistDB began empty and was the database used by the
+completed 5,000-game managed baseline. On 22 July its SHA-256 is
+`1203FC73CD7D0A06E2DD1FFACED5B031DFF8BD704E22B34BA02182FF3865614D`;
+SQLite `quick_check` passes; metadata includes
+`malom_label_version=sector-corrected-v1` and lineage root
+`managed-v4-baseline-v1-segment-0001`; it now contains 132,182 positions,
+41,904 Malom labels, 916 winning lines, and no preferred plays. It is trusted
+completed-run state, not an empty input for another fresh experiment.
+
+### Staged 21 July rebuilt databases
+
+The maintainer's newly uploaded candidates remain under `../Mills` and have not
+replaced either active database. Read-only inspection on 22 July found:
+
+- HumanDB SHA-256
+  `F0B20D33AEFCBAB9AEDC8537F12FA2E53F7865B0387E2175AFD0EA32D1B90E42`;
+  the supplied sidecar matches, SQLite `quick_check` passes, metadata is
+  `sector-corrected-v1`, all 2,167,498 position rows have Malom WDL, and
+  2,472,054 of 2,533,886 move rows have successor Malom WDL;
+- SpecialistDB SHA-256
+  `DF269D692E43815B88373F54B5AB1287022BC6736ECC8A5B95C7FB8A97FCD629`;
+  SQLite `quick_check` passes, metadata is `sector-corrected-v1`, it has
+  2,112,951 empirical positions, 60,117 winning lines, 30 preferred plays,
+  and zero persisted Malom labels.
+
+Thirty deterministic HumanDB probes, comprising five position and five
+successor-move rows from each W/D/L class, matched both W/D/L and DTW when
+queried through the current corrected Malom adapter. This supports the sampled
+labels and metadata; it does not activate the file or prove every row.
+
+The staged SpecialistDB retains the maintainer's empirical self-play history.
+It is therefore not interchangeable with the empty corrected baseline DB. A
+new experiment must explicitly choose one lineage. See
+[`docs/evidence/main-integration-audit-2026-07-22.md`](evidence/main-integration-audit-2026-07-22.md)
+for hashes, counts, checkpoint provenance, and remaining questions.
 
 The original legacy SpecialistDB is isolated at:
 
@@ -196,9 +230,11 @@ corrected database.
 Do not open either legacy snapshot in write mode, copy it back to the active
 database path, or add corrected labels to it.
 
-The 406 new human-game files were imported without rebuilding
-`data/human_db.sqlite`. HumanDB therefore still describes the earlier corpus
-until a separately reviewed incremental or full rebuild is performed. Its
+The 406 new human-game files were imported without rebuilding the active
+`data/human_db.sqlite`. That active HumanDB therefore still describes the
+earlier corpus. The staged rebuilt candidate is the separately versioned file
+described above; moving it into the active role remains an explicit future
+decision. The active database's
 94,983 `processed_files.file_path` keys use the author's `/home/...` absolute
 paths, while the current builder compares Windows absolute paths. A blind
 `--update` would therefore treat the existing corpus as new and double-count
@@ -246,8 +282,10 @@ work.
 
 ## Data-handling Rules
 
-- Keep the Google Drive import in its canonical destinations above. The
-  `Mills` staging directory has already been emptied.
+- Keep the current Google Drive candidates in `../Mills` until a separately
+  reviewed activation or archival decision records their destination and
+  lineage. Do not copy them over active databases merely because their
+  metadata audit passed.
 - Let `.gitignore` protect databases, recursive human-game records, endgame
   tables, local paths, generated checkpoints, and backup snapshots.
 - Before replacing a large database, record its size and checksum and retain a
