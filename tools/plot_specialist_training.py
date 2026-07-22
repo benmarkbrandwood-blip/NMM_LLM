@@ -140,6 +140,37 @@ def _get_advances(rows: list[dict]) -> list[tuple[int, int]]:
     return advances
 
 
+def _get_recovery_events(rows: list[dict]) -> dict[str, list[tuple[int, dict]]]:
+    """Extract recovery event rows by type."""
+    events: dict[str, list[tuple[int, dict]]] = {
+        "recovery_stage1": [],
+        "recovery_stage2": [],
+        "resurrection":    [],
+    }
+    for r in rows:
+        ev = r.get("event")
+        if ev in events:
+            events[ev].append((r.get("game", 0), r))
+    return events
+
+
+def _draw_recovery_events(ax, events: dict[str, list]) -> None:
+    """Overlay recovery event markers on a win-rate axes."""
+    _labeled: set[str] = set()
+
+    def _vline(game, color, ls, lw, label):
+        lbl = label if label not in _labeled else None
+        ax.axvline(game, color=color, linewidth=lw, linestyle=ls, alpha=0.8, zorder=3, label=lbl)
+        _labeled.add(label)
+
+    for game, _ in events["recovery_stage1"]:
+        _vline(game, "#FF9800", ":", 1.0, "hot-explore")
+    for game, _ in events["recovery_stage2"]:
+        _vline(game, "#F44336", "--", 1.0, "restore")
+    for game, _ in events["resurrection"]:
+        _vline(game, "#9C27B0", "-", 1.4, "resurrect")
+
+
 def _draw_advances(axes_col: list, advances: list[tuple[int, int]]) -> None:
     """Draw a vertical dashed line + level label at each advance point on all axes."""
     if not advances:
@@ -205,6 +236,8 @@ def draw(fig, axes, specialists):
         _plot_series(ax_wr, xs_b, ys_b, "best win rate",  "#E91E63")
         _plot_series(ax_wr, xs_w, ys_w, "win rate 200",   "#9C27B0")
         _plot_series(ax_wr, xs_d, ys_d, "draw rate",      "#FF9800")
+        recovery_events = _get_recovery_events(rows)
+        _draw_recovery_events(ax_wr, recovery_events)
         ax_wr.set_ylim(0, 1.05)
         ax_wr.legend(fontsize=6, loc="lower right")
         ax_wr.yaxis.set_major_formatter(mticker.PercentFormatter(xmax=1, decimals=0))

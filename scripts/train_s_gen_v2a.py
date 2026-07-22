@@ -329,6 +329,7 @@ class GameDiag:
     opponent_search_nodes:   int = 0
     opponent_search_calls:   int = 0
     opponent_node_budget:    Optional[int] = None
+    recovery_state:          str = ""
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1090,6 +1091,7 @@ def _build_game_diag(
     branch_ply_start: int,
     target_age:      int,
     bucket_counts:   Counter,
+    recovery_state:  str = "",
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
@@ -1137,6 +1139,7 @@ def _build_game_diag(
         opponent_search_nodes  =result.opponent_search_nodes,
         opponent_search_calls  =result.opponent_search_calls,
         opponent_node_budget   =result.opponent_node_budget,
+        recovery_state         =recovery_state,
     )
 
 
@@ -1278,11 +1281,18 @@ def run(args: argparse.Namespace) -> None:
     hot_explore_triggered:   bool  = False  # True once stage-1 has fired; arms stage-2 reload
     advance_rehearsal_remaining: int = 0  # batches left with expanded lower-diff opponent ratio
     _effective_entropy_coef: float = args.entropy_coef  # updated each iteration with entropy_boost
+    recovery_baseline_win_rate: float = 0.0  # win-rate snapshot taken when Stage 1 recovery fires
+    _current_recovery_state: str = ""        # "" | "hot_explore" | "grace"
 
     branch_bucket_history: deque[str] = deque(maxlen=args.bucket_window)
 
     log_path        = out_dir / "train_log.jsonl"
     update_log_path = out_dir / "update_log.jsonl"
+
+    def _log_event(event: str, **kwargs) -> None:
+        row = {"event": event, "game": game_count, **kwargs}
+        with open(log_path, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(row) + "\n")
 
     def _make_ga(color: str, gd: int, **kwargs) -> Any:
         """Build a GameAI using node budget if requested, else time budget."""
@@ -1399,13 +1409,15 @@ def run(args: argparse.Namespace) -> None:
                 _opp, _gt = _h, "vs_heuristic_blunder"
 
             elif _roll < _lower_diff_hi + 0.20:
-                # Blended special: opponent uses value_net+gap_net+sentinel
-                # blend ratios: value_net 10%, gap_net 30%, sentinel fires 20% of moves
-                _gd   = difficulty
-                _h    = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
-                _bw   = _mk_blend_weights()   # value_net_blend=10, gap_blend_*=30
-                _inner = _make_ga(_oc, _gd, value_net=value_net, gap_net=gap_net, weights=_bw)
-                if sentinel is not None:
+                # Blended special: nets added progressively by difficulty
+                # diff 1: pure heuristic; diff 2+: add VN; diff 3+: add gap; diff 4+: add sentinel
+                _gd        = difficulty
+                _h         = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
+                _blend_vn  = value_net if difficulty >= 2 else None
+                _blend_gap = gap_net   if difficulty >= 3 else None
+                _bw = _mk_blend_weights() if (_blend_vn is not None or _blend_gap is not None) else None
+                _inner = _make_ga(_oc, _gd, value_net=_blend_vn, gap_net=_blend_gap, weights=_bw)
+                if sentinel is not None and difficulty >= 4:
                     _inner.set_sentinel(sentinel, mode="score_adjust")
                     _inner._sentinel_activation_prob = 0.20
                 _h._inner = _inner
@@ -1445,8 +1457,48 @@ def run(args: argparse.Namespace) -> None:
         _draw_scale = 0.0 if recovery_grace > 0 else 1.0
         if recovery_grace > 0:
             recovery_grace -= 1
+            if recovery_grace % 10 == 0 and recovery_grace > 0:
+                _grace_h = list(win_history_heuristic)
+                _grace_wr = sum(1 for x in _grace_h if x == 1.0) / max(len(_grace_h), 1)
+                print(f"[s_gen_v2a] Recovery in progress ({_current_recovery_state}): "
+                      f"game {game_count} wr={_grace_wr:.3f} grace_remaining={recovery_grace}")
             if recovery_grace == 0:
-                print(f"[s_gen_v2a] Recovery grace expired — draw penalty restored")
+                _post_h  = list(win_history_heuristic)
+                _post_wr = sum(1 for x in _post_h if x == 1.0) / max(len(_post_h), 1)
+                if _current_recovery_state == "grace" and _post_wr < recovery_baseline_win_rate + 0.05:
+                    # Post-restore grace expired without improvement — resurrect best checkpoint
+                    best_ckpt = out_dir / f"best{difficulty}.pt"
+                    if best_ckpt.exists():
+                        _ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
+                        try:
+                            model.load_state_dict(_ckpt_r["model"])
+                        except RuntimeError:
+                            _pol = {k: v for k, v in _ckpt_r["model"].items() if k.startswith("policy_mlp")}
+                            try:
+                                model.load_state_dict(_pol, strict=False)
+                            except RuntimeError:
+                                pass
+                        model.to(device)
+                        opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+                        frozen_opp.refresh(model)
+                        win_history.clear()
+                        win_history_heuristic.clear()
+                        recovery_grace = 50
+                        _current_recovery_state = "grace"
+                        _log_event("resurrection",
+                                   wr=round(_post_wr, 4),
+                                   baseline=round(recovery_baseline_win_rate, 4))
+                        print(f"[s_gen_v2a] Post-grace resurrection: wr={_post_wr:.3f} vs "
+                              f"baseline={recovery_baseline_win_rate:.3f} — reloaded best{difficulty}.pt "
+                              f"(grace=50)")
+                    else:
+                        print(f"[s_gen_v2a] Post-grace: wr={_post_wr:.3f} vs "
+                              f"baseline={recovery_baseline_win_rate:.3f} — no checkpoint to resurrect")
+                        _current_recovery_state = ""
+                else:
+                    print(f"[s_gen_v2a] Recovery grace expired — draw penalty restored "
+                          f"(wr={_post_wr:.3f} baseline={recovery_baseline_win_rate:.3f})")
+                    _current_recovery_state = ""
 
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
         _is_deep_game = (game_count % 20 == 0)   # 1-in-20 games use full 12-ply sim
@@ -1552,6 +1604,7 @@ def run(args: argparse.Namespace) -> None:
                 game_type=game_type, phase_bucket="main", is_branch=False,
                 branch_ply_start=0, target_age=games_since_target_update,
                 bucket_counts=bucket_counts,
+                recovery_state=_current_recovery_state,
             )
             diag_buffer.append(_diag)
 
@@ -1664,6 +1717,7 @@ def run(args: argparse.Namespace) -> None:
                         game_type="branch", phase_bucket=bucket, is_branch=True,
                         branch_ply_start=branch_ply, target_age=games_since_target_update,
                         bucket_counts=bucket_counts,
+                        recovery_state=_current_recovery_state,
                     ))
 
                     if game_count % 10 == 0:
@@ -1710,12 +1764,15 @@ def run(args: argparse.Namespace) -> None:
                         print(f"[s_gen_v2a] Recovery skipped: AI is improving ({_first_wr:.3f} → {_second_wr:.3f})")
                         if hot_explore_triggered and hot_explore_remaining == 0:
                             hot_explore_triggered = False
+                            _current_recovery_state = ""
                             print(f"[s_gen_v2a] Hot-explore recovery successful — flags cleared")
                     elif hot_explore_triggered and hot_explore_remaining > 0:
                         pass  # Still in hot-explore phase; let it run
                     elif hot_explore_triggered and hot_explore_remaining == 0:
                         # Stage 2: hot-explore didn't fix it — full checkpoint restore
                         best_ckpt = out_dir / f"best{difficulty}.pt"
+                        # Always clear Stage 1 flag regardless of whether checkpoint exists
+                        hot_explore_triggered = False
                         if best_ckpt.exists():
                             ckpt_r = torch.load(str(best_ckpt), map_location=device, weights_only=False)
                             _loaded_recovery = False
@@ -1729,22 +1786,34 @@ def run(args: argparse.Namespace) -> None:
                                     _loaded_recovery = True
                                     print(f"[s_gen_v2a] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
                                 except RuntimeError:
-                                    print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible (old feat_dim) — keeping current weights")
+                                    print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible — keeping current weights")
                             if _loaded_recovery:
                                 model.to(device)
                                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
-                                temp_boost   = 0.0
+                                temp_boost    = 0.0
                                 entropy_boost = 0.0
-                                temperature  = args.temp_start
+                                temperature   = args.temp_start
                                 recovery_grace = 100
-                                hot_explore_triggered = False
-                                print(f"[s_gen_v2a] Recovery Stage 2: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                                recovery_baseline_win_rate = win_rate
+                                _current_recovery_state = "grace"
+                                _log_event("recovery_stage2",
+                                           wr=round(win_rate, 4), loss=round(loss_rate, 4),
+                                           checkpoint=str(best_ckpt))
+                                print(f"[s_gen_v2a] Recovery Stage 2: reloaded best{difficulty}.pt "
+                                      f"(W={win_rate:.2f} L={loss_rate:.2f})")
                                 print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
+                            else:
+                                _current_recovery_state = ""
+                        else:
+                            _current_recovery_state = ""
+                            print(f"[s_gen_v2a] Recovery Stage 2: no best{difficulty}.pt exists — cannot restore "
+                                  f"(W={win_rate:.2f} L={loss_rate:.2f})")
                     else:
                         # Stage 1: first sign of trouble — hot-explore phase
+                        recovery_baseline_win_rate = win_rate
                         if args.hot_explore_games > 0:
                             hot_explore_remaining = args.hot_explore_games
                             hot_explore_triggered = True
@@ -1752,6 +1821,10 @@ def run(args: argparse.Namespace) -> None:
                             temp_boost    = max(temp_boost,    args.advance_temp_boost_frac * (args.temp_start - _sched))
                             entropy_boost = max(entropy_boost, args.advance_entropy_boost_frac * args.entropy_coef)
                             recovery_grace = args.hot_explore_games
+                            _current_recovery_state = "hot_explore"
+                            _log_event("recovery_stage1",
+                                       wr=round(win_rate, 4), loss=round(loss_rate, 4),
+                                       hot_explore_games=args.hot_explore_games)
                             print(f"[s_gen_v2a] Recovery Stage 1: hot-explore for ~{args.hot_explore_games} iters "
                                   f"(W={win_rate:.2f} L={loss_rate:.2f}) temp_boost+{temp_boost:.3f} "
                                   f"ent_boost+{entropy_boost:.4f}")
@@ -1771,7 +1844,7 @@ def run(args: argparse.Namespace) -> None:
                                         _loaded_recovery = True
                                         print(f"[s_gen_v2a] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
                                     except RuntimeError:
-                                        print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible (old feat_dim) — keeping current weights")
+                                        print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible — keeping current weights")
                                 if _loaded_recovery:
                                     model.to(device)
                                     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -1782,8 +1855,19 @@ def run(args: argparse.Namespace) -> None:
                                     entropy_boost = 0.0
                                     temperature   = args.temp_start
                                     recovery_grace = 100
-                                    print(f"[s_gen_v2a] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                                    _current_recovery_state = "grace"
+                                    _log_event("recovery_stage2",
+                                               wr=round(win_rate, 4), loss=round(loss_rate, 4),
+                                               checkpoint=str(best_ckpt))
+                                    print(f"[s_gen_v2a] Recovery: reloaded best{difficulty}.pt "
+                                          f"(W={win_rate:.2f} L={loss_rate:.2f})")
                                     print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
+                                else:
+                                    _current_recovery_state = ""
+                            else:
+                                _current_recovery_state = ""
+                                print(f"[s_gen_v2a] Recovery: no best{difficulty}.pt exists — cannot restore "
+                                      f"(W={win_rate:.2f} L={loss_rate:.2f})")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
                 branch_diags = [d for d in diag_buffer if d.is_branch]
