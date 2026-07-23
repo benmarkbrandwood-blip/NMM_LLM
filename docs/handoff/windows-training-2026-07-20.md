@@ -625,6 +625,84 @@ The next-evaluation preparation records are:
 - [phase-corpus review record](../experiments/dev-v4-phase-covered-corpus-v1-review.md)
 - [phase-corpus artifact](../experiments/dev-v4-phase-covered-corpus-v1.json)
 
+## Strict Sanmill Bridge Validation
+
+The product owner deferred the current in-repository `GameAI` as the formal
+baseline because its compact lifecycle does not preserve authoritative
+repetition and no-capture history. A bounded bridge smoke was instead
+authorized against corrected local Sanmill commit
+`6f080c5a6d15919bf0a45fa5528c45d4487a2b8f`, tree
+`8b52f4d084758414ebc9aa4db239448f69e10bcf`. It did not load the candidate or
+run candidate-versus-baseline games.
+
+The bridge uses one thread, MTD(f), shuffling off, seed 42, fixed node ceilings,
+and no wall-clock limit. It sends no positive explicit depth, so Sanmill's
+normal non-developer `DrawOnHumanExperience` opening-depth policy remains
+active. HumanDB, the perfect database, patches, traps, lazy AI, and
+`FocusOnBlockingPaths` are disabled. The fail-closed binary is an optimized
+release build with debug assertions, preventing Sanmill's release-only
+depth-4/random fallback from masking an ongoing-position search failure.
+
+The bridge queries exported FEN, legal actions, repetition history, and
+Sanmill's authoritative `winner` and `outcome_reason` diagnostic fields before
+every search. It refuses to search a decisive terminal position. Black-box
+probes passed for the 100-ply no-capture draw, threefold repetition, fewer-than-
+three loss, a staged Mill and removal, and capture reset. The final Sanmill
+`cargo test --workspace` run passed; its pre-existing explicitly ignored
+external and slow cases were not weakened or reclassified.
+
+Two fresh-process Sanmill-versus-Sanmill replays were semantically identical
+and ended at turn 55 with the same threefold draw. Their identity is
+`0a61ccb62163096a8429fd56a7027466121ca3b23d7ba67bce37c1b369209b80`.
+At a 500,000-node ceiling, the representative movement sample took about
+103 ms and flying about 60 ms on this host. Placement stopped at 865 nodes and
+depth 3 after about 0.29 ms because the opening-depth policy was active. These
+are single-host performance observations, not a frozen formal workload or
+latency guarantee.
+
+The evidence identity is
+`723d40acf63d22cc7341ba234fff470e5fc5b8c55bf06053540df8ef0cd85b19`.
+It is bound to NMM_LLM bridge source commit
+`d692f488583b8f8ec04361cf352fc3968ee1d495`, the exact Sanmill source and
+binary identities, and the corrected opening-book asset.
+
+The final NMM_LLM complete suite under this pinned state reported 984 passed
+and 498 subtests passed in 3228.82 seconds (53:48). The focused strict-bridge
+suite separately reported 22 passed.
+
+The bridge result and raw evidence are:
+
+- [human-readable result](../evidence/sanmill-strict-uci-bridge-smoke-2026-07-23.md)
+- [machine-readable result](../evidence/sanmill-strict-uci-bridge-smoke-2026-07-23.json)
+- [authorized contract](../experiments/sanmill-strict-uci-bridge-smoke-v1.md)
+
+The strict book-off bridge passed, and the opening-book data defect is closed
+in the pinned local checkout. Sanmill commit
+`69d379a1a4e23395a45706df60f63282da20e85f` removed the occupied-`c3`
+recommendation and added authoritative whole-asset legality tests. Commit
+`6f080c5a6d15919bf0a45fa5528c45d4487a2b8f` removed a duplicate `c5`
+recommendation that otherwise altered rank-biased selection weight. The final
+asset SHA-256 is
+`cdc4768bc461c22177634985a4cc1d92452774e2992515b937fed8812eb076f5`;
+all 109 entries and 437 unique recommendations replay legally, with zero
+duplicates. These two Sanmill commits remain local until a separate push is
+authorized.
+
+The remaining blocker is the absent deterministic fail-closed UCI or referee
+opening interface and its unfrozen paired-diversity policy. The provisional
+infrastructure-smoke design assigns 75% of pair identifiers to corrected-book
+prefixes and 25% to prefixes sampled directly from the StrictSteps perfect
+database's tied-best legal actions. Perfect-database prefixes cover exactly
+eight logical player moves in total: four by each side, or four full rounds,
+not eight rounds. A Mill-forming move plus its required staged removal is one
+logical move even though it is two UCI action tokens. The implementation must
+therefore count completed side-to-move changes, not raw actions. Both games in
+a colour-swapped pair replay the same frozen-seed prefix, after which MTD(f)
+resumes with `Shuffling=false`. This is not yet a frozen formal ratio or launch
+authority. HumanDB, patches, and traps remain off; perfect-database use is
+limited to the proposed prefix sampler and is not enabled inside later MTD(f)
+search.
+
 ## Live Malom and Legacy-model Boundary
 
 The old note says `specialist_router.py` was a temporary containment against a
@@ -762,19 +840,29 @@ training merely because the managed run ended. Proceed in this order:
    recorded hashes; the one-run authorization is consumed.
 5. Preserve the `accepted` result as ablation-only training-signal evidence.
    Do not rerun it or treat acceptance as promotion evidence.
-6. Record the product choice of competent baseline. The recommendation is
-   corrected-rules GameAI at difficulty 10, no optional learned/database
-   components, `use_mcts=false`, and a fixed 500,000-node ceiling per move.
-   Freeze single-threaded native search, deterministic top-1, default weights,
-   and no opening recognition/book forcing, trajectory context, or UI variety
-   modes; native-search failure must stop the evaluation.
-7. Decide whether all 64 phase-covered panels require Mill-domain approval.
-   They are mechanically valid and visually audited but come from seeded
-   rules replay rather than expert games.
-8. Approve or change the proposed one-pair-per-start workload, 200-ply draw
-   ceiling, and fixed-corpus interval rule. Then implement and audit a new
-   paired runner; request launch separately after its immutable readiness
-   report. Do not pool any result with Stage 0.
+6. Preserve the passed strict Sanmill bridge evidence under its recorded
+   identities. Keep the current `GameAI` deferred as formal referee. The
+   60-turn bridge ceiling was smoke-only, and no candidate-versus-baseline
+   authority was consumed.
+7. Preserve the two atomic Sanmill book-repair commits and their passing
+   whole-workspace tests. Publish or synchronize them only with separate push
+   authority; do not recreate them as an untraceable replacement commit.
+8. Implement and audit a deterministic fail-closed opening interface plus a
+   paired prefix sampler. For the provisional smoke, mix 75% corrected-book
+   prefixes with 25% StrictSteps perfect-database tied-best prefixes and count
+   exactly eight logical player moves, four by each side. A staged removal is
+   part of its Mill-forming move, not a ninth raw action. Adapt rather than
+   directly reuse Sanmill's current raw-action-counting head-to-head sampler.
+9. Complete the already requested Mill-domain review of the 64 phase-covered
+   panels. They are mechanically valid and visually audited but come from
+   seeded rules replay rather than expert games. A review rejection should
+   drive corpus replacement or scope changes, not silent filtering after
+   results are seen.
+10. After the opening-interface and corpus-review gates close, freeze the formal
+   fixed-node ceiling, history-bearing start representation, accepted starts,
+   pair count, rules-compliant termination contract, and interval rule. Then
+   implement and audit the formal runner and request launch separately. Do not
+   pool any result with Stage 0.
 
 The previously executed isolated smoke command was:
 
@@ -816,6 +904,23 @@ The following choices are recorded for the first `dev` experiment:
 - start from random model weights, not a historical checkpoint;
 - use the corrected v4-style Generalist path, not claim the staged v5 baseline;
 - exclude legacy Sentinel, ValueNet, and GapNet from the first run.
+
+The following choices are recorded for the next formal-evaluation design:
+
+- defer the current `GameAI` and validate pinned Sanmill as rule/history owner;
+- use one thread, shuffling off, a fixed seed, and fixed node ceilings rather
+  than a wall-clock search limit;
+- retain Sanmill's normal `DrawOnHumanExperience` opening-depth behavior;
+- retain the corrected Sanmill opening book as one future opening source, but
+  keep book play off until a deterministic interface and paired policy pass;
+- keep HumanDB, patches, and traps off; keep the perfect database out of MTD(f)
+  search while allowing a separately audited tied-best prefix sampler;
+- treat the 75% book / 25% StrictSteps perfect-database mix and eight logical
+  player moves as a provisional smoke design, not a frozen formal decision;
+- use 60 complete turns only as a bridge/performance smoke ceiling; it is not a
+  rules draw or a formal match-length decision; and
+- do not run candidate-versus-baseline games until a later immutable contract
+  and explicit launch authorization exist.
 
 The product owner delegated routine technical choices for the authorized
 managed baseline to the Agent. The resulting immutable plan used A2C, no

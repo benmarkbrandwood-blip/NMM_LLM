@@ -1,0 +1,2147 @@
+{
+  "claim_boundary": "bridge/rule/reproducibility/performance evidence only; no candidate was loaded and no playing-strength evaluation was run",
+  "contract": {
+    "bestmove_failure": "hard-error-no-substitution",
+    "child_environment": "inherit non-TGF variables; remove all TGF_* variables",
+    "command": [
+      "target/release/tgf.exe",
+      "mill",
+      "uci"
+    ],
+    "contract_identity": "26f175d53d0e76813788f23229336b8f823bc1ae20f65b6b2f04187d0ef6879b",
+    "draw_on_human_experience_semantics": {
+      "effective_in_smoke": true,
+      "enabled": true,
+      "purpose": "phase-aware automatic search-depth policy",
+      "reason": "no-positive-explicit-depth-is-sent"
+    },
+    "knowledge_sources": {
+      "human_database": {
+        "active": false,
+        "reason": "not-exposed-by-the-pinned-UCI-interface"
+      },
+      "opening_book": {
+        "active_in_bridge_smoke": false,
+        "reason": "UCI-interface-and-paired-diversity-policy-gate",
+        "requested_for_future_formal_baseline": true
+      },
+      "patch_and_trap": {
+        "active": false
+      },
+      "perfect_database": {
+        "active": false
+      }
+    },
+    "options": {
+      "AiIsLazy": "false",
+      "Algorithm": "2",
+      "BoardFullAction": "0",
+      "ConsiderMobility": "true",
+      "CustodianCaptureEnabled": "false",
+      "DepthExtension": "true",
+      "DeveloperMode": "false",
+      "DrawOnHumanExperience": "true",
+      "EndgameNMoveRule": "100",
+      "FocusOnBlockingPaths": "false",
+      "HasDiagonalLines": "false",
+      "Hash": "16",
+      "IDSEnabled": "false",
+      "InterventionCaptureEnabled": "false",
+      "IsDefenderMoveFirst": "false",
+      "LeapCaptureEnabled": "false",
+      "MaxQuiescenceDepth": "0",
+      "MayFly": "true",
+      "MayMoveInPlacingPhase": "false",
+      "MayRemoveFromMillsAlways": "false",
+      "MayRemoveMultiple": "false",
+      "MillFormationActionInPlacingPhase": "0",
+      "MoveTimeMs": "0",
+      "MultiPV": "1",
+      "NMoveRule": "100",
+      "OneTimeUseMill": "false",
+      "PatchAvoidTraps": "false",
+      "PatchMakeTraps": "false",
+      "PiecesAtLeastCount": "3",
+      "PiecesCount": "9",
+      "Ponder": "false",
+      "RestrictRepeatedMillsFormation": "false",
+      "SearchShuffleSeed": "42",
+      "Shuffling": "false",
+      "SkillLevel": "30",
+      "StalemateAction": "0",
+      "StopPlacingWhenTwoEmptySquares": "false",
+      "Threads": "1",
+      "ThreefoldRepetitionRule": "true",
+      "UseLazySmp": "false",
+      "UsePerfectDatabase": "false",
+      "flyPieceCount": "3"
+    },
+    "random_failure_fallback": "forbidden-by-release-debug-assertion",
+    "sanmill_commit": "6f080c5a6d15919bf0a45fa5528c45d4487a2b8f",
+    "schema_version": "nmm.sanmill-strict-uci-contract.v1",
+    "search_command": "go nodes <positive-N>"
+  },
+  "evidence_identity": "723d40acf63d22cc7341ba234fff470e5fc5b8c55bf06053540df8ef0cd85b19",
+  "installation": {
+    "binary_relative_path": "target/release/tgf.exe",
+    "binary_sha256": "b1c816ee40f6cb9a91916ad094e82175ee6c975c7d15c396e672af58a15dc1a6",
+    "binary_size": 3720192,
+    "build_command": "cargo --config profile.release.debug-assertions=true build --release -p tgf-cli",
+    "commit": "6f080c5a6d15919bf0a45fa5528c45d4487a2b8f",
+    "fail_closed_assertion_present": true,
+    "license": {
+      "relative_path": "Copying.txt",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "spdx": "AGPL-3.0-or-later"
+    },
+    "path_lookup_key": "sanmill_checkout",
+    "tree": "8b52f4d084758414ebc9aa4db239448f69e10bcf"
+  },
+  "nmm_llm_source": {
+    "commit": "d692f488583b8f8ec04361cf352fc3968ee1d495",
+    "files": [
+      {
+        "relative_path": "learned_ai/evaluation/sanmill_uci.py",
+        "sha256": "62f05035b1f8f8eab6f7f75d5b4b02ef5a600f7eedc2c8611ffba3e29a8cd039"
+      },
+      {
+        "relative_path": "scripts/audit_sanmill_uci_bridge.py",
+        "sha256": "aae2c3d3d57ecbf1798fbdac3f04d7712f1b686b256880068eb3fe723e607c03"
+      },
+      {
+        "relative_path": "tests/test_sanmill_uci.py",
+        "sha256": "b79d7e16cd69cb4646ecd2ec9cfdd52ab50990a689500d23b672c0df4c7675fb"
+      }
+    ],
+    "scoped_worktree": "clean",
+    "tree": "2786c25c7abdf2372b057aab4a0ad91d4a33635d"
+  },
+  "opening_book_gate": {
+    "active_in_bridge_smoke": false,
+    "asset_relative_path": "src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
+    "asset_sha256": "cdc4768bc461c22177634985a4cc1d92452774e2992515b937fed8812eb076f5",
+    "legality_audit": {
+      "authority": "pinned-sanmill-uci-legal-actions",
+      "checked_recommendations": 437,
+      "duplicate_recommendations": 0,
+      "illegal_recommendations": 0
+    },
+    "oracle_entries": 109,
+    "oracle_recommendations": 437,
+    "remaining_gate": "expose a deterministic fail-closed UCI book interface and freeze its paired-opening diversity policy",
+    "removed_invalid_oracle_recommendation": {
+      "historical_reason": "c3 was already occupied in the source position",
+      "present": false,
+      "raw_key_sha256": "904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1"
+    },
+    "requested_for_future_formal_baseline": true,
+    "uci_support": "not-advertised-at-pinned-commit"
+  },
+  "performance": {
+    "samples": [
+      {
+        "elapsed_seconds": 0.0003589999978430569,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "node_ceiling": 1000,
+        "nodes_per_second": 2676880.238924452,
+        "phase": "placement",
+        "result": {
+          "bestmove": "g4",
+          "depth": 3,
+          "nodes": 961,
+          "score": 3,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.00036299999919719994,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "node_ceiling": 10000,
+        "nodes_per_second": 2382920.115462833,
+        "phase": "placement",
+        "result": {
+          "bestmove": "g4",
+          "depth": 3,
+          "nodes": 865,
+          "score": 3,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.0002997000119648874,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "node_ceiling": 100000,
+        "nodes_per_second": 2886219.437660025,
+        "phase": "placement",
+        "result": {
+          "bestmove": "g4",
+          "depth": 3,
+          "nodes": 865,
+          "score": 3,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.00029090000316500664,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "node_ceiling": 500000,
+        "nodes_per_second": 2973530.390473553,
+        "phase": "placement",
+        "result": {
+          "bestmove": "g4",
+          "depth": 3,
+          "nodes": 865,
+          "score": 3,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.0005169999931240454,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "node_ceiling": 1000,
+        "nodes_per_second": 1934236.002513963,
+        "phase": "movement",
+        "result": {
+          "bestmove": "c4-c5",
+          "depth": 30,
+          "nodes": 1000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.0025000999885378405,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "node_ceiling": 10000,
+        "nodes_per_second": 3999840.024737732,
+        "phase": "movement",
+        "result": {
+          "bestmove": "g7-d7",
+          "depth": 30,
+          "nodes": 10000,
+          "score": 1,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.021512100007385015,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "node_ceiling": 100000,
+        "nodes_per_second": 4648546.630299711,
+        "phase": "movement",
+        "result": {
+          "bestmove": "c4-c5",
+          "depth": 30,
+          "nodes": 100000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.10313250000763219,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "node_ceiling": 500000,
+        "nodes_per_second": 4848132.256689193,
+        "phase": "movement",
+        "result": {
+          "bestmove": "g7-d7",
+          "depth": 30,
+          "nodes": 500000,
+          "score": 1,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.0004668000037781894,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "node_ceiling": 1000,
+        "nodes_per_second": 2142245.055497413,
+        "phase": "flying",
+        "result": {
+          "bestmove": "c3-d5",
+          "depth": 30,
+          "nodes": 1000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.0012356000079307705,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "node_ceiling": 10000,
+        "nodes_per_second": 8093234.004382015,
+        "phase": "flying",
+        "result": {
+          "bestmove": "c3-d5",
+          "depth": 30,
+          "nodes": 10000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.012411799994879402,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "node_ceiling": 100000,
+        "nodes_per_second": 8056849.130767164,
+        "phase": "flying",
+        "result": {
+          "bestmove": "c3-d5",
+          "depth": 30,
+          "nodes": 100000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      },
+      {
+        "elapsed_seconds": 0.05985200000577606,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "node_ceiling": 500000,
+        "nodes_per_second": 8353939.717164792,
+        "phase": "flying",
+        "result": {
+          "bestmove": "c3-d5",
+          "depth": 30,
+          "nodes": 500000,
+          "score": 0,
+          "score_kind": "cp"
+        }
+      }
+    ],
+    "summary": {
+      "flying": {
+        "median_nodes_per_second": 8075041.5675745895,
+        "samples": 4
+      },
+      "movement": {
+        "median_nodes_per_second": 4324193.327518721,
+        "samples": 4
+      },
+      "placement": {
+        "median_nodes_per_second": 2781549.8382922383,
+        "samples": 4
+      }
+    }
+  },
+  "reproducibility": {
+    "equal": true,
+    "fresh_process_runs": 2,
+    "run": {
+      "completed_turns": 55,
+      "max_complete_turns": 60,
+      "node_ceiling_per_search": 10000,
+      "semantic_identity": "0a61ccb62163096a8429fd56a7027466121ca3b23d7ba67bce37c1b369209b80",
+      "staged_actions": [
+        "d6",
+        "f4",
+        "d2",
+        "b4",
+        "g4",
+        "d7",
+        "a4",
+        "d1",
+        "d5",
+        "d3",
+        "e4",
+        "c4",
+        "f6",
+        "b6",
+        "b2",
+        "f2",
+        "g7",
+        "g1",
+        "e4-e3",
+        "c4-c5",
+        "e3-e4",
+        "c5-c4",
+        "e4-e3",
+        "c4-c5",
+        "d5-e5",
+        "c5-d5",
+        "e3-e4",
+        "d3-c3",
+        "e4-e3",
+        "c3-c4",
+        "e3-d3",
+        "c4-c5",
+        "e5-e4",
+        "c5-c4",
+        "d3-c3",
+        "c4-c5",
+        "c3-c4",
+        "d5-e5",
+        "c4-c3",
+        "c5-d5",
+        "c3-c4",
+        "d1-a1",
+        "c4-c5",
+        "a1-d1",
+        "c5-c4",
+        "d7-a7",
+        "g7-d7",
+        "d5-c5",
+        "c4-c3",
+        "c5-d5",
+        "c3-c4",
+        "d1-a1",
+        "c4-c5",
+        "a1-d1",
+        "c5-c4"
+      ],
+      "stopped_at_ceiling": false,
+      "turns": [
+        {
+          "after_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/********/******** w p p 0 9 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d6",
+            "depth": 1,
+            "nodes": 52,
+            "score": 4,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 1
+        },
+        {
+          "after_fen": "********/O*@*****/******** w p p 1 8 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "f4",
+            "depth": 1,
+            "nodes": 50,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 2
+        },
+        {
+          "after_fen": "********/O*@*O***/******** b p p 2 7 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*****/******** w p p 1 8 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d2",
+            "depth": 1,
+            "nodes": 48,
+            "score": 4,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 3
+        },
+        {
+          "after_fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O***/******** b p p 2 7 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "b4",
+            "depth": 1,
+            "nodes": 46,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 4
+        },
+        {
+          "after_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "g4",
+            "depth": 3,
+            "nodes": 961,
+            "score": 3,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 5
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O***** w p p 3 6 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d7",
+            "depth": 3,
+            "nodes": 812,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 6
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O***O* b p p 4 5 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O*@*/@*O***** w p p 3 6 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "a4",
+            "depth": 3,
+            "nodes": 783,
+            "score": 3,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 7
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O*@*O* w p p 4 5 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O*@*/@*O***O* b p p 4 5 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d1",
+            "depth": 15,
+            "nodes": 10000,
+            "score": 1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 8
+        },
+        {
+          "after_fen": "O*******/O*@*O*@*/@*O*@*O* b p p 5 4 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "********/O*@*O*@*/@*O*@*O* w p p 4 5 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d5",
+            "depth": 15,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 9
+        },
+        {
+          "after_fen": "O***@***/O*@*O*@*/@*O*@*O* w p p 5 4 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*******/O*@*O*@*/@*O*@*O* b p p 5 4 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d3",
+            "depth": 5,
+            "nodes": 3990,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 10
+        },
+        {
+          "after_fen": "O*O*@***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O***@***/O*@*O*@*/@*O*@*O* w p p 5 4 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e4",
+            "depth": 18,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 11
+        },
+        {
+          "after_fen": "O*O*@*@*/O*@*O*@*/@*O*@*O* w p p 6 3 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 12
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@*O*@*/@*O*@*O* b p p 7 2 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/O*@*O*@*/@*O*@*O* w p p 6 3 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "f6",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 13
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@*O*@@/@*O*@*O* w p p 7 2 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@*O*@*/@*O*@*O* b p p 7 2 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "b6",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 14
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@*OO@@/@*O*@*O* b p p 8 1 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@*O*@@/@*O*@*O* w p p 7 2 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "b2",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 15
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@@OO@@/@*O*@*O* w p p 8 1 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@*OO@@/@*O*@*O* b p p 8 1 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "f2",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 16
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@@OO@@/@OO*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@@OO@@/@*O*@*O* w p p 8 1 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "g7",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 17
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@@OO@@/@OO*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "g1",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 18
+        },
+        {
+          "after_fen": "O**O@*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 1 10 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e4-e3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 19
+        },
+        {
+          "after_fen": "O**O@**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 2 11 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O**O@*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 1 10 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 20
+        },
+        {
+          "after_fen": "O*O*@**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 3 11 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O**O@**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 2 11 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e3-e4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 21
+        },
+        {
+          "after_fen": "O*O*@*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 3 11 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 22
+        },
+        {
+          "after_fen": "O**O@*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O*O*@*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e4-e3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 23
+        },
+        {
+          "after_fen": "O**O@**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 6 13 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O**O@*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 24
+        },
+        {
+          "after_fen": "*O*O@**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 7 13 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "O**O@**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 6 13 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d5-e5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 25
+        },
+        {
+          "after_fen": "@O*O@***/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 8 14 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "*O*O@**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 7 13 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-d5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 26
+        },
+        {
+          "after_fen": "@OO*@***/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 9 14 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@O*O@***/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 8 14 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e3-e4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 27
+        },
+        {
+          "after_fen": "@OO**@**/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 10 15 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@OO*@***/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 9 14 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d3-c3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 28
+        },
+        {
+          "after_fen": "@O*O*@**/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@OO**@**/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 10 15 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e4-e3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 29
+        },
+        {
+          "after_fen": "@O*O**@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@O*O*@**/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c3-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 30
+        },
+        {
+          "after_fen": "@O**O*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 13 16 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@O*O**@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e3-d3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 31
+        },
+        {
+          "after_fen": "@O**O**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 14 17 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@O**O*@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 13 16 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 32
+        },
+        {
+          "after_fen": "@*O*O**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 15 17 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@O**O**@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 14 17 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "e5-e4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 33
+        },
+        {
+          "after_fen": "@*O*O*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 16 18 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@*O*O**@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 15 17 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 34
+        },
+        {
+          "after_fen": "@*O**O@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 17 18 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@*O*O*@*/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 16 18 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d3-c3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 35
+        },
+        {
+          "after_fen": "@*O**O*@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 18 19 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@*O**O@*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 17 18 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 36
+        },
+        {
+          "after_fen": "@*O***O@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 19 19 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@*O**O*@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 18 19 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c3-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 37
+        },
+        {
+          "after_fen": "*@O***O@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 20 20 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@*O***O@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 19 19 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d5-e5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 38
+        },
+        {
+          "after_fen": "*@O**O*@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 21 20 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "*@O***O@/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 20 20 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 39
+        },
+        {
+          "after_fen": "@@O**O**/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 22 21 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "*@O**O*@/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 21 20 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-d5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 40
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 23 21 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O**O**/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 22 21 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c3-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 41
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/@OO@*@O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 24 22 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 23 21 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d1-a1",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 42
+        },
+        {
+          "after_fen": "@@O****O/OO@@OO@@/@OO@*@O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 25 22 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/@OO@*@O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 24 22 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 43
+        },
+        {
+          "after_fen": "@@O****O/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 26 23 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O****O/OO@@OO@@/@OO@*@O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 25 22 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "a1-d1",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 44
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 27 23 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O****O/OO@@OO@@/@OO@@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 26 23 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 45
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/*OO@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 28 24 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/@OO@@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 27 23 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d7-a7",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 46
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 29 24 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/*OO@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 28 24 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "g7-d7",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 47
+        },
+        {
+          "after_fen": "*@O***O@/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 30 25 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 29 24 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d5-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 48
+        },
+        {
+          "after_fen": "*@O**O*@/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 31 25 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "*@O***O@/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 30 25 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c3",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 49
+        },
+        {
+          "after_fen": "@@O**O**/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 32 26 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "*@O**O*@/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 31 25 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-d5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 50
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 33 26 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O**O**/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 32 26 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c3-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 51
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/O*O@*@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 34 27 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/O*O@@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 33 26 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "d1-a1",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 52
+        },
+        {
+          "after_fen": "@@O****O/OO@@OO@@/O*O@*@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 35 27 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O***O*/OO@@OO@@/O*O@*@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 34 27 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c4-c5",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 53
+        },
+        {
+          "after_fen": "@@O****O/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 36 28 ids:nodes",
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "before_fen": "@@O****O/OO@@OO@@/O*O@*@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 35 27 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "a1-d1",
+            "depth": 30,
+            "nodes": 10000,
+            "score": 0,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": false,
+          "turn": 54
+        },
+        {
+          "after_fen": "@@O***O*/OO@@OO@@/O*O@@*O@ w o ? 9 0 9 0 0 0 -1 -1 -1 -1 0 37 28 ids:nodes",
+          "after_outcome": {
+            "reason": "drawThreefoldRepetition",
+            "reason_code": 5,
+            "terminal": true,
+            "winner": "draw",
+            "winner_code": 2
+          },
+          "before_fen": "@@O****O/OO@@OO@@/O*O@@*O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 36 28 ids:nodes",
+          "before_outcome": {
+            "reason": "ongoing",
+            "reason_code": 0,
+            "terminal": false,
+            "winner": "none",
+            "winner_code": -1
+          },
+          "primary": {
+            "bestmove": "c5-c4",
+            "depth": 30,
+            "nodes": 10000,
+            "score": -1,
+            "score_kind": "cp"
+          },
+          "removal": null,
+          "terminal": true,
+          "turn": 55
+        }
+      ]
+    },
+    "semantic_identity": "0a61ccb62163096a8429fd56a7027466121ca3b23d7ba67bce37c1b369209b80"
+  },
+  "rule_probes": {
+    "fewer_than_three": {
+      "reason": "the fail-closed build rejects MOVE_NONE before Sanmill's release fallback; terminal phase and empty legal set are queried before every search",
+      "search_attempted": false,
+      "state": {
+        "action": "s",
+        "fen": "**O**O**/**@**@**/******** w o s 2 0 2 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "history": "hist key=47002381 len=0 current_count=0 count_all=0 last_is_current=false root_reset=false snapshots=0",
+        "legal_actions": [],
+        "outcome": {
+          "reason": "loseFewerThanThree",
+          "reason_code": 1,
+          "terminal": true,
+          "winner": "black",
+          "winner_code": 1
+        },
+        "phase": "o",
+        "removal_pending": false,
+        "side_to_move": "w",
+        "terminal": true
+      }
+    },
+    "no_capture_draw": {
+      "search": {
+        "bestmove": "draw",
+        "depth": 1,
+        "nodes": 0,
+        "score": 0,
+        "score_kind": "cp"
+      },
+      "state": {
+        "action": "s",
+        "fen": "***OOO**/***@@@**/******** w o s 3 0 3 0 0 0 -1 -1 -1 -1 0 100 1 ids:nodes",
+        "history": "hist key=77162163 len=0 current_count=0 count_all=0 last_is_current=false root_reset=false snapshots=0",
+        "legal_actions": [],
+        "outcome": {
+          "reason": "drawFiftyMove",
+          "reason_code": 8,
+          "terminal": true,
+          "winner": "draw",
+          "winner_code": 2
+        },
+        "phase": "o",
+        "removal_pending": false,
+        "side_to_move": "w",
+        "terminal": true
+      }
+    },
+    "opening_depth_policy": {
+      "interpretation": "depth 1 proves the ordinary Sanmill opening-depth table is active; SkillLevel=30 would select depth 30 if bypassed",
+      "node_ceiling": 100000,
+      "result": {
+        "bestmove": "d6",
+        "depth": 1,
+        "nodes": 52,
+        "score": 4,
+        "score_kind": "cp"
+      }
+    },
+    "staged_capture_and_reset": {
+      "after": {
+        "action": "s",
+        "fen": "OO**@@*O/*@@OO@@O/@@O***OO b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 12 ids:nodes",
+        "history": "hist key=130647155 len=0 current_count=0 count_all=0 last_is_current=false root_reset=true snapshots=24",
+        "legal_actions": [
+          "c3-c4",
+          "f6-d6",
+          "d3-e3",
+          "d7-d6",
+          "b4-c4",
+          "f4-e4"
+        ],
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": 0,
+          "terminal": false,
+          "winner": "none",
+          "winner_code": -1
+        },
+        "phase": "m",
+        "removal_pending": false,
+        "side_to_move": "b",
+        "terminal": false
+      },
+      "before": {
+        "action": "s",
+        "fen": "*O**@@*O/O@@OO@@O/@@O*@*OO w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+        "history": "hist key=391986230 len=4 current_count=0 count_all=1 last_is_current=true root_reset=false snapshots=22",
+        "legal_actions": [
+          "c5-d5",
+          "c5-c4",
+          "e5-e4",
+          "e5-d5",
+          "a4-a1",
+          "g4-g1",
+          "d6-d5"
+        ],
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": 0,
+          "terminal": false,
+          "winner": "none",
+          "winner_code": -1
+        },
+        "phase": "m",
+        "removal_pending": false,
+        "side_to_move": "w",
+        "terminal": false
+      },
+      "pending": {
+        "action": "r",
+        "fen": "OO**@@*O/*@@OO@@O/@@O*@*OO w m r 9 0 9 0 1 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+        "history": "hist key=1130841060 len=5 current_count=0 count_all=1 last_is_current=true root_reset=false snapshots=23",
+        "legal_actions": [
+          "xc3",
+          "xg7",
+          "xb2",
+          "xf6",
+          "xd3",
+          "xd1",
+          "xd7",
+          "xb4",
+          "xf4"
+        ],
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": 0,
+          "terminal": false,
+          "winner": "none",
+          "winner_code": -1
+        },
+        "phase": "m",
+        "removal_pending": true,
+        "side_to_move": "w",
+        "terminal": false
+      },
+      "primary_search": {
+        "bestmove": "d6-d5",
+        "depth": 30,
+        "nodes": 10000,
+        "score": 0,
+        "score_kind": "cp"
+      },
+      "removal_search": {
+        "bestmove": "xd1",
+        "depth": 30,
+        "nodes": 10000,
+        "score": 0,
+        "score_kind": "cp"
+      }
+    },
+    "threefold_draw": {
+      "after": {
+        "action": "?",
+        "fen": "@OO@@O@*/OO@*O*O@/@*O*@*@O w o ? 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+        "history": "hist key=287007320 len=12 current_count=2 count_all=3 last_is_current=true root_reset=false snapshots=30",
+        "legal_actions": [],
+        "outcome": {
+          "reason": "drawThreefoldRepetition",
+          "reason_code": 5,
+          "terminal": true,
+          "winner": "draw",
+          "winner_code": 2
+        },
+        "phase": "o",
+        "removal_pending": false,
+        "side_to_move": "w",
+        "terminal": true
+      },
+      "before": {
+        "action": "s",
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "history": "hist key=491524182 len=11 current_count=1 count_all=2 last_is_current=true root_reset=false snapshots=29",
+        "legal_actions": [
+          "g7-d7",
+          "c4-c5",
+          "d5-c5",
+          "a4-a1",
+          "d1-a1",
+          "d1-g1",
+          "f4-f2"
+        ],
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": 0,
+          "terminal": false,
+          "winner": "none",
+          "winner_code": -1
+        },
+        "phase": "m",
+        "removal_pending": false,
+        "side_to_move": "b",
+        "terminal": false
+      },
+      "search": {
+        "bestmove": "draw",
+        "depth": 1,
+        "nodes": 0,
+        "score": 0,
+        "score_kind": "cp"
+      }
+    }
+  },
+  "runtime": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.13.1",
+    "python_implementation": "CPython"
+  },
+  "schema_version": "nmm.sanmill-strict-uci-smoke-result.v1",
+  "status": "passed"
+}

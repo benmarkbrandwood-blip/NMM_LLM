@@ -58,18 +58,35 @@ made deterministic, but the surrounding compact position and game lifecycle
 do not yet carry the full repetition and no-capture history required of the
 formal referee.
 
-The selected next step is a strict bridge to pinned Sanmill commit
-`da922965946ab87b3b3f9eed5b170f3e01d6c473`. Sanmill owns the action history,
+The strict bridge passed against pinned local Sanmill commit
+`6f080c5a6d15919bf0a45fa5528c45d4487a2b8f`. Sanmill owns the action history,
 standard-rule lifecycle, and terminal outcome. The bridge disables shuffling,
-uses one thread, a fixed seed, and a fixed-node command, and fails rather than
-using Sanmill's release-mode random recovery path. Optional databases,
-patches, traps, and non-rule draw heuristics are disabled. The exact contract
-and bounded authorization are recorded in the linked bridge-smoke document.
+uses one thread, a fixed seed, and a fixed-node ceiling, and fails rather than
+using Sanmill's release-mode random recovery path. Sanmill's non-developer
+phase-depth policy remains active through `DrawOnHumanExperience=true`; no
+positive explicit depth may bypass it. HumanDB, the perfect database, patches,
+and traps were disabled for this smoke.
 
-The bridge report must establish rule consistency, semantic replay
-reproducibility, and representative fixed-node performance before Sanmill can
-be proposed as the formal baseline. The node budget is deliberately not yet
-selected.
+The NMM opening-book source is now corrected in two local Sanmill commits. The
+pinned asset contains 109 entries and 437 unique recommendations; authoritative
+replay found zero illegal and zero duplicate recommendations. The bridge still
+leaves book play disabled because `tgf mill uci` does not expose the provider.
+The remaining gate is a deterministic fail-closed UCI or referee interface and
+a frozen paired-opening diversity policy, not an unresolved book-data defect.
+
+The bridge established rule consistency, semantic replay reproducibility, and
+representative fixed-node performance. It did not load a candidate or establish
+playing strength. The formal node budget is deliberately not yet selected.
+
+For a later infrastructure smoke, the provisional opening policy is 75%
+corrected-book-derived prefixes and 25% StrictSteps perfect-database tied-best
+prefixes. Perfect-database sampling covers exactly eight logical player moves
+in total: four by each side, or four full rounds, not eight rounds. A
+mill-forming move and its required staged removal count as one logical move,
+even though UCI emits two action tokens. The sampler must use a frozen seed per
+pair and replay the same prefix in both colour-swapped games. MTD(f) then
+resumes with engine `Shuffling=false`. This ratio and prefix length are smoke
+proposals only and are not yet a formal evaluation decision.
 
 Not recommended:
 
@@ -83,9 +100,11 @@ Not recommended:
 
 ### 2. Corpus review and freeze
 
-Recommended: send all 64 rendered starts for Mill-domain review, apply only
-explicitly justified exclusions, regenerate if needed, and then freeze one
-pair per accepted ring16-unique start.
+The request to review all 64 rendered starts has been sent to the Mill-domain
+expert; a response is pending. Apply only explicitly justified exclusions,
+regenerate if needed, and then freeze one pair per accepted ring16-unique
+start. Do not freeze or inspect candidate-versus-baseline results while that
+review is open.
 
 The corpus is legal, playable, phase-balanced, absent by exact lookup from the
 bound HumanDB and final SpecialistDB, and labelled by corrected Malom. Its
@@ -102,9 +121,9 @@ Recommended initial contract, subject to corpus exclusions:
 | Pairs | One colour-role-swapped pair per accepted unique start |
 | Current draft size | 64 pairs / 128 games |
 | Candidate route | Exact `s-gen-v2-training-aligned-v1`, policy argmax |
-| Baseline | Not frozen; strict fixed-node Sanmill bridge under validation |
+| Baseline | Not frozen; strict fixed-node Sanmill bridge passed book-off validation |
 | Maximum length | Not frozen; 60 complete turns is smoke-only and is not a rules draw |
-| Random seed | 42 for provenance; neither policy may use random move choice |
+| Random seed | 42 base seed; search is deterministic and only the frozen prefix sampler may choose among approved opening alternatives |
 | Result summary | Pair-score difference and a fixed-corpus engineering interval |
 | Decision rule | Lower bound `> 0`: accept; upper bound `< 0`: reject; otherwise inconclusive |
 | Stopping | Infrastructure or evidence-integrity failure only; no result-based early stop |
@@ -115,19 +134,21 @@ must not be counted as additional observations.
 
 ### 4. Launch authority
 
-The currently authorized work is only the strict Sanmill bridge and its rule,
-reproducibility, and performance report. After that evidence is reviewed, the
-remaining product choices include the formal node budget, history-bearing
-start representation, accepted corpus, game count, and rules-compliant match
-termination contract. Starting candidate-versus-baseline games requires a
-separate explicit instruction against a later frozen specification.
+The authorized strict Sanmill bridge and its rule, reproducibility, and
+performance report are complete. Safe next work is limited to implementing and
+auditing the deterministic opening interface and prefix sampler, plus closing
+the corpus-review gate. The remaining formal product choices include the node
+budget, history-bearing start representation, accepted corpus, game count, and
+rules-compliant match termination contract. Starting candidate-versus-baseline
+games requires a separate explicit instruction against a later frozen
+specification.
 
 ## Current stop conditions
 
-No original-maintainer technical clarification is currently required: code,
-checkpoint, database, and fixture evidence resolve the route facts above. The
-bounded Sanmill bridge validation may proceed, but formal evaluation remains
-stopped at the later product gates.
+No original-maintainer technical clarification is currently required for the
+bridge: code, checkpoint, database, and fixture evidence resolve the route
+facts above. Formal evaluation remains stopped at the opening-interface,
+paired-prefix, corpus-review, workload, and launch gates.
 
 Until those choices are recorded:
 
