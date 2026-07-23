@@ -2031,8 +2031,12 @@ def run(args: argparse.Namespace) -> None:
                     }
                     torch.save(_adv_ckpt, prev_best)
                     print(f"[s_gen_v2a] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
-                if prev_best.exists():
-                    ckpt_prev = torch.load(str(prev_best), map_location=device, weights_only=False)
+                # Load latest.pt (current model state) as the starting point for the
+                # new level.  Previously loaded best{prev_diff}.pt which could regress
+                # progress if it was a stale checkpoint from an earlier run.
+                _latest_path = out_dir / "latest.pt"
+                if _latest_path.exists():
+                    ckpt_prev = torch.load(str(_latest_path), map_location=device, weights_only=False)
                     try:
                         model.load_state_dict(ckpt_prev["model"])
                     except RuntimeError:
@@ -2043,7 +2047,9 @@ def run(args: argparse.Namespace) -> None:
                         except RuntimeError:
                             print(f"[s_gen_v2a] Advance-load: checkpoint shape incompatible (old feat_dim) — keeping current weights")
                     model.to(device)
-                    print(f"[s_gen_v2a] Loaded best{prev_diff}.pt as starting point for diff {difficulty}")
+                    print(f"[s_gen_v2a] Loaded latest.pt as starting point for diff {difficulty}")
+                else:
+                    print(f"[s_gen_v2a] latest.pt not found — proceeding with in-memory model for diff {difficulty}")
 
                 best_win_rate_at_diff = 0.0
                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
