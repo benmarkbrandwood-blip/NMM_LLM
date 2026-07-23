@@ -1383,6 +1383,8 @@ def run(args: argparse.Namespace) -> None:
 
     batch_count   = 0
     _last_log_game = start_game   # threshold-based log gate; avoids modulo skip when game_count jumps
+    _last_advance_print_game = start_game   # throttle advance-check reason prints
+    _last_deep_game          = start_game   # threshold-based 1-in-20 deep-batch selector
     segment_stop = min(args.max_games, game_count + args.segment_games) if args.segment_games else args.max_games
 
     while game_count < segment_stop:
@@ -1543,7 +1545,11 @@ def run(args: argparse.Namespace) -> None:
                     _current_recovery_state = ""
 
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
-        _is_deep_game = (game_count % 20 == 0)   # 1-in-20 games use full 12-ply sim
+        # 1-in-20 batches use full 12-ply sim.  Threshold-based rather than
+        # game_count % 20 == 0 so batch increments >1 don't skip the boundary.
+        _is_deep_game = (game_count - _last_deep_game >= 20)
+        if _is_deep_game:
+            _last_deep_game = game_count
 
         def _primary(cfg: _GameConfig, opp: Any) -> RolloutResult:
             return _rollout(
@@ -1982,14 +1988,16 @@ def run(args: argparse.Namespace) -> None:
                     print(f"[s_gen_v2a]  → best diff-{difficulty} win rate: {best_win_rate_at_diff:.3f}")
 
             # ── Difficulty advancement (Sanmill superiority-probability) ──────
-            # Throttle: evaluate the P-value only every 10 games at the current
-            # level to limit false-positive advances from variance blips.
+            # Runs every batch once games_at_level >= 20 (the sanmill check's own floor).
+            # Previous `games_at_level % 10 == 0` modulo gate silently skipped whole
+            # advancement windows when batch increments crossed multiples of 10.
             _adv = None
-            if games_at_level >= 20 and games_at_level % 10 == 0:
+            if games_at_level >= 20:
                 _adv = _sanmill_check_advance(level_heuristic_history,
                                               difficulty=difficulty,
                                               games_at_level=games_at_level)
-                if game_count % 50 == 0:
+                if game_count - _last_advance_print_game >= 50:
+                    _last_advance_print_game = game_count
                     print(f"[s_gen_v2a] advance-check @ diff {difficulty}: {_adv.reason}")
             if _adv is not None and _adv.should_advance:
                 if difficulty >= args.diff_max:
