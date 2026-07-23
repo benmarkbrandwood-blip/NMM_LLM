@@ -175,17 +175,24 @@ def _get_recovery_events(rows: list[dict]) -> dict[str, list[tuple[int, dict]]]:
     # This catches stage1 even when _log_event missed the log_every boundary.
     # seen_zero_her guard: after a checkpoint restore hot_explore_remaining may start >0,
     # so we only fire the transition once we've seen at least one her==0 row first.
+    # DEDUP_WINDOW: an event row from _log_event is written at the log boundary, but the
+    # first batched game row with her>0 lands a few games later. Both sources point at
+    # the same Stage 1 trigger — treat any transition within DEDUP_WINDOW of an existing
+    # stage1 event as a duplicate.
+    DEDUP_WINDOW  = 100
     prev_her      = 0
     seen_zero_her = False
-    stage1_games  = {g for g, _ in events["recovery_stage1"]}
+    stage1_games  = [g for g, _ in events["recovery_stage1"]]
+    def _near_existing(g: int) -> bool:
+        return any(abs(g - eg) <= DEDUP_WINDOW for eg in stage1_games)
     for r in rows:
         if "event" in r:
             continue
         her = r.get("hot_explore_remaining") or 0
         g   = r.get("game", 0)
-        if her > 0 and prev_her == 0 and seen_zero_her and g not in stage1_games:
+        if her > 0 and prev_her == 0 and seen_zero_her and not _near_existing(g):
             events["recovery_stage1"].append((g, r))
-            stage1_games.add(g)
+            stage1_games.append(g)
         if her == 0:
             seen_zero_her = True
         prev_her = her
@@ -204,26 +211,34 @@ def _plot_series(ax, xs, ys, label, color, window=SMOOTH, alpha_raw=0.15, linest
     ax.plot(xs, smoothed, color=color, linewidth=1.6, label=label, linestyle=linestyle)
 
 
-def _draw_advances(axes_col: list, advances: list[tuple[int, int]]) -> None:
+_ADVANCE_COLOR = "#448AFF"   # blue — was bright green
+
+def _draw_advances(axes_col: list, advances: list[tuple[int, int]], label_ax=None) -> None:
     if not advances:
         return
     for ax in axes_col:
+        first_on_ax = (ax is label_ax)
         for game, _ in advances:
-            ax.axvline(game, color="#76FF03", linewidth=0.9, linestyle="--", alpha=0.7, zorder=3)
+            lbl = "diff advance" if first_on_ax else None
+            ax.axvline(game, color=_ADVANCE_COLOR, linewidth=0.9, linestyle="--", alpha=0.7, zorder=3, label=lbl)
+            first_on_ax = False
     ax_top = axes_col[0]
     for game, level in advances:
-        ax_top.text(game, 1.0, f"L{level}", fontsize=6, color="#76FF03",
+        ax_top.text(game, 1.0, f"L{level}", fontsize=6, color=_ADVANCE_COLOR,
                     ha="left", va="top", transform=ax_top.get_xaxis_transform(),
                     zorder=4, bbox=dict(boxstyle="round,pad=0.1", fc="black", alpha=0.5, lw=0))
 
 
-def _draw_recovery_events(ax, events: dict[str, list]) -> None:
+def _draw_recovery_events(ax, events: dict[str, list], add_labels: bool = False) -> None:
     _labeled: set[str] = set()
 
     def _vline(game, color, ls, lw, label):
-        lbl = label if label not in _labeled else None
+        if add_labels and label not in _labeled:
+            lbl = label
+            _labeled.add(label)
+        else:
+            lbl = None
         ax.axvline(game, color=color, linewidth=lw, linestyle=ls, alpha=0.85, zorder=3, label=lbl)
-        _labeled.add(label)
 
     for game, _ in events["recovery_stage1"]:
         _vline(game, "black",    "--", 1.0, "hot-explore")
@@ -376,11 +391,15 @@ def draw(fig, _axes_unused, specialists):
         _caption(ax_ret, "retro↑ = winning outcome reward;  retro↓ = losing;  near 0 = draws / mixed")
 
         # ── Advancement + recovery markers on all panels ──────────────────
+        # Labels are only produced for the top panel so its legend collects all
+        # four vertical-line entries (diff advance, hot-explore, restore, resurrect).
         advances = _get_advances(rows)
         _all_axes = [ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret]
-        _draw_advances(_all_axes, advances)
+        _draw_advances(_all_axes, advances, label_ax=ax_ent)
         for _ax in _all_axes:
-            _draw_recovery_events(_ax, rec_events)
+            _draw_recovery_events(_ax, rec_events, add_labels=(_ax is ax_ent))
+        # Re-render top panel legend so new vline labels appear alongside entropy/chosen prob.
+        ax_ent.legend(fontsize=6, loc="upper right", ncol=2)
 
         for ax in (ax_ent, ax_top1, ax_wr, ax_sent, ax_rew, ax_ret):
             ax.tick_params(labelsize=6)
