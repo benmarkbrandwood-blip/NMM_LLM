@@ -531,9 +531,21 @@ def _choose_resume_path(args: argparse.Namespace) -> tuple[Optional[Path], str]:
         p = Path(args.resume)
         if p.exists():
             return p, "explicit_resume"
-    out_dir_best = Path(args.out_dir) / "best.pt"
-    if args.auto_resume_best and out_dir_best.exists():
-        return out_dir_best, "s_gen_v2a_best"
+    # Candidate parents: run-name subfolder first (if set), then plain out-dir.
+    _parents = []
+    if getattr(args, "run_name", ""):
+        _parents.append(Path(args.out_dir) / args.run_name)
+    _parents.append(Path(args.out_dir))
+    if getattr(args, "auto_resume_latest", False):
+        for parent in _parents:
+            _latest = parent / "latest.pt"
+            if _latest.exists():
+                return _latest, f"latest@{parent.name}"
+    if args.auto_resume_best:
+        for parent in _parents:
+            _best = parent / "best.pt"
+            if _best.exists():
+                return _best, f"best@{parent.name}"
     return None, "scratch"
 
 
@@ -2078,7 +2090,10 @@ def run(args: argparse.Namespace) -> None:
 def main() -> None:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
     p.add_argument("--resume",             default="",   type=str)
-    p.add_argument("--auto-resume-best",   action="store_true")
+    p.add_argument("--auto-resume-best",   action="store_true",
+                   help="Resume from best.pt in <out-dir>/<run-name>/ if it exists, else <out-dir>/best.pt")
+    p.add_argument("--auto-resume-latest", action="store_true",
+                   help="Resume from latest.pt in <out-dir>/<run-name>/ if it exists, else <out-dir>/latest.pt")
     p.add_argument("--out-dir",   default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2a"))
     p.add_argument("--run-name",  default="", type=str,
                    help="Optional subfolder under --out-dir, e.g. 'exp1'. "
