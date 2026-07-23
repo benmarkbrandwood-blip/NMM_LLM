@@ -230,6 +230,11 @@ LR_SCALE_MIN = 0.50
 LR_SCALE_MAX = 2.00
 RECOVERY_THRESHOLD  = 0.12
 RECOVERY_MIN_GAMES  = 30
+# Chess-style score = win + 0.5*draw. Below this = genuinely losing on balance.
+RECOVERY_SCORE_THRESHOLD = 0.35
+# Score must have dropped by at least this much between first/second half of window
+# for Stage 1 to fire — prevents re-triggering on stable-but-mediocre plateaus.
+RECOVERY_DEGRADE_MARGIN  = 0.05
 TEMP_BOOST_DECAY       = 0.97   # per-iteration decay for advancement/recovery temperature boost
 ENTROPY_BOOST_DECAY    = 0.97   # per-iteration decay for advancement/recovery entropy boost
 HOT_EXPLORE_TEMP_SCALE = 1.3    # hot-explore temperature = temp_start * this multiplier
@@ -1780,15 +1785,24 @@ def run(args: argparse.Namespace) -> None:
 
                 _adapt_lr(opt, win_rate, args.lr)
 
-                if (len(win_history_heuristic) >= RECOVERY_MIN_GAMES
-                        and loss_rate > win_rate):
+                # Recovery trigger: chess-style score (win + 0.5*draw) with lockout
+                # during Stage 2 grace and a degradation check, so we don't re-trigger
+                # on stable draw-heavy plateaus or cycle Stage 2 → Stage 1 → Stage 2.
+                _score = win_rate + 0.5 * draw_rate
+                _in_stage2_grace = (_current_recovery_state == "grace")
+
+                if _in_stage2_grace:
+                    pass  # Stage 2 grace running — do not re-trigger
+                elif (len(win_history_heuristic) >= RECOVERY_MIN_GAMES
+                        and _score < RECOVERY_SCORE_THRESHOLD):
                     _h_list = list(win_history_heuristic)
                     _mid    = len(_h_list) // 2
-                    _first_wr  = sum(1 for x in _h_list[:_mid] if x == 1.0) / max(_mid, 1)
-                    _second_wr = sum(1 for x in _h_list[_mid:] if x == 1.0) / max(len(_h_list) - _mid, 1)
-                    _is_improving = _second_wr > _first_wr + 0.02
+                    _first_score  = sum(_h_list[:_mid]) / max(_mid, 1)
+                    _second_score = sum(_h_list[_mid:]) / max(len(_h_list) - _mid, 1)
+                    _is_improving = _second_score > _first_score + 0.02
+                    _is_degrading = _second_score < _first_score - RECOVERY_DEGRADE_MARGIN
                     if _is_improving:
-                        print(f"[s_gen_v2a] Recovery skipped: AI is improving ({_first_wr:.3f} → {_second_wr:.3f})")
+                        print(f"[s_gen_v2a] Recovery skipped: AI is improving (score {_first_score:.3f} → {_second_score:.3f})")
                         if hot_explore_triggered and hot_explore_remaining <= 0:
                             hot_explore_triggered = False
                             _current_recovery_state = ""
@@ -1838,6 +1852,9 @@ def run(args: argparse.Namespace) -> None:
                             _current_recovery_state = ""
                             print(f"[s_gen_v2a] Recovery Stage 2: no best{difficulty}.pt exists — cannot restore "
                                   f"(W={win_rate:.2f} L={loss_rate:.2f})")
+                    elif not _is_degrading:
+                        # Score is low but stable — don't fire Stage 1 on a plateau
+                        print(f"[s_gen_v2a] Recovery skipped: score low but stable ({_first_score:.3f} → {_second_score:.3f})")
                     else:
                         # Stage 1: first sign of trouble — hot-explore phase
                         recovery_baseline_win_rate = win_rate
