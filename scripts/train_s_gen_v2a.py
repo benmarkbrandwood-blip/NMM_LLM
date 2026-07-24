@@ -46,6 +46,13 @@ sys.path.insert(0, str(_ROOT))
 
 from game.board import BoardState, MILLS
 from game.rules import is_terminal
+from learned_ai.training.termination import (
+    TerminationReason,
+    VALID_OUTCOMES,
+    INFRA_REASONS,
+    classify_terminal,
+    rolling_percentages,
+)
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from learned_ai.agents.heuristic_agent import GameAI as _GA
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
@@ -336,6 +343,19 @@ class GameDiag:
     opponent_node_budget:    Optional[int] = None
     recovery_state:          str = ""
     hot_explore_remaining:   int = 0
+    termination_reason:      str = ""
+    # 50-game rolling termination-reason percentages (0..100). Empty when window unfilled.
+    term_win_lt3_pct:        float = 0.0
+    term_win_blocked_pct:    float = 0.0
+    term_loss_lt3_pct:       float = 0.0
+    term_loss_blocked_pct:   float = 0.0
+    term_draw_rep_pct:       float = 0.0
+    term_draw_50_pct:        float = 0.0
+    term_draw_trunc_pct:     float = 0.0
+    term_infra_learner_count: int = 0
+    term_infra_opponent_count: int = 0
+    # Cooldown state so we can see it in the log while it decays.
+    advance_cooldown_batches: int = 0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -697,6 +717,38 @@ def _outcome_to_history_float(outcome: float) -> float:
     return 0.0
 
 
+_INFRA_REASON_VALUES = frozenset(r.value for r in INFRA_REASONS)
+
+
+def _record_rollout_outcome(
+    reason: str,
+    hv: float,
+    win_history: deque,
+    win_history_heuristic: deque,
+    level_heuristic_history: deque,
+    termination_history: deque,
+    is_full_diff: bool,
+    advance_cooldown_batches: int,
+) -> None:
+    """Route a rollout outcome into the appropriate histories.
+
+    * INFRA_* reasons: recorded only in termination_history for observability.
+      They must never enter W/D/L or advancement statistics.
+    * Regular outcomes: full win_history; win_history_heuristic if is_full_diff.
+    * Cooldown active (advance_cooldown_batches > 0): full-diff outcomes still
+      enter win_history_heuristic (so recovery + display work) but do NOT enter
+      level_heuristic_history — that's the fresh-sample gate for advancement.
+    """
+    termination_history.append(reason)
+    if reason in _INFRA_REASON_VALUES:
+        return
+    win_history.append(hv)
+    if is_full_diff:
+        win_history_heuristic.append(hv)
+        if advance_cooldown_batches <= 0:
+            level_heuristic_history.append(hv)
+
+
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
     """Advance when (wins + 0.5×draws)/total >= threshold.
 
@@ -798,6 +850,7 @@ class RolloutResult:
     opponent_search_nodes: int = 0
     opponent_search_calls: int = 0
     opponent_node_budget:  Optional[int] = None
+    termination_reason:    str = TerminationReason.DRAW_MAX_PLY_TRUNCATED.value
 
 
 def _move_notation(mv: dict) -> str:
@@ -858,6 +911,8 @@ def _rollout(
     opponent_search_calls   = 0
     opponent_node_budget    = getattr(opponent, "node_budget", None)
 
+    termination_reason: TerminationReason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
+
     while ply < max_ply:
         if ply == retry_ply:
             retry_board = board
@@ -866,6 +921,7 @@ def _rollout(
 
         terminal, winner = is_terminal(board)
         if terminal:
+            termination_reason = classify_terminal(board, learner_color)
             if winner == learner_color:
                 outcome = WIN_REWARD
             elif winner is not None:
@@ -890,7 +946,10 @@ def _rollout(
                 sdb_min_samples=3,
             )
             if enc is None or not enc.legal_moves:
+                # is_terminal() said non-terminal but encoder can't produce a legal
+                # move for the learner — this is infrastructure, not a game loss.
                 outcome = LOSS_REWARD
+                termination_reason = TerminationReason.INFRA_LEARNER_FAILURE
                 done    = True
                 break
 
@@ -1038,7 +1097,12 @@ def _rollout(
             except Exception:
                 opp_move = None
             if not opp_move:
+                # Opponent produced no move on a non-terminal position — infra,
+                # not a learner win.  Keep outcome as WIN_REWARD so RL signal is
+                # unchanged (rare event), but tag reason so it can be excluded
+                # from advancement statistics.
                 outcome = WIN_REWARD
+                termination_reason = TerminationReason.INFRA_OPPONENT_FAILURE
                 done    = True
                 break
             if opponent_node_budget is not None:
@@ -1053,6 +1117,7 @@ def _rollout(
 
     if not done:
         outcome = DRAW_LONG
+        termination_reason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
 
     if _saved_sim_ply is not None and lookahead_advisor is not None:
         lookahead_advisor._sim_ply_depth = _saved_sim_ply
@@ -1087,6 +1152,7 @@ def _rollout(
         opponent_search_nodes=opponent_search_nodes,
         opponent_search_calls=opponent_search_calls,
         opponent_node_budget=opponent_node_budget,
+        termination_reason=termination_reason.value,
     )
 
 
@@ -1114,9 +1180,16 @@ def _build_game_diag(
     bucket_counts:   Counter,
     recovery_state:        str = "",
     hot_explore_remaining: int = 0,
+    termination_history:   Optional[deque] = None,
+    advance_cooldown_batches: int = 0,
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
+    # Rolling 50-game termination-reason breakdown (percentages ignore infra).
+    term_pcts: dict[str, float] = {}
+    if termination_history:
+        _recent = list(termination_history)[-50:]
+        term_pcts = rolling_percentages([TerminationReason(r) for r in _recent])
     return GameDiag(
         game=game_count,
         difficulty=difficulty,
@@ -1163,6 +1236,17 @@ def _build_game_diag(
         opponent_node_budget   =result.opponent_node_budget,
         recovery_state         =recovery_state,
         hot_explore_remaining  =hot_explore_remaining,
+        termination_reason     =result.termination_reason,
+        term_win_lt3_pct       =term_pcts.get("win_lt3", 0.0),
+        term_win_blocked_pct   =term_pcts.get("win_blocked", 0.0),
+        term_loss_lt3_pct      =term_pcts.get("loss_lt3", 0.0),
+        term_loss_blocked_pct  =term_pcts.get("loss_blocked", 0.0),
+        term_draw_rep_pct      =term_pcts.get("draw_rep", 0.0),
+        term_draw_50_pct       =term_pcts.get("draw_50", 0.0),
+        term_draw_trunc_pct    =term_pcts.get("draw_trunc", 0.0),
+        term_infra_learner_count  =int(term_pcts.get("infra_learner", 0.0)),
+        term_infra_opponent_count =int(term_pcts.get("infra_opponent", 0.0)),
+        advance_cooldown_batches  =int(advance_cooldown_batches),
     )
 
 
@@ -1285,7 +1369,14 @@ def run(args: argparse.Namespace) -> None:
     lookahead_advisor.set_frozen_model(frozen_opp._model, device=device)
     print("[s_gen_v2a] LookaheadAdvisor: frozen-model driven learner-side (Option C)")
     games_since_target_update = 0
-    games_at_level            = 0   # for Sanmill time-of-flight target relaxation
+    games_at_level            = int(_resume_ckpt.get("games_at_level", 0))
+    # Cooldown gate: blocks advancement while > 0, and diverts rehearsal outcomes
+    # away from level_heuristic_history so they can't drive the next advance.
+    advance_cooldown_batches  = int(_resume_ckpt.get("advance_cooldown_batches", 0))
+    # 200-game rolling window over termination reasons for observability.
+    termination_history: deque[str] = deque(
+        _resume_ckpt.get("termination_history", []), maxlen=200
+    )
 
     out_dir   = Path(args.out_dir)
     if getattr(args, "run_name", None):
@@ -1307,7 +1398,8 @@ def run(args: argparse.Namespace) -> None:
     temperature            = args.temp_start
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
-    level_heuristic_history: deque[float] = deque()  # uncapped; cleared on each difficulty advance
+    level_heuristic_history: deque[float] = deque(_resume_ckpt.get("level_heuristic_history", []))
+    # uncapped; cleared on each difficulty advance and when advance-cooldown expires
     ep_steps: list[ScaffoldedStep] = []
     last_update_pl  = None
     last_update_vl  = None
@@ -1389,6 +1481,16 @@ def run(args: argparse.Namespace) -> None:
 
     while game_count < segment_stop:
         batch_count += 1
+        # Advancement cooldown: decrement one per batch.  While > 0, rollout
+        # outcomes are diverted away from level_heuristic_history (see
+        # _record_rollout_outcome).  When it transitions to 0 for the first
+        # time, clear level_heuristic_history so the next advance decision is
+        # based only on fresh post-cooldown samples.
+        if advance_cooldown_batches > 0:
+            advance_cooldown_batches -= 1
+            if advance_cooldown_batches == 0:
+                level_heuristic_history.clear()
+                print(f"[s_gen_v2a] Advance cooldown expired — accumulating fresh samples at diff {difficulty}")
         _scheduled_temp = _compute_temperature(game_count, args.max_games, args.temp_start)
         # Decay ongoing boosts
         if temp_boost > 1e-4:
@@ -1627,19 +1729,21 @@ def run(args: argparse.Namespace) -> None:
                 games_at_level += 1
                 games_since_target_update += 1
                 _hv = _outcome_to_history_float(confirm_result.outcome)
-                win_history.append(_hv)
-                if is_full_diff:
-                    win_history_heuristic.append(_hv)
-                    level_heuristic_history.append(_hv)
+                _record_rollout_outcome(
+                    confirm_result.termination_reason, _hv,
+                    win_history, win_history_heuristic, level_heuristic_history,
+                    termination_history, is_full_diff, advance_cooldown_batches,
+                )
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
                     print(f"[s_gen_v2a] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
 
             _hv = _outcome_to_history_float(result.outcome)
-            win_history.append(_hv)
-            if is_full_diff:
-                win_history_heuristic.append(_hv)
-                level_heuristic_history.append(_hv)
+            _record_rollout_outcome(
+                result.termination_reason, _hv,
+                win_history, win_history_heuristic, level_heuristic_history,
+                termination_history, is_full_diff, advance_cooldown_batches,
+            )
             game_count += 1
             games_at_level += 1
             games_since_target_update += 1
@@ -1654,6 +1758,8 @@ def run(args: argparse.Namespace) -> None:
                 bucket_counts=bucket_counts,
                 recovery_state=_current_recovery_state,
                 hot_explore_remaining=hot_explore_remaining,
+                termination_history=termination_history,
+                advance_cooldown_batches=advance_cooldown_batches,
             )
             diag_buffer.append(_diag)
 
@@ -1695,10 +1801,11 @@ def run(args: argparse.Namespace) -> None:
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
                 _rv = _outcome_to_history_float(retry_result.outcome)
-                win_history.append(_rv)
-                if is_full_diff:
-                    win_history_heuristic.append(_rv)
-                    level_heuristic_history.append(_rv)
+                _record_rollout_outcome(
+                    retry_result.termination_reason, _rv,
+                    win_history, win_history_heuristic, level_heuristic_history,
+                    termination_history, is_full_diff, advance_cooldown_batches,
+                )
                 game_count += 1
                 games_at_level += 1
                 games_since_target_update += 1
@@ -1756,7 +1863,12 @@ def run(args: argparse.Namespace) -> None:
                     game_count += 1
                     games_at_level += 1
                     games_since_target_update += 1
-                    win_history.append(_outcome_to_history_float(branch_result.outcome))
+                    _record_rollout_outcome(
+                        branch_result.termination_reason,
+                        _outcome_to_history_float(branch_result.outcome),
+                        win_history, win_history_heuristic, level_heuristic_history,
+                        termination_history, False, advance_cooldown_batches,
+                    )
 
                     bucket_counts = Counter(branch_bucket_history)
                     diag_buffer.append(_build_game_diag(
@@ -1768,6 +1880,8 @@ def run(args: argparse.Namespace) -> None:
                         bucket_counts=bucket_counts,
                         recovery_state=_current_recovery_state,
                         hot_explore_remaining=hot_explore_remaining,
+                        termination_history=termination_history,
+                        advance_cooldown_batches=advance_cooldown_batches,
                     ))
 
                     if game_count % 10 == 0:
@@ -1951,7 +2065,6 @@ def run(args: argparse.Namespace) -> None:
                         f"temp={temperature:.2f} | "
                         f"outcome={d.outcome:+.2f} | lr={opt.param_groups[0]['lr']:.5f} | "
                         f"rew={_sign(d.reward_total_mean)} | "
-                        f"sent={_sign(d.reward_sentinel_mean)} "
                         f"h={_sign(d.reward_heuristic_mean)} | "
                         f"p_top1={d.policy_top1_rate:.2f} h_top1={d.heuristic_top1_rate:.2f} | "
                         f"branches={len(branch_diags)} "
@@ -1974,6 +2087,12 @@ def run(args: argparse.Namespace) -> None:
                     "recovery_grace":            recovery_grace,
                     "recovery_state":            _current_recovery_state,
                     "recovery_baseline_win_rate": recovery_baseline_win_rate,
+                    # Curriculum + termination state (v2a addition): survives restart
+                    # so a resume during rehearsal cooldown cannot bypass the gate.
+                    "games_at_level":            games_at_level,
+                    "advance_cooldown_batches":  advance_cooldown_batches,
+                    "level_heuristic_history":   list(level_heuristic_history),
+                    "termination_history":       list(termination_history),
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -2031,25 +2150,12 @@ def run(args: argparse.Namespace) -> None:
                     }
                     torch.save(_adv_ckpt, prev_best)
                     print(f"[s_gen_v2a] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
-                # Load latest.pt (current model state) as the starting point for the
-                # new level.  Previously loaded best{prev_diff}.pt which could regress
-                # progress if it was a stale checkpoint from an earlier run.
-                _latest_path = out_dir / "latest.pt"
-                if _latest_path.exists():
-                    ckpt_prev = torch.load(str(_latest_path), map_location=device, weights_only=False)
-                    try:
-                        model.load_state_dict(ckpt_prev["model"])
-                    except RuntimeError:
-                        pol_state = {k: v for k, v in ckpt_prev["model"].items() if k.startswith("policy_mlp")}
-                        try:
-                            model.load_state_dict(pol_state, strict=False)
-                            print(f"[s_gen_v2a] Advance-load: value_mlp shape mismatch — policy weights loaded, value head kept")
-                        except RuntimeError:
-                            print(f"[s_gen_v2a] Advance-load: checkpoint shape incompatible (old feat_dim) — keeping current weights")
-                    model.to(device)
-                    print(f"[s_gen_v2a] Loaded latest.pt as starting point for diff {difficulty}")
-                else:
-                    print(f"[s_gen_v2a] latest.pt not found — proceeding with in-memory model for diff {difficulty}")
+                # No reload on advance.  The in-memory model just achieved the
+                # advancement condition — those weights are the correct starting
+                # point for the new level.  latest.pt may lag behind between log
+                # ticks; best{prev_diff}.pt above may be stale from an earlier
+                # run.  Continue with current in-memory model.
+                print(f"[s_gen_v2a] Continuing with in-memory model for diff {difficulty} (no checkpoint reload)")
 
                 best_win_rate_at_diff = 0.0
                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -2060,6 +2166,9 @@ def run(args: argparse.Namespace) -> None:
                 entropy_boost = args.advance_entropy_boost_frac * args.entropy_coef
                 # Rehearsal: expand lower-diff opponent ratio for the first N iterations
                 advance_rehearsal_remaining = args.advance_rehearsal_games
+                # Advancement cooldown: block further advances until we've completed
+                # rehearsal AND accumulated a small tail of fresh non-rehearsal samples.
+                advance_cooldown_batches = args.advance_rehearsal_games + args.advance_cooldown_tail_batches
                 # Reset hot-explore state — new level is a fresh start
                 hot_explore_triggered = False
                 hot_explore_remaining = 0
@@ -2179,6 +2288,10 @@ def main() -> None:
                         "lower-diff opponent slot expanded (0=disabled; default 0)")
     p.add_argument("--advance-rehearsal-prob",    type=float, default=0.45,
                    help="Lower-diff opponent probability during rehearsal window (default 0.45 vs standard 0.20)")
+    p.add_argument("--advance-cooldown-tail-batches", type=int, default=8,
+                   help="Extra batches beyond rehearsal that must complete before another "
+                        "advancement can fire. Prevents chained advances driven by the "
+                        "temporarily easier rehearsal opponent mixture. (default 8)")
     p.add_argument("--hot-explore-games",         type=int,   default=75,
                    help="Stage-1 recovery: run this many PRIMARY games at elevated temperature before "
                         "reloading the best checkpoint. Counter decrements by batch_games per batch, "
