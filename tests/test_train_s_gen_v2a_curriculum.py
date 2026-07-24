@@ -199,6 +199,29 @@ def test_record_non_full_diff_never_enters_level_history():
 
 # ── Advance-check + cooldown interaction ──────────────────────────────────────
 
+def test_level_history_cap_is_bounded():
+    """The uncapped-history advancement drag is prevented by a maxlen cap.
+
+    Simulates 500 outcomes into a deque with the same maxlen convention the
+    training script uses (4 × rolling_win).  Verifies the deque never grows
+    beyond the cap and that the mean reflects the tail — not the full history.
+    """
+    rolling_win = 40
+    cap = rolling_win * 4  # 160
+    lhh: deque[float] = deque(maxlen=cap)
+    # 400 losses then 100 wins — old poor games should age out
+    for _ in range(400):
+        lhh.append(0.0)
+    for _ in range(100):
+        lhh.append(1.0)
+    assert len(lhh) == cap, "deque should be at maxlen after > cap appends"
+    mean = sum(lhh) / len(lhh)
+    # Tail is 60 losses + 100 wins → mean 100/160 = 0.625
+    assert mean == pytest.approx(0.625, abs=1e-6), (
+        f"level history mean should reflect the tail, got {mean}"
+    )
+
+
 def test_advance_stat_over_infra_flooded_window_is_stable():
     """A window flooded with infra failures produces the same rolling percentages
     over the valid subset as a window without any infra rows."""

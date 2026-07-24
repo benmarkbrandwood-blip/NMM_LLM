@@ -781,6 +781,12 @@ Checked **every batch** once `games_at_level ≥ 20` (was `% 10 == 0` before —
 that modulo gate silently skipped whole windows when batch increments crossed
 multiples of 10).
 
+`level_heuristic_history` is capped at `4 × --rolling-win` (default 160)
+outcomes so poor early games at a level can age out as the model improves.
+Before the cap, it was uncapped — under long-tenure runs at diff 1 the
+historical mean could be permanently dragged below target even after recent
+performance recovered.
+
 When the check fires:
 
 - **No checkpoint reload.** The in-memory model just achieved the gate, so it

@@ -1398,8 +1398,14 @@ def run(args: argparse.Namespace) -> None:
     temperature            = args.temp_start
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
-    level_heuristic_history: deque[float] = deque(_resume_ckpt.get("level_heuristic_history", []))
-    # uncapped; cleared on each difficulty advance and when advance-cooldown expires
+    # Cap at 4 × rolling_win so poor early games at a level age out and can't
+    # permanently drag the sanmill mean below target after the model improves.
+    # Trimmed to the tail on resume in case the persisted list is longer than
+    # the cap (e.g. saved before this cap was introduced).
+    _level_hist_cap = max(args.rolling_win * 4, 40)
+    _persisted_lh = list(_resume_ckpt.get("level_heuristic_history", []))[-_level_hist_cap:]
+    level_heuristic_history: deque[float] = deque(_persisted_lh, maxlen=_level_hist_cap)
+    # Cleared on each difficulty advance and when advance-cooldown expires.
     ep_steps: list[ScaffoldedStep] = []
     last_update_pl  = None
     last_update_vl  = None
