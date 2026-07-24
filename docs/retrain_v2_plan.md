@@ -72,6 +72,22 @@ Sentinel v2  →  ValueNet v2  →  HumanPrefNet  →  GapNet v2
 
 ## Step 0 — Train Sentinel v2 (Stages 1 → 2 → 4)
 
+A shell wrapper `scripts/train_sentinel_v2_step0.sh` runs all three stages in
+sequence with the correct resume chain and promotes the final checkpoint into
+`checkpoints/v2/best.pt`.  It is idempotent — delete any `v2_stage{N}/`
+directory to force that stage to rerun.  Environment overrides
+(`MALOM_DB`, `DEVICE`, `GAME_DIR`, `HUMAN_GAME_DIR`) let you retarget without
+editing the script.
+
+```bash
+./scripts/train_sentinel_v2_step0.sh                # cpu, default paths
+DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # on a gpu box
+```
+
+The individual commands below run the same three stages if you prefer to launch
+them one at a time.
+
+
 **Stage 3 is permanently archived** (feature leakage); do not run it.
 
 **Stage 5 is dropped from this retrain cycle.** Live sentinel inference always zeroes the oracle

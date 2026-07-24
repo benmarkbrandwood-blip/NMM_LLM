@@ -449,6 +449,28 @@ python tools/build_endgame_db.py --build-all --skip-existing  \
 | `--quiet` | off | Suppress per-pass logging |
 
 
+## Sentinel v2 — Step 0 Wrapper (Stages 1 → 2 → 4)
+
+Orchestrates the three-stage Sentinel v2 retrain from `docs/retrain_v2_plan.md`
+(Stage 3 archived, Stage 5 dropped). Idempotent — delete any `v2_stage{N}/`
+directory to force that stage to rerun. Promotes the final checkpoint to
+`learned_ai/sentinel/checkpoints/v2/best.pt` without touching production
+`best.pt`.
+
+```bash
+./scripts/train_sentinel_v2_step0.sh                # cpu, default paths
+DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # gpu run
+MALOM_DB=/path/to/Std_DD_89adjusted ./scripts/train_sentinel_v2_step0.sh
+```
+
+| Env var | Default | Description |
+| --- | --- | --- |
+| `DEVICE` | `cpu` | Passed as `--device` to `train_sentinel.py` |
+| `MALOM_DB` | `malom_db_path` from `data/training_paths.local.json` (else `/mnt/windows/...`) | Malom DB directory used in Stages 2 and 4 |
+| `GAME_DIR` | `data/games` | AI self-play game directory |
+| `HUMAN_GAME_DIR` | `data/human_games` | Human game directory |
+
+
 ## Sentinel v2 — Train
 
 ```
