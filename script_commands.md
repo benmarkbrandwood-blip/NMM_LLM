@@ -52,6 +52,52 @@ python tools/self_play.py --games 500 --no-llm --white 7 --black 3 --parallel 4 
 | `--verbose` | off | Per-game status lines |
 
 
+## Value Net v2 — Malom WDL Training (train_value_net_v2.py)
+
+Implements Step 1 of `docs/retrain_v2_plan.md`. Trains ValueNet on per-position
+Malom WDL labels ({+1, 0, −1}) from `human_db.sqlite` rather than the v1
+final-outcome-per-game approach. Output range stays `[−1, 1]` — existing
+blender code, VN blend %, and difficulty settings work unchanged.
+
+`specialist_db.sqlite` is **not** used (positions keyed by irreversible
+`pos_hash`). The `--specialist-db` flag is accepted for compatibility with the
+plan command but has no effect.
+
+**Full run:**
+
+```
+.venv/bin/python tools/train_value_net_v2.py \
+  --human-db data/human_db.sqlite \
+  --specialist-db data/specialist_db.sqlite \
+  --output data/value_net_v2.npz \
+  --epochs 200 --patience 10
+```
+
+**Smoke test (5k positions, 3 epochs):**
+
+```
+.venv/bin/python tools/train_value_net_v2.py \
+  --limit 5000 --epochs 3 --output /tmp/vn_v2_smoke.npz
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--human-db PATH` | `data/human_db.sqlite` | Positions + `malom_wdl` label source. Query is `WHERE malom_wdl IS NOT NULL`. |
+| `--specialist-db PATH` | — | Accepted for API compat; skipped with a warning. |
+| `--output PATH` | `data/value_net_v2.npz` | Output `.npz` checkpoint. |
+| `--epochs N` | 200 | Max epochs (early stopping usually terminates sooner). |
+| `--patience N` | 10 | Early-stop patience — epochs without val-loss improvement. |
+| `--lr F` | 1e-3 | Learning rate. |
+| `--batch-size N` | 256 | Mini-batch size. |
+| `--val-fraction F` | 0.20 | Held-out fraction for validation + early stop. |
+| `--limit N` | — | Cap positions loaded (for smoke tests). |
+| `--seed N` | 42 | RNG seed. |
+
+**Not** promoted to production. Compare against `data/value_net.npz` per plan
+Step 4c (held-out MSE + game bench at blends 30 / 60 / 80) before Step 8
+promotion.
+
+
 ## Value Net — Basic Training (train_value_net.py)
 
 ```
