@@ -208,22 +208,17 @@ and a game-bench runner respectively.
 
 ### 6e — GapNet human-proxy opponent bench
 
-Step 3 has landed (see below), so the infrastructure needed for this bench
-now exists: `HumanPrefAdvisor` at inference time and a `humanlike_blend`
-weight on `HeuristicWeights`.  What's still needed to run 6e end-to-end is
-CLI plumbing on `scripts/bench_sentinel.py` — specifically `--gap-net-path`,
-`--vn-path`, `--black-humanlike`, and `--humanlike-blend` flags that
-construct a human-proxy opponent for the GapNet round-robin.  Add those
-flags before running:
+Both prerequisites have landed: Step 3 wires `HumanPrefAdvisor` into
+`GameAI`, and `scripts/bench_sentinel.py` now exposes `--gap-net-path`,
+`--vn-path`, `--white-humanlike`, `--black-humanlike`, `--humanlike-blend`,
+`--humanlike-temperature`, and `--human-pref-path` flags.  See the
+"Benchmarking — Sentinel / GAP Net / Tournament" section below for the
+full flag table and the Step 6e command.
 
-```bash
-# Once bench_sentinel.py is updated:
-.venv/bin/python scripts/bench_sentinel.py \
-  --games 40 --difficulty 5 \
-  --white-gap-net --gap-net-path data/gap_net_v2.npz \
-  --black-humanlike --humanlike-blend 100 \
-  --vn-path data/value_net_v2.npz
-```
+The plan's Reconsider-later section (`docs/retrain_v2_plan.md`) tracks the
+follow-up items to revisit once real v2 checkpoints exist — flag defaults,
+softmax temperature calibration, and whether a `--suite` preset is worth
+adding for this round-robin.
 
 
 ## Retrain v2 — Step 3: HumanPrefNet at inference
@@ -575,11 +570,34 @@ signal (older datasets or synthetic-fallback samples) get NaN in `y_hp`.
 | `--white-value-net` | off | Enable value net for White |
 | `--black-value-net` | off | Enable value net for Black |
 | `--vn-blend N` | 0 | Value net blend % |
+| `--vn-path PATH` | `data/value_net.npz` | Override value_net checkpoint (v2 comparisons) |
 | `--white-gap-net` | off | Enable GAP net for White |
 | `--black-gap-net` | off | Enable GAP net for Black |
+| `--gap-net-path PATH` | `data/gap_net.npz` | Override gap_net checkpoint (v2 comparisons) |
+| `--white-humanlike` | off | Blend HumanPrefNet into White's leaf scoring (Step 6e human-proxy) |
+| `--black-humanlike` | off | Blend HumanPrefNet into Black's leaf scoring |
+| `--humanlike-blend N` | 100 | humanlike_blend percentage; 100 = pure HumanPrefNet |
+| `--humanlike-temperature F` | 1.0 | Softmax temperature for `HumanPrefAdvisor.probs()` |
+| `--human-pref-path PATH` | `data/human_pref_net.npz` | HumanPrefNet checkpoint |
 | `--time-budget F` | — | Per-move time budget override |
 | `--suite` | off | Run preset benchmark suite |
 | `--round-robin` | off | Round-robin all configurations |
+
+**Step 6e — GapNet vs human-proxy opponent** (once v2 checkpoints are trained):
+
+```
+.venv/bin/python scripts/bench_sentinel.py \
+  --games 40 --difficulty 5 \
+  --white-gap-net --gap-net-path data/gap_net_v2.npz \
+  --black-humanlike --humanlike-blend 100 \
+  --human-pref-path data/human_pref_net.npz \
+  --vn-path data/value_net_v2.npz
+```
+
+Repeat with `--gap-net-path data/gap_net.npz` for the v1 baseline and compare
+win rates against the same proxy.  Human-proxy games are intentionally weaker
+in absolute strength — the goal is measuring GapNet's ability to exploit
+human-style play, not to beat a strong engine.
 
 
 **Full round-robin tournament (S0/S10/S20/S30 + VN blends):**

@@ -66,35 +66,62 @@ def _load_sentinel(path: str = _SENTINEL_CKPT):
         return None
 
 
-def _load_value_net():
+def _load_value_net(path: str = _VALUE_NET_PATH):
     try:
         from ai.value_net import ValueNet
-        vn = ValueNet.load(_VALUE_NET_PATH)
-        print(f"  Value net loaded: {_VALUE_NET_PATH}")
+        vn = ValueNet.load(path)
+        print(f"  Value net loaded: {path}")
         return vn
     except Exception as e:
         print(f"  Value net load failed: {e}")
         return None
 
 
-def _load_gap_net():
+def _load_gap_net(path: str = _GAP_NET_PATH):
     try:
         from ai.value_net import ValueNet
-        gn = ValueNet.load(_GAP_NET_PATH)
-        print(f"  Gap net loaded: {_GAP_NET_PATH}")
+        gn = ValueNet.load(path)
+        print(f"  Gap net loaded: {path}")
         return gn
     except Exception as e:
         print(f"  Gap net load failed: {e}")
         return None
 
 
+def _load_human_pref(path: str, temperature: float = 1.0):
+    """Best-effort load of a HumanPrefNet.npz for humanlike-play mode.
+
+    Returns None on missing file so callers can graceful-skip.
+    """
+    try:
+        from ai.human_pref_advisor import try_load
+        adv = try_load(path, temperature=temperature)
+        if adv is not None:
+            print(f"  HumanPrefNet loaded: {path}")
+        else:
+            print(f"  HumanPrefNet not loaded (missing or malformed): {path}")
+        return adv
+    except Exception as e:
+        print(f"  HumanPrefNet load failed: {e}")
+        return None
+
+
 def _make_ai(color: str, difficulty: int, sentinel=None, sentinel_mode: str = "advisory",
              value_net=None, gap_net=None, time_budget: float | None = None,
-             vn_blend: int = 0, sentinel_scale: float | None = None) -> GameAI:
+             vn_blend: int = 0, sentinel_scale: float | None = None,
+             human_pref_net=None, humanlike_blend: int = 0) -> GameAI:
     from ai.heuristics import HeuristicWeights
-    weights = HeuristicWeights(value_net_blend=vn_blend) if vn_blend else None
+    # Build a weights struct only when at least one custom weight is set —
+    # keeps DEFAULT_WEIGHTS as the fast path for the pure-heuristic baseline.
+    weights = None
+    if vn_blend or (human_pref_net is not None and humanlike_blend):
+        weights = HeuristicWeights(value_net_blend=vn_blend)
+        if human_pref_net is not None and humanlike_blend:
+            weights.humanlike_blend = int(humanlike_blend)
     ai = GameAI(color=color, difficulty=difficulty, value_net=value_net,
-                gap_net=gap_net, weights=weights, override_time_budget=time_budget)
+                gap_net=gap_net, weights=weights,
+                human_pref_net=human_pref_net,
+                override_time_budget=time_budget)
     if sentinel is not None:
         ai.set_sentinel(sentinel, mode=sentinel_mode)
         if sentinel_scale is not None:
@@ -139,9 +166,11 @@ def run_matchup(
     # Config A
     sentinel_a=None, sentinel_mode_a: str = "advisory", sentinel_scale_a: float | None = None,
     value_net_a=None, gap_net_a=None, vn_blend_a: int = 0,
+    human_pref_a=None, humanlike_blend_a: int = 0,
     # Config B (baseline has all None/0)
     sentinel_b=None, sentinel_mode_b: str = "advisory", sentinel_scale_b: float | None = None,
     value_net_b=None, gap_net_b=None, vn_blend_b: int = 0,
+    human_pref_b=None, humanlike_blend_b: int = 0,
 ) -> dict:
     """Run n_games between config A and config B, alternating colours. Returns results dict."""
     results = {"A": 0, "B": 0, "draw": 0}
@@ -150,15 +179,19 @@ def run_matchup(
     for g in range(n_games):
         if g % 2 == 0:
             w_ai = _make_ai("W", difficulty, sentinel_a, sentinel_mode_a, value_net_a,
-                            gap_net_a, time_budget, vn_blend_a, sentinel_scale_a)
+                            gap_net_a, time_budget, vn_blend_a, sentinel_scale_a,
+                            human_pref_net=human_pref_a, humanlike_blend=humanlike_blend_a)
             b_ai = _make_ai("B", difficulty, sentinel_b, sentinel_mode_b, value_net_b,
-                            gap_net_b, time_budget, vn_blend_b, sentinel_scale_b)
+                            gap_net_b, time_budget, vn_blend_b, sentinel_scale_b,
+                            human_pref_net=human_pref_b, humanlike_blend=humanlike_blend_b)
             a_color = "W"
         else:
             w_ai = _make_ai("W", difficulty, sentinel_b, sentinel_mode_b, value_net_b,
-                            gap_net_b, time_budget, vn_blend_b, sentinel_scale_b)
+                            gap_net_b, time_budget, vn_blend_b, sentinel_scale_b,
+                            human_pref_net=human_pref_b, humanlike_blend=humanlike_blend_b)
             b_ai = _make_ai("B", difficulty, sentinel_a, sentinel_mode_a, value_net_a,
-                            gap_net_a, time_budget, vn_blend_a, sentinel_scale_a)
+                            gap_net_a, time_budget, vn_blend_a, sentinel_scale_a,
+                            human_pref_net=human_pref_a, humanlike_blend=humanlike_blend_a)
             a_color = "B"
 
         winner = play_game(w_ai, b_ai)
@@ -357,6 +390,22 @@ def main() -> int:
                    help="Enable gap_net blunder-zone correction for White (V3a)")
     p.add_argument("--black-gap-net", action="store_true",
                    help="Enable gap_net blunder-zone correction for Black (V3a)")
+    # ── retrain_v2_plan.md flags — override the checkpoint paths without editing constants ──
+    p.add_argument("--vn-path", default=_VALUE_NET_PATH,
+                   help="Override value_net .npz path (v2 comparisons)")
+    p.add_argument("--gap-net-path", default=_GAP_NET_PATH,
+                   help="Override gap_net .npz path (v2 comparisons)")
+    # ── Human-proxy opponent (Step 6e) — needs Step 3 wiring, already landed ──
+    p.add_argument("--white-humanlike", action="store_true",
+                   help="Blend HumanPrefNet into White's leaf scoring (humanlike-play mode)")
+    p.add_argument("--black-humanlike", action="store_true",
+                   help="Blend HumanPrefNet into Black's leaf scoring (humanlike-play mode)")
+    p.add_argument("--humanlike-blend", type=int, default=100,
+                   help="humanlike_blend percentage 0..100 (default 100 = pure HumanPrefNet)")
+    p.add_argument("--humanlike-temperature", type=float, default=1.0,
+                   help="Softmax temperature for HumanPrefAdvisor.probs() (default 1.0)")
+    p.add_argument("--human-pref-path", default="data/human_pref_net.npz",
+                   help="HumanPrefNet .npz path")
     p.add_argument("--time-budget", type=float, default=None,
                    help="Seconds per move override (omit to use difficulty's natural time budget)")
     args = p.parse_args()
@@ -372,14 +421,22 @@ def main() -> int:
         return 0
 
     # --- manual single-matchup mode (unchanged behaviour) ---
-    need_sentinel = args.white_sentinel or args.black_sentinel
-    need_vn = args.white_value_net or args.black_value_net
-    need_gn = args.white_gap_net or args.black_gap_net
+    need_sentinel  = args.white_sentinel or args.black_sentinel
+    need_vn        = args.white_value_net or args.black_value_net
+    need_gn        = args.white_gap_net or args.black_gap_net
+    need_humanlike = args.white_humanlike or args.black_humanlike
 
     print("Loading components...")
-    sentinel = _load_sentinel(args.sentinel_path) if need_sentinel else None
-    value_net = _load_value_net() if need_vn else None
-    gap_net = _load_gap_net() if need_gn else None
+    sentinel  = _load_sentinel(args.sentinel_path) if need_sentinel else None
+    value_net = _load_value_net(args.vn_path) if need_vn else None
+    gap_net   = _load_gap_net(args.gap_net_path) if need_gn else None
+    human_pref = (
+        _load_human_pref(args.human_pref_path, temperature=args.humanlike_temperature)
+        if need_humanlike else None
+    )
+    if need_humanlike and human_pref is None:
+        print("ERROR: --white-humanlike/--black-humanlike set but HumanPrefNet failed to load.")
+        return 1
     print()
 
     white_label = f"White[d{args.difficulty}"
@@ -391,6 +448,8 @@ def main() -> int:
         white_label += f"+vn{args.vn_blend}%"
     if args.white_gap_net:
         white_label += "+gap_net"
+    if args.white_humanlike:
+        white_label += f"+humanlike{args.humanlike_blend}%"
     white_label += "]"
     if args.black_sentinel:
         scale_pct = int(args.sentinel_scale * 100)
@@ -399,6 +458,8 @@ def main() -> int:
         black_label += f"+vn{args.vn_blend}%"
     if args.black_gap_net:
         black_label += "+gap_net"
+    if args.black_humanlike:
+        black_label += f"+humanlike{args.humanlike_blend}%"
     black_label += "]"
 
     w_scale = args.sentinel_scale if args.white_sentinel else None
@@ -412,12 +473,16 @@ def main() -> int:
         value_net_a=value_net if args.white_value_net else None,
         gap_net_a=gap_net if args.white_gap_net else None,
         vn_blend_a=args.vn_blend if args.white_value_net else 0,
+        human_pref_a=human_pref if args.white_humanlike else None,
+        humanlike_blend_a=args.humanlike_blend if args.white_humanlike else 0,
         sentinel_b=sentinel if args.black_sentinel else None,
         sentinel_mode_b=args.black_sentinel or "advisory",
         sentinel_scale_b=b_scale,
         value_net_b=value_net if args.black_value_net else None,
         gap_net_b=gap_net if args.black_gap_net else None,
         vn_blend_b=args.vn_blend if args.black_value_net else 0,
+        human_pref_b=human_pref if args.black_humanlike else None,
+        humanlike_blend_b=args.humanlike_blend if args.black_humanlike else 0,
     )
     return 0
 
