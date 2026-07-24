@@ -51,6 +51,40 @@ SENTINEL_WEIGHT = 0.6    # fraction of composite quality from sentinel (rest fro
 MAX_SYNTHETIC_GAMES = 200  # games to self-play if LOSING category under-represented
 
 
+# ── HumanPrefNet loader (numpy-only, matches train_human_pref_net.py .npz layout) ──
+
+class HumanPrefLoader:
+    """Load a HumanPrefNet .npz written by tools/train_human_pref_net.py and
+    run its forward pass in pure numpy.  Used to compute per-move ranking
+    scores so we can derive an hp_disagreement label for each position.
+    """
+    def __init__(self, npz_path: Path):
+        data = np.load(str(npz_path))
+        n_layers = int(data["layer_count"][0]) if "layer_count" in data.files else 0
+        if n_layers <= 0:
+            # Fall back: count w{i} arrays
+            n_layers = sum(1 for k in data.files if k.startswith("w"))
+        self.layers = [(data[f"w{i}"].astype(np.float32),
+                        data[f"b{i}"].astype(np.float32))
+                       for i in range(n_layers)]
+        self.input_dim = int(data["input_dim"][0]) if "input_dim" in data.files else self.layers[0][0].shape[1]
+        if self.layers[0][0].shape[1] != _INPUT_DIM:
+            raise ValueError(
+                f"HumanPrefNet input_dim {self.layers[0][0].shape[1]} does not "
+                f"match board_to_features dim {_INPUT_DIM}"
+            )
+
+    def score_batch(self, feats: np.ndarray) -> np.ndarray:
+        """Return one score per row of `feats` (shape (N, input_dim))."""
+        x = feats.astype(np.float32)
+        n = len(self.layers)
+        for i, (w, b) in enumerate(self.layers):
+            x = x @ w.T + b
+            if i < n - 1:
+                x = np.maximum(x, 0.0, out=x)
+        return x.squeeze(-1)
+
+
 # ── Board reconstruction ──────────────────────────────────────────────────────
 
 def _board_from_state_key(state_key: str) -> BoardState | None:
@@ -303,7 +337,9 @@ def _generate_synthetic_positions(n_games: int, value_net_path: Path) -> list[Bo
 # ── Main dataset builder ──────────────────────────────────────────────────────
 
 def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
-                  n_per_category: int, dtw_threshold: int) -> tuple[np.ndarray, np.ndarray]:
+                  n_per_category: int, dtw_threshold: int,
+                  human_pref_path: Path | None = None,
+                  ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     conn = sqlite3.connect(str(db_path))
     try:
         require_current_human_db_malom_labels(conn, db_path)
@@ -327,6 +363,17 @@ def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
             sentinel_advisor = None
     else:
         print(f"Sentinel checkpoint not found at {sentinel_path} — using heuristics only")
+
+    # Optional HumanPrefNet loader (Step 4 label enrichment).
+    hp_loader: HumanPrefLoader | None = None
+    if human_pref_path is not None and human_pref_path.exists():
+        try:
+            hp_loader = HumanPrefLoader(human_pref_path)
+            print(f"HumanPrefNet loaded from {human_pref_path}")
+        except Exception as e:
+            print(f"HumanPrefNet load failed ({e}) — hp_disagreement label will be NaN")
+    elif human_pref_path is not None:
+        print(f"HumanPrefNet path {human_pref_path} does not exist — hp_disagreement will be NaN")
 
     rng = np.random.default_rng(42)
 
@@ -353,6 +400,7 @@ def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
 
     # Score each position
     X_list, y_list = [], []
+    y_hp_list: list[float] = []   # per-plan: |malom_optimal_q - malom_q_of_hp_top|
     skipped = 0
     t0 = time.time()
 
@@ -380,9 +428,36 @@ def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
             skipped += 1
             continue
 
+        # Auxiliary target: hp_disagreement.  For each legal move we already
+        # have composite[key].  Score each legal successor via the HumanPrefNet
+        # (numpy forward pass), find the HP-top move, and take the malom
+        # composite gap between that and the malom-top move.
+        hp_disagreement = float("nan")
+        if hp_loader is not None and legal:
+            try:
+                succ_feats = []
+                keys       = []
+                for m in legal:
+                    succ_b = board.apply_move(m)
+                    succ_feats.append(board_to_features(succ_b, succ_b.turn))
+                    keys.append((m.get("from"), m.get("to"), m.get("capture")))
+                succ_feats_arr = np.stack(succ_feats).astype(np.float32)
+                hp_scores      = hp_loader.score_batch(succ_feats_arr)
+                hp_top_idx     = int(np.argmax(hp_scores))
+                # Composite mapping was keyed by move-tuple; pick out per-move q.
+                q_by_key       = composite
+                malom_qs       = np.array([q_by_key.get(k, 0.5) for k in keys], dtype=np.float32)
+                malom_top_q    = float(malom_qs.max())
+                hp_top_q       = float(malom_qs[hp_top_idx])
+                # Positive when HP prefers a worse move; zero when they agree.
+                hp_disagreement = malom_top_q - hp_top_q
+            except Exception:
+                hp_disagreement = float("nan")
+
         y_scaled = float(2.0 * gap - 1.0)
         X_list.append(feats)
         y_list.append(y_scaled)
+        y_hp_list.append(hp_disagreement)
 
         if (i + 1) % 1000 == 0:
             elapsed = time.time() - t0
@@ -415,14 +490,26 @@ def build_dataset(db_path: Path, sentinel_path: Path, value_net_path: Path,
                 continue
             X_list.append(feats)
             y_list.append(float(2.0 * gap - 1.0))
+            # Synthetic positions have no HP disagreement signal — mark NaN so
+            # downstream training can mask/weight them.
+            y_hp_list.append(float("nan"))
 
-    X = np.stack(X_list).astype(np.float32)
-    y = np.array(y_list, dtype=np.float32)
+    X    = np.stack(X_list).astype(np.float32)
+    y    = np.array(y_list,    dtype=np.float32)
+    y_hp = np.array(y_hp_list, dtype=np.float32)
 
     n_blunder = int(np.sum(y > -0.5))
     print(f"Dataset: {len(X)} samples, blunder zones (gap>0.25): {n_blunder} ({100*n_blunder/len(y):.1f}%)")
     print(f"y stats: min={y.min():.3f} max={y.max():.3f} mean={y.mean():.3f}")
-    return X, y
+    hp_valid_mask = ~np.isnan(y_hp)
+    n_hp_valid = int(hp_valid_mask.sum())
+    if n_hp_valid:
+        hp_valid = y_hp[hp_valid_mask]
+        print(f"y_hp: {n_hp_valid} valid / {len(y_hp)} total  "
+              f"min={hp_valid.min():.3f} max={hp_valid.max():.3f} mean={hp_valid.mean():.3f}")
+    else:
+        print("y_hp: no valid samples (HumanPrefNet not loaded).")
+    return X, y, y_hp
 
 
 def main():
@@ -430,7 +517,12 @@ def main():
     parser.add_argument("--db",  default="data/human_db.sqlite",
                         help="Human DB path")
     parser.add_argument("--sentinel", default="learned_ai/sentinel/checkpoints/best.pt",
-                        help="Sentinel checkpoint path")
+                        help="Sentinel checkpoint path (or use --sentinel-ckpt as an alias)")
+    parser.add_argument("--sentinel-ckpt", default=None,
+                        help="Alias for --sentinel; matches retrain_v2_plan.md wording")
+    parser.add_argument("--human-pref-ckpt", default=None,
+                        help="HumanPrefNet .npz for auxiliary hp_disagreement label "
+                             "(Step 4 label enrichment; leave unset to skip)")
     parser.add_argument("--value-net", default="data/value_net.npz",
                         help="Value net path (for synthetic fallback)")
     parser.add_argument("--out", default="data/gap_net_training.npz",
@@ -442,17 +534,19 @@ def main():
     args = parser.parse_args()
 
     db_path       = _ROOT / args.db
-    sentinel_path = _ROOT / args.sentinel
+    sentinel_path = _ROOT / (args.sentinel_ckpt or args.sentinel)
     vn_path       = _ROOT / args.value_net
     out_path      = _ROOT / args.out
+    hp_path       = (_ROOT / args.human_pref_ckpt) if args.human_pref_ckpt else None
 
     if not db_path.exists():
         print(f"ERROR: DB not found at {db_path}")
         sys.exit(1)
 
-    X, y = build_dataset(db_path, sentinel_path, vn_path,
-                         args.samples_per_category, args.dtw_threshold)
-    np.savez(str(out_path), X=X, y=y)
+    X, y, y_hp = build_dataset(db_path, sentinel_path, vn_path,
+                               args.samples_per_category, args.dtw_threshold,
+                               human_pref_path=hp_path)
+    np.savez(str(out_path), X=X, y=y, y_hp=y_hp)
     print(f"Saved {len(X)} samples → {out_path}")
 
 

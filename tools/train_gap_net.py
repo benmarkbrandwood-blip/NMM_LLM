@@ -2,12 +2,23 @@
 """
 tools/train_gap_net.py — Train the GapNet (blunder density network).
 
-Loads data/gap_net_training.npz (built by scripts/build_gap_dataset.py).
-Saves the trained network to data/gap_net.npz.
-Does NOT touch data/value_net.npz.
+Loads a dataset built by scripts/build_gap_dataset.py.  The v2 dataset
+(gap_net_training_v2.npz) additionally carries a `y_hp` auxiliary label
+(HumanPrefNet disagreement — malom_top_q − malom_q_of_hp_top).  When
+`--hp-blend > 0`, this label is added into the training target with the
+given weight and the sum is clipped to [-1, 1].  Positions with NaN y_hp
+(older datasets or synthetic-fallback samples) fall back to the plain
+gap target.
 
 Usage:
-    .venv/bin/python tools/train_gap_net.py [--epochs N] [--lr F] [--data PATH]
+    # v1 backwards compat (uses only y):
+    .venv/bin/python tools/train_gap_net.py --epochs 80
+
+    # v2 (retrain_v2_plan.md Step 5):
+    .venv/bin/python tools/train_gap_net.py \\
+        --data data/gap_net_training_v2.npz \\
+        --out  data/gap_net_v2.npz \\
+        --epochs 80 --hp-blend 0.3
 """
 from __future__ import annotations
 
@@ -28,6 +39,9 @@ def main():
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--data", default="data/gap_net_training.npz")
     parser.add_argument("--out", default="data/gap_net.npz")
+    parser.add_argument("--hp-blend", type=float, default=0.0,
+                        help="Weight for hp_disagreement auxiliary label added "
+                             "into y (v2 datasets).  0 = ignore.")
     args = parser.parse_args()
 
     data_path = _ROOT / args.data
@@ -39,9 +53,33 @@ def main():
         sys.exit(1)
 
     data = np.load(str(data_path))
-    X, y = data["X"].astype(np.float32), data["y"].astype(np.float32)
+    X = data["X"].astype(np.float32)
+    y = data["y"].astype(np.float32)
     print(f"Loaded {len(X)} samples from {data_path}")
     print(f"y stats: min={y.min():.3f} max={y.max():.3f} mean={y.mean():.3f}")
+
+    # v2 auxiliary label enrichment (Step 4 of retrain_v2_plan.md)
+    if args.hp_blend != 0.0 and "y_hp" in data.files:
+        y_hp = data["y_hp"].astype(np.float32)
+        valid_mask = ~np.isnan(y_hp)
+        n_valid = int(valid_mask.sum())
+        if n_valid > 0:
+            # y_hp in [0, 1] (malom_top_q - malom_q_of_hp_top).  Add scaled hp
+            # signal to y so positions with strong HP-vs-Malom disagreement are
+            # pushed toward the blunder-zone end of the target range.
+            y_blended = y.copy()
+            y_blended[valid_mask] = np.clip(
+                y[valid_mask] + args.hp_blend * y_hp[valid_mask], -1.0, 1.0
+            )
+            print(f"y_hp blend {args.hp_blend}: applied to {n_valid}/{len(y)} samples "
+                  f"({100*n_valid/len(y):.1f}%)")
+            print(f"y (blended) stats: min={y_blended.min():.3f} "
+                  f"max={y_blended.max():.3f} mean={y_blended.mean():.3f}")
+            y = y_blended
+        else:
+            print("y_hp present but all NaN — training on plain y.")
+    elif args.hp_blend != 0.0:
+        print("--hp-blend requested but dataset has no y_hp array — training on plain y.")
 
     net = ValueNet()
     print(f"Training GapNet for {args.epochs} epochs (lr={args.lr})...")

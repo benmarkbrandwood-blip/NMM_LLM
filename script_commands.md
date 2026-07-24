@@ -319,11 +319,28 @@ Configs: `Baseline`, `TrajVN-10%`, `TrajVN-30%`, `TrajVN-60%`, `GapNet`
 .venv/bin/python scripts/build_gap_dataset.py
 ```
 
+For the v2 rebuild in `docs/retrain_v2_plan.md` (Step 4 — sentinel v2 signal
+plus HumanPrefNet disagreement as an auxiliary label):
+
+```
+.venv/bin/python scripts/build_gap_dataset.py \
+  --sentinel-ckpt learned_ai/sentinel/checkpoints/v2/best.pt \
+  --human-pref-ckpt data/human_pref_net.npz \
+  --out data/gap_net_training_v2.npz \
+  --samples-per-category 20000
+```
+
+The output NPZ carries `X`, `y` (gap target), and (v2) `y_hp` — a per-position
+`malom_top_q − malom_q_of_hp_top` value in `[0, 1]`.  Positions with no HP
+signal (older datasets or synthetic-fallback samples) get NaN in `y_hp`.
+
 | Flag | Default | Description |
 | - | - | - |
 | `--db PATH` | `data/human_db.sqlite` | Human DB source |
 | `--sentinel PATH` | `learned_ai/sentinel/checkpoints/best.pt` | Sentinel checkpoint |
-| `--value-net PATH` | `data/value_net.npz` | Value net checkpoint |
+| `--sentinel-ckpt PATH` | — | Alias of `--sentinel` (matches retrain_v2_plan.md wording) |
+| `--human-pref-ckpt PATH` | — | HumanPrefNet .npz — enables `y_hp` auxiliary label |
+| `--value-net PATH` | `data/value_net.npz` | Value net checkpoint (synthetic-fallback opponent) |
 | `--out PATH` | `data/gap_net_training.npz` | Output training data |
 | `--samples-per-category N` | 15000 | Samples per WDL category |
 | `--dtw-threshold N` | 15 | DTW threshold for gap labelling |
@@ -332,7 +349,14 @@ Configs: `Baseline`, `TrajVN-10%`, `TrajVN-30%`, `TrajVN-60%`, `GapNet`
 **Step 2 — Train the GAP net:**
 
 ```
+# v1 backwards compat (uses only y):
 .venv/bin/python tools/train_gap_net.py --epochs 80
+
+# v2 (retrain_v2_plan.md Step 5 — blends y_hp into target):
+.venv/bin/python tools/train_gap_net.py \
+  --data data/gap_net_training_v2.npz \
+  --out  data/gap_net_v2.npz \
+  --epochs 80 --hp-blend 0.3
 ```
 
 | Flag | Default | Description |
@@ -341,6 +365,7 @@ Configs: `Baseline`, `TrajVN-10%`, `TrajVN-30%`, `TrajVN-60%`, `GapNet`
 | `--lr F` | 0.001 | Learning rate |
 | `--data PATH` | `data/gap_net_training.npz` | Training data |
 | `--out PATH` | `data/gap_net.npz` | Output net |
+| `--hp-blend F` | 0.0 | Weight added: `y ← clip(y + hp_blend * y_hp, -1, 1)`. 0 = ignore y_hp. Positions with NaN y_hp use plain y. |
 
 
 ## Benchmarking — Sentinel / GAP Net / Tournament
