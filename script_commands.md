@@ -569,7 +569,7 @@ Three independent phase specialists (opening / midgame / endgame). Each one sits
 
 **Model:** `ScaffoldedPolicyNet` — policy MLP `126 → 512 → 256 → 128 → 1`, value MLP `80 → 256 → 128 → 64 → 1`. ~289 k params.
 
-**Difficulty:** 20 levels. Log-scale per-move opponent budget: L1 ≈ 1 ms → L15+ caps at 2 s (mid/end) or 1 s (opening). **Advancement:** Sanmill superiority-probability gate — `P(true score > target) ≥ 0.95` on the last 50 games; target ramps 55% (L1) → 60% (L20) with time-of-flight relaxation to a 51% floor after 1000+ stalled games. Checked every 10 games once `games_at_level ≥ 20`.
+**Difficulty:** 20 levels. Log-scale per-move opponent budget: L1 ≈ 1 ms → L15+ caps at 2 s (mid/end) or 1 s (opening). **Advancement:** Sanmill superiority-probability gate — `P(true score > target) ≥ 0.70` on the last 50 games (v2a); target ramps 55% (L1) → 60% (L20) with time-of-flight relaxation to a 51% floor after 1000+ stalled games. In v2a the check now fires every batch once `games_at_level ≥ 20` (the old `games_at_level % 10 == 0` gate silently skipped windows under batched increments).
 
 ### Prerequisites
 
@@ -720,9 +720,11 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 | `--sim-ply-depth N` | 5 | LookaheadAdvisor simulation depth during training (12 recommended; inference stays at 15-ply) |
 | `--self-play-ratio F` | 0.5 | Fraction of standard-slot games vs frozen model (0.05 recommended — mostly vs heuristic) |
 | `--ppo` | off | Use PPO update; otherwise A2C |
-| `--auto-resume-best` | off | Resume from `s_gen_v2a/best.pt` automatically |
+| `--auto-resume-best` | off | Resume from `<out-dir>/<run-name>/best.pt` if present, else `<out-dir>/best.pt` |
+| `--auto-resume-latest` | off | Resume from `<out-dir>/<run-name>/latest.pt` if present, else `<out-dir>/latest.pt` |
 | `--resume PATH` | — | Resume from explicit checkpoint path |
-| `--out-dir PATH` | `learned_ai/checkpoints/scaffolded/s_gen_v2a` | Checkpoint output directory |
+| `--out-dir PATH` | `learned_ai/checkpoints/scaffolded/s_gen_v2a` | Checkpoint output directory (parent) |
+| `--run-name STR` | "" | Optional subfolder under `--out-dir` for parallel experiments |
 | `--diff-start N` | 1 | Override starting difficulty |
 | `--diff-max N` | 20 | Maximum difficulty level |
 | `--lr F` | 1e-4 | Base learning rate (scaled by win-rate LR adaptation each log interval) |
@@ -756,16 +758,123 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 | `--advance-entropy-boost-frac F` | 0.5 | On advancement/hot-explore, add `F × entropy_coef` as a decaying entropy bonus to encourage exploration at the new difficulty. Decays at 0.97/iter. |
 | `--advance-rehearsal-games N` | 0 | After each difficulty advancement, expand the lower-diff opponent slot from 20% to `--advance-rehearsal-prob` for N iterations. 0 = disabled. 50 recommended. |
 | `--advance-rehearsal-prob F` | 0.45 | Lower-diff opponent probability during rehearsal window (vs standard 0.20). |
-| `--hot-explore-games N` | 75 | **Stage-1 recovery:** run N elevated-temperature iterations before reloading a checkpoint. While `hot_explore_remaining > 0` the scheduled temperature is floored at `temp_start × 1.3`. Set 0 to skip Stage 1 and go straight to checkpoint restore. |
+| `--advance-cooldown-tail-batches N` | 8 | Extra batches beyond rehearsal before another advance can fire. Prevents chained advances driven by the temporarily easier rehearsal opponent mix. Persisted in `latest.pt`. |
+| `--hot-explore-games N` | 75 | **Stage-1 recovery:** run N elevated-temperature PRIMARY games before reloading a checkpoint. Counter decrements by `batch_games` per batch (so ~ `N / batch_games` batches). While `hot_explore_remaining > 0` the scheduled temperature is floored at `temp_start × 1.3`. Set 0 to skip Stage 1. |
 
 ### Two-stage recovery
 
-Recovery triggers at each `--log-every` checkpoint when `loss_rate > win_rate` and the model is **not improving** (second half of rolling window ≤ first half + 2pp):
+Recovery triggers at each `--log-every` checkpoint when the chess-style score
+`win + 0.5×draw < 0.35` **and the model is actively degrading** (second-half
+score of the rolling window is at least 5pp below the first half). Suppressed
+entirely while `_current_recovery_state == "grace"` so a Stage 2 restore cannot
+immediately re-trigger Stage 1.
 
-1. **Stage 1 (hot-explore):** Boosts temperature and entropy coefficient, runs `--hot-explore-games` iterations without loading any checkpoint. If the model recovers naturally, flags are cleared.
+1. **Stage 1 (hot-explore):** Boosts temperature and entropy coefficient, runs `--hot-explore-games` PRIMARY games at elevated temperature without loading any checkpoint. If the model recovers naturally, flags are cleared.
 2. **Stage 2 (checkpoint restore):** If still failing after Stage 1 completes, loads `best{difficulty}.pt`, resets the optimiser, clears histories, and suppresses the draw penalty for 100 games. All boosts are cleared.
 
 Setting `--hot-explore-games 0` skips Stage 1 entirely (original behaviour).
+
+### Difficulty advancement (v2a, updated)
+
+Uses the Sanmill superiority-probability gate on `level_heuristic_history`.
+Checked **every batch** once `games_at_level ≥ 20` (was `% 10 == 0` before —
+that modulo gate silently skipped whole windows when batch increments crossed
+multiples of 10).
+
+When the check fires:
+
+- **No checkpoint reload.** The in-memory model just achieved the gate, so it
+  continues at the new level with those same weights. `best{prev_diff}.pt` is
+  still saved as a milestone.
+- **Advancement cooldown** starts: `advance_rehearsal_games + advance_cooldown_tail_batches`
+  batches. While the cooldown is active, rehearsal outcomes flow into
+  `win_history_heuristic` (recovery + display) but not into
+  `level_heuristic_history`. When the cooldown expires, `level_heuristic_history`
+  is cleared so the next advance decision is based only on fresh post-cooldown
+  samples.
+- Cooldown, `games_at_level`, `level_heuristic_history`, and
+  `termination_history` are persisted in `latest.pt`, so a restart during
+  rehearsal cannot bypass the gate.
+
+### Termination classification (v2a)
+
+Every rollout tags a termination reason from
+`learned_ai/training/termination.py`:
+
+| Reason | Meaning |
+| --- | --- |
+| `win_lt3` / `loss_lt3` | opponent (or learner) placed 9 and dropped below 3 |
+| `win_blocked` / `loss_blocked` | opponent (or learner) has no legal move |
+| `draw_trunc` | rollout hit `--max-ply` without a terminal state |
+| `draw_rep` / `draw_50` | reserved for repetition + 50-move rule (not yet detected) |
+| `infra_learner` | learner encoder/policy raised or produced no action |
+| `infra_opponent` | opponent raised or produced no action on a non-terminal position |
+
+Infra reasons **never** enter `win_history`, `win_history_heuristic`, or
+`level_heuristic_history` — so a broken opponent cannot inflate advancement
+statistics. A 50-game rolling termination-mix is logged in each `GameDiag`
+row and rendered on Row 6 of the v2a plot script.
+
+### Deep-batch selector (v2a)
+
+`_is_deep_game` (1-in-20 batches use full 12-ply sim) now uses a
+threshold-based counter instead of `game_count % 20 == 0`. Under
+`batch_games=6` the old modulo gate fired only 1-in-30 batches or worse.
+
+
+## Learned AI — v2a Training Dashboard (plot_specialist_training_2a.py)
+
+Live 7-row dashboard for one or more scaffolded checkpoint folders.  Reads
+`train_log.jsonl` and refreshes on an interval.
+
+**Default (all four v2 specialists):**
+
+```
+.venv/bin/python tools/plot_specialist_training_2a.py
+```
+
+**Single v2a run:**
+
+```
+.venv/bin/python tools/plot_specialist_training_2a.py \
+  learned_ai/checkpoints/scaffolded/s_gen_v2a/hot-recover-fixed-model-fail-assessment
+```
+
+**Single render, no live loop:**
+
+```
+.venv/bin/python tools/plot_specialist_training_2a.py \
+  s_gen_v2a/hot-recover-fixed-model-fail-assessment --no-loop
+```
+
+Rows:
+- Row 0 — entropy + chosen prob
+- Row 1 — Malom win-move + heuristic top-1 + policy top-1 %
+- Row 2 — best_win_rate + win_rate_200 + draw rate; ply on rhs
+- Row 3 — sentinel chosen vs mean + gap shaded
+- Row 4 — reward breakdown (sentinel + heuristic) + LR on rhs
+- Row 5 — retro (outcome) reward
+- **Row 6 (v2a-only) — 50-game rolling termination-reason mix, stacked area.
+  Infra failure counts drawn as red x's (learner) and pink +'s (opponent).**
+  Distinguishes truncation draws (`draw_trunc`) from rules-based draws so a
+  high draw rate can't be mistaken for genuine drawn play.
+
+Vertical markers on all rows:
+- black dashed — Stage-1 hot-explore trigger
+- green dashed — Stage-2 checkpoint restore
+- green solid  — post-grace resurrection
+- blue  dashed — difficulty advance (label + level annotation on top row)
+
+The resolver prefers folders containing `train_log.jsonl` over empty stubs at
+the same relative path.
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--interval N` | 20 | Refresh interval in minutes |
+| `--no-loop` | off | Single render then exit (useful for saving a snapshot) |
+
+The original `tools/plot_specialist_training.py` (6-row layout, no termination
+mix) remains available for pre-v2a runs.
 
 
 ## Learned AI — Specialist Benchmark (bench_scaffolded.py)
