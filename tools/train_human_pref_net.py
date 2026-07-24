@@ -295,41 +295,56 @@ def train_model(
     val_idx = order[:n_val]
     tr_idx  = order[n_val:]
 
-    X_pos_tr = torch.from_numpy(X_pos[tr_idx]).to(device)
-    X_neg_tr = torch.from_numpy(X_neg[tr_idx]).to(device)
-    X_pos_va = torch.from_numpy(X_pos[val_idx]).to(device)
-    X_neg_va = torch.from_numpy(X_neg[val_idx]).to(device)
+    # Keep the full dataset on CPU (7M+ rows × 79 floats × 2 sides = several GB
+    # on GPU otherwise, plus a full-tensor copy per epoch for shuffling).
+    # Slice per batch on CPU, move each batch to GPU on demand.
+    X_pos_tr_cpu = torch.from_numpy(np.ascontiguousarray(X_pos[tr_idx]))
+    X_neg_tr_cpu = torch.from_numpy(np.ascontiguousarray(X_neg[tr_idx]))
+    X_pos_va_cpu = torch.from_numpy(np.ascontiguousarray(X_pos[val_idx]))
+    X_neg_va_cpu = torch.from_numpy(np.ascontiguousarray(X_neg[val_idx]))
 
-    def _epoch_loss(X_p, X_n) -> float:
+    def _epoch_loss(X_p_cpu, X_n_cpu) -> float:
         # Bradley-Terry: minimise -log σ(pos - neg) = softplus(-(pos - neg))
-        with_grad = model.training
-        n = X_p.shape[0]
+        n = X_p_cpu.shape[0]
         total = 0.0
         for start in range(0, n, batch_size):
-            end = min(start + batch_size, n)
-            s_p = model(X_p[start:end]).squeeze(-1)
-            s_n = model(X_n[start:end]).squeeze(-1)
+            end   = min(start + batch_size, n)
+            s_p = model(X_p_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
+            s_n = model(X_n_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
             loss = F.softplus(-(s_p - s_n)).mean()
             total += float(loss.item()) * (end - start)
         return total / max(n, 1)
+
+    def _val_acc(X_p_cpu, X_n_cpu) -> float:
+        n = X_p_cpu.shape[0]
+        correct = 0
+        for start in range(0, n, batch_size):
+            end   = min(start + batch_size, n)
+            s_p = model(X_p_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
+            s_n = model(X_n_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
+            correct += int((s_p > s_n).sum().item())
+        return correct / max(n, 1)
 
     best_val = float("inf")
     best_state: dict[str, np.ndarray] | None = None
     stall = 0
 
-    print(f"[hp] device={device.type} train_pairs={len(tr_idx):,} val_pairs={len(val_idx):,}")
+    print(f"[hp] device={device.type} train_pairs={len(tr_idx):,} val_pairs={len(val_idx):,}  "
+          f"(dataset on CPU, per-batch GPU transfer)")
     for ep in range(1, epochs + 1):
-        # Shuffle within train each epoch
-        perm = rng.permutation(len(tr_idx))
-        X_p_e = X_pos_tr[perm]
-        X_n_e = X_neg_tr[perm]
+        # Shuffle indices per epoch — no full-tensor copy, just an index vector.
+        perm_np = rng.permutation(len(tr_idx))
+        perm    = torch.from_numpy(perm_np)
 
         model.train()
         train_loss_sum = 0.0
         for start in range(0, len(tr_idx), batch_size):
             end = min(start + batch_size, len(tr_idx))
-            s_p = model(X_p_e[start:end]).squeeze(-1)
-            s_n = model(X_n_e[start:end]).squeeze(-1)
+            idx = perm[start:end]
+            xp = X_pos_tr_cpu[idx].to(device, non_blocking=True)
+            xn = X_neg_tr_cpu[idx].to(device, non_blocking=True)
+            s_p = model(xp).squeeze(-1)
+            s_n = model(xn).squeeze(-1)
             loss = F.softplus(-(s_p - s_n)).mean()
             opt.zero_grad()
             loss.backward()
@@ -339,11 +354,8 @@ def train_model(
 
         model.eval()
         with torch.no_grad():
-            val_loss = _epoch_loss(X_pos_va, X_neg_va)
-            # Ranking accuracy: fraction of (pos, neg) with s(pos) > s(neg).
-            s_p = model(X_pos_va).squeeze(-1)
-            s_n = model(X_neg_va).squeeze(-1)
-            val_acc = float((s_p > s_n).float().mean().item())
+            val_loss = _epoch_loss(X_pos_va_cpu, X_neg_va_cpu)
+            val_acc  = _val_acc(X_pos_va_cpu, X_neg_va_cpu)
 
         marker = ""
         if val_loss < best_val - 1e-5:
@@ -363,13 +375,10 @@ def train_model(
     if best_state is not None:
         model.load_state_dict({k: __import__('torch').from_numpy(v) for k, v in best_state.items()})
 
-    # Final val accuracy on best weights
-    import torch as _t
+    # Final val accuracy on best weights (batched, matches training path).
     model.eval()
-    with _t.no_grad():
-        s_p = model(X_pos_va).squeeze(-1)
-        s_n = model(X_neg_va).squeeze(-1)
-        final_val_acc = float((s_p > s_n).float().mean().item())
+    with torch.no_grad():
+        final_val_acc = _val_acc(X_pos_va_cpu, X_neg_va_cpu)
 
     _save_npz(model, output)
     return {"best_val_loss": best_val, "final_val_acc": final_val_acc}
