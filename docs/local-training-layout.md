@@ -32,7 +32,7 @@ repository merely to describe its children.
 | `../human_database` | Human-game source archives and database-building source material | Never add to Git |
 | `../opening_book` | Source opening-book material | Keep outside Git unless deliberately imported as reviewed source data |
 | `../notes` | Original handover (`Notes.md`), its images, the unfinished archived trainer copy, and the 20 July author-`main` diagnostic bundle | Historical reference only; independently verify claims, never use these files as `dev` resume/input evidence, and do not execute or merge the draft blindly |
-| `../Mills` | Temporary import staging directory | Holds the maintainer's 21/22 July candidate HumanDB, SpecialistDB, retraining plan, and earlier v2a script; read-only audit input, not active training data |
+| `../maintainer_inbox` | Temporary incoming directory for files received from the `main` maintainer | Keep new deliveries in dated subdirectories until their identity and purpose are recorded; never use inbox contents directly as active training inputs |
 | `../.cargo-target` | Optional external Rust build cache | Currently empty; not project source |
 
 The empty `../.git` and `../.agents` directories are Codex workspace
@@ -113,11 +113,11 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Asset | Current location and state |
 | --- | --- |
 | HumanDB | `data/human_db.sqlite`, 738,091,008 bytes; 94,429 games, 2,152,889 positions, and 2,516,356 move rows |
-| Staged rebuilt HumanDB | `../Mills/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
+| Archived rebuilt HumanDB candidate | `data/backups/maintainer_upload_20260721/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
-| Staged rebuilt SpecialistDB | `../Mills/specialist_db.sqlite`, 290,820,096 bytes; versioned empirical-history candidate only, not active |
+| Archived rebuilt SpecialistDB candidate | `data/backups/maintainer_upload_20260721/specialist_db.sqlite`, 290,820,096 bytes; versioned empirical-history candidate only, not active |
 | Legacy SpecialistDB snapshots | Two ignored, read-only snapshots under `data/backups/drive_import_20260720`; neither is an active training database |
 | Endgame databases | `data/endgame`, fourteen `.wdl` files plus `fullgame.bin` at 571,683,560 bytes |
 | Malom tablebase | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted`; 512 files and 83,582,223,577 bytes |
@@ -169,10 +169,12 @@ SQLite `quick_check` passes; metadata includes
 41,904 Malom labels, 916 winning lines, and no preferred plays. It is trusted
 completed-run state, not an empty input for another fresh experiment.
 
-### Staged 21 July rebuilt databases
+### Archived 21 July rebuilt databases
 
-The maintainer's newly uploaded candidates remain under `../Mills` and have not
-replaced either active database. Read-only inspection on 22 July found:
+The maintainer's uploaded candidates were moved on 25 July to the ignored
+archive `data/backups/maintainer_upload_20260721`. They have not replaced
+either active database. Read-only inspection on 22 July, followed by
+post-move hash and SQLite checks on 25 July, found:
 
 - HumanDB SHA-256
   `F0B20D33AEFCBAB9AEDC8537F12FA2E53F7865B0387E2175AFD0EA32D1B90E42`;
@@ -190,11 +192,13 @@ successor-move rows from each W/D/L class, matched both W/D/L and DTW when
 queried through the current corrected Malom adapter. This supports the sampled
 labels and metadata; it does not activate the file or prove every row.
 
-The staged SpecialistDB retains the maintainer's empirical self-play history.
+The archived SpecialistDB retains the maintainer's empirical self-play history.
 It is therefore not interchangeable with the empty corrected baseline DB. A
 new experiment must explicitly choose one lineage. See
 [`docs/evidence/main-integration-audit-2026-07-22.md`](evidence/main-integration-audit-2026-07-22.md)
-for hashes, counts, checkpoint provenance, and remaining questions.
+for the original audit and
+[`docs/evidence/maintainer-upload-relocation-2026-07-25.md`](evidence/maintainer-upload-relocation-2026-07-25.md)
+for the relocation, file purposes, and small-file disposition.
 
 The original legacy SpecialistDB is isolated at:
 
@@ -232,9 +236,9 @@ database path, or add corrected labels to it.
 
 The 406 new human-game files were imported without rebuilding the active
 `data/human_db.sqlite`. That active HumanDB therefore still describes the
-earlier corpus. The staged rebuilt candidate is the separately versioned file
-described above; moving it into the active role remains an explicit future
-decision. The active database's
+earlier corpus. The archived rebuilt candidate is the separately versioned
+file described above; moving it into the active role remains an explicit
+future decision. The active database's
 94,983 `processed_files.file_path` keys use the author's `/home/...` absolute
 paths, while the current builder compares Windows absolute paths. A blind
 `--update` would therefore treat the existing corpus as new and double-count
@@ -265,7 +269,9 @@ documents. The intended logical mapping is:
 
 The generalist trainer consumes the seven training keys above.
 `sanmill_checkout` is only a local reference-path index for documentation and
-differential-test tooling.
+differential-test tooling. The archived candidates deliberately have no
+configuration keys: find their relative paths in the inventory and relocation
+record, then create a separately reviewed experiment contract before use.
 
 The trainer resolves configuration in this order:
 
@@ -282,10 +288,14 @@ work.
 
 ## Data-handling Rules
 
-- Keep the current Google Drive candidates in `../Mills` until a separately
-  reviewed activation or archival decision records their destination and
-  lineage. Do not copy them over active databases merely because their
-  metadata audit passed.
+- Put future maintainer deliveries under
+  `../maintainer_inbox/<delivery-date-or-bundle-name>/`. Record the sender,
+  delivery date, purpose, size, and checksum before moving them elsewhere.
+  Never point training or evaluation directly at an inbox file.
+- Keep the 21 July candidate databases in
+  `data/backups/maintainer_upload_20260721` until a separately reviewed
+  activation or retirement decision records their lineage. Do not copy them
+  over active databases merely because their metadata audit passed.
 - Let `.gitignore` protect databases, recursive human-game records, endgame
   tables, local paths, generated checkpoints, and backup snapshots.
 - Before replacing a large database, record its size and checksum and retain a

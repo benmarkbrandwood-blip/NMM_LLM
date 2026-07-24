@@ -24,8 +24,13 @@ recovery, rehearsal, database-identity, or exact-resume state.
 
 ## Staged Database Bundle
 
-The following files remain in the sibling `Mills` staging directory. Neither
-has replaced the active repository-local database.
+The following files were originally audited in the sibling `Mills` staging
+directory. On 25 July they were moved without modification to
+`data/backups/maintainer_upload_20260721`, and the former staging directory was
+renamed `maintainer_inbox` for future deliveries. Neither candidate has
+replaced the active repository-local database. See
+[`maintainer-upload-relocation-2026-07-25.md`](maintainer-upload-relocation-2026-07-25.md)
+for post-move verification and the disposition of the bundle's small files.
 
 | Candidate | SHA-256 | Read-only audit |
 | --- | --- | --- |
@@ -65,8 +70,9 @@ completed managed baseline populated it. Its current SHA-256 is
 it has 132,182 positions, 41,904 current-version Malom labels, 916 winning
 lines, no preferred plays, and lineage root
 `managed-v4-baseline-v1-segment-0001`. It is preserved completed-run state,
-not an input to a second fresh experiment. The staged candidate, completed-run
-database, and a newly empty database are three distinct lineages.
+not an input to a second fresh experiment. The archived candidate,
+completed-run database, and a newly empty database are three distinct
+lineages.
 
 ## Imported Checkpoints
 
@@ -98,14 +104,15 @@ formal baselines, or evidence of corrected retraining.
   `E348CBD442BB221588BC96DD7EF0500AB8CA31AA1306B84CFEC422D7D4EF1C8E`.
   It is separate from the pinned Sanmill Oracle review corpus and does not
   change that corpus's identity or expert-review status.
-- The downloaded `Mills/train_s_gen_v2a.py` has SHA-256
+- The downloaded `Mills/train_s_gen_v2a.py` had SHA-256
   `EDB0E4D35981900414A1DC6E870E36F44F23D77EE2693C7D56C4C2ACDC566F79`.
   The `b9a13ce` version first imported by Git had SHA-256
   `FF5760F5D08A9D48B4A5E5E72CF51F74AD6E45EE11B861B388BA231299BE9BB5`.
   The final upstream `67af016` version has SHA-256
   `4DC873E86F5C7B94D6BFC412CDBCAC404D97E4199AAAB97A35E9F77DB4AE8F9B`.
   Therefore the repository history, not the earlier downloaded copy, is the
-  relevant review source.
+  relevant review source. The redundant staging copy was removed on 25 July
+  after its exact Git recovery object was verified.
 - The v2a fork is 1,011 lines behind the current `dev` trainer and lacks the
   current managed preflight and exact-resume contract. It also silently
   degrades missing required components and uses a fixed SpecialistDB path.

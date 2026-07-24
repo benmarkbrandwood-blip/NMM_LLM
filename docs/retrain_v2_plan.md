@@ -4,10 +4,11 @@
 
 This maintainer-authored plan was imported from `main` on 22 July 2026. It is
 valuable design input, but no retraining run or promotion is authorized. The
-staged rebuilt databases remain under `../Mills`; neither has replaced the
-active database selected by `data/training_paths.local.json`.
+rebuilt database candidates are archived under
+`data/backups/maintainer_upload_20260721`; neither has replaced the active
+database selected by `data/training_paths.local.json`.
 
-A read-only audit verified both staged SQLite files, their
+A read-only audit verified both archived SQLite files, their
 `sector-corrected-v1` metadata, and 30 deterministic HumanDB labels against the
 current corrected Malom adapter. The audit does not establish the lineage of
 the seven updated model checkpoints or authorize a retraining run. Exact
@@ -41,9 +42,9 @@ The v1 sentinel, value net, and gap net were trained before the Malom sector-off
 fixed.  Specifically:
 
 - **Legacy Specialist DB** had 364,262 unversioned Malom labels written by the old decoder. The
-  staged rebuilt candidate has `sector-corrected-v1`, 2,112,951 retained empirical positions,
+  archived rebuilt candidate has `sector-corrected-v1`, 2,112,951 retained empirical positions,
   and zero Malom labels. It is not the empty fresh-baseline database and is not active.
-- **Active Human DB** still has its historical unversioned label columns masked. The staged
+- **Active Human DB** still has its historical unversioned label columns masked. The archived
   21 July rebuild has `sector-corrected-v1`; all 2,167,498 positions have labels and sampled
   position/successor labels match the corrected adapter. It remains a candidate until activation
   and lineage are recorded.

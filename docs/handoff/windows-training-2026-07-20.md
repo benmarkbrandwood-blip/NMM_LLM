@@ -143,12 +143,15 @@ Two independent safety commits follow that merge:
   removes its unsafe smoke/resume examples while retaining the source for
   reviewed feature porting.
 
-The staged rebuilt databases are intact and remain under `../Mills`. The
-HumanDB sidecar hash matches, both SQLite quick checks pass, and 30 sampled
-HumanDB labels match the current corrected Malom adapter for W/D/L and DTW.
-This supports the staged candidate but does not replace the active HumanDB or
-change the completed baseline. The staged SpecialistDB's retained empirical
-history also makes it a different experiment input from the fresh baseline DB.
+The rebuilt database candidates are intact under the ignored archive
+`data/backups/maintainer_upload_20260721`. The former sibling `Mills`
+directory was renamed `maintainer_inbox` on 25 July and left empty for future
+incoming deliveries. The HumanDB sidecar hash matches, both post-move SQLite
+quick checks pass, and 30 sampled HumanDB labels match the current corrected
+Malom adapter for W/D/L and DTW. This supports the archived candidate but does
+not replace the active HumanDB or change the completed baseline. The archived
+SpecialistDB's retained empirical history also makes it a different
+experiment input from the fresh baseline DB.
 
 The imported retraining plan remains a proposal. Current code and the v5 design
 resolve its apparent model-contract ambiguity locally: Sentinel stays DB-free
@@ -274,10 +277,12 @@ not a failing test.
 
 ## Data and Model State
 
-The Google Drive delivery referenced by the original handover has been moved
-out of the import staging directory and into the intended repository-local or
-external locations. The staging directory is now empty. Its host-specific
-location and the relative destination map are recorded in the
+Files from the Google Drive deliveries are no longer held in an ambiguous
+sibling staging directory. Reviewed assets are in their repository-local or
+external destinations, while the inactive 21 July database candidates are in
+`data/backups/maintainer_upload_20260721`. The former `Mills` directory is now
+the empty `maintainer_inbox` for future deliveries. Its role and the relative
+destination map are recorded in the
 [`docs/local-training-layout.md`](../local-training-layout.md) path list.
 
 Available assets include:
@@ -829,10 +834,11 @@ training merely because the managed run ended. Proceed in this order:
 
 1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
    and scratch-init bundle under their recorded identities.
-2. Keep both rebuilt databases staged and keep every imported checkpoint out of
-   the `dev` resume lineage. Ask for additional checkpoint lineage only if a
-   future experiment proposes to adopt one; use the locally resolved Sentinel,
-   ValueNet/HumanPolicy, and GapNet boundaries recorded in the retraining plan.
+2. Keep both rebuilt database candidates archived and inactive, and keep every
+   imported checkpoint out of the `dev` resume lineage. Ask for additional
+   checkpoint lineage only if a future experiment proposes to adopt one; use
+   the locally resolved Sentinel, ValueNet/HumanPolicy, and GapNet boundaries
+   recorded in the retraining plan.
 3. Preserve the completed owner review: original review position 101 is
    excluded, the other 106 are accepted, and the withdrawn concern about 83 is
    not a corpus defect.

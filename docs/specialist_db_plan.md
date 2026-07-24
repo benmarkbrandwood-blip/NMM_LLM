@@ -7,8 +7,9 @@ This document was imported from the maintainer's `main` branch on 22 July
 modifying or relabelling the isolated legacy SpecialistDB, and the active
 corrected baseline database must not be replaced by an implicit migration.
 
-The maintainer has also supplied a rebuilt candidate in the sibling `Mills`
-staging directory. A read-only audit found:
+The maintainer has also supplied a rebuilt candidate, now preserved in
+`data/backups/maintainer_upload_20260721/specialist_db.sqlite`. A read-only
+audit found:
 
 | Property | Observed value |
 | --- | --- |
