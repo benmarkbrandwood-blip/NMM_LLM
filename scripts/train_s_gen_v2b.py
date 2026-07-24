@@ -1,4 +1,4 @@
-"""scripts/train_s_gen_v2a.py — Generalist v2a: full-game + opponent variety.
+"""scripts/train_s_gen_v2b.py — Generalist v2b: full-game + opponent variety.
 
 Extends train_s_gen_v2.py with a diversified opponent schedule (harder/easier
 heuristic, blundering, and blended net opponents) to reduce overfitting.
@@ -17,8 +17,8 @@ Resume chain: explicit --resume → <out-dir>/best.pt → scratch
 
 Usage
 -----
-.venv/bin/python scripts/train_s_gen_v2a.py --max-games 20
-.venv/bin/python scripts/train_s_gen_v2a.py --auto-resume-best
+.venv/bin/python scripts/train_s_gen_v2b.py --max-games 20
+.venv/bin/python scripts/train_s_gen_v2b.py --auto-resume-best
 """
 
 from __future__ import annotations
@@ -46,6 +46,13 @@ sys.path.insert(0, str(_ROOT))
 
 from game.board import BoardState, MILLS
 from game.rules import is_terminal
+from learned_ai.training.termination import (
+    TerminationReason,
+    VALID_OUTCOMES,
+    INFRA_REASONS,
+    classify_terminal,
+    rolling_percentages,
+)
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from learned_ai.agents.heuristic_agent import GameAI as _GA
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
@@ -179,8 +186,8 @@ def _build_history_features(history: deque, n: int = 3) -> np.ndarray:
 
 # ── Stage tag ─────────────────────────────────────────────────────────────────
 
-STAGE_TAG = "s_gen_v2a"
-OUT_DIR   = "learned_ai/checkpoints/scaffolded/s_gen_v2a"
+STAGE_TAG = "s_gen_v2b"
+OUT_DIR   = "learned_ai/checkpoints/scaffolded/s_gen_v2b"
 
 FEATURE_SCHEMA_VERSION = "nmm.scaffolded-generalist.v2a"
 LABEL_SCHEMA_VERSION   = "sector-corrected-v1"
@@ -336,6 +343,19 @@ class GameDiag:
     opponent_node_budget:    Optional[int] = None
     recovery_state:          str = ""
     hot_explore_remaining:   int = 0
+    termination_reason:      str = ""
+    # 50-game rolling termination-reason percentages (0..100). Empty when window unfilled.
+    term_win_lt3_pct:        float = 0.0
+    term_win_blocked_pct:    float = 0.0
+    term_loss_lt3_pct:       float = 0.0
+    term_loss_blocked_pct:   float = 0.0
+    term_draw_rep_pct:       float = 0.0
+    term_draw_50_pct:        float = 0.0
+    term_draw_trunc_pct:     float = 0.0
+    term_infra_learner_count: int = 0
+    term_infra_opponent_count: int = 0
+    # Cooldown state so we can see it in the log while it decays.
+    advance_cooldown_batches: int = 0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -374,7 +394,7 @@ def _run_s1b_refresher(
 ) -> None:
     p = Path(data_path)
     if not p.exists():
-        print(f"[s_gen_v2a] s1b refresher: data not found ({data_path}) — skipping")
+        print(f"[s_gen_v2b] s1b refresher: data not found ({data_path}) — skipping")
         return
 
     data          = np.load(str(p), allow_pickle=True)
@@ -401,7 +421,7 @@ def _run_s1b_refresher(
     )
 
     model.train()
-    print(f"[s_gen_v2a] s1b refresher: loser={len(loser_idxs)} winner={len(winner_idxs)} positions  lr={lr:.2e}")
+    print(f"[s_gen_v2b] s1b refresher: loser={len(loser_idxs)} winner={len(winner_idxs)} positions  lr={lr:.2e}")
 
     def _pad_feat(fm: np.ndarray) -> np.ndarray:
         k, d = fm.shape
@@ -448,7 +468,7 @@ def _run_s1b_refresher(
                 opt_s1b.step()
                 ep_loss  += float(loss.item()) * float(w_t.sum())
                 ep_w_sum += float(w_t.sum())
-            print(f"[s_gen_v2a]   refresher [{phase_label}] epoch {epoch}/{epochs}  loss={ep_loss / max(ep_w_sum, 1e-9):.4f}")
+            print(f"[s_gen_v2b]   refresher [{phase_label}] epoch {epoch}/{epochs}  loss={ep_loss / max(ep_w_sum, 1e-9):.4f}")
 
     _run_phase(loser_idxs, "loser→heuristic", use_heuristic_target=True)
     _run_phase(winner_idxs, "winner", use_heuristic_target=False)
@@ -457,7 +477,7 @@ def _run_s1b_refresher(
         param.requires_grad = True
 
     model.eval()
-    print("[s_gen_v2a] s1b refresher done")
+    print("[s_gen_v2b] s1b refresher done")
 
 
 def _imitation_mix_step(
@@ -572,7 +592,7 @@ def _load_model(
     # If the requested architecture differs from the checkpoint, start fresh.
     ckpt_hidden = tuple(cfg.get("policy_hidden", (512, 256, 128)))
     if ckpt_hidden != policy_hidden:
-        print(f"[s_gen_v2a] policy_hidden mismatch: ckpt={ckpt_hidden} vs requested={policy_hidden} — starting fresh")
+        print(f"[s_gen_v2b] policy_hidden mismatch: ckpt={ckpt_hidden} vs requested={policy_hidden} — starting fresh")
         return _fresh()
 
     cfg["move_feat_dim"]   = feat_dim
@@ -585,12 +605,15 @@ def _load_model(
         pol_state = {k: v for k, v in ckpt[sd_key].items() if k.startswith("policy_mlp")}
         try:
             model.load_state_dict(pol_state, strict=False)
-            print("[s_gen_v2a] Warning: value_mlp shape mismatch — policy weights loaded, value head reinitialized")
+            print("[s_gen_v2b] Warning: value_mlp shape mismatch — policy weights loaded, value head reinitialized")
         except RuntimeError:
-            print(f"[s_gen_v2a] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
+            print(f"[s_gen_v2b] State dict incompatible — starting fresh with policy_hidden={policy_hidden}")
             return _fresh()
     stage          = ckpt.get("stage", "unknown")
-    is_mine        = (stage == STAGE_TAG)
+    # Accept the pre-rename v2a tag as valid lineage — v2b is the continuation
+    # of that codebase.  Keeps existing checkpoints resumable without editing.
+    _valid_lineage_tags = {STAGE_TAG, "s_gen_v2a"}
+    is_mine        = (stage in _valid_lineage_tags)
     start_game     = int(ckpt.get("game_count",           0))         if is_mine else 0
     best_wr        = float(ckpt.get("best_win_rate",      0.0))       if is_mine else 0.0
     # Fall back to best_win_rate for old checkpoints (best.pt stored them equal)
@@ -617,12 +640,12 @@ def _should_save_best_checkpoint(
 def _report_final_checkpoints(out_dir: Path) -> None:
     latest_path = out_dir / "latest.pt"
     best_path   = out_dir / "best.pt"
-    print(f"[s_gen_v2a] Latest checkpoint: {latest_path}")
+    print(f"[s_gen_v2b] Latest checkpoint: {latest_path}")
     if best_path.exists():
-        print(f"[s_gen_v2a] Best checkpoint available: {best_path}")
+        print(f"[s_gen_v2b] Best checkpoint available: {best_path}")
     else:
         print(
-            f"[s_gen_v2a] Best checkpoint: not created "
+            f"[s_gen_v2b] Best checkpoint: not created "
             f"(requires ≥{BEST_CHECKPOINT_MIN_GAMES} heuristic games with improved win rate)"
         )
 
@@ -695,6 +718,38 @@ def _outcome_to_history_float(outcome: float) -> float:
     if outcome in (DRAW_SHORT, DRAW_LONG):
         return 0.5
     return 0.0
+
+
+_INFRA_REASON_VALUES = frozenset(r.value for r in INFRA_REASONS)
+
+
+def _record_rollout_outcome(
+    reason: str,
+    hv: float,
+    win_history: deque,
+    win_history_heuristic: deque,
+    level_heuristic_history: deque,
+    termination_history: deque,
+    is_full_diff: bool,
+    advance_cooldown_batches: int,
+) -> None:
+    """Route a rollout outcome into the appropriate histories.
+
+    * INFRA_* reasons: recorded only in termination_history for observability.
+      They must never enter W/D/L or advancement statistics.
+    * Regular outcomes: full win_history; win_history_heuristic if is_full_diff.
+    * Cooldown active (advance_cooldown_batches > 0): full-diff outcomes still
+      enter win_history_heuristic (so recovery + display work) but do NOT enter
+      level_heuristic_history — that's the fresh-sample gate for advancement.
+    """
+    termination_history.append(reason)
+    if reason in _INFRA_REASON_VALUES:
+        return
+    win_history.append(hv)
+    if is_full_diff:
+        win_history_heuristic.append(hv)
+        if advance_cooldown_batches <= 0:
+            level_heuristic_history.append(hv)
 
 
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
@@ -798,6 +853,7 @@ class RolloutResult:
     opponent_search_nodes: int = 0
     opponent_search_calls: int = 0
     opponent_node_budget:  Optional[int] = None
+    termination_reason:    str = TerminationReason.DRAW_MAX_PLY_TRUNCATED.value
 
 
 def _move_notation(mv: dict) -> str:
@@ -858,6 +914,8 @@ def _rollout(
     opponent_search_calls   = 0
     opponent_node_budget    = getattr(opponent, "node_budget", None)
 
+    termination_reason: TerminationReason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
+
     while ply < max_ply:
         if ply == retry_ply:
             retry_board = board
@@ -866,6 +924,7 @@ def _rollout(
 
         terminal, winner = is_terminal(board)
         if terminal:
+            termination_reason = classify_terminal(board, learner_color)
             if winner == learner_color:
                 outcome = WIN_REWARD
             elif winner is not None:
@@ -890,7 +949,10 @@ def _rollout(
                 sdb_min_samples=3,
             )
             if enc is None or not enc.legal_moves:
+                # is_terminal() said non-terminal but encoder can't produce a legal
+                # move for the learner — this is infrastructure, not a game loss.
                 outcome = LOSS_REWARD
+                termination_reason = TerminationReason.INFRA_LEARNER_FAILURE
                 done    = True
                 break
 
@@ -1038,7 +1100,12 @@ def _rollout(
             except Exception:
                 opp_move = None
             if not opp_move:
+                # Opponent produced no move on a non-terminal position — infra,
+                # not a learner win.  Keep outcome as WIN_REWARD so RL signal is
+                # unchanged (rare event), but tag reason so it can be excluded
+                # from advancement statistics.
                 outcome = WIN_REWARD
+                termination_reason = TerminationReason.INFRA_OPPONENT_FAILURE
                 done    = True
                 break
             if opponent_node_budget is not None:
@@ -1053,6 +1120,7 @@ def _rollout(
 
     if not done:
         outcome = DRAW_LONG
+        termination_reason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
 
     if _saved_sim_ply is not None and lookahead_advisor is not None:
         lookahead_advisor._sim_ply_depth = _saved_sim_ply
@@ -1087,6 +1155,7 @@ def _rollout(
         opponent_search_nodes=opponent_search_nodes,
         opponent_search_calls=opponent_search_calls,
         opponent_node_budget=opponent_node_budget,
+        termination_reason=termination_reason.value,
     )
 
 
@@ -1114,9 +1183,16 @@ def _build_game_diag(
     bucket_counts:   Counter,
     recovery_state:        str = "",
     hot_explore_remaining: int = 0,
+    termination_history:   Optional[deque] = None,
+    advance_cooldown_batches: int = 0,
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
+    # Rolling 50-game termination-reason breakdown (percentages ignore infra).
+    term_pcts: dict[str, float] = {}
+    if termination_history:
+        _recent = list(termination_history)[-50:]
+        term_pcts = rolling_percentages([TerminationReason(r) for r in _recent])
     return GameDiag(
         game=game_count,
         difficulty=difficulty,
@@ -1163,6 +1239,17 @@ def _build_game_diag(
         opponent_node_budget   =result.opponent_node_budget,
         recovery_state         =recovery_state,
         hot_explore_remaining  =hot_explore_remaining,
+        termination_reason     =result.termination_reason,
+        term_win_lt3_pct       =term_pcts.get("win_lt3", 0.0),
+        term_win_blocked_pct   =term_pcts.get("win_blocked", 0.0),
+        term_loss_lt3_pct      =term_pcts.get("loss_lt3", 0.0),
+        term_loss_blocked_pct  =term_pcts.get("loss_blocked", 0.0),
+        term_draw_rep_pct      =term_pcts.get("draw_rep", 0.0),
+        term_draw_50_pct       =term_pcts.get("draw_50", 0.0),
+        term_draw_trunc_pct    =term_pcts.get("draw_trunc", 0.0),
+        term_infra_learner_count  =int(term_pcts.get("infra_learner", 0.0)),
+        term_infra_opponent_count =int(term_pcts.get("infra_opponent", 0.0)),
+        advance_cooldown_batches  =int(advance_cooldown_batches),
     )
 
 
@@ -1170,23 +1257,23 @@ def _build_game_diag(
 
 def run(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[s_gen_v2a] Device: {device}")
+    print(f"[s_gen_v2b] Device: {device}")
     rng = _initialize_training_rngs(args.seed)
 
     # ── Load components ────────────────────────────────────────────────────────
     sentinel = None
     if getattr(args, "no_sentinel", False):
-        print("[s_gen_v2a] Sentinel disabled via --no-sentinel")
+        print("[s_gen_v2b] Sentinel disabled via --no-sentinel")
     else:
         sent_path = args.sentinel or str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt")
         if Path(sent_path).exists():
             sentinel = load_advisor(sent_path)
             if sentinel and sentinel.is_loaded():
-                print(f"[s_gen_v2a] Sentinel loaded: {sent_path}")
+                print(f"[s_gen_v2b] Sentinel loaded: {sent_path}")
             else:
                 sentinel = None
         if sentinel is None:
-            print("[s_gen_v2a] Sentinel unavailable — sentinel reward = 0")
+            print("[s_gen_v2b] Sentinel unavailable — sentinel reward = 0")
 
     db = None
     malom_path = args.malom or _load_settings().get("malom_db_path", "")
@@ -1195,43 +1282,43 @@ def run(args: argparse.Namespace) -> None:
             from learned_ai.sentinel.db_teacher import ExternalSolvedDB
             db = ExternalSolvedDB(malom_path)
             if db.is_available():
-                print(f"[s_gen_v2a] Malom DB loaded (lookahead termination only): {malom_path}")
+                print(f"[s_gen_v2b] Malom DB loaded (lookahead termination only): {malom_path}")
             else:
                 db = None
         except Exception as e:
-            print(f"[s_gen_v2a] Malom DB failed ({e})")
+            print(f"[s_gen_v2b] Malom DB failed ({e})")
     if db is None:
-        print("[s_gen_v2a] Malom DB unavailable — lookahead uses no endgame early-exit")
+        print("[s_gen_v2b] Malom DB unavailable — lookahead uses no endgame early-exit")
 
     value_net = None
     if getattr(args, "no_value_net", False):
-        print("[s_gen_v2a] Value net disabled via --no-value-net")
+        print("[s_gen_v2b] Value net disabled via --no-value-net")
     else:
         vn_path = args.value_net or str(_ROOT / "data" / "value_net.npz")
         if vn_path and Path(vn_path).exists():
             try:
                 from ai.value_net import ValueNet as _ValueNet
                 value_net = _ValueNet.load(vn_path)
-                print(f"[s_gen_v2a] Value net loaded: {vn_path}")
+                print(f"[s_gen_v2b] Value net loaded: {vn_path}")
             except Exception as e:
-                print(f"[s_gen_v2a] Value net load failed ({e}) — VN features will be 0")
+                print(f"[s_gen_v2b] Value net load failed ({e}) — VN features will be 0")
         else:
-            print("[s_gen_v2a] No value net — VN features will be 0")
+            print("[s_gen_v2b] No value net — VN features will be 0")
 
     gap_net = None
     if getattr(args, "no_gap_net", False):
-        print("[s_gen_v2a] Gap net disabled via --no-gap-net")
+        print("[s_gen_v2b] Gap net disabled via --no-gap-net")
     else:
         gap_path = args.gap_net or str(_ROOT / "data" / "gap_net.npz")
         if gap_path and Path(gap_path).exists():
             try:
                 from ai.gap_net import GapNet as _GapNet
                 gap_net = _GapNet.load(gap_path)
-                print(f"[s_gen_v2a] Gap net loaded: {gap_path}")
+                print(f"[s_gen_v2b] Gap net loaded: {gap_path}")
             except Exception as e:
-                print(f"[s_gen_v2a] Gap net load failed ({e}) — gap features will be 0.5")
+                print(f"[s_gen_v2b] Gap net load failed ({e}) — gap features will be 0.5")
         else:
-            print("[s_gen_v2a] No gap net — gap features will be 0.5")
+            print("[s_gen_v2b] No gap net — gap features will be 0.5")
 
     # v3: HumanDB — for per-candidate human-play-frequency feature
     human_db = None
@@ -1240,12 +1327,12 @@ def run(args: argparse.Namespace) -> None:
         try:
             from ai.human_db import HumanDB
             human_db = HumanDB(hdb_path)
-            print(f"[s_gen_v2a] HumanDB loaded: {human_db.game_count} games "
+            print(f"[s_gen_v2b] HumanDB loaded: {human_db.game_count} games "
                   f"({human_db.entry_count} positions)")
         except Exception as e:
-            print(f"[s_gen_v2a] HumanDB load failed ({e}) — human_freq features will be 0")
+            print(f"[s_gen_v2b] HumanDB load failed ({e}) — human_freq features will be 0")
     else:
-        print("[s_gen_v2a] No HumanDB — human_freq features will be 0")
+        print("[s_gen_v2b] No HumanDB — human_freq features will be 0")
 
     # ── LookaheadAdvisor ─────────────────────────────────────────────────────
     lookahead_advisor = LookaheadAdvisor(
@@ -1259,33 +1346,40 @@ def run(args: argparse.Namespace) -> None:
         sim_ply_depth=args.sim_ply_depth,
         endgame_db=db,
     )
-    print(f"[s_gen_v2a] LookaheadAdvisor: 12-ply width, {args.sim_ply_depth}-ply sim, 5 signals (h+learner_sent+opp_sent+vn+gap)")
+    print(f"[s_gen_v2b] LookaheadAdvisor: 12-ply width, {args.sim_ply_depth}-ply sim, 5 signals (h+learner_sent+opp_sent+vn+gap)")
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
     specialist_db = SpecialistDB(_ROOT / "data" / "specialist_db.sqlite")
-    print(f"[s_gen_v2a] SpecialistDB: {specialist_db.stats()}")
+    print(f"[s_gen_v2b] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────
     resume_path, source_tag = _choose_resume_path(args)
     model, start_game, best_win_rate, best_win_rate_at_diff, difficulty, source_checkpoint = _load_model(device, resume_path, args.policy_hidden)
     difficulty = _apply_diff_start_override(difficulty, args)
     if resume_path is None:
-        print("[s_gen_v2a] No checkpoint found — starting from scratch")
+        print("[s_gen_v2b] No checkpoint found — starting from scratch")
         _resume_ckpt: dict = {}
     else:
-        print(f"[s_gen_v2a] Resuming from ({source_tag}): {resume_path}  best_wr_at_diff={best_win_rate_at_diff:.3f}")
+        print(f"[s_gen_v2b] Resuming from ({source_tag}): {resume_path}  best_wr_at_diff={best_win_rate_at_diff:.3f}")
         try:
             _resume_ckpt = torch.load(str(resume_path), map_location="cpu", weights_only=False)
         except Exception:
             _resume_ckpt = {}
-    print(f"[s_gen_v2a] feat_dim={MOVE_FEAT_DIM_WITH_LOOKAHEAD}, starting game={start_game}, diff={difficulty}")
+    print(f"[s_gen_v2b] feat_dim={MOVE_FEAT_DIM_WITH_LOOKAHEAD}, starting game={start_game}, diff={difficulty}")
 
     frozen_opp = FrozenModelOpponent(model, device, sentinel=sentinel, value_net=value_net)
     # Option C: lookahead uses same frozen snapshot for learner-side simulated moves.
     lookahead_advisor.set_frozen_model(frozen_opp._model, device=device)
-    print("[s_gen_v2a] LookaheadAdvisor: frozen-model driven learner-side (Option C)")
+    print("[s_gen_v2b] LookaheadAdvisor: frozen-model driven learner-side (Option C)")
     games_since_target_update = 0
-    games_at_level            = 0   # for Sanmill time-of-flight target relaxation
+    games_at_level            = int(_resume_ckpt.get("games_at_level", 0))
+    # Cooldown gate: blocks advancement while > 0, and diverts rehearsal outcomes
+    # away from level_heuristic_history so they can't drive the next advance.
+    advance_cooldown_batches  = int(_resume_ckpt.get("advance_cooldown_batches", 0))
+    # 200-game rolling window over termination reasons for observability.
+    termination_history: deque[str] = deque(
+        _resume_ckpt.get("termination_history", []), maxlen=200
+    )
 
     out_dir   = Path(args.out_dir)
     if getattr(args, "run_name", None):
@@ -1298,7 +1392,7 @@ def run(args: argparse.Namespace) -> None:
     _args_file = out_dir / f"args_{_args_ts}.json"
     with open(_args_file, "w", encoding="utf-8") as _af:
         json.dump(vars(args), _af, indent=2, default=str)
-    print(f"[s_gen_v2a] Args saved → {_args_file.name}")
+    print(f"[s_gen_v2b] Args saved → {_args_file.name}")
 
     opt       = torch.optim.Adam(model.parameters(), lr=args.lr)
     update_fn = scaffolded_ppo_update if args.ppo else scaffolded_a2c_update
@@ -1307,7 +1401,14 @@ def run(args: argparse.Namespace) -> None:
     temperature            = args.temp_start
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
-    level_heuristic_history: deque[float] = deque()  # uncapped; cleared on each difficulty advance
+    # Cap at 4 × rolling_win so poor early games at a level age out and can't
+    # permanently drag the sanmill mean below target after the model improves.
+    # Trimmed to the tail on resume in case the persisted list is longer than
+    # the cap (e.g. saved before this cap was introduced).
+    _level_hist_cap = max(args.rolling_win * 4, 40)
+    _persisted_lh = list(_resume_ckpt.get("level_heuristic_history", []))[-_level_hist_cap:]
+    level_heuristic_history: deque[float] = deque(_persisted_lh, maxlen=_level_hist_cap)
+    # Cleared on each difficulty advance and when advance-cooldown expires.
     ep_steps: list[ScaffoldedStep] = []
     last_update_pl  = None
     last_update_vl  = None
@@ -1344,14 +1445,14 @@ def run(args: argparse.Namespace) -> None:
 
     # Generalist starts every game from scratch (no position pool)
 
-    print(f"[s_gen_v2a] Starting at game {game_count}, difficulty {difficulty}")
-    print(f"[s_gen_v2a] Self-play ratio {args.self_play_ratio:.0%}, "
+    print(f"[s_gen_v2b] Starting at game {game_count}, difficulty {difficulty}")
+    print(f"[s_gen_v2b] Self-play ratio {args.self_play_ratio:.0%}, "
           f"branch every {args.branch_every} turns, "
           f"max {args.max_branches_per_game} branches/game")
 
     # s1a warm-start: run once before RL if starting from game 0
     if not args.no_s1a_warmstart and start_game == 0 and not getattr(args, "no_imitation_mix", False):
-        print(f"[s_gen_v2a] Running s1a warm-start (pre-RL imitation) from {args.s1a_data}")
+        print(f"[s_gen_v2b] Running s1a warm-start (pre-RL imitation) from {args.s1a_data}")
         _run_s1b_refresher(model, device, args.s1a_data,
                            epochs=args.s1b_refresher_epochs,
                            lr=args.s1b_refresher_lr)
@@ -1367,16 +1468,16 @@ def run(args: argparse.Namespace) -> None:
                 "label_dists":   _raw["label_dists"],
                 "is_winner":     _raw["is_winner"] if "is_winner" in _raw else np.ones(len(_raw["feat_matrices"]), dtype=bool),
             }
-            print(f"[s_gen_v2a] Imitation data loaded: {len(_imitation_data['feat_matrices'])} positions for mixing")
+            print(f"[s_gen_v2b] Imitation data loaded: {len(_imitation_data['feat_matrices'])} positions for mixing")
         except Exception as e:
-            print(f"[s_gen_v2a] Imitation data load failed ({e}) — imitation mixing disabled")
+            print(f"[s_gen_v2b] Imitation data load failed ({e}) — imitation mixing disabled")
 
     # Warm the lazy-init heuristic eval global before spawning threads
     if args.batch_games > 1:
         encode_position_with_lookahead(BoardState.new_game(), "W",
                                        sentinel_advisor=None, db=None,
                                        value_net=None, lookahead_advisor=None)
-        print(f"[s_gen_v2a] Encoder warmed for {args.batch_games}-game parallel batches")
+        print(f"[s_gen_v2b] Encoder warmed for {args.batch_games}-game parallel batches")
 
     diag_buffer: list[GameDiag] = []
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
@@ -1389,6 +1490,16 @@ def run(args: argparse.Namespace) -> None:
 
     while game_count < segment_stop:
         batch_count += 1
+        # Advancement cooldown: decrement one per batch.  While > 0, rollout
+        # outcomes are diverted away from level_heuristic_history (see
+        # _record_rollout_outcome).  When it transitions to 0 for the first
+        # time, clear level_heuristic_history so the next advance decision is
+        # based only on fresh post-cooldown samples.
+        if advance_cooldown_batches > 0:
+            advance_cooldown_batches -= 1
+            if advance_cooldown_batches == 0:
+                level_heuristic_history.clear()
+                print(f"[s_gen_v2b] Advance cooldown expired — accumulating fresh samples at diff {difficulty}")
         _scheduled_temp = _compute_temperature(game_count, args.max_games, args.temp_start)
         # Decay ongoing boosts
         if temp_boost > 1e-4:
@@ -1402,7 +1513,7 @@ def run(args: argparse.Namespace) -> None:
             hot_explore_remaining = max(0, hot_explore_remaining - args.batch_games)
             temperature = max(temperature, args.temp_start * HOT_EXPLORE_TEMP_SCALE)
             if hot_explore_remaining <= 0:
-                print(f"[s_gen_v2a] Hot-explore phase complete at game {game_count} — armed for full recovery if still failing")
+                print(f"[s_gen_v2b] Hot-explore phase complete at game {game_count} — armed for full recovery if still failing")
         # Rehearsal: expand lower-diff opponent ratio for N iterations after advancement
         _use_rehearsal = advance_rehearsal_remaining > 0
         if _use_rehearsal:
@@ -1412,7 +1523,7 @@ def run(args: argparse.Namespace) -> None:
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
             games_since_target_update = 0
-            print(f"[s_gen_v2a] Frozen model updated at game {game_count}")
+            print(f"[s_gen_v2b] Frozen model updated at game {game_count}")
 
         # ── Build N game configs ──────────────────────────────────────────────
         # Opponent schedule (per game):
@@ -1504,7 +1615,7 @@ def run(args: argparse.Namespace) -> None:
             if 0 < recovery_grace and recovery_grace % 25 < args.batch_games:
                 _grace_h = list(win_history_heuristic)
                 _grace_wr = sum(1 for x in _grace_h if x == 1.0) / max(len(_grace_h), 1)
-                print(f"[s_gen_v2a] Recovery in progress ({_current_recovery_state}): "
+                print(f"[s_gen_v2b] Recovery in progress ({_current_recovery_state}): "
                       f"game {game_count} wr={_grace_wr:.3f} grace_remaining={recovery_grace}")
             if recovery_grace <= 0:
                 _post_h  = list(win_history_heuristic)
@@ -1532,15 +1643,15 @@ def run(args: argparse.Namespace) -> None:
                         _log_event("resurrection",
                                    wr=round(_post_wr, 4),
                                    baseline=round(recovery_baseline_win_rate, 4))
-                        print(f"[s_gen_v2a] Post-grace resurrection: wr={_post_wr:.3f} vs "
+                        print(f"[s_gen_v2b] Post-grace resurrection: wr={_post_wr:.3f} vs "
                               f"baseline={recovery_baseline_win_rate:.3f} — reloaded best{difficulty}.pt "
                               f"(grace=50)")
                     else:
-                        print(f"[s_gen_v2a] Post-grace: wr={_post_wr:.3f} vs "
+                        print(f"[s_gen_v2b] Post-grace: wr={_post_wr:.3f} vs "
                               f"baseline={recovery_baseline_win_rate:.3f} — no checkpoint to resurrect")
                         _current_recovery_state = ""
                 else:
-                    print(f"[s_gen_v2a] Recovery grace expired — draw penalty restored "
+                    print(f"[s_gen_v2b] Recovery grace expired — draw penalty restored "
                           f"(wr={_post_wr:.3f} baseline={recovery_baseline_win_rate:.3f})")
                     _current_recovery_state = ""
 
@@ -1627,19 +1738,21 @@ def run(args: argparse.Namespace) -> None:
                 games_at_level += 1
                 games_since_target_update += 1
                 _hv = _outcome_to_history_float(confirm_result.outcome)
-                win_history.append(_hv)
-                if is_full_diff:
-                    win_history_heuristic.append(_hv)
-                    level_heuristic_history.append(_hv)
+                _record_rollout_outcome(
+                    confirm_result.termination_reason, _hv,
+                    win_history, win_history_heuristic, level_heuristic_history,
+                    termination_history, is_full_diff, advance_cooldown_batches,
+                )
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
-                    print(f"[s_gen_v2a] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
+                    print(f"[s_gen_v2b] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
 
             _hv = _outcome_to_history_float(result.outcome)
-            win_history.append(_hv)
-            if is_full_diff:
-                win_history_heuristic.append(_hv)
-                level_heuristic_history.append(_hv)
+            _record_rollout_outcome(
+                result.termination_reason, _hv,
+                win_history, win_history_heuristic, level_heuristic_history,
+                termination_history, is_full_diff, advance_cooldown_batches,
+            )
             game_count += 1
             games_at_level += 1
             games_since_target_update += 1
@@ -1654,6 +1767,8 @@ def run(args: argparse.Namespace) -> None:
                 bucket_counts=bucket_counts,
                 recovery_state=_current_recovery_state,
                 hot_explore_remaining=hot_explore_remaining,
+                termination_history=termination_history,
+                advance_cooldown_batches=advance_cooldown_batches,
             )
             diag_buffer.append(_diag)
 
@@ -1665,7 +1780,7 @@ def run(args: argparse.Namespace) -> None:
                 _oc  = "W" if result.outcome == WIN_REWARD else ("L" if result.outcome == LOSS_REWARD else "D")
                 _gt  = "heur" if game_type == "vs_heuristic" else "self"
                 _dif = f"d{game_difficulty}" if game_difficulty != difficulty else f"diff {difficulty}"
-                print(f"[s_gen_v2a] {game_count:6d} {_gt:4s} {learner_color} | {_dif} | {_oc} ply={result.ply:3d} | hwr={hwr:.3f} hdr={hdr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
+                print(f"[s_gen_v2b] {game_count:6d} {_gt:4s} {learner_color} | {_dif} | {_oc} ply={result.ply:3d} | hwr={hwr:.3f} hdr={hdr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
 
             if (not args.minimal_rollouts
                 and result.outcome != WIN_REWARD
@@ -1695,16 +1810,17 @@ def run(args: argparse.Namespace) -> None:
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
                 _rv = _outcome_to_history_float(retry_result.outcome)
-                win_history.append(_rv)
-                if is_full_diff:
-                    win_history_heuristic.append(_rv)
-                    level_heuristic_history.append(_rv)
+                _record_rollout_outcome(
+                    retry_result.termination_reason, _rv,
+                    win_history, win_history_heuristic, level_heuristic_history,
+                    termination_history, is_full_diff, advance_cooldown_batches,
+                )
                 game_count += 1
                 games_at_level += 1
                 games_since_target_update += 1
                 _roc = "W" if retry_result.outcome == WIN_REWARD else ("L" if retry_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
-                    print(f"[s_gen_v2a] {game_count:6d} retry {learner_color} |          | {_roc} ply={retry_result.ply:3d} | (from ply {game_retry_ply})")
+                    print(f"[s_gen_v2b] {game_count:6d} retry {learner_color} |          | {_roc} ply={retry_result.ply:3d} | (from ply {game_retry_ply})")
 
             # ── Branch games ───────────────────────────────────────────────────
             branches_spawned = 0
@@ -1756,7 +1872,12 @@ def run(args: argparse.Namespace) -> None:
                     game_count += 1
                     games_at_level += 1
                     games_since_target_update += 1
-                    win_history.append(_outcome_to_history_float(branch_result.outcome))
+                    _record_rollout_outcome(
+                        branch_result.termination_reason,
+                        _outcome_to_history_float(branch_result.outcome),
+                        win_history, win_history_heuristic, level_heuristic_history,
+                        termination_history, False, advance_cooldown_batches,
+                    )
 
                     bucket_counts = Counter(branch_bucket_history)
                     diag_buffer.append(_build_game_diag(
@@ -1768,11 +1889,13 @@ def run(args: argparse.Namespace) -> None:
                         bucket_counts=bucket_counts,
                         recovery_state=_current_recovery_state,
                         hot_explore_remaining=hot_explore_remaining,
+                        termination_history=termination_history,
+                        advance_cooldown_batches=advance_cooldown_batches,
                     ))
 
                     if game_count % 10 == 0:
                         _boc = "W" if branch_result.outcome == WIN_REWARD else ("L" if branch_result.outcome == LOSS_REWARD else "D")
-                        print(f"[s_gen_v2a] {game_count:6d}  +b  {learner_color} | {bucket:7s} | {_boc} ply={branch_result.ply:3d} | (from ply {branch_ply})")
+                        print(f"[s_gen_v2b] {game_count:6d}  +b  {learner_color} | {bucket:7s} | {_boc} ply={branch_result.ply:3d} | (from ply {branch_ply})")
 
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
@@ -1820,11 +1943,11 @@ def run(args: argparse.Namespace) -> None:
                     _is_improving = _second_score > _first_score + 0.02
                     _is_degrading = _second_score < _first_score - RECOVERY_DEGRADE_MARGIN
                     if _is_improving:
-                        print(f"[s_gen_v2a] Recovery skipped: AI is improving (score {_first_score:.3f} → {_second_score:.3f})")
+                        print(f"[s_gen_v2b] Recovery skipped: AI is improving (score {_first_score:.3f} → {_second_score:.3f})")
                         if hot_explore_triggered and hot_explore_remaining <= 0:
                             hot_explore_triggered = False
                             _current_recovery_state = ""
-                            print(f"[s_gen_v2a] Hot-explore recovery successful — flags cleared")
+                            print(f"[s_gen_v2b] Hot-explore recovery successful — flags cleared")
                     elif hot_explore_triggered and hot_explore_remaining > 0:
                         pass  # Still in hot-explore phase; let it run
                     elif hot_explore_triggered and hot_explore_remaining <= 0:
@@ -1843,9 +1966,9 @@ def run(args: argparse.Namespace) -> None:
                                 try:
                                     model.load_state_dict(pol_state, strict=False)
                                     _loaded_recovery = True
-                                    print(f"[s_gen_v2a] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
+                                    print(f"[s_gen_v2b] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
                                 except RuntimeError:
-                                    print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible — keeping current weights")
+                                    print(f"[s_gen_v2b] Recovery: checkpoint shape incompatible — keeping current weights")
                             if _loaded_recovery:
                                 model.to(device)
                                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -1861,18 +1984,18 @@ def run(args: argparse.Namespace) -> None:
                                 _log_event("recovery_stage2",
                                            wr=round(win_rate, 4), loss=round(loss_rate, 4),
                                            checkpoint=str(best_ckpt))
-                                print(f"[s_gen_v2a] Recovery Stage 2: reloaded best{difficulty}.pt "
+                                print(f"[s_gen_v2b] Recovery Stage 2: reloaded best{difficulty}.pt "
                                       f"(W={win_rate:.2f} L={loss_rate:.2f})")
-                                print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
+                                print(f"[s_gen_v2b] Recovery grace: draw penalty suppressed for 100 games")
                             else:
                                 _current_recovery_state = ""
                         else:
                             _current_recovery_state = ""
-                            print(f"[s_gen_v2a] Recovery Stage 2: no best{difficulty}.pt exists — cannot restore "
+                            print(f"[s_gen_v2b] Recovery Stage 2: no best{difficulty}.pt exists — cannot restore "
                                   f"(W={win_rate:.2f} L={loss_rate:.2f})")
                     elif not _is_degrading:
                         # Score is low but stable — don't fire Stage 1 on a plateau
-                        print(f"[s_gen_v2a] Recovery skipped: score low but stable ({_first_score:.3f} → {_second_score:.3f})")
+                        print(f"[s_gen_v2b] Recovery skipped: score low but stable ({_first_score:.3f} → {_second_score:.3f})")
                     else:
                         # Stage 1: first sign of trouble — hot-explore phase
                         recovery_baseline_win_rate = win_rate
@@ -1887,7 +2010,7 @@ def run(args: argparse.Namespace) -> None:
                             _log_event("recovery_stage1",
                                        wr=round(win_rate, 4), loss=round(loss_rate, 4),
                                        hot_explore_games=args.hot_explore_games)
-                            print(f"[s_gen_v2a] Recovery Stage 1: hot-explore for ~{args.hot_explore_games} iters "
+                            print(f"[s_gen_v2b] Recovery Stage 1: hot-explore for ~{args.hot_explore_games} iters "
                                   f"(W={win_rate:.2f} L={loss_rate:.2f}) temp_boost+{temp_boost:.3f} "
                                   f"ent_boost+{entropy_boost:.4f}")
                         else:
@@ -1904,9 +2027,9 @@ def run(args: argparse.Namespace) -> None:
                                     try:
                                         model.load_state_dict(pol_state, strict=False)
                                         _loaded_recovery = True
-                                        print(f"[s_gen_v2a] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
+                                        print(f"[s_gen_v2b] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
                                     except RuntimeError:
-                                        print(f"[s_gen_v2a] Recovery: checkpoint shape incompatible — keeping current weights")
+                                        print(f"[s_gen_v2b] Recovery: checkpoint shape incompatible — keeping current weights")
                                 if _loaded_recovery:
                                     model.to(device)
                                     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -1921,14 +2044,14 @@ def run(args: argparse.Namespace) -> None:
                                     _log_event("recovery_stage2",
                                                wr=round(win_rate, 4), loss=round(loss_rate, 4),
                                                checkpoint=str(best_ckpt))
-                                    print(f"[s_gen_v2a] Recovery: reloaded best{difficulty}.pt "
+                                    print(f"[s_gen_v2b] Recovery: reloaded best{difficulty}.pt "
                                           f"(W={win_rate:.2f} L={loss_rate:.2f})")
-                                    print(f"[s_gen_v2a] Recovery grace: draw penalty suppressed for 100 games")
+                                    print(f"[s_gen_v2b] Recovery grace: draw penalty suppressed for 100 games")
                                 else:
                                     _current_recovery_state = ""
                             else:
                                 _current_recovery_state = ""
-                                print(f"[s_gen_v2a] Recovery: no best{difficulty}.pt exists — cannot restore "
+                                print(f"[s_gen_v2b] Recovery: no best{difficulty}.pt exists — cannot restore "
                                       f"(W={win_rate:.2f} L={loss_rate:.2f})")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
@@ -1946,12 +2069,11 @@ def run(args: argparse.Namespace) -> None:
                     d = last_main
                     _sign = lambda v: f"{'+' if v >= 0 else ''}{v:.3f}"
                     print(
-                        f"[s_gen_v2a] game {game_count:6d} | diff {difficulty} | "
+                        f"[s_gen_v2b] game {game_count:6d} | diff {difficulty} | "
                         f"win={win_rate:.3f} draw={draw_rate:.3f} all={win_rate_all:.3f} | "
                         f"temp={temperature:.2f} | "
                         f"outcome={d.outcome:+.2f} | lr={opt.param_groups[0]['lr']:.5f} | "
                         f"rew={_sign(d.reward_total_mean)} | "
-                        f"sent={_sign(d.reward_sentinel_mean)} "
                         f"h={_sign(d.reward_heuristic_mean)} | "
                         f"p_top1={d.policy_top1_rate:.2f} h_top1={d.heuristic_top1_rate:.2f} | "
                         f"branches={len(branch_diags)} "
@@ -1974,6 +2096,12 @@ def run(args: argparse.Namespace) -> None:
                     "recovery_grace":            recovery_grace,
                     "recovery_state":            _current_recovery_state,
                     "recovery_baseline_win_rate": recovery_baseline_win_rate,
+                    # Curriculum + termination state (v2a addition): survives restart
+                    # so a resume during rehearsal cooldown cannot bypass the gate.
+                    "games_at_level":            games_at_level,
+                    "advance_cooldown_batches":  advance_cooldown_batches,
+                    "level_heuristic_history":   list(level_heuristic_history),
+                    "termination_history":       list(termination_history),
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -1985,7 +2113,7 @@ def run(args: argparse.Namespace) -> None:
                     torch.save(ckpt, out_dir / "best.pt")
                     if win_rate > best_win_rate:
                         best_win_rate = win_rate
-                    print(f"[s_gen_v2a]  → best diff-{difficulty} win rate: {best_win_rate_at_diff:.3f}")
+                    print(f"[s_gen_v2b]  → best diff-{difficulty} win rate: {best_win_rate_at_diff:.3f}")
 
             # ── Difficulty advancement (Sanmill superiority-probability) ──────
             # Runs every batch once games_at_level >= 20 (the sanmill check's own floor).
@@ -1998,10 +2126,10 @@ def run(args: argparse.Namespace) -> None:
                                               games_at_level=games_at_level)
                 if game_count - _last_advance_print_game >= 50:
                     _last_advance_print_game = game_count
-                    print(f"[s_gen_v2a] advance-check @ diff {difficulty}: {_adv.reason}")
+                    print(f"[s_gen_v2b] advance-check @ diff {difficulty}: {_adv.reason}")
             if _adv is not None and _adv.should_advance:
                 if difficulty >= args.diff_max:
-                    print(f"[s_gen_v2a] *** DONE at diff {difficulty}: {_adv.reason} ***")
+                    print(f"[s_gen_v2b] *** DONE at diff {difficulty}: {_adv.reason} ***")
                     _advance_done = True
                     break
                 else:
@@ -2011,7 +2139,7 @@ def run(args: argparse.Namespace) -> None:
                     win_history_heuristic.clear()
                     level_heuristic_history.clear()
                     games_at_level = 0
-                    print(f"[s_gen_v2a] *** Advanced to diff {difficulty} (was diff {prev_diff}: "
+                    print(f"[s_gen_v2b] *** Advanced to diff {difficulty} (was diff {prev_diff}: "
                           f"score={_adv.score_pct:.3f} P={_adv.p_super:.3f} target={_adv.target:.3f}) ***")
                     wr = _adv.score_pct
 
@@ -2030,26 +2158,13 @@ def run(args: argparse.Namespace) -> None:
                         "temperature":           float(temperature),
                     }
                     torch.save(_adv_ckpt, prev_best)
-                    print(f"[s_gen_v2a] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
-                # Load latest.pt (current model state) as the starting point for the
-                # new level.  Previously loaded best{prev_diff}.pt which could regress
-                # progress if it was a stale checkpoint from an earlier run.
-                _latest_path = out_dir / "latest.pt"
-                if _latest_path.exists():
-                    ckpt_prev = torch.load(str(_latest_path), map_location=device, weights_only=False)
-                    try:
-                        model.load_state_dict(ckpt_prev["model"])
-                    except RuntimeError:
-                        pol_state = {k: v for k, v in ckpt_prev["model"].items() if k.startswith("policy_mlp")}
-                        try:
-                            model.load_state_dict(pol_state, strict=False)
-                            print(f"[s_gen_v2a] Advance-load: value_mlp shape mismatch — policy weights loaded, value head kept")
-                        except RuntimeError:
-                            print(f"[s_gen_v2a] Advance-load: checkpoint shape incompatible (old feat_dim) — keeping current weights")
-                    model.to(device)
-                    print(f"[s_gen_v2a] Loaded latest.pt as starting point for diff {difficulty}")
-                else:
-                    print(f"[s_gen_v2a] latest.pt not found — proceeding with in-memory model for diff {difficulty}")
+                    print(f"[s_gen_v2b] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
+                # No reload on advance.  The in-memory model just achieved the
+                # advancement condition — those weights are the correct starting
+                # point for the new level.  latest.pt may lag behind between log
+                # ticks; best{prev_diff}.pt above may be stale from an earlier
+                # run.  Continue with current in-memory model.
+                print(f"[s_gen_v2b] Continuing with in-memory model for diff {difficulty} (no checkpoint reload)")
 
                 best_win_rate_at_diff = 0.0
                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -2060,10 +2175,13 @@ def run(args: argparse.Namespace) -> None:
                 entropy_boost = args.advance_entropy_boost_frac * args.entropy_coef
                 # Rehearsal: expand lower-diff opponent ratio for the first N iterations
                 advance_rehearsal_remaining = args.advance_rehearsal_games
+                # Advancement cooldown: block further advances until we've completed
+                # rehearsal AND accumulated a small tail of fresh non-rehearsal samples.
+                advance_cooldown_batches = args.advance_rehearsal_games + args.advance_cooldown_tail_batches
                 # Reset hot-explore state — new level is a fresh start
                 hot_explore_triggered = False
                 hot_explore_remaining = 0
-                print(f"[s_gen_v2a] Advancement boosts: temp+{temp_boost:.3f} "
+                print(f"[s_gen_v2b] Advancement boosts: temp+{temp_boost:.3f} "
                       f"ent+{entropy_boost:.4f} rehearsal={args.advance_rehearsal_games}iters")
 
         if _advance_done:
@@ -2095,7 +2213,7 @@ def run(args: argparse.Namespace) -> None:
         "recovery_baseline_win_rate": recovery_baseline_win_rate,
     }
     torch.save(ckpt, out_dir / "latest.pt")
-    print(f"\n[s_gen_v2a] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
+    print(f"\n[s_gen_v2b] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
     _report_final_checkpoints(out_dir)
 
 
@@ -2108,7 +2226,7 @@ def main() -> None:
                    help="Resume from best.pt in <out-dir>/<run-name>/ if it exists, else <out-dir>/best.pt")
     p.add_argument("--auto-resume-latest", action="store_true",
                    help="Resume from latest.pt in <out-dir>/<run-name>/ if it exists, else <out-dir>/latest.pt")
-    p.add_argument("--out-dir",   default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2a"))
+    p.add_argument("--out-dir",   default=str(_ROOT / "learned_ai" / "checkpoints" / "scaffolded" / "s_gen_v2b"))
     p.add_argument("--run-name",  default="", type=str,
                    help="Optional subfolder under --out-dir, e.g. 'exp1'. "
                         "Keeps each experiment's checkpoints and logs separate.")
@@ -2179,6 +2297,10 @@ def main() -> None:
                         "lower-diff opponent slot expanded (0=disabled; default 0)")
     p.add_argument("--advance-rehearsal-prob",    type=float, default=0.45,
                    help="Lower-diff opponent probability during rehearsal window (default 0.45 vs standard 0.20)")
+    p.add_argument("--advance-cooldown-tail-batches", type=int, default=8,
+                   help="Extra batches beyond rehearsal that must complete before another "
+                        "advancement can fire. Prevents chained advances driven by the "
+                        "temporarily easier rehearsal opponent mixture. (default 8)")
     p.add_argument("--hot-explore-games",         type=int,   default=75,
                    help="Stage-1 recovery: run this many PRIMARY games at elevated temperature before "
                         "reloading the best checkpoint. Counter decrements by batch_games per batch, "

@@ -1,7 +1,7 @@
-"""Regression tests for gen v2a curriculum + termination behaviour.
+"""Regression tests for gen v2b curriculum + termination behaviour.
 
 Covers the changes in learned_ai/training/termination.py and
-scripts/train_s_gen_v2a.py.  None of these tests require a training run;
+scripts/train_s_gen_v2b.py.  None of these tests require a training run;
 they exercise the pure helpers and dataclass contracts directly.
 """
 from __future__ import annotations
@@ -92,7 +92,7 @@ def test_rolling_percentages_empty_window_returns_zeros():
 
 
 # ── _record_rollout_outcome helper (imported from training script) ────────────
-# The helper is defined inside scripts/train_s_gen_v2a.py.  Import via source
+# The helper is defined inside scripts/train_s_gen_v2b.py.  Import via source
 # execution so we don't need the full module dependency chain at import time.
 
 def _load_record_helper():
@@ -103,7 +103,7 @@ def _load_record_helper():
     imports it needs.
     """
     from pathlib import Path
-    src = Path(__file__).parent.parent / "scripts" / "train_s_gen_v2a.py"
+    src = Path(__file__).parent.parent / "scripts" / "train_s_gen_v2b.py"
     text = src.read_text()
     # Extract the function definition block.  It starts after the marker.
     start_marker = "def _record_rollout_outcome("

@@ -1002,7 +1002,21 @@ Speed flags: `--sim-ply-depth 5` (~3× lookahead speed-up during training; infer
 - Advance-check log line format: `[s_open_v2] advance-check @ diff 3: P=0.982 ≥ 0.95 (target=0.545, score=0.760)`. When the P-value stays < 0.5 for 5000+ games at a level, more games won't help — the model has plateaued.
 
 
-## Learned AI — Generalist v2a (train_s_gen_v2a.py)
+## Learned AI — Generalist v2a (train_s_gen_v2a.py, legacy)
+
+The v2a script is retained at the pre-`4809b33` state as a stable reference
+for the original generalist behaviour (temp/entropy boost, two-stage
+recovery, rehearsal games, auto-resume flags).  It does **not** carry the
+new termination classification, advancement cooldown, no-reload-on-advance,
+or `level_heuristic_history` cap — those live in v2b.
+
+Use v2a if you specifically want to reproduce an older run; use v2b for all
+new training.  Checkpoints from either script are cross-compatible: v2b's
+`_load_model` accepts the `s_gen_v2a` stage tag as valid lineage, so a v2a
+`latest.pt` resumes cleanly with `--auto-resume-latest`.
+
+
+## Learned AI — Generalist v2b (train_s_gen_v2b.py)
 
 Full-game generalist that plays from `new_game()` through placement, midgame, and endgame in a single model. Uses a diversified opponent schedule to prevent overfitting to any one difficulty.
 
@@ -1019,7 +1033,7 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 **Recommended run:**
 
 ```
-.venv/bin/python scripts/train_s_gen_v2a.py \
+.venv/bin/python scripts/train_s_gen_v2b.py \
   --max-games 50000 \
   --temp-start 1.2 \
   --sim-ply-depth 12 \
@@ -1035,7 +1049,7 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 **Resume from checkpoint:**
 
 ```
-.venv/bin/python scripts/train_s_gen_v2a.py --auto-resume-best \
+.venv/bin/python scripts/train_s_gen_v2b.py --auto-resume-best \
   --max-games 50000 --temp-start 1.2 --sim-ply-depth 12 \
   --self-play-ratio 0.05 --ppo \
   --advance-temp-boost-frac 0.5 --advance-entropy-boost-frac 0.5 \
@@ -1045,7 +1059,7 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 **Smoke test (3 games, no warm-start, no nets):**
 
 ```
-.venv/bin/python scripts/train_s_gen_v2a.py --max-games 3 \
+.venv/bin/python scripts/train_s_gen_v2b.py --max-games 3 \
   --no-s1a-warmstart --no-sentinel --no-value-net --no-gap-net --no-imitation-mix
 ```
 
@@ -1061,7 +1075,7 @@ Full-game generalist that plays from `new_game()` through placement, midgame, an
 | `--auto-resume-best` | off | Resume from `<out-dir>/<run-name>/best.pt` if present, else `<out-dir>/best.pt` |
 | `--auto-resume-latest` | off | Resume from `<out-dir>/<run-name>/latest.pt` if present, else `<out-dir>/latest.pt` |
 | `--resume PATH` | — | Resume from explicit checkpoint path |
-| `--out-dir PATH` | `learned_ai/checkpoints/scaffolded/s_gen_v2a` | Checkpoint output directory (parent) |
+| `--out-dir PATH` | `learned_ai/checkpoints/scaffolded/s_gen_v2b` | Checkpoint output directory (parent) |
 | `--run-name STR` | "" | Optional subfolder under `--out-dir` for parallel experiments |
 | `--diff-start N` | 1 | Override starting difficulty |
 | `--diff-max N` | 20 | Maximum difficulty level |
