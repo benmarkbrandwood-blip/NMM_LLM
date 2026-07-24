@@ -9,7 +9,7 @@ dropout: 0.2
 lr: 0.0003
 batch_size: 128
 epochs: 30
-patience: 4    # DB-labelled stage; give it slightly more slack than Stage 1
+patience: 10   # DB-labelled stage; wide slack in case val dips back after a stall
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage2

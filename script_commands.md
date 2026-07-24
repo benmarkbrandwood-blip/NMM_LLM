@@ -778,7 +778,7 @@ MALOM_DB=/path/to/Std_DD_89adjusted ./scripts/train_sentinel_v2_step0.sh
 | `MALOM_DB` | `malom_db_path` from `data/training_paths.local.json` (else `/mnt/windows/...`) | Malom DB directory used in Stages 2 and 4 |
 | `GAME_DIR` | `data/games` | AI self-play game directory |
 | `HUMAN_GAME_DIR` | `data/human_games` | Human game directory |
-| `PATIENCE` | *from config* | Override early-stop patience. Stage 1 config uses 3; Stages 2 and 4 use 4. Set `PATIENCE=0` to disable. |
+| `PATIENCE` | *from config* | Override early-stop patience. All three stages ship `patience: 10` in their YAML. Set `PATIENCE=0` to disable, or any positive int to override. |
 
 Early stopping (`patience`) is now built into `scripts/train_sentinel.py`: the
 epoch loop breaks after N consecutive epochs without a new best val loss.

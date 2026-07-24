@@ -8,7 +8,7 @@ dropout: 0.3
 lr: 0.001
 batch_size: 128
 epochs: 20
-patience: 3    # early-stop after 3 consecutive epochs without val-loss improvement
+patience: 10   # early-stop after 10 consecutive epochs without val-loss improvement
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage1
