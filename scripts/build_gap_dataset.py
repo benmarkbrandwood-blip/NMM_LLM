@@ -51,38 +51,21 @@ SENTINEL_WEIGHT = 0.6    # fraction of composite quality from sentinel (rest fro
 MAX_SYNTHETIC_GAMES = 200  # games to self-play if LOSING category under-represented
 
 
-# ── HumanPrefNet loader (numpy-only, matches train_human_pref_net.py .npz layout) ──
+# HumanPrefNet loader lives in ai/human_pref_advisor.py (Step 3 of the plan).
+# We keep the `HumanPrefLoader` alias here for backwards-compatible imports
+# from anything that predated the ai/human_pref_advisor.py landing.
+from ai.human_pref_advisor import HumanPrefAdvisor
 
-class HumanPrefLoader:
-    """Load a HumanPrefNet .npz written by tools/train_human_pref_net.py and
-    run its forward pass in pure numpy.  Used to compute per-move ranking
-    scores so we can derive an hp_disagreement label for each position.
-    """
-    def __init__(self, npz_path: Path):
-        data = np.load(str(npz_path))
-        n_layers = int(data["layer_count"][0]) if "layer_count" in data.files else 0
-        if n_layers <= 0:
-            # Fall back: count w{i} arrays
-            n_layers = sum(1 for k in data.files if k.startswith("w"))
-        self.layers = [(data[f"w{i}"].astype(np.float32),
-                        data[f"b{i}"].astype(np.float32))
-                       for i in range(n_layers)]
-        self.input_dim = int(data["input_dim"][0]) if "input_dim" in data.files else self.layers[0][0].shape[1]
-        if self.layers[0][0].shape[1] != _INPUT_DIM:
-            raise ValueError(
-                f"HumanPrefNet input_dim {self.layers[0][0].shape[1]} does not "
-                f"match board_to_features dim {_INPUT_DIM}"
-            )
+
+class HumanPrefLoader(HumanPrefAdvisor):
+    """Deprecated alias for HumanPrefAdvisor.  Prefer the ai/ module."""
 
     def score_batch(self, feats: np.ndarray) -> np.ndarray:
-        """Return one score per row of `feats` (shape (N, input_dim))."""
-        x = feats.astype(np.float32)
-        n = len(self.layers)
-        for i, (w, b) in enumerate(self.layers):
-            x = x @ w.T + b
-            if i < n - 1:
-                x = np.maximum(x, 0.0, out=x)
-        return x.squeeze(-1)
+        return self._score_batch(feats)
+
+    @property
+    def layers(self):
+        return self._layers
 
 
 # ── Board reconstruction ──────────────────────────────────────────────────────

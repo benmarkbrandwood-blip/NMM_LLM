@@ -447,6 +447,7 @@ class GameAI:
         use_mcts: bool = False,
         value_net=None,
         gap_net=None,              # ai.value_net.ValueNet trained on blunder gaps | None
+        human_pref_net=None,       # ai.human_pref_advisor.HumanPrefAdvisor | None (Step 3)
         fullgame_db=None,           # ai.fullgame_db.FullGameDB | None
         endgame_solved_db=None,     # ai.endgame_solved_db.EndgameSolvedDB | None
         malom_db=None,              # learned_ai.sentinel.db_teacher.ExternalSolvedDB | None
@@ -480,6 +481,7 @@ class GameAI:
         self.use_mcts = use_mcts
         self._value_net = value_net
         self._gap_net = gap_net        # GapNet: blunder-zone exploitation (V3a)
+        self._human_pref_net = human_pref_net   # HumanPrefAdvisor for humanlike-play mode
         self._gap_leaf_cache: dict[int, int] = {}   # cleared per search
         self.use_gap_net: bool = True
         # Which side's leaves get the gap-net blunder-zone correction.
@@ -1620,6 +1622,52 @@ class GameAI:
             adjusted.append((move, blended))
         return adjusted
 
+    def _apply_humanlike_adjust(
+        self,
+        scored: list[tuple[dict, int]],
+        board: "BoardState",
+    ) -> list[tuple[dict, int]]:
+        """Blend a HumanPrefNet-derived score into each move (Step 3 of retrain_v2_plan.md).
+
+        For humanlike_blend α ∈ [0, 1]:
+            adjusted = int((1-α) * heuristic_raw + α * (hp_prob * _VN_SCALE))
+
+        Terminal / mate scores (|raw| ≥ INF/2) are left untouched — a mate move
+        must remain mate regardless of humanlike setting.  Called between
+        opening adjustments and VN blending; no-op when the advisor is absent
+        or the weight is zero.
+        """
+        if self._human_pref_net is None:
+            return scored
+        blend_pct = getattr(self._weights, "humanlike_blend", 0)
+        if not blend_pct or blend_pct <= 0:
+            return scored
+        alpha = max(0.0, min(1.0, blend_pct / 100.0))
+        # Advisor rebuilt with the current temperature so a slider change on the
+        # weights struct propagates without needing a full advisor rebuild.
+        try:
+            self._human_pref_net.temperature = float(
+                getattr(self._weights, "humanlike_temperature", 1.0)
+            )
+        except Exception:
+            pass
+        try:
+            probs = self._human_pref_net.probs(board, [m for m, _ in scored])
+        except Exception:
+            return scored
+        if len(probs) != len(scored):
+            return scored
+        # Map softmax prob to the same integer scale VN blending uses so the
+        # two signals sit in comparable magnitudes.
+        hp_scores = [int(float(p) * _VN_SCALE) for p in probs]
+        adjusted: list[tuple[dict, int]] = []
+        for (move, raw), hp in zip(scored, hp_scores):
+            if abs(raw) >= 5_000_000:   # terminal / mate — preserve
+                adjusted.append((move, raw))
+                continue
+            adjusted.append((move, int((1.0 - alpha) * raw + alpha * hp)))
+        return adjusted
+
     def _apply_opening_adjustments(
         self,
         scored: list[tuple[dict, int]],
@@ -2388,6 +2436,7 @@ class GameAI:
                         scored = self._apply_opening_adjustments(scored, recognition, board)
                     if trajectory_hints:
                         scored = self._apply_trajectory_hints(scored, trajectory_hints)
+                    scored = self._apply_humanlike_adjust(scored, board)
                     if _vn_blend_active:
                         scored = self._apply_vn_blend(scored, board)
                     if top_n > 1:
@@ -2582,6 +2631,9 @@ class GameAI:
                 n_bonuses += 1
             if trajectory_hints:
                 scored = self._apply_trajectory_hints(scored, trajectory_hints)
+                n_bonuses += 1
+            if self._human_pref_net is not None and getattr(self._weights, "humanlike_blend", 0) > 0:
+                scored = self._apply_humanlike_adjust(scored, board)
                 n_bonuses += 1
             if self._value_net is not None and self._weights.value_net_blend > 0:
                 scored = self._apply_vn_blend(scored, board)

@@ -135,6 +135,12 @@ class HeuristicWeights:
     make_mistakes: int        = 0     # blunder probability 0-100 %
     opening_adherence: int    = 50    # how strongly to follow the opening book (0-100)
     move_variance_pct: int    = 0     # pick randomly from moves within top N% of score range (0=off)
+    # ── Human-like play mode (retrain_v2_plan.md Step 3) ─────────────────
+    # HumanPrefNet blend into leaf ordering.  0 = pure heuristic; 100 = pure
+    # HumanPrefNet.  Intentionally hurts absolute strength — the point is
+    # move-distribution match to human play, not maximum win rate.
+    humanlike_blend: int          = 0
+    humanlike_temperature: float  = 1.0   # softmax temperature for HumanPrefAdvisor.probs()
 
 
 DEFAULT_WEIGHTS = HeuristicWeights()

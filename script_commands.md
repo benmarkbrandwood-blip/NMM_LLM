@@ -208,13 +208,68 @@ and a game-bench runner respectively.
 
 ### 6e — GapNet human-proxy opponent bench
 
-**Blocked on Step 3** (`ai/human_pref_advisor.py` + `humanlike_blend`
-wiring into `GameAI`).  The plan's `bench_sentinel.py --black-humanlike
---humanlike-blend 100` invocation can't execute until GameAI knows how to
-treat HumanPrefNet as a policy at inference time.  Once Step 3 lands, the
-existing `scripts/bench_sentinel.py` gains `--gap-net-path`, `--vn-path`,
-and `--humanlike-blend` flags — see the plan's Step 6e for the exact
-invocations.
+Step 3 has landed (see below), so the infrastructure needed for this bench
+now exists: `HumanPrefAdvisor` at inference time and a `humanlike_blend`
+weight on `HeuristicWeights`.  What's still needed to run 6e end-to-end is
+CLI plumbing on `scripts/bench_sentinel.py` — specifically `--gap-net-path`,
+`--vn-path`, `--black-humanlike`, and `--humanlike-blend` flags that
+construct a human-proxy opponent for the GapNet round-robin.  Add those
+flags before running:
+
+```bash
+# Once bench_sentinel.py is updated:
+.venv/bin/python scripts/bench_sentinel.py \
+  --games 40 --difficulty 5 \
+  --white-gap-net --gap-net-path data/gap_net_v2.npz \
+  --black-humanlike --humanlike-blend 100 \
+  --vn-path data/value_net_v2.npz
+```
+
+
+## Retrain v2 — Step 3: HumanPrefNet at inference
+
+Two pieces of plumbing land in this step (see docs/retrain_v2_plan.md § 3):
+
+**Advisor class** — `ai/human_pref_advisor.py`
+
+```python
+from ai.human_pref_advisor import HumanPrefAdvisor, try_load
+
+adv = HumanPrefAdvisor("data/human_pref_net.npz", temperature=1.0)
+scores = adv.rank(board, legal_moves)        # unbounded scalars, higher = more human-likely
+probs  = adv.probs(board, legal_moves)       # softmax; use for sampling in humanlike mode
+
+# Graceful "off" if the file is absent:
+adv = try_load("data/human_pref_net.npz")    # returns None on missing / bad file
+```
+
+Pure-numpy forward pass — no torch import at inference.  Reads the same NPZ
+layout emitted by `tools/train_human_pref_net.py` (`w0/b0…w{n-1}/b{n-1}`
+plus `input_dim` / `layer_count` metadata).
+
+**HeuristicWeights fields** — `ai/heuristics.py`
+
+```python
+humanlike_blend: int = 0        # 0 = pure heuristic; 100 = pure HumanPrefNet
+humanlike_temperature: float = 1.0
+```
+
+**GameAI wiring** — `ai/game_ai.py`
+
+- New `human_pref_net=` parameter on `GameAI.__init__`.  Pass `try_load(...)`
+  from your loader; leave as `None` to disable.
+- New `_apply_humanlike_adjust(scored, board)` method blends
+  `hp_prob × _VN_SCALE` into each move's leaf score with weight
+  `humanlike_blend / 100`.  Called between opening adjustments and VN
+  blending.  Mate / terminal scores (|raw| ≥ 5,000,000) are preserved
+  untouched.
+
+**Human-like play mode is intentionally weaker.**  The whole point is
+move-distribution match; do not treat a lower absolute win rate as a
+regression when `humanlike_blend > 0`.
+
+
+
 
 
 ## Value Net v2 — Malom WDL Training (train_value_net_v2.py)
