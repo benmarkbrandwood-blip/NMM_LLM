@@ -16,6 +16,7 @@
 #   DEVICE=cuda|cpu           — training device (default cpu)
 #   GAME_DIR=path             — AI self-play game directory (default data/games)
 #   HUMAN_GAME_DIR=path       — human game directory (default data/human_games)
+#   PATIENCE=N                — override early-stop patience (0 = disable)
 #
 # Usage:
 #   ./scripts/train_sentinel_v2_step0.sh
@@ -80,6 +81,9 @@ echo "  human dir      : $HUMAN_GAME_DIR"
 echo "  malom db       : $DB_PATH"
 echo "  device         : $DEVICE"
 echo "  checkpoint root: $CKPT_ROOT"
+if [[ -n "${PATIENCE:-}" ]]; then
+    echo "  patience       : $PATIENCE (overrides config)"
+fi
 echo
 
 # ── Stage runner ─────────────────────────────────────────────────────────────
@@ -112,6 +116,9 @@ _run_stage() {
         --out-dir "$out_dir"
         --device "$DEVICE"
     )
+    if [[ -n "${PATIENCE:-}" ]]; then
+        cmd+=(--patience "$PATIENCE")
+    fi
     if [[ "$use_db" == "yes" ]]; then
         cmd+=(--db-path "$DB_PATH")
     fi

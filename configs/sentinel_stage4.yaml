@@ -8,6 +8,7 @@ dropout: 0.2
 lr: 0.001
 batch_size: 256
 epochs: 30
+patience: 4    # matches Stage 2 slack; final calibration stage
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage4

@@ -105,6 +105,9 @@ def main() -> int:
     p.add_argument("--db-path", default="")
     p.add_argument("--resume", default=None)
     p.add_argument("--epochs", type=int, default=None)
+    p.add_argument("--patience", type=int, default=None,
+                   help="Override config.patience (early stop after N consecutive "
+                        "epochs without val improvement).  0 disables early stop.")
     p.add_argument("--device", default="cpu")
     p.add_argument("--limit", type=int, default=None, help="max game files")
     p.add_argument("--decisive-only", action="store_true",
@@ -142,6 +145,8 @@ def main() -> int:
     config = load_config(args.config)
     if args.epochs is not None:
         config.epochs = args.epochs
+    if args.patience is not None:
+        config.patience = args.patience
     if args.out_dir is not None:
         config.checkpoint_dir = args.out_dir
     _set_seed(config.seed)
@@ -223,6 +228,7 @@ def main() -> int:
     optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
     start_epoch = 0
     best_val = float("inf")
+    stall = 0   # epochs since last best_val improvement (drives early stopping)
 
     if args.resume and os.path.exists(args.resume):
         ckpt = torch.load(args.resume, map_location=device, weights_only=False)
@@ -314,7 +320,10 @@ def main() -> int:
 
     # ── Training loop ────────────────────────────────────────────────────────────
     epoch = start_epoch
+    early_stopped = False
     for phase_num, n_epochs, freeze_trunk, lr in phase_schedule:
+        if early_stopped:
+            break
         if n_epochs <= 0:
             continue
         _freeze_trunk(freeze_trunk)
@@ -392,7 +401,18 @@ def main() -> int:
             cur_val = val_loss if val_loader is not None else train_loss
             if cur_val < best_val:
                 best_val = cur_val
+                stall   = 0
                 _save(os.path.join(config.checkpoint_dir, "best.pt"), epoch + 1)
+            else:
+                stall += 1
+                # Early stopping: patience > 0 caps consecutive stall epochs.
+                _patience = int(getattr(config, "patience", 0) or 0)
+                if _patience > 0 and stall >= _patience:
+                    print(f"  Early stop: {stall} consecutive epochs without val "
+                          f"improvement (patience={_patience}). Best val {best_val:.4f}.")
+                    early_stopped = True
+                    epoch += 1
+                    break
 
             epoch += 1
 

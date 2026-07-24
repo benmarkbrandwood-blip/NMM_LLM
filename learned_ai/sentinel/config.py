@@ -30,6 +30,10 @@ class SentinelConfig:
     batch_size: int = 64
     epochs: int = 50
     val_fraction: float = 0.15
+    # Early stopping: break the epoch loop after this many consecutive epochs
+    # without a new best val loss.  0 = disabled (run to `epochs` regardless).
+    # The best.pt checkpoint remains the epoch with the lowest val loss.
+    patience: int = 0
     seed: int = 42
     checkpoint_dir: str = "learned_ai/sentinel/checkpoints"
     log_dir: str = "learned_ai/sentinel/logs"
