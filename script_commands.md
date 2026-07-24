@@ -104,6 +104,119 @@ Not usable at inference until Step 3 wires `ai/human_pref_advisor.py` into
 the Step 4 GapNet dataset build).
 
 
+## Retrain v2 — Testing Protocol (Step 6)
+
+Four evaluation scripts implement the plan's testing matrix. None of them
+touch production files; they all read from `data/human_db.sqlite` and (for
+Sentinel) the Malom DB.
+
+### 6a — Sentinel DB correlation (eval_sentinel_db.py)
+
+Samples state_keys from `human_db` (stratified by phase), reconstructs each
+board, queries Malom per move, runs the sentinel with DB slots ZEROED
+(matches live inference), and reports `win_acc`, `loss_acc`, `top1_win_rate`,
+`spearman_r`, `dtm_pearson_r`, and phase breakdown.
+
+specialist_db is deliberately skipped (irreversible `pos_hash`).
+
+```bash
+# v1 vs v2 comparison
+.venv/bin/python scripts/eval_sentinel_db.py \
+  --checkpoint learned_ai/sentinel/checkpoints/best.pt \
+  --output eval_sentinel_db_v1.json --n-samples 1000
+
+.venv/bin/python scripts/eval_sentinel_db.py \
+  --checkpoint learned_ai/sentinel/checkpoints/v2/best.pt \
+  --output eval_sentinel_db_v2.json --n-samples 1000
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--checkpoint PATH` | *required* | Sentinel `.pt` to evaluate |
+| `--human-db PATH` | `data/human_db.sqlite` | State-key source |
+| `--malom-db PATH` | `/mnt/windows/.../Std_DD_89adjusted` | Malom DB directory |
+| `--n-samples N` | 1000 | Total positions across place / move / fly |
+| `--output PATH` | — | Optional JSON summary path |
+| `--seed N` | 42 | RNG seed for the state_key sample |
+
+### 6b — Sentinel game bench (bench_sentinel_v2.py)
+
+Existing script — round-robin between old and new sentinel checkpoints at
+20% / 30% gap thresholds vs base heuristic.
+
+```bash
+.venv/bin/python tools/bench_sentinel_v2.py \
+  --diff 5 --budget 3.0 --games-per-pair 40 \
+  --old-ckpt learned_ai/sentinel/checkpoints/best.pt \
+  --new-ckpt learned_ai/sentinel/checkpoints/v2/best.pt \
+  --out eval_sentinel_v2_roundrobin.json
+```
+
+### 6c — ValueNet held-out MSE + sign accuracy (eval_value_net_v2.py)
+
+Deterministic SHA-256 hash of the state_key drives a shared 20% held-out
+split; the same split is used across all `--net` entries so v1 vs v2
+metrics are directly comparable.
+
+```bash
+.venv/bin/python scripts/eval_value_net_v2.py \
+  --net data/value_net.npz    --net-name v1 \
+  --net data/value_net_v2.npz --net-name v2 \
+  --output eval_vn_v2_holdout.json
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--human-db PATH` | `data/human_db.sqlite` | Position source |
+| `--net PATH` | *required, repeatable* | ValueNet `.npz` to evaluate |
+| `--net-name NAME` | *matches `--net` order* | Optional label per net |
+| `--val-fraction F` | 0.20 | Held-out fraction (matching v2 training split rule) |
+| `--limit N` | — | Cap positions read (smoke tests) |
+| `--output PATH` | — | Optional JSON summary path |
+
+For the game-bench sanity check (blends 30 / 60 / 80), use
+`tools/bench_trajectory_value_net.py`:
+
+```bash
+.venv/bin/python tools/bench_trajectory_value_net.py \
+  --vn-path data/value_net_v2.npz --blends 30 60 80 --games 40
+```
+
+### 6d — HumanPrefNet held-out top-K + Spearman (eval_human_pref_net.py)
+
+Same per-position filter as the training script — keeps records with
+`malom_wdl_after='L'` when any exist for a state_key, else `='D'`, always
+skips `='W'`.  Split is deterministic hash by state_key so it's stable
+across runs.
+
+```bash
+.venv/bin/python scripts/eval_human_pref_net.py \
+  --net data/human_pref_net.npz \
+  --output eval_human_pref_net.json
+```
+
+Reports:
+
+- `top1_acc` / `top3_acc` / `top5_acc` — does the human's actual highest-
+  frequency move fall in the top-K HumanPrefNet ranking?
+- `spearman_multi` — for positions with more than one recorded human move,
+  Spearman r between the HP-net ranking and observed play frequency.
+
+Elo-strata top-1 and the AI-move-pruner bench remain in the plan as follow-
+ups; they need per-game Elo tracking (would require a `human_db` rebuild)
+and a game-bench runner respectively.
+
+### 6e — GapNet human-proxy opponent bench
+
+**Blocked on Step 3** (`ai/human_pref_advisor.py` + `humanlike_blend`
+wiring into `GameAI`).  The plan's `bench_sentinel.py --black-humanlike
+--humanlike-blend 100` invocation can't execute until GameAI knows how to
+treat HumanPrefNet as a policy at inference time.  Once Step 3 lands, the
+existing `scripts/bench_sentinel.py` gains `--gap-net-path`, `--vn-path`,
+and `--humanlike-blend` flags — see the plan's Step 6e for the exact
+invocations.
+
+
 ## Value Net v2 — Malom WDL Training (train_value_net_v2.py)
 
 Implements Step 1 of `docs/retrain_v2_plan.md`. Trains ValueNet on per-position
