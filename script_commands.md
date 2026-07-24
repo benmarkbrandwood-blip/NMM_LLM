@@ -52,6 +52,58 @@ python tools/self_play.py --games 500 --no-llm --white 7 --black 3 --parallel 4 
 | `--verbose` | off | Per-game status lines |
 
 
+## HumanPrefNet — Train (train_human_pref_net.py)
+
+Implements Step 2 of `docs/retrain_v2_plan.md`. Trains a move-ranking net on
+human_db moves using pairwise Bradley-Terry (sigmoid BCE) loss:
+`L = − log σ(h(chosen_successor) − h(other_successor))`.
+
+**Per-position filter** (avoids training on positions humans blundered): keep
+records with `malom_wdl_after='L'` (human's move was winning) when any exist
+for this state; else `='D'` records; always skip `='W'` records.
+
+Output: PyTorch weights saved as `data/human_pref_net.npz` — layers stored as
+`w{i}, b{i}` plus `input_dim` / `layer_count` metadata so a lightweight numpy
+loader can drive inference without a torch dependency.
+
+**Full run:**
+
+```
+.venv/bin/python tools/train_human_pref_net.py \
+  --db data/human_db.sqlite \
+  --output data/human_pref_net.npz \
+  --patience 10
+```
+
+**Smoke test (500 positions, 3 epochs — CPU or GPU):**
+
+```
+.venv/bin/python tools/train_human_pref_net.py \
+  --limit 500 --epochs 3 --output /tmp/hp_smoke.npz
+```
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--db PATH` | `data/human_db.sqlite` | Source database (`moves` table joined against `positions`). |
+| `--output PATH` | `data/human_pref_net.npz` | Output NPZ. |
+| `--epochs N` | 100 | Max epochs (early stopping usually terminates sooner). |
+| `--patience N` | 10 | Early-stop patience — epochs without val-loss improvement. |
+| `--lr F` | 3e-4 | Learning rate. |
+| `--batch-size N` | 512 | Mini-batch size. |
+| `--val-fraction F` | 0.20 | Held-out fraction for val + early stop. |
+| `--pairs-per-position N` | 4 | Cap on (chosen, other) pairs sampled per qualifying position. |
+| `--limit N` | — | Cap positions loaded (for smoke tests). |
+| `--seed N` | 42 | RNG seed. |
+
+Ranking accuracy (val) is the primary metric: fraction of `(chosen, other)`
+pairs where `h(chosen) > h(other)`. The smoke test above reaches ~0.68 on 500
+positions in 3 epochs; a full run should climb well past that.
+
+Not usable at inference until Step 3 wires `ai/human_pref_advisor.py` into
+`GameAI` (both for "human-like play" mode and as the human-proxy opponent in
+the Step 4 GapNet dataset build).
+
+
 ## Value Net v2 — Malom WDL Training (train_value_net_v2.py)
 
 Implements Step 1 of `docs/retrain_v2_plan.md`. Trains ValueNet on per-position
