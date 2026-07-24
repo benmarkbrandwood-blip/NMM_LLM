@@ -241,8 +241,15 @@ pairwise loss).
 .venv/bin/python tools/train_human_pref_net.py \
   --db data/human_db.sqlite \
   --output data/human_pref_net.npz \
-  --patience 10
+  --patience 10 --batch-size 4096
 ```
+
+**Memory**: full-DB training produces ~7M pairs (2M positions × up to
+`--pairs-per-position`).  The trainer keeps the pair arrays on CPU and moves
+only the current batch to GPU, so peak GPU memory scales with `--batch-size`,
+not dataset size.  Default `--batch-size 512` is safe anywhere; bump to 4096
+or 8192 on a modern GPU to cut per-epoch iteration count roughly 8–16× — the
+per-batch payload at 8192 is still just ~2.6 MB per side.
 
 **Pre-flight**: spot-check `malom_wdl_after` semantics before writing the script — confirm 'L'
 means the *next player loses* (i.e. the human's move was winning) and 'W' means the human's move

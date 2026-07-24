@@ -72,7 +72,7 @@ loader can drive inference without a torch dependency.
 .venv/bin/python tools/train_human_pref_net.py \
   --db data/human_db.sqlite \
   --output data/human_pref_net.npz \
-  --patience 10
+  --patience 10 --batch-size 4096
 ```
 
 **Smoke test (500 positions, 3 epochs — CPU or GPU):**
@@ -89,11 +89,18 @@ loader can drive inference without a torch dependency.
 | `--epochs N` | 100 | Max epochs (early stopping usually terminates sooner). |
 | `--patience N` | 10 | Early-stop patience — epochs without val-loss improvement. |
 | `--lr F` | 3e-4 | Learning rate. |
-| `--batch-size N` | 512 | Mini-batch size. |
+| `--batch-size N` | 512 | Mini-batch size. See note below on picking a larger value for full-DB runs. |
 | `--val-fraction F` | 0.20 | Held-out fraction for val + early stop. |
 | `--pairs-per-position N` | 4 | Cap on (chosen, other) pairs sampled per qualifying position. |
 | `--limit N` | — | Cap positions loaded (for smoke tests). |
 | `--seed N` | 42 | RNG seed. |
+
+**Memory model**: the trainer keeps the full pair arrays on CPU and moves
+only the current batch to GPU each step.  Peak GPU memory scales with
+`--batch-size`, not dataset size — an 8 GB GPU handles the full 2M-position
+run at any reasonable batch size.  Default 512 is safe on any hardware;
+bump to 4096 or 8192 on a modern GPU to cut per-epoch iteration count 8–16×
+(per-batch payload at 8192 is still ~2.6 MB per side).
 
 Ranking accuracy (val) is the primary metric: fraction of `(chosen, other)`
 pairs where `h(chosen) > h(other)`. The smoke test above reaches ~0.68 on 500
