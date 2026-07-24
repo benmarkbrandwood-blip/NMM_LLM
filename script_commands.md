@@ -766,6 +766,13 @@ directory to force that stage to rerun. Promotes the final checkpoint to
 `learned_ai/sentinel/checkpoints/v2/best.pt` without touching production
 `best.pt`.
 
+**Best-checkpoint fallback**: the trainer restores `best_val` from the
+resume checkpoint, so a stage that never dips below that inherited value
+never writes a fresh `best.pt`. The wrapper handles this by copying the
+resume checkpoint (or `latest.pt` as second fallback) into the stage's
+`best.pt` with a clear log message, so the chain proceeds even when a
+stage plateaus.
+
 ```bash
 ./scripts/train_sentinel_v2_step0.sh                # cpu, default paths
 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # gpu run

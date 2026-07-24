@@ -128,9 +128,25 @@ _run_stage() {
     echo "  ${cmd[*]}"
     "${cmd[@]}"
 
+    # Fallback: the trainer restores best_val from the resume checkpoint
+    # (train_sentinel.py:240), so a stage that never dips below that inherited
+    # value never writes a fresh best.pt.  That's honest — no epoch improved
+    # on the resume baseline — but the chain needs a best.pt at each stage,
+    # so carry the resume checkpoint (or latest.pt) forward with a clear log.
     if [[ ! -f "$best" ]]; then
-        echo "ERROR: Stage $stage finished but $best was not produced." >&2
-        exit 3
+        if [[ -n "$resume" && -f "$resume" ]]; then
+            echo "  Stage $stage did not improve over its resume baseline;"
+            echo "  carrying $resume → $best"
+            cp "$resume" "$best"
+        elif [[ -f "$out_dir/latest.pt" ]]; then
+            echo "  Stage $stage best.pt missing but latest.pt exists;"
+            echo "  promoting $out_dir/latest.pt → $best"
+            cp "$out_dir/latest.pt" "$best"
+        else
+            echo "ERROR: Stage $stage finished but neither $best nor a resume" >&2
+            echo "       checkpoint nor $out_dir/latest.pt is available." >&2
+            exit 3
+        fi
     fi
     echo "── Stage $stage — complete ($best) ──"
     echo
