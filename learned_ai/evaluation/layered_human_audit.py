@@ -64,7 +64,7 @@ class _HistoryGroup:
     final_ring16_fen: str
     occurrence_count: int = 0
     session_ids: set[str] = field(default_factory=set)
-    results: Counter[str] = field(default_factory=Counter)
+    session_results: dict[str, str] = field(default_factory=dict)
 
 
 def _file_sha256(path: Path) -> str:
@@ -409,6 +409,7 @@ def _history_record(
     *,
     book: Mapping[str, set[str]],
 ) -> dict[str, Any]:
+    results = Counter(group.session_results.values())
     return {
         "schema_version": HUMAN_HISTORY_SCHEMA,
         "history_identity": history_identity,
@@ -425,9 +426,9 @@ def _history_record(
             "black_second_game_count": len(group.session_ids),
         },
         "results": {
-            "white_wins": group.results["white_wins"],
-            "black_wins": group.results["black_wins"],
-            "draws": group.results["draws"],
+            "white_wins": results["white_wins"],
+            "black_wins": results["black_wins"],
+            "draws": results["draws"],
         },
         "final": {
             "nmm_fen": group.final_nmm_fen,
@@ -493,6 +494,8 @@ def audit_human_prefix_histories(
     source_counts: Counter[str] = Counter()
     source_type_counts: Counter[str] = Counter()
     groups: dict[str, _HistoryGroup] = {}
+    session_history: dict[str, str] = {}
+    session_record_counts: Counter[str] = Counter()
     manifest_temporary = manifest_target.with_suffix(
         manifest_target.suffix + ".tmp"
     )
@@ -519,6 +522,18 @@ def audit_human_prefix_histories(
                     history_identity = canonical_sha256(
                         list(extracted.action_tokens)
                     )
+                    previous_history = session_history.get(
+                        extracted.session_sha256
+                    )
+                    if (
+                        previous_history is not None
+                        and previous_history != history_identity
+                    ):
+                        raise LayeredHumanAuditError(
+                            "one PlayOK session has conflicting prefix histories"
+                        )
+                    session_history[extracted.session_sha256] = history_identity
+                    session_record_counts[extracted.session_sha256] += 1
                     group = groups.get(history_identity)
                     if group is None:
                         group = _HistoryGroup(
@@ -539,7 +554,18 @@ def audit_human_prefix_histories(
                         )
                     group.occurrence_count += 1
                     group.session_ids.add(extracted.session_sha256)
-                    group.results[_winner_key(extracted.winner)] += 1
+                    result = _winner_key(extracted.winner)
+                    previous_result = group.session_results.get(
+                        extracted.session_sha256
+                    )
+                    if (
+                        previous_result is not None
+                        and previous_result != result
+                    ):
+                        raise LayeredHumanAuditError(
+                            "one PlayOK session has conflicting outcomes"
+                        )
+                    group.session_results[extracted.session_sha256] = result
             manifest_handle.flush()
             os.fsync(manifest_handle.fileno())
         os.replace(manifest_temporary, manifest_target)
@@ -554,6 +580,7 @@ def audit_human_prefix_histories(
     ]
     history_records.sort(
         key=lambda record: (
+            -int(record["distinct_game_count"]),
             -int(record["occurrence_count"]),
             str(record["history_identity"]),
         )
@@ -563,7 +590,10 @@ def audit_human_prefix_histories(
         "logical_ply_count": PREFIX_LOGICAL_PLIES_V2,
         "logical_plies_by_side": list(PREFIX_LOGICAL_PLIES_BY_SIDE_V2),
         "record_count": len(history_records),
-        "ordering": "occurrence_count_desc_then_history_identity",
+        "ordering": (
+            "distinct_game_count_desc_then_occurrence_count_desc_then_"
+            "history_identity"
+        ),
     }
     ledger_temporary = ledger_target.with_suffix(ledger_target.suffix + ".tmp")
     if ledger_temporary.exists():
@@ -581,20 +611,18 @@ def audit_human_prefix_histories(
             ledger_temporary.unlink()
         raise
 
-    frequency = Counter(
+    game_frequency = Counter(
+        int(record["distinct_game_count"]) for record in history_records
+    )
+    record_frequency = Counter(
         int(record["occurrence_count"]) for record in history_records
     )
-    eligible_games = status_counts["eligible"]
+    distinct_eligible_games = len(session_history)
     repeated = [
         record
         for record in history_records
-        if int(record["occurrence_count"]) >= 2
+        if int(record["distinct_game_count"]) >= 2
     ]
-    distinct_sessions = {
-        session
-        for group in groups.values()
-        for session in group.session_ids
-    }
     book_overlap = {
         field: sum(
             bool(record["overlap"][field]) for record in history_records
@@ -638,18 +666,36 @@ def audit_human_prefix_histories(
             }
             for source_type in sorted(source_type_counts)
         ],
-        "eligible_record_count": eligible_games,
-        "distinct_eligible_game_count": len(distinct_sessions),
+        "eligible_record_count": status_counts["eligible"],
+        "distinct_eligible_game_count": distinct_eligible_games,
+        "duplicate_source_record_count": (
+            status_counts["eligible"] - distinct_eligible_games
+        ),
+        "sessions_with_duplicate_source_records": sum(
+            count > 1 for count in session_record_counts.values()
+        ),
+        "maximum_source_records_for_one_session": max(
+            session_record_counts.values(),
+            default=0,
+        ),
+        "conflicting_duplicate_session_count": 0,
         "unique_exact_history_count": len(history_records),
         "frequency_distribution": [
             {
-                "occurrences": occurrences,
-                "history_count": frequency[occurrences],
+                "distinct_games": games,
+                "history_count": game_frequency[games],
             }
-            for occurrences in sorted(frequency)
+            for games in sorted(game_frequency)
+        ],
+        "source_record_occurrence_distribution": [
+            {
+                "source_records": occurrences,
+                "history_count": record_frequency[occurrences],
+            }
+            for occurrences in sorted(record_frequency)
         ],
         "maximum_history_frequency": (
-            int(history_records[0]["occurrence_count"])
+            int(history_records[0]["distinct_game_count"])
             if history_records
             else 0
         ),
@@ -659,7 +705,7 @@ def audit_human_prefix_histories(
         ),
         "concentration": _concentration(
             history_records,
-            eligible_games,
+            distinct_eligible_games,
             (1, 10, 64, 100, 1000),
         ),
         "book_overlap_history_counts": book_overlap,
@@ -802,10 +848,40 @@ def verify_layered_human_audit(payload: Mapping[str, Any]) -> dict[str, Any]:
         )
     ):
         raise LayeredHumanAuditError("HumanDB concentration is non-finite")
+    if (
+        raw["duplicate_source_record_count"]
+        != raw["eligible_record_count"] - raw["distinct_eligible_game_count"]
+        or raw["conflicting_duplicate_session_count"] != 0
+    ):
+        raise LayeredHumanAuditError(
+            "HumanDB duplicate-session accounting drifted"
+        )
+    if sum(
+        int(item["history_count"])
+        for item in raw["frequency_distribution"]
+    ) != raw["unique_exact_history_count"]:
+        raise LayeredHumanAuditError(
+            "HumanDB frequency histogram count drifted"
+        )
+    if sum(
+        int(item["distinct_games"]) * int(item["history_count"])
+        for item in raw["frequency_distribution"]
+    ) != raw["distinct_eligible_game_count"]:
+        raise LayeredHumanAuditError(
+            "HumanDB frequency histogram game total drifted"
+        )
+    for record in raw["highest_frequency_histories"]:
+        if sum(int(value) for value in record["results"].values()) != record[
+            "distinct_game_count"
+        ]:
+            raise LayeredHumanAuditError(
+                "HumanDB result distribution counts duplicate source records"
+            )
     return {
         "snapshot_sha256": snapshot["snapshot"]["sha256"],
         "source_files": raw["source_file_count"],
-        "eligible_games": raw["eligible_record_count"],
+        "eligible_source_records": raw["eligible_record_count"],
+        "distinct_eligible_games": raw["distinct_eligible_game_count"],
         "unique_histories": raw["unique_exact_history_count"],
         "repeated_histories": raw["repeated_history_count"],
         "maximum_frequency": raw["maximum_history_frequency"],
