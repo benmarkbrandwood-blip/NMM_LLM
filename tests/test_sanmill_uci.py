@@ -204,6 +204,39 @@ def test_state_parser_accepts_authoritative_protocol_v1_snapshot() -> None:
     assert len(state.legal_actions) == 24
 
 
+def test_state_parser_allows_terminal_snapshot_to_retain_remove_action() -> None:
+    payload = _valid_state_payload()
+    payload.update(
+        {
+            "status": "terminal",
+            "fen": (
+                "**O**O**/@**OOOOO/**O*@*** w o r 8 0 2 0 0 0 "
+                "-1 -1 -1 -1 0 0 29 ids:nodes"
+            ),
+            "side_to_move": None,
+            "phase": "game_over",
+            "action": "remove",
+            "legal_actions": [],
+            "action_token_count": 2,
+            "logical_ply_count": 1,
+            "logical_plies_by_side": [1, 0],
+            "terminal": True,
+            "winner": "white",
+            "winner_code": 0,
+            "outcome_reason": "loseFewerThanThree",
+            "outcome_reason_code": "lose_fewer_than_three",
+        }
+    )
+
+    state = parse_state_json_line(
+        _machine_line("info string sanmill_state ", payload)
+    )
+
+    assert state.terminal
+    assert state.action == "remove"
+    assert not state.removal_pending
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [

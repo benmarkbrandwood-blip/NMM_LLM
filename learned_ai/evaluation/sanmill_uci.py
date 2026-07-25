@@ -611,7 +611,11 @@ def parse_state_json_line(line: str) -> UciPositionState:
         raise SanmillBridgeError("Sanmill pending-removal fields disagree")
     if pending_removal and action != "remove":
         raise SanmillBridgeError("pending Sanmill removal has the wrong action")
-    if not pending_removal and action == "remove":
+    if (
+        not pending_removal
+        and action == "remove"
+        and status != "terminal"
+    ):
         raise SanmillBridgeError("Sanmill remove action lacks a pending removal")
 
     raw_legal = payload.get("legal_actions")
