@@ -66,13 +66,15 @@ the imported in-place SpecialistDB clearing tool has been made non-destructive.
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
 storage map and machine-local lookup keys, and
-[`docs/v5-specialist-plan.md`](../v5-specialist-plan.md) for the broader design.
+[`docs/v5-specialist-plan.md`](../v5-specialist-plan.md) for the modular v5
+design and its owning subdocuments.
 Machine-specific absolute values are intentionally kept only in the ignored
 `data/training_paths.local.json`. Path names shown in committed documents are
 relative to the repository root; Markdown link targets are relative to their
 containing files so that they render correctly.
-The v5 plan is a target and audit document; statements in it that describe the
-decoder as currently broken have been superseded by the commits listed below.
+The dated monolithic v5 snapshot is historical. The current v5 entry point
+records that the coarse sector-corrected decoder is already repaired while the
+complete comparator, rule-history, proof, and release questions remain open.
 
 ## Repository and Workspace Boundary
 
@@ -1079,8 +1081,10 @@ rewrite without the applicable separate authorization.
 - [`docs/retrain_v2_plan.md`](../retrain_v2_plan.md): maintainer proposal for
   Sentinel, ValueNet, and GapNet v2 work; useful design input but not a frozen
   or authorized run contract.
-- [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): target
-  architecture, evidence boundaries, and staged acceptance plan.
+- [`docs/v5-specialist-plan.md`](../v5-specialist-plan.md): modular v5 entry
+  point, evidence boundary, feasibility-first route, and links to the owning
+  oracle, training, human-data, runtime, release, and governance
+  specifications.
 - [`docs/managed-training-operations.md`](../managed-training-operations.md):
   durable Agent/product authority boundary, managed contracts, commands,
   status model, and stop policy.

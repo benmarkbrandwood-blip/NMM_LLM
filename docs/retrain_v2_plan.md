@@ -212,12 +212,14 @@ it. The aggregate `positions` and `moves` tables have already discarded game
 and player membership and cannot support the required leakage-safe split or a
 complete observed choice-set likelihood.
 
-Any future HumanPolicy implementation is owned by the data and model contract
-in [`docs/v5-specialist-plan.md`](v5-specialist-plan.md). It must start from
-the raw JSONL records, preserve stable game and available player identity,
-split before aggregation, represent the complete legal choice set for each
-observed decision, and define calibration, OOD, and abstention evidence. That
-work requires a separate experiment and authorization; it is not a prerequisite
+Any future HumanPolicy implementation is owned by the
+[v5 human-data/statistics plan](v5/human-data-and-statistics-plan.md) and
+[training research plan](v5/training-research-plan.md), indexed by
+[`docs/v5-specialist-plan.md`](v5-specialist-plan.md). It must start from the
+raw JSONL records, preserve stable game and available player identity, split
+before aggregation, represent the complete legal choice set for each observed
+decision, and define calibration, OOD, and abstention evidence. That work
+requires a separate experiment and authorization; it is not a prerequisite
 for Sentinel or GapNet safety fixes.
 
 ---

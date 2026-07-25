@@ -7,8 +7,9 @@
 - Read `docs/local-training-layout.md` before touching machine-local data.
 - Use `docs/experiments/dev-v4-malom-corrected-baseline.md` for the current
   corrected Generalist experiment contract.
-- Use `docs/v5-specialist-plan.md` for target v5 design, not for claims about
-  the current implementation.
+- Use `docs/v5-specialist-plan.md` as the target-v5 entry point and follow its
+  owning modular specifications under `docs/v5/`. Current implementation and
+  run claims remain owned by the handover and accepted evidence.
 - Use `.agents/skills/verify-training-readiness` before any training smoke,
   resume, or long-run launch.
 
