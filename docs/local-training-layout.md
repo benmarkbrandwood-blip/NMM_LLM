@@ -115,6 +115,7 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | HumanDB | `data/human_db.sqlite`, 738,091,008 bytes; 94,429 games, 2,152,889 positions, and 2,516,356 move rows |
 | Twelve-ply HumanDB audit snapshot | Ignored point-in-time SQLite online backup under `data/backups/prefix12_human_db_20260725`; 738,091,008 bytes, SHA-256 `97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c`, `quick_check=ok`; resolve the database, source manifest, and complete-history ledger through the local path registry |
 | Archived rebuilt HumanDB candidate | `data/backups/maintainer_upload_20260721/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
+| Archived maintainer Openings delivery | Exact ignored retention copy under `data/backups/maintainer_openings_20260725`; the two Book files duplicate tracked assets, while the 184-record learned file contains 15 unmerged `seed_source=learned` candidates; see the delivery evidence |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
@@ -200,6 +201,13 @@ new experiment must explicitly choose one lineage. See
 for the original audit and
 [`docs/evidence/maintainer-upload-relocation-2026-07-25.md`](evidence/maintainer-upload-relocation-2026-07-25.md)
 for the relocation, file purposes, and small-file disposition.
+
+The 25 July Openings delivery is retained separately under
+`data/backups/maintainer_openings_20260725`. Its two Book files are exact
+duplicates of tracked assets. Its learned-opening file contains 15 additional
+low-confidence application-generated candidates and has not been merged into
+an active source. See
+[`docs/evidence/maintainer-openings-delivery-2026-07-25.md`](evidence/maintainer-openings-delivery-2026-07-25.md).
 
 The original legacy SpecialistDB is isolated at:
 
