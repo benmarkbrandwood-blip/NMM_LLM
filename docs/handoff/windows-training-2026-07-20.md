@@ -640,6 +640,8 @@ The next-evaluation preparation records are:
 - [training-aligned product decision brief](../experiments/dev-v4-training-aligned-evaluation-v1-decision-brief.md)
 - [phase-corpus review record](../experiments/dev-v4-phase-covered-corpus-v1-review.md)
 - [phase-corpus artifact](../experiments/dev-v4-phase-covered-corpus-v1.json)
+- [complete Sanmill book-path contract](../experiments/sanmill-book-path-corpus-v1.md)
+- [complete Sanmill book-path artifact](../experiments/sanmill-book-path-corpus-v1.json)
 
 ## Strict Sanmill Bridge Validation
 
@@ -743,9 +745,22 @@ resumes. No optional database is enabled inside later MTD(f) search.
 The corrected book is sparse. A fixed `pair-12` diagnostic generated the same
 eight-ply book prefix in two fresh processes, but `pair-0` reached
 `book_miss` before its sixth logical move. No fallback was used. Before a
-75/25 smoke, freeze either an eligible book pair-ID set, a complete-path
+75/25 smoke, use either an eligible book pair-ID set, a frozen complete-path
 corpus, or an explicit per-ply source schedule. Do not interpret a book miss
 as permission to switch sources at runtime.
+
+The complete-path option is now implemented as inventory-only infrastructure.
+Contract commit `8edb148` and implementation commit `024d1f8` produced a
+host-path-free artifact from two fresh Sanmill processes. Both enumerations
+contained the same 192 complete eight-logical-ply histories, 508 pruned
+`book_miss` leaves, and zero fallback or pre-depth terminal leaves. The
+artifact corpus identity is
+`3bc9bc05a66a1a53255444266388838489020667272fc2ffa7445e7cf44be985`;
+its file SHA-256 is
+`490537d892e4dc64b0b46331754bab448a3b3d99dad620131cb692916e540ceb`.
+The 192 histories end in only 84 distinct FENs. Therefore the inventory does
+not silently define uniform path, final-position, or source-rank weighting,
+nor does it freeze the proposed book/Perfect DB proportions.
 
 The configured Perfect DB returned 24 StrictSteps-tied initial candidates and
 reported complete standard-sector coverage. The active HumanDB currently
@@ -753,11 +768,11 @@ fails closed with `database_not_immutable` because its SQLite `-shm` sidecar
 is non-empty; no sidecar was changed. Whether HumanDB becomes evidence only or
 a third source remains unfrozen.
 
-After the complete suite passed, the referenced Sanmill checkout acquired two
-untracked interchange-format documents under its `docs/standards/` directory.
-The strict installation audit now rejects that dirty checkout. Do not remove
-or adopt those files from this repository; the Sanmill workspace owner must
-resolve them before another bridge or prefix smoke.
+The two untracked interchange-format drafts that temporarily dirtied the
+referenced Sanmill checkout were removed by its workspace owner. The pinned
+installation audit and 60 Sanmill UCI/data-query/prefix regressions then passed
+again. No file was imported from the other workspace. The active HumanDB
+sidecar remains a separate unresolved local-data condition.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -905,13 +920,14 @@ training merely because the managed run ended. Proceed in this order:
    commits pinned by identity even though they are now on Sanmill `master`.
    Do not silently float to later CLI or rule changes.
 8. Preserve the implemented fail-closed data-query client and paired-prefix
-   sampler. Freeze how sparse-book misses are handled before using the
-   provisional 75% book / 25% StrictSteps mix. The allowed choices are a
-   pre-audited eligible pair-ID set, a frozen complete-path corpus, or an
-   explicit per-ply source schedule; there is no runtime fallback. Decide
+   sampler together with the complete-path inventory. Sparse-book misses are
+   now exhaustively recorded, but no sampling distribution is implied. Before
+   using the provisional 75% book / 25% StrictSteps mix, choose an explicit
+   within-book weighting (or choose the eligible pair-ID/per-ply alternative)
+   and freeze the source proportions; there is no runtime fallback. Decide
    separately whether HumanDB frequencies are evidence only or a third source.
-   Resolve the active HumanDB sidecar and Sanmill worktree cleanliness only
-   through their owning workspaces.
+   Resolve the active HumanDB sidecar only through its owning data workflow;
+   the Sanmill worktree cleanliness blocker is closed.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions

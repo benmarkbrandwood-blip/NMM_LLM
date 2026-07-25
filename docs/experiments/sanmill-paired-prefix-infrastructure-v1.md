@@ -167,6 +167,13 @@ The complete repository suite at
 `498 subtests passed` in 3306.78 seconds. This run did not load a candidate or
 play a candidate-versus-baseline game.
 
+Two later independent commits implement the complete-path option without
+changing this sampler's policy:
+
+- `8edb148` freezes the exhaustive corpus contract; and
+- `024d1f8` adds enumeration, strict persistence, the clean-tree builder, and
+  regressions.
+
 Two fresh data-query processes produced byte-identical eight-logical-ply
 book prefixes for the frozen diagnostic identity
 `book-prefix-black-box-v1`, pair `pair-12`, seed 42, using the explicit
@@ -185,6 +192,16 @@ frozen, it must choose one of these pre-result policies:
 
 Silently filling a book miss with Perfect DB is not an allowed interpretation.
 
+The second option now has complete infrastructure evidence. Contract
+[`sanmill-book-path-corpus-v1.md`](sanmill-book-path-corpus-v1.md) and artifact
+[`sanmill-book-path-corpus-v1.json`](sanmill-book-path-corpus-v1.json)
+exhaustively enumerate the pinned corrected book. Two fresh processes produced
+the same 192 complete eight-logical-ply histories and 508 pruned
+`book_miss` leaves, with no fallback. Those exact histories end in only 84
+distinct FENs, so the artifact remains an inventory rather than an implicit
+uniform sampling policy. The later experiment must still choose whether and
+how to use it before any result is observed.
+
 A read-only query of the configured standard Perfect DB returned `available`,
 24 tied initial candidates, `fully_available=true`, and the expected
 `std.secval` SHA-256
@@ -197,9 +214,8 @@ sidecar was removed or altered. HumanDB remains outside the prefix policy, and
 this local state must be resolved by the database owner before any later
 HumanDB query smoke.
 
-After the complete suite passed, the referenced Sanmill checkout acquired two
-untracked interchange-format documents under `docs/standards/`. The strict
-installation audit now rejects that dirty checkout. These files belong to the
-other workspace and were not modified here. A new bridge or prefix smoke must
-wait until the Sanmill workspace owner records or otherwise resolves them and
-the pinned-scope audit is rerun.
+The Sanmill workspace owner removed the two untracked interchange-format
+drafts that had temporarily made the checkout dirty. The pinned installation
+audit then passed again, and the Sanmill UCI/data-query/prefix regressions
+reported `60 passed`. No draft from the other workspace was imported into this
+repository.

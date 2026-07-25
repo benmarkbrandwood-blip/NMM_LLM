@@ -1,6 +1,7 @@
 # Sanmill Complete Book-Path Corpus v1
 
-Status: infrastructure corpus contract frozen; evaluation use not frozen.
+Status: infrastructure corpus contract and artifact frozen; evaluation use not
+frozen.
 
 This contract defines a reproducible inventory of every corrected Sanmill NMM
 opening-book branch that can complete exactly eight logical plies from
@@ -110,3 +111,55 @@ The implementation must demonstrate:
 - a local build against the pinned corrected book.
 
 No candidate model is loaded and no game is played during this build.
+
+## Frozen artifact evidence
+
+Implementation commit
+`024d1f891ac81e8cd0f2b7c25b22fbec28947d7d` added the fail-closed
+enumerator, strict loader, exclusive builder, and regressions. From that clean
+commit, the builder opened two fresh Sanmill data-query processes and obtained
+identical canonical corpus bodies before publishing
+[`sanmill-book-path-corpus-v1.json`](sanmill-book-path-corpus-v1.json).
+
+The frozen identities are:
+
+- corpus identity
+  `3bc9bc05a66a1a53255444266388838489020667272fc2ffa7445e7cf44be985`;
+- corpus file SHA-256
+  `490537d892e4dc64b0b46331754bab448a3b3d99dad620131cb692916e540ceb`;
+- bundled-book portable identity
+  `58101aa9b7f58f30a0489c0d85a991ba78e3147d94a87e5456af3f2167f58eaf`;
+- pinned Sanmill commit
+  `db65eb3e73189d934d615d0f47519d395193c646`; and
+- pinned Windows release binary SHA-256
+  `cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc`.
+
+The exhaustive depth audit is:
+
+| Input logical ply | Input prefixes | Available | Book miss | Candidate edges | Compound edges |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 1 | 1 | 0 | 8 | 0 |
+| 1 | 8 | 8 | 0 | 40 | 0 |
+| 2 | 40 | 40 | 0 | 76 | 0 |
+| 3 | 76 | 76 | 0 | 140 | 0 |
+| 4 | 140 | 48 | 92 | 264 | 0 |
+| 5 | 264 | 64 | 200 | 232 | 0 |
+| 6 | 232 | 80 | 152 | 128 | 48 |
+| 7 | 128 | 64 | 64 | 192 | 128 |
+
+The result contains 192 complete exact histories and 508 audited
+`book_miss` leaves, with no terminal leaf and no fallback. The 192 histories
+have 192 distinct history SHA-256 values but only 84 distinct final FENs.
+That difference is expected under the frozen path-equivalence rule and is
+important for the later sampling decision: uniform-over-paths is not the same
+distribution as uniform-over-final-positions.
+
+The corpus-specific suite reports `6 passed`, including two fresh real
+Sanmill processes. The combined book-corpus, data-query, and prefix suites
+report `25 passed`. The prior clean Sanmill UCI/data-query/prefix regression
+run remains `60 passed`; the 55-minute full repository suite was not repeated
+for this artifact-only step.
+
+This artifact closes the technical option to inventory complete book paths.
+It does not select uniform path sampling, source-rank weighting, a 75/25
+book/Perfect DB mixture, HumanDB participation, or any evaluation launch.

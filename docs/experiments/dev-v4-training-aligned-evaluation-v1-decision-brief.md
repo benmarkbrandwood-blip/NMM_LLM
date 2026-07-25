@@ -12,6 +12,8 @@ Related:
 - [managed training experiment](dev-v4-malom-corrected-baseline.md)
 - [current Sanmill bridge contract](sanmill-strict-uci-bridge-smoke-v2.md)
 - [current Sanmill bridge result](../evidence/sanmill-strict-uci-bridge-smoke-v2-2026-07-25.md)
+- [complete Sanmill book-path contract](sanmill-book-path-corpus-v1.md)
+- [complete Sanmill book-path artifact](sanmill-book-path-corpus-v1.json)
 
 ## What is now locally resolved
 
@@ -108,9 +110,14 @@ The corrected book is a sparse position-to-candidate source rather than a
 complete depth-eight tree for every locally sampled branch. A fixed diagnostic
 `pair-12` generated a byte-identical eight-ply prefix in two fresh processes,
 while `pair-0` failed closed with `book_miss` before its sixth logical move.
-Therefore the 75% book proposal still needs a pre-result definition of either
-an eligible pair-ID set, a frozen complete-path corpus, or a per-ply source
-schedule. A runtime fallback from book miss to Perfect DB remains forbidden.
+The complete-path infrastructure option is now built and frozen separately.
+It contains all 192 exact eight-logical-ply histories and records 508 shorter
+`book_miss` leaves without fallback. The 192 histories end in 84 distinct
+FENs, so selecting this artifact still requires a pre-result weighting choice:
+uniform histories, uniform final positions, source-rank-derived weights, or
+another explicit design are materially different populations. The artifact
+does not select the provisional 75% book share, and a runtime fallback from
+book miss to Perfect DB remains forbidden.
 
 The configured Perfect DB passed a read-only initial-position source probe
 with 24 StrictSteps ties and complete standard-sector coverage. The configured
@@ -171,21 +178,25 @@ must not be counted as additional observations.
 
 The authorized strict Sanmill logical-turn bridge and its rule,
 reproducibility, and performance report are complete. Safe next work is
-limited to implementing and auditing the NMM_LLM paired-prefix client and
-sampler, recording the corpus disposition, and then implementing the still
-unfrozen formal runner. The remaining product choices include whether HumanDB
-frequencies participate in prefix selection, the book/Perfect DB proportions,
-node budget, history-bearing start representation, accepted corpus, game
-count, and rules-compliant termination contract. Starting
-candidate-versus-baseline games requires a separate explicit instruction
-against a later frozen specification.
+limited to selecting a pre-result prefix distribution from the audited
+sources, recording the phase-corpus disposition, and then implementing the
+still-unfrozen formal runner. The paired-prefix client, sampler, and complete
+book-path inventory are implemented. The remaining product choices include
+whether HumanDB frequencies participate in prefix selection, the
+book/Perfect DB proportions and within-book weighting, node budget,
+history-bearing start representation, accepted phase corpus, game count, and
+rules-compliant termination contract. Starting candidate-versus-baseline
+games requires a separate explicit instruction against a later frozen
+specification.
 
 ## Current stop conditions
 
 No original-maintainer technical clarification is currently required for the
 bridge: code, checkpoint, database, and fixture evidence resolve the route
 facts above. Formal evaluation remains stopped at the paired-prefix policy,
-corpus disposition, workload, runner-audit, and launch gates.
+phase-corpus disposition, workload, runner-audit, and launch gates. The
+complete book-path inventory removes one implementation uncertainty but does
+not make those product decisions automatically.
 
 Until those choices are recorded:
 
