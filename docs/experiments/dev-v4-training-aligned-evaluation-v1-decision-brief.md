@@ -78,9 +78,10 @@ pinned asset contains 109 entries and 437 unique recommendations; authoritative
 replay found zero illegal and zero duplicate recommendations. The bridge still
 leaves book play disabled. Sanmill now exposes fail-closed data-query
 interfaces for the corrected book, HumanDB, and Perfect DB, so the
-provider-interface blocker is closed. The remaining gate is an NMM_LLM paired
-prefix sampler and a frozen diversity policy, not an unresolved book-data
-defect.
+provider-interface blocker is closed. NMM_LLM now has a strict JSONL client
+and a deterministic paired-prefix sampler. The remaining gate is a frozen
+diversity and book-miss policy plus formal-runner integration, not an
+unresolved provider or book-legality defect.
 
 The bridge established rule consistency, one-budget compound-turn handling,
 semantic replay reproducibility, and representative fixed-node performance. It
@@ -96,6 +97,25 @@ even though UCI emits two action tokens. The sampler must use a frozen seed per
 pair and replay the same prefix in both colour-swapped games. MTD(f) then
 resumes with engine `Shuffling=false`. This ratio and prefix length are smoke
 proposals only and are not yet a formal evaluation decision.
+
+The implemented sampler does not contain that ratio as a default. It accepts
+explicit integer source weights and an explicit candidate policy, uses
+versioned SHA-256 draws, and records one prefix for both games of the pair.
+Focused Sanmill bridge/query/prefix tests report `60 passed`; the complete
+repository suite at `d6ea9f5` reports `1022 passed, 498 subtests passed`.
+
+The corrected book is a sparse position-to-candidate source rather than a
+complete depth-eight tree for every locally sampled branch. A fixed diagnostic
+`pair-12` generated a byte-identical eight-ply prefix in two fresh processes,
+while `pair-0` failed closed with `book_miss` before its sixth logical move.
+Therefore the 75% book proposal still needs a pre-result definition of either
+an eligible pair-ID set, a frozen complete-path corpus, or a per-ply source
+schedule. A runtime fallback from book miss to Perfect DB remains forbidden.
+
+The configured Perfect DB passed a read-only initial-position source probe
+with 24 StrictSteps ties and complete standard-sector coverage. The configured
+HumanDB did not pass its source probe because a non-empty SQLite `-shm`
+sidecar made the database non-immutable; it remains outside the prefix policy.
 
 Not recommended:
 

@@ -723,17 +723,41 @@ all 109 entries and 437 unique recommendations replay legally, with zero
 duplicates. These corrections and the later strict/data-query/logical-turn
 interfaces are now present on Sanmill `master`.
 
-The missing-provider-interface blocker is closed; the paired opening policy
-and NMM_LLM evaluator implementation are not. The provisional infrastructure
-design still assigns 75% of pair identifiers to corrected-book prefixes and
-25% to StrictSteps Perfect DB tied-best prefixes. Perfect prefixes cover
-exactly eight logical player moves in total: four by each side, or four full
-rounds, not eight rounds. A Mill-forming move plus its required removal is one
-logical move even though it uses two UCI tokens. Both games in a colour-swapped
-pair must replay the same frozen-seed prefix before strict MTD(f) resumes.
-Sanmill also exposes HumanDB frequencies through its data-query interface, but
-whether they become a third prefix source is not frozen. No optional database
-is enabled inside later MTD(f) search.
+The missing-provider-interface and NMM_LLM paired-prefix implementation
+blockers are closed. Commits `a4e166e` and `d6ea9f5` provide a strict JSONL
+client and a deterministic, source-policy-explicit sampler. They verify every
+source identity, FEN, history SHA-256, action count, logical count, and stable
+primary-plus-removal boundary. One prefix is recorded for both games in a
+colour-swapped pair. The focused Sanmill bridge/query/prefix suites report
+`60 passed`; the complete repository suite at `d6ea9f5` reports
+`1022 passed` and `498 subtests passed` in 3306.78 seconds.
+
+The provisional infrastructure design still proposes 75% corrected-book
+prefixes and 25% StrictSteps Perfect DB tied-best prefixes, but the code has no
+default mixture. Prefixes cover exactly eight logical player moves in total:
+four by each side, or four full rounds, not eight rounds. A Mill-forming move
+plus its required removal is one logical move even though it uses two UCI
+tokens. Both games replay the same frozen-seed prefix before strict MTD(f)
+resumes. No optional database is enabled inside later MTD(f) search.
+
+The corrected book is sparse. A fixed `pair-12` diagnostic generated the same
+eight-ply book prefix in two fresh processes, but `pair-0` reached
+`book_miss` before its sixth logical move. No fallback was used. Before a
+75/25 smoke, freeze either an eligible book pair-ID set, a complete-path
+corpus, or an explicit per-ply source schedule. Do not interpret a book miss
+as permission to switch sources at runtime.
+
+The configured Perfect DB returned 24 StrictSteps-tied initial candidates and
+reported complete standard-sector coverage. The active HumanDB currently
+fails closed with `database_not_immutable` because its SQLite `-shm` sidecar
+is non-empty; no sidecar was changed. Whether HumanDB becomes evidence only or
+a third source remains unfrozen.
+
+After the complete suite passed, the referenced Sanmill checkout acquired two
+untracked interchange-format documents under its `docs/standards/` directory.
+The strict installation audit now rejects that dirty checkout. Do not remove
+or adopt those files from this repository; the Sanmill workspace owner must
+resolve them before another bridge or prefix smoke.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -880,11 +904,14 @@ training merely because the managed run ended. Proceed in this order:
 7. Keep the Sanmill book, data-query, strict-error, logical-turn, and state
    commits pinned by identity even though they are now on Sanmill `master`.
    Do not silently float to later CLI or rule changes.
-8. Implement the NMM_LLM paired-prefix client and sampler against Sanmill's
-   now-available fail-closed data-query interface. The provisional policy is
-   still 75% corrected-book prefixes and 25% StrictSteps tied-best prefixes,
-   with exactly eight logical moves, four by each side. Decide explicitly
-   whether HumanDB frequencies are evidence only or a third prefix source.
+8. Preserve the implemented fail-closed data-query client and paired-prefix
+   sampler. Freeze how sparse-book misses are handled before using the
+   provisional 75% book / 25% StrictSteps mix. The allowed choices are a
+   pre-audited eligible pair-ID set, a frozen complete-path corpus, or an
+   explicit per-ply source schedule; there is no runtime fallback. Decide
+   separately whether HumanDB frequencies are evidence only or a third source.
+   Resolve the active HumanDB sidecar and Sanmill worktree cleanliness only
+   through their owning workspaces.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions
