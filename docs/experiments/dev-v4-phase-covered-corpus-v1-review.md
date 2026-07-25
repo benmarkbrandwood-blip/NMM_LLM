@@ -2,8 +2,8 @@
 
 Date: 23 July 2026
 
-Status: **generated and mechanically audited; not domain-approved, frozen, or
-authorized for execution**.
+Status: **generated, mechanically audited, and reviewed once by the Mill
+expert; not product-frozen or authorized for execution**.
 
 Related:
 
@@ -114,6 +114,45 @@ unnatural to support the desired claim. Unusual appearance alone is not an
 automatic exclusion because the source is intentionally a rules-replay stress
 pool.
 
+## Mill-expert first-pass review
+
+The original maintainer and Mill-domain expert subsequently reviewed all 64
+panels. He spent approximately 10–30 seconds on each and supplied the move he
+would choose for every position. This is useful coverage evidence, but the
+short review was not represented as exhaustive game-theoretic analysis.
+
+He described the set as a useful spread overall, including some unlikely and
+already poor or losing states. The explicitly qualified panels were:
+
+| Panel | First-pass observation |
+| --- | --- |
+| 016 | unlikely; suggested `f6xd3` |
+| 021 | unlikely; suggested `f6` |
+| 022 | `c3xg4`; questioned whether the state is bad for Black |
+| 023 | `f2-f4`; unlikely and bad for White |
+| 027 | `d3-e3`; bad for White |
+| 028 | unlikely; suggested `a4-b4` |
+| 029 | unlikely; suggested `d1-g1` |
+| 031 | poor prospects for Black; suggested `b6-d6` |
+| 032 | poor prospects for Black; suggested `a4-a7` |
+| 038 | bad for Black; suggested `e3-e4` |
+| 047 | attributed the position to bad Black play; suggested `g1-d1` |
+| 057 | questioned whether Black is already lost; suggested `d5-d1` and a Malom check |
+
+No panel was explicitly rejected in that reply. The expert also recommended a
+future tactical group where the side to move must choose among closing a Mill,
+blocking an opponent's approaching Mill, removing a piece that enables a chain
+Mill, or disabling the opponent's alternative Mill. His illustrative board
+was expressly approximate rather than a ready-to-freeze critical position.
+
+These comments do not prove natural HumanDB frequency, reachability under a
+particular prior history, or balanced theoretical value. They do close the
+pending request for an initial human look. Before freeze, the product owner
+must choose one of three explicit dispositions: retain the stress-oriented
+draft unchanged, replace specified outliers, or add a separately labelled
+tactical stratum. Any exact-list change requires regenerated identities and a
+new complete mechanical and visual audit.
+
 ## Reproduction and identities
 
 The package was generated from the repository root with:
@@ -138,11 +177,11 @@ and every one of the 71 PNG/manifest file hashes.
 ## Freeze disposition
 
 The current lifecycle value is
-`draft_for_owner_and_product_review_not_frozen`. No specification references
-this list, no game has been run from it, and no launch is authorized.
+`domain_reviewed_draft_for_product_disposition_not_frozen`. No specification
+references this list, no game has been run from it, and no launch is
+authorized.
 
-Before freeze, the product owner must choose the baseline and fixed workload,
-and should decide whether domain-expert review of all 64 panels is mandatory.
-Any exclusions require regeneration, new identities, and another complete
-visual and mechanical audit before an immutable evaluation specification is
-created.
+Before freeze, the product owner must choose the corpus disposition, baseline,
+and fixed workload. Any exclusions or additions require regeneration, new
+identities, and another complete visual and mechanical audit before an
+immutable evaluation specification is created.
