@@ -10,7 +10,8 @@ Related:
 - [completed Stage-0 result](../evidence/dev-v4-stage0-result-2026-07-23.md)
 - [phase-corpus review record](dev-v4-phase-covered-corpus-v1-review.md)
 - [managed training experiment](dev-v4-malom-corrected-baseline.md)
-- [authorized Sanmill bridge smoke](sanmill-strict-uci-bridge-smoke-v1.md)
+- [current Sanmill bridge contract](sanmill-strict-uci-bridge-smoke-v2.md)
+- [current Sanmill bridge result](../evidence/sanmill-strict-uci-bridge-smoke-v2-2026-07-25.md)
 
 ## What is now locally resolved
 
@@ -47,7 +48,8 @@ different experiment; a corrected evaluator may be studied later under a new
 route name.
 
 The 64-position phase-covered corpus is also generated and mechanically
-audited. It is not yet domain-approved or frozen.
+audited. The Mill expert completed a quick first pass over every panel and
+supplied a plausible move for each. The product disposition is not yet frozen.
 
 ## Recorded baseline direction
 
@@ -58,25 +60,32 @@ made deterministic, but the surrounding compact position and game lifecycle
 do not yet carry the full repetition and no-capture history required of the
 formal referee.
 
-The strict bridge passed against pinned local Sanmill commit
-`6f080c5a6d15919bf0a45fa5528c45d4487a2b8f`. Sanmill owns the action history,
+The current strict logical-turn bridge passed against pinned Sanmill commit
+`db65eb3e73189d934d615d0f47519d395193c646`. Sanmill owns the action history,
 standard-rule lifecycle, and terminal outcome. The bridge disables shuffling,
-uses one thread, a fixed seed, and a fixed-node ceiling, and fails rather than
-using Sanmill's release-mode random recovery path. Sanmill's non-developer
-phase-depth policy remains active through `DrawOnHumanExperience=true`; no
-positive explicit depth may bypass it. HumanDB, the perfect database, patches,
-and traps were disabled for this smoke.
+uses one thread, a fixed seed, and one fixed-node ceiling per complete logical
+turn. `StrictFailurePolicy` and `go logical` prevent Perfect DB, patch/trap,
+depth-4, or random failure recovery from substituting a move. Machine-readable
+`statejson` supplies rule identity, action and logical counts, no-capture and
+repetition counters, terminal reason, and history SHA-256. Sanmill's
+non-developer phase-depth policy remains active through
+`DrawOnHumanExperience=true`; normal turns send no positive explicit depth.
+HumanDB, the perfect database, patches, traps, and opening-book search were
+disabled for this smoke.
 
-The NMM opening-book source is now corrected in two local Sanmill commits. The
+The NMM opening-book source is now corrected on Sanmill `master`. The
 pinned asset contains 109 entries and 437 unique recommendations; authoritative
 replay found zero illegal and zero duplicate recommendations. The bridge still
-leaves book play disabled because `tgf mill uci` does not expose the provider.
-The remaining gate is a deterministic fail-closed UCI or referee interface and
-a frozen paired-opening diversity policy, not an unresolved book-data defect.
+leaves book play disabled. Sanmill now exposes fail-closed data-query
+interfaces for the corrected book, HumanDB, and Perfect DB, so the
+provider-interface blocker is closed. The remaining gate is an NMM_LLM paired
+prefix sampler and a frozen diversity policy, not an unresolved book-data
+defect.
 
-The bridge established rule consistency, semantic replay reproducibility, and
-representative fixed-node performance. It did not load a candidate or establish
-playing strength. The formal node budget is deliberately not yet selected.
+The bridge established rule consistency, one-budget compound-turn handling,
+semantic replay reproducibility, and representative fixed-node performance. It
+did not load a candidate or establish playing strength. The formal node budget
+is deliberately not yet selected.
 
 For a later infrastructure smoke, the provisional opening policy is 75%
 corrected-book-derived prefixes and 25% StrictSteps perfect-database tied-best
@@ -100,11 +109,17 @@ Not recommended:
 
 ### 2. Corpus review and freeze
 
-The request to review all 64 rendered starts has been sent to the Mill-domain
-expert; a response is pending. Apply only explicitly justified exclusions,
-regenerate if needed, and then freeze one pair per accepted ring16-unique
-start. Do not freeze or inspect candidate-versus-baseline results while that
-review is open.
+The Mill-domain expert completed a quick first pass over all 64 rendered
+starts, gave a move he would choose for every position, identified several
+unlikely or poor states, and described the spread as useful overall. He also
+suggested adding positions where closing a Mill competes with blocking an
+opponent Mill, preserving an approaching piece, or enabling a chain Mill.
+
+This is meaningful domain feedback, but it is not an automatic corpus freeze.
+The product owner must decide whether to accept the draft unchanged, replace
+specified outliers, or add a separately identified tactical stratum. Apply
+only pre-result, explicitly justified changes; regenerate and audit new
+identities if the exact start list changes.
 
 The corpus is legal, playable, phase-balanced, absent by exact lookup from the
 bound HumanDB and final SpecialistDB, and labelled by corrected Malom. Its
@@ -121,7 +136,7 @@ Recommended initial contract, subject to corpus exclusions:
 | Pairs | One colour-role-swapped pair per accepted unique start |
 | Current draft size | 64 pairs / 128 games |
 | Candidate route | Exact `s-gen-v2-training-aligned-v1`, policy argmax |
-| Baseline | Not frozen; strict fixed-node Sanmill bridge passed book-off validation |
+| Baseline | Not frozen; strict fixed-node Sanmill logical-turn bridge v2 passed book-off validation |
 | Maximum length | Not frozen; 60 complete turns is smoke-only and is not a rules draw |
 | Random seed | 42 base seed; search is deterministic and only the frozen prefix sampler may choose among approved opening alternatives |
 | Result summary | Pair-score difference and a fixed-corpus engineering interval |
@@ -134,21 +149,23 @@ must not be counted as additional observations.
 
 ### 4. Launch authority
 
-The authorized strict Sanmill bridge and its rule, reproducibility, and
-performance report are complete. Safe next work is limited to implementing and
-auditing the deterministic opening interface and prefix sampler, plus closing
-the corpus-review gate. The remaining formal product choices include the node
-budget, history-bearing start representation, accepted corpus, game count, and
-rules-compliant match termination contract. Starting candidate-versus-baseline
-games requires a separate explicit instruction against a later frozen
-specification.
+The authorized strict Sanmill logical-turn bridge and its rule,
+reproducibility, and performance report are complete. Safe next work is
+limited to implementing and auditing the NMM_LLM paired-prefix client and
+sampler, recording the corpus disposition, and then implementing the still
+unfrozen formal runner. The remaining product choices include whether HumanDB
+frequencies participate in prefix selection, the book/Perfect DB proportions,
+node budget, history-bearing start representation, accepted corpus, game
+count, and rules-compliant termination contract. Starting
+candidate-versus-baseline games requires a separate explicit instruction
+against a later frozen specification.
 
 ## Current stop conditions
 
 No original-maintainer technical clarification is currently required for the
 bridge: code, checkpoint, database, and fixture evidence resolve the route
-facts above. Formal evaluation remains stopped at the opening-interface,
-paired-prefix, corpus-review, workload, and launch gates.
+facts above. Formal evaluation remains stopped at the paired-prefix policy,
+corpus disposition, workload, runner-audit, and launch gates.
 
 Until those choices are recorded:
 

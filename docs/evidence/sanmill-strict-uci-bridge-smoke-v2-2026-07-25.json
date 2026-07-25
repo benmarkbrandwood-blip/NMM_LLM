@@ -1,0 +1,3808 @@
+{
+  "claim_boundary": "bridge/rule/reproducibility/performance evidence only; no candidate was loaded and no playing-strength evaluation was run",
+  "contract": {
+    "child_environment": "inherit non-TGF variables; remove all TGF_* variables",
+    "command": [
+      "target/release/tgf.exe",
+      "mill",
+      "uci"
+    ],
+    "contract_identity": "c878e36743a15119104a8669ebac2698ad14e83c8bbf88e5684bb546e2ce0b29",
+    "draw_on_human_experience_semantics": {
+      "effective_in_smoke": true,
+      "enabled": true,
+      "purpose": "phase-aware automatic search-depth policy",
+      "reason": "no-positive-explicit-depth-is-sent"
+    },
+    "knowledge_sources": {
+      "human_database": {
+        "active": false,
+        "reason": "data-query-only-and-not-used-by-logical-search"
+      },
+      "opening_book": {
+        "active_in_bridge_smoke": false,
+        "reason": "UCI-interface-and-paired-diversity-policy-gate",
+        "requested_for_future_formal_baseline": true
+      },
+      "patch_and_trap": {
+        "active": false
+      },
+      "perfect_database": {
+        "active": false
+      }
+    },
+    "logical_turn_budget": "one aggregate node ceiling covers primary and mandatory removal",
+    "options": {
+      "AiIsLazy": "false",
+      "Algorithm": "2",
+      "BoardFullAction": "0",
+      "ConsiderMobility": "true",
+      "CustodianCaptureEnabled": "false",
+      "DepthExtension": "true",
+      "DeveloperMode": "false",
+      "DrawOnHumanExperience": "true",
+      "EndgameNMoveRule": "100",
+      "FocusOnBlockingPaths": "false",
+      "HasDiagonalLines": "false",
+      "Hash": "16",
+      "IDSEnabled": "true",
+      "InterventionCaptureEnabled": "false",
+      "IsDefenderMoveFirst": "false",
+      "LeapCaptureEnabled": "false",
+      "MaxQuiescenceDepth": "0",
+      "MayFly": "true",
+      "MayMoveInPlacingPhase": "false",
+      "MayRemoveFromMillsAlways": "false",
+      "MayRemoveMultiple": "false",
+      "MillFormationActionInPlacingPhase": "0",
+      "MoveTimeMs": "0",
+      "MultiPV": "1",
+      "NMoveRule": "100",
+      "OneTimeUseMill": "false",
+      "PatchAvoidTraps": "false",
+      "PatchMakeTraps": "false",
+      "PiecesAtLeastCount": "3",
+      "PiecesCount": "9",
+      "Ponder": "false",
+      "RestrictRepeatedMillsFormation": "false",
+      "SearchShuffleSeed": "42",
+      "Shuffling": "false",
+      "SkillLevel": "30",
+      "StalemateAction": "0",
+      "StopPlacingWhenTwoEmptySquares": "false",
+      "StrictFailurePolicy": "true",
+      "Threads": "1",
+      "ThreefoldRepetitionRule": "true",
+      "UseLazySmp": "false",
+      "UsePerfectDatabase": "false",
+      "flyPieceCount": "3"
+    },
+    "position_ownership": "go logical does not mutate state; caller replays full_turn_actions and verifies statejson",
+    "protocol_versions": {
+      "error": 1,
+      "logical_turn": 1,
+      "state": 1
+    },
+    "random_failure_fallback": "forbidden-by-strict-policy-and-logical-turn-search-path",
+    "sanmill_commit": "db65eb3e73189d934d615d0f47519d395193c646",
+    "schema_version": "nmm.sanmill-strict-uci-contract.v2",
+    "search_command": "go logical nodes <positive-N> [depth <positive-D>]",
+    "search_failure": "versioned-sanmill_error-no-substitution",
+    "state_command": "statejson"
+  },
+  "evidence_identity": "b8e31cb621e95ecdf5708145c3c4c3ba43b0fbae863bd93460db1beba96cd188",
+  "installation": {
+    "binary_relative_path": "target/release/tgf.exe",
+    "binary_sha256": "cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc",
+    "binary_size": 4109312,
+    "build_command": "cargo build --release -p tgf-cli",
+    "checkout_head": "aa6b0c99ee3fca13b0d34e6f929257959ed51414",
+    "checkout_policy": "pinned commit or descendant with no changes in the pinned CLI, rule, build, bridge-document, or opening-book scope",
+    "commit": "db65eb3e73189d934d615d0f47519d395193c646",
+    "license": {
+      "relative_path": "Copying.txt",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "spdx": "AGPL-3.0-or-later"
+    },
+    "path_lookup_key": "sanmill_checkout",
+    "strict_failure_protocol_version": 1,
+    "tree": "b8fa6c0119c2dec4443efc59deab8b7d835e0c88"
+  },
+  "nmm_llm_source": {
+    "commit": "70de75bb8247ec6795b69045ac53558161e6c045",
+    "files": [
+      {
+        "relative_path": "learned_ai/evaluation/sanmill_uci.py",
+        "sha256": "8c40e352c010d21835d200349f1a27b4f417f325783f0af56ad056d74352a91d"
+      },
+      {
+        "relative_path": "scripts/audit_sanmill_uci_bridge.py",
+        "sha256": "e8f8419664e3ab26803e3a0836a8afc0347a3ef96ed1a65b2afa1a4e0c972698"
+      },
+      {
+        "relative_path": "tests/test_sanmill_uci.py",
+        "sha256": "53c285842c2ba1cd98a34a2650942a1610456c34d1fe9897af24f49ba9b9b927"
+      },
+      {
+        "relative_path": "docs/experiments/sanmill-strict-uci-bridge-smoke-v2.md",
+        "sha256": "b9b287bc3f4df469dd0303cb9e07c6cd0385c18179173173383863a2c99d8f74"
+      }
+    ],
+    "scoped_worktree": "clean",
+    "tree": "7a88e4dc6b37981cc95ae5a4114835bc01d6adc0"
+  },
+  "opening_book_gate": {
+    "active_in_bridge_smoke": false,
+    "asset_relative_path": "src/ui/flutter_app/assets/opening_books/nmm/opening_book.json",
+    "asset_sha256": "cdc4768bc461c22177634985a4cc1d92452774e2992515b937fed8812eb076f5",
+    "legality_audit": {
+      "authority": "pinned-sanmill-uci-legal-actions",
+      "checked_recommendations": 437,
+      "duplicate_recommendations": 0,
+      "illegal_recommendations": 0
+    },
+    "oracle_entries": 109,
+    "oracle_recommendations": 437,
+    "remaining_gate": "expose a deterministic fail-closed UCI book interface and freeze its paired-opening diversity policy",
+    "removed_invalid_oracle_recommendation": {
+      "historical_reason": "c3 was already occupied in the source position",
+      "present": false,
+      "raw_key_sha256": "904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1"
+    },
+    "requested_for_future_formal_baseline": true,
+    "uci_support": "not-advertised-at-pinned-commit"
+  },
+  "performance": {
+    "samples": [
+      {
+        "elapsed_seconds": 0.00033099998836405575,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 2,
+          "effective_depth": 3,
+          "full_turn_actions": [
+            "g4"
+          ],
+          "logical_move_id": "g4",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": null,
+            "to": "g4"
+          },
+          "node_budget": 1000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1000,
+          "removal_nodes": 0,
+          "resulting_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 0,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 3,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 1000,
+        "nodes_per_second": 3021148.1424589464,
+        "phase": "placement"
+      },
+      {
+        "elapsed_seconds": 0.00015960002201609313,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 3,
+          "effective_depth": 3,
+          "full_turn_actions": [
+            "g4"
+          ],
+          "logical_move_id": "g4",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": null,
+            "to": "g4"
+          },
+          "node_budget": 10000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1080,
+          "removal_nodes": 0,
+          "resulting_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 3,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 3,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1080,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 10000,
+        "nodes_per_second": 6766916.359767789,
+        "phase": "placement"
+      },
+      {
+        "elapsed_seconds": 0.00014960000407882035,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 3,
+          "effective_depth": 3,
+          "full_turn_actions": [
+            "g4"
+          ],
+          "logical_move_id": "g4",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": null,
+            "to": "g4"
+          },
+          "node_budget": 100000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1080,
+          "removal_nodes": 0,
+          "resulting_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 3,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 3,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1080,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 100000,
+        "nodes_per_second": 7219251.140066654,
+        "phase": "placement"
+      },
+      {
+        "elapsed_seconds": 0.000149500003317371,
+        "fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 3,
+          "effective_depth": 3,
+          "full_turn_actions": [
+            "g4"
+          ],
+          "logical_move_id": "g4",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": null,
+            "to": "g4"
+          },
+          "node_budget": 500000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1080,
+          "removal_nodes": 0,
+          "resulting_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 3,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 3,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1080,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 500000,
+        "nodes_per_second": 7224080.107257834,
+        "phase": "placement"
+      },
+      {
+        "elapsed_seconds": 0.0002542000147514045,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 5,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "d1-g1"
+          ],
+          "logical_move_id": "d1-g1",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "d1",
+            "to": "g1"
+          },
+          "node_budget": 1000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1000,
+          "removal_nodes": 0,
+          "resulting_fen": "@OO@@O@*/OO@*O*O@/*@O@**@O w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "resulting_side_to_move": "white",
+          "score": -4,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 6,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 1000,
+        "nodes_per_second": 3933910.078557439,
+        "phase": "movement"
+      },
+      {
+        "elapsed_seconds": 0.001420000015059486,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 10,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "d1-g1"
+          ],
+          "logical_move_id": "d1-g1",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "d1",
+            "to": "g1"
+          },
+          "node_budget": 10000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 10000,
+          "removal_nodes": 0,
+          "resulting_fen": "@OO@@O@*/OO@*O*O@/*@O@**@O w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "resulting_side_to_move": "white",
+          "score": -2,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 11,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 10000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 10000,
+        "nodes_per_second": 7042253.446441748,
+        "phase": "movement"
+      },
+      {
+        "elapsed_seconds": 0.012947399984113872,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 15,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "d1-g1"
+          ],
+          "logical_move_id": "d1-g1",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "d1",
+            "to": "g1"
+          },
+          "node_budget": 100000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 100000,
+          "removal_nodes": 0,
+          "resulting_fen": "@OO@@O@*/OO@*O*O@/*@O@**@O w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "resulting_side_to_move": "white",
+          "score": -2,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 16,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 100000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 100000,
+        "nodes_per_second": 7723558.407301654,
+        "phase": "movement"
+      },
+      {
+        "elapsed_seconds": 0.05965660000219941,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 18,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "d1-g1"
+          ],
+          "logical_move_id": "d1-g1",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "d1",
+            "to": "g1"
+          },
+          "node_budget": 500000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 500000,
+          "removal_nodes": 0,
+          "resulting_fen": "@OO@@O@*/OO@*O*O@/*@O@**@O w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "resulting_side_to_move": "white",
+          "score": -1,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 19,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 500000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 500000,
+        "nodes_per_second": 8381302.3199707335,
+        "phase": "movement"
+      },
+      {
+        "elapsed_seconds": 0.00028840001323260367,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 2,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "c3-d5"
+          ],
+          "logical_move_id": "c3-d5",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "c3",
+            "to": "d5"
+          },
+          "node_budget": 1000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 1000,
+          "removal_nodes": 0,
+          "resulting_fen": "O**OO***/***@@@**/******** b m s 3 0 3 0 0 0 -1 -1 -1 -1 0 1 1 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 0,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 3,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 1000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 1000,
+        "nodes_per_second": 3467406.2209333833,
+        "phase": "flying"
+      },
+      {
+        "elapsed_seconds": 0.0010444999788887799,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 3,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "c3-e5"
+          ],
+          "logical_move_id": "c3-e5",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "c3",
+            "to": "e5"
+          },
+          "node_budget": 10000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 10000,
+          "removal_nodes": 0,
+          "resulting_fen": "*O*OO***/***@@@**/******** b m s 3 0 3 0 0 0 -1 -1 -1 -1 0 1 1 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 5,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 4,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 10000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 10000,
+        "nodes_per_second": 9573959.025483921,
+        "phase": "flying"
+      },
+      {
+        "elapsed_seconds": 0.010552799998549744,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 7,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "c3-e5"
+          ],
+          "logical_move_id": "c3-e5",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "c3",
+            "to": "e5"
+          },
+          "node_budget": 100000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 100000,
+          "removal_nodes": 0,
+          "resulting_fen": "*O*OO***/***@@@**/******** b m s 3 0 3 0 0 0 -1 -1 -1 -1 0 1 1 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": -1,
+          "score_kind": "mate",
+          "score_perspective": "white",
+          "search_calls": 8,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 100000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 100000,
+        "nodes_per_second": 9476157.987808246,
+        "phase": "flying"
+      },
+      {
+        "elapsed_seconds": 0.03619079999043606,
+        "fen": "***OOO**/***@@@**/******** w m s 3 0 3 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 10,
+          "effective_depth": 30,
+          "full_turn_actions": [
+            "c3-e5"
+          ],
+          "logical_move_id": "c3-e5",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": null,
+            "from": "c3",
+            "to": "e5"
+          },
+          "node_budget": 500000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 500000,
+          "removal_nodes": 0,
+          "resulting_fen": "*O*OO***/***@@@**/******** b m s 3 0 3 0 0 0 -1 -1 -1 -1 0 1 1 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": -2,
+          "score_kind": "mate",
+          "score_perspective": "white",
+          "search_calls": 11,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 500000,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 500000,
+        "nodes_per_second": 13815665.863482768,
+        "phase": "flying"
+      },
+      {
+        "elapsed_seconds": 0.01381740000215359,
+        "fen": "*O**@@*O/O@@OO@@O/@@O*@*OO w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+        "logical_turn": {
+          "completed_depth": 8,
+          "effective_depth": 8,
+          "full_turn_actions": [
+            "d6-d5",
+            "xc3"
+          ],
+          "logical_move_id": "d6-d5xc3",
+          "logical_ply_delta": 1,
+          "model_action": {
+            "capture": "c3",
+            "from": "d6",
+            "to": "d5"
+          },
+          "node_budget": 500000,
+          "outcome_reason": "ongoing",
+          "primary_nodes": 11776,
+          "removal_nodes": 0,
+          "resulting_fen": "OO**@**O/*@@OO@@O/@@O*@*OO b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 12 ids:nodes",
+          "resulting_side_to_move": "black",
+          "score": 11,
+          "score_kind": "cp",
+          "score_perspective": "white",
+          "search_calls": 8,
+          "status": "ok",
+          "terminal": false,
+          "total_nodes": 11776,
+          "winner": null,
+          "winner_code": null
+        },
+        "node_ceiling": 500000,
+        "nodes_per_second": 852258.7460857023,
+        "phase": "compound_mill"
+      }
+    ],
+    "summary": {
+      "compound_mill": {
+        "median_nodes_per_second": 852258.7460857023,
+        "samples": 1
+      },
+      "flying": {
+        "median_nodes_per_second": 9525058.506646084,
+        "samples": 4
+      },
+      "movement": {
+        "median_nodes_per_second": 7382905.926871701,
+        "samples": 4
+      },
+      "placement": {
+        "median_nodes_per_second": 6993083.749917222,
+        "samples": 4
+      }
+    }
+  },
+  "reproducibility": {
+    "equal": true,
+    "fresh_process_runs": 2,
+    "run": {
+      "completed_turns": 57,
+      "max_complete_logical_turns": 60,
+      "node_ceiling_per_logical_turn": 10000,
+      "replayed_action_tokens": [
+        "d6",
+        "f4",
+        "d2",
+        "b4",
+        "g4",
+        "d7",
+        "a4",
+        "d1",
+        "e4",
+        "d5",
+        "d3",
+        "f6",
+        "f2",
+        "b2",
+        "c3",
+        "e3",
+        "b6",
+        "c4",
+        "e4-e5",
+        "d7-g7",
+        "e5-e4",
+        "d5-e5",
+        "a4-a1",
+        "b4-a4",
+        "b6-b4",
+        "g7-d7",
+        "g4-g7",
+        "e5-d5",
+        "e4-e5",
+        "a4-a7",
+        "a1-a4",
+        "d1-a1",
+        "d2-d1",
+        "b2-d2",
+        "g7-g4",
+        "d7-g7",
+        "b4-b2",
+        "a7-d7",
+        "e5-e4",
+        "d7-a7",
+        "a4-b4",
+        "g7-d7",
+        "d6-b6",
+        "xd2",
+        "f6-d6",
+        "xd1",
+        "d3-d2",
+        "xf4",
+        "a7-a4",
+        "f2-f4",
+        "xa4",
+        "d6-f6",
+        "f4-f2",
+        "xf6",
+        "d5-d6",
+        "b4-a4",
+        "a1-d1",
+        "f2-f4",
+        "xc4",
+        "e3-d3",
+        "f4-f2",
+        "xd7",
+        "d3-f4",
+        "a4-b4",
+        "xf4"
+      ],
+      "semantic_identity": "ae51a16b726e7227f499f054310fed5fbd4b158d8f1b998a4d8cb65d1f7c27bc",
+      "stopped_at_ceiling": false,
+      "turns": [
+        {
+          "after_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "after_history_sha256": "0fd1dc91bd20924fab9fc3c7a233cccc5cea8db73551397bd702bc45a1df49af",
+          "after_logical_ply_count": 1,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/********/******** w p p 0 9 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "before_history_sha256": "3399f97a1de994f4513ae6a7dabb0377392ddea95def7bceb242456d81444e09",
+          "before_logical_ply_count": 0,
+          "logical_turn": {
+            "completed_depth": 1,
+            "effective_depth": 1,
+            "full_turn_actions": [
+              "d6"
+            ],
+            "logical_move_id": "d6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 52,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 1,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 52,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 1
+        },
+        {
+          "after_fen": "********/O*@*****/******** w p p 1 8 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "after_history_sha256": "ad8bb7aa2fe8cf5d3addfd898061b5c1851ef31bd55777ff464b962036e73503",
+          "after_logical_ply_count": 2,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+          "before_history_sha256": "0fd1dc91bd20924fab9fc3c7a233cccc5cea8db73551397bd702bc45a1df49af",
+          "before_logical_ply_count": 1,
+          "logical_turn": {
+            "completed_depth": 1,
+            "effective_depth": 1,
+            "full_turn_actions": [
+              "f4"
+            ],
+            "logical_move_id": "f4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "f4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 50,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*****/******** w p p 1 8 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 1,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 50,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 2
+        },
+        {
+          "after_fen": "********/O*@*O***/******** b p p 2 7 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "after_history_sha256": "cda315cc5a986c5e027adf90c2650b29b3e7b3e8554f9365121fc321e348cca7",
+          "after_logical_ply_count": 3,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*****/******** w p p 1 8 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "before_history_sha256": "ad8bb7aa2fe8cf5d3addfd898061b5c1851ef31bd55777ff464b962036e73503",
+          "before_logical_ply_count": 2,
+          "logical_turn": {
+            "completed_depth": 1,
+            "effective_depth": 1,
+            "full_turn_actions": [
+              "d2"
+            ],
+            "logical_move_id": "d2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 48,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O***/******** b p p 2 7 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 1,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 48,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 3
+        },
+        {
+          "after_fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "after_history_sha256": "a14c31ac5a9694948098dd62434384796a949600525ddecc078317cfb6c95398",
+          "after_logical_ply_count": 4,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O***/******** b p p 2 7 1 8 0 0 -1 -1 -1 -1 0 0 2 ids:nodes",
+          "before_history_sha256": "cda315cc5a986c5e027adf90c2650b29b3e7b3e8554f9365121fc321e348cca7",
+          "before_logical_ply_count": 3,
+          "logical_turn": {
+            "completed_depth": 1,
+            "effective_depth": 1,
+            "full_turn_actions": [
+              "b4"
+            ],
+            "logical_move_id": "b4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "b4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 46,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 1,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 46,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 4
+        },
+        {
+          "after_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "after_history_sha256": "ef97bd0f68ea30d974e1adfbda038e20f63ec5b3afbdc773c44d1f0980125e4c",
+          "after_logical_ply_count": 5,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O*@*/******** w p p 2 7 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "before_history_sha256": "a14c31ac5a9694948098dd62434384796a949600525ddecc078317cfb6c95398",
+          "before_logical_ply_count": 4,
+          "logical_turn": {
+            "completed_depth": 3,
+            "effective_depth": 3,
+            "full_turn_actions": [
+              "g4"
+            ],
+            "logical_move_id": "g4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "g4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 1080,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 3,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 3,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 1080,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 5
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O***** w p p 3 6 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "after_history_sha256": "cf9f4f41691429421065a2200953935271e52eb00a346ebe28362c3cbe6d7547",
+          "after_logical_ply_count": 6,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O*@*/**O***** b p p 3 6 2 7 0 0 -1 -1 -1 -1 0 0 3 ids:nodes",
+          "before_history_sha256": "ef97bd0f68ea30d974e1adfbda038e20f63ec5b3afbdc773c44d1f0980125e4c",
+          "before_logical_ply_count": 5,
+          "logical_turn": {
+            "completed_depth": 3,
+            "effective_depth": 3,
+            "full_turn_actions": [
+              "d7"
+            ],
+            "logical_move_id": "d7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 987,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O*@*/@*O***** w p p 3 6 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 3,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 987,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 6
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O***O* b p p 4 5 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "after_history_sha256": "4f6a09474aba71e2bad8317862df378e842bad5e7f20e0be43dd2ec8914bf5ac",
+          "after_logical_ply_count": 7,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O*@*/@*O***** w p p 3 6 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "before_history_sha256": "cf9f4f41691429421065a2200953935271e52eb00a346ebe28362c3cbe6d7547",
+          "before_logical_ply_count": 6,
+          "logical_turn": {
+            "completed_depth": 3,
+            "effective_depth": 3,
+            "full_turn_actions": [
+              "a4"
+            ],
+            "logical_move_id": "a4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "a4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 890,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O*@*/@*O***O* b p p 4 5 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 3,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 3,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 890,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 7
+        },
+        {
+          "after_fen": "********/O*@*O*@*/@*O*@*O* w p p 4 5 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "after_history_sha256": "0df1afeb0281eac8a7706d2a201b9a6fb71edb45f1e844afe6f92f5bd5267f64",
+          "after_logical_ply_count": 8,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O*@*/@*O***O* b p p 4 5 3 6 0 0 -1 -1 -1 -1 0 0 4 ids:nodes",
+          "before_history_sha256": "4f6a09474aba71e2bad8317862df378e842bad5e7f20e0be43dd2ec8914bf5ac",
+          "before_logical_ply_count": 7,
+          "logical_turn": {
+            "completed_depth": 5,
+            "effective_depth": 15,
+            "full_turn_actions": [
+              "d1"
+            ],
+            "logical_move_id": "d1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d1"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "********/O*@*O*@*/@*O*@*O* w p p 4 5 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 6,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 8
+        },
+        {
+          "after_fen": "**O*****/O*@*O*@*/@*O*@*O* b p p 5 4 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "after_history_sha256": "73d92d1f57226cc63809c57013fda3564b13ed347a4d41b3164252c09500a241",
+          "after_logical_ply_count": 9,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "********/O*@*O*@*/@*O*@*O* w p p 4 5 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "before_history_sha256": "0df1afeb0281eac8a7706d2a201b9a6fb71edb45f1e844afe6f92f5bd5267f64",
+          "before_logical_ply_count": 8,
+          "logical_turn": {
+            "completed_depth": 5,
+            "effective_depth": 15,
+            "full_turn_actions": [
+              "e4"
+            ],
+            "logical_move_id": "e4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "e4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O*****/O*@*O*@*/@*O*@*O* b p p 5 4 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 6,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 9
+        },
+        {
+          "after_fen": "@*O*****/O*@*O*@*/@*O*@*O* w p p 5 4 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "after_history_sha256": "d3e43aa0b299eec9ce003eca12695d55d65f396250145f3712ce3ea25adb01fb",
+          "after_logical_ply_count": 10,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O*****/O*@*O*@*/@*O*@*O* b p p 5 4 4 5 0 0 -1 -1 -1 -1 0 0 5 ids:nodes",
+          "before_history_sha256": "73d92d1f57226cc63809c57013fda3564b13ed347a4d41b3164252c09500a241",
+          "before_logical_ply_count": 9,
+          "logical_turn": {
+            "completed_depth": 5,
+            "effective_depth": 5,
+            "full_turn_actions": [
+              "d5"
+            ],
+            "logical_move_id": "d5",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d5"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 4915,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*****/O*@*O*@*/@*O*@*O* w p p 5 4 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 5,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 4915,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 10
+        },
+        {
+          "after_fen": "@*O*O***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "after_history_sha256": "8db2b76df1f6345b7a931fdf79d371ce86ea08b1d5f7ad4922c7fd25aee1e80f",
+          "after_logical_ply_count": 11,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*****/O*@*O*@*/@*O*@*O* w p p 5 4 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "before_history_sha256": "d3e43aa0b299eec9ce003eca12695d55d65f396250145f3712ce3ea25adb01fb",
+          "before_logical_ply_count": 10,
+          "logical_turn": {
+            "completed_depth": 5,
+            "effective_depth": 18,
+            "full_turn_actions": [
+              "d3"
+            ],
+            "logical_move_id": "d3",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "d3"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*O***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 6,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 11
+        },
+        {
+          "after_fen": "@*O*O***/O@@*O*@*/@*O*@*O* w p p 6 3 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "after_history_sha256": "a98e1c4d0412f275c61fbdd04ba6cbdf63addffe0c79186c9f6e5b194ae56a10",
+          "after_logical_ply_count": 12,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*O***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+          "before_history_sha256": "8db2b76df1f6345b7a931fdf79d371ce86ea08b1d5f7ad4922c7fd25aee1e80f",
+          "before_logical_ply_count": 11,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f6"
+            ],
+            "logical_move_id": "f6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "f6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*O***/O@@*O*@*/@*O*@*O* w p p 6 3 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 12
+        },
+        {
+          "after_fen": "@*O*O***/O@@OO*@*/@*O*@*O* b p p 7 2 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "after_history_sha256": "f1fdf718b38314168ff72def61328157b64c0b4839e0a7f9701fc87456a44515",
+          "after_logical_ply_count": 13,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*O***/O@@*O*@*/@*O*@*O* w p p 6 3 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "before_history_sha256": "a98e1c4d0412f275c61fbdd04ba6cbdf63addffe0c79186c9f6e5b194ae56a10",
+          "before_logical_ply_count": 12,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f2"
+            ],
+            "logical_move_id": "f2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "f2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*O***/O@@OO*@*/@*O*@*O* b p p 7 2 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 13
+        },
+        {
+          "after_fen": "@*O*O***/O@@OO@@*/@*O*@*O* w p p 7 2 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "after_history_sha256": "85a61c6ca81ae0cc07ca8ce530d224dd1b2df4baedcbce3171f1f0c26aed662b",
+          "after_logical_ply_count": 14,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*O***/O@@OO*@*/@*O*@*O* b p p 7 2 6 3 0 0 -1 -1 -1 -1 0 0 7 ids:nodes",
+          "before_history_sha256": "f1fdf718b38314168ff72def61328157b64c0b4839e0a7f9701fc87456a44515",
+          "before_logical_ply_count": 13,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b2"
+            ],
+            "logical_move_id": "b2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "b2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*O***/O@@OO@@*/@*O*@*O* w p p 7 2 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 14
+        },
+        {
+          "after_fen": "@*O*OO**/O@@OO@@*/@*O*@*O* b p p 8 1 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "after_history_sha256": "e09c791c1f73eeb9398ad4861608c9face60fcc1fbae23c4336d379839a99225",
+          "after_logical_ply_count": 15,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*O***/O@@OO@@*/@*O*@*O* w p p 7 2 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "before_history_sha256": "85a61c6ca81ae0cc07ca8ce530d224dd1b2df4baedcbce3171f1f0c26aed662b",
+          "before_logical_ply_count": 14,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "c3"
+            ],
+            "logical_move_id": "c3",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "c3"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O*OO**/O@@OO@@*/@*O*@*O* b p p 8 1 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": -2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 15
+        },
+        {
+          "after_fen": "@*O@OO**/O@@OO@@*/@*O*@*O* w p p 8 1 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "after_history_sha256": "5b91e284063b1bd0d322d8dd3f53360429fa591a61cc3dc04b9a30c64d4e3f55",
+          "after_logical_ply_count": 16,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O*OO**/O@@OO@@*/@*O*@*O* b p p 8 1 7 2 0 0 -1 -1 -1 -1 0 0 8 ids:nodes",
+          "before_history_sha256": "e09c791c1f73eeb9398ad4861608c9face60fcc1fbae23c4336d379839a99225",
+          "before_logical_ply_count": 15,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e3"
+            ],
+            "logical_move_id": "e3",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "e3"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO**/O@@OO@@*/@*O*@*O* w p p 8 1 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 16
+        },
+        {
+          "after_fen": "@*O@OO**/O@@OO@@O/@*O*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "after_history_sha256": "35695d4e4808f7557d4d407fb315299eae645efbc29a87961e74fbb1c1bf923a",
+          "after_logical_ply_count": 17,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO**/O@@OO@@*/@*O*@*O* w p p 8 1 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "before_history_sha256": "5b91e284063b1bd0d322d8dd3f53360429fa591a61cc3dc04b9a30c64d4e3f55",
+          "before_logical_ply_count": 16,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b6"
+            ],
+            "logical_move_id": "b6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "b6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO**/O@@OO@@O/@*O*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": -2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 17
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@OO@@O/@*O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+          "after_history_sha256": "f000196da9cf3085483d85e64412ba00bb907e152287181092f38a2cbe027987",
+          "after_logical_ply_count": 18,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO**/O@@OO@@O/@*O*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+          "before_history_sha256": "35695d4e4808f7557d4d407fb315299eae645efbc29a87961e74fbb1c1bf923a",
+          "before_logical_ply_count": 17,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "c4"
+            ],
+            "logical_move_id": "c4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": null,
+              "to": "c4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@OO@@O/@*O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 18
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@@O/@*O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 1 10 ids:nodes",
+          "after_history_sha256": "0d3387ca4ff9c5323f882fddf0112898e8515691bbf72641d28bcd50bc406fd7",
+          "after_logical_ply_count": 19,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@OO@@O/@*O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+          "before_history_sha256": "f000196da9cf3085483d85e64412ba00bb907e152287181092f38a2cbe027987",
+          "before_logical_ply_count": 18,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e4-e5"
+            ],
+            "logical_move_id": "e4-e5",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e4",
+              "to": "e5"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@@O/@*O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 1 10 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": -2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 19
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 2 11 ids:nodes",
+          "after_history_sha256": "e7ac66c5f69a087c1bdc9fec920fe57c2ab877d1340f7c4d03d17f416f663917",
+          "after_logical_ply_count": 20,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@@O/@*O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 1 10 ids:nodes",
+          "before_history_sha256": "0d3387ca4ff9c5323f882fddf0112898e8515691bbf72641d28bcd50bc406fd7",
+          "before_logical_ply_count": 19,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d7-g7"
+            ],
+            "logical_move_id": "d7-g7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d7",
+              "to": "g7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 2 11 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 20
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@OO@@O/*@O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 3 11 ids:nodes",
+          "after_history_sha256": "e0239ea126aadde2a14dbe2c9d6a8ca4e5268ee03121701d561cda17ea97eb7b",
+          "after_logical_ply_count": 21,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 2 11 ids:nodes",
+          "before_history_sha256": "e7ac66c5f69a087c1bdc9fec920fe57c2ab877d1340f7c4d03d17f416f663917",
+          "before_logical_ply_count": 20,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e5-e4"
+            ],
+            "logical_move_id": "e5-e4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e5",
+              "to": "e4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@OO@@O/*@O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 3 11 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 21
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+          "after_history_sha256": "f21b0f114105a5b883648873e7637ea68d8de135f8ad882077a61e55fc1e8e8d",
+          "after_logical_ply_count": 22,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@OO@@O/*@O*@*O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 3 11 ids:nodes",
+          "before_history_sha256": "e0239ea126aadde2a14dbe2c9d6a8ca4e5268ee03121701d561cda17ea97eb7b",
+          "before_logical_ply_count": 21,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d5-e5"
+            ],
+            "logical_move_id": "d5-e5",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d5",
+              "to": "e5"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 22
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@@O/*@O*@O** b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+          "after_history_sha256": "e53b95f608a0f35a2df70c253da16e425160120290903c2a45d8612570548f91",
+          "after_logical_ply_count": 23,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@@O/*@O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+          "before_history_sha256": "f21b0f114105a5b883648873e7637ea68d8de135f8ad882077a61e55fc1e8e8d",
+          "before_logical_ply_count": 22,
+          "logical_turn": {
+            "completed_depth": 10,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a4-a1"
+            ],
+            "logical_move_id": "a4-a1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a4",
+              "to": "a1"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@@O/*@O*@O** b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 11,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 23
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@*O/*@O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 6 13 ids:nodes",
+          "after_history_sha256": "5078b5941e291b211a3aa9adf027d500eebab2f2d8ab2f12145f731d69602dc7",
+          "after_logical_ply_count": 24,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@@O/*@O*@O** b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 5 12 ids:nodes",
+          "before_history_sha256": "e53b95f608a0f35a2df70c253da16e425160120290903c2a45d8612570548f91",
+          "before_logical_ply_count": 23,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b4-a4"
+            ],
+            "logical_move_id": "b4-a4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "b4",
+              "to": "a4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@*O/*@O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 6 13 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 24
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@O*/*@O*@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 7 13 ids:nodes",
+          "after_history_sha256": "e9ed3ca04cf9b86e7320689086c5ca7fc2b76835196a6c0e4a9d5c449968ab54",
+          "after_logical_ply_count": 25,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@*O/*@O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 6 13 ids:nodes",
+          "before_history_sha256": "5078b5941e291b211a3aa9adf027d500eebab2f2d8ab2f12145f731d69602dc7",
+          "before_logical_ply_count": 24,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b6-b4"
+            ],
+            "logical_move_id": "b6-b4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "b6",
+              "to": "b4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@O*/*@O*@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 7 13 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 1,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 25
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@O*/@*O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 8 14 ids:nodes",
+          "after_history_sha256": "6da9e3401e379488da03762846524baf740302856951e1c52f9a95d5a39c11be",
+          "after_logical_ply_count": 26,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@O*/*@O*@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 7 13 ids:nodes",
+          "before_history_sha256": "e9ed3ca04cf9b86e7320689086c5ca7fc2b76835196a6c0e4a9d5c449968ab54",
+          "before_logical_ply_count": 25,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "g7-d7"
+            ],
+            "logical_move_id": "g7-d7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "g7",
+              "to": "d7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@O*/@*O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 8 14 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 26
+        },
+        {
+          "after_fen": "*@O@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 9 14 ids:nodes",
+          "after_history_sha256": "f10162ddd6660108964095cf0bfca22e85e884687c08d6cbd8427b42a9c84d2a",
+          "after_logical_ply_count": 27,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@O*/@*O*@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 8 14 ids:nodes",
+          "before_history_sha256": "6da9e3401e379488da03762846524baf740302856951e1c52f9a95d5a39c11be",
+          "before_logical_ply_count": 26,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "g4-g7"
+            ],
+            "logical_move_id": "g4-g7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "g4",
+              "to": "g7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "*@O@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 9 14 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 27
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@OO@O*/@O**@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 10 15 ids:nodes",
+          "after_history_sha256": "d435420c705ed2f31bf3947c64553370489cf7ab0ddb8ca7520516d223a54b1b",
+          "after_logical_ply_count": 28,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "*@O@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 9 14 ids:nodes",
+          "before_history_sha256": "f10162ddd6660108964095cf0bfca22e85e884687c08d6cbd8427b42a9c84d2a",
+          "before_logical_ply_count": 27,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e5-d5"
+            ],
+            "logical_move_id": "e5-d5",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e5",
+              "to": "d5"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@OO@O*/@O**@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 10 15 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 28
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+          "after_history_sha256": "40124d6f81a10f2392e1193be554c90dc3d8dd3c9527dd6fdb1c248297f5abb0",
+          "after_logical_ply_count": 29,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@OO@O*/@O**@O@* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 10 15 ids:nodes",
+          "before_history_sha256": "d435420c705ed2f31bf3947c64553370489cf7ab0ddb8ca7520516d223a54b1b",
+          "before_logical_ply_count": 28,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e4-e5"
+            ],
+            "logical_move_id": "e4-e5",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e4",
+              "to": "e5"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 29
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@O*/@O**@O*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "after_history_sha256": "00699a3e0a6ced2e576dffa9782289edb35d9b596a8e31e48bb2d4cd17a34aef",
+          "after_logical_ply_count": 30,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+          "before_history_sha256": "40124d6f81a10f2392e1193be554c90dc3d8dd3c9527dd6fdb1c248297f5abb0",
+          "before_logical_ply_count": 29,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a4-a7"
+            ],
+            "logical_move_id": "a4-a7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a4",
+              "to": "a7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@O*/@O**@O*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 30
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@O*/@O**@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 13 16 ids:nodes",
+          "after_history_sha256": "fcf85013a5f08f60f8543e521cdb58445d119280e8e73b62ddef49491343d6d8",
+          "after_logical_ply_count": 31,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@O*/@O**@O*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+          "before_history_sha256": "00699a3e0a6ced2e576dffa9782289edb35d9b596a8e31e48bb2d4cd17a34aef",
+          "before_logical_ply_count": 30,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a1-a4"
+            ],
+            "logical_move_id": "a1-a4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a1",
+              "to": "a4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@O*/@O**@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 13 16 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 31
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@OO@O*/@O***@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 14 17 ids:nodes",
+          "after_history_sha256": "27dc658b66958eeb1b2a3e9ba5040b553f7f4ce86c299e0dca617cf262320928",
+          "after_logical_ply_count": 32,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@O*/@O**@*O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 13 16 ids:nodes",
+          "before_history_sha256": "fcf85013a5f08f60f8543e521cdb58445d119280e8e73b62ddef49491343d6d8",
+          "before_logical_ply_count": 31,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d1-a1"
+            ],
+            "logical_move_id": "d1-a1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d1",
+              "to": "a1"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@OO@O*/@O***@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 14 17 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 32
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O*@O*/@O**O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 15 17 ids:nodes",
+          "after_history_sha256": "3e422ed7afb8a433715b3d96576afad16559516d04e54d67686f4a38d35be866",
+          "after_logical_ply_count": 33,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@OO@O*/@O***@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 14 17 ids:nodes",
+          "before_history_sha256": "27dc658b66958eeb1b2a3e9ba5040b553f7f4ce86c299e0dca617cf262320928",
+          "before_logical_ply_count": 32,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d2-d1"
+            ],
+            "logical_move_id": "d2-d1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d2",
+              "to": "d1"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O*@O*/@O**O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 15 17 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 33
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O@*O*/@O**O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 16 18 ids:nodes",
+          "after_history_sha256": "49b98ae1b4df90457880a8c1acffa8234f5b93e1a8818bcb0c508c5898c73cc2",
+          "after_logical_ply_count": 34,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O*@O*/@O**O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 15 17 ids:nodes",
+          "before_history_sha256": "3e422ed7afb8a433715b3d96576afad16559516d04e54d67686f4a38d35be866",
+          "before_logical_ply_count": 33,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b2-d2"
+            ],
+            "logical_move_id": "b2-d2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "b2",
+              "to": "d2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O@*O*/@O**O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 16 18 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 3,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 34
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O@*O*/@*O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 17 18 ids:nodes",
+          "after_history_sha256": "64a79487e274f8fa8d9aea407485ff4c2cbcc1c5e3223bcc3ba712990d644b83",
+          "after_logical_ply_count": 35,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O@*O*/@O**O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 16 18 ids:nodes",
+          "before_history_sha256": "49b98ae1b4df90457880a8c1acffa8234f5b93e1a8818bcb0c508c5898c73cc2",
+          "before_logical_ply_count": 34,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "g7-g4"
+            ],
+            "logical_move_id": "g7-g4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "g7",
+              "to": "g4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O@*O*/@*O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 17 18 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 3,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 35
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O@*O*/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 18 19 ids:nodes",
+          "after_history_sha256": "9a970288c462d00aedd587a8967cf6c105e112f55c3e7e87e81d2e49bd1cd65e",
+          "after_logical_ply_count": 36,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O@*O*/@*O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 17 18 ids:nodes",
+          "before_history_sha256": "64a79487e274f8fa8d9aea407485ff4c2cbcc1c5e3223bcc3ba712990d644b83",
+          "before_logical_ply_count": 35,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d7-g7"
+            ],
+            "logical_move_id": "d7-g7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d7",
+              "to": "g7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O@*O*/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 18 19 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 3,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 36
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O@O**/*@O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 19 19 ids:nodes",
+          "after_history_sha256": "98cda360fd91feabced4b4b8224d42b10de1028708b7aa16013d5728be8f28f5",
+          "after_logical_ply_count": 37,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O@*O*/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 18 19 ids:nodes",
+          "before_history_sha256": "9a970288c462d00aedd587a8967cf6c105e112f55c3e7e87e81d2e49bd1cd65e",
+          "before_logical_ply_count": 36,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b4-b2"
+            ],
+            "logical_move_id": "b4-b2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "b4",
+              "to": "b2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O@O**/*@O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 19 19 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 6,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 37
+        },
+        {
+          "after_fen": "@O*@OO@*/O@@O@O**/@@O*O@O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 20 20 ids:nodes",
+          "after_history_sha256": "f7c0d1a5b31d33cd1d42a87003b10fa5e52c8aa19e5e9f1547654f6d3c22996d",
+          "after_logical_ply_count": 38,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O@O**/*@O*O@O@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 19 19 ids:nodes",
+          "before_history_sha256": "98cda360fd91feabced4b4b8224d42b10de1028708b7aa16013d5728be8f28f5",
+          "before_logical_ply_count": 37,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a7-d7"
+            ],
+            "logical_move_id": "a7-d7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a7",
+              "to": "d7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@O*@OO@*/O@@O@O**/@@O*O@O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 20 20 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 2,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 38
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@O@O**/@@O*O@O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 21 20 ids:nodes",
+          "after_history_sha256": "265f3a3655a712068f83444dfa99da425371c96ee7b494006403e185f7c13e37",
+          "after_logical_ply_count": 39,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@O*@OO@*/O@@O@O**/@@O*O@O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 20 20 ids:nodes",
+          "before_history_sha256": "f7c0d1a5b31d33cd1d42a87003b10fa5e52c8aa19e5e9f1547654f6d3c22996d",
+          "before_logical_ply_count": 38,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e5-e4"
+            ],
+            "logical_move_id": "e5-e4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e5",
+              "to": "e4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@O@O**/@@O*O@O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 21 20 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 39
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@O@O**/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 22 21 ids:nodes",
+          "after_history_sha256": "3a280157a35b4ca34c012e9edfc535fdf6760bca2cefd248f72c789ae5610737",
+          "after_logical_ply_count": 40,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@O@O**/@@O*O@O* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 21 20 ids:nodes",
+          "before_history_sha256": "265f3a3655a712068f83444dfa99da425371c96ee7b494006403e185f7c13e37",
+          "before_logical_ply_count": 39,
+          "logical_turn": {
+            "completed_depth": 9,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d7-a7"
+            ],
+            "logical_move_id": "d7-a7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d7",
+              "to": "a7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@O@O**/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 22 21 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 5,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 10,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 40
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@O@OO*/*@O*O@*@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 23 21 ids:nodes",
+          "after_history_sha256": "22ca1dcdc72dfeb4fc19ecf018fd3cd3b8a2f4a54e365d39be2afd522055a7d0",
+          "after_logical_ply_count": 41,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@O@O**/*@O*O@O@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 22 21 ids:nodes",
+          "before_history_sha256": "3a280157a35b4ca34c012e9edfc535fdf6760bca2cefd248f72c789ae5610737",
+          "before_logical_ply_count": 40,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a4-b4"
+            ],
+            "logical_move_id": "a4-b4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a4",
+              "to": "b4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@O@OO*/*@O*O@*@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 23 21 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 5,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 41
+        },
+        {
+          "after_fen": "@*O@OO@*/O@@O@OO*/@*O*O@*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 24 22 ids:nodes",
+          "after_history_sha256": "60976f80fac6f31184e2e32092a6c4578c67ad0668495a3534cec42c35ed8951",
+          "after_logical_ply_count": 42,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@O@OO*/*@O*O@*@ b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 23 21 ids:nodes",
+          "before_history_sha256": "22ca1dcdc72dfeb4fc19ecf018fd3cd3b8a2f4a54e365d39be2afd522055a7d0",
+          "before_logical_ply_count": 41,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "g7-d7"
+            ],
+            "logical_move_id": "g7-d7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "g7",
+              "to": "d7"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/O@@O@OO*/@*O*O@*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 24 22 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 4,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 42
+        },
+        {
+          "after_fen": "@*O@OO@*/*@@O*OOO/@*O*O@*@ b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 22 ids:nodes",
+          "after_history_sha256": "4afdccec7a8254dabbab2714786a436e7117d62d950d1fd4df1681a5943bf05a",
+          "after_logical_ply_count": 43,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/O@@O@OO*/@*O*O@*@ w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 24 22 ids:nodes",
+          "before_history_sha256": "60976f80fac6f31184e2e32092a6c4578c67ad0668495a3534cec42c35ed8951",
+          "before_logical_ply_count": 42,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d6-b6",
+              "xd2"
+            ],
+            "logical_move_id": "d6-b6xd2",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "d2",
+              "from": "d6",
+              "to": "b6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/*@@O*OOO/@*O*O@*@ b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 22 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 7,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 43
+        },
+        {
+          "after_fen": "@*O@OO@*/@*@O*OOO/@*O**@*@ w m s 8 0 8 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+          "after_history_sha256": "f6b1d6d6bee54dc0274b00f71e636919d4bcf40b7f9d5cb878769ca66762cb4a",
+          "after_logical_ply_count": 44,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/*@@O*OOO/@*O*O@*@ b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 22 ids:nodes",
+          "before_history_sha256": "4afdccec7a8254dabbab2714786a436e7117d62d950d1fd4df1681a5943bf05a",
+          "before_logical_ply_count": 43,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f6-d6",
+              "xd1"
+            ],
+            "logical_move_id": "f6-d6xd1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "d1",
+              "from": "f6",
+              "to": "d6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@OO@*/@*@O*OOO/@*O**@*@ w m s 8 0 8 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 10,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 44
+        },
+        {
+          "after_fen": "@*O@*O@*/@**OOOOO/@*O**@*@ b m s 8 0 7 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+          "after_history_sha256": "07fc686eea32249222835ba7a4c9a53333d249cb9499856ba4914e2ad128fb28",
+          "after_logical_ply_count": 45,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@OO@*/@*@O*OOO/@*O**@*@ w m s 8 0 8 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+          "before_history_sha256": "f6b1d6d6bee54dc0274b00f71e636919d4bcf40b7f9d5cb878769ca66762cb4a",
+          "before_logical_ply_count": 44,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d3-d2",
+              "xf4"
+            ],
+            "logical_move_id": "d3-d2xf4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "f4",
+              "from": "d3",
+              "to": "d2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@*O@*/@**OOOOO/@*O**@*@ b m s 8 0 7 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 19,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 45
+        },
+        {
+          "after_fen": "@*O@*O@*/@**OOOOO/@*O**@@* w m s 8 0 7 0 0 0 -1 -1 -1 -1 0 1 24 ids:nodes",
+          "after_history_sha256": "312b46477ef0d1c2eba9bb8e695faf0c92fea532ab79022ccaf436e6558a60fc",
+          "after_logical_ply_count": 46,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@*O@*/@**OOOOO/@*O**@*@ b m s 8 0 7 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+          "before_history_sha256": "07fc686eea32249222835ba7a4c9a53333d249cb9499856ba4914e2ad128fb28",
+          "before_logical_ply_count": 45,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a7-a4"
+            ],
+            "logical_move_id": "a7-a4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a7",
+              "to": "a4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@*O@*/@**OOOOO/@*O**@@* w m s 8 0 7 0 0 0 -1 -1 -1 -1 0 1 24 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 23,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 46
+        },
+        {
+          "after_fen": "@*O@*O@*/@*O*OOOO/@*O**@** b m s 8 0 6 0 0 0 -1 -1 -1 -1 0 0 24 ids:nodes",
+          "after_history_sha256": "d86b5543ace0c522c4310ad64492da563f86aaac3de30316780bd2f26377ab99",
+          "after_logical_ply_count": 47,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@*O@*/@**OOOOO/@*O**@@* w m s 8 0 7 0 0 0 -1 -1 -1 -1 0 1 24 ids:nodes",
+          "before_history_sha256": "312b46477ef0d1c2eba9bb8e695faf0c92fea532ab79022ccaf436e6558a60fc",
+          "before_logical_ply_count": 46,
+          "logical_turn": {
+            "completed_depth": 8,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f2-f4",
+              "xa4"
+            ],
+            "logical_move_id": "f2-f4xa4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "a4",
+              "from": "f2",
+              "to": "f4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@*O@*/@*O*OOOO/@*O**@** b m s 8 0 6 0 0 0 -1 -1 -1 -1 0 0 24 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 23,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 9,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 47
+        },
+        {
+          "after_fen": "@*O@*O@*/*@O*OOOO/@*O**@** w m s 8 0 6 0 0 0 -1 -1 -1 -1 0 1 25 ids:nodes",
+          "after_history_sha256": "a55086579d0580a91f7b4d1ef10ed0163dc9cc51d7c3b659d04686c463126f76",
+          "after_logical_ply_count": 48,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@*O@*/@*O*OOOO/@*O**@** b m s 8 0 6 0 0 0 -1 -1 -1 -1 0 0 24 ids:nodes",
+          "before_history_sha256": "d86b5543ace0c522c4310ad64492da563f86aaac3de30316780bd2f26377ab99",
+          "before_logical_ply_count": 47,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d6-f6"
+            ],
+            "logical_move_id": "d6-f6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d6",
+              "to": "f6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@*O@*/*@O*OOOO/@*O**@** w m s 8 0 6 0 0 0 -1 -1 -1 -1 0 1 25 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 23,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 48
+        },
+        {
+          "after_fen": "@*O@*O@*/***OOOOO/@*O**@** b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 0 25 ids:nodes",
+          "after_history_sha256": "28e2bf51d02dbd81faa5a8018196ea3f271109eff5322a2c0ef555386f2d9739",
+          "after_logical_ply_count": 49,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@*O@*/*@O*OOOO/@*O**@** w m s 8 0 6 0 0 0 -1 -1 -1 -1 0 1 25 ids:nodes",
+          "before_history_sha256": "a55086579d0580a91f7b4d1ef10ed0163dc9cc51d7c3b659d04686c463126f76",
+          "before_logical_ply_count": 48,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f4-f2",
+              "xf6"
+            ],
+            "logical_move_id": "f4-f2xf6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "f6",
+              "from": "f4",
+              "to": "f2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "@*O@*O@*/***OOOOO/@*O**@** b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 0 25 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 28,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 49
+        },
+        {
+          "after_fen": "**O@*O@*/@**OOOOO/@*O**@** w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 1 26 ids:nodes",
+          "after_history_sha256": "cdf45a4a2cc2d12414d66aff610b3aac577e5a205f459f4c7cdc380884cbd5c4",
+          "after_logical_ply_count": 50,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "@*O@*O@*/***OOOOO/@*O**@** b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 0 25 ids:nodes",
+          "before_history_sha256": "28e2bf51d02dbd81faa5a8018196ea3f271109eff5322a2c0ef555386f2d9739",
+          "before_logical_ply_count": 49,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d5-d6"
+            ],
+            "logical_move_id": "d5-d6",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d5",
+              "to": "d6"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O@*O@*/@**OOOOO/@*O**@** w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 1 26 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 26,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 50
+        },
+        {
+          "after_fen": "**O@*O@*/@**OOO*O/@*O**@O* b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 2 26 ids:nodes",
+          "after_history_sha256": "789fd0abd3e4226541c63e33fef81fefb49900949619580fd42304c2f7963839",
+          "after_logical_ply_count": 51,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O@*O@*/@**OOOOO/@*O**@** w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 1 26 ids:nodes",
+          "before_history_sha256": "cdf45a4a2cc2d12414d66aff610b3aac577e5a205f459f4c7cdc380884cbd5c4",
+          "before_logical_ply_count": 50,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "b4-a4"
+            ],
+            "logical_move_id": "b4-a4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "b4",
+              "to": "a4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O@*O@*/@**OOO*O/@*O**@O* b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 2 26 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 31,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 51
+        },
+        {
+          "after_fen": "**O@*O@*/@**OOO*O/@*O*@*O* w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 3 27 ids:nodes",
+          "after_history_sha256": "0bcaff8383c330333852daf06382c07da7ccd4ddbd39db03662a11a50d18e95f",
+          "after_logical_ply_count": 52,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O@*O@*/@**OOO*O/@*O**@O* b m s 8 0 5 0 0 0 -1 -1 -1 -1 0 2 26 ids:nodes",
+          "before_history_sha256": "789fd0abd3e4226541c63e33fef81fefb49900949619580fd42304c2f7963839",
+          "before_logical_ply_count": 51,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a1-d1"
+            ],
+            "logical_move_id": "a1-d1",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "a1",
+              "to": "d1"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O@*O@*/@**OOO*O/@*O*@*O* w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 3 27 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 27,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 52
+        },
+        {
+          "after_fen": "**O@*O**/@*O*OO*O/@*O*@*O* b m s 8 0 4 0 0 0 -1 -1 -1 -1 0 0 27 ids:nodes",
+          "after_history_sha256": "02062cdbef7da7577bb99f1da867c6242939c51eb01d1bdd0c72a75a1b691cc4",
+          "after_logical_ply_count": 53,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O@*O@*/@**OOO*O/@*O*@*O* w m s 8 0 5 0 0 0 -1 -1 -1 -1 0 3 27 ids:nodes",
+          "before_history_sha256": "0bcaff8383c330333852daf06382c07da7ccd4ddbd39db03662a11a50d18e95f",
+          "before_logical_ply_count": 52,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f2-f4",
+              "xc4"
+            ],
+            "logical_move_id": "f2-f4xc4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "c4",
+              "from": "f2",
+              "to": "f4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O@*O**/@*O*OO*O/@*O*@*O* b m s 8 0 4 0 0 0 -1 -1 -1 -1 0 0 27 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 31,
+            "score_kind": "cp",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 53
+        },
+        {
+          "after_fen": "**O*@O**/@*O*OO*O/@*O*@*O* w m s 8 0 4 0 0 0 -1 -1 -1 -1 0 1 28 ids:nodes",
+          "after_history_sha256": "d54cbffb122794631c62d79a474d133a84b295d11832244f9551390463b96884",
+          "after_logical_ply_count": 54,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O@*O**/@*O*OO*O/@*O*@*O* b m s 8 0 4 0 0 0 -1 -1 -1 -1 0 0 27 ids:nodes",
+          "before_history_sha256": "02062cdbef7da7577bb99f1da867c6242939c51eb01d1bdd0c72a75a1b691cc4",
+          "before_logical_ply_count": 53,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "e3-d3"
+            ],
+            "logical_move_id": "e3-d3",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "e3",
+              "to": "d3"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O*@O**/@*O*OO*O/@*O*@*O* w m s 8 0 4 0 0 0 -1 -1 -1 -1 0 1 28 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": 0,
+            "score_kind": "mate",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 54
+        },
+        {
+          "after_fen": "**O*@O**/@**OOO*O/**O*@*O* b m s 8 0 3 0 0 0 -1 -1 -1 -1 0 0 28 ids:nodes",
+          "after_history_sha256": "4c6d0f6ea460322733c2c87467fe93a473c1b50242fb959fc4ba602469e69c7d",
+          "after_logical_ply_count": 55,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O*@O**/@*O*OO*O/@*O*@*O* w m s 8 0 4 0 0 0 -1 -1 -1 -1 0 1 28 ids:nodes",
+          "before_history_sha256": "d54cbffb122794631c62d79a474d133a84b295d11832244f9551390463b96884",
+          "before_logical_ply_count": 54,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "f4-f2",
+              "xd7"
+            ],
+            "logical_move_id": "f4-f2xd7",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "d7",
+              "from": "f4",
+              "to": "f2"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O*@O**/@**OOO*O/**O*@*O* b m s 8 0 3 0 0 0 -1 -1 -1 -1 0 0 28 ids:nodes",
+            "resulting_side_to_move": "black",
+            "score": 0,
+            "score_kind": "mate",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 55
+        },
+        {
+          "after_fen": "**O**O**/@*@OOO*O/**O*@*O* w m s 8 0 3 0 0 0 -1 -1 -1 -1 0 1 29 ids:nodes",
+          "after_history_sha256": "4c8f1c48cfc0d8b1d6fb866f7357a1418968fca6b54f835b2b0d55e983e75c34",
+          "after_logical_ply_count": 56,
+          "after_outcome": {
+            "reason": "ongoing",
+            "reason_code": "ongoing",
+            "terminal": false,
+            "winner": null,
+            "winner_code": null
+          },
+          "before_fen": "**O*@O**/@**OOO*O/**O*@*O* b m s 8 0 3 0 0 0 -1 -1 -1 -1 0 0 28 ids:nodes",
+          "before_history_sha256": "4c6d0f6ea460322733c2c87467fe93a473c1b50242fb959fc4ba602469e69c7d",
+          "before_logical_ply_count": 55,
+          "logical_turn": {
+            "completed_depth": 7,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "d3-f4"
+            ],
+            "logical_move_id": "d3-f4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": null,
+              "from": "d3",
+              "to": "f4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "ongoing",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O**O**/@*@OOO*O/**O*@*O* w m s 8 0 3 0 0 0 -1 -1 -1 -1 0 1 29 ids:nodes",
+            "resulting_side_to_move": "white",
+            "score": -1,
+            "score_kind": "mate",
+            "score_perspective": "white",
+            "search_calls": 8,
+            "status": "ok",
+            "terminal": false,
+            "total_nodes": 10000,
+            "winner": null,
+            "winner_code": null
+          },
+          "terminal": false,
+          "turn": 56
+        },
+        {
+          "after_fen": "**O**O**/@**OOOOO/**O*@*** w o r 8 0 2 0 0 0 -1 -1 -1 -1 0 0 29 ids:nodes",
+          "after_history_sha256": "341a06b353bdf5d9493351c6ac7defb2dc63bfc09187755ee89944ee66c363aa",
+          "after_logical_ply_count": 57,
+          "after_outcome": {
+            "reason": "loseFewerThanThree",
+            "reason_code": "lose_fewer_than_three",
+            "terminal": true,
+            "winner": "white",
+            "winner_code": 0
+          },
+          "before_fen": "**O**O**/@*@OOO*O/**O*@*O* w m s 8 0 3 0 0 0 -1 -1 -1 -1 0 1 29 ids:nodes",
+          "before_history_sha256": "4c8f1c48cfc0d8b1d6fb866f7357a1418968fca6b54f835b2b0d55e983e75c34",
+          "before_logical_ply_count": 56,
+          "logical_turn": {
+            "completed_depth": 6,
+            "effective_depth": 30,
+            "full_turn_actions": [
+              "a4-b4",
+              "xf4"
+            ],
+            "logical_move_id": "a4-b4xf4",
+            "logical_ply_delta": 1,
+            "model_action": {
+              "capture": "f4",
+              "from": "a4",
+              "to": "b4"
+            },
+            "node_budget": 10000,
+            "outcome_reason": "loseFewerThanThree",
+            "primary_nodes": 10000,
+            "removal_nodes": 0,
+            "resulting_fen": "**O**O**/@**OOOOO/**O*@*** w o r 8 0 2 0 0 0 -1 -1 -1 -1 0 0 29 ids:nodes",
+            "resulting_side_to_move": null,
+            "score": -1,
+            "score_kind": "mate",
+            "score_perspective": "white",
+            "search_calls": 7,
+            "status": "ok",
+            "terminal": true,
+            "total_nodes": 10000,
+            "winner": "white",
+            "winner_code": 0
+          },
+          "terminal": true,
+          "turn": 57
+        }
+      ]
+    },
+    "semantic_identity": "ae51a16b726e7227f499f054310fed5fbd4b158d8f1b998a4d8cb65d1f7c27bc"
+  },
+  "rule_probes": {
+    "compound_capture_and_reset": {
+      "after": {
+        "action": "select",
+        "action_token_count": 24,
+        "fen": "OO**@**O/*@@OO@@O/@@O*@*OO b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 12 ids:nodes",
+        "history_origin": "game_start",
+        "history_sha256": "844300c6b6f7de6e3af51ecb17c2abcc9e5898bd98179e442e1d92a9aa9c7ab0",
+        "legal_actions": [
+          "d1-a1",
+          "d1-g1",
+          "d7-d6",
+          "b4-c4",
+          "f4-e4",
+          "f6-d6",
+          "d3-c3",
+          "d3-e3"
+        ],
+        "logical_plies_by_side": [
+          12,
+          11
+        ],
+        "logical_ply_count": 23,
+        "no_capture_count": 0,
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": "ongoing",
+          "terminal": false,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "moving",
+        "removal_pending": false,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": "black",
+        "snapshot_history_length": 24,
+        "status": "ok",
+        "terminal": false
+      },
+      "before": {
+        "action": "select",
+        "action_token_count": 22,
+        "fen": "*O**@@*O/O@@OO@@O/@@O*@*OO w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 4 12 ids:nodes",
+        "history_origin": "game_start",
+        "history_sha256": "f6a75f16808c00f17f4dc9890f801bbbcd540c14a3562cf186a22660ffe4f526",
+        "legal_actions": [
+          "a4-a1",
+          "g4-g1",
+          "d6-d5",
+          "c5-d5",
+          "c5-c4",
+          "e5-e4",
+          "e5-d5"
+        ],
+        "logical_plies_by_side": [
+          11,
+          11
+        ],
+        "logical_ply_count": 22,
+        "no_capture_count": 4,
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": "ongoing",
+          "terminal": false,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "moving",
+        "removal_pending": false,
+        "repetition_current_count": 1,
+        "repetition_history_length": 4,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": "white",
+        "snapshot_history_length": 22,
+        "status": "ok",
+        "terminal": false
+      },
+      "logical_turn": {
+        "completed_depth": 8,
+        "effective_depth": 8,
+        "full_turn_actions": [
+          "d6-d5",
+          "xc3"
+        ],
+        "logical_move_id": "d6-d5xc3",
+        "logical_ply_delta": 1,
+        "model_action": {
+          "capture": "c3",
+          "from": "d6",
+          "to": "d5"
+        },
+        "node_budget": 500000,
+        "outcome_reason": "ongoing",
+        "primary_nodes": 11776,
+        "removal_nodes": 0,
+        "resulting_fen": "OO**@**O/*@@OO@@O/@@O*@*OO b m s 9 0 8 0 0 0 -1 -1 -1 -1 0 0 12 ids:nodes",
+        "resulting_side_to_move": "black",
+        "score": 11,
+        "score_kind": "cp",
+        "score_perspective": "white",
+        "search_calls": 8,
+        "status": "ok",
+        "terminal": false,
+        "total_nodes": 11776,
+        "winner": null,
+        "winner_code": null
+      }
+    },
+    "fewer_than_three": {
+      "logical_turn": {
+        "completed_depth": null,
+        "effective_depth": null,
+        "full_turn_actions": [],
+        "logical_move_id": null,
+        "logical_ply_delta": 0,
+        "model_action": null,
+        "node_budget": 10000,
+        "outcome_reason": "loseFewerThanThree",
+        "primary_nodes": 0,
+        "removal_nodes": 0,
+        "resulting_fen": null,
+        "resulting_side_to_move": null,
+        "score": null,
+        "score_kind": null,
+        "score_perspective": null,
+        "search_calls": 0,
+        "status": "terminal",
+        "terminal": true,
+        "total_nodes": 0,
+        "winner": "black",
+        "winner_code": 1
+      },
+      "state": {
+        "action": "select",
+        "action_token_count": 0,
+        "fen": "**O**O**/**@**@**/******** w o s 2 0 2 0 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "history_origin": "fresh_setup",
+        "history_sha256": "4ac125dad9bd60fd024a5cfe2d0972260bcea45b7e137c56a6d1d4af72e94085",
+        "legal_actions": [],
+        "logical_plies_by_side": [
+          0,
+          0
+        ],
+        "logical_ply_count": 0,
+        "no_capture_count": 0,
+        "outcome": {
+          "reason": "loseFewerThanThree",
+          "reason_code": "lose_fewer_than_three",
+          "terminal": true,
+          "winner": "black",
+          "winner_code": 1
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "game_over",
+        "removal_pending": false,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": null,
+        "snapshot_history_length": 0,
+        "status": "terminal",
+        "terminal": true
+      }
+    },
+    "no_capture_draw": {
+      "logical_turn": {
+        "completed_depth": null,
+        "effective_depth": null,
+        "full_turn_actions": [],
+        "logical_move_id": null,
+        "logical_ply_delta": 0,
+        "model_action": null,
+        "node_budget": 10000,
+        "outcome_reason": "drawFiftyMove",
+        "primary_nodes": 0,
+        "removal_nodes": 0,
+        "resulting_fen": null,
+        "resulting_side_to_move": null,
+        "score": null,
+        "score_kind": null,
+        "score_perspective": null,
+        "search_calls": 0,
+        "status": "terminal",
+        "terminal": true,
+        "total_nodes": 0,
+        "winner": null,
+        "winner_code": null
+      },
+      "state": {
+        "action": "select",
+        "action_token_count": 0,
+        "fen": "***OOO**/***@@@**/******** w o s 3 0 3 0 0 0 -1 -1 -1 -1 0 100 1 ids:nodes",
+        "history_origin": "fresh_setup",
+        "history_sha256": "7e35ee8534366581bd1b93af867e758a2ecb2cc981d36dd64c567693af43d350",
+        "legal_actions": [],
+        "logical_plies_by_side": [
+          0,
+          0
+        ],
+        "logical_ply_count": 0,
+        "no_capture_count": 100,
+        "outcome": {
+          "reason": "drawFiftyMove",
+          "reason_code": "draw_fifty_move",
+          "terminal": true,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "game_over",
+        "removal_pending": false,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": null,
+        "snapshot_history_length": 0,
+        "status": "terminal",
+        "terminal": true
+      }
+    },
+    "opening_depth_policy": {
+      "before": {
+        "action": "place",
+        "action_token_count": 0,
+        "fen": "********/********/******** w p p 0 9 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "history_origin": "game_start",
+        "history_sha256": "3399f97a1de994f4513ae6a7dabb0377392ddea95def7bceb242456d81444e09",
+        "legal_actions": [
+          "d5",
+          "e5",
+          "e4",
+          "e3",
+          "d3",
+          "c3",
+          "c4",
+          "c5",
+          "d6",
+          "f6",
+          "f4",
+          "f2",
+          "d2",
+          "b2",
+          "b4",
+          "b6",
+          "d7",
+          "g7",
+          "g4",
+          "g1",
+          "d1",
+          "a1",
+          "a4",
+          "a7"
+        ],
+        "logical_plies_by_side": [
+          0,
+          0
+        ],
+        "logical_ply_count": 0,
+        "no_capture_count": 0,
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": "ongoing",
+          "terminal": false,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "placing",
+        "removal_pending": false,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": "white",
+        "snapshot_history_length": 0,
+        "status": "ok",
+        "terminal": false
+      },
+      "interpretation": "depth 1 proves the ordinary Sanmill opening-depth table is active; SkillLevel=30 would select depth 30 if bypassed",
+      "logical_turn": {
+        "completed_depth": 1,
+        "effective_depth": 1,
+        "full_turn_actions": [
+          "d6"
+        ],
+        "logical_move_id": "d6",
+        "logical_ply_delta": 1,
+        "model_action": {
+          "capture": null,
+          "from": null,
+          "to": "d6"
+        },
+        "node_budget": 100000,
+        "outcome_reason": "ongoing",
+        "primary_nodes": 52,
+        "removal_nodes": 0,
+        "resulting_fen": "********/O*******/******** b p p 1 8 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "resulting_side_to_move": "black",
+        "score": 4,
+        "score_kind": "cp",
+        "score_perspective": "white",
+        "search_calls": 1,
+        "status": "ok",
+        "terminal": false,
+        "total_nodes": 52,
+        "winner": null,
+        "winner_code": null
+      },
+      "node_ceiling": 100000
+    },
+    "threefold_draw": {
+      "after": {
+        "action": "game_over",
+        "action_token_count": 30,
+        "fen": "@OO@@O@*/OO@*O*O@/@*O*@*@O w o ? 9 0 9 0 0 0 -1 -1 -1 -1 0 12 16 ids:nodes",
+        "history_origin": "game_start",
+        "history_sha256": "400b2f1690363fc2d0dddfffa120444e2483533b226843d7ae15ff29d3a5075c",
+        "legal_actions": [],
+        "logical_plies_by_side": [
+          15,
+          15
+        ],
+        "logical_ply_count": 30,
+        "no_capture_count": 12,
+        "outcome": {
+          "reason": "drawThreefoldRepetition",
+          "reason_code": "draw_threefold_repetition",
+          "terminal": true,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "game_over",
+        "removal_pending": false,
+        "repetition_current_count": 3,
+        "repetition_history_length": 12,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": null,
+        "snapshot_history_length": 30,
+        "status": "terminal",
+        "terminal": true
+      },
+      "before": {
+        "action": "select",
+        "action_token_count": 29,
+        "fen": "@OO@@O@*/OO@*O*O@/*@O*@*@O b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "history_origin": "game_start",
+        "history_sha256": "92d744c6a0412e15ef548ab08e81cb4afc725772546d4e466cee280b6d14f80e",
+        "legal_actions": [
+          "a4-a1",
+          "d1-a1",
+          "d1-g1",
+          "g7-d7",
+          "f4-f2",
+          "c4-c5",
+          "d5-c5"
+        ],
+        "logical_plies_by_side": [
+          15,
+          14
+        ],
+        "logical_ply_count": 29,
+        "no_capture_count": 11,
+        "outcome": {
+          "reason": "ongoing",
+          "reason_code": "ongoing",
+          "terminal": false,
+          "winner": null,
+          "winner_code": null
+        },
+        "pending_removal_count": 0,
+        "pending_removals": [
+          0,
+          0
+        ],
+        "phase": "moving",
+        "removal_pending": false,
+        "repetition_current_count": 2,
+        "repetition_history_length": 11,
+        "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f",
+        "ruleset_id": "nmm",
+        "side_to_move": "black",
+        "snapshot_history_length": 29,
+        "status": "ok",
+        "terminal": false
+      },
+      "logical_turn": {
+        "completed_depth": null,
+        "effective_depth": null,
+        "full_turn_actions": [],
+        "logical_move_id": null,
+        "logical_ply_delta": 0,
+        "model_action": null,
+        "node_budget": 10000,
+        "outcome_reason": "drawThreefoldRepetition",
+        "primary_nodes": 0,
+        "removal_nodes": 0,
+        "resulting_fen": null,
+        "resulting_side_to_move": null,
+        "score": null,
+        "score_kind": null,
+        "score_perspective": null,
+        "search_calls": 0,
+        "status": "terminal",
+        "terminal": true,
+        "total_nodes": 0,
+        "winner": null,
+        "winner_code": null
+      }
+    }
+  },
+  "runtime": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.13.1",
+    "python_implementation": "CPython"
+  },
+  "schema_version": "nmm.sanmill-strict-uci-smoke-result.v2",
+  "status": "passed"
+}

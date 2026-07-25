@@ -28,6 +28,9 @@ htmlcov/
 .tmp/
 .tmp-pytest/
 
+# Local diagnostic and smoke outputs; reviewed evidence belongs under docs/
+/out/
+
 # Rust build artefacts (repo-root or native crate)
 /target/
 native/target/
