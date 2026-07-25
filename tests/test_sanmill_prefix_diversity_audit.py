@@ -3,8 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from learned_ai.evaluation.sanmill_book_paths import load_book_path_corpus
 from scripts.audit_sanmill_prefix_diversity import (
+    _freeze,
     _ring16,
     book_diversity_record,
     perfect_diversity_record,
@@ -77,3 +80,14 @@ def test_perfect_record_counts_orbits_and_book_overlap() -> None:
     assert record["unique_ring16_final_orbit_count"] == 2
     assert record["maximum_ring16_orbit_multiplicity"] == 1
     assert record["book_ring16_overlap_count"] == 1
+
+
+def test_audit_freeze_is_exclusive_and_canonical(tmp_path: Path) -> None:
+    target = tmp_path / "audit.json"
+    payload = {"z": 1, "a": [2, 3]}
+
+    _freeze(target, payload)
+
+    assert target.read_bytes() == b'{"a":[2,3],"z":1}'
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        _freeze(target, payload)

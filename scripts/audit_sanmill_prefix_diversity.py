@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -35,7 +36,7 @@ from learned_ai.evaluation.sanmill_uci import (
     SanmillInstallation,
     inspect_sanmill_installation,
 )
-from learned_ai.training.run_contract import canonical_sha256
+from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
 
 
 _SCHEMA = "nmm.sanmill-prefix-diversity-audit.v1"
@@ -88,6 +89,32 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _freeze(path: Path, payload: dict[str, Any]) -> None:
+    target = path.resolve()
+    if target.exists():
+        raise FileExistsError(f"refusing to overwrite {target.name}")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    if temporary.exists():
+        raise FileExistsError(
+            f"prefix-diversity temporary file exists: {temporary.name}"
+        )
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(canonical_json_bytes(payload))
+            handle.flush()
+            os.fsync(handle.fileno())
+        if target.exists():
+            raise FileExistsError(
+                f"prefix-diversity output appeared during write: {target.name}"
+            )
+        os.replace(temporary, target)
+    except BaseException:
+        if temporary.exists():
+            temporary.unlink()
+        raise
 
 
 def _ring16(tgf_fen: str) -> str:
@@ -232,9 +259,21 @@ def main() -> int:
     )
     parser.add_argument("--samples", type=int, default=64)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=(
+            _ROOT
+            / "docs"
+            / "evidence"
+            / "sanmill-prefix-diversity-audit-2026-07-25.json"
+        ),
+    )
     args = parser.parse_args()
     if args.samples <= 0:
         raise ValueError("--samples must be positive")
+    if args.output.resolve().exists():
+        raise FileExistsError(f"refusing to overwrite {args.output.name}")
 
     generator_commit = _clean_commit()
     paths = _strict_paths(args.paths_config)
@@ -298,6 +337,7 @@ def main() -> int:
         ),
     }
     payload = {**body, "audit_identity": canonical_sha256(body)}
+    _freeze(args.output, payload)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
