@@ -270,6 +270,17 @@ humanlike_temperature: float = 1.0
 move-distribution match; do not treat a lower absolute win rate as a
 regression when `humanlike_blend > 0`.
 
+**Web GUI exposure.**  The Settings modal exposes a "Human-like play"
+checkbox and a "Strength %" slider directly below the "Gap exploitation"
+group.  Toggling the checkbox sends `use_humanlike` + `humanlike_blend`
+on every WebSocket play request; the server overrides
+`HeuristicWeights.humanlike_blend` from those fields before constructing
+`GameAI`.  Disabling the checkbox forces `humanlike_blend = 0` regardless
+of the slider value.  Slider defaults to 50 %; unchecked by default.
+The AI Tuning panel no longer carries `humanlike_blend` — the toggle
+lives in Settings because it changes the AI's *style*, not its
+tuning constants.
+
 
 
 
@@ -773,6 +784,17 @@ directory to force that stage to rerun. Promotes the final checkpoint to
 `learned_ai/sentinel/checkpoints/v2/best.pt` without touching production
 `best.pt`.
 
+**Combined JSONL + Malom dataset (v2b default).** The wrapper now builds
+a single training dataset up front via `scripts/build_sentinel_dataset_v2.py`
+and feeds it to all three stages via `train_sentinel.py --dataset PATH`:
+
+- 60 % Malom-sampled positions (equal parts placement / midgame / fly),
+  each position guaranteed to contain at least one W-or-L legal move
+  (not all-draw) so the model isn't dominated by flat-draw states.
+- 40 % classic JSONL replay from `data/games` + `data/human_games`.
+- Total size defaults to 4M examples (~2× the JSONL-only baseline);
+  override via `DATASET_TOTAL_EXAMPLES=...`.
+
 **Best-checkpoint fallback**: the trainer restores `best_val` from the
 resume checkpoint, so a stage that never dips below that inherited value
 never writes a fresh `best.pt`. The wrapper handles this by copying the
@@ -784,15 +806,33 @@ stage plateaus.
 ./scripts/train_sentinel_v2_step0.sh                # cpu, default paths
 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # gpu run
 MALOM_DB=/path/to/Std_DD_89adjusted ./scripts/train_sentinel_v2_step0.sh
+REBUILD_DATASET=1 ./scripts/train_sentinel_v2_step0.sh   # force dataset rebuild
 ```
 
 | Env var | Default | Description |
 | --- | --- | --- |
 | `DEVICE` | `cpu` | Passed as `--device` to `train_sentinel.py` |
-| `MALOM_DB` | `malom_db_path` from `data/training_paths.local.json` (else `/mnt/windows/...`) | Malom DB directory used in Stages 2 and 4 |
+| `MALOM_DB` | `malom_db_path` from `data/training_paths.local.json` (else `/mnt/windows/...`) | Malom DB directory used for Malom sampling AND for Stages 2 / 4 label queries |
 | `GAME_DIR` | `data/games` | AI self-play game directory |
 | `HUMAN_GAME_DIR` | `data/human_games` | Human game directory |
 | `PATIENCE` | *from config* | Override early-stop patience. All three stages ship `patience: 10` in their YAML. Set `PATIENCE=0` to disable, or any positive int to override. |
+| `DATASET_PATH` | `learned_ai/sentinel/datasets/v2_combined.npz` | Where the combined dataset is written / read |
+| `DATASET_TOTAL_EXAMPLES` | `4000000` | Combined-dataset target size |
+| `DATASET_MALOM_FRACTION` | `0.60` | Fraction of examples drawn from Malom sampling |
+| `REBUILD_DATASET` | *(unset)* | Set to `1` to rebuild `DATASET_PATH` even when the file already exists |
+
+**Standalone dataset builder**: `scripts/build_sentinel_dataset_v2.py` can
+be run outside the wrapper for offline dataset production or debugging.
+Its output is a plain `.npz` that `train_sentinel.py --dataset` consumes.
+
+```bash
+.venv/bin/python scripts/build_sentinel_dataset_v2.py \
+  --out learned_ai/sentinel/datasets/v2_combined.npz \
+  --total-examples 4000000 --malom-fraction 0.60
+```
+
+Small `--total-examples` (< 250k) auto-caps the JSONL file glob so smoke
+runs finish in seconds instead of minutes.
 
 Early stopping (`patience`) is now built into `scripts/train_sentinel.py`: the
 epoch loop breaks after N consecutive epochs without a new best val loss.

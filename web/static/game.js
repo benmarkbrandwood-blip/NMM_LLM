@@ -115,8 +115,8 @@ const WEIGHT_DEFAULTS = [
     tip: "How strongly the AI follows its chosen opening line. 0 = ignores the book entirely; 100 = always prefers the book destination over tactical moves." },
   { key: "loss_exploit",         group: "Behaviour",  label: "Exploit opponent losing lines %", def: 150, min: 0, max: 300, step: 10,
     tip: "How strongly to follow game lines where the opponent historically loses. 150 = 1.5× weight on opponent-loss trajectory hints." },
-  { key: "humanlike_blend",      group: "Behaviour",  label: "Human-like play %",           def: 0,   min: 0,   max: 100,  step: 5,
-    tip: "Blend HumanPrefNet's move-likelihood scoring into leaf ordering. 0 = pure engine; 100 = pure HumanPrefNet sampling. Intentionally weaker at higher values — the goal is human-recognisable play, not maximum strength. No effect if the HumanPrefNet checkpoint isn't installed on the server." },
+  // humanlike_blend lives in the Settings modal (Human-like play toggle + slider),
+  // not here — it changes the AI's *style*, not its tuning constants.
 ];
 
 // ── Personality presets ───────────────────────────────────────────────────────
@@ -321,6 +321,25 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  const chkHumanlike = $("chk-humanlike");
+  const rowHumanlikeBlend = $("row-humanlike-blend");
+  const rngHumanlikeBlend = $("rng-humanlike-blend");
+  if (chkHumanlike) {
+    chkHumanlike.addEventListener("change", () => {
+      if (rowHumanlikeBlend)
+        rowHumanlikeBlend.style.display = chkHumanlike.checked ? "flex" : "none";
+    });
+    // Initial visibility to match the checkbox's default state.
+    if (rowHumanlikeBlend)
+      rowHumanlikeBlend.style.display = chkHumanlike.checked ? "flex" : "none";
+  }
+  if (rngHumanlikeBlend) {
+    rngHumanlikeBlend.addEventListener("input", () => {
+      const lbl = $("lbl-humanlike-blend");
+      if (lbl) lbl.textContent = rngHumanlikeBlend.value + "%";
+    });
+  }
+
   const chkValueNet = $("chk-value-net");
   const rngValueNetBlend = $("rng-value-net-blend");
   if (chkValueNet) {
@@ -488,6 +507,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "rng-sentinel-gap",    type: "range" },
     { id: "chk-gap-net",         type: "checkbox" },
     { id: "rng-gap-net-blend",   type: "range" },
+    { id: "chk-humanlike",       type: "checkbox" },
+    { id: "rng-humanlike-blend", type: "range" },
     { id: "chk-value-net",       type: "checkbox" },
     { id: "rng-value-net-blend", type: "range" },
     { id: "chk-ext-qsearch",     type: "checkbox" },
@@ -1040,6 +1061,8 @@ function startNewGame() {
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,
+      use_humanlike:  $("chk-humanlike") ? $("chk-humanlike").checked : false,
+      humanlike_blend: $("rng-humanlike-blend") ? parseInt($("rng-humanlike-blend").value) : 0,
       use_extended_qsearch: $("chk-ext-qsearch") ? $("chk-ext-qsearch").checked : true,
       star_square_mode: $("chk-star-square") ? $("chk-star-square").checked : false,
       use_ngram_search: $("chk-ngram") ? $("chk-ngram").checked : false,
@@ -1336,6 +1359,8 @@ function startSetupGame() {
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,
+      use_humanlike:  $("chk-humanlike") ? $("chk-humanlike").checked : false,
+      humanlike_blend: $("rng-humanlike-blend") ? parseInt($("rng-humanlike-blend").value) : 0,
       use_extended_qsearch: $("chk-ext-qsearch") ? $("chk-ext-qsearch").checked : true,
       star_square_mode: $("chk-star-square") ? $("chk-star-square").checked : false,
       use_ngram_search: $("chk-ngram") ? $("chk-ngram").checked : false,
@@ -2955,6 +2980,8 @@ function _handleTournamentNext(msg) {
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,
+      use_humanlike:  $("chk-humanlike") ? $("chk-humanlike").checked : false,
+      humanlike_blend: $("rng-humanlike-blend") ? parseInt($("rng-humanlike-blend").value) : 0,
       use_extended_qsearch: $("chk-ext-qsearch") ? $("chk-ext-qsearch").checked : true,
       star_square_mode: $("chk-star-square") ? $("chk-star-square").checked : false,
       use_ngram_search: $("chk-ngram") ? $("chk-ngram").checked : false,

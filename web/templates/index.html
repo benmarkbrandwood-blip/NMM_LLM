@@ -387,6 +387,22 @@
           &#9888; Sentinel + Gap exploitation together can degrade play at lower difficulties — consider disabling one.
         </div>
 
+        <div class="form-row" id="row-humanlike" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-humanlike">
+          <label for="chk-humanlike" style="color:var(--text); font-size:.9rem;">
+            Human-like play
+            <span style="font-size:.75rem; color:var(--text-dim);">(blend HumanPrefNet into move choice)</span>
+          </label>
+        </div>
+        <div id="row-humanlike-blend" style="display:none; flex-direction:column; gap:3px; padding-left:24px; margin-bottom:2px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label for="rng-humanlike-blend" style="font-size:.82rem; color:var(--text-dim);">Strength %</label>
+            <span id="lbl-humanlike-blend" style="font-size:.82rem; font-weight:600; min-width:2.8em; text-align:right;">50%</span>
+          </div>
+          <input type="range" id="rng-humanlike-blend" min="0" max="100" step="5" value="50" style="width:100%">
+          <span style="font-size:.72rem; color:var(--text-dim);">Higher = closer to human distribution; intentionally weaker than pure engine.</span>
+        </div>
+
         <div class="form-row" id="row-value-net" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-value-net" checked>
           <label for="chk-value-net" style="color:var(--text); font-size:.9rem;">
