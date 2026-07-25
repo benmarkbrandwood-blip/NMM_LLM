@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the authorized strict Sanmill UCI bridge validation smoke."""
+"""Run the authorized strict Sanmill logical-turn bridge validation smoke."""
 
 from __future__ import annotations
 
@@ -22,9 +22,7 @@ from learned_ai.evaluation.sanmill_uci import (  # noqa: E402
     SanmillBridgeError,
     SanmillInstallation,
     SanmillUciSession,
-    assert_pending_removal_parity,
     assert_stable_legal_parity,
-    atomic_move_for_actions,
     inspect_sanmill_installation,
     inspect_sanmill_opening_book,
     project_stable_sanmill_fen,
@@ -65,6 +63,7 @@ _EVIDENCE_SOURCE_FILES = (
     "learned_ai/evaluation/sanmill_uci.py",
     "scripts/audit_sanmill_uci_bridge.py",
     "tests/test_sanmill_uci.py",
+    "docs/experiments/sanmill-strict-uci-bridge-smoke-v2.md",
 )
 
 
@@ -151,14 +150,6 @@ def inspect_nmm_llm_source() -> dict[str, Any]:
     }
 
 
-def _fen_counter(fen: str, index: int) -> int:
-    fields = fen.split()
-    try:
-        return int(fields[index])
-    except (IndexError, ValueError) as exc:
-        raise SanmillBridgeError(f"cannot read FEN counter {index}: {fen}") from exc
-
-
 def run_rule_probes(
     installation: SanmillInstallation,
     *,
@@ -167,95 +158,106 @@ def run_rule_probes(
     with SanmillUciSession(installation) as session:
         session.new_game()
         session.position_startpos()
-        opening = session.search_fixed_nodes(max(node_budget, 100_000))
-        if opening.depth != 1:
+        opening_state = session.state_json()
+        opening = session.search_logical_turn(max(node_budget, 100_000))
+        if opening.effective_depth != 1 or opening.completed_depth != 1:
             raise SanmillBridgeError(
                 "DrawOnHumanExperience opening-depth probe did not select depth 1"
             )
 
         session.new_game()
         session.position_fen(NO_CAPTURE_DRAW_FEN)
-        no_capture_state = session.position_state()
-        no_capture_search = session.probe_terminal_draw(node_budget)
-        if _fen_counter(no_capture_state.fen, 15) != 100:
+        no_capture_state = session.state_json()
+        no_capture_search = session.search_logical_turn(node_budget)
+        if no_capture_state.no_capture_count != 100:
             raise SanmillBridgeError("no-capture draw FEN lost its 100-ply counter")
         if (
-            no_capture_state.outcome.winner != "draw"
-            or no_capture_state.outcome.reason != "drawFiftyMove"
+            no_capture_state.winner is not None
+            or no_capture_state.outcome_reason != "drawFiftyMove"
+            or no_capture_search.status != "terminal"
+            or no_capture_search.total_nodes != 0
         ):
             raise SanmillBridgeError("no-capture fixture has the wrong Sanmill outcome")
 
         session.new_game()
         session.position_startpos(THREEFOLD_PREFIX)
-        repetition_before = session.position_state()
+        repetition_before = session.state_json()
         if repetition_before.terminal:
             raise SanmillBridgeError("threefold fixture became terminal too early")
         session.position_startpos((*THREEFOLD_PREFIX, THREEFOLD_FINAL))
-        repetition_after = session.position_state()
-        repetition_search = session.probe_terminal_draw(node_budget)
-        if "current_count=2" not in repetition_after.history:
+        repetition_after = session.state_json()
+        repetition_search = session.search_logical_turn(node_budget)
+        if repetition_before.repetition_current_count != 2:
             raise SanmillBridgeError(
-                "threefold history did not retain two prior matches"
+                "threefold fixture did not retain two prior occurrences"
             )
-        if repetition_after.outcome.reason != "drawThreefoldRepetition":
+        if (
+            repetition_after.repetition_current_count != 3
+            or repetition_after.outcome_reason != "drawThreefoldRepetition"
+            or repetition_search.status != "terminal"
+        ):
             raise SanmillBridgeError("threefold fixture has the wrong Sanmill outcome")
 
         session.new_game()
         session.position_startpos(STAGED_CAPTURE_PREFIX)
-        capture_before = session.position_state()
+        capture_before = session.state_json()
         capture_board = project_stable_sanmill_fen(capture_before.fen)
-        capture_nmm_moves = assert_stable_legal_parity(
+        assert_stable_legal_parity(
             capture_board,
             capture_before.legal_actions,
         )
-        capture_primary = session.search_fixed_nodes(node_budget)
-        if capture_primary.bestmove != "d6-d5":
+        capture_budget = max(node_budget, 500_000)
+        capture_turn = session.search_logical_turn(capture_budget, depth=8)
+        if capture_turn.full_turn_actions[0] != "d6-d5":
             raise SanmillBridgeError(
                 "staged-capture fixture did not choose its pinned mill-forming move"
             )
-        capture_actions = (*STAGED_CAPTURE_PREFIX, capture_primary.bestmove)
-        session.position_startpos(capture_actions)
-        capture_pending = session.position_state()
-        if not capture_pending.removal_pending:
-            raise SanmillBridgeError("mill-forming move did not stage a removal")
-        assert_pending_removal_parity(
-            capture_nmm_moves,
-            capture_primary.bestmove,
-            capture_pending.legal_actions,
+        if (
+            len(capture_turn.full_turn_actions) != 2
+            or not capture_turn.full_turn_actions[1].startswith("x")
+        ):
+            raise SanmillBridgeError(
+                "logical capture probe did not return its required removal"
+            )
+        session.position_startpos(
+            (*STAGED_CAPTURE_PREFIX, *capture_turn.full_turn_actions)
         )
-        capture_removal = session.search_fixed_nodes(node_budget)
-        if not capture_removal.bestmove.startswith("x"):
-            raise SanmillBridgeError("staged-capture probe did not choose a removal")
-        atomic_move_for_actions(
-            capture_nmm_moves,
-            capture_primary.bestmove,
-            capture_removal.bestmove,
-        )
-        session.position_startpos((*capture_actions, capture_removal.bestmove))
-        capture_after = session.position_state()
-        if capture_after.terminal or _fen_counter(capture_after.fen, 15) != 0:
+        capture_after = session.state_json()
+        if capture_turn.resulting_fen != capture_after.fen:
+            raise SanmillBridgeError(
+                "logical capture result differs from authoritative replay"
+            )
+        if capture_after.terminal or capture_after.no_capture_count != 0:
             raise SanmillBridgeError("capture did not reset the no-capture counter")
         if (
-            "root_reset=true" not in capture_after.history
-            or "len=0" not in capture_after.history
+            capture_after.repetition_history_length != 0
+            or capture_after.repetition_current_count != 0
         ):
             raise SanmillBridgeError("capture did not reset repetition history")
+        if (
+            capture_after.logical_ply_count
+            != capture_before.logical_ply_count + 1
+        ):
+            raise SanmillBridgeError("capture did not advance one logical ply")
 
         session.new_game()
         session.position_fen(FEWER_THAN_THREE_FEN)
-        terminal_state = session.position_state()
+        terminal_state = session.state_json()
+        terminal_search = session.search_logical_turn(node_budget)
         if not terminal_state.terminal or terminal_state.legal_actions:
             raise SanmillBridgeError("fewer-than-three fixture is not terminal")
         if (
-            terminal_state.outcome.winner != "black"
-            or terminal_state.outcome.reason != "loseFewerThanThree"
+            terminal_state.winner != "black"
+            or terminal_state.outcome_reason != "loseFewerThanThree"
+            or terminal_search.status != "terminal"
         ):
             raise SanmillBridgeError("fewer-than-three fixture has the wrong outcome")
 
         return {
             "opening_depth_policy": {
                 "node_ceiling": max(node_budget, 100_000),
-                "result": opening.semantic_record(),
+                "before": opening_state.portable_record(),
+                "logical_turn": opening.semantic_record(),
                 "interpretation": (
                     "depth 1 proves the ordinary Sanmill opening-depth table is "
                     "active; SkillLevel=30 would select depth 30 if bypassed"
@@ -263,28 +265,21 @@ def run_rule_probes(
             },
             "no_capture_draw": {
                 "state": no_capture_state.portable_record(),
-                "search": no_capture_search.semantic_record(),
+                "logical_turn": no_capture_search.semantic_record(),
             },
             "threefold_draw": {
                 "before": repetition_before.portable_record(),
                 "after": repetition_after.portable_record(),
-                "search": repetition_search.semantic_record(),
+                "logical_turn": repetition_search.semantic_record(),
             },
-            "staged_capture_and_reset": {
+            "compound_capture_and_reset": {
                 "before": capture_before.portable_record(),
-                "primary_search": capture_primary.semantic_record(),
-                "pending": capture_pending.portable_record(),
-                "removal_search": capture_removal.semantic_record(),
+                "logical_turn": capture_turn.semantic_record(),
                 "after": capture_after.portable_record(),
             },
             "fewer_than_three": {
                 "state": terminal_state.portable_record(),
-                "search_attempted": False,
-                "reason": (
-                    "the fail-closed build rejects MOVE_NONE before Sanmill's "
-                    "release fallback; terminal phase and empty legal set are "
-                    "queried before every search"
-                ),
+                "logical_turn": terminal_search.semantic_record(),
             },
         }
 
@@ -301,41 +296,49 @@ def run_selfplay(
         session.new_game()
         for turn_index in range(1, max_turns + 1):
             session.position_startpos(actions)
-            before = session.position_state()
+            before = session.state_json()
             if before.terminal:
                 break
             if before.removal_pending:
                 raise SanmillBridgeError("selfplay turn began with a pending removal")
             board = project_stable_sanmill_fen(before.fen)
-            nmm_moves = assert_stable_legal_parity(board, before.legal_actions)
+            assert_stable_legal_parity(board, before.legal_actions)
 
-            primary = session.search_fixed_nodes(node_budget)
-            if primary.terminal_token:
-                raise SanmillBridgeError("ongoing selfplay returned a terminal token")
-            actions.append(primary.bestmove)
-            session.position_startpos(actions)
-            staged = session.position_state()
-
-            removal_result = None
-            removal_action = None
-            if staged.removal_pending:
-                assert_pending_removal_parity(
-                    nmm_moves,
-                    primary.bestmove,
-                    staged.legal_actions,
+            logical_turn = session.search_logical_turn(node_budget)
+            if logical_turn.status != "ok":
+                raise SanmillBridgeError(
+                    "ongoing selfplay returned a terminal logical response"
                 )
-                removal_result = session.search_fixed_nodes(node_budget)
-                if not removal_result.bestmove.startswith("x"):
-                    raise SanmillBridgeError("removal search did not choose a removal")
-                removal_action = removal_result.bestmove
-                actions.append(removal_action)
-                session.position_startpos(actions)
-            elif staged.terminal:
-                if staged.legal_actions:
-                    raise SanmillBridgeError("terminal staged state advertised actions")
-
-            atomic_move_for_actions(nmm_moves, primary.bestmove, removal_action)
-            after = session.position_state()
+            actions.extend(logical_turn.full_turn_actions)
+            session.position_startpos(actions)
+            after = session.state_json()
+            if after.fen != logical_turn.resulting_fen:
+                raise SanmillBridgeError(
+                    "selfplay replay differs from logical-turn resulting FEN"
+                )
+            if after.logical_ply_count != before.logical_ply_count + 1:
+                raise SanmillBridgeError(
+                    "selfplay logical-ply count did not advance exactly once"
+                )
+            if (
+                after.action_token_count
+                != before.action_token_count + len(logical_turn.full_turn_actions)
+            ):
+                raise SanmillBridgeError(
+                    "selfplay action-token count differs from returned turn"
+                )
+            if after.history_sha256 == before.history_sha256:
+                raise SanmillBridgeError(
+                    "selfplay history identity did not change after a turn"
+                )
+            if after.terminal != logical_turn.terminal:
+                raise SanmillBridgeError(
+                    "logical-turn and replay terminal flags disagree"
+                )
+            if after.outcome_reason != logical_turn.outcome_reason:
+                raise SanmillBridgeError(
+                    "logical-turn and replay outcome reasons disagree"
+                )
             if not after.terminal:
                 after_board = project_stable_sanmill_fen(after.fen)
                 assert_stable_legal_parity(after_board, after.legal_actions)
@@ -344,14 +347,12 @@ def run_selfplay(
                 {
                     "turn": turn_index,
                     "before_fen": before.fen,
-                    "before_outcome": before.outcome.portable_record(),
-                    "primary": primary.semantic_record(),
-                    "removal": (
-                        removal_result.semantic_record()
-                        if removal_result is not None
-                        else None
-                    ),
+                    "before_history_sha256": before.history_sha256,
+                    "before_logical_ply_count": before.logical_ply_count,
+                    "logical_turn": logical_turn.semantic_record(),
                     "after_fen": after.fen,
+                    "after_history_sha256": after.history_sha256,
+                    "after_logical_ply_count": after.logical_ply_count,
                     "after_outcome": after.outcome.portable_record(),
                     "terminal": after.terminal,
                 }
@@ -360,10 +361,10 @@ def run_selfplay(
                 break
 
     semantic = {
-        "node_ceiling_per_search": node_budget,
-        "max_complete_turns": max_turns,
+        "node_ceiling_per_logical_turn": node_budget,
+        "max_complete_logical_turns": max_turns,
         "completed_turns": len(turns),
-        "staged_actions": actions,
+        "replayed_action_tokens": actions,
         "turns": turns,
         "stopped_at_ceiling": bool(
             turns and len(turns) == max_turns and not turns[-1]["terminal"]
@@ -388,14 +389,14 @@ def run_performance_probes(
                 else:
                     assert isinstance(source, str)
                     session.position_fen(source)
-                state = session.position_state()
+                state = session.state_json()
                 if state.terminal or state.removal_pending:
                     raise SanmillBridgeError(
                         f"performance fixture is not a stable {phase} position"
                     )
-                result = session.search_fixed_nodes(budget)
+                result = session.search_logical_turn(budget)
                 nps = (
-                    result.nodes / result.elapsed_seconds
+                    result.total_nodes / result.elapsed_seconds
                     if result.elapsed_seconds > 0
                     else None
                 )
@@ -404,14 +405,41 @@ def run_performance_probes(
                         "phase": phase,
                         "fen": state.fen,
                         "node_ceiling": budget,
-                        "result": result.semantic_record(),
+                        "logical_turn": result.semantic_record(),
                         "elapsed_seconds": result.elapsed_seconds,
                         "nodes_per_second": nps,
                     }
                 )
 
+        compound_budget = max(max(budgets), 500_000)
+        session.new_game()
+        session.position_startpos(STAGED_CAPTURE_PREFIX)
+        compound_state = session.state_json()
+        compound = session.search_logical_turn(compound_budget, depth=8)
+        if (
+            len(compound.full_turn_actions) != 2
+            or not compound.full_turn_actions[1].startswith("x")
+        ):
+            raise SanmillBridgeError(
+                "compound performance fixture did not include its removal"
+            )
+        samples.append(
+            {
+                "phase": "compound_mill",
+                "fen": compound_state.fen,
+                "node_ceiling": compound_budget,
+                "logical_turn": compound.semantic_record(),
+                "elapsed_seconds": compound.elapsed_seconds,
+                "nodes_per_second": (
+                    compound.total_nodes / compound.elapsed_seconds
+                    if compound.elapsed_seconds > 0
+                    else None
+                ),
+            }
+        )
+
     by_phase: dict[str, dict[str, Any]] = {}
-    for phase, _, _ in PERFORMANCE_POSITIONS:
+    for phase in sorted({sample["phase"] for sample in samples}):
         phase_samples = [sample for sample in samples if sample["phase"] == phase]
         rates = [
             float(sample["nodes_per_second"])
@@ -442,7 +470,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=_ROOT / "out" / "diagnostics" / "sanmill-uci-bridge-smoke.json",
+        default=(
+            _ROOT
+            / "out"
+            / "diagnostics"
+            / "sanmill-strict-uci-bridge-smoke-v2.json"
+        ),
     )
     return parser.parse_args()
 
@@ -472,7 +505,7 @@ def main() -> int:
         budgets=args.performance_budgets,
     )
     payload = {
-        "schema_version": "nmm.sanmill-strict-uci-smoke-result.v1",
+        "schema_version": "nmm.sanmill-strict-uci-smoke-result.v2",
         "status": "passed",
         "claim_boundary": (
             "bridge/rule/reproducibility/performance evidence only; no candidate "
