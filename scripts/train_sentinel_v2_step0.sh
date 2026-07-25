@@ -29,6 +29,10 @@
 #   DATASET_MALOM_FRACTION=F       override --malom-fraction (default 0.60)
 #   DATASET_PATH=path              override output/consumed dataset path
 #   REBUILD_DATASET=1              force dataset rebuild even if the file exists
+#   RUN_STAGE1=1                   include Stage 1 (skipped by default because
+#                                  the structural warm-start empirically
+#                                  anchors the trunk on heuristic labels and
+#                                  Stage 2 then plateaus without moving)
 
 set -euo pipefail
 
@@ -180,10 +184,26 @@ _run_stage() {
     echo
 }
 
-# ── Run the three stages ─────────────────────────────────────────────────────
+# ── Run the stages ───────────────────────────────────────────────────────────
+# Stage 1 is SKIPPED by default.  Its original job was a structural warm-start
+# with heuristic labels; empirically that anchors the trunk on the heuristic
+# function, and Stage 2 (at low LR) can't move the weights far enough onto the
+# Malom labels — a plateau observed in an earlier run (Stage 2 val==Stage 1 val
+# to four decimal places for 10 consecutive epochs).  Set RUN_STAGE1=1 to bring
+# it back for A/B comparisons.
+#
+# With Stage 1 skipped, Stage 2 becomes the entry point and starts from a
+# random-initialised model on the Malom-labelled combined dataset at its now-
+# bumped LR (0.001), giving it enough gradient to actually learn.
 
-_run_stage 1 configs/sentinel_stage1.yaml "$CKPT_ROOT/v2_stage1" "" no
-_run_stage 2 configs/sentinel_stage2.yaml "$CKPT_ROOT/v2_stage2" "$CKPT_ROOT/v2_stage1/best.pt" yes
+if [[ "${RUN_STAGE1:-0}" == "1" ]]; then
+    _run_stage 1 configs/sentinel_stage1.yaml "$CKPT_ROOT/v2_stage1" "" no
+    _run_stage 2 configs/sentinel_stage2.yaml "$CKPT_ROOT/v2_stage2" "$CKPT_ROOT/v2_stage1/best.pt" yes
+else
+    echo "── Stage 1 SKIPPED (set RUN_STAGE1=1 to run it) ──"
+    echo
+    _run_stage 2 configs/sentinel_stage2.yaml "$CKPT_ROOT/v2_stage2" "" yes
+fi
 _run_stage 4 configs/sentinel_stage4.yaml "$CKPT_ROOT/v2_stage4" "$CKPT_ROOT/v2_stage2/best.pt" yes
 
 # ── Promote Stage 4 → v2 slot (per plan, NOT into production best.pt) ───────

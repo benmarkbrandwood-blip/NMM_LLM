@@ -1,15 +1,25 @@
-# Stage 2 — DB calibration (Malom labels, structural features only)
-# Resume from Stage 1.  The Malom DB provides strong WDL+DTM labels for every
-# legal move, but --drop-db-features still zeros the DB indicator slots so the
-# model updates its structural weights toward DB ground truth rather than
-# memorising the oracle signal directly.
+# Stage 2 — Malom-labelled training from scratch (v2b default entry point)
+#
+# The old Stage 1 (structural warm-start on heuristic labels) is skipped by
+# default in scripts/train_sentinel_v2_step0.sh because it empirically anchors
+# the trunk on the heuristic function and Stage 2 then fails to move onto the
+# Malom labels.  See docs/retrain_v2_plan.md.
+#
+# Malom DB provides strong WDL+DTM labels for every legal move.
+# --drop-db-features still zeros the DB indicator slots so the model
+# learns structural features that match live-inference conditions
+# rather than memorising the oracle input signal.
+#
+# LR bumped from 0.0003 to 0.001 so Stage 2 can actually learn from random
+# init — at 0.0003 it never moves off the initial loss floor on this size
+# of dataset.
 input_dim: 58
 hidden_dims: [128, 64, 32]
 dropout: 0.2
-lr: 0.0003
+lr: 0.001
 batch_size: 128
 epochs: 30
-patience: 10   # DB-labelled stage; wide slack in case val dips back after a stall
+patience: 10
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage2

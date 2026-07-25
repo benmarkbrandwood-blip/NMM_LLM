@@ -820,6 +820,14 @@ REBUILD_DATASET=1 ./scripts/train_sentinel_v2_step0.sh   # force dataset rebuild
 | `DATASET_TOTAL_EXAMPLES` | `4000000` | Combined-dataset target size |
 | `DATASET_MALOM_FRACTION` | `0.60` | Fraction of examples drawn from Malom sampling |
 | `REBUILD_DATASET` | *(unset)* | Set to `1` to rebuild `DATASET_PATH` even when the file already exists |
+| `RUN_STAGE1` | *(unset)* | Set to `1` to include the Stage 1 heuristic-label warm-start. **Skipped by default** — it anchors the trunk on the heuristic function and Stage 2 then plateaus without learning Malom labels. Stage 2 is the entry point in the default flow. |
+
+**Why Stage 1 is skipped**: an earlier run showed Stage 2's val loss identical
+to Stage 1's for 10 straight epochs (0.3382 → 0.3382 → …). Stage 1 imprints a
+strong heuristic prior; at Stage 2's original `lr: 0.0003` Adam can't move the
+trunk far enough to learn Malom labels. The fix is (a) skip Stage 1 so there's
+no prior anchor, and (b) bump Stage 2's LR to `0.001` so it can learn from
+random init. Both are default in v2b.
 
 **Standalone dataset builder**: `scripts/build_sentinel_dataset_v2.py` can
 be run outside the wrapper for offline dataset production or debugging.
