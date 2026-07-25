@@ -201,6 +201,19 @@ must not manufacture synthetic human lines.
 
 Until that gate is resolved, the state remains `needs_decision`.
 
+## Current Book evidence
+
+The source-only
+[twelve-ply Book audit](../evidence/sanmill-layered-book-source-audit-2026-07-25.md)
+is complete. The `oracle_query_book` graph supplies zero pure twelve-ply
+histories: all 1,472 paths entering the final ply report `book_miss`. The
+author-defined named lines are a separate representation; 84 of 107 variations
+produce complete legal twelve-ply prefixes, expanding to 112 capture-resolved
+records and 110 unique exact histories and `ring16` endpoints.
+
+These results do not freeze Book membership or authorise a Book-seeded Perfect
+DB continuation. HumanDB and Perfect DB evidence remain outstanding.
+
 ## Explicit exclusions
 
 This preparation must not:
