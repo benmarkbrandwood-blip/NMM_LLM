@@ -261,6 +261,18 @@ if _gap_net is not None:
 else:
     log.info("GapNet: not found at %s — blunder exploitation disabled", _gap_net_path)
 
+# Load HumanPrefNet — human-move ranker for humanlike-play mode (Step 3
+# of docs/retrain_v2_plan.md).  Optional; graceful no-op if the file is
+# missing so servers without this checkpoint start normally.
+from ai.human_pref_advisor import try_load as _try_load_hp
+_human_pref_path = _ROOT / "data" / "human_pref_net.npz"
+_human_pref_net = _try_load_hp(_human_pref_path)
+if _human_pref_net is not None:
+    _hp_size_kb = round(_human_pref_path.stat().st_size / 1024, 1)
+    log.info("HumanPrefNet: loaded from %s (%s KB)", _human_pref_path, _hp_size_kb)
+else:
+    log.info("HumanPrefNet: not found at %s — humanlike-play slider will be a no-op", _human_pref_path)
+
 
 # ── Sentinel overlay (optional — only loads if checkpoint exists) ─────────────
 _sentinel_advisor = None
@@ -325,7 +337,7 @@ try:
     _overseer_advisor = _load_specialist_router(
         sentinel_advisor=_sentinel_advisor,
         value_net=_value_net,
-        gap_net=_gap_net,
+        gap_net=_gap_net, human_pref_net=_human_pref_net,
         human_db=_human_db,
         specialist_db=_specialist_db,
         runtime_quarantine=_runtime_game_quarantine,
@@ -341,7 +353,7 @@ try:
     _generalist_advisor = _load_generalist(
         sentinel_advisor=_sentinel_advisor,
         value_net=_value_net,
-        gap_net=_gap_net,
+        gap_net=_gap_net, human_pref_net=_human_pref_net,
         human_db=_human_db,
         specialist_db=_specialist_db,
     )
@@ -2625,6 +2637,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         make_mistakes=_w("make_mistakes", 0),
         opening_adherence=_w("opening_adherence", 50),
         value_net_blend=_w("value_net_blend", 80),
+        humanlike_blend=_w("humanlike_blend", 0),
         cross_mill_cycling=_w("cross_mill_cycling", 300),
         move_variance_pct=_w("move_variance_pct", 0),
     )
@@ -2635,7 +2648,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         endgame_solved_db=_endgame_solved_db,
         malom_db=_malom_db,
         value_net=_value_net,
-        gap_net=_gap_net,
+        gap_net=_gap_net, human_pref_net=_human_pref_net,
     )
     _apply_search_depth(_gai)
     return _gai
@@ -3266,7 +3279,7 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_solved_db=_endgame_solved_db,
                             malom_db=_malom_db,
                             value_net=_value_net,
-                            gap_net=_gap_net,
+                            gap_net=_gap_net, human_pref_net=_human_pref_net,
                         )
                         _apply_search_depth(_re_ai)
 
@@ -3367,6 +3380,7 @@ async def ws_endpoint(websocket: WebSocket):
                         make_mistakes=_w("make_mistakes", 0),
                         opening_adherence=_w("opening_adherence", 50),
                         value_net_blend=_w("value_net_blend", 80),
+                        humanlike_blend=_w("humanlike_blend", 0),
                         cross_mill_cycling=_w("cross_mill_cycling", 300),
                         gap_blend_place=round(12 * _gap_scale),
                         gap_blend_move=round(20 * _gap_scale),
@@ -3380,7 +3394,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
-                        gap_net=_gap_net,
+                        gap_net=_gap_net, human_pref_net=_human_pref_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
@@ -3532,6 +3546,7 @@ async def ws_endpoint(websocket: WebSocket):
                         make_mistakes=_w("make_mistakes", 0),
                         opening_adherence=_w("opening_adherence", 50),
                         value_net_blend=_w("value_net_blend", 80),
+                        humanlike_blend=_w("humanlike_blend", 0),
                         cross_mill_cycling=_w("cross_mill_cycling", 300),
                         gap_blend_place=round(12 * _gap_scale),
                         gap_blend_move=round(20 * _gap_scale),
@@ -3544,7 +3559,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
-                        gap_net=_gap_net,
+                        gap_net=_gap_net, human_pref_net=_human_pref_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
@@ -4065,9 +4080,10 @@ async def ws_endpoint(websocket: WebSocket):
                     make_mistakes=_w("make_mistakes", 0),
                     opening_adherence=_w("opening_adherence", 50),
                     value_net_blend=_w("value_net_blend", 80),
+                    humanlike_blend=_w("humanlike_blend", 0),
                     cross_mill_cycling=_w("cross_mill_cycling", 300),
                 )
-                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
+                new_ai = GameAI(color=handoff_color, difficulty=diff, weights=_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net, human_pref_net=_human_pref_net)
                 _apply_search_depth(new_ai)
 
                 new_coord = None
@@ -4438,7 +4454,7 @@ async def ws_endpoint(websocket: WebSocket):
                     _gai = GameAI(
                         color=ai_color, difficulty=_ava_diff, weights=_ava_hw,
                         fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db,
-                        malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net,
+                        malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net, human_pref_net=_human_pref_net,
                     )
                     session.game_ai    = _gai
                     session.human_color = hc
@@ -4455,8 +4471,8 @@ async def ws_endpoint(websocket: WebSocket):
 
                 else:
                     # "auto" — AI vs AI watch mode
-                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
-                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net)
+                    _ai_w = GameAI(color="W", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net, human_pref_net=_human_pref_net)
+                    _ai_b = GameAI(color="B", difficulty=_ava_diff, weights=_ava_hw, fullgame_db=_fullgame_db, endgame_solved_db=_endgame_solved_db, malom_db=_malom_db, value_net=_value_net, gap_net=_gap_net, human_pref_net=_human_pref_net)
                     session.ai_vs_ai        = True
                     session.vs_human        = False
                     session.game_ai_white   = _ai_w

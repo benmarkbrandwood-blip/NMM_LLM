@@ -115,6 +115,8 @@ const WEIGHT_DEFAULTS = [
     tip: "How strongly the AI follows its chosen opening line. 0 = ignores the book entirely; 100 = always prefers the book destination over tactical moves." },
   { key: "loss_exploit",         group: "Behaviour",  label: "Exploit opponent losing lines %", def: 150, min: 0, max: 300, step: 10,
     tip: "How strongly to follow game lines where the opponent historically loses. 150 = 1.5× weight on opponent-loss trajectory hints." },
+  { key: "humanlike_blend",      group: "Behaviour",  label: "Human-like play %",           def: 0,   min: 0,   max: 100,  step: 5,
+    tip: "Blend HumanPrefNet's move-likelihood scoring into leaf ordering. 0 = pure engine; 100 = pure HumanPrefNet sampling. Intentionally weaker at higher values — the goal is human-recognisable play, not maximum strength. No effect if the HumanPrefNet checkpoint isn't installed on the server." },
 ];
 
 // ── Personality presets ───────────────────────────────────────────────────────
