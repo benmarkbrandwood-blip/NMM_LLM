@@ -407,9 +407,30 @@ class SentinelDataset(_TorchDataset):
     # ----- Dataset protocol ----------------------------------------------------
 
     def __len__(self) -> int:
+        if getattr(self, "_arr_features", None) is not None:
+            return int(self._arr_features.shape[0])
         return len(self.examples)
 
     def __getitem__(self, idx: int):
+        # Fast path: raw arrays (set by load_from_disk).  Avoids materialising
+        # 4M+ MoveExample dataclass instances at load time.
+        if getattr(self, "_arr_features", None) is not None:
+            feat_np = self._arr_features[idx]
+            if torch is not None:
+                feat = torch.from_numpy(feat_np.astype(np.float32, copy=False))
+            else:
+                feat = feat_np.astype(np.float32, copy=False)
+            q = float(self._arr_quality[idx])
+            w = float(self._arr_weight[idx])
+            src = self._arr_source[idx]
+            if isinstance(src, bytes):
+                src = src.decode("utf-8", "replace")
+            if src in ("solved_db", "solved_db_dtm"):
+                wdl_cls = 2 if q > 0.5 else (0 if q < 0.5 else 1)
+            else:
+                wdl_cls = -1
+            return feat, (q, w, wdl_cls)
+
         ex = self.examples[idx]
         feat = ex.features.astype(np.float32)
         if torch is not None:
@@ -444,29 +465,34 @@ class SentinelDataset(_TorchDataset):
 
     @classmethod
     def load_from_disk(cls, path: str) -> "SentinelDataset":
-        """Reconstruct a dataset previously written by :meth:`save_to_disk`."""
+        """Reconstruct a dataset previously written by :meth:`save_to_disk`.
+
+        Fast path: instead of materialising N MoveExample dataclass instances
+        (which is ~10μs each — 40s+ for a 4M-row dataset), keep the raw numpy
+        arrays and let __getitem__ read from them on demand.
+        """
         data = np.load(path, allow_pickle=True)
-        feats = data["features"]
-        n = feats.shape[0]
-        pos_keys = data["position_key"] if "position_key" in data else np.array([""] * n, dtype=object)
-        examples: List[MoveExample] = []
-        for i in range(n):
-            examples.append(
-                MoveExample(
-                    features=feats[i].astype(np.float32),
-                    move_quality=float(data["move_quality"][i]),
-                    training_weight=float(data["training_weight"][i]),
-                    supervision_source=str(data["supervision_source"][i]),
-                    ply=int(data["ply"][i]),
-                    position_key=str(pos_keys[i]),
-                )
-            )
-        return cls(examples)
+        ds = cls(examples=[])
+        ds._arr_features = np.ascontiguousarray(data["features"], dtype=np.float32)
+        ds._arr_quality  = np.ascontiguousarray(data["move_quality"], dtype=np.float32)
+        ds._arr_weight   = np.ascontiguousarray(data["training_weight"], dtype=np.float32)
+        # supervision_source is dtype=object; keep as-is for per-item lookup.
+        ds._arr_source   = data["supervision_source"]
+        ds._arr_ply      = data["ply"] if "ply" in data.files else np.zeros(len(ds._arr_features), np.int64)
+        ds._arr_pos_key  = data["position_key"] if "position_key" in data.files else None
+        return ds
 
     # ----- diagnostics ---------------------------------------------------------
 
     def quality_distribution(self) -> Dict[str, int]:
         """Bucket examples by move_quality (works with binary and DTM-graded labels)."""
+        if getattr(self, "_arr_quality", None) is not None:
+            q = self._arr_quality
+            return {
+                "win":  int((q > 0.5 + 1e-3).sum()),
+                "loss": int((q < 0.5 - 1e-3).sum()),
+                "draw": int((np.abs(q - 0.5) < 1e-3).sum()),
+            }
         dist = {"win": 0, "draw": 0, "loss": 0}
         for e in self.examples:
             q = e.move_quality
@@ -479,6 +505,9 @@ class SentinelDataset(_TorchDataset):
         return dist
 
     def source_distribution(self) -> Dict[str, int]:
+        if getattr(self, "_arr_source", None) is not None:
+            uniq, counts = np.unique(self._arr_source.astype(str), return_counts=True)
+            return {str(k): int(v) for k, v in zip(uniq, counts)}
         dist: Dict[str, int] = {}
         for e in self.examples:
             dist[e.supervision_source] = dist.get(e.supervision_source, 0) + 1
