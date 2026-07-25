@@ -14,6 +14,7 @@ Related:
 - [current Sanmill bridge result](../evidence/sanmill-strict-uci-bridge-smoke-v2-2026-07-25.md)
 - [complete Sanmill book-path contract](sanmill-book-path-corpus-v1.md)
 - [complete Sanmill book-path artifact](sanmill-book-path-corpus-v1.json)
+- [Sanmill prefix-diversity audit](../evidence/sanmill-prefix-diversity-audit-2026-07-25.md)
 
 ## What is now locally resolved
 
@@ -113,11 +114,19 @@ while `pair-0` failed closed with `book_miss` before its sixth logical move.
 The complete-path infrastructure option is now built and frozen separately.
 It contains all 192 exact eight-logical-ply histories and records 508 shorter
 `book_miss` leaves without fallback. The 192 histories end in 84 distinct
-FENs, so selecting this artifact still requires a pre-result weighting choice:
-uniform histories, uniform final positions, source-rank-derived weights, or
-another explicit design are materially different populations. The artifact
-does not select the provisional 75% book share, and a runtime fallback from
-book miss to Perfect DB remains forbidden.
+FENs but only seven distinct `ring16` endpoint orbits. Selecting uniformly
+over histories or exact FENs therefore does not create broad structural
+diversity.
+
+A separate pre-result source audit generated 64 deterministic StrictSteps
+prefixes twice in fresh processes. Both canonical record sets matched; all 64
+histories, exact FENs, and `ring16` orbits were unique, with zero overlap
+against the seven book orbits. Therefore the provisional 75% book / 25%
+Perfect DB ratio is no longer recommended when the stated objective is
+structural diversity. The current diversity-first draft is one representative
+from each of the seven book orbits plus 57 orbit-unique Perfect DB prefixes.
+This 7/57 draft is evidence-based but not yet a frozen product decision. A
+runtime fallback from book miss to Perfect DB remains forbidden.
 
 The configured Perfect DB passed a read-only initial-position source probe
 with 24 StrictSteps ties and complete standard-sector coverage. The configured
@@ -183,11 +192,12 @@ sources, recording the phase-corpus disposition, and then implementing the
 still-unfrozen formal runner. The paired-prefix client, sampler, and complete
 book-path inventory are implemented. The remaining product choices include
 whether HumanDB frequencies participate in prefix selection, the
-book/Perfect DB proportions and within-book weighting, node budget,
+book/Perfect DB objective and exact stratum construction, node budget,
 history-bearing start representation, accepted phase corpus, game count, and
-rules-compliant termination contract. Starting candidate-versus-baseline
-games requires a separate explicit instruction against a later frozen
-specification.
+rules-compliant termination contract. If diversity is the objective, the
+source audit recommends the orbit-stratified 7/57 draft rather than 75/25.
+Starting candidate-versus-baseline games requires a separate explicit
+instruction against a later frozen specification.
 
 ## Current stop conditions
 

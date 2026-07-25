@@ -80,8 +80,12 @@ The sampler accepts an explicit source and candidate-selection policy. It has
 no default 75/25 mixture and no implicit fallback chain.
 
 The previously discussed 75% corrected-book and 25% Perfect DB assignment is
-only a proposed infrastructure-smoke policy. Before it is used, the owning
-experiment must freeze:
+a historical proposed infrastructure-smoke policy. The later
+[prefix-diversity audit](../evidence/sanmill-prefix-diversity-audit-2026-07-25.md)
+shows that it is not appropriate when the objective is structural diversity:
+all complete book paths reach only seven final `ring16` orbits, while the
+first 64 fixed-seed StrictSteps paths reach 64. Before any mixture is used,
+the owning experiment must name its objective and freeze:
 
 - source weights and the deterministic pair-assignment algorithm;
 - candidate weighting for each source;
@@ -202,11 +206,16 @@ distinct FENs, so the artifact remains an inventory rather than an implicit
 uniform sampling policy. The later experiment must still choose whether and
 how to use it before any result is observed.
 
-A read-only query of the configured standard Perfect DB returned `available`,
-24 tied initial candidates, `fully_available=true`, and the expected
-`std.secval` SHA-256
+A later read-only audit of the configured standard Perfect DB returned
+`available`, 24 tied initial candidates, `fully_available=true`, and the
+expected `std.secval` SHA-256
 `5078bf84505fe2845a4af7c36907efa2d66b2eb76f149ce12faa248117405b68`.
-This was a source probe, not an eight-ply Perfect DB or mixed-source smoke.
+It then reproduced 64 of 64 eight-ply prefix records across two fresh
+processes. All 64 final `ring16` orbits were unique and none overlapped the
+seven book orbits. This was still a source-only probe, not a mixed-source
+smoke or candidate evaluation. For a diversity-first 64-prefix draft, the
+current recommendation is one representative from each book orbit plus 57
+orbit-unique StrictSteps prefixes; this recommendation remains unfrozen.
 
 The configured active HumanDB currently fails closed with
 `database_not_immutable` because `human_db.sqlite-shm` is non-empty. No

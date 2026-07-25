@@ -163,3 +163,10 @@ for this artifact-only step.
 This artifact closes the technical option to inventory complete book paths.
 It does not select uniform path sampling, source-rank weighting, a 75/25
 book/Perfect DB mixture, HumanDB participation, or any evaluation launch.
+
+The later
+[prefix-diversity audit](../evidence/sanmill-prefix-diversity-audit-2026-07-25.md)
+applies the separately tested `ring16` projection without changing this
+corpus. It finds that the 84 exact final FENs occupy only seven structural
+orbits. That derived result reinforces the policy boundary: exact-history
+inventory size is not a measure of independent opening diversity.

@@ -642,6 +642,7 @@ The next-evaluation preparation records are:
 - [phase-corpus artifact](../experiments/dev-v4-phase-covered-corpus-v1.json)
 - [complete Sanmill book-path contract](../experiments/sanmill-book-path-corpus-v1.md)
 - [complete Sanmill book-path artifact](../experiments/sanmill-book-path-corpus-v1.json)
+- [Sanmill prefix-diversity audit](../evidence/sanmill-prefix-diversity-audit-2026-07-25.md)
 
 ## Strict Sanmill Bridge Validation
 
@@ -761,6 +762,18 @@ its file SHA-256 is
 The 192 histories end in only 84 distinct FENs. Therefore the inventory does
 not silently define uniform path, final-position, or source-rank weighting,
 nor does it freeze the proposed book/Perfect DB proportions.
+
+The later source-only diversity audit projects those 84 FENs through the
+book's own `ring16` symmetry and finds only seven endpoint orbits. In contrast,
+two fresh processes generated the same first 64 fixed-seed StrictSteps
+prefixes, comprising 64 unique exact FENs and 64 unique `ring16` orbits with
+zero book-orbit overlap. Audit identity
+`a7bc734ad3f85d2ae3ab75c901467da7b1835932fefa9aadd6067e1f4a982990`
+records this pre-result evidence. The 75/25 proposal is therefore not
+recommended as a diversity-first policy. The non-frozen technical
+recommendation for 64 opening prefixes is one representative from each of the
+seven book orbits plus 57 orbit-unique StrictSteps prefixes. Book-style
+exposure would be a different named objective.
 
 The configured Perfect DB returned 24 StrictSteps-tied initial candidates and
 reported complete standard-sector coverage. The active HumanDB currently
@@ -922,9 +935,10 @@ training merely because the managed run ended. Proceed in this order:
 8. Preserve the implemented fail-closed data-query client and paired-prefix
    sampler together with the complete-path inventory. Sparse-book misses are
    now exhaustively recorded, but no sampling distribution is implied. Before
-   using the provisional 75% book / 25% StrictSteps mix, choose an explicit
-   within-book weighting (or choose the eligible pair-ID/per-ply alternative)
-   and freeze the source proportions; there is no runtime fallback. Decide
+   freezing an opening smoke, name its objective. For structural diversity,
+   prefer the audited orbit-stratified 7-book/57-StrictSteps draft; for curated
+   book exposure, define a separate stratum and do not count symmetric book
+   histories as independent positions. There is no runtime fallback. Decide
    separately whether HumanDB frequencies are evidence only or a third source.
    Resolve the active HumanDB sidecar only through its owning data workflow;
    the Sanmill worktree cleanliness blocker is closed.
@@ -993,7 +1007,9 @@ The following choices are recorded for the next formal-evaluation design:
 - keep HumanDB, patches, and traps off; keep the perfect database out of MTD(f)
   search while allowing a separately audited tied-best prefix sampler;
 - treat the 75% book / 25% StrictSteps perfect-database mix and eight logical
-  player moves as a provisional smoke design, not a frozen formal decision;
+  player moves as a historical provisional smoke design, not a frozen formal
+  decision; the later pre-result diversity audit recommends 7/57 if structural
+  diversity is the actual objective;
 - use 60 complete turns only as a bridge/performance smoke ceiling; it is not a
   rules draw or a formal match-length decision; and
 - do not run candidate-versus-baseline games until a later immutable contract
