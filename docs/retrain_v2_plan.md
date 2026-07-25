@@ -82,9 +82,22 @@ editing the script.
 ```bash
 ./scripts/train_sentinel_v2_step0.sh                # cpu, default paths
 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # on a gpu box
+REBUILD_DATASET=1 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh   # rebuild dataset first
+RUN_STAGE1=1 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh        # A/B include Stage 1
 ```
 
-The individual commands below run the same three stages if you prefer to launch
+**Combined JSONL + Malom dataset (v2b default).** The wrapper builds a single
+training dataset up front via `scripts/build_sentinel_dataset_v2.py` and feeds
+it to every stage via `train_sentinel.py --dataset PATH`:
+
+- **60%** Malom-sampled positions (equal parts placement / midgame / fly),
+  each position guaranteed to contain at least one W-or-L legal move (not
+  all-draw), so the trainer isn't dominated by flat-draw states.
+- **40%** classic JSONL replay from `data/games` + `data/human_games`.
+- Total defaults to 4M examples (~2× the pure-JSONL baseline); override via
+  `DATASET_TOTAL_EXAMPLES=N` and `DATASET_MALOM_FRACTION=F`.
+
+The individual commands below run the same stages if you prefer to launch
 them one at a time.
 
 
@@ -101,11 +114,22 @@ The `v2/` checkpoint directory already exists from a prior partial run. Use `v2_
 sub-directories. If a usable Stage 4 checkpoint already exists at `checkpoints/v2/best.pt`,
 evaluate it first (Step 6a) before retraining.
 
-### Stage 1 — Structural foundation
+### Stage 1 — Structural foundation *(SKIPPED by default)*
 
-No DB labels. `--drop-db-features` zeroes oracle slots so the model learns structural patterns.
+Original intent: no DB labels, `--drop-db-features` zeroes oracle slots so the
+model learns structural patterns first.  **In the current v2b pipeline this
+stage is skipped**: an earlier run showed Stage 2's val loss identical to
+Stage 1's for 10 consecutive epochs (0.3382 → 0.3382 → …), stalling into
+early-stop without learning.  Diagnosis: Stage 1 imprints a strong heuristic
+prior; at Stage 2's original `lr: 0.0003` Adam cannot move the trunk far
+enough to fit Malom labels.  Fix: skip Stage 1 so there's no anchor, and bump
+Stage 2's LR to `0.001` so it can train from random init.
+
+Set the env var `RUN_STAGE1=1` on `scripts/train_sentinel_v2_step0.sh` to
+bring it back for A/B comparisons.
 
 ```bash
+# Optional (A/B only) — legacy path:
 .venv/bin/python scripts/train_sentinel.py \
   --config configs/sentinel_stage1.yaml \
   --game-dir data/games \
@@ -368,11 +392,30 @@ before running.
 
 ### 6a. Sentinel — Malom DB correlation eval
 
-New script: `scripts/eval_sentinel_db.py`. Sample ≥500 positions from each of `specialist_db` and
-`human_db` (stratified by phase). For each: reconstruct board, query Malom for per-move WDL+DTM,
-run sentinel with **DB slots zeroed** (matches live inference), score all legal moves. Report
-`win_acc`, `loss_acc`, `top1_win_rate`, `spearman_r`, `dtm_pearson_r`, phase breakdown. Run for
-v1 and v2 to compare.
+`scripts/eval_sentinel_db.py`. **Now draws an independent composite sample**
+matching the training builder's 60% Malom / 40% JSONL composition but at a
+different default RNG seed (`99999` vs the builder's `42`) so overlap with the
+training set is minimised.  For each sampled board: enumerate legal moves,
+query Malom per-move for WDL+DTM ground truth, run sentinel with **DB feature
+slots zeroed** (matches live inference), score all legal moves.
+
+`specialist_db` is not sampled — its `pos_hash` primary key is a non-reversible
+SHA-1; per "Known issues" below.
+
+Reports:
+
+- `win_acc`, `loss_acc`, `top1_win_rate`, `spearman_r`, `dtm_pearson_r`
+- `phase_breakdown` — same four metrics split by place / move / fly
+- `source_breakdown` — **contamination fence**: same four metrics split into a
+  Malom-source subgroup and a JSONL-source subgroup.  The Malom-source rows
+  are drawn from the same pool the training builder samples from (overlap
+  possible even at a different seed), while the JSONL-source rows come from
+  random game FILES that are unlikely to have been fully consumed during
+  training.  A large gap between the two suggests memorisation of training
+  positions; near-identical numbers suggest genuine generalisation.
+
+Run for v1 and v2 to compare, and repeat 2–3× at different `--seed` values
+(`99999`, `12345`, `7777`) to gauge sampling variance.
 
 ### 6b. Sentinel — game bench (v2 vs v1 vs baseline)
 
