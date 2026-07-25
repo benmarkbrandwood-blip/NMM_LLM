@@ -113,6 +113,7 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Asset | Current location and state |
 | --- | --- |
 | HumanDB | `data/human_db.sqlite`, 738,091,008 bytes; 94,429 games, 2,152,889 positions, and 2,516,356 move rows |
+| Twelve-ply HumanDB audit snapshot | Ignored point-in-time SQLite online backup under `data/backups/prefix12_human_db_20260725`; 738,091,008 bytes, SHA-256 `97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c`, `quick_check=ok`; resolve the database, source manifest, and complete-history ledger through the local path registry |
 | Archived rebuilt HumanDB candidate | `data/backups/maintainer_upload_20260721/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
@@ -263,6 +264,10 @@ documents. The intended logical mapping is:
 | `value_net_path` | `data/value_net.npz` |
 | `gap_net_path` | Disabled pending provenance review |
 | `human_db_path` | `data/human_db.sqlite` |
+| `human_db_prefix12_snapshot_path` | Ignored online-backup snapshot for the twelve-ply source audit |
+| `human_db_prefix12_source_manifest_path` | Ignored content manifest for the recursive PlayOK JSONL sample |
+| `human_db_prefix12_history_ledger_path` | Ignored complete 83,002-history frequency and overlap ledger |
+| `human_games_imported_manifest_path` | `data/human_games/imported.json` |
 | `specialist_db_path` | `data/specialist_db.sector_corrected.sqlite` |
 | `malom_db_path` | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted` |
 | `sanmill_checkout` | Cross-volume reference checkout; read the actual value from the ignored registry |

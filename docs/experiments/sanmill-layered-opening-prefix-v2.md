@@ -214,6 +214,25 @@ records and 110 unique exact histories and `ring16` endpoints.
 These results do not freeze Book membership or authorise a Book-seeded Perfect
 DB continuation. HumanDB and Perfect DB evidence remain outstanding.
 
+## Current HumanDB evidence
+
+The source-only
+[twelve-ply HumanDB audit](../evidence/sanmill-layered-human-source-audit-2026-07-25.md)
+is complete. SQLite online backup produced a 738,091,008-byte immutable
+snapshot with `quick_check=ok`; the active WAL and non-empty SHM were retained.
+
+The recursive current PlayOK sample contains 95,389 source files. After legal
+replay, short-game exclusion, one incomplete mandatory-capture exclusion, and
+deduplication by PlayOK session identifier, 92,939 distinct games contribute
+83,002 exact twelve-ply histories. Of those histories, 77,828 are singletons
+and 5,174 have at least two-game support. The top 64 histories cover only 1,165
+games, or 1.254% of the eligible distinct-game sample.
+
+This measured sparsity does not select a threshold or a HumanDB allocation. It
+does establish that a small "most frequent" list cannot be described as
+representing most human openings. Perfect DB evidence and cross-source overlap
+remain outstanding.
+
 ## Explicit exclusions
 
 This preparation must not:
