@@ -26,24 +26,22 @@ from learned_ai.evaluation.phase_corpus import project_tgf_fen
 from learned_ai.training.run_contract import canonical_sha256
 
 
-PINNED_SANMILL_COMMIT = "6f080c5a6d15919bf0a45fa5528c45d4487a2b8f"
+PINNED_SANMILL_COMMIT = "db65eb3e73189d934d615d0f47519d395193c646"
 PINNED_SANMILL_SHORT_COMMIT = PINNED_SANMILL_COMMIT[:10]
-PINNED_SANMILL_TREE = "8b52f4d084758414ebc9aa4db239448f69e10bcf"
+PINNED_SANMILL_TREE = "b8fa6c0119c2dec4443efc59deab8b7d835e0c88"
 SANMILL_BINARY_RELATIVE = (
     Path("target") / "release" / ("tgf.exe" if os.name == "nt" else "tgf")
 )
 EXPECTED_SANMILL_BINARY_SHA256 = (
-    "b1c816ee40f6cb9a91916ad094e82175ee6c975c7d15c396e672af58a15dc1a6"
+    "cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc"
 )
-EXPECTED_SANMILL_BINARY_SIZE = 3_720_192
-FAIL_CLOSED_ASSERTION = (
-    b"main search returned MOVE_NONE; bug must be diagnosed before "
-    b"release-mode fallback masks it"
-)
-STRICT_BUILD_COMMAND = (
-    "cargo --config profile.release.debug-assertions=true build --release -p tgf-cli"
-)
+EXPECTED_SANMILL_BINARY_SIZE = 4_109_312
+STRICT_BUILD_COMMAND = "cargo build --release -p tgf-cli"
 STRICT_HASH_MIB = 16
+STRICT_PROTOCOL_VERSION = 1
+EXPECTED_RULES_IDENTITY_SHA256 = (
+    "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f"
+)
 SANMILL_LICENSE_RELATIVE = Path("Copying.txt")
 EXPECTED_SANMILL_LICENSE_SHA256 = (
     "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
@@ -68,10 +66,22 @@ REMOVED_INVALID_ORACLE_KEY = (
 REMOVED_INVALID_ORACLE_KEY_SHA256 = (
     "904777ade504367c4e62446f105f1b125aaea7d6bec217984518025d8df3b0d1"
 )
+_SANMILL_PINNED_SOURCE_SCOPE = (
+    "crates",
+    "Cargo.toml",
+    "Cargo.lock",
+    "rust-toolchain.toml",
+    ".cargo",
+    "docs/UCI_CLI_BRIDGE.md",
+    SANMILL_OPENING_BOOK_RELATIVE.as_posix(),
+)
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _COORDINATES = frozenset(POSITIONS)
 _OPTION_NAME = re.compile(r"^option name (?P<name>.+?) type ")
+_ERROR_PREFIX = "info string sanmill_error "
+_LOGICAL_TURN_PREFIX = "info string sanmill_logical_turn "
+_STATE_PREFIX = "info string sanmill_state "
 _PROTOCOL_ERRORS = (
     "info string unsupported setoption:",
     "info string invalid fen ignored:",
@@ -98,10 +108,34 @@ class SanmillBridgeError(RuntimeError):
     """Raised when identity, protocol, rule, or reproducibility checks fail."""
 
 
+class SanmillProtocolError(SanmillBridgeError):
+    """A versioned fail-closed error emitted by Sanmill."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        command: str,
+        message: str,
+        action_index: int | None = None,
+        token: str | None = None,
+    ) -> None:
+        self.code = code
+        self.command = command
+        self.message = message
+        self.action_index = action_index
+        self.token = token
+        detail = f"Sanmill {command} error {code}: {message}"
+        if action_index is not None:
+            detail += f" (action_index={action_index}, token={token!r})"
+        super().__init__(detail)
+
+
 @dataclass(frozen=True)
 class SanmillInstallation:
     checkout: Path
     commit: str
+    checkout_head: str
     tree: str
     binary: Path
     binary_sha256: str
@@ -112,12 +146,17 @@ class SanmillInstallation:
         return {
             "path_lookup_key": "sanmill_checkout",
             "commit": self.commit,
+            "checkout_head": self.checkout_head,
+            "checkout_policy": (
+                "pinned commit or descendant with no changes in the pinned "
+                "CLI, rule, build, bridge-document, or opening-book scope"
+            ),
             "tree": self.tree,
             "binary_relative_path": SANMILL_BINARY_RELATIVE.as_posix(),
             "binary_sha256": self.binary_sha256,
             "binary_size": self.binary_size,
-            "fail_closed_assertion_present": True,
             "build_command": STRICT_BUILD_COMMAND,
+            "strict_failure_protocol_version": STRICT_PROTOCOL_VERSION,
             "license": {
                 "spdx": "AGPL-3.0-or-later",
                 "relative_path": SANMILL_LICENSE_RELATIVE.as_posix(),
@@ -214,35 +253,755 @@ class UciOutcomeState:
 
 
 @dataclass(frozen=True)
-class UciPositionState:
-    fen: str
-    side_to_move: str
-    phase: str
-    action: str
-    legal_actions: tuple[str, ...]
-    history: str
-    outcome: UciOutcomeState
-
-    @property
-    def terminal(self) -> bool:
-        return self.phase == "o"
-
-    @property
-    def removal_pending(self) -> bool:
-        return self.action == "r"
+class UciStateOutcome:
+    terminal: bool
+    winner: str | None
+    winner_code: int | None
+    reason: str
+    reason_code: str
 
     def portable_record(self) -> dict[str, Any]:
         return {
+            "terminal": self.terminal,
+            "winner": self.winner,
+            "winner_code": self.winner_code,
+            "reason": self.reason,
+            "reason_code": self.reason_code,
+        }
+
+
+@dataclass(frozen=True)
+class UciPositionState:
+    status: str
+    ruleset_id: str
+    rules_identity_sha256: str
+    rules_options: Mapping[str, Any]
+    history_origin: str
+    fen: str
+    side_to_move: str | None
+    phase: str
+    action: str
+    pending_removal_count: int
+    pending_removals: tuple[int, int]
+    legal_actions: tuple[str, ...]
+    action_token_count: int
+    logical_ply_count: int
+    logical_plies_by_side: tuple[int, int]
+    no_capture_count: int
+    repetition_current_count: int
+    repetition_history_length: int
+    snapshot_history_length: int
+    history_sha256: str
+    terminal: bool
+    winner: str | None
+    winner_code: int | None
+    outcome_reason: str
+    outcome_reason_code: str
+    raw_line: str
+
+    @property
+    def removal_pending(self) -> bool:
+        return self.pending_removal_count > 0
+
+    @property
+    def outcome(self) -> UciStateOutcome:
+        return UciStateOutcome(
+            terminal=self.terminal,
+            winner=self.winner,
+            winner_code=self.winner_code,
+            reason=self.outcome_reason,
+            reason_code=self.outcome_reason_code,
+        )
+
+    def portable_record(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "ruleset_id": self.ruleset_id,
+            "rules_identity_sha256": self.rules_identity_sha256,
+            "history_origin": self.history_origin,
             "fen": self.fen,
             "side_to_move": self.side_to_move,
             "phase": self.phase,
             "action": self.action,
             "terminal": self.terminal,
             "removal_pending": self.removal_pending,
+            "pending_removal_count": self.pending_removal_count,
+            "pending_removals": list(self.pending_removals),
             "legal_actions": list(self.legal_actions),
-            "history": self.history,
+            "action_token_count": self.action_token_count,
+            "logical_ply_count": self.logical_ply_count,
+            "logical_plies_by_side": list(self.logical_plies_by_side),
+            "no_capture_count": self.no_capture_count,
+            "repetition_current_count": self.repetition_current_count,
+            "repetition_history_length": self.repetition_history_length,
+            "snapshot_history_length": self.snapshot_history_length,
+            "history_sha256": self.history_sha256,
             "outcome": self.outcome.portable_record(),
         }
+
+
+@dataclass(frozen=True)
+class UciLogicalTurnResult:
+    status: str
+    full_turn_actions: tuple[str, ...]
+    logical_move_id: str | None
+    model_action: Mapping[str, str | None] | None
+    logical_ply_delta: int
+    resulting_fen: str | None
+    resulting_side_to_move: str | None
+    terminal: bool
+    winner: str | None
+    winner_code: int | None
+    outcome_reason: str
+    effective_depth: int | None
+    completed_depth: int | None
+    score_kind: str | None
+    score: int | None
+    score_perspective: str | None
+    node_budget: int
+    primary_nodes: int
+    removal_nodes: int
+    total_nodes: int
+    search_calls: int
+    elapsed_seconds: float
+    raw_line: str
+
+    def semantic_record(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "full_turn_actions": list(self.full_turn_actions),
+            "logical_move_id": self.logical_move_id,
+            "model_action": (
+                dict(self.model_action) if self.model_action is not None else None
+            ),
+            "logical_ply_delta": self.logical_ply_delta,
+            "resulting_fen": self.resulting_fen,
+            "resulting_side_to_move": self.resulting_side_to_move,
+            "terminal": self.terminal,
+            "winner": self.winner,
+            "winner_code": self.winner_code,
+            "outcome_reason": self.outcome_reason,
+            "effective_depth": self.effective_depth,
+            "completed_depth": self.completed_depth,
+            "score_kind": self.score_kind,
+            "score": self.score,
+            "score_perspective": self.score_perspective,
+            "node_budget": self.node_budget,
+            "primary_nodes": self.primary_nodes,
+            "removal_nodes": self.removal_nodes,
+            "total_nodes": self.total_nodes,
+            "search_calls": self.search_calls,
+        }
+
+
+def _machine_json_object(line: str, prefix: str, *, context: str) -> Mapping[str, Any]:
+    if not line.startswith(prefix):
+        raise SanmillBridgeError(f"{context} response has the wrong prefix")
+    encoded = line.removeprefix(prefix)
+    try:
+        payload = json.loads(encoded)
+    except json.JSONDecodeError as exc:
+        raise SanmillBridgeError(f"{context} response is not valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise SanmillBridgeError(f"{context} response must contain a JSON object")
+    if payload.get("protocol_version") != STRICT_PROTOCOL_VERSION:
+        raise SanmillBridgeError(
+            f"{context} protocol version is not {STRICT_PROTOCOL_VERSION}"
+        )
+    return payload
+
+
+def _required_string(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+) -> str:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value:
+        raise SanmillBridgeError(f"{context}.{field} must be a non-empty string")
+    return value
+
+
+def _optional_string(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+) -> str | None:
+    value = payload.get(field)
+    if value is not None and (not isinstance(value, str) or not value):
+        raise SanmillBridgeError(f"{context}.{field} must be null or a string")
+    return value
+
+
+def _required_int(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+    minimum: int = 0,
+) -> int:
+    value = payload.get(field)
+    if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
+        raise SanmillBridgeError(
+            f"{context}.{field} must be an integer >= {minimum}"
+        )
+    return value
+
+
+def _optional_int(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+) -> int | None:
+    value = payload.get(field)
+    if value is not None and (
+        not isinstance(value, int) or isinstance(value, bool)
+    ):
+        raise SanmillBridgeError(f"{context}.{field} must be null or an integer")
+    return value
+
+
+def _required_bool(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+) -> bool:
+    value = payload.get(field)
+    if not isinstance(value, bool):
+        raise SanmillBridgeError(f"{context}.{field} must be a boolean")
+    return value
+
+
+def _nonnegative_int_pair(
+    payload: Mapping[str, Any],
+    field: str,
+    *,
+    context: str,
+) -> tuple[int, int]:
+    value = payload.get(field)
+    if (
+        not isinstance(value, list)
+        or len(value) != 2
+        or any(
+            not isinstance(item, int) or isinstance(item, bool) or item < 0
+            for item in value
+        )
+    ):
+        raise SanmillBridgeError(
+            f"{context}.{field} must contain two non-negative integers"
+        )
+    return value[0], value[1]
+
+
+def parse_protocol_error(line: str) -> SanmillProtocolError:
+    payload = _machine_json_object(line, _ERROR_PREFIX, context="sanmill_error")
+    if payload.get("status") != "error":
+        raise SanmillBridgeError("sanmill_error.status must be error")
+    code = _required_string(payload, "code", context="sanmill_error")
+    command = _required_string(payload, "command", context="sanmill_error")
+    message = _required_string(payload, "message", context="sanmill_error")
+    action_index = _optional_int(
+        payload,
+        "action_index",
+        context="sanmill_error",
+    )
+    token = _optional_string(payload, "token", context="sanmill_error")
+    if (action_index is None) != (token is None):
+        raise SanmillBridgeError(
+            "sanmill_error action_index and token must appear together"
+        )
+    if action_index is not None and action_index < 0:
+        raise SanmillBridgeError("sanmill_error.action_index must be non-negative")
+    return SanmillProtocolError(
+        code=code,
+        command=command,
+        message=message,
+        action_index=action_index,
+        token=token,
+    )
+
+
+def _validate_sha256(value: str, *, context: str) -> str:
+    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+        raise SanmillBridgeError(f"{context} must be a lowercase SHA-256")
+    return value
+
+
+def parse_state_json_line(line: str) -> UciPositionState:
+    payload = _machine_json_object(line, _STATE_PREFIX, context="sanmill_state")
+    status = _required_string(payload, "status", context="sanmill_state")
+    if status in {"position_unavailable", "error"}:
+        code = _required_string(payload, "code", context="sanmill_state")
+        message = _required_string(payload, "message", context="sanmill_state")
+        if status == "position_unavailable":
+            position_code = _required_string(
+                payload,
+                "position_error_code",
+                context="sanmill_state",
+            )
+            message = f"{message}; rejected position code={position_code}"
+        raise SanmillProtocolError(
+            code=code,
+            command="statejson",
+            message=message,
+        )
+    if status not in {"ok", "terminal"}:
+        raise SanmillBridgeError(f"unknown sanmill_state status: {status}")
+
+    ruleset_id = _required_string(payload, "ruleset_id", context="sanmill_state")
+    if ruleset_id != "nmm":
+        raise SanmillBridgeError(f"unexpected Sanmill ruleset: {ruleset_id}")
+    identity = payload.get("rules_identity")
+    if not isinstance(identity, dict) or identity.get("format_version") != 1:
+        raise SanmillBridgeError("invalid Sanmill rules identity")
+    identity_sha256 = _validate_sha256(
+        _required_string(identity, "sha256", context="sanmill_state.rules_identity"),
+        context="sanmill_state.rules_identity.sha256",
+    )
+    if identity_sha256 != EXPECTED_RULES_IDENTITY_SHA256:
+        raise SanmillBridgeError(
+            "Sanmill active rule options differ from the pinned NMM contract"
+        )
+    rules_options = payload.get("rules_options")
+    if not isinstance(rules_options, dict):
+        raise SanmillBridgeError("sanmill_state.rules_options must be an object")
+    history_origin = _required_string(
+        payload,
+        "history_origin",
+        context="sanmill_state",
+    )
+    if history_origin not in {"game_start", "fresh_setup"}:
+        raise SanmillBridgeError("unknown Sanmill history origin")
+    fen = _required_string(payload, "fen", context="sanmill_state")
+    if "\n" in fen or "\r" in fen:
+        raise SanmillBridgeError("sanmill_state.fen must be one line")
+    side_to_move = _optional_string(
+        payload,
+        "side_to_move",
+        context="sanmill_state",
+    )
+    if side_to_move not in {None, "white", "black"}:
+        raise SanmillBridgeError("unknown Sanmill side to move")
+    phase = _required_string(payload, "phase", context="sanmill_state")
+    if phase not in {"ready", "placing", "moving", "game_over"}:
+        raise SanmillBridgeError("unknown Sanmill phase")
+    action = _required_string(payload, "action", context="sanmill_state")
+    if action not in {"place", "select", "remove", "game_over"}:
+        raise SanmillBridgeError("unknown Sanmill atomic action")
+    pending_removal = _required_bool(
+        payload,
+        "pending_removal",
+        context="sanmill_state",
+    )
+    pending_removal_count = _required_int(
+        payload,
+        "pending_removal_count",
+        context="sanmill_state",
+    )
+    pending_removals = _nonnegative_int_pair(
+        payload,
+        "pending_removals",
+        context="sanmill_state",
+    )
+    if pending_removal != (pending_removal_count > 0):
+        raise SanmillBridgeError("Sanmill pending-removal fields disagree")
+    if pending_removal and action != "remove":
+        raise SanmillBridgeError("pending Sanmill removal has the wrong action")
+    if not pending_removal and action == "remove":
+        raise SanmillBridgeError("Sanmill remove action lacks a pending removal")
+
+    raw_legal = payload.get("legal_actions")
+    if not isinstance(raw_legal, list) or any(
+        not isinstance(item, str) for item in raw_legal
+    ):
+        raise SanmillBridgeError("sanmill_state.legal_actions must be strings")
+    legal_actions = tuple(validate_uci_action_token(item) for item in raw_legal)
+    if len(legal_actions) != len(set(legal_actions)):
+        raise SanmillBridgeError("Sanmill advertised duplicate legal actions")
+    if pending_removal != any(action.startswith("x") for action in legal_actions):
+        raise SanmillBridgeError(
+            "Sanmill pending-removal state and legal-action kinds disagree"
+        )
+    if pending_removal and any(
+        not legal.startswith("x") for legal in legal_actions
+    ):
+        raise SanmillBridgeError("pending Sanmill removal advertised a primary action")
+
+    action_token_count = _required_int(
+        payload,
+        "action_token_count",
+        context="sanmill_state",
+    )
+    logical_ply_count = _required_int(
+        payload,
+        "logical_ply_count",
+        context="sanmill_state",
+    )
+    pending_primary = 1 if pending_removal else 0
+    minimum_pending_primary = (
+        pending_primary if history_origin == "game_start" else 0
+    )
+    if not (
+        logical_ply_count + minimum_pending_primary
+        <= action_token_count
+        <= 2 * logical_ply_count + pending_primary
+    ):
+        raise SanmillBridgeError(
+            "Sanmill atomic-action and logical-ply counts disagree: "
+            f"actions={action_token_count}, logical={logical_ply_count}, "
+            f"pending={pending_removal}"
+        )
+    logical_plies_by_side = _nonnegative_int_pair(
+        payload,
+        "logical_plies_by_side",
+        context="sanmill_state",
+    )
+    if sum(logical_plies_by_side) != logical_ply_count:
+        raise SanmillBridgeError("Sanmill per-side logical-ply counts disagree")
+    no_capture_count = _required_int(
+        payload,
+        "no_capture_count",
+        context="sanmill_state",
+    )
+    repetition_current_count = _required_int(
+        payload,
+        "repetition_current_count",
+        context="sanmill_state",
+    )
+    repetition_history_length = _required_int(
+        payload,
+        "repetition_history_length",
+        context="sanmill_state",
+    )
+    snapshot_history_length = _required_int(
+        payload,
+        "snapshot_history_length",
+        context="sanmill_state",
+    )
+    history_sha256 = _validate_sha256(
+        _required_string(payload, "history_sha256", context="sanmill_state"),
+        context="sanmill_state.history_sha256",
+    )
+    terminal = _required_bool(payload, "terminal", context="sanmill_state")
+    winner = _optional_string(payload, "winner", context="sanmill_state")
+    winner_code = _optional_int(payload, "winner_code", context="sanmill_state")
+    outcome_reason = _required_string(
+        payload,
+        "outcome_reason",
+        context="sanmill_state",
+    )
+    outcome_reason_code = _required_string(
+        payload,
+        "outcome_reason_code",
+        context="sanmill_state",
+    )
+    if terminal != (status == "terminal"):
+        raise SanmillBridgeError("Sanmill state status and terminal flag disagree")
+    if terminal:
+        if legal_actions:
+            raise SanmillBridgeError("terminal Sanmill state still advertises actions")
+        if outcome_reason == "ongoing" or outcome_reason_code == "ongoing":
+            raise SanmillBridgeError("terminal Sanmill state has an ongoing outcome")
+    elif (
+        winner is not None
+        or winner_code is not None
+        or outcome_reason != "ongoing"
+        or outcome_reason_code != "ongoing"
+    ):
+        raise SanmillBridgeError("ongoing Sanmill state has a terminal outcome")
+    if winner not in {None, "white", "black"}:
+        raise SanmillBridgeError("unknown Sanmill winner")
+    if (winner, winner_code) not in {
+        (None, None),
+        ("white", 0),
+        ("black", 1),
+    }:
+        raise SanmillBridgeError("Sanmill winner name and code disagree")
+
+    return UciPositionState(
+        status=status,
+        ruleset_id=ruleset_id,
+        rules_identity_sha256=identity_sha256,
+        rules_options=dict(rules_options),
+        history_origin=history_origin,
+        fen=fen,
+        side_to_move=side_to_move,
+        phase=phase,
+        action=action,
+        pending_removal_count=pending_removal_count,
+        pending_removals=pending_removals,
+        legal_actions=legal_actions,
+        action_token_count=action_token_count,
+        logical_ply_count=logical_ply_count,
+        logical_plies_by_side=logical_plies_by_side,
+        no_capture_count=no_capture_count,
+        repetition_current_count=repetition_current_count,
+        repetition_history_length=repetition_history_length,
+        snapshot_history_length=snapshot_history_length,
+        history_sha256=history_sha256,
+        terminal=terminal,
+        winner=winner,
+        winner_code=winner_code,
+        outcome_reason=outcome_reason,
+        outcome_reason_code=outcome_reason_code,
+        raw_line=line,
+    )
+
+
+def _model_action_from_tokens(
+    actions: Sequence[str],
+) -> dict[str, str | None]:
+    if len(actions) not in {1, 2}:
+        raise SanmillBridgeError("logical turn must contain one or two actions")
+    primary = validate_uci_action_token(actions[0])
+    if primary.startswith("x"):
+        raise SanmillBridgeError("logical turn begins with a removal")
+    source: str | None
+    target: str
+    if "-" in primary:
+        source, target = primary.split("-")
+    else:
+        source, target = None, primary
+    capture = None
+    if len(actions) == 2:
+        removal = validate_uci_action_token(actions[1])
+        if not removal.startswith("x"):
+            raise SanmillBridgeError("logical turn second action is not a removal")
+        capture = removal[1:]
+    return {"from": source, "to": target, "capture": capture}
+
+
+def parse_logical_turn_line(
+    line: str,
+    elapsed_seconds: float = 0.0,
+) -> UciLogicalTurnResult:
+    if elapsed_seconds < 0:
+        raise SanmillBridgeError("logical-turn elapsed time must be non-negative")
+    payload = _machine_json_object(
+        line,
+        _LOGICAL_TURN_PREFIX,
+        context="sanmill_logical_turn",
+    )
+    status = _required_string(
+        payload,
+        "status",
+        context="sanmill_logical_turn",
+    )
+    if status not in {"ok", "terminal"}:
+        raise SanmillBridgeError(f"unknown logical-turn status: {status}")
+    raw_actions = payload.get("full_turn_actions")
+    if not isinstance(raw_actions, list) or any(
+        not isinstance(item, str) for item in raw_actions
+    ):
+        raise SanmillBridgeError(
+            "sanmill_logical_turn.full_turn_actions must be strings"
+        )
+    actions = tuple(validate_uci_action_token(item) for item in raw_actions)
+    logical_ply_delta = _required_int(
+        payload,
+        "logical_ply_delta",
+        context="sanmill_logical_turn",
+    )
+    terminal = _required_bool(
+        payload,
+        "terminal",
+        context="sanmill_logical_turn",
+    )
+    winner = _optional_string(
+        payload,
+        "winner",
+        context="sanmill_logical_turn",
+    )
+    winner_code = _optional_int(
+        payload,
+        "winner_code",
+        context="sanmill_logical_turn",
+    )
+    if winner not in {None, "white", "black"} or (winner, winner_code) not in {
+        (None, None),
+        ("white", 0),
+        ("black", 1),
+    }:
+        raise SanmillBridgeError("logical-turn winner fields disagree")
+    outcome_reason = _required_string(
+        payload,
+        "outcome_reason",
+        context="sanmill_logical_turn",
+    )
+    node_budget = _required_int(
+        payload,
+        "node_budget",
+        context="sanmill_logical_turn",
+        minimum=1,
+    )
+    primary_nodes = _required_int(
+        payload,
+        "primary_nodes",
+        context="sanmill_logical_turn",
+    )
+    removal_nodes = _required_int(
+        payload,
+        "removal_nodes",
+        context="sanmill_logical_turn",
+    )
+    total_nodes = _required_int(
+        payload,
+        "total_nodes",
+        context="sanmill_logical_turn",
+    )
+    search_calls = _required_int(
+        payload,
+        "search_calls",
+        context="sanmill_logical_turn",
+    )
+    if primary_nodes + removal_nodes != total_nodes or total_nodes > node_budget:
+        raise SanmillBridgeError("logical-turn node accounting exceeds its budget")
+
+    if status == "terminal":
+        if (
+            actions
+            or logical_ply_delta != 0
+            or not terminal
+            or outcome_reason == "ongoing"
+            or total_nodes != 0
+            or search_calls != 0
+        ):
+            raise SanmillBridgeError("malformed terminal logical-turn response")
+        return UciLogicalTurnResult(
+            status=status,
+            full_turn_actions=actions,
+            logical_move_id=None,
+            model_action=None,
+            logical_ply_delta=logical_ply_delta,
+            resulting_fen=None,
+            resulting_side_to_move=None,
+            terminal=terminal,
+            winner=winner,
+            winner_code=winner_code,
+            outcome_reason=outcome_reason,
+            effective_depth=None,
+            completed_depth=None,
+            score_kind=None,
+            score=None,
+            score_perspective=None,
+            node_budget=node_budget,
+            primary_nodes=primary_nodes,
+            removal_nodes=removal_nodes,
+            total_nodes=total_nodes,
+            search_calls=search_calls,
+            elapsed_seconds=elapsed_seconds,
+            raw_line=line,
+        )
+
+    if not actions or logical_ply_delta != 1:
+        raise SanmillBridgeError("successful logical turn is not one complete ply")
+    expected_model_action = _model_action_from_tokens(actions)
+    model_action = payload.get("model_action")
+    if not isinstance(model_action, dict) or set(model_action) != {
+        "from",
+        "to",
+        "capture",
+    }:
+        raise SanmillBridgeError("logical-turn model_action has the wrong shape")
+    if dict(model_action) != expected_model_action:
+        raise SanmillBridgeError(
+            "logical-turn action tokens and model_action disagree"
+        )
+    logical_move_id = _required_string(
+        payload,
+        "logical_move_id",
+        context="sanmill_logical_turn",
+    )
+    if logical_move_id != "".join(actions):
+        raise SanmillBridgeError("logical-turn identifier disagrees with its actions")
+    resulting_fen = _required_string(
+        payload,
+        "resulting_fen",
+        context="sanmill_logical_turn",
+    )
+    resulting_side_to_move = _optional_string(
+        payload,
+        "resulting_side_to_move",
+        context="sanmill_logical_turn",
+    )
+    if resulting_side_to_move not in {None, "white", "black"}:
+        raise SanmillBridgeError("unknown logical-turn resulting side")
+    effective_depth = _required_int(
+        payload,
+        "effective_depth",
+        context="sanmill_logical_turn",
+        minimum=1,
+    )
+    completed_depth = _required_int(
+        payload,
+        "completed_depth",
+        context="sanmill_logical_turn",
+        minimum=1,
+    )
+    if completed_depth > effective_depth:
+        raise SanmillBridgeError("logical-turn completed depth exceeds its ceiling")
+    score_kind = _required_string(
+        payload,
+        "score_kind",
+        context="sanmill_logical_turn",
+    )
+    if score_kind not in {"cp", "mate"}:
+        raise SanmillBridgeError("unknown logical-turn score kind")
+    score = _required_int(
+        payload,
+        "score",
+        context="sanmill_logical_turn",
+        minimum=-(2**31),
+    )
+    score_perspective = _required_string(
+        payload,
+        "score_perspective",
+        context="sanmill_logical_turn",
+    )
+    if score_perspective != "white":
+        raise SanmillBridgeError("logical-turn score is not White-perspective")
+    if total_nodes <= 0 or search_calls <= 0:
+        raise SanmillBridgeError("successful logical turn did not search")
+    if terminal:
+        if outcome_reason == "ongoing":
+            raise SanmillBridgeError("terminal logical turn has an ongoing outcome")
+    elif (
+        winner is not None
+        or winner_code is not None
+        or outcome_reason != "ongoing"
+        or resulting_side_to_move is None
+    ):
+        raise SanmillBridgeError("ongoing logical turn has terminal fields")
+
+    return UciLogicalTurnResult(
+        status=status,
+        full_turn_actions=actions,
+        logical_move_id=logical_move_id,
+        model_action=dict(model_action),
+        logical_ply_delta=logical_ply_delta,
+        resulting_fen=resulting_fen,
+        resulting_side_to_move=resulting_side_to_move,
+        terminal=terminal,
+        winner=winner,
+        winner_code=winner_code,
+        outcome_reason=outcome_reason,
+        effective_depth=effective_depth,
+        completed_depth=completed_depth,
+        score_kind=score_kind,
+        score=score,
+        score_perspective=score_perspective,
+        node_budget=node_budget,
+        primary_nodes=primary_nodes,
+        removal_nodes=removal_nodes,
+        total_nodes=total_nodes,
+        search_calls=search_calls,
+        elapsed_seconds=elapsed_seconds,
+        raw_line=line,
+    )
 
 
 def parse_debug_outcome(lines: Sequence[str]) -> UciOutcomeState:
@@ -335,7 +1094,7 @@ def inspect_sanmill_installation(
     *,
     binary_override: str | Path | None = None,
 ) -> SanmillInstallation:
-    """Verify source and fail-closed binary identity without changing Sanmill."""
+    """Verify the pinned source and release binary without changing Sanmill."""
     config = _strict_json_object(Path(paths_config))
     checkout = _resolve_registry_path(
         config.get("sanmill_checkout"), field="sanmill_checkout"
@@ -344,19 +1103,44 @@ def inspect_sanmill_installation(
         raise SanmillBridgeError("sanmill_checkout is not a directory")
 
     head = _git_output(checkout, "rev-parse", "HEAD")
-    if head != PINNED_SANMILL_COMMIT:
+    pinned_tree = _git_output(
+        checkout,
+        "rev-parse",
+        f"{PINNED_SANMILL_COMMIT}^{{tree}}",
+    )
+    if pinned_tree != PINNED_SANMILL_TREE:
         raise SanmillBridgeError(
-            f"Sanmill HEAD drift: expected {PINNED_SANMILL_COMMIT}, observed {head}"
+            "the pinned Sanmill commit no longer resolves to its recorded tree"
         )
+    if head != PINNED_SANMILL_COMMIT:
+        try:
+            _git_output(
+                checkout,
+                "merge-base",
+                "--is-ancestor",
+                PINNED_SANMILL_COMMIT,
+                head,
+            )
+        except SanmillBridgeError as exc:
+            raise SanmillBridgeError(
+                f"Sanmill HEAD does not descend from {PINNED_SANMILL_COMMIT}: {head}"
+            ) from exc
+        relevant_drift = _git_output(
+            checkout,
+            "diff",
+            "--name-only",
+            f"{PINNED_SANMILL_COMMIT}..{head}",
+            "--",
+            *_SANMILL_PINNED_SOURCE_SCOPE,
+        )
+        if relevant_drift:
+            raise SanmillBridgeError(
+                "Sanmill checkout changed pinned bridge source paths:\n"
+                f"{relevant_drift}"
+            )
     dirty = _git_output(checkout, "status", "--short", "--untracked-files=all")
     if dirty:
         raise SanmillBridgeError(f"Sanmill checkout is not clean:\n{dirty}")
-    tree = _git_output(checkout, "rev-parse", "HEAD^{tree}")
-    if tree != PINNED_SANMILL_TREE:
-        raise SanmillBridgeError(
-            f"Sanmill tree drift: expected {PINNED_SANMILL_TREE}, observed {tree}"
-        )
-
     binary = (
         Path(binary_override).resolve()
         if binary_override is not None
@@ -375,11 +1159,6 @@ def inspect_sanmill_installation(
         raise SanmillBridgeError(
             "Sanmill UCI binary identity differs from the pinned strict build"
         )
-    if FAIL_CLOSED_ASSERTION not in binary_bytes:
-        raise SanmillBridgeError(
-            "Sanmill binary lacks the fail-closed assertion marker; rebuild with "
-            "release debug assertions"
-        )
 
     license_path = checkout / SANMILL_LICENSE_RELATIVE
     if not license_path.is_file():
@@ -389,8 +1168,9 @@ def inspect_sanmill_installation(
         raise SanmillBridgeError("Sanmill license identity differs from the pinned text")
     return SanmillInstallation(
         checkout=checkout,
-        commit=head,
-        tree=tree,
+        commit=PINNED_SANMILL_COMMIT,
+        checkout_head=head,
+        tree=pinned_tree,
         binary=binary,
         binary_sha256=binary_sha256,
         binary_size=len(binary_bytes),
@@ -477,11 +1257,12 @@ def strict_option_values(seed: int = 42) -> tuple[tuple[str, str], ...]:
         ("SkillLevel", "30"),
         ("MoveTimeMs", "0"),
         ("AiIsLazy", "false"),
-        ("IDSEnabled", "false"),
+        ("IDSEnabled", "true"),
         ("DepthExtension", "true"),
         ("Shuffling", "false"),
         ("UseLazySmp", "false"),
         ("Algorithm", "2"),
+        ("StrictFailurePolicy", "true"),
         ("DrawOnHumanExperience", "true"),
         ("UsePerfectDatabase", "false"),
         ("PatchAvoidTraps", "false"),
@@ -518,14 +1299,29 @@ def strict_option_values(seed: int = 42) -> tuple[tuple[str, str], ...]:
 def strict_contract_record(seed: int = 42) -> dict[str, Any]:
     options = strict_option_values(seed)
     return {
-        "schema_version": "nmm.sanmill-strict-uci-contract.v1",
+        "schema_version": "nmm.sanmill-strict-uci-contract.v2",
         "sanmill_commit": PINNED_SANMILL_COMMIT,
         "command": [SANMILL_BINARY_RELATIVE.as_posix(), "mill", "uci"],
-        "search_command": "go nodes <positive-N>",
+        "search_command": "go logical nodes <positive-N> [depth <positive-D>]",
+        "state_command": "statejson",
+        "protocol_versions": {
+            "error": STRICT_PROTOCOL_VERSION,
+            "logical_turn": STRICT_PROTOCOL_VERSION,
+            "state": STRICT_PROTOCOL_VERSION,
+        },
         "options": {name: value for name, value in options},
         "child_environment": "inherit non-TGF variables; remove all TGF_* variables",
-        "random_failure_fallback": "forbidden-by-release-debug-assertion",
-        "bestmove_failure": "hard-error-no-substitution",
+        "random_failure_fallback": (
+            "forbidden-by-strict-policy-and-logical-turn-search-path"
+        ),
+        "search_failure": "versioned-sanmill_error-no-substitution",
+        "logical_turn_budget": (
+            "one aggregate node ceiling covers primary and mandatory removal"
+        ),
+        "position_ownership": (
+            "go logical does not mutate state; caller replays full_turn_actions "
+            "and verifies statejson"
+        ),
         "knowledge_sources": {
             "opening_book": {
                 "requested_for_future_formal_baseline": True,
@@ -534,7 +1330,7 @@ def strict_contract_record(seed: int = 42) -> dict[str, Any]:
             },
             "human_database": {
                 "active": False,
-                "reason": "not-exposed-by-the-pinned-UCI-interface",
+                "reason": "data-query-only-and-not-used-by-logical-search",
             },
             "perfect_database": {"active": False},
             "patch_and_trap": {"active": False},
@@ -550,7 +1346,8 @@ def strict_contract_record(seed: int = 42) -> dict[str, Any]:
                 "commit": PINNED_SANMILL_COMMIT,
                 "depth": "sanmill-phase-policy",
                 "options": options,
-                "fallback": "release-debug-assertion",
+                "fallback": "strict-policy-logical-turn",
+                "protocol": STRICT_PROTOCOL_VERSION,
             }
         ),
     }
@@ -796,9 +1593,11 @@ class SanmillUciSession:
         *,
         timeout: float,
         context: str,
+        defer_protocol_error: bool = False,
     ) -> tuple[str, list[str]]:
         deadline = time.monotonic() + timeout
         seen: list[str] = []
+        deferred_error: SanmillBridgeError | None = None
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -820,9 +1619,22 @@ class SanmillUciSession:
                 )
             self.transcript.append({"direction": "from_engine", "line": line})
             seen.append(line)
-            if line.startswith(_PROTOCOL_ERRORS):
-                raise SanmillBridgeError(f"Sanmill protocol error: {line}")
+            protocol_error: SanmillBridgeError | None = None
+            if line.startswith(_ERROR_PREFIX):
+                protocol_error = parse_protocol_error(line)
+            elif line.startswith(_PROTOCOL_ERRORS):
+                protocol_error = SanmillBridgeError(
+                    f"Sanmill protocol error: {line}"
+                )
+            if protocol_error is not None:
+                if not defer_protocol_error:
+                    raise protocol_error
+                if deferred_error is None:
+                    deferred_error = protocol_error
+                continue
             if predicate(line):
+                if deferred_error is not None:
+                    raise deferred_error
                 return line, seen
 
     def _sync(self) -> list[str]:
@@ -831,6 +1643,7 @@ class SanmillUciSession:
             lambda line: line == "readyok",
             timeout=self.protocol_timeout,
             context="readyok",
+            defer_protocol_error=True,
         )
         return lines
 
@@ -963,32 +1776,85 @@ class SanmillUciSession:
         return parse_debug_outcome(lines)
 
     def position_state(self) -> UciPositionState:
-        fen = self.export_fen()
-        fields = fen.split()
-        if len(fields) < 4 or fields[1] not in {"w", "b"}:
-            raise SanmillBridgeError(f"malformed exported Sanmill FEN: {fen}")
-        if fields[2] not in {"p", "m", "o"} or fields[3] not in {"p", "r", "s", "?"}:
-            raise SanmillBridgeError(f"unknown Sanmill phase/action in FEN: {fen}")
-        legal = self.legal_moves()
-        outcome = self.debug_outcome()
-        terminal = fields[2] == "o"
-        if terminal != (not legal):
-            raise SanmillBridgeError(
-                "Sanmill terminal phase and legal-action availability disagree"
-            )
-        if terminal != outcome.terminal:
-            raise SanmillBridgeError(
-                "Sanmill exported phase and authoritative outcome disagree"
-            )
-        return UciPositionState(
-            fen=fen,
-            side_to_move=fields[1],
-            phase=fields[2],
-            action=fields[3],
-            legal_actions=legal,
-            history=self.history_summary(),
-            outcome=outcome,
+        """Compatibility alias for the authoritative machine-readable state."""
+        return self.state_json()
+
+    def state_json(self) -> UciPositionState:
+        self._send("statejson")
+        line, _ = self._read_until(
+            lambda value: value.startswith(_STATE_PREFIX),
+            timeout=self.protocol_timeout,
+            context="sanmill_state",
         )
+        return parse_state_json_line(line)
+
+    def search_logical_turn(
+        self,
+        node_budget: int,
+        *,
+        depth: int | None = None,
+    ) -> UciLogicalTurnResult:
+        if (
+            not isinstance(node_budget, int)
+            or isinstance(node_budget, bool)
+            or node_budget <= 0
+        ):
+            raise SanmillBridgeError("node budget must be a positive integer")
+        if depth is not None and (
+            not isinstance(depth, int)
+            or isinstance(depth, bool)
+            or depth <= 0
+        ):
+            raise SanmillBridgeError("logical search depth must be positive")
+
+        state = self.state_json()
+        if state.removal_pending:
+            raise SanmillBridgeError(
+                "refusing logical search from a pending-removal position"
+            )
+        command = f"go logical nodes {node_budget}"
+        if depth is not None:
+            command += f" depth {depth}"
+        started = time.perf_counter()
+        self._send(command)
+        line, _ = self._read_until(
+            lambda value: value.startswith(_LOGICAL_TURN_PREFIX),
+            timeout=self.search_timeout,
+            context="sanmill_logical_turn or sanmill_error",
+        )
+        result = parse_logical_turn_line(
+            line,
+            elapsed_seconds=time.perf_counter() - started,
+        )
+        if result.node_budget != node_budget:
+            raise SanmillBridgeError(
+                "Sanmill logical-turn response changed the requested node budget"
+            )
+        if state.terminal:
+            if result.status != "terminal":
+                raise SanmillBridgeError(
+                    "terminal Sanmill root returned a non-terminal logical turn"
+                )
+            return result
+        if result.status != "ok":
+            raise SanmillBridgeError(
+                "ongoing Sanmill root returned a terminal logical response"
+            )
+
+        board = project_stable_sanmill_fen(state.fen)
+        nmm_moves = assert_stable_legal_parity(board, state.legal_actions)
+        primary = result.full_turn_actions[0]
+        removal = (
+            result.full_turn_actions[1]
+            if len(result.full_turn_actions) == 2
+            else None
+        )
+        atomic = atomic_move_for_actions(nmm_moves, primary, removal)
+        if dict(result.model_action or {}) != atomic:
+            raise SanmillBridgeError(
+                "Sanmill logical-turn model action differs from NMM mapping"
+            )
+        return result
 
     def _run_fixed_node_search(
         self,
