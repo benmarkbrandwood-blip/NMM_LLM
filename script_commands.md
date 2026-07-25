@@ -119,10 +119,20 @@ Sentinel) the Malom DB.
 
 ### 6a — Sentinel DB correlation (eval_sentinel_db.py)
 
-Samples state_keys from `human_db` (stratified by phase), reconstructs each
-board, queries Malom per move, runs the sentinel with DB slots ZEROED
-(matches live inference), and reports `win_acc`, `loss_acc`, `top1_win_rate`,
-`spearman_r`, `dtm_pearson_r`, and phase breakdown.
+Draws an **independent** JSONL + Malom sample with the same 60/40 composition
+the training builder uses (`scripts/build_sentinel_dataset_v2.py`), but with
+a different default RNG seed (99999 vs the builder's 42) so overlap with the
+training set is minimised.  Reconstructs each board, queries Malom per move,
+runs the sentinel with DB slots ZEROED (matches live inference), and reports:
+
+- `win_acc`, `loss_acc`, `top1_win_rate`, `spearman_r`, `dtm_pearson_r`
+- `phase_breakdown` — same four metrics split by place / move / fly
+- `source_breakdown` — same four metrics split into **Malom-source** and
+  **JSONL-source** sub-populations.  This is the contamination fence: the
+  Malom-source rows may overlap the training pool at the state-key level,
+  whereas the JSONL-source rows come from random game files that are unlikely
+  to have been fully consumed during training.  A large gap between the two
+  suggests memorisation; near-identical numbers suggest genuine generalisation.
 
 specialist_db is deliberately skipped (irreversible `pos_hash`).
 
@@ -135,16 +145,24 @@ specialist_db is deliberately skipped (irreversible `pos_hash`).
 .venv/bin/python scripts/eval_sentinel_db.py \
   --checkpoint learned_ai/sentinel/checkpoints/v2/best.pt \
   --output eval_sentinel_db_v2.json --n-samples 1000
+
+# Repeat 2-3 times with different --seed to gauge sampling variance.
+.venv/bin/python scripts/eval_sentinel_db.py \
+  --checkpoint learned_ai/sentinel/checkpoints/v2/best.pt \
+  --output eval_sentinel_db_v2_seed2.json --n-samples 1000 --seed 12345
 ```
 
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--checkpoint PATH` | *required* | Sentinel `.pt` to evaluate |
-| `--human-db PATH` | `data/human_db.sqlite` | State-key source |
-| `--malom-db PATH` | `/mnt/windows/.../Std_DD_89adjusted` | Malom DB directory |
-| `--n-samples N` | 1000 | Total positions across place / move / fly |
+| `--human-db PATH` | `data/human_db.sqlite` | State-key source for the Malom-sample portion |
+| `--malom-db PATH` | `/mnt/windows/.../Std_DD_89adjusted` | Malom DB directory (per-move WDL+DTM ground truth) |
+| `--n-samples N` | 1000 | Total positions across both sources |
+| `--jsonl-fraction F` | 0.40 | Fraction of the sample drawn from JSONL replay (matches training builder) |
+| `--game-dir PATH` | `data/games` | AI self-play JSONL for the JSONL-source portion |
+| `--human-game-dir PATH` | `data/human_games` | Human JSONL for the JSONL-source portion |
 | `--output PATH` | — | Optional JSON summary path |
-| `--seed N` | 42 | RNG seed for the state_key sample |
+| `--seed N` | 99999 | RNG seed; deliberately different from the training builder's 42 |
 
 ### 6b — Sentinel game bench (bench_sentinel_v2.py)
 

@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""scripts/eval_sentinel_db.py — Sentinel evaluation on DB-sampled positions (Step 6a).
+"""scripts/eval_sentinel_db.py — Sentinel eval on a fresh JSONL+Malom sample (Step 6a).
 
-Samples positions directly from human_db.sqlite (reversible state_key), reconstructs
-each board, enumerates its legal moves, queries the Malom DB for per-move WDL + DTM,
-runs the sentinel with DB feature slots ZEROED (matches live inference), and reports
-alignment metrics.
+Samples an independent test set with the SAME 60% Malom / 40% JSONL composition
+the training builder uses, but with a different default RNG seed (99999 vs the
+builder's 42) so overlap with the training set is minimised.  Reports:
 
-specialist_db is NOT sampled — its `pos_hash` primary key is a non-reversible SHA-1,
-so board reconstruction from the DB alone is not possible.  Per the plan's "Known
-issues" section, that data source would require replaying the JSONL games that fed
-the DB.
-
-Metrics (matches scripts/eval_sentinel.py naming):
     win_acc         fraction of DB-win moves the sentinel scores > 0.5
     loss_acc        fraction of DB-loss moves the sentinel scores < 0.5
     top1_win_rate   positions with a DB-win available where sentinel #1 is a win
     spearman_r      Spearman rank correlation between sentinel and DB quality
     dtm_pearson_r   Pearson correlation between sentinel and DB DTM
+    phase_breakdown same four metrics split by place / move / fly
+    source_breakdown same four metrics split by Malom source vs JSONL source
 
-Run for v1 and v2 sentinels to produce a direct comparison table.
+The per-source split is the *contamination fence*: the Malom-source metrics
+still overlap the training pool at the state-key level (some fraction of
+sampled state_keys will coincide with training positions), whereas the JSONL-
+source metrics are pulled from a random subset of game FILES which are unlikely
+to have been fully consumed at training time.  A large gap between the two
+suggests memorisation; near-identical numbers suggest genuine generalisation.
+
+specialist_db is NOT sampled — its `pos_hash` primary key is a non-reversible
+SHA-1, so board reconstruction from the DB alone is not possible.
 
 Usage:
     .venv/bin/python scripts/eval_sentinel_db.py \\
@@ -28,6 +31,8 @@ Usage:
     .venv/bin/python scripts/eval_sentinel_db.py \\
         --checkpoint learned_ai/sentinel/checkpoints/v2/best.pt \\
         --output eval_sentinel_db_v2.json --n-samples 1000
+
+Run each seed 2-3 times with different --seed to gauge sampling variance.
 """
 from __future__ import annotations
 
@@ -126,24 +131,71 @@ def _malom_move_signals(board: BoardState, legal: list[dict], malom_db) -> list[
 
 # ── Main eval ────────────────────────────────────────────────────────────────
 
+def _sample_boards_from_jsonl(
+    game_dir: Path, human_game_dir: "Path | None",
+    n_files: int, rng,
+) -> "list[BoardState]":
+    """Pick N random JSONL game files and yield boards from every ply."""
+    import glob
+    from learned_ai.sentinel.dataset import _iter_game_records, _board_from_fen_before
+
+    files = sorted(glob.glob(str(game_dir / "**" / "*.jsonl"), recursive=True))
+    if human_game_dir is not None:
+        files += sorted(glob.glob(str(human_game_dir / "**" / "*.jsonl"), recursive=True))
+    if not files:
+        return []
+    if len(files) > n_files:
+        idx = rng.choice(len(files), size=n_files, replace=False)
+        files = [files[i] for i in idx]
+    boards: list = []
+    for path in files:
+        for record in _iter_game_records(path):
+            moves = record.get("moves") or []
+            for log_move in moves:
+                fen = log_move.get("board_fen_before")
+                if not fen:
+                    continue
+                board = _board_from_fen_before(fen)
+                if board is not None:
+                    boards.append(board)
+    return boards
+
+
 def evaluate(
     checkpoint: Path,
     human_db: Path,
     malom_db_path: Path,
     n_samples: int,
     seed: int,
+    jsonl_fraction: float = 0.40,
+    game_dir: "Path | None" = None,
+    human_game_dir: "Path | None" = None,
 ) -> dict:
+    """Run the eval on a fresh composite sample: (1-jsonl_fraction) from
+    human_db state_keys (Malom-labelled, phase-stratified) + jsonl_fraction
+    from replayed JSONL games.  Matches the training builder's 60/40 default
+    composition but uses a different `seed` (default 99999) so overlap with
+    the training sample is minimised."""
     import numpy as np
     from ai.malom_db import MalomDB
     from learned_ai.sentinel.infer import SentinelAdvisor
 
-    # Sample state_keys, stratified by phase where possible.
+    if not (0.0 <= jsonl_fraction <= 1.0):
+        raise ValueError("jsonl_fraction must be in [0, 1]")
+
     rng = np.random.default_rng(seed)
+
+    n_malom = int(round(n_samples * (1.0 - jsonl_fraction)))
+    n_jsonl = n_samples - n_malom
+
+    # ── Malom-sampled portion (phase-stratified from human_db) ──────────────
     conn = sqlite3.connect(str(human_db))
 
     def _sample(phase: str, n: int) -> list[str]:
         rows = conn.execute(
-            f"SELECT state_key FROM positions WHERE state_key LIKE '%|{phase}|%'"
+            "SELECT state_key FROM positions WHERE malom_wdl IS NOT NULL "
+            f"AND state_key LIKE '%|{phase}|%' LIMIT ?",
+            (n * 8,),
         ).fetchall()
         if not rows:
             return []
@@ -153,15 +205,35 @@ def evaluate(
         idx = rng.choice(len(keys), size=n, replace=False)
         return [keys[i] for i in idx]
 
-    per_phase = max(1, n_samples // 3)
-    state_keys = (
-        _sample("place", per_phase)
-        + _sample("move",  per_phase)
-        + _sample("fly",   per_phase)
-    )
+    per_phase = max(1, n_malom // 3)
+    malom_boards: list = []
+    for phase in ("place", "move", "fly"):
+        for sk in _sample(phase, per_phase):
+            b = _board_from_state_key(sk)
+            if b is not None:
+                malom_boards.append(b)
     conn.close()
-    print(f"Sampled {len(state_keys)} positions from human_db "
-          f"(target {n_samples} across place / move / fly).")
+    print(f"Malom-source: {len(malom_boards)} boards "
+          f"(target {n_malom} across place / move / fly, seed={seed}).")
+
+    # ── JSONL-sampled portion (random game files replayed) ────────────────
+    jsonl_boards: list = []
+    if n_jsonl > 0 and game_dir is not None:
+        # ~10-40 boards per file — sample enough files to hit n_jsonl.
+        est_boards_per_file = 20
+        n_files = max(10, n_jsonl // est_boards_per_file)
+        jsonl_boards = _sample_boards_from_jsonl(game_dir, human_game_dir, n_files, rng)
+        if len(jsonl_boards) > n_jsonl:
+            idx = rng.choice(len(jsonl_boards), size=n_jsonl, replace=False)
+            jsonl_boards = [jsonl_boards[i] for i in idx]
+        print(f"JSONL-source: {len(jsonl_boards)} boards from {n_files} game files.")
+    elif n_jsonl > 0:
+        print(f"JSONL-source: 0 boards (no --game-dir supplied; --jsonl-fraction 0 to silence).")
+
+    # Tag boards with source so metrics can be reported per source.
+    tagged = [(b, "malom") for b in malom_boards] + [(b, "jsonl") for b in jsonl_boards]
+    # Shuffle so progress bar reflects both sources evenly.
+    rng.shuffle(tagged)
 
     # Load sentinel + malom.
     advisor = SentinelAdvisor(checkpoint_path=str(checkpoint))
@@ -171,25 +243,25 @@ def evaluate(
     advisor.advise(board_tmp, [{"from": None, "to": "a1", "capture": None}],
                    board_tmp.turn, played_move_idx=0)
 
-    # Per-phase counters.
+    # Per-phase AND per-source counters.
     counters = {
         "overall": defaultdict(int),
         "place":   defaultdict(int),
         "move":    defaultdict(int),
         "fly":     defaultdict(int),
+        "src_malom": defaultdict(int),
+        "src_jsonl": defaultdict(int),
     }
-    quality_pairs:  list[tuple[float, float]] = []   # (sentinel_score, DB quality)
-    dtm_pairs:      list[tuple[float, int]]   = []   # (sentinel_score, DB DTM)
-    top1_positions       = 0
-    top1_win_positions   = 0
-    top1_win_correct     = 0
+    # Split top1/spearman/dtm collectors per source so training-contamination
+    # (which mostly affects the malom source) is visible in the output.
+    quality_pairs: dict[str, list[tuple[float, float]]] = {"malom": [], "jsonl": []}
+    dtm_pairs:     dict[str, list[tuple[float, int]]]   = {"malom": [], "jsonl": []}
+    top1_positions = {"malom": 0, "jsonl": 0}
+    top1_win_positions = {"malom": 0, "jsonl": 0}
+    top1_win_correct   = {"malom": 0, "jsonl": 0}
     skipped              = 0
 
-    for i, sk in enumerate(state_keys):
-        board = _board_from_state_key(sk)
-        if board is None:
-            skipped += 1
-            continue
+    for i, (board, source) in enumerate(tagged):
         try:
             phase = get_game_phase(board, board.turn)
         except Exception:
@@ -217,9 +289,9 @@ def evaluate(
             if wdl not in _WDL_QUALITY:
                 continue
             q = _WDL_QUALITY[wdl]
-            quality_pairs.append((score, q))
-            dtm_pairs.append((score, int(dtw)))
-            for cell in ("overall", phase):
+            quality_pairs[source].append((score, q))
+            dtm_pairs[source].append((score, int(dtw)))
+            for cell in ("overall", phase, f"src_{source}"):
                 c = counters[cell]
                 if wdl == "L":
                     c["win_total"] += 1
@@ -233,14 +305,14 @@ def evaluate(
         # top1_win_rate: positions where a DB-win exists, does sentinel top-1 pick one?
         db_win_indices = [j for j, (w, _) in enumerate(malom_move) if w == "L"]
         if db_win_indices:
-            top1_win_positions += 1
+            top1_win_positions[source] += 1
             top1_idx = max(range(len(sent_scores)), key=lambda k: sent_scores[k])
             if malom_move[top1_idx][0] == "L":
-                top1_win_correct += 1
-        top1_positions += 1
+                top1_win_correct[source] += 1
+        top1_positions[source] += 1
 
         if (i + 1) % 100 == 0:
-            print(f"  scored {i+1}/{len(state_keys)}  skipped={skipped}")
+            print(f"  scored {i+1}/{len(tagged)}  skipped={skipped}")
 
     def _safe_div(a: int, b: int) -> float:
         return round(a / b, 4) if b > 0 else 0.0
@@ -253,19 +325,44 @@ def evaluate(
             "n_loss":   bucket["loss_total"],
         }
 
+    def _all_quality_pairs():
+        return quality_pairs["malom"] + quality_pairs["jsonl"]
+
+    def _all_dtm_pairs():
+        return dtm_pairs["malom"] + dtm_pairs["jsonl"]
+
+    def _source_summary(src: str) -> dict:
+        return {
+            "n_positions":    top1_positions[src],
+            "win_acc":        _phase_summary(counters[f"src_{src}"])["win_acc"],
+            "loss_acc":       _phase_summary(counters[f"src_{src}"])["loss_acc"],
+            "top1_win_rate":  _safe_div(top1_win_correct[src], top1_win_positions[src]),
+            "spearman_r":     round(_spearman_r([p[0] for p in quality_pairs[src]],
+                                                [p[1] for p in quality_pairs[src]]), 4),
+            "dtm_pearson_r":  round(_pearson([p[0] for p in dtm_pairs[src]],
+                                             [float(p[1]) for p in dtm_pairs[src]]), 4),
+        }
+
     result = {
         "checkpoint":     str(checkpoint),
-        "n_positions":    top1_positions,
+        "seed":           seed,
+        "jsonl_fraction": jsonl_fraction,
+        "n_positions":    sum(top1_positions.values()),
         "n_skipped":      skipped,
         "win_acc":        _phase_summary(counters["overall"])["win_acc"],
         "loss_acc":       _phase_summary(counters["overall"])["loss_acc"],
-        "top1_win_rate":  _safe_div(top1_win_correct, top1_win_positions),
-        "spearman_r":     round(_spearman_r([p[0] for p in quality_pairs],
-                                            [p[1] for p in quality_pairs]), 4),
-        "dtm_pearson_r":  round(_pearson([p[0] for p in dtm_pairs],
-                                         [float(p[1]) for p in dtm_pairs]), 4),
+        "top1_win_rate":  _safe_div(sum(top1_win_correct.values()),
+                                    sum(top1_win_positions.values())),
+        "spearman_r":     round(_spearman_r([p[0] for p in _all_quality_pairs()],
+                                            [p[1] for p in _all_quality_pairs()]), 4),
+        "dtm_pearson_r":  round(_pearson([p[0] for p in _all_dtm_pairs()],
+                                         [float(p[1]) for p in _all_dtm_pairs()]), 4),
         "phase_breakdown": {
             phase: _phase_summary(counters[phase]) for phase in ("place", "move", "fly")
+        },
+        "source_breakdown": {
+            "malom": _source_summary("malom"),
+            "jsonl": _source_summary("jsonl"),
         },
     }
     return result
@@ -279,10 +376,25 @@ def main() -> int:
     parser.add_argument("--malom-db",  type=Path,
                         default=Path("/mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted"))
     parser.add_argument("--n-samples", type=int, default=1000,
-                        help="Positions to sample across place / move / fly.")
+                        help="Total positions to sample; split between Malom-source "
+                             "and JSONL-source per --jsonl-fraction.")
+    parser.add_argument("--jsonl-fraction", type=float, default=0.40,
+                        help="Fraction of the sample drawn from JSONL replay "
+                             "(matches training builder's 60/40 default).")
+    parser.add_argument("--game-dir",       type=Path,
+                        default=Path("data/games"),
+                        help="AI self-play JSONL directory for the JSONL-source sample.")
+    parser.add_argument("--human-game-dir", type=Path,
+                        default=Path("data/human_games"),
+                        help="Human game JSONL directory for the JSONL-source sample.")
     parser.add_argument("--output",    type=Path, default=None,
                         help="Optional JSON path for the result summary.")
-    parser.add_argument("--seed",      type=int, default=42)
+    parser.add_argument("--seed",      type=int, default=99999,
+                        help="RNG seed for the eval sample.  Default 99999 is "
+                             "intentionally different from the training builder's "
+                             "default (42) so overlap with the training set is "
+                             "minimised.  Pick a distinct seed per eval run to "
+                             "explore sampling variance.")
     args = parser.parse_args()
 
     if not args.checkpoint.exists():
@@ -298,6 +410,9 @@ def main() -> int:
         malom_db_path=args.malom_db,
         n_samples=args.n_samples,
         seed=args.seed,
+        jsonl_fraction=args.jsonl_fraction,
+        game_dir=args.game_dir if args.game_dir.exists() else None,
+        human_game_dir=args.human_game_dir if args.human_game_dir and args.human_game_dir.exists() else None,
     )
     print()
     print(json.dumps(result, indent=2))
