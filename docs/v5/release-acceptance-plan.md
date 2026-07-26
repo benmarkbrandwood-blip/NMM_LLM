@@ -141,7 +141,7 @@ human-targeted merely because HumanDB was used for a diagnostic.
 
 The first D-only treatment additionally requires:
 
-- F0-H and direct-teacher headroom passed;
+- F0-H1, T0-H-pilot, and direct-teacher headroom passed;
 - same-stack compact reference as the attribution control;
 - primary natural-match product effect passed;
 - loss-rate non-inferiority;

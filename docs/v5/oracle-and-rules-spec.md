@@ -46,7 +46,7 @@ no-capture/no-progress state sufficient for adjudication
 claim and terminal state
 ```
 
-The exact minimal sufficient history representation is an F0-P deliverable.
+The exact minimal sufficient history representation is an F0-P1 deliverable.
 Until it is proved, an implementation may use a conservative complete
 representation, but it must not silently omit history to improve cache reuse.
 
@@ -139,7 +139,7 @@ no-progress draw. A W certificate requires an augmented-history AND/OR proof:
 - proof artifacts bind the root, variant, rules/oracle versions, explored
   actions, rank, and verifier.
 
-Before W liveness becomes a reference-baseline dependency, F0-P must:
+Before W liveness becomes a reference-baseline dependency, F0-P1 must:
 
 1. prove or conservatively define the minimal sufficient history key;
 2. measure graph nodes, edges, strongly connected components, history depth,

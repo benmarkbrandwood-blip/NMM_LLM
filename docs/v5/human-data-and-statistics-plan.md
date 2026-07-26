@@ -68,31 +68,82 @@ Its effect on the target measure, effective sample size, and player
 concentration is reported. The product owner freezes the target measure before
 candidate results are examined.
 
-## HumanDB Support Audit
+## Planning Data and Untouched Evidence
 
-F0-H is a read-only, rejection-capable audit. By target condition and coarse
-phase/structure, report:
+Before any state/action headroom analysis, freeze:
 
-- games, observed decisions, independent players, and time coverage;
+- a content-addressed `planning_snapshot` that F0-H0, architecture work, and
+  model design may inspect; and
+- an untouched source that planning cannot access, defined by a pre-existing
+  access-controlled snapshot or, preferably, future players/time collected
+  after the design freeze.
+
+The current aggregate HumanDB and historical corpus have already informed
+project planning. They are development/planning data and cannot be
+retroactively renamed a pristine final test merely by choosing rows after
+their aggregate properties were examined. A player/time-isolated historical
+split may still support development confirmation under an explicit limitation;
+the strongest transport claim requires prospective or demonstrably untouched
+data.
+
+Hashes, membership rules, permitted users/jobs, and access counts are frozen
+before F0-H0. Planning, train, and selection jobs cannot read the untouched
+source.
+
+## F0-D0 Raw Reconstructability
+
+Before using aggregate positions for full-rule reasoning, replay raw records
+and report:
+
+- games with a complete continuous move sequence;
+- games that replay unambiguously from the initial state;
+- recoverable player, Elo, time, source, and rules-variant fields;
+- recoverable terminal and draw reasons;
+- interrupted, missing-ply, duplicate-export, malformed, and illegal rates;
+- decisions for which repetition/no-progress/claim history can be recovered;
+- independent players and games in each usable support class.
+
+The current HumanDB v2 tables and four-field board FEN do not contain complete
+history, player, Elo, or time state. Their board/action frequencies may support
+a coarse visible-board behaviour audit. They cannot supply formal `A_allow`,
+`certW`, W-liveness, or full-rule teacher labels.
+
+## F0-H0 Coarse Support Screen
+
+F0-H0 is read-only and rejection-only. On the planning snapshot, by target
+condition and coarse phase/structure, report:
+
+- recoverable games, decisions, independent players, and time coverage;
 - player/game concentration and maximum information share;
-- player-cluster effective sample size;
-- legal choice-set and action support;
-- D-state mass with `|A_allow| > 1`;
-- optimistic HumanPolicy calibration width;
-- expected OOD/abstention mass;
-- optimistic distinguishable-pair mass;
-- maximum whole-game effect implied by natural visit mass.
+- player-cluster effective sample size where identity is recoverable;
+- legal choice-set and observed-action support;
+- coarse positional-D and multi-legal-action mass;
+- natural probability that a game reaches at least one potentially modifiable
+  state.
+
+A conservative coarse whole-game score bound may use:
+
+```text
+P(reference game reaches at least one modifiable coarse state)
+* maximum possible per-game score swing
+```
+
+This deliberately avoids adding repeated decision effects as if they were
+independent. A tighter first-divergence or closed-loop occupancy calculation is
+permitted only when its assumptions are verified. Any quantity that is not
+proved to upper-bound the effect is named `optimistic_headroom_heuristic` and
+cannot veto the route alone.
 
 Millions of decisions from a small or concentrated player set do not become
-millions of independent observations. If the optimistic effect bound is below
-the product target, stop specialisation before building HumanDB v3 or a
-multi-step teacher.
+millions of independent observations. A valid conservative bound below the
+product target rejects specialisation before HumanDB v3 or teacher work.
+F0-H0 cannot approve T1.
 
-## Rebuild and Splitting
+## Rebuild, Splitting, and F0-H1
 
-If F0-H permits continuation, rebuild from raw complete games and retain the
-fields needed for the target estimand. Do not reconstruct missing
-player/time/Elo information from an aggregate table.
+If F0-H0 permits continuation, rebuild the development corpus from raw
+complete games and retain the fields needed for the target estimand. Do not
+reconstruct missing player/time/Elo information from an aggregate table.
 
 Deduplicate and split in this order:
 
@@ -107,6 +158,13 @@ Deduplicate and split in this order:
 Every variant of the same game or duplicate component stays on one side.
 Confirmation is accessed once by one selected recipe. Final test is not used
 for architecture, calibration, thresholds, or curriculum.
+
+After E0 and the split freeze, F0-H1 may use accepted `A_allow`, the complete
+comparator, and one approved minimal HumanPolicy on planning/train data. It
+reports formal D eligibility, HumanPolicy support/abstention, equivalence-band
+candidate mass, and exact-headroom uncertainty. The separate T0-H-pilot owns
+any same-state or short-rollout comparison. Neither stage reads confirmation or
+final data.
 
 ## HumanPolicy Evidence Level
 

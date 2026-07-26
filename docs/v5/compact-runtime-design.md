@@ -9,7 +9,7 @@ bundle is cheaper or better than an optional full DB or server oracle.
 
 ## Architecture Decision Comes First
 
-F0-A compares at least:
+F0-A0 inventories and F0-A1 selects among at least:
 
 1. ordinary local always-move AI;
 2. verified compact AI without a pack;

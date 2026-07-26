@@ -136,21 +136,39 @@ The identifiers below replace the archived document's overlapping
 Section/Stage/P-numbering. They describe dependencies, not calendar promises.
 
 ```text
-F0 read-only feasibility
-├─ F0-R: reconcile current code, assets, rules, and accepted evidence
-├─ F0-H: specialisation headroom and HumanDB support upper bound
-├─ F0-P: W-liveness/history-state and runtime-proof size benchmark
-└─ F0-A: ordinary/compact/pack/full-DB/server architecture comparison
+P-1 product brief
+└─ role is frozen; deployment, offline, device, cost, and resource limits
+   must close before final architecture selection
+
+F0 pre-E0 read-only feasibility
+├─ F0-R0: reconcile current code, assets, rules, and accepted evidence
+├─ F0-D0: raw-game reconstructability plus planning/untouched data freeze
+├─ F0-H0: coarse specialisation upper screen; rejection only
+├─ F0-P0: proof/history scale reconnaissance; rejection only
+└─ F0-A0: architecture inventory under known product constraints
 
 E0 deterministic foundation
 └─ oracle comparator + authoritative rules/history + atomic actions
 
-T0 reference baselines
-└─ direct q_ref → compact student → authorised shallow search → pack variants
-   → clean corrected-v4/generalist control
+Post-E0 exact feasibility
+├─ F0-H1: formal A_allow + approved minimal HumanPolicy headroom
+├─ T0-H-pilot: non-promotable same-state/short-rollout comparison
+├─ F0-P1: full-history proof and recursive-viability feasibility
+└─ F0-A1: select one product lane under frozen deployment constraints
 
-T1 optional minimal human specialisation
-└─ only if F0-H and T0 justify it; high-support D states only
+Selected product lane
+├─ ordinary: strong policy/search, no online proof claim
+├─ theory verified: recursive full-rule viability required
+├─ positional exact: positional claim only
+├─ bounded survival: finite-horizon claim only
+└─ Oracle service: mounted local/server authority and cache
+
+T0 reference baselines in the selected lane
+└─ exact/classic baselines → direct q_ref where applicable → compact student
+   → authorised search/pack variants → clean corrected-v4 control
+
+T1 optional supported-error-pattern reranking
+└─ only if F0-H1, T0-H-pilot, and T0 justify it; high-support D states only
 
 E1 deployment closure
 └─ train/evaluate against the exact runtime pack, prover, pool, deadline,
@@ -161,15 +179,20 @@ R0 frozen acceptance
    target-device resources and claims
 ```
 
-F0 is allowed before building a comprehensive governance framework because it
-is read-only, bounded, and cannot produce a release artifact. It may produce
-reports and recommended thresholds, but it may not generate training labels,
-modify databases, train models, or launch evaluation games.
+Pre-E0 F0 is allowed before building a comprehensive governance framework
+because it is read-only, bounded, and cannot produce a release artifact. It may
+produce reports and recommended thresholds, but it may not generate training
+labels, modify databases, train models, or launch evaluation games. F0-H0 and
+F0-P0 may reject a route; they cannot approve T1 or a verified product.
+
+Post-E0 F0-H1/F0-P1 and T0-H-pilot use accepted deterministic semantics and
+their own bounded experiment cards. They still cannot promote a candidate, and
+an evaluation pilot still needs explicit launch authority.
 
 The expensive HumanPolicy v3, full multi-step teacher, GapNet/SelfRiskNet,
 DAgger, adaptive curriculum, and PPO stack remains closed until all applicable
-F0 and T0 stop/go decisions pass. A negative feasibility result is a valid
-project result and preserves the reference path.
+F0-H1, F0-P1, T0-H-pilot, and T0 stop/go decisions pass. A negative
+feasibility result is a valid project result and preserves the reference path.
 
 ## Required Early Decisions
 
@@ -224,7 +247,7 @@ follow this rule.
 ### W conversion and deployment feasibility
 
 A positional W pack entry does not establish full-history W liveness. Before W
-conversion becomes a foundational dependency, F0-P must identify the minimal
+conversion becomes a foundational dependency, F0-P1 must identify the minimal
 sufficient history state and measure proof graph size, cache reuse, proof
 artifact size, and cold/warm completion across natural W, cyclic W, and
 near-threshold histories. Until then, a pack W result may order candidates but
@@ -248,9 +271,9 @@ although its Stage-0 result remains too narrow for promotion.
 
 ## Stop Rules
 
-- Stop optional specialisation when the optimistic global-effect headroom is
-  below the signed product effect, HumanPolicy support is inadequate, or the
-  smallest student cannot retain a direct-teacher gain.
+- Stop optional specialisation when a valid F0-H0 bound is below the signed
+  product effect, F0-H1 HumanPolicy support is inadequate, or the smallest
+  student cannot retain a direct-teacher gain.
 - Stop a verified runtime architecture when its proof/availability contract
   cannot close on target hardware; this does not prohibit an explicitly
   ordinary always-move product.

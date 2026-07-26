@@ -45,7 +45,7 @@ first integration and measurement host. That fact does not freeze a release
 device, operating-system floor, local-versus-server architecture, or hardware
 budget.
 
-Before F0-A can select a release architecture, the product owner must freeze:
+Before F0-A1 can select a release architecture, the product owner must freeze:
 
 - whether the top-strength opponent must work fully offline;
 - supported product host and minimum/representative devices;
@@ -55,8 +55,9 @@ Before F0-A can select a release architecture, the product owner must freeze:
 - engineering-time, CPU/GPU-hour, hosting, and maintenance ceilings; and
 - redistribution constraints for tablebase-derived artifacts.
 
-Until those values are recorded, F0-A may inventory and measure alternatives
-but cannot declare a final architecture or make a numerical budget governing.
+Until those values are recorded, F0-A0 may inventory and measure alternatives
+but F0-A1 cannot declare a final architecture or make a numerical budget
+governing.
 
 ## Relationship to Existing Features
 

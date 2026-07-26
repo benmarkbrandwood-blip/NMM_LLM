@@ -40,52 +40,92 @@ The completed managed corrected-v4 baseline is clean category-two lineage. Its
 training signal only; they do not establish strength, phase coverage, or
 promotion.
 
-## F0 Feasibility Before Complex Training
+## Feasibility Before Complex Training
 
-No full HumanPolicy v3, multi-step FrozenTeacher, GapNet/SelfRiskNet, DAgger,
-adaptive curriculum, or PPO work begins before these bounded reports:
+No full HumanPolicy, multi-step FrozenTeacher, GapNet/SelfRiskNet, DAgger,
+adaptive curriculum, or PPO work begins before the applicable stages below.
 
-### F0-H: Specialisation headroom
+### F0-D0: data reconstructability and planning freeze
 
-On the intended natural traffic measure, report:
+Before inspecting state/action headroom, freeze one planning snapshot and an
+untouched or prospective confirmation source as specified by the
+[human-data plan](human-data-and-statistics-plan.md). Produce the raw-game
+reconstructability report before treating any aggregate HumanDB row as a
+full-history decision.
 
-- mass of D decisions;
-- mass with `|A_allow| > 1`;
-- exact and near ties under the complete ultra-strong comparator;
-- HumanPolicy-supported mass and an optimistic uncertainty floor;
-- optimistic fraction of distinguishable candidate pairs;
-- natural visit mass of those states;
-- an upper bound on the whole-game effect even if every eligible decision
-  improves.
+### F0-H0: pre-E0 coarse upper screen
 
-If the global upper bound is below the signed product effect, target
-specialisation stops before HumanDB v3 or full teacher construction.
+F0-H0 uses only the planning snapshot, `A_legal`, trusted coarse positional
+W/D/L where available, raw observed-choice frequencies, and coarse natural
+visit estimates. It may report:
 
-Before full teacher construction, run one same-state, same-budget comparison
-over:
+- mass of coarse D decisions and states with more than one legal action;
+- observed action support and concentration;
+- a conservative reachability upper bound on whole-game score headroom; and
+- clearly named optimistic heuristics that are not mathematical bounds.
+
+F0-H0 cannot use formal `A_allow`, `certW`, a trained HumanPolicy, or the
+complete comparator because E0 has not accepted them. A valid upper bound below
+the signed product effect rejects specialisation. A heuristic estimate cannot
+approve T1 or veto it by itself.
+
+### F0-P0: pre-E0 proof reconnaissance
+
+Inventory history-state dimensions, positional W incidence, rough graph
+branching, and representative proof-resource scale. These measurements may
+reject an obviously infeasible design but cannot establish soundness,
+W-liveness, or runtime authorisation.
+
+### F0-A0: architecture inventory
+
+Under the known product constraints, inventory ordinary local search, compact
+policy/search, exact-policy compression, pack, optional local full DB, server
+Oracle, and hybrid designs. Unknown deployment constraints remain explicit;
+F0-A0 cannot select a final architecture while they are open.
+
+### E0: deterministic foundation
+
+Accept one rules/history state, complete comparator, atomic-action surface, and
+strict Oracle/proof error boundary before exact headroom or proof feasibility.
+
+### F0-H1: post-E0 exact headroom
+
+Using only the planning/train domains, report:
+
+- D-state mass with `|A_allow| > 1`;
+- exact and equivalence-band ties under the complete comparator;
+- support and uncertainty from one approved minimal HumanPolicy;
+- distinguishable candidate-pair and natural visit mass; and
+- a conservative whole-game bound or an explicitly non-binding optimistic
+  headroom heuristic.
+
+### T0-H-pilot: non-promotable direct comparison
+
+Under its own bounded experiment card, compare:
 
 - coarse W/D/L with a neutral tie policy;
 - the complete ultra-strong reference;
 - one-step HumanPolicy allow-mass ranking; and
 - a very short, support-qualified target rollout.
 
+The pilot cannot access confirmation/final data and cannot promote a candidate.
 If neither human-conditioned baseline shows a stable advantage over the
-ultra-strong reference, do not build a larger `T_full` merely because the
-ultra-strong design was expected to leave headroom.
+ultra-strong reference, do not build a larger teacher merely because the
+design was expected to leave headroom.
 
-### F0-P: proof and history feasibility
+### F0-P1: exact proof and viability feasibility
 
-Use the requirements in
-[the oracle/rules specification](oracle-and-rules-spec.md) to measure
-W-liveness and runtime proof size. Do not bind reference training to a proof
-system that has not demonstrated a viable support domain.
+Use the accepted E0 semantics to measure full-history W-liveness, runtime proof
+size, and recursive viability for any whole-game verified claim. Do not bind a
+reference or product to a proof system that has not closed its support domain.
 
-### F0-A: architecture comparison
+### F0-A1: final lane selection
 
-Compare ordinary always-move, verified compact, compact plus pack, optional
-local full DB, server oracle, and hybrid designs before freezing the release
-form. Include total engineering cost, licensing/redistribution, target-device
-latency/resources, availability, and user experience.
+After the product's deployment constraints and the applicable H1/P1 evidence
+are frozen, select one ordinary, theory-verified, positional-exact,
+bounded-survival, or Oracle-service lane. Subsequent T0 and E1 work follow that
+lane; they do not default back to compact proof merely because it appears in
+the research plan.
 
 ## T0 Reference Baseline Ladder
 
@@ -350,7 +390,8 @@ semantics, or weights-only restart cannot be accepted as exact continuation.
 
 Stop target specialisation when:
 
-- F0-H cannot support the signed global effect;
+- a valid F0-H0 bound cannot support the signed global effect;
+- F0-H1 or T0-H-pilot cannot establish adequate supported headroom;
 - direct teacher does not stably beat `q_ref`;
 - the minimum student cannot retain the gain;
 - independent opponent/search stress reverses the direction;
