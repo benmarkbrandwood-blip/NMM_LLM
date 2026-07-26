@@ -110,10 +110,12 @@ confirming the correction, but its row-19 child panel is not a current
 selection input.
 
 The review supplement also contains partial family and child annotations.
-Those annotations are semantic evidence, not part of this move-history audit.
-They do not complete the requested parent-priority tiers, all primary-child
-choices, or a standalone P14 classification. Those remaining judgments must
-stay explicit rather than being inferred.
+Those annotations are separately preserved in the
+[semantic review disposition](maintainer-book-opening-plays-semantic-review-2026-07-26.md);
+they are not part of this move-history audit. They do not complete the
+requested parent-priority tiers, all primary-child choices, or a standalone
+P14 classification. Those remaining judgments must stay explicit rather than
+being inferred.
 
 The overall source ratio, allocation between the two Book subtypes, and exact
 64-prefix list remain unfrozen. This audit does not authorize candidate

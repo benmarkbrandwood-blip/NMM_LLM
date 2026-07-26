@@ -62,9 +62,10 @@ rules. It changes only source row 19. Source row 18 retains `d7`; the two rows
 are no longer exact-history duplicates after the correction.
 
 The original delivery, its transcription, and its source audit remain
-immutable historical evidence. The correction must be applied through a
-separately identified reviewed-source overlay and a newly generated audit; it
-must not overwrite or relabel the original evidence.
+immutable historical evidence. The correction is now applied through a
+separately identified
+[reviewed-source audit](sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.md);
+it does not overwrite or relabel the original evidence.
 
 ## Semantic-review content
 
@@ -89,6 +90,10 @@ The review does not yet assign the requested `core`, `useful`, or
 select a primary child for every multi-child exact parent. P14 has no
 standalone row in the added parent table. These are remaining decision inputs,
 not grounds for inferring an answer from layout or wording.
+
+The extracted annotations, later chat clarifications, and four-point
+completion state are recorded in the
+[semantic review disposition](maintainer-book-opening-plays-semantic-review-2026-07-26.md).
 
 ## Use boundary
 

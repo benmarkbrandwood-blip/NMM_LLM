@@ -811,9 +811,12 @@ The later 35-row `Book Opening Plays.docx` delivery is separately archived and
 audited as `maintainer_expert_curated_play`, a Book subtype rather than a
 fourth reporting stratum. Its 36 explicit records all replay legally in two
 fresh pinned Sanmill processes and reduce to 34 histories, 33 final FENs, 32
-final ring16 orbits, and 14 eight-ply parent orbits. One parent supplies 16
+final ring16 orbits, and 14 eight-ply parent orbits. The expert-confirmed
+row-19 correction has since been replayed through a separate reviewed-source
+lineage, producing 35 histories, 34 final FENs, and 33 final ring16 orbits
+without changing the 14 eight-ply parent orbits. One parent supplies 16
 children. Six exact histories occur in 29 distinct frozen PlayOK games; no
-exact history matches the Sanmill named lines, although eight unique final
+exact history matches the Sanmill named lines, although nine unique final
 FENs and orbits overlap. Row 11's final `c5` is screenshot-derived and remains
 explicitly identified as visual evidence, but the original-resolution move
 panel is unambiguous and it is not an expert-confirmation blocker.
@@ -821,14 +824,16 @@ panel is unambiguous and it is not an expert-confirmation blocker.
 The updated
 [twelve-ply decision brief](../experiments/sanmill-layered-opening-prefix-v2-decision-brief.md)
 recommends a non-frozen near-balanced `22 Book / 21 HumanDB / 21 Perfect DB`
-composition. Status remains `needs_decision` until the product owner approves
-that composition and the Mill expert reviews the 14 structural parent groups
-against human opening-family concepts. The
-[expert parent-and-child review guide](../experiments/sanmill-layered-expert-book-parent-review.md)
-defines the four requested outputs: family classification, semantic
-combination or splitting of structural groups, parent-coverage priority, and
-identification of strategically distinct children from the same exact
-parent. The two Book subtypes have no frozen internal allocation.
+composition. The expert review supplement provides substantial family and
+child semantics, establishes that P03 needs extended-family splitting, and
+identifies P13-A/P13-B as a symmetry pair. It does not provide a standalone
+P14 classification, complete priority tiers, a final P03 partition, or every
+primary-child choice. The
+[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
+and
+[short follow-up](../experiments/sanmill-layered-expert-book-review-follow-up.md)
+separate the answered and remaining questions. Status stays `needs_decision`;
+the two Book subtypes have no frozen internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned

@@ -255,28 +255,31 @@ it does not freeze a quota or turn the 128 audit routes into the final corpus.
 ## Current expert-curated Book evidence
 
 The later source-only
-[expert Book play audit](../evidence/sanmill-layered-expert-book-source-audit-2026-07-26.md)
+[reviewed expert Book play audit](../evidence/sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.md)
 is complete. The 35 document rows contain 36 explicit candidates, all of
 which replay legally through project rules and two fresh pinned Sanmill
-processes. They reduce to 34 unique histories, 33 final FENs, and 32 final
+processes. They reduce to 35 unique histories, 34 final FENs, and 33 final
 `ring16` orbits.
 
 At eight logical plies those candidates contain only 15 exact parent
 histories and 14 parent `ring16` orbits. One parent supplies 16 of the 36
 twelve-ply children. Six exact expert histories are also present in 29
 distinct games in the frozen current PlayOK sample. There is no exact-history
-overlap with the corrected Sanmill named lines, but eight unique final FENs
-and eight unique final orbits overlap. The fixed Perfect DB audit pool has no
+overlap with the corrected Sanmill named lines, but nine unique final FENs
+and nine unique final orbits overlap. The fixed Perfect DB audit pool has no
 overlap.
 
 This evidence supports adding the expert material as a Book candidate subtype,
 not adding all rows or changing the Book quota automatically. Row 11's final
 `c5` is screenshot-derived but unambiguous at original resolution; its visual
 evidence basis remains recorded and is not an expert-confirmation blocker. The
-remaining four Mill-domain judgments are defined in the
-[expert parent-and-child review guide](sanmill-layered-expert-book-parent-review.md):
-human family classification, structural-group combination or splitting,
-parent-coverage priority, and strategically distinct child selection. The
+expert has partially answered the four Mill-domain judgments. The
+[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
+records the supplied family and child annotations without inferring missing
+answers. The
+[short follow-up](sanmill-layered-expert-book-review-follow-up.md)
+retains only the unresolved family partition, P14 classification,
+parent-coverage priority, and primary/additional child choices. The
 provisional corpus decision must account for that review and the two distinct
 Book subtypes before any list is frozen.
 

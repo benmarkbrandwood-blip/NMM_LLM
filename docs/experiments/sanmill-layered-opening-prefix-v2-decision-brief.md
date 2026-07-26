@@ -55,19 +55,20 @@ The later expert-curated document contributes a second Book subtype:
 - 35 source rows contain 36 explicit candidates;
 - all 36 replay legally through project rules and two fresh pinned Sanmill
   processes;
-- they reduce to 34 exact histories, 33 final FENs, and 32 final `ring16`
+- they reduce to 35 exact histories, 34 final FENs, and 33 final `ring16`
   orbits;
 - their eight-ply parents reduce to 15 exact histories and 14 `ring16` orbits;
   and
 - one parent supplies 16 of the 36 twelve-ply children.
 
-Rows 14/20 and 18/19 are exact duplicates. Six expert histories have exact
-support in 29 distinct games in the frozen PlayOK sample, with a maximum of
-nine games for one history. This corroborates that some lines occur in human
-play, but it does not make the whole delivery a HumanDB-frequency source.
+Rows 14/20 are the only remaining exact duplicate pair. Six expert histories
+have exact support in 29 distinct games in the frozen PlayOK sample, with a
+maximum of nine games for one history. This corroborates that some lines occur
+in human play, but it does not make the whole delivery a HumanDB-frequency
+source.
 
 The expert subtype has no exact-history overlap with the Sanmill named lines.
-It shares eight unique final FENs and eight unique final `ring16` orbits with
+It shares nine unique final FENs and nine unique final `ring16` orbits with
 them, so concatenating both Book pools would still duplicate structures.
 Row 11's final `c5` was read unambiguously from its embedded move-list
 screenshot; the visual evidence basis remains recorded but is not a blocker.
@@ -111,7 +112,7 @@ The source inventories have these unique-set sizes:
 | Source | Exact histories | Final FENs | Ring16 orbits |
 | --- | ---: | ---: | ---: |
 | Book named-line records | 110 | 110 | 110 |
-| Expert Book records | 34 | 33 | 32 |
+| Expert Book records | 35 | 34 | 33 |
 | HumanDB | 83,002 | 64,468 | 38,237 |
 | Perfect DB audit pool | 128 | 128 | 128 |
 
@@ -122,9 +123,9 @@ orbit. The audited Perfect DB pool has zero overlap with either source on all
 three measures.
 
 The expert Book pool intersects HumanDB at six exact histories, 12 unique
-final FENs, and 17 unique final `ring16` orbits. It has zero overlap with the
+final FENs, and 18 unique final `ring16` orbits. It has zero overlap with the
 fixed Perfect DB pool on all three measures. Against the Sanmill Book subtype
-it has zero exact-history, eight final-FEN, and eight `ring16` intersections.
+it has zero exact-history, nine final-FEN, and nine `ring16` intersections.
 
 Final selection should remove cross-stratum endpoint and ring16 duplicates
 unless a later contract gives a specific reason to retain the same structure
@@ -165,9 +166,10 @@ The proposed later selection rules are:
    separately identified subtypes inside the 22-slot Book stratum. Cover
    expert eight-ply parents before adding a second child from one parent, and
    cover every Sanmill declared family before adding another member of a
-   covered family. A later expert review must determine whether the 14
-   structural parent groups map onto the seven author-named families; the two
-   concepts are not assumed equivalent. Retain row 11's visual `c5`
+   covered family. The partial expert review establishes that P03 needs
+   extended-family splitting and that P13-A/P13-B are symmetry-related, but
+   it does not supply the complete family partition or priority tiers. Retain
+   row 11's visual `c5`
    provenance, use no more than one record per exact history, and maximise
    exact-FEN/`ring16` diversity under a predeclared deterministic tiebreak.
 2. **HumanDB:** rank complete histories by distinct-game count, then occurrence
@@ -184,7 +186,7 @@ These rules are a proposal, not an executable freeze. The 22 Book slots are
 not yet divided between the two subtypes. The exact parent/family mapping,
 subtype allocation, selected identities, list hash, and review images must be
 generated only after the product owner accepts the composition and the expert
-reviews the parent-group interpretation.
+closes the remaining family, priority, and child-selection questions.
 
 ## Inputs that remain excluded
 
@@ -206,24 +208,23 @@ The recommended product decision remains to accept the provisional
 `22 Book / 21 HumanDB / 21 Perfect DB` composition. The newly measured expert
 source does not justify changing that overall split.
 
-Before freezing the 22 Book members, the Mill expert should review the 14
-eight-ply structural parent groups against the human opening-family concepts
-used in the delivered repertoire. The
-[expert parent-and-child review guide](sanmill-layered-expert-book-parent-review.md)
-turns that gate into four concrete questions:
+The Mill expert has partially answered the original
+[parent-and-child review guide](sanmill-layered-expert-book-parent-review.md).
+The response is preserved in the
+[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md),
+and the
+[short follow-up](sanmill-layered-expert-book-review-follow-up.md)
+limits the remaining gate to four concrete outputs:
 
-1. which human opening family or strategic plan describes each parent;
-2. which structural groups should be combined or split at the human-strategy
-   level;
-3. which resulting parents are core, useful, or optional/niche coverage; and
-4. which continuations from the same exact parent are strategically distinct
-   enough to supplement its primary twelve-ply child.
+1. a standalone family or plan description for P14;
+2. the final P03 extended-family partition and any other combine/split
+   correction;
+3. `core`, `useful`, or `optional/niche` coverage tiers; and
+4. primary, additional-distinct, and redundant child choices for the remaining
+   multi-child exact parents.
 
-The guide defines the fourth point by strategic purpose rather than move
-difference and provides all 14 parent histories plus every multi-child
-continuation. The review remains semantic: it is not a request to recheck
-legality, hashes, HumanDB frequency, row 11, Sanmill replay, or objective
-strength.
+The expert does not need to recheck legality, hashes, HumanDB frequency,
+row 11, Sanmill replay, or objective strength.
 
 Until that decision is recorded, status remains `needs_decision`; no final
 prefix list, final corpus image-review package, candidate-versus-baseline run,

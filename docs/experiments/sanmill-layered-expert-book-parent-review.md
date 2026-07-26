@@ -1,10 +1,19 @@
 # Expert review guide for twelve-ply Book parents and children
 
-Status: `awaiting_expert_semantic_review`
+Status: historical review request; partial expert response recorded
 
 Corpus status: `needs_decision`
 
 Date: 2026-07-26
+
+The expert has now supplied a review supplement and follow-up messages. This
+file preserves the exact request and the original image package that he saw.
+Its row-19 panel predates the confirmed `d7` to `d5` correction and must not be
+used for current selection. See the
+[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
+and the
+[reviewed-source follow-up](sanmill-layered-expert-book-review-follow-up.md)
+for current evidence, corrected images, and the remaining questions.
 
 This guide asks for a narrow Mill-domain review of the expert-curated
 `Book Opening Plays.docx` delivery. The source has already been transcribed,
