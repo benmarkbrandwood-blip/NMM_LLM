@@ -89,13 +89,13 @@ See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
 
 ### Game engine
 
-- Full Nine Men's Morris rules: placement, movement, flying (3-piece phase), mill detection, and captures
+- Core Nine Men's Morris board rules: placement, movement, flying (3-piece phase), mill detection, and captures. The current in-repository game loop does not yet provide complete full-history repetition and no-capture adjudication; see the [current product claims audit](docs/v5/current-product-claims-audit-2026-07-26.md)
 
 - 10 difficulty levels — all use iterative deepening; time budgets range from 0.3 s (level 1) to 90 s (level 10). Search depth cap is configurable per-difficulty via the Settings panel depth slider (levels 1–8 interpolated, default 5–16 ply)
 
 - Human vs AI, Human vs Human (local pass-and-play), AI vs AI spectator mode, or random colour selection
 
-- Draw by threefold repetition, 50-move rule, and mutual agreement (Offer Draw unlocks after 40 post-placement half-moves)
+- Compatibility draw handling for one fixed eight-half-move oscillation pattern, an automatic 100-post-placement-half-move counter, and mutual agreement (Offer Draw unlocks after 40 post-placement half-moves). These first two mechanisms must not be described as complete threefold-repetition or correctly reset no-capture rules
 
 - Undo rewinds both your move and the AI's response
 
@@ -1338,4 +1338,3 @@ python -m unittest discover tests/ -v
 This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
 
 You are free to use, modify, and distribute this software under the terms of the AGPL-3.0. If you run a modified version as a network service and allow users to interact with it remotely, you must make the corresponding source code available to those users under the same license. This project incorporates data from the [Malom](https://github.com/ggevay/malom) Nine Men's Morris endgame database (Copyright © Gábor E. Gevay and Gábor Danner), which is distributed under GPL-3.0. See [LICENSE.md](http://LICENSE.md/) for full terms, third-party attributions, and dependency license details.
-
