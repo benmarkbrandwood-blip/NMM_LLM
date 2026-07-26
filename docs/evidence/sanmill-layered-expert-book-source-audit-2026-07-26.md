@@ -19,7 +19,7 @@ corrected Sanmill opening-book asset, HumanDB, or Perfect DB.
 | Source DOCX | 3,432,474 bytes; SHA-256 `227584cde9d8c6278665a1b6decac6491d6b30b9b7add44a4b00200aec5e83c7` |
 | Tracked transcription | SHA-256 `16c83726eaa872db8ccc8195c12153215e74b0b3e14acbb4e187e7e2195a48d2`; internal identity `de3f7a33e772501f8cd369fbfb540ab8d7dabf259c15c51087acf2b425436273` |
 | Portable source identity | `9c0c3ae58aaec67cb752899121cec465d19dd2bf332a869fddb0216e36a1463f` |
-| NMM_LLM generator commit | `1bb4f19ac025abc8298d7dbf4f510815e716340f` |
+| NMM_LLM generator commit | `271209481196cb47ca0382ca0cff7f5d3a56d63b` |
 | Pinned Sanmill interface commit | `db65eb3e73189d934d615d0f47519d395193c646` |
 | Sanmill binary | 4,109,312 bytes; SHA-256 `cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc` |
 
@@ -28,10 +28,10 @@ The inspected Sanmill checkout was descendant
 confirmed that the pinned CLI, rules, build, bridge-document, and
 opening-book scope had not changed.
 
-The canonical audit is 521,654 bytes, has file SHA-256
-`081c22f6f401f9cdcb514f75cde67b06939e509afcabbe268fec771c93b00748`,
+The canonical audit is 521,638 bytes, has file SHA-256
+`e6bdb4d66f868fde6cdf1928b25174d323da533c03f074cf1c717b428bbdf107`,
 and internal audit identity
-`8acf417ba8fbfe2870de591ad4a9ca0f2d7b41b8fcdbf8ac454cdc5883f61a63`.
+`29293523ba211775827bfd903ef8dd0a0220bcd958a46974e37809a55dd51ff4`.
 
 No candidate model was loaded, no game was played, and no source fallback was
 available.

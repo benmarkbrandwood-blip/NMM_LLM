@@ -16,7 +16,7 @@ the movement/flying corpus, or authorize an evaluation launch.
 | Stratum | Audit identity | Essential source identity |
 | --- | --- | --- |
 | Sanmill Book subtype | `b0d3bd526b7ab951c7dbd10552c77e8f6db5f1e69510829bdd642049bff72c48` | corrected 109-position/437-recommendation asset SHA-256 `cdc4768bc461c22177634985a4cc1d92452774e2992515b937fed8812eb076f5` |
-| Expert Book subtype | `8acf417ba8fbfe2870de591ad4a9ca0f2d7b41b8fcdbf8ac454cdc5883f61a63` | source identity `9c0c3ae58aaec67cb752899121cec465d19dd2bf332a869fddb0216e36a1463f` |
+| Expert Book subtype | `29293523ba211775827bfd903ef8dd0a0220bcd958a46974e37809a55dd51ff4` | source identity `9c0c3ae58aaec67cb752899121cec465d19dd2bf332a869fddb0216e36a1463f` |
 | HumanDB | `15aa81528a93d0777cc6479a285ff41058ae5860383b24d2629038cd779478fa` | immutable snapshot SHA-256 `97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c` |
 | Perfect DB | `fcac7e8e864e345669a497c600e4a901eff1f9203e3b83baf6895a89c2b0be56` | portable identity `d6a85d25e87e28cc33e1408539585dadd83349da1cb63aa3f1a0f32307087508` |
 
