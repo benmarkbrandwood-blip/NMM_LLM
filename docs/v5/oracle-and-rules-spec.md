@@ -99,6 +99,7 @@ The following sets have different meanings and must retain different names:
 | `A_pack_exact(S)` | Individual candidates whose current state and successor have exact, verified pack values sufficient for that candidate's positional claim |
 | `A_runtime_proved(S, X_rt)` | Individual candidates with a completed runtime proof of the declared finite-horizon property |
 | `A_runtime(S)` | The pool a named product contract may actually select from |
+| `K_theory` | States in a recursively closed full-rule viability set for one explicitly stated whole-game property |
 
 For W and D, `A_pos` is non-empty when action enumeration and oracle semantics
 are correct. An empty set is an adapter or enumeration defect, not evidence
@@ -145,6 +146,27 @@ The three human-behaviour masses are also distinct:
 
 An L-tier quantity must not be named safe mass without an explicit
 finite-horizon qualifier.
+
+## Recursive Viability
+
+A one-step exact value or finite-horizon proof does not establish that a later
+decision remains authorisable. A whole-game `theory_preserving_verified` mode
+requires a versioned invariant or viability kernel:
+
+```text
+K_theory = acceptable terminal states union
+  {S: exists authorised a such that every legal opponent reply
+      reaches K_theory or an acceptable terminal state}
+```
+
+The artifact binds the exact state/action semantics, rules and Oracle versions,
+support domain, terminal property, covered opponent replies, and independent
+verifier. The selected action must prove the quantified successor condition,
+not merely prefer a state with historically high next-proof availability.
+
+If the project can establish only a positional relation or an `X_rt` survival
+bound, it uses the separate `positional_exact` or `bounded_survival` name.
+Those valid local certificates do not imply recursive feasibility.
 
 ## Full-History W Liveness
 
@@ -201,8 +223,8 @@ Pack use is per candidate, not all-or-nothing:
 2. each successor with an exact verified value is independently considered
    for `A_pack_exact`;
 3. candidates without a sufficient exact successor enter the runtime prover;
-4. the usable pool is the union of independently authorised pack and proof
-   candidates;
+4. an experiment may schedule over the union of independently authorised pack
+   and proof candidates, but each retains its own claim class;
 5. every selected action records its own authorisation source.
 
 For W/D, a pack candidate may establish only the positional claim its fields
@@ -233,7 +255,8 @@ independent verifier identity
 ```
 
 `unknown`, timeout, partial expansion, a neural prior, policy confidence, and
-“no counterexample yet” never authorise an action in verified mode. They may
+“no counterexample yet” never authorise an action in a
+theory-preserving, positional-exact, or bounded-survival mode. They may
 influence search order only.
 
 ## Deterministic Acceptance

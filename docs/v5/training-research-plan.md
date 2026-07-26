@@ -363,13 +363,15 @@ regenerates labels under the exact named runtime contract:
 - proof certificate and scheduler;
 - deadline and early-stop rule;
 - actual authorised pool;
-- ordinary or verified product mode;
+- ordinary-best-effort, theory-preserving, positional-exact, or
+  bounded-survival product mode;
 - runtime unavailable/shortfall handling.
 
-If a verified pool can contain oracle-denied horizon-proved actions, train a
-separate runtime fallback policy over those candidates. Otherwise verified
-mode selects only from `A_allow ∩ A_runtime` and reports unavailable when the
-intersection is empty.
+If a bounded-survival pool can contain Oracle-denied horizon-proved actions,
+train a separate bounded policy over those candidates. A
+theory-preserving policy selects only from its recursively viable
+`A_allow ∩ A_runtime ∩ K_theory` pool. Every named mode reports unavailable
+when its exact pool is empty.
 
 Among oracle-equivalent candidates, runtime training may optimise proof cost,
 future availability, pack closure, support closure, and measured risk. It must

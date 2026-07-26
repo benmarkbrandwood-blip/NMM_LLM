@@ -32,7 +32,7 @@ opponent mode.
 | Persona | Initial v5 status | Primary product objective |
 | --- | --- | --- |
 | Top-strength/research opponent | In scope | Match result, correctness, runtime reliability, and precisely bounded claims |
-| Verified-theory opponent | Research lane only until recursive viability and target-device availability close | The exact whole-game or per-move property named by its contract |
+| Verified-theory opponent | Research lane only until recursive viability and target-device availability close | The exact whole-game property and support domain proved by its invariant |
 | Coach/teaching opponent | Existing product retained; v5 integration deferred | Instruction quality, calibrated challenge, and explanation fidelity |
 | Personality/relaxed opponent | Existing product retained; v5 integration deferred | Style, variety, calibrated difficulty, and repeat-play experience |
 | Adaptive-difficulty opponent | Existing product retained; v5 integration deferred | Player-level challenge calibration and retention, including deliberate weakening where declared |

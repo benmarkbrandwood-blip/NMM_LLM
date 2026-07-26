@@ -120,15 +120,18 @@ must compare at least these architectures before a release form is frozen:
 
 | Mode | Move behaviour | Permitted claim |
 | --- | --- | --- |
-| `ordinary_always_move` | Always returns a legal move through a bounded policy/search path; may use best effort when proof is unavailable | Playing strength and measured risk only; no per-move safety claim |
-| `verified_compact` | Selects only an action authorised by an exact pack or completed runtime proof; returns `runtime_unavailable` when none is authorised in budget | Only the exact per-move guarantee recorded by the authorisation artifact |
-| `oracle_optional` | Uses a separately installed local tablebase or a versioned server oracle | Claims are limited to the mounted service, rules/history coverage, and verified interface |
+| `ordinary_best_effort` | Always returns a legal move through a bounded deterministic policy/search path | Playing strength and measured risk only; no per-move safety claim |
+| `theory_preserving_verified` | Selects only actions inside a recursively closed full-rule viability set | The exact whole-game property and support domain proved by that invariant |
+| `positional_exact` | Selects a candidate with an exact verified positional relation | The stated positional relation for that move; no history or future-availability claim |
+| `bounded_survival` | Selects a candidate with a completed finite-horizon proof | The stated `X_rt` bound for that move only |
+| `oracle_service` | Uses a separately installed local tablebase or a versioned server Oracle | Claims are limited to the mounted service, rules/history coverage, and verified interface |
 
-These are distinct product contracts. The first is not a hidden fallback for
-the second, and the second must not silently take over the first. A hybrid may
-be evaluated, but each decision must record which authority selected the move.
-No mode is the release default until target device, deployment form, costs,
-availability, user experience, and redistribution constraints are compared.
+These are distinct product contracts. None is a hidden fallback for another.
+`compact_verified_family` may be used internally as an architecture grouping,
+but it is not a user-visible guarantee. A hybrid may be evaluated only when
+each decision displays and records the exact authority and claim. No mode is
+the release default until target device, deployment form, costs, availability,
+user experience, and redistribution constraints are compared.
 
 ## Feasibility-First Decision Path
 
@@ -198,19 +201,19 @@ feasibility result is a valid project result and preserves the reference path.
 
 ### Candidate-pool alignment
 
-The oracle training policy and a verified runtime policy must not silently rank
+The Oracle training policy and a runtime policy must not silently rank
 different games:
 
 - `oracle_policy` is trained and normalised inside full-rule `A_allow`.
-- `verified_runtime_policy` is trained on the exact pool produced by the
-  deployed pack/prover/deadline contract.
-- If the verified runtime contract permits an oracle-denied but
-  horizon-proved action, that action requires runtime-policy supervision and
-  must be reported as a weaker finite-horizon decision, not as theory-safe.
-- If one policy is retained, verified mode may select only from
-  `A_allow ∩ A_runtime`; an empty intersection is `runtime_unavailable`.
-- Ordinary always-move mode may choose outside that intersection only under
-  its separately named best-effort contract and without a safety claim.
+- `theory_policy` is trained only on actions that retain membership in the
+  recursively verified full-rule viability set.
+- `positional_policy` is trained on the exact positional pool its pack can
+  establish.
+- `bounded_survival_policy` is trained on the deployed proof pool and `X_rt`.
+- If one policy is retained across these games, each named mode still masks to
+  its exact authorised pool. An empty pool is `runtime_unavailable`.
+- `ordinary_policy` may choose outside every proof pool only under its
+  separately named best-effort contract and without a safety claim.
 
 Training horizon `X` and runtime horizon `X_rt` are different versioned
 quantities unless explicitly proved equal. No model trained for one may be
@@ -274,9 +277,9 @@ although its Stage-0 result remains too narrow for promotion.
 - Stop optional specialisation when a valid F0-H0 bound is below the signed
   product effect, F0-H1 HumanPolicy support is inadequate, or the smallest
   student cannot retain a direct-teacher gain.
-- Stop a verified runtime architecture when its proof/availability contract
-  cannot close on target hardware; this does not prohibit an explicitly
-  ordinary always-move product.
+- Stop a proof-bearing runtime architecture when its
+  proof/availability/viability contract cannot close on target hardware; this
+  does not prohibit an explicitly ordinary best-effort product.
 - Stop promotion on any false authorisation, unauthorised move, rule/oracle
   contradiction, corrupted checkpoint, data-identity drift, or invalid
   statistical design.

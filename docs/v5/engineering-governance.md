@@ -124,7 +124,7 @@ Use one of these non-overlapping levels:
 | `job_fail` | Current bounded job cannot produce a trustworthy artifact | Exit non-zero; preserve reproduction evidence |
 | `experiment_block` | Evidence, support, resources, or prerequisites are inadequate | Do not start/continue the dependent experiment |
 | `release_block` | Candidate evidence cannot support promotion | Retain current product and artifacts |
-| `runtime_unavailable` | Verified product cannot authorise this decision in budget | Follow the pre-signed product adjudication; no hidden fallback |
+| `runtime_unavailable` | A proof-bearing product cannot authorise this decision in budget or support domain | Follow the pre-signed product adjudication; no hidden fallback |
 | `fatal_safety_fault` | False authorisation, illegal/unauthorised move, oracle/rule contradiction, or corrupted authority state | Stop the affected runtime and quarantine the artifact/version |
 
 Planning conflicts, a second confirmation access, or an over-budget pilot are

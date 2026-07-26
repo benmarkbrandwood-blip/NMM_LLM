@@ -26,7 +26,7 @@ result; `0/n` is not a proof; a training graph is not a strength evaluation.
 | `compact_reference_candidate` | Reference source completed E1 runtime closure in a named product mode |
 | `compact_proxy_specialised_candidate` | D-specialised source completed E1 and passed frozen proxy/mechanism gates |
 | `human_validated_product` | Complete product passed the applicable prospective human product-effect gate |
-| `ordinary_measured_product` | Always-move product passed measured strength/risk/resource gates without a per-move safety claim |
+| `ordinary_measured_product` | Best-effort product passed measured strength/risk/resource gates without a per-move safety claim |
 
 “Safe,” “certified,” “human-like,” and “improved against humans” are not
 candidate names and cannot be inferred from model provenance.
@@ -59,8 +59,10 @@ For the named product mode, freeze before confirmation:
 - start/game cluster and interval method;
 - handling of unavoidable states and unknown audit results.
 
-Ordinary always-move and verified compact products have different gates and
-claims. Verified mode requires replayable authorisation for every move.
+Ordinary best-effort, positional-exact, bounded-survival, and
+theory-preserving products have different gates and claims. Positional and
+bounded modes require replayable authorisation for every claimed move.
+Theory-preserving mode additionally requires recursive support-domain closure.
 Ordinary mode reports measured downgrade/failure rates and never upgrades them
 to a guarantee.
 
@@ -224,6 +226,7 @@ The final UI, API, README, status output, and error messages are checked against
 the actual mode and evidence:
 
 - ordinary mode says best effort/measured risk, not safe;
+- theory-preserving mode names the recursively closed property and domain;
 - pack mode names the exact positional relation actually checked;
 - proof mode names the actual `X_rt` bound;
 - unavailable and shortfall are visible rather than replaced by a move;
