@@ -16,12 +16,25 @@ AUDIT = (
     / "evidence"
     / "sanmill-layered-expert-book-source-audit-2026-07-26.json"
 )
+REVIEWED_AUDIT = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.json"
+)
 ASSETS = (
     ROOT
     / "docs"
     / "experiments"
     / "assets"
     / "sanmill-layered-expert-book-parent-review-2026-07-26"
+)
+REVIEWED_ASSETS = (
+    ROOT
+    / "docs"
+    / "experiments"
+    / "assets"
+    / "sanmill-layered-expert-book-parent-review-reviewed-source-2026-07-26"
 )
 
 
@@ -73,4 +86,45 @@ def test_frozen_review_assets_match_source_and_renderer() -> None:
         "child_comparisons": 7,
         "child_panels": 28,
         "assets": 51,
+    }
+
+
+def test_reviewed_model_keeps_row_18_and_row_19_distinct() -> None:
+    audit = json.loads(REVIEWED_AUDIT.read_text(encoding="utf-8"))
+
+    model = build_review_model(audit)
+    comparisons = {
+        item["review_id"]: item for item in model["child_comparisons"]
+    }
+    p03 = {
+        item["source_row"]: item for item in comparisons["P03"]["records"]
+    }
+
+    assert p03[18]["continuation"] == "c4 d7 e3 d1"
+    assert p03[19]["continuation"] == "c4 d5 e3 d1"
+    assert p03[18]["exact_history_sha256"] != (
+        p03[19]["exact_history_sha256"]
+    )
+
+
+def test_frozen_reviewed_assets_match_source_and_renderer() -> None:
+    manifest = json.loads(
+        (REVIEWED_ASSETS / "manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert verify_review_assets(REVIEWED_AUDIT, REVIEWED_ASSETS) == {
+        "parent_groups": 14,
+        "parent_variants": 15,
+        "child_comparisons": 7,
+        "child_panels": 28,
+        "assets": 51,
+    }
+    assert manifest["manifest_identity"] == (
+        "1349107cc616b44a7017af2db1734f04a267c286be5155f449fed93c552bf568"
+    )
+    assert manifest["rendered_positions"] == {
+        "count": 43,
+        "ordered_fens_sha256": (
+            "329ba864219a6e0d1898b87a2d84586e8bd3a480dbd320602a487b42fdee76c3"
+        ),
     }
