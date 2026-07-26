@@ -241,3 +241,4 @@ def test_audit_replays_all_records_and_round_trips(
         "human_exact_matches": 0,
     }
     assert audit["decision"]["final_corpus_frozen"] is False
+    assert audit["decision"]["row_11_visual_completion_confirmed"] is True

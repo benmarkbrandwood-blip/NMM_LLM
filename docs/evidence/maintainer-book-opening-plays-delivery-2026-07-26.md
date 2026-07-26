@@ -39,7 +39,7 @@ The tracked
 preserves each table row's text, embedded-image SHA-256, explicit
 normalisation notes, and twelve-ply token candidates. Its transcription
 identity is
-`ccb673a7dd52e7614adb2994a20531ca12359cede03adb6f89b1a11291c6b581`.
+`de3f7a33e772501f8cd369fbfb540ab8d7dabf259c15c51087acf2b425436273`.
 
 ## Explicit interpretation boundary
 
@@ -48,9 +48,9 @@ The transcription does not silently discard source ambiguity:
 - row 1 expressly gives `c5` as a trap continuation and `d1` as the better
   continuation, so both are retained as separate candidate histories;
 - row 11 contains only eleven typed tokens. Its embedded screenshot shows
-  Black's final `c5`; the transcription records that token as a visual
-  interpretation which still requires expert confirmation before final
-  corpus membership;
+  `6. d5 c5`, White to move, and six placed pieces per side. The transcription
+  therefore records Black's final `c5` as unambiguous visual source evidence
+  while keeping it distinguishable from typed text;
 - rows 18/19 and 14/20 are retained as separate source rows even though their
   typed histories duplicate one another; and
 - row 23 mentions additional children and row 29 mentions other losing Black

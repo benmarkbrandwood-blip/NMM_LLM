@@ -805,11 +805,26 @@ The v2 source-only audits are now complete:
 
 The maintainer Openings delivery is also archived by identity. Its two Book
 files duplicate tracked assets; its 15 learned additions remain an independent
-candidate pool, not a formal stratum. The current
+candidate pool, not a formal stratum.
+
+The later 35-row `Book Opening Plays.docx` delivery is separately archived and
+audited as `maintainer_expert_curated_play`, a Book subtype rather than a
+fourth reporting stratum. Its 36 explicit records all replay legally in two
+fresh pinned Sanmill processes and reduce to 34 histories, 33 final FENs, 32
+final ring16 orbits, and 14 eight-ply parent orbits. One parent supplies 16
+children. Six exact histories occur in 29 distinct frozen PlayOK games; no
+exact history matches the Sanmill named lines, although eight unique final
+FENs and orbits overlap. Row 11's final `c5` is screenshot-derived and remains
+explicitly identified as visual evidence, but the original-resolution move
+panel is unambiguous and it is not an expert-confirmation blocker.
+
+The updated
 [twelve-ply decision brief](../experiments/sanmill-layered-opening-prefix-v2-decision-brief.md)
 recommends a non-frozen near-balanced `22 Book / 21 HumanDB / 21 Perfect DB`
 composition. Status remains `needs_decision` until the product owner approves
-that composition and the source-specific selection rules.
+that composition and the Mill expert reviews the 14 structural parent groups
+against human opening-family concepts. The two Book subtypes have no frozen
+internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -963,12 +978,14 @@ training merely because the managed run ended. Proceed in this order:
    commits pinned by identity even though they are now on Sanmill `master`.
    Do not silently float to later CLI or rule changes.
 8. Preserve the eight-ply implementation and 7/57 evidence as v1 history.
-   For current work, use the twelve-ply v2 contract and completed Book,
-   HumanDB, and Perfect DB audits. The HumanDB immutable snapshot was created
-   without deleting active sidecars. Review the proposed
-   `22 Book / 21 HumanDB / 21 Perfect DB` split; do not generate or freeze the
-   final list until that product decision is recorded. There is no runtime
-   source fallback.
+   For current work, use the twelve-ply v2 contract and completed Sanmill Book,
+   expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
+   was created without deleting active sidecars. Review the proposed
+   `22 Book / 21 HumanDB / 21 Perfect DB` split and the 14 expert parent
+   groups; do not generate or freeze the final list until the product decision
+   and narrow expert mapping are recorded. Row 11's screenshot-derived `c5`
+   is source-verified and retains a visual provenance marker. There is no
+   runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions

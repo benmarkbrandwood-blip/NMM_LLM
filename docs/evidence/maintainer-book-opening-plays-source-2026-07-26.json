@@ -46,7 +46,7 @@
     "mill_and_required_capture_count_as_one_logical_ply": true,
     "source_rows_preserved_before_deduplication": true,
     "row_1_explicit_alternatives_preserved": true,
-    "row_11_missing_typed_token_policy": "The final black c5 is transcribed from the embedded move-list screenshot and remains explicitly marked as visual interpretation.",
+    "row_11_missing_typed_token_policy": "The final black c5 is transcribed from the unambiguous embedded move-list screenshot and remains explicitly marked as visual evidence.",
     "selection_status": "audit_candidate_not_frozen",
     "final_corpus_membership_frozen": false
   },
@@ -277,14 +277,14 @@
       "normalization_notes": [
         "The typed table cell omits Black's sixth move.",
         "The embedded screenshot's move list shows Black c5 as logical ply 12.",
-        "This visual transcription must remain distinguishable from typed source text and should be confirmed by the expert before final corpus membership."
+        "This visual transcription remains distinguishable from typed source text; the unambiguous embedded move list is sufficient source evidence."
       ],
       "variations": [
         {
           "variation_id": "expert-book-play-011-visual-c5",
           "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "e5", "e4", "d5", "c5"],
           "evidence_basis": "typed_text_plus_embedded_move_list",
-          "label": "visual completion pending expert confirmation"
+          "label": "visual completion from embedded move list"
         }
       ]
     },
@@ -729,5 +729,5 @@
       ]
     }
   ],
-  "transcription_identity": "ccb673a7dd52e7614adb2994a20531ca12359cede03adb6f89b1a11291c6b581"
+  "transcription_identity": "de3f7a33e772501f8cd369fbfb540ab8d7dabf259c15c51087acf2b425436273"
 }

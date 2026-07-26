@@ -228,9 +228,9 @@ def _validate_source_payload(payload: Mapping[str, Any]) -> None:
         "source_rows_preserved_before_deduplication": True,
         "row_1_explicit_alternatives_preserved": True,
         "row_11_missing_typed_token_policy": (
-            "The final black c5 is transcribed from the embedded move-list "
-            "screenshot and remains explicitly marked as visual "
-            "interpretation."
+            "The final black c5 is transcribed from the unambiguous embedded "
+            "move-list screenshot and remains explicitly marked as visual "
+            "evidence."
         ),
         "selection_status": "audit_candidate_not_frozen",
         "final_corpus_membership_frozen": False,
@@ -1040,7 +1040,7 @@ def build_layered_expert_book_audit(
             "final_corpus_frozen": False,
             "book_quota_frozen": False,
             "expert_book_membership_frozen": False,
-            "row_11_visual_completion_confirmed": False,
+            "row_11_visual_completion_confirmed": True,
             "selection_status": (
                 "fixed source-audit candidates only; no corpus membership "
                 "frozen"
@@ -1216,7 +1216,7 @@ def verify_layered_expert_book_audit(
         "final_corpus_frozen": False,
         "book_quota_frozen": False,
         "expert_book_membership_frozen": False,
-        "row_11_visual_completion_confirmed": False,
+        "row_11_visual_completion_confirmed": True,
         "selection_status": (
             "fixed source-audit candidates only; no corpus membership frozen"
         ),

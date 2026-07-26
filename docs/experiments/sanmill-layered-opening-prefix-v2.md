@@ -271,9 +271,10 @@ overlap.
 
 This evidence supports adding the expert material as a Book candidate subtype,
 not adding all rows or changing the Book quota automatically. Row 11's final
-`c5` is a screenshot-derived transcription and remains unconfirmed for final
-membership. The provisional corpus decision must now account for parent
-coverage and the two distinct Book subtypes before any list is frozen.
+`c5` is screenshot-derived but unambiguous at original resolution; its visual
+evidence basis remains recorded and is not an expert-confirmation blocker. The
+provisional corpus decision must now account for parent coverage and the two
+distinct Book subtypes before any list is frozen.
 
 ## Current delivery and corpus decision
 

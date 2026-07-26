@@ -17,8 +17,8 @@ corrected Sanmill opening-book asset, HumanDB, or Perfect DB.
 | Evidence | Identity |
 | --- | --- |
 | Source DOCX | 3,432,474 bytes; SHA-256 `227584cde9d8c6278665a1b6decac6491d6b30b9b7add44a4b00200aec5e83c7` |
-| Tracked transcription | SHA-256 `badc4ef0505f76ed71b5174371447472d69ae848bb312acbaaba2e3e5f09285b`; internal identity `ccb673a7dd52e7614adb2994a20531ca12359cede03adb6f89b1a11291c6b581` |
-| Portable source identity | `5aac6c6dff578f7d15587a56ca93560521c095f39e1f85ec13ccfe1e406c0cc8` |
+| Tracked transcription | SHA-256 `16c83726eaa872db8ccc8195c12153215e74b0b3e14acbb4e187e7e2195a48d2`; internal identity `de3f7a33e772501f8cd369fbfb540ab8d7dabf259c15c51087acf2b425436273` |
+| Portable source identity | `9c0c3ae58aaec67cb752899121cec465d19dd2bf332a869fddb0216e36a1463f` |
 | NMM_LLM generator commit | `1bb4f19ac025abc8298d7dbf4f510815e716340f` |
 | Pinned Sanmill interface commit | `db65eb3e73189d934d615d0f47519d395193c646` |
 | Sanmill binary | 4,109,312 bytes; SHA-256 `cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc` |
@@ -42,7 +42,9 @@ All 35 source rows and 35 embedded image identities were retained. Row 1
 contains two explicit final continuations, so the audit has 36 source
 variation records. Row 11's final Black `c5` remains expressly marked as a
 move read from its embedded screenshot rather than from the typed table cell.
-It still requires expert confirmation before final corpus membership.
+At original resolution the move panel unambiguously shows `6. d5 c5`, White
+to move, and six placed pieces per side, so no further expert confirmation is
+required for that transcription.
 
 Every variation:
 
@@ -150,8 +152,8 @@ A later Book selection rule should:
    objective is met;
 3. cover the corrected Sanmill Book's declared families separately;
 4. remove exact-FEN and `ring16` duplicates across all three final strata; and
-5. keep row 11 out of a final freeze until its screenshot-derived `c5` is
-   confirmed.
+5. retain row 11's visual rather than typed evidence basis in any later
+   provenance record.
 
 The overall 64-prefix composition and the allocation between the two Book
 subtypes remain product and expert decisions.
