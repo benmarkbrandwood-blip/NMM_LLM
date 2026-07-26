@@ -12,7 +12,14 @@ The prior 1,744-line plan is retained only as a historical design snapshot in
 It must not be used as an implementation contract when it conflicts with this
 entry point, a modular specification, current code, or accepted evidence.
 
-## Objective
+## Product Scope and Objective
+
+The first v5 product is the separately named top-strength/research opponent
+defined by the [product decision](v5/product-decision.md). It does not replace
+the current ten difficulty levels, personality presets, adaptive difficulty,
+tournament roster, or LLM coaching surfaces. Those modes retain their existing
+contracts unless a later persona-specific decision explicitly adopts a v5
+component.
 
 v5 has three physically separate objectives, in this order:
 
@@ -24,6 +31,11 @@ v5 has three physically separate objectives, in this order:
 3. Measure human-facing style—patience, constriction, inducement, naturalness,
    and interpretability—only as a secondary objective that cannot override the
    first two.
+
+This ordering governs the top-strength/research product. Style, teaching value,
+and calibrated weakening may be primary objectives for a future coach,
+personality, or adaptive product, but such a mode needs its own contract and
+must not inherit the top-strength or verified claims.
 
 The project does not claim to reproduce human cognition. A model may be
 described as human-targeted only when it was trained against a declared human
@@ -41,6 +53,7 @@ When two documents disagree, use the following order:
 
 | Owner | Scope |
 | --- | --- |
+| [Product decision](v5/product-decision.md) | Initial v5 role, retained existing modes, persona objectives, and product constraints that must precede final architecture selection |
 | [Oracle and rules](v5/oracle-and-rules-spec.md) | Decision state, atomic actions, Malom values, safe sets, history, W liveness, proof semantics, and deterministic acceptance |
 | [Training research](v5/training-research-plan.md) | Corrected-v4/reference baselines, feasibility-first research, HumanPolicy/StrategyPolicy roles, minimal D specialisation, and optional escalation |
 | [Human data and statistics](v5/human-data-and-statistics-plan.md) | Target population, HumanDB use, support and privacy gates, estimands, power, and human evaluation |
@@ -91,8 +104,8 @@ implementation claims in the archived plan:
 
 ## Product Modes Are a Decision, Not an Assumption
 
-The feasibility phase must compare at least these architectures before a
-release form is frozen:
+The product role is frozen, but its architecture is not. The feasibility phase
+must compare at least these architectures before a release form is frozen:
 
 | Mode | Move behaviour | Permitted claim |
 | --- | --- | --- |
