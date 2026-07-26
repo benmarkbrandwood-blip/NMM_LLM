@@ -36,6 +36,12 @@ SOURCE = (
     / "evidence"
     / "maintainer-book-opening-plays-source-2026-07-26.json"
 )
+REVIEWED_SOURCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "maintainer-book-opening-plays-reviewed-source-2026-07-26.json"
+)
 
 
 def _digest(label: str) -> str:
@@ -171,8 +177,63 @@ def test_project_rules_resolve_all_source_variations_without_fallback() -> None:
     assert len({item.exact_history_sha256 for item in candidates}) == 34
     assert len({item.final_nmm_fen for item in candidates}) == 33
     assert len({item.final_ring16_fen for item in candidates}) == 32
+    assert (
+        len({item.parent8_exact_history_sha256 for item in candidates})
+        == 15
+    )
+    assert len({item.parent8_ring16_fen for item in candidates}) == 14
+
+
+def test_reviewed_source_applies_only_confirmed_row_19_correction() -> None:
+    original = load_expert_book_source(SOURCE)
+    reviewed = load_expert_book_source(REVIEWED_SOURCE)
+
+    original_row = original.payload["entries"][18]
+    reviewed_row = reviewed.payload["entries"][18]
+    assert original_row["variations"][0]["author_tokens"][9] == "d7"
+    assert reviewed_row["variations"][0]["author_tokens"][9] == "d5"
+    assert reviewed_row["variations"][0]["evidence_basis"] == (
+        "typed_text_plus_expert_confirmed_correction"
+    )
+    assert reviewed.file_record["reviewed_from"][
+        "transcription_identity"
+    ] == original.payload["transcription_identity"]
+
+    candidates = prepare_expert_book_candidates(reviewed)
+    assert len(candidates) == 36
+    assert len({item.exact_history_sha256 for item in candidates}) == 35
+    assert len({item.final_nmm_fen for item in candidates}) == 34
+    assert len({item.final_ring16_fen for item in candidates}) == 33
     assert len({item.parent8_exact_history_sha256 for item in candidates}) == 15
     assert len({item.parent8_ring16_fen for item in candidates}) == 14
+
+
+def test_reviewed_source_rejects_an_unconfirmed_entry_change(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = json.loads(REVIEWED_SOURCE.read_text(encoding="utf-8"))
+    changed = copy.deepcopy(payload)
+    changed["entries"][17]["variations"][0]["label"] = "unconfirmed edit"
+    changed["transcription_identity"] = canonical_sha256(
+        {
+            key: value
+            for key, value in changed.items()
+            if key != "transcription_identity"
+        }
+    )
+    path = tmp_path / "unconfirmed-reviewed-change.json"
+    path.write_text(json.dumps(changed), encoding="utf-8")
+    monkeypatch.setattr(
+        "learned_ai.evaluation.layered_expert_book_audit._repo_relative",
+        lambda _path: "unconfirmed-reviewed-change.json",
+    )
+
+    with pytest.raises(
+        LayeredExpertBookAuditError,
+        match="unconfirmed change",
+    ):
+        load_expert_book_source(path)
 
 
 def test_source_identity_fails_closed_after_token_edit(
@@ -242,3 +303,48 @@ def test_audit_replays_all_records_and_round_trips(
     }
     assert audit["decision"]["final_corpus_frozen"] is False
     assert audit["decision"]["row_11_visual_completion_confirmed"] is True
+
+
+def test_reviewed_audit_replays_corrected_record_and_updates_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "learned_ai.evaluation.layered_opening_prefix."
+        "project_stable_sanmill_fen",
+        lambda fen: BoardState.from_fen_string(fen),
+    )
+    monkeypatch.setattr(
+        "learned_ai.evaluation.layered_expert_book_audit."
+        "project_stable_sanmill_fen",
+        lambda fen: BoardState.from_fen_string(fen),
+    )
+    source = load_expert_book_source(REVIEWED_SOURCE)
+    candidates = prepare_expert_book_candidates(source)
+    audit = build_layered_expert_book_audit(
+        _ProjectHistorySession(),  # type: ignore[arg-type]
+        _installation(),
+        source=source,
+        candidates=candidates,
+        overlap=_empty_overlap(),
+        generator_commit="6" * 40,
+    )
+
+    summary = verify_layered_expert_book_audit(audit)
+
+    assert summary == {
+        "source_rows": 35,
+        "source_variations": 36,
+        "legal_records": 36,
+        "unique_histories": 35,
+        "unique_final_fens": 34,
+        "unique_ring16_orbits": 33,
+        "parent8_ring16_orbits": 14,
+        "human_exact_matches": 0,
+    }
+    corrected = next(
+        record for record in audit["records"] if record["source_row"] == 19
+    )
+    assert corrected["author_tokens"][9] == "d5"
+    assert corrected["evidence_basis"] == (
+        "typed_text_plus_expert_confirmed_correction"
+    )

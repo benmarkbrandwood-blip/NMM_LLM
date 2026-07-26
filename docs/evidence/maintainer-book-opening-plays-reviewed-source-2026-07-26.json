@@ -1,0 +1,762 @@
+{
+  "schema_version": "nmm.maintainer-expert-book-play-source.v2",
+  "status": "source-only-audit-candidate",
+  "candidate_loaded": false,
+  "games_played": 0,
+  "delivery": {
+    "delivery_date": "2026-07-26",
+    "sender_role": "main maintainer and Mill-domain expert",
+    "document_title": "Book Opening Plays (2)",
+    "archive": {
+      "relative_path": "data/backups/maintainer_book_opening_plays_20260726/Book Opening Plays (2).docx",
+      "byte_length": 3434996,
+      "sha256": "9ef34e0a984d63167a5db526e87e3849ec2752b05cf7a3ed27adfa932fcf9ad8"
+    },
+    "table_row_count": 35,
+    "embedded_image_count": 35,
+    "rendered_page_count": 15,
+    "word_table_count": 8,
+    "review_table_count": 7
+  },
+  "expert_context": {
+    "source_description": "Opening plays that the sender believes most established players know.",
+    "skill_claim": {
+      "reported_elo_examples": [
+        1400,
+        1800,
+        2100
+      ],
+      "reported_dependence": "site or application used",
+      "reported_win_rate_against_players_without_a_plan": 0.9
+    },
+    "human_play_app_observation": {
+      "reported_win_rate": 0.6,
+      "reported_draw_rate": 0.2,
+      "implied_loss_rate": 0.2,
+      "derived_score_rate_with_half_point_draws": 0.7,
+      "conditions": "Personal human play in one application, often interrupted by other people.",
+      "evidence_status": "Self-reported uncontrolled context, not a frozen benchmark, Elo calibration, causal opening effect, model result, or corpus-weighting signal."
+    },
+    "review_confirmation": {
+      "date": "2026-07-26",
+      "subject": "P03 child 11 source-row mapping",
+      "question_interpretation": "Apply d5 instead of d7 to source row 19.",
+      "reply": "Yes. Otherwise we have 2 games like that with black moving to d7."
+    }
+  },
+  "normalization_contract": {
+    "target_prefix_schema": "nmm.layered-opening-prefix.v2",
+    "logical_ply_count": 12,
+    "logical_plies_by_side": [
+      6,
+      6
+    ],
+    "mill_and_required_capture_count_as_one_logical_ply": true,
+    "source_rows_preserved_before_deduplication": true,
+    "row_1_explicit_alternatives_preserved": true,
+    "row_11_missing_typed_token_policy": "The final black c5 is transcribed from the unambiguous embedded move-list screenshot and remains explicitly marked as visual evidence.",
+    "base_source": {
+      "relative_path": "docs/evidence/maintainer-book-opening-plays-source-2026-07-26.json",
+      "schema_version": "nmm.maintainer-expert-book-play-source.v1",
+      "file_sha256": "16c83726eaa872db8ccc8195c12153215e74b0b3e14acbb4e187e7e2195a48d2",
+      "transcription_identity": "de3f7a33e772501f8cd369fbfb540ab8d7dabf259c15c51087acf2b425436273",
+      "document_sha256": "227584cde9d8c6278665a1b6decac6491d6b30b9b7add44a4b00200aec5e83c7"
+    },
+    "confirmed_corrections": [
+      {
+        "source_row": 19,
+        "variation_id": "expert-book-play-019",
+        "logical_ply_number": 10,
+        "actor": "black",
+        "original_token": "d7",
+        "corrected_token": "d5",
+        "evidence": "Added P03 child table plus subsequent explicit expert confirmation."
+      }
+    ],
+    "review_tables_are_semantic_selection_evidence_only": true,
+    "selection_status": "audit_candidate_not_frozen",
+    "final_corpus_membership_frozen": false
+  },
+  "entries": [
+    {
+      "entry_id": "expert-book-play-001",
+      "source_row": 1,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.c4 b2\n4.f2 b6xc4\n5.c3 a4\n6.c4 (c5 is the trap) d1 better move",
+      "embedded_image": {
+        "media_name": "image1.png",
+        "sha256": "45337ecbc1a41493ed20cc9c65e806cec8eb4c803a7d0a45bd4edeee997f4fed"
+      },
+      "normalization_notes": [
+        "The source explicitly gives c5 as the trap continuation and d1 as the better continuation.",
+        "Both alternatives are retained as separate twelve-ply candidate histories."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-001-trap-c5",
+          "author_tokens": [
+            "d6",
+            "d2",
+            "f4",
+            "b4",
+            "c4",
+            "b2",
+            "f2",
+            "b6xc4",
+            "c3",
+            "a4",
+            "c4",
+            "c5"
+          ],
+          "evidence_basis": "typed_text_explicit_alternative",
+          "label": "trap continuation"
+        },
+        {
+          "variation_id": "expert-book-play-001-better-d1",
+          "author_tokens": [
+            "d6",
+            "d2",
+            "f4",
+            "b4",
+            "c4",
+            "b2",
+            "f2",
+            "b6xc4",
+            "c3",
+            "a4",
+            "c4",
+            "d1"
+          ],
+          "evidence_basis": "typed_text_explicit_alternative",
+          "label": "better continuation"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-002",
+      "source_row": 2,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.a4 b2\n4.f2 b6xf2\n5.f2 e5\n6.c3 c5",
+      "embedded_image": {
+        "media_name": "image2.png",
+        "sha256": "33ebe639c7ee59f189a63f36cee4cf44709d162a911053f604f0e449be565d74"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-002",
+          "author_tokens": ["d6", "d2", "f4", "b4", "a4", "b2", "f2", "b6xf2", "f2", "e5", "c3", "c5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-003",
+      "source_row": 3,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.b2 c5\n6.c4 e5",
+      "embedded_image": {
+        "media_name": "image3.png",
+        "sha256": "b27e4a74cfc5db7f5236108458a049462a778fa82079bf4bfbeda0e0e668f09b"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-003",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "b2", "c5", "c4", "e5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-004",
+      "source_row": 4,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.g7 g4\n4.d7 d5\n5.a7xd5 d5\n6.f6 b6",
+      "embedded_image": {
+        "media_name": "image4.png",
+        "sha256": "d423a1ed93cc8da21219b8abc20b3a6e4f07bb4f38cbe964ca6d95789c8d9579"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-004",
+          "author_tokens": ["d6", "d2", "f4", "b4", "g7", "g4", "d7", "d5", "a7xd5", "d5", "f6", "b6"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-005",
+      "source_row": 5,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.g7 g4\n4.d7 d5\n5.a7xd5 d5\n6.f6 f2",
+      "embedded_image": {
+        "media_name": "image5.png",
+        "sha256": "909a5e9bd208cac6ef33996fc3f30f03c420f33a6e13f79394c4395b90a7f5af"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-005",
+          "author_tokens": ["d6", "d2", "f4", "b4", "g7", "g4", "d7", "d5", "a7xd5", "d5", "f6", "f2"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-006",
+      "source_row": 6,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.g7 g4\n4.d7 a7\n5.d5xa7 a7\n6.f6 b6",
+      "embedded_image": {
+        "media_name": "image6.png",
+        "sha256": "66b58ca2a81106b86c640827e6cce52630d521fd8bc87c80d2a2896f07913164"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-006",
+          "author_tokens": ["d6", "d2", "f4", "b4", "g7", "g4", "d7", "a7", "d5xa7", "a7", "f6", "b6"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-007",
+      "source_row": 7,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.g7 g4\n4.d7 a7\n5.d5xa7 a7\n6.f6 f2",
+      "embedded_image": {
+        "media_name": "image7.png",
+        "sha256": "dd239cd9250c407fbafb0c6240bf3907a696cb17ed2e93e4c918f2522bbce12f"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-007",
+          "author_tokens": ["d6", "d2", "f4", "b4", "g7", "g4", "d7", "a7", "d5xa7", "a7", "f6", "f2"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-008",
+      "source_row": 8,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.e5 d5\n6.e4 g4",
+      "embedded_image": {
+        "media_name": "image8.png",
+        "sha256": "c9b025f4a1bad2fd944d8d119478527cd1880423a08aa8bea911d5db1c50479d"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-008",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "e5", "d5", "e4", "g4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-009",
+      "source_row": 9,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.e5 d5\n6.e4 e3",
+      "embedded_image": {
+        "media_name": "image9.png",
+        "sha256": "a57592280ca63df4009902fa22c08d5daee7a5762226850ce3c2ed51f262380b"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-009",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "e5", "d5", "e4", "e3"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-010",
+      "source_row": 10,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.e5 e4\n6.d5 d7",
+      "embedded_image": {
+        "media_name": "image10.png",
+        "sha256": "df6e98f6e10a7c6f16f5871e676a395ce1469f9d89e23a2fd61398ec565adb56"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-010",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "e5", "e4", "d5", "d7"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-011",
+      "source_row": 11,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.e5 e4\n6.d5",
+      "embedded_image": {
+        "media_name": "image11.png",
+        "sha256": "0423fa1e6f7976d965f3a757422101c494acee630ce34fce0d56fba6ea37f5e2"
+      },
+      "normalization_notes": [
+        "The typed table cell omits Black's sixth move.",
+        "The embedded screenshot's move list shows Black c5 as logical ply 12.",
+        "This visual transcription remains distinguishable from typed source text; the unambiguous embedded move list is sufficient source evidence."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-011-visual-c5",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "e5", "e4", "d5", "c5"],
+          "evidence_basis": "typed_text_plus_embedded_move_list",
+          "label": "visual completion from embedded move list"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-012",
+      "source_row": 12,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.g7 d3\n4.d1 c4\n5.a4 b2\n6.f2 c3",
+      "embedded_image": {
+        "media_name": "image12.png",
+        "sha256": "dc7921da1ec5e57a66c92fc2518ca4de9fb2e3ffa83f456215b3568d5f412cf3"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-012",
+          "author_tokens": ["d6", "d2", "f4", "b4", "g7", "d3", "d1", "c4", "a4", "b2", "f2", "c3"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-013",
+      "source_row": 13,
+      "source_text": "1.d6 d2\n2.f4 b6\n3.c3 b2\n4.f2 b4xf2\n5.f2 f6\n6.c5 c4",
+      "embedded_image": {
+        "media_name": "image13.png",
+        "sha256": "67e8f4050a1147fc72b52aabdd6777d723b44cac7186f23df214c31d6919c8fc"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-013",
+          "author_tokens": ["d6", "d2", "f4", "b6", "c3", "b2", "f2", "b4xf2", "f2", "f6", "c5", "c4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-014",
+      "source_row": 14,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 e5\n6.b2 c5",
+      "embedded_image": {
+        "media_name": "image14.png",
+        "sha256": "aea7bf1968d4692cbefd356e4187e1adc45f7987cd64b155a23da0660513ffa6"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-014",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "e5", "b2", "c5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-015",
+      "source_row": 15,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 a7\n6.a4 g7",
+      "embedded_image": {
+        "media_name": "image15.png",
+        "sha256": "ab94cb3ed370b4305c1ba0e42c13229ec93b59f5ac25e05fc515e7128ab4dfbc"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-015",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "a7", "a4", "g7"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-016",
+      "source_row": 16,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.b2 a7\n6.a4 g7",
+      "embedded_image": {
+        "media_name": "image16.png",
+        "sha256": "81c9831a7aa97989474d3fbba9e356e5abef1a8904db95a2a35e4dd39f6eb39e"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-016",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "b2", "a7", "a4", "g7"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-017",
+      "source_row": 17,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 a7\n6.e3 g7",
+      "embedded_image": {
+        "media_name": "image17.png",
+        "sha256": "e704eec17774c5b22274c3f608ca3c80007167dc9681963c07764922342289e6"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-017",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "a7", "e3", "g7"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-018",
+      "source_row": 18,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 d7\n6.e3 d1",
+      "embedded_image": {
+        "media_name": "image18.png",
+        "sha256": "c738bef9aeaf6a4904e722f71380f6686aa9c72f01a2adadff7660eeb402b9d8"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-018",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "d7", "e3", "d1"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-019",
+      "source_row": 19,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 d7\n6.e3 d1",
+      "embedded_image": {
+        "media_name": "image19.png",
+        "sha256": "ac574817740bf8025dbcefc987add7904977db9a5e157e8f2a78fd8e9f919e97"
+      },
+      "normalization_notes": [
+        "The main move-list table repeats source row 18 with d7.",
+        "The added P03 child table directs Black to d5 instead of d7 for child 11.",
+        "The expert subsequently confirmed that the instruction maps to source row 19 and avoids retaining two d7 games."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-019",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "d5", "e3", "d1"],
+          "evidence_basis": "typed_text_plus_expert_confirmed_correction",
+          "label": "expert-confirmed d5 correction"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-020",
+      "source_row": 20,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 e5\n6.b2 c5",
+      "embedded_image": {
+        "media_name": "image20.png",
+        "sha256": "6a84eff4a2c47292c19dbfad366456683a12148c243f4c7b58b2067a4d41763d"
+      },
+      "normalization_notes": [
+        "The typed line duplicates source row 14; it remains a distinct source row until audit deduplication."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-020",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "e5", "b2", "c5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-021",
+      "source_row": 21,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 d5\n6.e3 e4",
+      "embedded_image": {
+        "media_name": "image21.png",
+        "sha256": "b65ccde374870100fdc0e54f5a57c1e187428e2fbea9a09b5ffa9110038e165f"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-021",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "d5", "e3", "e4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-022",
+      "source_row": 22,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 d5\n6.d3 e3",
+      "embedded_image": {
+        "media_name": "image22.png",
+        "sha256": "a035ab32a07069344ef445a254c5c09b8c90ccdae03b90498619cb19c06a545f"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-022",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "d5", "d3", "e3"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-023",
+      "source_row": 23,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 g1\n6.d3 a1(etc.. more children)",
+      "embedded_image": {
+        "media_name": "image23.png",
+        "sha256": "2a572a96ba8ffb4e1ce95d50ab26227a65470177214fb0833d357929ce355736"
+      },
+      "normalization_notes": [
+        "The parenthetical note indicates additional children not enumerated in the delivery; only the explicit a1 child is transcribed."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-023",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "g1", "d3", "a1"],
+          "evidence_basis": "typed_text",
+          "label": "explicit child only"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-024",
+      "source_row": 24,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xb4 b2xf4\n5.d3 e4\n6.c4 g4",
+      "embedded_image": {
+        "media_name": "image24.png",
+        "sha256": "7b414758d5a87606098ab27ac55b5162cea4e6d62d784a32c6a02497311c4a9c"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-024",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xb4", "b2xf4", "d3", "e4", "c4", "g4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-025",
+      "source_row": 25,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xb4 b2xf4\n5.d3 g4\n6.c4 d7",
+      "embedded_image": {
+        "media_name": "image25.png",
+        "sha256": "9157c377bd115c08ff26353cead80a66c716b1a8c5c3f41775227b756dc4e14d"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-025",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xb4", "b2xf4", "d3", "g4", "c4", "d7"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-026",
+      "source_row": 26,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.c4 d5\n4.d3 e4\n5.a4 g4\n6.d1 b2",
+      "embedded_image": {
+        "media_name": "image26.png",
+        "sha256": "1513b105fd545ca3755e12a0211f16f339b45fdc676a80dc7aa3935b0800d0eb"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-026",
+          "author_tokens": ["d6", "d2", "f4", "b4", "c4", "d5", "d3", "e4", "a4", "g4", "d1", "b2"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-027",
+      "source_row": 27,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.c4 d5\n4.d3 e4\n5.a4 g4\n6.d7 b2",
+      "embedded_image": {
+        "media_name": "image27.png",
+        "sha256": "2cb451a1374366f744d4cb41c0396c117bbf5589b7284922d245190223101377"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-027",
+          "author_tokens": ["d6", "d2", "f4", "b4", "c4", "d5", "d3", "e4", "a4", "g4", "d7", "b2"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-028",
+      "source_row": 28,
+      "source_text": "1.d6 d2\n2.f4 b4\n3.f6 f2\n4.b6xf2 f2\n5.c4 e4\n6.d3 d5",
+      "embedded_image": {
+        "media_name": "image28.png",
+        "sha256": "918875a4bee23f5a0a978ab17c4b959c67e17c9c0f8a666e237d526394f0e728"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-028",
+          "author_tokens": ["d6", "d2", "f4", "b4", "f6", "f2", "b6xf2", "f2", "c4", "e4", "d3", "d5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-029",
+      "source_row": 29,
+      "source_text": "1.d6 d2\n2.f4 b2\n3.f2 f6\n4.a4 c4\n5.d1 d7 (black has many losing options here)\n6.a1 g1",
+      "embedded_image": {
+        "media_name": "image29.png",
+        "sha256": "567a15b930be1ebf468a2954b2b067a875e83d07fe2c51bf8f1b60996df1f3ca"
+      },
+      "normalization_notes": [
+        "The warning about Black alternatives is retained as commentary; only the explicit d7 continuation is transcribed."
+      ],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-029",
+          "author_tokens": ["d6", "d2", "f4", "b2", "f2", "f6", "a4", "c4", "d1", "d7", "a1", "g1"],
+          "evidence_basis": "typed_text",
+          "label": "explicit continuation only"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-030",
+      "source_row": 30,
+      "source_text": "1.d6 d2\n2.f4 f2\n3.b2 b4\n4.a4 d7\n5.d1 g1\n6.g7 e4",
+      "embedded_image": {
+        "media_name": "image30.png",
+        "sha256": "3df025d8bc62afcb0974a2b5075174b6eac880087ab2ae8aca5b2694d63b9280"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-030",
+          "author_tokens": ["d6", "d2", "f4", "f2", "b2", "b4", "a4", "d7", "d1", "g1", "g7", "e4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-031",
+      "source_row": 31,
+      "source_text": "1.g4 b4\n2.e3 d2\n3.e4 e5\n4.f4xe5 e5\n5.d6 f6\n6.g7 g1",
+      "embedded_image": {
+        "media_name": "image31.png",
+        "sha256": "3593d1b882ade7326659f4897259cde752a68c72a0a5da329cbb56d051fc82be"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-031",
+          "author_tokens": ["g4", "b4", "e3", "d2", "e4", "e5", "f4xe5", "e5", "d6", "f6", "g7", "g1"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-032",
+      "source_row": 32,
+      "source_text": "1.g4 b4\n2.e3 d2\n3.e4 f4\n4.e5xf4 f4\n5.d7 g7\n6.d5 d6",
+      "embedded_image": {
+        "media_name": "image32.png",
+        "sha256": "d66f8f4ca28f88a4f90fa8b238804d887a642138c9ff123ab2e98c79f5f59994"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-032",
+          "author_tokens": ["g4", "b4", "e3", "d2", "e4", "f4", "e5xf4", "f4", "d7", "g7", "d5", "d6"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-033",
+      "source_row": 33,
+      "source_text": "1.g4 b4\n2.e3 d2\n3.e4 f4\n4.e5xf4 f4\n5.d7 g7\n6.d5 c5",
+      "embedded_image": {
+        "media_name": "image33.png",
+        "sha256": "7a9301cd6f84fd5696d695e73c21d67e691365c176a542be4500e7b366ab5461"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-033",
+          "author_tokens": ["g4", "b4", "e3", "d2", "e4", "f4", "e5xf4", "f4", "d7", "g7", "d5", "c5"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-034",
+      "source_row": 34,
+      "source_text": "1.g4 b4\n2.e3 f4\n3.d1 d2\n4.e5 e4\n5.g1 g7\n6.a1xe4 e4",
+      "embedded_image": {
+        "media_name": "image34.png",
+        "sha256": "c03c9b0c6e815517659a3ec2ef9b07b9d55e24ca36bd2b8833b8714aa029235e"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-034",
+          "author_tokens": ["g4", "b4", "e3", "f4", "d1", "d2", "e5", "e4", "g1", "g7", "a1xe4", "e4"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    },
+    {
+      "entry_id": "expert-book-play-035",
+      "source_row": 35,
+      "source_text": "1.g4 b4\n2.e3 d6\n3.e4 f4\n4.e5xd6 d6\n5.d1 b6\n6.b2 f6xb2",
+      "embedded_image": {
+        "media_name": "image35.png",
+        "sha256": "4fd4c87e94fa29d05b67c4c4091623be4e9b667f4444fd30f6d56207645989a2"
+      },
+      "normalization_notes": [],
+      "variations": [
+        {
+          "variation_id": "expert-book-play-035",
+          "author_tokens": ["g4", "b4", "e3", "d6", "e4", "f4", "e5xd6", "d6", "d1", "b6", "b2", "f6xb2"],
+          "evidence_basis": "typed_text",
+          "label": "source line"
+        }
+      ]
+    }
+  ],
+  "transcription_identity": "03fc4195ab9cb68ac275ae70e7a680401a56257bfc4c98883f53aad931907e74"
+}

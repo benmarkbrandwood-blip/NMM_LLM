@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from collections import Counter, defaultdict
@@ -38,6 +39,9 @@ from learned_ai.training.run_contract import canonical_sha256
 
 
 EXPERT_BOOK_SOURCE_SCHEMA = "nmm.maintainer-expert-book-play-source.v1"
+EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA = (
+    "nmm.maintainer-expert-book-play-source.v2"
+)
 EXPERT_BOOK_AUDIT_SCHEMA = "nmm.layered-expert-book-source-audit.v1"
 EXPERT_BOOK_SOURCE_SUBTYPE = "maintainer_expert_curated_play"
 _EVIDENCE_BASES = frozenset(
@@ -45,6 +49,7 @@ _EVIDENCE_BASES = frozenset(
         "typed_text",
         "typed_text_explicit_alternative",
         "typed_text_plus_embedded_move_list",
+        "typed_text_plus_expert_confirmed_correction",
     }
 )
 _SHA256_CHARS = frozenset("0123456789abcdef")
@@ -182,8 +187,13 @@ def _validate_source_payload(payload: Mapping[str, Any]) -> None:
         raise LayeredExpertBookAuditError(
             "expert Book source top-level fields drifted"
         )
+    schema_version = payload["schema_version"]
     if (
-        payload["schema_version"] != EXPERT_BOOK_SOURCE_SCHEMA
+        schema_version
+        not in {
+            EXPERT_BOOK_SOURCE_SCHEMA,
+            EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA,
+        }
         or payload["status"] != "source-only-audit-candidate"
         or payload["candidate_loaded"] is not False
         or payload["games_played"] != 0
@@ -218,9 +228,43 @@ def _validate_source_payload(payload: Mapping[str, Any]) -> None:
             "expert Book archive byte length is invalid"
         )
     _sha256(archive.get("sha256"), context="expert Book document identity")
+    if schema_version == EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA:
+        if (
+            delivery.get("word_table_count") != 8
+            or delivery.get("review_table_count") != 7
+            or delivery.get("rendered_page_count") != 15
+        ):
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed document inventory drifted"
+            )
+        expert_context = _mapping(
+            payload["expert_context"],
+            context="expert Book reviewed expert context",
+        )
+        confirmation = _mapping(
+            expert_context.get("review_confirmation"),
+            context="expert Book reviewed confirmation",
+        )
+        if set(confirmation) != {
+            "date",
+            "subject",
+            "question_interpretation",
+            "reply",
+        }:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed confirmation fields drifted"
+            )
+        for key, value in confirmation.items():
+            _string(
+                value,
+                context=f"expert Book reviewed confirmation {key}",
+            )
 
-    contract = payload["normalization_contract"]
-    if contract != {
+    contract = _mapping(
+        payload["normalization_contract"],
+        context="expert Book normalization contract",
+    )
+    common_contract = {
         "target_prefix_schema": LAYERED_PREFIX_SCHEMA,
         "logical_ply_count": PREFIX_LOGICAL_PLIES_V2,
         "logical_plies_by_side": list(PREFIX_LOGICAL_PLIES_BY_SIDE_V2),
@@ -234,10 +278,114 @@ def _validate_source_payload(payload: Mapping[str, Any]) -> None:
         ),
         "selection_status": "audit_candidate_not_frozen",
         "final_corpus_membership_frozen": False,
-    }:
+    }
+    if schema_version == EXPERT_BOOK_SOURCE_SCHEMA:
+        expected_contract = common_contract
+    else:
+        expected_contract = {
+            **common_contract,
+            "base_source": contract.get("base_source"),
+            "confirmed_corrections": contract.get(
+                "confirmed_corrections"
+            ),
+            "review_tables_are_semantic_selection_evidence_only": True,
+        }
+    if contract != expected_contract:
         raise LayeredExpertBookAuditError(
             "expert Book normalization contract drifted"
         )
+    if schema_version == EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA:
+        base_source = _mapping(
+            contract["base_source"],
+            context="expert Book reviewed base source",
+        )
+        if set(base_source) != {
+            "relative_path",
+            "schema_version",
+            "file_sha256",
+            "transcription_identity",
+            "document_sha256",
+        }:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed base-source fields drifted"
+            )
+        _portable_relative_path(
+            base_source["relative_path"],
+            context="expert Book reviewed base-source path",
+        )
+        if base_source["schema_version"] != EXPERT_BOOK_SOURCE_SCHEMA:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed base-source schema drifted"
+            )
+        _sha256(
+            base_source["file_sha256"],
+            context="expert Book reviewed base-source file identity",
+        )
+        _sha256(
+            base_source["transcription_identity"],
+            context="expert Book reviewed base transcription identity",
+        )
+        _sha256(
+            base_source["document_sha256"],
+            context="expert Book reviewed base document identity",
+        )
+        corrections = contract["confirmed_corrections"]
+        if not isinstance(corrections, list) or not corrections:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed corrections are absent"
+            )
+        correction_keys: set[tuple[int, str]] = set()
+        for correction in corrections:
+            item = _mapping(
+                correction,
+                context="expert Book reviewed correction",
+            )
+            if set(item) != {
+                "source_row",
+                "variation_id",
+                "logical_ply_number",
+                "actor",
+                "original_token",
+                "corrected_token",
+                "evidence",
+            }:
+                raise LayeredExpertBookAuditError(
+                    "expert Book reviewed correction fields drifted"
+                )
+            source_row = item["source_row"]
+            logical_ply = item["logical_ply_number"]
+            variation_id = _string(
+                item["variation_id"],
+                context="expert Book reviewed correction variation",
+            )
+            if (
+                not isinstance(source_row, int)
+                or source_row <= 0
+                or not isinstance(logical_ply, int)
+                or not 1 <= logical_ply <= PREFIX_LOGICAL_PLIES_V2
+                or item["actor"] not in {"white", "black"}
+            ):
+                raise LayeredExpertBookAuditError(
+                    "expert Book reviewed correction index is invalid"
+                )
+            _string(
+                item["original_token"],
+                context="expert Book reviewed original token",
+            )
+            _string(
+                item["corrected_token"],
+                context="expert Book reviewed corrected token",
+            )
+            _string(
+                item["evidence"],
+                context="expert Book reviewed correction evidence",
+            )
+            key = (source_row, variation_id)
+            if key in correction_keys:
+                raise LayeredExpertBookAuditError(
+                    "expert Book reviewed correction is duplicated"
+                )
+            correction_keys.add(key)
 
     entries = payload["entries"]
     if not isinstance(entries, list) or not entries:
@@ -351,11 +499,122 @@ def _validate_source_payload(payload: Mapping[str, Any]) -> None:
             _string(item["label"], context="expert Book variation label")
 
 
+def _validate_reviewed_source_base(
+    payload: Mapping[str, Any],
+    *,
+    source_path: Path,
+) -> None:
+    """Verify that v2 changes only explicitly reviewed source tokens."""
+    if payload["schema_version"] != EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA:
+        return
+    contract = payload["normalization_contract"]
+    base_record = contract["base_source"]
+    base_path = (
+        Path.cwd() / str(base_record["relative_path"])
+    ).resolve()
+    if base_path == source_path:
+        raise LayeredExpertBookAuditError(
+            "expert Book reviewed source cannot reference itself"
+        )
+    if not base_path.is_file():
+        raise LayeredExpertBookAuditError(
+            "expert Book reviewed base source is unavailable"
+        )
+    if _file_sha256(base_path) != base_record["file_sha256"]:
+        raise LayeredExpertBookAuditError(
+            "expert Book reviewed base-source file identity mismatch"
+        )
+    base_payload = _load_json(
+        base_path,
+        label="expert Book reviewed base transcription",
+    )
+    _validate_source_payload(base_payload)
+    if (
+        base_payload["schema_version"] != base_record["schema_version"]
+        or base_payload["transcription_identity"]
+        != base_record["transcription_identity"]
+        or base_payload["delivery"]["archive"]["sha256"]
+        != base_record["document_sha256"]
+    ):
+        raise LayeredExpertBookAuditError(
+            "expert Book reviewed base-source identity drifted"
+        )
+
+    expected_entries = copy.deepcopy(base_payload["entries"])
+    reviewed_entries = payload["entries"]
+    reviewed_by_row = {
+        int(entry["source_row"]): entry for entry in reviewed_entries
+    }
+    for raw_correction in contract["confirmed_corrections"]:
+        correction = dict(raw_correction)
+        source_row = int(correction["source_row"])
+        if not 1 <= source_row <= len(expected_entries):
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed correction row is unavailable"
+            )
+        expected_entry = expected_entries[source_row - 1]
+        if expected_entry["source_row"] != source_row:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed base-source row drifted"
+            )
+        variations = [
+            variation
+            for variation in expected_entry["variations"]
+            if variation["variation_id"] == correction["variation_id"]
+        ]
+        if len(variations) != 1:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed correction variation is unavailable"
+            )
+        variation = variations[0]
+        token_index = int(correction["logical_ply_number"]) - 1
+        if variation["author_tokens"][token_index] != correction[
+            "original_token"
+        ]:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed original token drifted"
+            )
+        expected_actor = "white" if token_index % 2 == 0 else "black"
+        if correction["actor"] != expected_actor:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed correction actor drifted"
+            )
+        variation["author_tokens"][token_index] = correction[
+            "corrected_token"
+        ]
+        variation["evidence_basis"] = (
+            "typed_text_plus_expert_confirmed_correction"
+        )
+        reviewed_entry = reviewed_by_row.get(source_row)
+        if reviewed_entry is None:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed correction row is absent"
+            )
+        reviewed_variations = [
+            item
+            for item in reviewed_entry["variations"]
+            if item["variation_id"] == correction["variation_id"]
+        ]
+        if len(reviewed_variations) != 1:
+            raise LayeredExpertBookAuditError(
+                "expert Book reviewed correction variation is absent"
+            )
+        variation["label"] = reviewed_variations[0]["label"]
+        expected_entry["normalization_notes"] = reviewed_entry[
+            "normalization_notes"
+        ]
+    if expected_entries != reviewed_entries:
+        raise LayeredExpertBookAuditError(
+            "expert Book reviewed entries contain an unconfirmed change"
+        )
+
+
 def load_expert_book_source(path: str | Path) -> ExpertBookSource:
     """Load and content-identify the tracked expert Book transcription."""
     source_path = Path(path).resolve()
     payload = _load_json(source_path, label="expert Book transcription")
     _validate_source_payload(payload)
+    _validate_reviewed_source_base(payload, source_path=source_path)
     delivery = _mapping(payload["delivery"], context="expert Book delivery")
     archive = _mapping(
         delivery["archive"],
@@ -375,6 +634,13 @@ def load_expert_book_source(path: str | Path) -> ExpertBookSource:
             "embedded_image_count": delivery["embedded_image_count"],
         },
     }
+    if payload["schema_version"] == EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA:
+        contract = payload["normalization_contract"]
+        file_record["reviewed_from"] = dict(contract["base_source"])
+        file_record["confirmed_corrections"] = [
+            dict(correction)
+            for correction in contract["confirmed_corrections"]
+        ]
     identity_body = {
         "kind": "book",
         "source_subtype": EXPERT_BOOK_SOURCE_SUBTYPE,
@@ -383,6 +649,14 @@ def load_expert_book_source(path: str | Path) -> ExpertBookSource:
         "transcription_schema": payload["schema_version"],
         "transcription_identity": payload["transcription_identity"],
     }
+    if payload["schema_version"] == EXPERT_BOOK_REVIEWED_SOURCE_SCHEMA:
+        contract = payload["normalization_contract"]
+        identity_body["reviewed_from_transcription_identity"] = contract[
+            "base_source"
+        ]["transcription_identity"]
+        identity_body["confirmed_correction_count"] = len(
+            contract["confirmed_corrections"]
+        )
     source_identity = {
         "kind": "book",
         "identity": identity_body,
