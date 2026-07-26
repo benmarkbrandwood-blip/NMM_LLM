@@ -116,6 +116,7 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Twelve-ply HumanDB audit snapshot | Ignored point-in-time SQLite online backup under `data/backups/prefix12_human_db_20260725`; 738,091,008 bytes, SHA-256 `97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c`, `quick_check=ok`; resolve the database, source manifest, and complete-history ledger through the local path registry |
 | Archived rebuilt HumanDB candidate | `data/backups/maintainer_upload_20260721/human_db.sqlite`, 745,385,984 bytes; versioned candidate only, not active |
 | Archived maintainer Openings delivery | Exact ignored retention copy under `data/backups/maintainer_openings_20260725`; the two Book files duplicate tracked assets, while the 184-record learned file contains 15 unmerged `seed_source=learned` candidates; see the delivery evidence |
+| Archived maintainer Book Opening Plays delivery | Exact ignored DOCX retention copy under `data/backups/maintainer_book_opening_plays_20260726`; 3,432,474 bytes, SHA-256 `227584cde9d8c6278665a1b6decac6491d6b30b9b7add44a4b00200aec5e83c7`; the tracked transcription is source-only Book-candidate evidence |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
@@ -208,6 +209,13 @@ duplicates of tracked assets. Its learned-opening file contains 15 additional
 low-confidence application-generated candidates and has not been merged into
 an active source. See
 [`docs/evidence/maintainer-openings-delivery-2026-07-25.md`](evidence/maintainer-openings-delivery-2026-07-25.md).
+
+The 26 July expert-curated Book Opening Plays delivery is retained separately
+under `data/backups/maintainer_book_opening_plays_20260726`. The exact DOCX is
+ignored; its tracked source transcription preserves every row and embedded
+image identity while keeping visual interpretations explicit. It is not the
+Sanmill Book asset and is not an active input. See
+[`docs/evidence/maintainer-book-opening-plays-delivery-2026-07-26.md`](evidence/maintainer-book-opening-plays-delivery-2026-07-26.md).
 
 The original legacy SpecialistDB is isolated at:
 
