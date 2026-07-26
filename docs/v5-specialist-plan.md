@@ -44,12 +44,23 @@ style evaluation supports that wording.
 
 ## Authority and Document Map
 
-When two documents disagree, use the following order:
+When two artifacts disagree, use the following order:
 
-1. accepted executable rule/oracle tests and immutable evidence;
+1. the signed product decision, rules variant, and primary normative rules
+   sources named by their owning contract;
 2. the owning modular specification below;
-3. this entry point;
-4. the archived monolithic snapshot.
+3. independently derived reference results and reviewed boundary examples;
+4. executable conformance tests;
+5. the engineering implementation;
+6. experimental and operational evidence;
+7. this entry point for navigation; and
+8. the archived monolithic snapshot.
+
+Tests are executable evidence that an implementation follows a frozen
+contract; they cannot make an incorrect rule normative merely by passing.
+Raw inputs, commands, hashes, and results remain immutable evidence. Their
+interpretation and acceptance status remain corrigible when stronger evidence
+shows that a specification, expected result, or test was wrong.
 
 | Owner | Scope |
 | --- | --- |

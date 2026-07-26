@@ -19,6 +19,30 @@ F0 `analysis_only` work may precede a complete machine-readable governance
 stack. It cannot modify databases, labels, models, runtime decisions, or
 release artifacts.
 
+## Normative Authority
+
+Passing code is not the highest source of truth. Use this order:
+
+1. signed product and rules-variant decisions plus the primary normative
+   sources they identify;
+2. the modular specification that owns the disputed semantic field;
+3. independent reference implementations or hand-derived boundary results;
+4. executable conformance tests;
+5. production or research implementation;
+6. experimental and operational observations.
+
+A conformance test is accepted only inside its declared rules version and
+support domain. If new evidence shows that its expected result encoded the
+wrong rule, preserve the old test result as history, correct the owning
+specification and independent expectation, and invalidate dependent evidence.
+Do not preserve an incorrect semantic result merely because it was previously
+marked accepted.
+
+Raw inputs, commands, hashes, logs, and results are immutable evidence.
+Interpretations, review dispositions, and pass/fail status are append-only but
+corrigible: a later record may supersede them while preserving the earlier
+record and reason.
+
 ## Review Policy
 
 Heterogeneous model or human review is required for critical rules/oracle/gold,
@@ -54,8 +78,9 @@ must not be called mechanical merely to avoid review.
 
 ## Minimal Executable Contract
 
-`training_contract.yaml` or an experiment-specific equivalent contains only
-machine-enforceable hard constraints:
+`experiment-card.yaml`, the historical `training_contract.yaml`, or an
+experiment-specific equivalent contains only machine-enforceable hard
+constraints:
 
 - variant, code/data/rule/oracle/model hashes;
 - dependency DAG and accepted prerequisite artifacts;
@@ -73,6 +98,21 @@ review discussion remain in Markdown or analysis code. A semantic statement
 must not be duplicated in Markdown, YAML, implementation, and tests with four
 independent owners. The contract references the owning specification and
 encodes only the values needed to reject an invalid execution.
+
+The four execution-level sources of truth are:
+
+- `product-decision.md` for user, persona, deployment, and value decisions;
+- `oracle-and-rules-spec.md` plus its signed variant record for deterministic
+  semantics;
+- one `experiment-card.yaml` for the actual variables and permissions of a
+  bounded run; and
+- one `release-decision.yaml` for the applicable release gates and result.
+
+The research, human-data, runtime, and governance documents remain design
+owners and reference material. An executor reads this entry point, the product
+decision, the one owning modular specification, and the selected card. It does
+not need to load every design note for a bounded change that cannot affect
+their semantics.
 
 ## Failure Severity
 
