@@ -19,10 +19,11 @@ and split checks. Unversioned historical Malom columns are not label authority.
 Candidate counterfactual outcomes come only from a versioned oracle/teacher or
 from prospective data with a known action propensity.
 
-The complete observed decision is the supervision unit for HumanPolicy:
+HumanPolicy observes what the player could perceive, not the server's complete
+rules state. Its supervision unit is:
 
 ```text
-DecisionState
+HumanObservationState
 legal choice set
 observed action
 actor/opponent conditions
@@ -30,6 +31,25 @@ game/player/time/source identity
 ```
 
 An unchosen candidate is missing observational data, not a negative example.
+
+`HumanObservationState` is a separate versioned type containing only
+player-visible information:
+
+```text
+visible board and side/phase cues
+visible move history and draw/claim indicators
+clock and time-control information
+UI orientation, prompts, and assistance
+available player/session context and prior-game exposure
+explicit missingness for fields not preserved by the source
+```
+
+The full `DecisionState` remains the input to rules, Oracle, and proof layers.
+HumanPolicy must not read hidden repetition multiplicity, no-progress counters,
+proof/pack status, `A_allow`, or other server-only fields unless the source UI
+actually displayed equivalent information. An offline labeler may join both
+types by an opaque decision ID without copying hidden fields into the behaviour
+model.
 
 ## Legal, Licence, and Privacy Gate
 
@@ -67,6 +87,19 @@ Player/game normalisation is not assumed to be correct for every objective.
 Its effect on the target measure, effective sample size, and player
 concentration is reported. The product owner freezes the target measure before
 candidate results are examined.
+
+Freeze a small robustness panel with the primary estimand:
+
+- the main target Elo interval and one adjacent interval on each side where
+  support permits;
+- first exposure and repeat exposure;
+- a small number of predeclared behaviour clusters;
+- source platform and target product platform.
+
+Use a prespecified worst-stratum non-inferiority rule, CVaR, or maximum subgroup
+regret for harms that the product decision considers material. Do not create
+dozens of underpowered release gates. Report unsupported strata as unknown and
+control multiplicity for every confirmatory subgroup decision.
 
 ## Planning Data and Untouched Evidence
 
@@ -173,6 +206,16 @@ abstains outside support. It fixes one behaviour member or latent style for a
 whole rollout, as required by the
 [training research plan](training-research-plan.md).
 
+That fixed member models a consistent but static player, not learning or
+adaptation. Unless repeat-exposure evidence is available, its claim is limited
+to first or isolated exposure. Before a repeat-play product claim, report:
+
+- first exposure and the second through fourth similar exposures;
+- within-player change across consecutive games;
+- conditioning on available prior-game/session history; and
+- an adaptive stress opponent that searches for a public frozen policy's
+  repeated pattern.
+
 `label_generation_hp` and a different architecture trained on disjoint folds
 of the same HumanDB remain same-source models. A separately isolated
 `proxy_eval_hp` can detect overfitting to one model, but its proper label is
@@ -181,6 +224,17 @@ humans, a new platform, or a new historical period.
 
 True external confirmation requires prospectively collected people or a
 materially independent source with its own provenance and target match.
+
+When HumanDB comes from a different UI or platform, run a small
+`transport_pilot` before T1 promotion evidence:
+
+- present aligned decisions through both source-like and target-product views;
+- compare action distributions, decision time, and orientation effects;
+- separate game-structure features from UI/source features; and
+- retain the source model as a source-only proxy when transport fails.
+
+The pilot is not required for a coarse source-domain F0-H1 audit, but it is
+required before calling that model representative of the target product.
 
 ## Primary Product Effects
 
@@ -291,6 +345,11 @@ claim is limited to its declared estimand.
 Both use randomised frozen versions, one intent-to-treat result per assignment,
 player clustering, colour/start balancing, actual assignment probabilities,
 and prespecified handling of disconnections and runtime failure.
+
+Player-level parallel assignment is the default because seeing one strategy
+can change later responses to the other. A crossover design must separately
+report first-period effects, treatment order, period-by-treatment interaction,
+and learning/carryover; the aggregate crossover contrast is not sufficient.
 
 ## Style and “Human-Like” Evidence
 

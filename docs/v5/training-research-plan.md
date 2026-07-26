@@ -132,9 +132,12 @@ the research plan.
 Use the smallest baseline capable of falsifying the next hypothesis:
 
 `q_ref` is the non-human-targeted reference policy produced by the accepted
-rules/oracle layer: full-history liveness/proof rank in W, the complete
-ultra-strong comparator in D, and the verified survival/reference ordering in
-L. Its exact tie policy is versioned.
+rules/oracle layer: full-history liveness/proof rank in W; full-rule D
+viability followed by versioned history-slack/cycle-risk handling and then the
+complete positional comparator in D; and the verified survival/reference
+ordering in L. If only the positional D comparator is available, name the
+control `positional_ultra_strong_control` rather than implying complete
+history-aware D strategy.
 
 1. direct `q_ref` from the accepted oracle/rules gate;
 2. a small policy distilled from `q_ref`;
@@ -161,6 +164,7 @@ The first behaviour model is deliberately coarse:
 - observed single-decision choice distribution;
 - one-step unsafe/allow mass and coarse structural calibration;
 - very short rollout horizons only where support is adequate;
+- `HumanObservationState` inputs only, with hidden rule/proof state excluded;
 - explicit OOD/abstention.
 
 Player/game concentration, time span, and state sparsity prohibit unsupported
@@ -175,11 +179,13 @@ move. Each rollout samples one frozen behaviour member or latent style:
 
 ```text
 z ~ P(style | target condition)
-a_t ~ HumanPolicy(a_t | DecisionState_t, target condition, z)
+a_t ~ HumanPolicy(a_t | HumanObservationState_t, target condition, z)
 ```
 
 The same `z` or ensemble member remains fixed for that rollout. A memoryless
-population-average baseline may be retained as an explicit ablation.
+population-average baseline may be retained as an explicit ablation. This is a
+static-player model; repeat-play claims require the adaptation and carryover
+tests in the human-data plan.
 
 ### Symmetry
 
@@ -202,9 +208,11 @@ changes the target population and therefore must be justified against the
 product estimand. See the
 [human-data/statistics plan](human-data-and-statistics-plan.md).
 
-## T1 Minimal D-Mode Specialisation
+## T1 Minimal Supported-Error-Pattern Reranking
 
-The first specialisation experiment is limited to:
+The first specialisation experiment safely reorders already supported human
+error patterns. It does not claim to invent novel traps or unfamiliar
+dilemmas. It is limited to:
 
 - D states;
 - high HumanPolicy support;
@@ -216,11 +224,13 @@ The first specialisation experiment is limited to:
 - one policy-only StrategyPolicy;
 - no GapNet, SelfRiskNet, DAgger, PPO, or adaptive curriculum.
 
-The direct teacher must first beat `q_ref` on a confirmation set not used to
-choose labels. A minimum student must retain a preregistered share of that
-gain. The effect must remain directionally stable under a different
-same-source model family, independent search/AB stress, a reference-best-reply
-branch, and at least one deployment-relevant self continuation.
+The direct teacher must first beat `q_ref` on a planning-domain
+`teacher_validation` holdout not used to choose labels. This is not the
+one-time confirmation or final test. A minimum student must retain a
+preregistered share of that gain. The effect must remain directionally stable
+under a different same-source model family, independent search/AB stress, a
+reference-best-reply branch, and a prespecified set of deployment-relevant
+self continuations.
 
 Same-source model agreement tests model overfitting only. It is not an
 independent human confirmation.
@@ -233,6 +243,9 @@ A state/candidate may be called a target-human inducement only when:
 - at least one correct opponent reply remains;
 - the simultaneous lower confidence bound on target-human incorrect-reply
   mass is at least a frozen positive `p_min`;
+- the simultaneous lower bound on incorrect-reply probability or terminal
+  match score improves over the frozen `q_ref` action by at least the
+  preregistered `delta_induce`;
 - independent-player/support floors pass and the mass is not an OOD
   extrapolation;
 - the incorrect reply genuinely creates the specified theoretical event; and
@@ -240,27 +253,51 @@ A state/candidate may be called a target-human inducement only when:
 
 A softmax's nonzero probability is not evidence. A popular but unsupported
 action and a theoretically forced win are not target-human inducements.
+Without the relative improvement requirement, the accurate description is
+“enters a supported human-error-prone state,” not “induces an error.”
 
 ## D Teacher Objective
 
-The D teacher preserves D as a hard constraint. Its primary event remains
-entry into a full-history certified W after an opponent error, but two D
-candidates with similar entry probability must not be treated as equivalent
-when their W states have materially different product value.
+The D teacher preserves the applicable full-rule D boundary as a hard
+constraint. Within that permitted set, its primary utility is the conservative
+terminal product score under frozen human, self-continuation, horizon, and
+runtime identities:
 
-Use a lexicographic, conversion-aware target:
+```text
+Q_D(S, a; pi_self, pi_h, H, runtime)
+  = LCB E[1 * win + 0.5 * draw + 0 * loss
+          | S, a, pi_self, pi_h, H, runtime]
+```
 
-1. conservative lower bound on entering certified W within `H_D`;
-2. among statistically indistinguishable first-tier candidates, conservative
-   terminal conversion under the frozen W policy and runtime contract;
-3. if conversion cannot be estimated reliably, use proof rank, measured
-   W-conversion calibration, future proof availability, pack closure, and
-   runtime unavailability risk as secondary fields;
-4. retain `q_ref` or abstain whenever uncertainty can reverse the order.
+The loss-rate constraint remains independently enforced; expected score cannot
+purchase a forbidden theory downgrade or an unacceptable loss increase.
+`P(certW)`, conditional W conversion, proof rank, pack closure, and runtime
+availability are mechanism diagnostics and, where the product contract
+requires them, secondary constraints. They do not outrank terminal utility
+merely because the current prover finds one line easier to certify.
 
-The deployment-aware fields may break ties only within an oracle-equivalent or
-explicitly allowed near-equivalent tier. They cannot buy a theoretical
-downgrade in verified mode.
+A secondary field may break a first-tier tie only when the confidence interval
+for the primary-utility difference is wholly inside the preregistered
+equivalence band `[-epsilon_D, +epsilon_D]`. Failure to reject zero difference
+is not equivalence. If equivalence cannot be established, obtain more data or
+retain `q_ref`/abstain.
+
+### Continuation-dependent labels
+
+Teacher values are versioned functions of `pi_self`, `pi_h`, horizon, and the
+runtime contract; they are not timeless state-action labels. T1 therefore uses
+a conservative policy-improvement loop:
+
+1. label with frozen `pi_k` and a prespecified continuation set;
+2. constrain the student update by a small KL bound or a bounded state scope;
+3. evaluate `pi_(k+1)` in closed loop under the same product estimand;
+4. relabel high-impact reached states with `pi_(k+1)`; and
+5. continue only when whole-policy gain and every hard constraint remain.
+
+The primary report includes the conservative result across the continuation
+set, not only the checkpoint under which the teacher looked best. DAgger may
+later improve reached-state coverage, but it does not by itself cure a drifting
+continuation-dependent objective.
 
 ## W and L Scope
 

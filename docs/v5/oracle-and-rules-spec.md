@@ -114,6 +114,28 @@ separates rescue probability from mere delay.
 exact `DecisionState` and rules version. Positional W without that proof is
 reported as `positional_W`; it is not silently counted as `certW`.
 
+Keep three epistemic/deployment layers separate:
+
+- `full_rule_value`: an exact game value only when an independently accepted
+  complete method establishes it for the stated rules and support domain;
+- `offline_certifiable`: the property can be proved under the frozen offline
+  proof budget; and
+- `runtime_authorisable`: the deployed pack/prover can establish the exact
+  declared property within its runtime contract.
+
+When no accepted complete method exists, use `offline_verified_W`,
+`estimated_full_rule_value`, or another evidence-accurate name; do not call a
+high-budget estimate `game_true_W`. Improving a prover may expand the latter
+two sets without changing the game semantics. An ordinary strategic policy
+therefore optimises terminal product utility subject to its rule constraints,
+not whatever the current prover happens to certify cheaply. A verified product
+may make offline or runtime certifiability an explicit constraint.
+
+Within D, `q_ref` first requires full-rule D viability. Its versioned reference
+order then considers remaining history slack and cycle/claim risk before the
+complete positional comparator and final tie policy. A baseline that has only
+the latter comparator is named `positional_ultra_strong_control`.
+
 The three human-behaviour masses are also distinct:
 
 - `positional_safe_mass`: HumanPolicy mass on `A_pos`;
