@@ -42,6 +42,12 @@ REVIEWED_SOURCE = (
     / "evidence"
     / "maintainer-book-opening-plays-reviewed-source-2026-07-26.json"
 )
+REVIEWED_AUDIT = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.json"
+)
 
 
 def _digest(label: str) -> str:
@@ -341,6 +347,37 @@ def test_reviewed_audit_replays_corrected_record_and_updates_counts(
         "parent8_ring16_orbits": 14,
         "human_exact_matches": 0,
     }
+    corrected = next(
+        record for record in audit["records"] if record["source_row"] == 19
+    )
+    assert corrected["author_tokens"][9] == "d5"
+    assert corrected["evidence_basis"] == (
+        "typed_text_plus_expert_confirmed_correction"
+    )
+
+
+def test_frozen_reviewed_audit_binds_the_confirmed_lineage() -> None:
+    audit = json.loads(REVIEWED_AUDIT.read_text(encoding="utf-8"))
+
+    assert verify_layered_expert_book_audit(audit) == {
+        "source_rows": 35,
+        "source_variations": 36,
+        "legal_records": 36,
+        "unique_histories": 35,
+        "unique_final_fens": 34,
+        "unique_ring16_orbits": 33,
+        "parent8_ring16_orbits": 14,
+        "human_exact_matches": 6,
+    }
+    assert audit["audit_identity"] == (
+        "1f6f9ceb8df36150ea401145e16c88cc25550622c1ad85a1b54a067183b9978d"
+    )
+    assert audit["generator"]["nmm_llm_commit"] == (
+        "927c2a60f6af6f5ea5a3ba0badae02fa46f92d5e"
+    )
+    assert audit["source_identity"]["identity_sha256"] == (
+        "6e33d7af134ca88cc161a947590457c9f7af2d3a8a285f7d8a581ca2a0350142"
+    )
     corrected = next(
         record for record in audit["records"] if record["source_row"] == 19
     )
