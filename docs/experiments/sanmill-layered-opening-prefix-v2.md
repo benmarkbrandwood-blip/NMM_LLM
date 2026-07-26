@@ -184,6 +184,13 @@ tracked assets are not new evidence. The fifteen additions in the delivered
 candidate pool. They are not HumanDB frequencies, the corrected Sanmill Book,
 or members of the formal v2 corpus.
 
+The later `Book Opening Plays.docx` delivery is a separate
+`maintainer_expert_curated_play` Book subtype. Its tracked transcription must
+preserve row-level text and image identities, keep explicit alternatives and
+visual interpretations distinguishable, and pass the same twelve-ply replay
+and cross-source overlap gates. It must not be silently merged into the
+corrected Sanmill asset.
+
 ## Decision gate
 
 The final 64-prefix composition remains unset until the source audits report:
@@ -244,6 +251,29 @@ HumanDB histories.
 
 This proves that the Perfect DB can supply an independently diverse stratum;
 it does not freeze a quota or turn the 128 audit routes into the final corpus.
+
+## Current expert-curated Book evidence
+
+The later source-only
+[expert Book play audit](../evidence/sanmill-layered-expert-book-source-audit-2026-07-26.md)
+is complete. The 35 document rows contain 36 explicit candidates, all of
+which replay legally through project rules and two fresh pinned Sanmill
+processes. They reduce to 34 unique histories, 33 final FENs, and 32 final
+`ring16` orbits.
+
+At eight logical plies those candidates contain only 15 exact parent
+histories and 14 parent `ring16` orbits. One parent supplies 16 of the 36
+twelve-ply children. Six exact expert histories are also present in 29
+distinct games in the frozen current PlayOK sample. There is no exact-history
+overlap with the corrected Sanmill named lines, but eight unique final FENs
+and eight unique final orbits overlap. The fixed Perfect DB audit pool has no
+overlap.
+
+This evidence supports adding the expert material as a Book candidate subtype,
+not adding all rows or changing the Book quota automatically. Row 11's final
+`c5` is a screenshot-derived transcription and remains unconfirmed for final
+membership. The provisional corpus decision must now account for parent
+coverage and the two distinct Book subtypes before any list is frozen.
 
 ## Current delivery and corpus decision
 
