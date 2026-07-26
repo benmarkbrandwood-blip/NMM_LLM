@@ -1,0 +1,1152 @@
+{
+  "assets": [
+    {
+      "height": 840,
+      "path": "parents/P01.png",
+      "sha256": "af28d348f7131f5af3999df1dbe22d7ffb04be00c08ad4efdd30a5b321eb7ca4",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P02.png",
+      "sha256": "59ff5a1658664f7dfa99abe14490cc63e1b7aad5e1fcf7bd839523d5ea7511ff",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P03.png",
+      "sha256": "878740e7d6ce1fa8f85f8a521e598a66954e824fb500174d064cc894f2505898",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P04.png",
+      "sha256": "68f63eb1b54a2efd3a00a64dae02876670ff097704f3237557c58fbdfcebd691",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P05.png",
+      "sha256": "3b0b5cc5dd2606d1a183da0f017c23096d7b1c8146b39d291df7e7fdf84fa082",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P06.png",
+      "sha256": "ed7a736a13835521ff570e0e920515a4f22e809db5d3eb7781457adb50105507",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P07.png",
+      "sha256": "77ad3b8293fe6069c1c43686aca8f30ce39c40dde7d879e799da7459df526796",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P08.png",
+      "sha256": "203068a7cdf3870a42ec369b974652573c4a390a181d1ee9f10f6977b876a2f5",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P09.png",
+      "sha256": "d553a80b3a666923c374d439921399439806c2620eee5726eaeda28cbe8adce2",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P10.png",
+      "sha256": "f1942c6bdc0c0abb90914fb9542f5155b966f1e8366f7cf1d7c8b3114f31d773",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P11.png",
+      "sha256": "691476f0b2b72bab6ee85e9c768258dbb2d6e4c91ff940d6274a28a1a43f1620",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P12.png",
+      "sha256": "ba9dc44f73a89d46fd3a0338279473bd5a55663daf30b691ee73cd48658b594c",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P13-A.png",
+      "sha256": "3fea0434c158f01702125737a194e0c6a5efcf996c26589533645ad8becf0bd6",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P13-B.png",
+      "sha256": "bf10e9593603fe26fc55082f3d4a149f62adc421573485e8a09f3791ec83e50f",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "parents/P14.png",
+      "sha256": "0f598b8466d351f652dc82e7d861da01b01ebb3d0167dc72628f0d043c0ad784",
+      "width": 720
+    },
+    {
+      "height": 1732,
+      "path": "parent-overview.png",
+      "sha256": "96b2325ee87028b081b9ed6a035320c2b160694fcc8096ed1bdc8a127da18f0a",
+      "width": 1440
+    },
+    {
+      "height": 840,
+      "path": "children/P01/row-001-better-continuation.png",
+      "sha256": "03364120f4daa5593029314f19d64ec348f46d1bd5605a52b00f64b0ce0b42a6",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P01/row-001-trap-continuation.png",
+      "sha256": "ad4ad04e38d273edcbf4affb3a27182a471ce0edc4d741ab7693a207683c823b",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P01.png",
+      "sha256": "490af352c6be77e49bdf7269696a6c12853acb06bde8b1bf3137a3f0c5dff531",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-003.png",
+      "sha256": "1b9f6cd05a124cd8a4995480b56a46b7066b1cfb5771d43229f29e7ac98811ca",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-008.png",
+      "sha256": "0add6d85058adf27d79b6a6b5a765753df744ad0b2932c28798d0f789edc54a5",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-009.png",
+      "sha256": "ebbfe36d3c47b1eabb4aee6ca93e459dcfcd96c9d3c60c31c76e9dfd4e6a0e33",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-010.png",
+      "sha256": "f0a87dfeb4882cf3c9d78e3b93da488a33995109b833b4679ccd61ea9a233ba4",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-011.png",
+      "sha256": "28ad317422ea677e11ac02e6e39ba8bbee83d474804c9b56ebe441721eacf408",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-014.png",
+      "sha256": "7f7fc883aaad3b61124b032f5f3b992670ab283a531988f7717c385858058b43",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-015.png",
+      "sha256": "ebb9efd4959797f7ca27c513f4fb79cfa298c0d743d31ea80d52f29b50c7c9d6",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-016.png",
+      "sha256": "df445738763ba9c818702445d6164ae8866e965c6bfacab57264fe8fa3ba1f4e",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-017.png",
+      "sha256": "de5c9543f04b4aedf4d387fd38fbf4818a5f563bbbe10f6bf183ac035229ba0f",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-018.png",
+      "sha256": "ba2be54c9e0f8553fde837022cae7ddeb3db3fa5522829b3516b326502e14721",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-019.png",
+      "sha256": "25392751a8b07c3ad0a4ec753bda752bc4409bea78bd97aee1adfbc989439526",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-020.png",
+      "sha256": "655aad7c9bec1c78f2ccf083d45958fa7017a952c9b514908e1981e40db4f6fb",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-021.png",
+      "sha256": "2d6c2737d75d2fcbb86c42199e8721ffa65e09dc8bf048e54d388fbe192cf40f",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-022.png",
+      "sha256": "9529692b83697dab88b5b26a6268926578733390654aafdcabe1fbf0c25cf1c8",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-023.png",
+      "sha256": "f0c2c0c0f736a1a643e3c5f3933c868924922025390b2746bf970cd1bf94b31c",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P03/row-028.png",
+      "sha256": "ab00ee078577d51865000c11ef4848639c95dd1d93bf22d448495a183047ff0c",
+      "width": 720
+    },
+    {
+      "height": 1732,
+      "path": "child-overviews/P03.png",
+      "sha256": "7e86bb26b54c1b528e842c3684b3b173133371893a8f7c0e01bece1487ac12d3",
+      "width": 1440
+    },
+    {
+      "height": 840,
+      "path": "children/P04/row-004.png",
+      "sha256": "8bfd85c081b2acf695334066f54f5299a22e7cf3a6b23472cacf34ebdcee01c4",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P04/row-005.png",
+      "sha256": "58f9f51a8e6af5c6204e19f86482b3b61c320bf4247c1ac8ee6e710f6291310b",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P04.png",
+      "sha256": "60b70d530a62e9ee8d98744b4a5f3be00ca766dd027fda28f261bde1fde17332",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P05/row-006.png",
+      "sha256": "5d3f69562ed8e4fa4439f6428ec32c05b42d8f3c45986c3a8ce7366035d4691a",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P05/row-007.png",
+      "sha256": "24e1322758b204c5875968f5b6c0dcc3ad14660dd07bff389689cc92f4acf46c",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P05.png",
+      "sha256": "5d67c0a02e3d5aa6d8d0f03fe953e73a09c27d989133b73d1253024a2666a5f3",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P08/row-024.png",
+      "sha256": "4cd5c9f8b2d2a214657a5d0e0c10e21f349bafe2b5b6bda4ed5697a02d76d8e4",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P08/row-025.png",
+      "sha256": "428296eb970526e7b038aad53f5b9efa72f6ad9d46153c80cf1faf7962a0435f",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P08.png",
+      "sha256": "2aa27b889cce4ded55f18956f659d8f2cd22192202fdb9c1c8d8113095b2f364",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P09/row-026.png",
+      "sha256": "7e3de32960ce8f48ff3ae78d96c8821994f3ccd91ae157a4436693c43add0a4a",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P09/row-027.png",
+      "sha256": "bb8da970c457e7fe69b8941365894e4cd2c1f86004116c702ae043010d33e84d",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P09.png",
+      "sha256": "4f9e4f19634258d2370567ce3bf63d2ff1109a4d17be9346dacdbb3fd41cd8da",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P13-A/row-032.png",
+      "sha256": "08c920eb41419f288f962c0ff437ed061df026bff654c5b4d097b93bf9b92d03",
+      "width": 720
+    },
+    {
+      "height": 840,
+      "path": "children/P13-A/row-033.png",
+      "sha256": "609bb5197ece53651501224c9ef6d38436e1ee1a0413944c07483576c655ffa7",
+      "width": 720
+    },
+    {
+      "height": 472,
+      "path": "child-overviews/P13-A.png",
+      "sha256": "0bbaa7bcad379f3c78d03164def0b03c21949066c93b958d7583092e1b6100a4",
+      "width": 720
+    }
+  ],
+  "child_comparisons": [
+    {
+      "exact_history_sha256": "acbe63dcd2b04427b6e720b8edc54a4a44ad3e7159c4ef4865fec27acd00928d",
+      "group_id": "P01",
+      "parent_history": "d6 d2 f4 b4 c4 b2 f2 b6xc4",
+      "records": [
+        {
+          "continuation": "c3 a4 c4 d1",
+          "exact_history_sha256": "f1898c09877a1518ad90de7dfdabd7527a6ef1265c45f3bbdd5c34d9fdff642e",
+          "label": "better continuation",
+          "nmm_fen": ".....B.BBW.WWBBB......WW|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P01/row-001-better-continuation.png",
+            "sha256": "03364120f4daa5593029314f19d64ec348f46d1bd5605a52b00f64b0ce0b42a6",
+            "width": 720
+          },
+          "source_label": "row-001-better-continuation",
+          "source_row": 1,
+          "variation_id": "expert-book-play-001-better-d1"
+        },
+        {
+          "continuation": "c3 a4 c4 c5",
+          "exact_history_sha256": "c26e54971d94601c6389b00adc2a3e0456b97ff3b880f2e8da127d38ec2ccb9d",
+          "label": "trap continuation",
+          "nmm_fen": ".......BBW.WWBBBB.....WW|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P01/row-001-trap-continuation.png",
+            "sha256": "ad4ad04e38d273edcbf4affb3a27182a471ce0edc4d741ab7693a207683c823b",
+            "width": 720
+          },
+          "source_label": "row-001-trap-continuation",
+          "source_row": 1,
+          "variation_id": "expert-book-play-001-trap-c5"
+        }
+      ],
+      "review_id": "P01",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P01.png",
+        "sha256": "490af352c6be77e49bdf7269696a6c12853acb06bde8b1bf3137a3f0c5dff531",
+        "width": 720
+      }
+    },
+    {
+      "exact_history_sha256": "dec9a4f4f2385e6c90f65eac3d06fdbf4e0513cb521de1a80a7b73813c978b30",
+      "group_id": "P03",
+      "parent_history": "d6 d2 f4 b4 f6 f2 b6xf2 f2",
+      "records": [
+        {
+          "continuation": "b2 c5 c4 e5",
+          "exact_history_sha256": "cb9975ffc6c6c807af248d6262b713e8251ead440d03886ccb9651ea0f45837c",
+          "label": "source line",
+          "nmm_fen": "........WWWWBBWBB.B....W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-003.png",
+            "sha256": "1b9f6cd05a124cd8a4995480b56a46b7066b1cfb5771d43229f29e7ac98811ca",
+            "width": 720
+          },
+          "source_label": "row-003",
+          "source_row": 3,
+          "variation_id": "expert-book-play-003"
+        },
+        {
+          "continuation": "e5 d5 e4 g4",
+          "exact_history_sha256": "772fae355dae1f285a9cc8f75b139ecf206fd3c3abf12cb3f912428b32b2c0eb",
+          "label": "source line",
+          "nmm_fen": "...B....WWWWBB.B.BWW....|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-008.png",
+            "sha256": "0add6d85058adf27d79b6a6b5a765753df744ad0b2932c28798d0f789edc54a5",
+            "width": 720
+          },
+          "source_label": "row-008",
+          "source_row": 8,
+          "variation_id": "expert-book-play-008"
+        },
+        {
+          "continuation": "e5 d5 e4 e3",
+          "exact_history_sha256": "58a593e2b7c3e882a0c161200eb3f23ddf16339bcb193ce832ed42e4f981dee7",
+          "label": "source line",
+          "nmm_fen": "........WWWWBB.B.BWWB...|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-009.png",
+            "sha256": "ebbfe36d3c47b1eabb4aee6ca93e459dcfcd96c9d3c60c31c76e9dfd4e6a0e33",
+            "width": 720
+          },
+          "source_label": "row-009",
+          "source_row": 9,
+          "variation_id": "expert-book-play-009"
+        },
+        {
+          "continuation": "e5 e4 d5 d7",
+          "exact_history_sha256": "a595e1d7a3567b40626490f84a35e78eecec487dc024da4fb56243439f53bfad",
+          "label": "source line",
+          "nmm_fen": ".B......WWWWBB.B.WWB....|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-010.png",
+            "sha256": "f0a87dfeb4882cf3c9d78e3b93da488a33995109b833b4679ccd61ea9a233ba4",
+            "width": 720
+          },
+          "source_label": "row-010",
+          "source_row": 10,
+          "variation_id": "expert-book-play-010"
+        },
+        {
+          "continuation": "e5 e4 d5 c5",
+          "exact_history_sha256": "9fc236a68bbd692e2a6179e33dc1c3bf526a4e544b2dfbf11e58d5eadfdcff8e",
+          "label": "visual completion from embedded move list",
+          "nmm_fen": "........WWWWBB.BBWWB....|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-011.png",
+            "sha256": "28ad317422ea677e11ac02e6e39ba8bbee83d474804c9b56ebe441721eacf408",
+            "width": 720
+          },
+          "source_label": "row-011",
+          "source_row": 11,
+          "variation_id": "expert-book-play-011-visual-c5"
+        },
+        {
+          "continuation": "c4 e5 b2 c5",
+          "exact_history_sha256": "cacc51460b25d274cc1037a060ea589955e03887398078ba1f550d5afb64f34a",
+          "label": "source line",
+          "nmm_fen": "........WWWWBBWBB.B....W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-014.png",
+            "sha256": "7f7fc883aaad3b61124b032f5f3b992670ab283a531988f7717c385858058b43",
+            "width": 720
+          },
+          "source_label": "row-014",
+          "source_row": 14,
+          "variation_id": "expert-book-play-014"
+        },
+        {
+          "continuation": "c4 a7 a4 g7",
+          "exact_history_sha256": "c7413ce7770709465219c5523e4b432141336b1cfab33026f00a1da15f653489",
+          "label": "source line",
+          "nmm_fen": "B.B....WWWWWBB.B.......W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-015.png",
+            "sha256": "ebb9efd4959797f7ca27c513f4fb79cfa298c0d743d31ea80d52f29b50c7c9d6",
+            "width": 720
+          },
+          "source_label": "row-015",
+          "source_row": 15,
+          "variation_id": "expert-book-play-015"
+        },
+        {
+          "continuation": "b2 a7 a4 g7",
+          "exact_history_sha256": "a6c5ee59b80e9c1c5bcea5744677a469dc472fd36e29f0f62ca9f06a5e6572fd",
+          "label": "source line",
+          "nmm_fen": "B.B....WWWWWBBWB........|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-016.png",
+            "sha256": "df445738763ba9c818702445d6164ae8866e965c6bfacab57264fe8fa3ba1f4e",
+            "width": 720
+          },
+          "source_label": "row-016",
+          "source_row": 16,
+          "variation_id": "expert-book-play-016"
+        },
+        {
+          "continuation": "c4 a7 e3 g7",
+          "exact_history_sha256": "46f7718e736d0bb5d01b67d3d22c601915e2606cad4a7c9d96de298865b3a472",
+          "label": "source line",
+          "nmm_fen": "B.B.....WWWWBB.B....W..W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-017.png",
+            "sha256": "de5c9543f04b4aedf4d387fd38fbf4818a5f563bbbe10f6bf183ac035229ba0f",
+            "width": 720
+          },
+          "source_label": "row-017",
+          "source_row": 17,
+          "variation_id": "expert-book-play-017"
+        },
+        {
+          "continuation": "c4 d7 e3 d1",
+          "exact_history_sha256": "0478c2abcaac55e07bd3a7b02a7a3298d71152eb9d1a7667612621e19ca3a451",
+          "label": "source line",
+          "nmm_fen": ".B...B..WWWWBB.B....W..W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-018.png",
+            "sha256": "ba2be54c9e0f8553fde837022cae7ddeb3db3fa5522829b3516b326502e14721",
+            "width": 720
+          },
+          "source_label": "row-018",
+          "source_row": 18,
+          "variation_id": "expert-book-play-018"
+        },
+        {
+          "continuation": "c4 d7 e3 d1",
+          "exact_history_sha256": "0478c2abcaac55e07bd3a7b02a7a3298d71152eb9d1a7667612621e19ca3a451",
+          "label": "source line",
+          "nmm_fen": ".B...B..WWWWBB.B....W..W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-019.png",
+            "sha256": "25392751a8b07c3ad0a4ec753bda752bc4409bea78bd97aee1adfbc989439526",
+            "width": 720
+          },
+          "source_label": "row-019",
+          "source_row": 19,
+          "variation_id": "expert-book-play-019"
+        },
+        {
+          "continuation": "c4 e5 b2 c5",
+          "exact_history_sha256": "cacc51460b25d274cc1037a060ea589955e03887398078ba1f550d5afb64f34a",
+          "label": "source line",
+          "nmm_fen": "........WWWWBBWBB.B....W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-020.png",
+            "sha256": "655aad7c9bec1c78f2ccf083d45958fa7017a952c9b514908e1981e40db4f6fb",
+            "width": 720
+          },
+          "source_label": "row-020",
+          "source_row": 20,
+          "variation_id": "expert-book-play-020"
+        },
+        {
+          "continuation": "c4 d5 e3 e4",
+          "exact_history_sha256": "e5e8e6ea426207577738320ac5a4688d7eef055be29981c83b7397d129eb6154",
+          "label": "source line",
+          "nmm_fen": "........WWWWBB.B.B.BW..W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-021.png",
+            "sha256": "2d6c2737d75d2fcbb86c42199e8721ffa65e09dc8bf048e54d388fbe192cf40f",
+            "width": 720
+          },
+          "source_label": "row-021",
+          "source_row": 21,
+          "variation_id": "expert-book-play-021"
+        },
+        {
+          "continuation": "c4 d5 d3 e3",
+          "exact_history_sha256": "af51d7dfb53e72af6b551077139dbb76437491eec7c9affe88cc662a774c4fdc",
+          "label": "source line",
+          "nmm_fen": "........WWWWBB.B.B..BW.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-022.png",
+            "sha256": "9529692b83697dab88b5b26a6268926578733390654aafdcabe1fbf0c25cf1c8",
+            "width": 720
+          },
+          "source_label": "row-022",
+          "source_row": 22,
+          "variation_id": "expert-book-play-022"
+        },
+        {
+          "continuation": "c4 g1 d3 a1",
+          "exact_history_sha256": "ffe6ad1fb917c02b58266b6d12d084c3d123cd3bd6f8cafddfef7fd2e314084d",
+          "label": "explicit child only",
+          "nmm_fen": "....B.B.WWWWBB.B.....W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-023.png",
+            "sha256": "f0c2c0c0f736a1a643e3c5f3933c868924922025390b2746bf970cd1bf94b31c",
+            "width": 720
+          },
+          "source_label": "row-023",
+          "source_row": 23,
+          "variation_id": "expert-book-play-023"
+        },
+        {
+          "continuation": "c4 e4 d3 d5",
+          "exact_history_sha256": "5fdbc6449eea892d1fb0a80c0d9cc7ec470b8b4018d62cb5a8cba7fcbb40ef58",
+          "label": "source line",
+          "nmm_fen": "........WWWWBB.B.B.B.W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P03/row-028.png",
+            "sha256": "ab00ee078577d51865000c11ef4848639c95dd1d93bf22d448495a183047ff0c",
+            "width": 720
+          },
+          "source_label": "row-028",
+          "source_row": 28,
+          "variation_id": "expert-book-play-028"
+        }
+      ],
+      "review_id": "P03",
+      "sheet": {
+        "height": 1732,
+        "path": "child-overviews/P03.png",
+        "sha256": "7e86bb26b54c1b528e842c3684b3b173133371893a8f7c0e01bece1487ac12d3",
+        "width": 1440
+      }
+    },
+    {
+      "exact_history_sha256": "417e54aef20ae2fdef99bbabfbb0f3755bb4505a0d4fa9e9e64d5141a4231017",
+      "group_id": "P04",
+      "parent_history": "d6 d2 f4 b4 g7 g4 d7 d5",
+      "records": [
+        {
+          "continuation": "a7xd5 d5 f6 b6",
+          "exact_history_sha256": "54b3ee8d1e64b7f108f15853c74d963396531fbb206e5097fbcd37c8cfda4f23",
+          "label": "source line",
+          "nmm_fen": "WWWB....BWWW.B.B.B......|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P04/row-004.png",
+            "sha256": "8bfd85c081b2acf695334066f54f5299a22e7cf3a6b23472cacf34ebdcee01c4",
+            "width": 720
+          },
+          "source_label": "row-004",
+          "source_row": 4,
+          "variation_id": "expert-book-play-004"
+        },
+        {
+          "continuation": "a7xd5 d5 f6 f2",
+          "exact_history_sha256": "2299b061b7f6c6596668694708812177389e60d2453f0821ea3ef8fca0cb10b0",
+          "label": "source line",
+          "nmm_fen": "WWWB.....WWWBB.B.B......|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P04/row-005.png",
+            "sha256": "58f9f51a8e6af5c6204e19f86482b3b61c320bf4247c1ac8ee6e710f6291310b",
+            "width": 720
+          },
+          "source_label": "row-005",
+          "source_row": 5,
+          "variation_id": "expert-book-play-005"
+        }
+      ],
+      "review_id": "P04",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P04.png",
+        "sha256": "60b70d530a62e9ee8d98744b4a5f3be00ca766dd027fda28f261bde1fde17332",
+        "width": 720
+      }
+    },
+    {
+      "exact_history_sha256": "66bfe9f8a24a24b8b360c97a14fae133ea2176ec1f704b7691684fc03a944fce",
+      "group_id": "P05",
+      "parent_history": "d6 d2 f4 b4 g7 g4 d7 a7",
+      "records": [
+        {
+          "continuation": "d5xa7 a7 f6 b6",
+          "exact_history_sha256": "c4ea86ace72c37d4bfc3f5d5cf015f47fd87efde27c11f76fa5e11ffb2e2296d",
+          "label": "source line",
+          "nmm_fen": "BWWB....BWWW.B.B.W......|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P05/row-006.png",
+            "sha256": "5d3f69562ed8e4fa4439f6428ec32c05b42d8f3c45986c3a8ce7366035d4691a",
+            "width": 720
+          },
+          "source_label": "row-006",
+          "source_row": 6,
+          "variation_id": "expert-book-play-006"
+        },
+        {
+          "continuation": "d5xa7 a7 f6 f2",
+          "exact_history_sha256": "b0815afa1242cce34388fe7e2b7e93aa6fe8d24fe163c788180bef4648f82b5e",
+          "label": "source line",
+          "nmm_fen": "BWWB.....WWWBB.B.W......|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P05/row-007.png",
+            "sha256": "24e1322758b204c5875968f5b6c0dcc3ad14660dd07bff389689cc92f4acf46c",
+            "width": 720
+          },
+          "source_label": "row-007",
+          "source_row": 7,
+          "variation_id": "expert-book-play-007"
+        }
+      ],
+      "review_id": "P05",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P05.png",
+        "sha256": "5d67c0a02e3d5aa6d8d0f03fe953e73a09c27d989133b73d1253024a2666a5f3",
+        "width": 720
+      }
+    },
+    {
+      "exact_history_sha256": "481278a3c2947a6a5e9f8f4246403472d6c57a3b2b0858eced07a9db8f1f6119",
+      "group_id": "P08",
+      "parent_history": "d6 d2 f4 b4 f6 f2 b6xb4 b2xf4",
+      "records": [
+        {
+          "continuation": "d3 e4 c4 g4",
+          "exact_history_sha256": "37451b2e37e4c995cea9caf3ae8a85bf302624249dc32d9fca4ba61d67f1e344",
+          "label": "source line",
+          "nmm_fen": "...B....WWW.BBB....B.W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P08/row-024.png",
+            "sha256": "4cd5c9f8b2d2a214657a5d0e0c10e21f349bafe2b5b6bda4ed5697a02d76d8e4",
+            "width": 720
+          },
+          "source_label": "row-024",
+          "source_row": 24,
+          "variation_id": "expert-book-play-024"
+        },
+        {
+          "continuation": "d3 g4 c4 d7",
+          "exact_history_sha256": "b4072c4184f5e6b0ff31d8003e44413a7fea7dd77bc3823596c4c736dc2b580f",
+          "label": "source line",
+          "nmm_fen": ".B.B....WWW.BBB......W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P08/row-025.png",
+            "sha256": "428296eb970526e7b038aad53f5b9efa72f6ad9d46153c80cf1faf7962a0435f",
+            "width": 720
+          },
+          "source_label": "row-025",
+          "source_row": 25,
+          "variation_id": "expert-book-play-025"
+        }
+      ],
+      "review_id": "P08",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P08.png",
+        "sha256": "2aa27b889cce4ded55f18956f659d8f2cd22192202fdb9c1c8d8113095b2f364",
+        "width": 720
+      }
+    },
+    {
+      "exact_history_sha256": "5582f0f3f9ee6715b1bf7c5b51327c188a659db0546e13ab4818b3f5c19f39e2",
+      "group_id": "P09",
+      "parent_history": "d6 d2 f4 b4 c4 d5 d3 e4",
+      "records": [
+        {
+          "continuation": "a4 g4 d1 b2",
+          "exact_history_sha256": "f4a5b6e5ce5a8ade9174a00a9d403ca59da09fd83966470c508995ec6c33e534",
+          "label": "source line",
+          "nmm_fen": "...B.W.W.W.W.BBB.B.B.W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P09/row-026.png",
+            "sha256": "7e3de32960ce8f48ff3ae78d96c8821994f3ccd91ae157a4436693c43add0a4a",
+            "width": 720
+          },
+          "source_label": "row-026",
+          "source_row": 26,
+          "variation_id": "expert-book-play-026"
+        },
+        {
+          "continuation": "a4 g4 d7 b2",
+          "exact_history_sha256": "64752352a152a80f8e76ce412029da2199d7752e0ed730f7dc95d6186492ea41",
+          "label": "source line",
+          "nmm_fen": ".W.B...W.W.W.BBB.B.B.W.W|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P09/row-027.png",
+            "sha256": "bb8da970c457e7fe69b8941365894e4cd2c1f86004116c702ae043010d33e84d",
+            "width": 720
+          },
+          "source_label": "row-027",
+          "source_row": 27,
+          "variation_id": "expert-book-play-027"
+        }
+      ],
+      "review_id": "P09",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P09.png",
+        "sha256": "4f9e4f19634258d2370567ce3bf63d2ff1109a4d17be9346dacdbb3fd41cd8da",
+        "width": 720
+      }
+    },
+    {
+      "exact_history_sha256": "3140b59c5a341db873f9df67fdf59dd42e9f6e903f8d7f6e9dc18ea8f4dca4a0",
+      "group_id": "P13",
+      "parent_history": "g4 b4 e3 d2 e4 f4 e5xf4 f4",
+      "records": [
+        {
+          "continuation": "d7 g7 d5 d6",
+          "exact_history_sha256": "17b0d73aa6e3dbc786038724b82603abadf7b049db37961f7cfc6d12913af961",
+          "label": "source line",
+          "nmm_fen": ".WBW.....B.B.B.B.WWWW...|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P13-A/row-032.png",
+            "sha256": "08c920eb41419f288f962c0ff437ed061df026bff654c5b4d097b93bf9b92d03",
+            "width": 720
+          },
+          "source_label": "row-032",
+          "source_row": 32,
+          "variation_id": "expert-book-play-032"
+        },
+        {
+          "continuation": "d7 g7 d5 c5",
+          "exact_history_sha256": "32b07fade0a850f0181ef1b764badd36200ef0ecbd2d907dd09c24b64477ded0",
+          "label": "source line",
+          "nmm_fen": ".WBW.......B.B.BBWWWW...|W|6|6",
+          "panel": {
+            "height": 840,
+            "path": "children/P13-A/row-033.png",
+            "sha256": "609bb5197ece53651501224c9ef6d38436e1ee1a0413944c07483576c655ffa7",
+            "width": 720
+          },
+          "source_label": "row-033",
+          "source_row": 33,
+          "variation_id": "expert-book-play-033"
+        }
+      ],
+      "review_id": "P13-A",
+      "sheet": {
+        "height": 472,
+        "path": "child-overviews/P13-A.png",
+        "sha256": "0bbaa7bcad379f3c78d03164def0b03c21949066c93b958d7583092e1b6100a4",
+        "width": 720
+      }
+    }
+  ],
+  "manifest_identity": "434f69786830118570c317341d7867c81da41ed42692f93fa781c7bc1114b2a2",
+  "parent_overview": {
+    "height": 1732,
+    "path": "parent-overview.png",
+    "sha256": "96b2325ee87028b081b9ed6a035320c2b160694fcc8096ed1bdc8a127da18f0a",
+    "width": 1440
+  },
+  "parent_variants": [
+    {
+      "exact_history_sha256": "acbe63dcd2b04427b6e720b8edc54a4a44ad3e7159c4ef4865fec27acd00928d",
+      "group_id": "P01",
+      "history": "d6 d2 f4 b4 c4 b2 f2 b6xc4",
+      "nmm_fen": "........BW.WWBBB........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P01.png",
+        "sha256": "af28d348f7131f5af3999df1dbe22d7ffb04be00c08ad4efdd30a5b321eb7ca4",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P01",
+      "ring16_canonical_fen": ".........WBBBBWW........|W|4|4",
+      "source_rows": [
+        1
+      ]
+    },
+    {
+      "exact_history_sha256": "12338a0e1c1c7347958b9bab26caf74b72ede9590ee40438cde143d7ef9d9910",
+      "group_id": "P02",
+      "history": "d6 d2 f4 b4 a4 b2 f2 b6xf2",
+      "nmm_fen": ".......WBW.W.BBB........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P02.png",
+        "sha256": "59ff5a1658664f7dfa99abe14490cc63e1b7aad5e1fcf7bd839523d5ea7511ff",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P02",
+      "ring16_canonical_fen": ".........BBBBW.W...W....|W|4|4",
+      "source_rows": [
+        2
+      ]
+    },
+    {
+      "exact_history_sha256": "dec9a4f4f2385e6c90f65eac3d06fdbf4e0513cb521de1a80a7b73813c978b30",
+      "group_id": "P03",
+      "history": "d6 d2 f4 b4 f6 f2 b6xf2 f2",
+      "nmm_fen": "........WWWWBB.B........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P03.png",
+        "sha256": "878740e7d6ce1fa8f85f8a521e598a66954e824fb500174d064cc894f2505898",
+        "width": 720
+      },
+      "record_count": 16,
+      "review_id": "P03",
+      "ring16_canonical_fen": ".........BBWWWWB........|W|4|4",
+      "source_rows": [
+        3,
+        8,
+        9,
+        10,
+        11,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        28
+      ]
+    },
+    {
+      "exact_history_sha256": "417e54aef20ae2fdef99bbabfbb0f3755bb4505a0d4fa9e9e64d5141a4231017",
+      "group_id": "P04",
+      "history": "d6 d2 f4 b4 g7 g4 d7 d5",
+      "nmm_fen": ".WWB.....W.W.B.B.B......|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P04.png",
+        "sha256": "68f63eb1b54a2efd3a00a64dae02876670ff097704f3237557c58fbdfcebd691",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P04",
+      "ring16_canonical_fen": ".......B.B.B.W.W.....BWW|W|4|4",
+      "source_rows": [
+        4,
+        5
+      ]
+    },
+    {
+      "exact_history_sha256": "66bfe9f8a24a24b8b360c97a14fae133ea2176ec1f704b7691684fc03a944fce",
+      "group_id": "P05",
+      "history": "d6 d2 f4 b4 g7 g4 d7 a7",
+      "nmm_fen": "BWWB.....W.W.B.B........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P05.png",
+        "sha256": "3b0b5cc5dd2606d1a183da0f017c23096d7b1c8146b39d291df7e7fdf84fa082",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P05",
+      "ring16_canonical_fen": ".........B.B.W.W....BWWB|W|4|4",
+      "source_rows": [
+        6,
+        7
+      ]
+    },
+    {
+      "exact_history_sha256": "8544f278a15b1fcd6a9a94efc1453251661b71fc4ff4eca07742ab3f2a723a46",
+      "group_id": "P06",
+      "history": "d6 d2 f4 b4 g7 d3 d1 c4",
+      "nmm_fen": "..W..W...W.W.B.B.....B.B|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P06.png",
+        "sha256": "ed7a736a13835521ff570e0e920515a4f22e809db5d3eb7781457adb50105507",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P06",
+      "ring16_canonical_fen": ".....B.B.W.W.B.B..W....W|W|4|4",
+      "source_rows": [
+        12
+      ]
+    },
+    {
+      "exact_history_sha256": "982ea788afa9cb30fe3d6be096960949995c012d12df125d67dc9055ff6f0097",
+      "group_id": "P07",
+      "history": "d6 d2 f4 b6 c3 b2 f2 b4xf2",
+      "nmm_fen": "........BW.W.BBB......W.|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P07.png",
+        "sha256": "77ad3b8293fe6069c1c43686aca8f30ce39c40dde7d879e799da7459df526796",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P07",
+      "ring16_canonical_fen": ".........BBBBW.W..W.....|W|4|4",
+      "source_rows": [
+        13
+      ]
+    },
+    {
+      "exact_history_sha256": "481278a3c2947a6a5e9f8f4246403472d6c57a3b2b0858eced07a9db8f1f6119",
+      "group_id": "P08",
+      "history": "d6 d2 f4 b4 f6 f2 b6xb4 b2xf4",
+      "nmm_fen": "........WWW.BBB.........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P08.png",
+        "sha256": "203068a7cdf3870a42ec369b974652573c4a390a181d1ee9f10f6977b876a2f5",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P08",
+      "ring16_canonical_fen": "........B.WWW.BB........|W|4|4",
+      "source_rows": [
+        24,
+        25
+      ]
+    },
+    {
+      "exact_history_sha256": "5582f0f3f9ee6715b1bf7c5b51327c188a659db0546e13ab4818b3f5c19f39e2",
+      "group_id": "P09",
+      "history": "d6 d2 f4 b4 c4 d5 d3 e4",
+      "nmm_fen": ".........W.W.B.B.B.B.W.W|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P09.png",
+        "sha256": "d553a80b3a666923c374d439921399439806c2620eee5726eaeda28cbe8adce2",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P09",
+      "ring16_canonical_fen": ".........B.B.W.W.W.W.B.B|W|4|4",
+      "source_rows": [
+        26,
+        27
+      ]
+    },
+    {
+      "exact_history_sha256": "8b6149625e17eea637ac14d8ccd366cc4dbb07651e8402940b8785bf20d86965",
+      "group_id": "P10",
+      "history": "d6 d2 f4 b2 f2 f6 a4 c4",
+      "nmm_fen": ".......W.WBWWBB........B|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P10.png",
+        "sha256": "f1942c6bdc0c0abb90914fb9542f5155b966f1e8366f7cf1d7c8b3114f31d773",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P10",
+      "ring16_canonical_fen": ".......B.WBWWBB........W|W|4|4",
+      "source_rows": [
+        29
+      ]
+    },
+    {
+      "exact_history_sha256": "760c881a406647a82b5832101020462e5074b3e816b7bfceca7c9fd6b796431c",
+      "group_id": "P11",
+      "history": "d6 d2 f4 f2 b2 b4 a4 d7",
+      "nmm_fen": ".B.....W.W.WBBWB........|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P11.png",
+        "sha256": "691476f0b2b72bab6ee85e9c768258dbb2d6e4c91ff940d6274a28a1a43f1620",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P11",
+      "ring16_canonical_fen": ".........BWBBW.W.W.....B|W|4|4",
+      "source_rows": [
+        30
+      ]
+    },
+    {
+      "exact_history_sha256": "1d3c37e7a593ad71fb0ecc51300814b9ca0867055e72e2241dd207325e3e286e",
+      "group_id": "P12",
+      "history": "g4 b4 e3 d2 e4 e5 f4xe5 e5",
+      "nmm_fen": "...W.......W.B.B..BWW...|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P12.png",
+        "sha256": "ba9dc44f73a89d46fd3a0338279473bd5a55663daf30b691ee73cd48658b594c",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P12",
+      "ring16_canonical_fen": ".......W...B.B.WB.....WW|W|4|4",
+      "source_rows": [
+        31
+      ]
+    },
+    {
+      "exact_history_sha256": "3140b59c5a341db873f9df67fdf59dd42e9f6e903f8d7f6e9dc18ea8f4dca4a0",
+      "group_id": "P13",
+      "history": "g4 b4 e3 d2 e4 f4 e5xf4 f4",
+      "nmm_fen": "...W.......B.B.B..WWW...|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P13-A.png",
+        "sha256": "3fea0434c158f01702125737a194e0c6a5efcf996c26589533645ad8becf0bd6",
+        "width": 720
+      },
+      "record_count": 2,
+      "review_id": "P13-A",
+      "ring16_canonical_fen": ".......W...B.B.BW.....WW|W|4|4",
+      "source_rows": [
+        32,
+        33
+      ]
+    },
+    {
+      "exact_history_sha256": "366ad91b539844c8ff64cbc78cbeb6d05dd13f7d096049c11b3296b305f14a3c",
+      "group_id": "P13",
+      "history": "g4 b4 e3 d6 e4 f4 e5xd6 d6",
+      "nmm_fen": "...W.....B.B...B..WWW...|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P13-B.png",
+        "sha256": "bf10e9593603fe26fc55082f3d4a149f62adc421573485e8a09f3791ec83e50f",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P13-B",
+      "ring16_canonical_fen": ".......W...B.B.BW.....WW|W|4|4",
+      "source_rows": [
+        35
+      ]
+    },
+    {
+      "exact_history_sha256": "e597aa22f250601e6682f4cea261bb04a4cccd48940e5e7c427ea1377739069d",
+      "group_id": "P14",
+      "history": "g4 b4 e3 f4 d1 d2 e5 e4",
+      "nmm_fen": "...W.W.....B.B.B..WBW...|W|4|4",
+      "panel": {
+        "height": 840,
+        "path": "parents/P14.png",
+        "sha256": "0f598b8466d351f652dc82e7d861da01b01ebb3d0167dc72628f0d043c0ad784",
+        "width": 720
+      },
+      "record_count": 1,
+      "review_id": "P14",
+      "ring16_canonical_fen": ".....W.W...B.B.BW.....WB|W|4|4",
+      "source_rows": [
+        34
+      ]
+    }
+  ],
+  "rendered_positions": {
+    "count": 43,
+    "ordered_fens_sha256": "1ce2230fadf255f8e951cf411dd1803ac317c179a0f13655c5e6e64cbb951a62"
+  },
+  "renderer": {
+    "path": "tools/render_layered_expert_book_review.py",
+    "pillow_version": "12.3.0",
+    "sha256": "6fc7748f9719cf6f6276000924ec73b91792a9903dc8edf95227b5b1aec44a47"
+  },
+  "schema_version": "nmm.layered-expert-book-review-assets.v1",
+  "source": {
+    "audit_identity": "29293523ba211775827bfd903ef8dd0a0220bcd958a46974e37809a55dd51ff4",
+    "path": "docs/evidence/sanmill-layered-expert-book-source-audit-2026-07-26.json",
+    "sha256": "e6bdb4d66f868fde6cdf1928b25174d323da533c03f074cf1c717b428bbdf107"
+  },
+  "status": "semantic_review_only_not_corpus_freeze",
+  "summary": {
+    "asset_count": 51,
+    "child_panel_count": 28,
+    "exact_parent_variant_count": 15,
+    "multi_child_exact_parent_count": 7,
+    "parent_group_count": 14
+  }
+}

@@ -273,8 +273,12 @@ This evidence supports adding the expert material as a Book candidate subtype,
 not adding all rows or changing the Book quota automatically. Row 11's final
 `c5` is screenshot-derived but unambiguous at original resolution; its visual
 evidence basis remains recorded and is not an expert-confirmation blocker. The
-provisional corpus decision must now account for parent coverage and the two
-distinct Book subtypes before any list is frozen.
+remaining four Mill-domain judgments are defined in the
+[expert parent-and-child review guide](sanmill-layered-expert-book-parent-review.md):
+human family classification, structural-group combination or splitting,
+parent-coverage priority, and strategically distinct child selection. The
+provisional corpus decision must account for that review and the two distinct
+Book subtypes before any list is frozen.
 
 ## Current delivery and corpus decision
 
@@ -288,7 +292,8 @@ The completed source comparison and provisional `22 Book / 21 HumanDB /
 21 Perfect DB` recommendation are recorded in the
 [corpus decision brief](sanmill-layered-opening-prefix-v2-decision-brief.md).
 That composition is not frozen. Product confirmation is required before an
-immutable list or review material is generated.
+immutable list or final corpus image-review material is generated. The
+source-only semantic guide above does not select corpus members.
 
 ## Explicit exclusions
 

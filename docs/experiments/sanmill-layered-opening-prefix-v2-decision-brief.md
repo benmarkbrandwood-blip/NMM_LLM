@@ -208,10 +208,23 @@ source does not justify changing that overall split.
 
 Before freezing the 22 Book members, the Mill expert should review the 14
 eight-ply structural parent groups against the human opening-family concepts
-used in the delivered repertoire. That review is a narrow semantic gate, not
-a request to recheck legality, hashes, HumanDB frequency, row 11, or Sanmill
-replay.
+used in the delivered repertoire. The
+[expert parent-and-child review guide](sanmill-layered-expert-book-parent-review.md)
+turns that gate into four concrete questions:
+
+1. which human opening family or strategic plan describes each parent;
+2. which structural groups should be combined or split at the human-strategy
+   level;
+3. which resulting parents are core, useful, or optional/niche coverage; and
+4. which continuations from the same exact parent are strategically distinct
+   enough to supplement its primary twelve-ply child.
+
+The guide defines the fourth point by strategic purpose rather than move
+difference and provides all 14 parent histories plus every multi-child
+continuation. The review remains semantic: it is not a request to recheck
+legality, hashes, HumanDB frequency, row 11, Sanmill replay, or objective
+strength.
 
 Until that decision is recorded, status remains `needs_decision`; no final
-prefix list, review package, candidate-versus-baseline run, or launch
-authorization exists.
+prefix list, final corpus image-review package, candidate-versus-baseline run,
+or launch authorization exists.

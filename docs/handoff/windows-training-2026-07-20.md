@@ -823,8 +823,12 @@ The updated
 recommends a non-frozen near-balanced `22 Book / 21 HumanDB / 21 Perfect DB`
 composition. Status remains `needs_decision` until the product owner approves
 that composition and the Mill expert reviews the 14 structural parent groups
-against human opening-family concepts. The two Book subtypes have no frozen
-internal allocation.
+against human opening-family concepts. The
+[expert parent-and-child review guide](../experiments/sanmill-layered-expert-book-parent-review.md)
+defines the four requested outputs: family classification, semantic
+combination or splitting of structural groups, parent-coverage priority, and
+identification of strategically distinct children from the same exact
+parent. The two Book subtypes have no frozen internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -982,9 +986,11 @@ training merely because the managed run ended. Proceed in this order:
    expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
    was created without deleting active sidecars. Review the proposed
    `22 Book / 21 HumanDB / 21 Perfect DB` split and the 14 expert parent
-   groups; do not generate or freeze the final list until the product decision
-   and narrow expert mapping are recorded. Row 11's screenshot-derived `c5`
-   is source-verified and retains a visual provenance marker. There is no
+   groups using the
+   [expert review guide](../experiments/sanmill-layered-expert-book-parent-review.md);
+   do not generate or freeze the final list until the product decision and
+   four narrow expert judgments are recorded. Row 11's screenshot-derived
+   `c5` is source-verified and retains a visual provenance marker. There is no
    runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,

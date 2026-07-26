@@ -155,5 +155,32 @@ A later Book selection rule should:
 5. retain row 11's visual rather than typed evidence basis in any later
    provenance record.
 
-The overall 64-prefix composition and the allocation between the two Book
-subtypes remain product and expert decisions.
+The remaining Mill-domain review is defined in the
+[expert parent-and-child review guide](../experiments/sanmill-layered-expert-book-parent-review.md).
+It requests four explicit judgments:
+
+1. name or describe the human opening family represented by each of the 14
+   structural parent groups;
+2. identify strategic family relationships that require combining different
+   structural groups or splitting one normalised group;
+3. classify the resulting parents as core, useful, or optional/niche for
+   coverage; and
+4. for each exact parent with multiple continuations, choose one primary
+   twelve-ply child and identify any additional children whose plies 9–12
+   express a genuinely different human strategy.
+
+The fourth judgment is not a request to retain every different move sequence.
+An additional child needs a distinct Mill, block, fork, chain, trap, escape,
+regional-development, or opponent-response plan. Symmetric renderings,
+transpositions, exact duplicates, and minor alternatives with the same plan do
+not gain a separate place merely because their coordinates differ.
+
+The guide lists every parent group, source row, eight-ply history, and
+multi-child continuation. It embeds 15 full-size exact-parent panels and seven
+same-exact-parent child comparison sheets, all bound to the frozen audit by a
+hashed manifest. It also makes clear that `ring16` has already normalised
+rotations, reflections, and the inner/outer-ring swap; the expert is being
+asked for human strategic semantics that the structural audit cannot infer.
+
+The overall 64-prefix composition, the allocation between the two Book
+subtypes, and the exact selected members remain product and expert decisions.
