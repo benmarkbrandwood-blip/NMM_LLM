@@ -42,6 +42,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 PYTHON=".venv/bin/python"
+# Force unbuffered stdout so `| tee` shows epoch lines as they happen rather
+# than sitting in an 8 KB block-buffer for ~40 epochs before flushing.
+export PYTHONUNBUFFERED=1
 CKPT_ROOT="learned_ai/sentinel/checkpoints"
 GAME_DIR="${GAME_DIR:-data/games}"
 HUMAN_GAME_DIR="${HUMAN_GAME_DIR:-data/human_games}"
