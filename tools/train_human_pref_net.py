@@ -128,8 +128,18 @@ def build_pairs(
     limit_positions: int | None = None,
     pairs_per_position: int = 4,
     seed: int = 42,
-) -> tuple[np.ndarray, np.ndarray, dict]:
-    """Return (X_pos, X_neg, stats) where each row is a chosen/other successor pair."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+    """Return (X_pos, X_neg, weights, stats) where each row is a chosen/other successor pair.
+
+    §H1 — position-level held-out slice: state_keys in the shared val bucket
+    (learned_ai.data.human_db_split.in_val_bucket) are skipped entirely so
+    eval_human_pref_net.py can grade on positions the trainer never saw.
+
+    §H1 — pair weight: `weights[i]` is the total human play-count for the
+    chosen move.  Downstream loss weights each pair by its frequency so a
+    move played 1000× counts 1000× as strongly as a move played once.
+    """
+    from learned_ai.data.human_db_split import in_val_bucket
     if not db_path.exists():
         raise FileNotFoundError(f"human_db not found at {db_path}")
 
@@ -137,23 +147,28 @@ def build_pairs(
     conn = sqlite3.connect(str(db_path))
     # Grouping by state_key requires deterministic order.
     rows = conn.execute(
-        "SELECT state_key, notation, malom_wdl_after FROM moves "
+        "SELECT state_key, notation, malom_wdl_after, total FROM moves "
         "WHERE malom_wdl_after IS NOT NULL ORDER BY state_key"
     )
 
     pos_feats: list[np.ndarray] = []
     neg_feats: list[np.ndarray] = []
+    weights:   list[float]      = []   # §H1
     stats = defaultdict(int)
     t0 = time.time()
 
     current_key: str | None = None
-    buffered: list[tuple[str, str]] = []   # (notation, malom_wdl_after)
+    buffered: list[tuple[str, str, int]] = []   # (notation, malom_wdl_after, total)
     n_positions_seen  = 0
 
-    def _flush(key: str, records: list[tuple[str, str]]) -> None:
+    def _flush(key: str, records: list[tuple[str, str, int]]) -> None:
         nonlocal n_positions_seen
         n_positions_seen += 1
         stats["positions_seen"] += 1
+        # §H1 — position-level held-out: skip val-bucket state_keys entirely.
+        if in_val_bucket(key):
+            stats["positions_val_skipped"] += 1
+            return
         wdls = [r[1] for r in records]
         keep = _per_state_filter(wdls)
         if keep is None:
@@ -174,7 +189,7 @@ def build_pairs(
         notation_to_move: dict[str, dict] = {}
         for m in legal:
             notation_to_move[_move_notation(m)] = m
-        for chosen_notation, _ in chosen_records:
+        for chosen_notation, _wdl, chosen_total in chosen_records:
             move = notation_to_move.get(chosen_notation)
             if move is None:
                 stats["notation_match_miss"] += 1
@@ -195,6 +210,9 @@ def build_pairs(
             if not others:
                 continue
             sampled = others if len(others) <= pairs_per_position else rng.sample(others, pairs_per_position)
+            # §H1 — per-pair weight = human play frequency of the chosen move.
+            # Clamp to 1 so a move recorded with total=0 doesn't zero out the loss.
+            _pair_weight = float(max(1, int(chosen_total or 0)))
             for other in sampled:
                 try:
                     other_board = board.apply_move(other)
@@ -210,9 +228,10 @@ def build_pairs(
                     continue
                 pos_feats.append(chosen_feat)
                 neg_feats.append(other_feat)
+                weights.append(_pair_weight)
                 stats["pairs"] += 1
 
-    for state_key, notation, wdl_after in rows:
+    for state_key, notation, wdl_after, total in rows:
         if current_key is None:
             current_key = state_key
         if state_key != current_key:
@@ -221,7 +240,7 @@ def build_pairs(
             current_key = state_key
             if limit_positions is not None and n_positions_seen >= limit_positions:
                 break
-        buffered.append((notation, wdl_after))
+        buffered.append((notation, wdl_after, int(total or 0)))
     else:
         # Flush the final group only if we exited normally.
         if current_key is not None and buffered:
@@ -238,7 +257,8 @@ def build_pairs(
 
     X_pos = np.stack(pos_feats)
     X_neg = np.stack(neg_feats)
-    return X_pos, X_neg, dict(stats)
+    W_arr = np.asarray(weights, dtype=np.float32)
+    return X_pos, X_neg, W_arr, dict(stats)
 
 
 # ── Model + training (PyTorch) ───────────────────────────────────────────────
@@ -276,7 +296,7 @@ def _save_npz(model, output: Path) -> None:
 
 
 def train_model(
-    X_pos: np.ndarray, X_neg: np.ndarray,
+    X_pos: np.ndarray, X_neg: np.ndarray, weights: np.ndarray,
     epochs: int, batch_size: int, lr: float, val_frac: float,
     patience: int, seed: int, output: Path,
 ) -> dict:
@@ -287,6 +307,14 @@ def train_model(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model  = _build_model().to(device)
     opt    = torch.optim.Adam(model.parameters(), lr=lr)
+
+    # §H1 — normalise weights to mean 1 so per-batch magnitudes stay
+    # comparable to the unweighted loss the earlier hyperparams were tuned for.
+    _w = np.asarray(weights, dtype=np.float32)
+    _w_mean = float(_w.mean()) if _w.size else 1.0
+    if _w_mean > 0:
+        _w = _w / _w_mean
+    W_all = torch.from_numpy(_w)
 
     N = X_pos.shape[0]
     n_val = max(1, int(N * val_frac))
@@ -302,16 +330,21 @@ def train_model(
     X_neg_tr_cpu = torch.from_numpy(np.ascontiguousarray(X_neg[tr_idx]))
     X_pos_va_cpu = torch.from_numpy(np.ascontiguousarray(X_pos[val_idx]))
     X_neg_va_cpu = torch.from_numpy(np.ascontiguousarray(X_neg[val_idx]))
+    # §H1 — per-pair frequency weights, indexed the same way as X_pos/X_neg.
+    W_tr_cpu = W_all[torch.from_numpy(tr_idx.copy())]
+    W_va_cpu = W_all[torch.from_numpy(val_idx.copy())]
 
-    def _epoch_loss(X_p_cpu, X_n_cpu) -> float:
-        # Bradley-Terry: minimise -log σ(pos - neg) = softplus(-(pos - neg))
+    def _epoch_loss(X_p_cpu, X_n_cpu, W_cpu) -> float:
+        # §H1 — Bradley-Terry loss, weighted by human play frequency.
         n = X_p_cpu.shape[0]
         total = 0.0
         for start in range(0, n, batch_size):
             end   = min(start + batch_size, n)
             s_p = model(X_p_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
             s_n = model(X_n_cpu[start:end].to(device, non_blocking=True)).squeeze(-1)
-            loss = F.softplus(-(s_p - s_n)).mean()
+            w   = W_cpu[start:end].to(device, non_blocking=True)
+            per = F.softplus(-(s_p - s_n))
+            loss = (per * w).sum() / w.sum().clamp(min=1e-6)
             total += float(loss.item()) * (end - start)
         return total / max(n, 1)
 
@@ -343,9 +376,11 @@ def train_model(
             idx = perm[start:end]
             xp = X_pos_tr_cpu[idx].to(device, non_blocking=True)
             xn = X_neg_tr_cpu[idx].to(device, non_blocking=True)
+            w  = W_tr_cpu[idx].to(device, non_blocking=True)
             s_p = model(xp).squeeze(-1)
             s_n = model(xn).squeeze(-1)
-            loss = F.softplus(-(s_p - s_n)).mean()
+            per  = F.softplus(-(s_p - s_n))
+            loss = (per * w).sum() / w.sum().clamp(min=1e-6)
             opt.zero_grad()
             loss.backward()
             opt.step()
@@ -354,7 +389,7 @@ def train_model(
 
         model.eval()
         with torch.no_grad():
-            val_loss = _epoch_loss(X_pos_va_cpu, X_neg_va_cpu)
+            val_loss = _epoch_loss(X_pos_va_cpu, X_neg_va_cpu, W_va_cpu)
             val_acc  = _val_acc(X_pos_va_cpu, X_neg_va_cpu)
 
         marker = ""
@@ -410,7 +445,7 @@ def main() -> int:
         print(f"[hp] WARNING: output {args.output} exists and will be overwritten.")
 
     print(f"[hp] Building pairs from {args.db}")
-    X_pos, X_neg, stats = build_pairs(
+    X_pos, X_neg, weights, stats = build_pairs(
         args.db,
         limit_positions=args.limit,
         pairs_per_position=args.pairs_per_position,
@@ -420,15 +455,16 @@ def main() -> int:
     print("[hp] Data build summary:")
     for k, v in stats.items():
         print(f"    {k:>30} : {v:,}" if isinstance(v, int) else f"    {k:>30} : {v}")
-    print(f"    X_pos shape: {X_pos.shape}   X_neg shape: {X_neg.shape}")
+    print(f"    X_pos shape: {X_pos.shape}   X_neg shape: {X_neg.shape}   "
+          f"weights: mean={weights.mean():.1f} max={weights.max():.0f}")
     print()
 
-    print(f"[hp] Training MLP {_INPUT_DIM} → 128 → 64 → 32 → 1 (Bradley-Terry pairwise BCE).")
+    print(f"[hp] Training MLP {_INPUT_DIM} → 128 → 64 → 32 → 1 (Bradley-Terry pairwise BCE, §H1 freq-weighted).")
     print(f"[hp] epochs={args.epochs}  lr={args.lr}  batch={args.batch_size}  "
           f"patience={args.patience}  val_frac={args.val_fraction}")
 
     result = train_model(
-        X_pos, X_neg,
+        X_pos, X_neg, weights,
         epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
         val_frac=args.val_fraction, patience=args.patience, seed=args.seed,
         output=args.output,

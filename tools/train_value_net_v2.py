@@ -123,7 +123,14 @@ def load_from_human_db(
     db_path: Path,
     limit: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, dict]:
-    """Query positions with a Malom WDL label; return (X, y, stats)."""
+    """Query positions with a Malom WDL label; return (X, y, stats).
+
+    §V2 — filters out state_keys that fall in the shared held-out val bucket
+    (learned_ai/data/human_db_split.in_val_bucket) so training never sees the
+    positions eval_value_net_v2.py will grade on.  This is what makes the
+    held-out comparison honest.
+    """
+    from learned_ai.data.human_db_split import in_val_bucket
     if not db_path.exists():
         raise FileNotFoundError(f"human_db not found at {db_path}")
     conn = sqlite3.connect(str(db_path))
@@ -138,10 +145,14 @@ def load_from_human_db(
     n_bad_key    = 0
     n_bad_wdl    = 0
     n_feat_error = 0
+    n_val_skipped = 0   # §V2
     t_start      = time.time()
 
     for state_key, wdl in conn.execute(q):
         n_seen += 1
+        if in_val_bucket(state_key):
+            n_val_skipped += 1
+            continue
         label = _WDL_TO_LABEL.get(wdl)
         if label is None:
             n_bad_wdl += 1
@@ -177,12 +188,13 @@ def load_from_human_db(
     y = np.asarray(labels, dtype=np.float32)
 
     stats = {
-        "n_seen":       n_seen,
-        "n_usable":     X.shape[0],
-        "n_bad_key":    n_bad_key,
-        "n_bad_wdl":    n_bad_wdl,
-        "n_feat_error": n_feat_error,
-        "load_seconds": round(time.time() - t_start, 2),
+        "n_seen":         n_seen,
+        "n_usable":       X.shape[0],
+        "n_val_skipped":  n_val_skipped,   # §V2 — held-out slice, never trained on
+        "n_bad_key":      n_bad_key,
+        "n_bad_wdl":      n_bad_wdl,
+        "n_feat_error":   n_feat_error,
+        "load_seconds":   round(time.time() - t_start, 2),
     }
     return X, y, stats
 

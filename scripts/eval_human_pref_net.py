@@ -54,9 +54,7 @@ from tools.train_human_pref_net import _move_notation, _per_state_filter
 from scripts.build_gap_dataset import HumanPrefLoader
 
 
-def _val_bucket(state_key: str) -> int:
-    h = hashlib.sha256(state_key.encode("utf-8")).digest()
-    return int.from_bytes(h[:4], "big") % 100
+from learned_ai.data.human_db_split import state_key_bucket as _val_bucket  # §H3
 
 
 def _spearman(xs: list[float], ys: list[float]) -> float:

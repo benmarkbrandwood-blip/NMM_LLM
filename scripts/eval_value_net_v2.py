@@ -40,10 +40,7 @@ from tools.train_value_net_v2 import board_from_state_key
 _WDL_TO_LABEL = {"W": 1.0, "D": 0.0, "L": -1.0}
 
 
-def _val_hash_bucket(state_key: str) -> int:
-    """Deterministic 0-99 bucket per state_key so multiple runs share the split."""
-    h = hashlib.sha256(state_key.encode("utf-8")).digest()
-    return int.from_bytes(h[:4], "big") % 100
+from learned_ai.data.human_db_split import state_key_bucket as _val_hash_bucket  # §V2
 
 
 def load_val(human_db: Path, val_fraction: float, limit: int | None) -> tuple[np.ndarray, np.ndarray, dict]:
