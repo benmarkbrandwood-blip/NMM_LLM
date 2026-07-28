@@ -1,5 +1,11 @@
 # Gen 2b Training Script — Plan
 
+> **Status (2026-07-28)**: every concern in the table below has an
+> implementation in `scripts/train_s_gen_v2b.py`.  This document is kept as
+> a design record; for current behaviour see
+> `docs/discussion_plan.md` (which added §A/§D/§I/§L/§O/§R/§T/§Δ tags on
+> top of the original A–H list) and `script_commands.md`.
+
 ## 1. Motivation
 
 The v2a training run has surfaced several structural issues that cannot be safely

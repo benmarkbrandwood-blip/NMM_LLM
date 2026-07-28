@@ -825,7 +825,21 @@ stage plateaus.
 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh    # gpu run
 MALOM_DB=/path/to/Std_DD_89adjusted ./scripts/train_sentinel_v2_step0.sh
 REBUILD_DATASET=1 ./scripts/train_sentinel_v2_step0.sh   # force dataset rebuild
+RUN_STAGE1=1 ./scripts/train_sentinel_v2_step0.sh        # A/B include Stage 1 (⚠︎ not equivalent to Recipe A of the rollback doc)
 ```
+
+**Extended epoch budget (§S1)**: `configs/sentinel_stage{1,2,4}.yaml` ship
+with `epochs: 100 / 150 / 150` (5× the previous limits) so the trainer has
+room to fit the combined dataset.  Every stage carries `patience: 10`, so
+early-stop still shortens the run when val plateaus.
+
+**Position-level split marker (§S1)**: `scripts/build_sentinel_dataset_v2.py`
+now emits an `is_val` boolean array in the `.npz`.  Every candidate move
+from the same `position_key` (state_key for Malom-sampled rows, board FEN
+for JSONL rows) lands in the same slice, so no ply leaks between train and
+val.  `scripts/train_sentinel.py` picks up the marker automatically; falls
+back to a random per-example split with a warning if a legacy `.npz` has
+no marker.
 
 | Env var | Default | Description |
 | --- | --- | --- |
@@ -1099,6 +1113,51 @@ new training.  Checkpoints from either script are cross-compatible: v2b's
 ## Learned AI — Generalist v2b (train_s_gen_v2b.py)
 
 Full-game generalist that plays from `new_game()` through placement, midgame, and endgame in a single model. Uses a diversified opponent schedule to prevent overfitting to any one difficulty.
+
+**Discussion-plan fixes landed (§A/§D/§I/§L/§O/§R/§T/§Δ)** — see
+`docs/discussion_plan.md` for the full write-up.  Short summary of the
+behavioural changes:
+
+- **§T** — Temperature schedule cools with `games_at_level` (per-level
+  clock, resets on advancement) rather than global `game_count`.
+  `--temp-floor` (default 0.30) sets a persistent minimum effective
+  temperature.  Boost decays per **primary game**, not per outer batch, so
+  batch size no longer changes curriculum timing.  `temp_boost`,
+  `entropy_boost`, and `temp_boost_last_game` round-trip through
+  `latest.pt`.
+- **§D** — Rules-based draws detected during rollout:
+  `DRAW_REPETITION` (threefold identical board+turn) and `DRAW_50_MOVE`
+  (100 half-plies without a capture) are distinct termination reasons from
+  `DRAW_MAX_PLY_TRUNCATED`.
+- **§R** — `latest.pt` persists optimizer state, all four RNG streams
+  (Python / NumPy / torch / torch.cuda), and every periodic counter
+  (`games_since_target_update`, `_last_log_game`,
+  `_last_advance_print_game`, `_last_deep_game`).  Resume is
+  trajectory-equivalent modulo GPU determinism.
+- **§L** — LR-adaptation now smooths its win-rate signal via an EMA
+  (`lr_win_rate_ema`, alpha 0.30, persisted in `latest.pt`), so a single
+  bad log tick can't slam LR to the boundary.
+- **§O** — Console log line uses explicit opponent-class tags: `heur`,
+  `hard`, `easy`, `blnd`, `bldd`, `self`, `?xyz`.  JSONL row still
+  carries the full `game_type` string for downstream analysis.
+- **§A** — Only `vs_heuristic` games at the **current difficulty**
+  populate `level_heuristic_history` (the advancement gate).
+  `is_advance_reference` is a new `_GameConfig` field set exclusively for
+  those games; hard / easy / blend / blunder / frozen games still feed
+  `win_history_heuristic` for display + recovery but do NOT drive
+  advancement.
+- **§I** — INFRA rollouts (learner encoder failure, opponent exception)
+  are excluded from `_retroactive_rescore`, from `ep_steps` extension,
+  from SpecialistDB writes, and from every W/D/L history.  A single
+  broken opponent no longer contaminates the RL update.
+- **§Δ** — `GameDiag.opponent_search_depth_mean` (float): realised
+  opponent search depth per move, averaged over the rollout.  Lets the
+  plot distinguish "harder opponent" from "same opponent + more search
+  time" at high difficulty levels.
+
+New CLI flags: `--temp-floor F`, `--temp-anneal-games N`.  Old flags
+unchanged.  A v2b `latest.pt` produced by any older revision is still
+loadable — missing new fields fall back to safe defaults.
 
 **Opponent schedule (per batch iteration):**
 
