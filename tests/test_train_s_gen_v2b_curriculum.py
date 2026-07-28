@@ -173,12 +173,16 @@ def test_record_cooldown_diverts_from_level_history_only():
 
 
 def test_record_no_cooldown_writes_to_level_history():
+    """After §A, is_full_diff alone is not enough — the game must also be
+    against the advancement-reference opponent to feed level_heuristic_history.
+    """
     record = _load_record_helper()
     wh, whh, lhh, th = deque(), deque(), deque(), deque()
     record(
         TerminationReason.WIN_FEWER_THAN_THREE.value, 1.0,
         wh, whh, lhh, th,
         is_full_diff=True, advance_cooldown_batches=0,
+        is_advance_reference=True,
     )
     assert list(lhh) == [1.0]
 
@@ -232,3 +236,112 @@ def test_advance_stat_over_infra_flooded_window_is_stable():
     # Same denominator (30) after infra exclusion → same percentages
     for r in VALID_OUTCOMES:
         assert p1[r.value] == pytest.approx(p2[r.value], abs=1e-6)
+
+
+# ── §A: advance-reference gate on level_heuristic_history ────────────────────
+
+def test_advance_reference_false_blocks_level_history():
+    """§A — full-diff blend/blunder/hard/easy games (is_advance_reference=False)
+    populate win_history_heuristic (recovery + display) but NOT
+    level_heuristic_history (advancement gate)."""
+    record = _load_record_helper()
+    wh, whh, lhh, th = deque(), deque(), deque(), deque()
+    record(
+        TerminationReason.WIN_FEWER_THAN_THREE.value, 1.0,
+        wh, whh, lhh, th,
+        is_full_diff=True, advance_cooldown_batches=0,
+        is_advance_reference=False,
+    )
+    assert list(wh) == [1.0]
+    assert list(whh) == [1.0]
+    assert list(lhh) == [], "non-reference full-diff game must not feed advancement stat"
+
+
+def test_advance_reference_true_feeds_level_history():
+    """§A — vs_heuristic at current diff (is_advance_reference=True) does
+    populate level_heuristic_history when cooldown is zero."""
+    record = _load_record_helper()
+    wh, whh, lhh, th = deque(), deque(), deque(), deque()
+    record(
+        TerminationReason.WIN_FEWER_THAN_THREE.value, 1.0,
+        wh, whh, lhh, th,
+        is_full_diff=True, advance_cooldown_batches=0,
+        is_advance_reference=True,
+    )
+    assert list(wh) == [1.0]
+    assert list(whh) == [1.0]
+    assert list(lhh) == [1.0], "advance-reference game must feed advancement stat"
+
+
+def test_advance_reference_but_cooldown_still_blocks():
+    """§A — even a reference game does not feed the level history while the
+    cooldown is active."""
+    record = _load_record_helper()
+    wh, whh, lhh, th = deque(), deque(), deque(), deque()
+    record(
+        TerminationReason.WIN_FEWER_THAN_THREE.value, 1.0,
+        wh, whh, lhh, th,
+        is_full_diff=True, advance_cooldown_batches=5,
+        is_advance_reference=True,
+    )
+    assert list(lhh) == [], "cooldown must gate the level history even for reference games"
+    assert list(whh) == [1.0]
+
+
+# ── §R: checkpoint schema contains resume-critical keys ─────────────────────
+
+def test_checkpoint_save_dict_contains_resume_state():
+    """§R — the training script's latest.pt save block must persist optimizer,
+    RNG streams, and every periodic counter.  Regression against silent
+    schema drift.
+    """
+    from pathlib import Path
+    src = (Path(__file__).parent.parent / "scripts" / "train_s_gen_v2b.py").read_text()
+    _required_keys = (
+        # §R
+        '"optimizer_state":',
+        '"rng_python":',
+        '"rng_numpy":',
+        '"rng_torch":',
+        '"rng_torch_cuda":',
+        '"games_since_target_update":',
+        '"last_log_game":',
+        '"last_advance_print_game":',
+        '"last_deep_game":',
+        # §T
+        '"temp_boost":',
+        '"entropy_boost":',
+        '"temp_boost_last_game":',
+        # §A / §L
+        '"advance_rehearsal_remaining":',
+        '"advance_cooldown_batches":',
+        '"lr_win_rate_ema":',
+        # Termination / curriculum
+        '"level_heuristic_history":',
+        '"termination_history":',
+    )
+    missing = [k for k in _required_keys if k not in src]
+    assert not missing, f"latest.pt schema missing §R/§T/§A/§L fields: {missing}"
+
+
+# ── §I: infra guards on _record_rollout_outcome are load-bearing ────────────
+
+def test_infra_guard_still_excludes_from_history_and_advancement():
+    """§I — even with the new is_advance_reference flag, INFRA rollouts must
+    not enter any of the win-history deques nor level_heuristic_history.
+    """
+    record = _load_record_helper()
+    wh, whh, lhh, th = deque(), deque(), deque(), deque()
+    for reason in (TerminationReason.INFRA_LEARNER_FAILURE,
+                   TerminationReason.INFRA_OPPONENT_FAILURE):
+        record(
+            reason.value, 1.0,
+            wh, whh, lhh, th,
+            is_full_diff=True, advance_cooldown_batches=0,
+            is_advance_reference=True,
+        )
+    assert list(wh) == []
+    assert list(whh) == []
+    assert list(lhh) == []
+    assert set(th) == {r.value for r in (TerminationReason.INFRA_LEARNER_FAILURE,
+                                          TerminationReason.INFRA_OPPONENT_FAILURE)}
