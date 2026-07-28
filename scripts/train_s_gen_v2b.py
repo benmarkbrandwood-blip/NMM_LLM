@@ -242,7 +242,9 @@ RECOVERY_SCORE_THRESHOLD = 0.35
 # Score must have dropped by at least this much between first/second half of window
 # for Stage 1 to fire — prevents re-triggering on stable-but-mediocre plateaus.
 RECOVERY_DEGRADE_MARGIN  = 0.05
-TEMP_BOOST_DECAY       = 0.97   # per-iteration decay for advancement/recovery temperature boost
+TEMP_BOOST_DECAY       = 0.97   # legacy per-batch decay, retained for reference; see PER_GAME below
+TEMP_BOOST_PER_GAME_DECAY = 0.995   # multiplicative decay applied per primary game (batch-size invariant)
+TEMP_FLOOR_DEFAULT     = 0.30   # persistent minimum effective temperature to prevent plateau over-cooling
 ENTROPY_BOOST_DECAY    = 0.97   # per-iteration decay for advancement/recovery entropy boost
 HOT_EXPLORE_TEMP_SCALE = 1.3    # hot-explore temperature = temp_start * this multiplier
 
@@ -356,6 +358,12 @@ class GameDiag:
     term_infra_opponent_count: int = 0
     # Cooldown state so we can see it in the log while it decays.
     advance_cooldown_batches: int = 0
+    # §T — temperature schedule components logged as three separate fields so
+    # scheduled anneal + advancement boost + effective clip are separately
+    # observable in the plot.
+    temp_scheduled:           float = 0.0
+    temp_boost:               float = 0.0
+    temp_effective:           float = 0.0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -650,9 +658,19 @@ def _report_final_checkpoints(out_dir: Path) -> None:
         )
 
 
-def _compute_temperature(game_count: int, max_games: int, temp_start: float = TEMP_START) -> float:
-    progress = min(1.0, game_count / max(max_games * 0.8, 1))
-    return float(temp_start - (temp_start - TEMP_END) * progress)
+def _compute_temperature(games_at_level: int, anneal_games: int,
+                         temp_start: float = TEMP_START,
+                         temp_end: float = TEMP_END) -> float:
+    """Per-level cooling: temperature anneals with games_at_level.
+
+    On advancement games_at_level resets to 0, so the scheduled temperature
+    also resets to temp_start — no more silent over-cooling on a plateau
+    (§T of docs/discussion_plan.md).  ``anneal_games`` is the reference
+    horizon in primary games over which the temperature crosses from
+    temp_start to temp_end at a single level.
+    """
+    progress = min(1.0, games_at_level / max(anneal_games * 0.8, 1))
+    return float(temp_start - (temp_start - temp_end) * progress)
 
 
 def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:
@@ -1185,6 +1203,8 @@ def _build_game_diag(
     hot_explore_remaining: int = 0,
     termination_history:   Optional[deque] = None,
     advance_cooldown_batches: int = 0,
+    temp_scheduled:        float = 0.0,
+    temp_boost:            float = 0.0,
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
@@ -1250,6 +1270,9 @@ def _build_game_diag(
         term_infra_learner_count  =int(term_pcts.get("infra_learner", 0.0)),
         term_infra_opponent_count =int(term_pcts.get("infra_opponent", 0.0)),
         advance_cooldown_batches  =int(advance_cooldown_batches),
+        temp_scheduled            =round(float(temp_scheduled), 4),
+        temp_boost                =round(float(temp_boost), 4),
+        temp_effective            =round(float(temperature), 4),
     )
 
 
@@ -1420,10 +1443,21 @@ def run(args: argparse.Namespace) -> None:
     hot_explore_triggered:    bool  = bool(_resume_ckpt.get("hot_explore_triggered",    False))
     recovery_baseline_win_rate: float = float(_resume_ckpt.get("recovery_baseline_win_rate", 0.0))
     _current_recovery_state:  str   = str(_resume_ckpt.get("recovery_state",            ""))
-    temp_boost:               float = 0.0  # not persisted — safe to reset; decays quickly
-    entropy_boost:            float = 0.0
-    advance_rehearsal_remaining: int = 0
+    # Temperature-boost state (§T of docs/discussion_plan.md): now persisted
+    # and decayed per primary game so batch size no longer distorts curriculum
+    # timing.  _temp_boost_last_game tracks the game_count value at which the
+    # boost was last decayed; the loop's per-batch tick multiplies by
+    # TEMP_BOOST_PER_GAME_DECAY ** (game_count - _temp_boost_last_game).
+    temp_boost:               float = float(_resume_ckpt.get("temp_boost", 0.0))
+    entropy_boost:            float = float(_resume_ckpt.get("entropy_boost", 0.0))
+    _temp_boost_last_game:    int   = int(_resume_ckpt.get("temp_boost_last_game", start_game))
+    advance_rehearsal_remaining: int = int(_resume_ckpt.get("advance_rehearsal_remaining", 0))
     _effective_entropy_coef:  float = args.entropy_coef
+    # Per-level cooling horizon (§T).  Falls back to a sensible default derived
+    # from the run budget and the maximum difficulty level.
+    _temp_anneal_games = args.temp_anneal_games if args.temp_anneal_games else max(
+        1, args.max_games // max(1, args.diff_max)
+    )
 
     branch_bucket_history: deque[str] = deque(maxlen=args.bucket_window)
 
@@ -1500,20 +1534,32 @@ def run(args: argparse.Namespace) -> None:
             if advance_cooldown_batches == 0:
                 level_heuristic_history.clear()
                 print(f"[s_gen_v2b] Advance cooldown expired — accumulating fresh samples at diff {difficulty}")
-        _scheduled_temp = _compute_temperature(game_count, args.max_games, args.temp_start)
-        # Decay ongoing boosts
-        if temp_boost > 1e-4:
-            temp_boost *= TEMP_BOOST_DECAY
-        if entropy_boost > 1e-4:
-            entropy_boost *= ENTROPY_BOOST_DECAY
+        # §T — Temperature schedule: cools with games_at_level, not global
+        # game_count, so plateaus at one difficulty do not silently over-cool.
+        _scheduled_temp = _compute_temperature(
+            games_at_level, _temp_anneal_games, args.temp_start
+        )
+        # §T — Boost decay expressed in PRIMARY GAMES, not per outer batch, so
+        # batch size no longer changes curriculum timing.
+        _delta_games = max(0, game_count - _temp_boost_last_game)
+        if _delta_games > 0:
+            _decay_factor = TEMP_BOOST_PER_GAME_DECAY ** _delta_games
+            if temp_boost > 1e-4:
+                temp_boost *= _decay_factor
+            if entropy_boost > 1e-4:
+                entropy_boost *= _decay_factor
+            _temp_boost_last_game = game_count
         _effective_entropy_coef = args.entropy_coef + entropy_boost
-        # Apply temperature boost; cap at 1.5× temp_start to avoid runaway exploration
+        # Apply temperature boost; cap at 1.5× temp_start to avoid runaway exploration.
         temperature = min(args.temp_start * 1.5, _scheduled_temp + temp_boost)
         if hot_explore_remaining > 0:
             hot_explore_remaining = max(0, hot_explore_remaining - args.batch_games)
             temperature = max(temperature, args.temp_start * HOT_EXPLORE_TEMP_SCALE)
             if hot_explore_remaining <= 0:
                 print(f"[s_gen_v2b] Hot-explore phase complete at game {game_count} — armed for full recovery if still failing")
+        # §T — Persistent temperature floor; effective temperature never falls
+        # below this even after annealing + boost decay.
+        temperature = max(temperature, float(args.temp_floor))
         # Rehearsal: expand lower-diff opponent ratio for N iterations after advancement
         _use_rehearsal = advance_rehearsal_remaining > 0
         if _use_rehearsal:
@@ -1769,6 +1815,8 @@ def run(args: argparse.Namespace) -> None:
                 hot_explore_remaining=hot_explore_remaining,
                 termination_history=termination_history,
                 advance_cooldown_batches=advance_cooldown_batches,
+                temp_scheduled=_scheduled_temp,
+                temp_boost=temp_boost,
             )
             diag_buffer.append(_diag)
 
@@ -1891,6 +1939,8 @@ def run(args: argparse.Namespace) -> None:
                         hot_explore_remaining=hot_explore_remaining,
                         termination_history=termination_history,
                         advance_cooldown_batches=advance_cooldown_batches,
+                        temp_scheduled=_scheduled_temp,
+                        temp_boost=temp_boost,
                     ))
 
                     if game_count % 10 == 0:
@@ -2002,9 +2052,10 @@ def run(args: argparse.Namespace) -> None:
                         if args.hot_explore_games > 0:
                             hot_explore_remaining = args.hot_explore_games
                             hot_explore_triggered = True
-                            _sched = _compute_temperature(game_count, args.max_games, args.temp_start)
+                            _sched = _compute_temperature(games_at_level, _temp_anneal_games, args.temp_start)
                             temp_boost    = max(temp_boost,    args.advance_temp_boost_frac * (args.temp_start - _sched))
                             entropy_boost = max(entropy_boost, args.advance_entropy_boost_frac * args.entropy_coef)
+                            _temp_boost_last_game = game_count
                             recovery_grace = args.hot_explore_games
                             _current_recovery_state = "hot_explore"
                             _log_event("recovery_stage1",
@@ -2100,8 +2151,14 @@ def run(args: argparse.Namespace) -> None:
                     # so a resume during rehearsal cooldown cannot bypass the gate.
                     "games_at_level":            games_at_level,
                     "advance_cooldown_batches":  advance_cooldown_batches,
+                    "advance_rehearsal_remaining": advance_rehearsal_remaining,
                     "level_heuristic_history":   list(level_heuristic_history),
                     "termination_history":       list(termination_history),
+                    # §T — temperature-boost state; persisting means restart mid-decay
+                    # resumes with the correct effective temperature.
+                    "temp_boost":                float(temp_boost),
+                    "entropy_boost":             float(entropy_boost),
+                    "temp_boost_last_game":      int(_temp_boost_last_game),
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -2169,10 +2226,13 @@ def run(args: argparse.Namespace) -> None:
                 best_win_rate_at_diff = 0.0
                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
                 frozen_opp.refresh(model)
-                # Decaying temperature + entropy boost to ease the transition to the new difficulty
-                _sched_adv = _compute_temperature(game_count, args.max_games, args.temp_start)
+                # Decaying temperature + entropy boost to ease the transition to the new difficulty.
+                # games_at_level was reset above → scheduled temp is now temp_start.
+                _sched_adv = _compute_temperature(games_at_level, _temp_anneal_games, args.temp_start)
                 temp_boost    = args.advance_temp_boost_frac * (args.temp_start - _sched_adv)
                 entropy_boost = args.advance_entropy_boost_frac * args.entropy_coef
+                # §T — reset the primary-game decay clock so the new boost decays from now.
+                _temp_boost_last_game = game_count
                 # Rehearsal: expand lower-diff opponent ratio for the first N iterations
                 advance_rehearsal_remaining = args.advance_rehearsal_games
                 # Advancement cooldown: block further advances until we've completed
@@ -2211,6 +2271,11 @@ def run(args: argparse.Namespace) -> None:
         "recovery_grace":            recovery_grace,
         "recovery_state":            _current_recovery_state,
         "recovery_baseline_win_rate": recovery_baseline_win_rate,
+        "advance_rehearsal_remaining": advance_rehearsal_remaining,
+        # §T
+        "temp_boost":                float(temp_boost),
+        "entropy_boost":             float(entropy_boost),
+        "temp_boost_last_game":      int(_temp_boost_last_game),
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2b] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
@@ -2245,6 +2310,13 @@ def main() -> None:
     p.add_argument("--diff-start",          type=int,   default=None)
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
     p.add_argument("--temp-start",          type=float, default=TEMP_START)
+    p.add_argument("--temp-floor",           type=float, default=TEMP_FLOOR_DEFAULT,
+                   help="Persistent minimum effective temperature (§T of discussion_plan). "
+                        "Prevents scheduled+boost cooling from crushing exploration on a plateau.")
+    p.add_argument("--temp-anneal-games",    type=int,   default=None,
+                   help="Primary games per level over which temperature cools from "
+                        "temp_start to TEMP_END.  Default: max_games // diff_max.  Cooling clock "
+                        "resets to zero on every difficulty advancement.")
     p.add_argument("--log-every",           type=int,   default=LOG_EVERY)
     p.add_argument("--max-ply",             type=int,   default=MAX_PLY)
     p.add_argument("--max-ply-branch",      type=int,   default=MAX_PLY_BRANCH)
