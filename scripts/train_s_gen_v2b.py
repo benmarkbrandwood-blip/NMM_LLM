@@ -44,7 +44,7 @@ import torch.nn.functional as F
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from game.board import BoardState, MILLS
+from game.board import BoardState, MILLS, POSITIONS
 from game.rules import is_terminal
 from learned_ai.training.termination import (
     TerminationReason,
@@ -934,6 +934,14 @@ def _rollout(
 
     termination_reason: TerminationReason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
 
+    # §D — rules-based draw detection (repetition + N-ply no-capture).  Distinct
+    # from DRAW_MAX_PLY_TRUNCATED so the plot can separate genuine drawn play
+    # from rollouts that simply ran out of the training-time ply budget.
+    _pos_counts: dict[str, int] = {}
+    _plies_since_capture: int = 0
+    _REPETITION_LIMIT = 3       # threefold-repetition draw
+    _NO_CAPTURE_LIMIT = 100     # 100 half-plies = 50 moves per side without a capture / mill
+
     while ply < max_ply:
         if ply == retry_ply:
             retry_board = board
@@ -1013,6 +1021,9 @@ def _rollout(
                 learner_placement_count += 1
             move_history.append(move)   # advance history for next-state context
             hist_feats_next = _build_history_features(move_history)
+            # §D — reset no-capture counter on learner captures.
+            _learner_captured = bool(move.get("capture"))
+            _plies_since_capture = 0 if _learner_captured else _plies_since_capture + 1
 
             board_after = board.apply_move(move)
             learner_result_boards.append(board_after)
@@ -1132,7 +1143,31 @@ def _rollout(
                     opponent_search_nodes += int(last_nodes)
                     opponent_search_calls += 1
             move_history.append(opp_move)
+            _opp_captured = bool(opp_move.get("capture"))
             board = board.apply_move(opp_move)
+            _plies_since_capture = 0 if _opp_captured else _plies_since_capture + 1
+
+        # §D — check the two rules-based draw conditions after every applied move.
+        # A rules draw takes precedence over max_ply truncation because it
+        # represents a genuine outcome the game engine would accept.
+        try:
+            _pos_key = f"{board.turn}|" + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
+        except Exception:
+            _pos_key = None
+        if _pos_key is not None:
+            _pos_counts[_pos_key] = _pos_counts.get(_pos_key, 0) + 1
+            if _pos_counts[_pos_key] >= _REPETITION_LIMIT:
+                outcome = DRAW_LONG
+                termination_reason = TerminationReason.DRAW_REPETITION
+                done = True
+                ply += 1
+                break
+        if _plies_since_capture >= _NO_CAPTURE_LIMIT:
+            outcome = DRAW_LONG
+            termination_reason = TerminationReason.DRAW_50_MOVE
+            done = True
+            ply += 1
+            break
 
         ply += 1
 
