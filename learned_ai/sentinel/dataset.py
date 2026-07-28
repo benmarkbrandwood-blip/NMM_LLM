@@ -446,14 +446,19 @@ class SentinelDataset(_TorchDataset):
 
     # ----- persistence ---------------------------------------------------------
 
-    def save_to_disk(self, path: str) -> None:
-        """Persist all examples to a single ``.npz`` file."""
+    def save_to_disk(self, path: str, is_val: "np.ndarray | None" = None) -> None:
+        """Persist all examples to a single ``.npz`` file.
+
+        §S1 — optionally accepts an `is_val` boolean array (one flag per
+        example) so the builder can freeze a position/game-level split at
+        dataset creation time.  When present, the trainer uses it instead
+        of doing a random per-example split at train time.
+        """
         if not self.examples:
             np.savez_compressed(path, features=np.zeros((0, FEATURE_DIM), np.float32))
             return
         feats = np.stack([e.features for e in self.examples]).astype(np.float32)
-        np.savez_compressed(
-            path,
+        payload = dict(
             features=feats,
             move_quality=np.array([e.move_quality for e in self.examples], np.float32),
             training_weight=np.array([e.training_weight for e in self.examples], np.float32),
@@ -462,6 +467,9 @@ class SentinelDataset(_TorchDataset):
             ply=np.array([e.ply for e in self.examples], np.int64),
             position_key=np.array([e.position_key for e in self.examples], dtype=object),
         )
+        if is_val is not None:
+            payload["is_val"] = np.asarray(is_val, dtype=np.bool_)
+        np.savez_compressed(path, **payload)
 
     @classmethod
     def load_from_disk(cls, path: str) -> "SentinelDataset":
@@ -480,6 +488,9 @@ class SentinelDataset(_TorchDataset):
         ds._arr_source   = data["supervision_source"]
         ds._arr_ply      = data["ply"] if "ply" in data.files else np.zeros(len(ds._arr_features), np.int64)
         ds._arr_pos_key  = data["position_key"] if "position_key" in data.files else None
+        # §S1 — position/game-level split marker (optional).  When present,
+        # trainer honours it instead of doing a random per-example split.
+        ds._arr_is_val   = np.asarray(data["is_val"], dtype=np.bool_) if "is_val" in data.files else None
         return ds
 
     # ----- diagnostics ---------------------------------------------------------

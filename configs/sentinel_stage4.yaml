@@ -7,8 +7,8 @@ hidden_dims: [128, 64, 32]
 dropout: 0.2
 lr: 0.001
 batch_size: 256
-epochs: 30
-patience: 10   # matches Stage 2 slack; final calibration stage
+epochs: 150   # §S1: 30 → 150 to match Stage 2's extended budget; patience 10 shortens as needed
+patience: 10
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage4

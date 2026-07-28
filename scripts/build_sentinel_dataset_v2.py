@@ -248,8 +248,30 @@ def build(
     # Shuffle once before writing so per-batch samples come from both sources.
     rng.shuffle(combined.examples)
 
+    # §S1 — position/game-level split marker.  We split on a stable SHA-256
+    # hash of the position_key (state-key for Malom-sampled rows;
+    # board FEN for JSONL-replayed rows).  Every ply / candidate move from
+    # the same position lands in the same bucket, so no position leaks
+    # between train and val.  Target val_fraction defaults to 0.15 —
+    # matches SentinelConfig.val_fraction.
+    import hashlib
+    _val_frac_target = 0.15
+    _val_bucket_upper = int(round(_val_frac_target * 100))
+    _is_val = np.zeros(len(combined.examples), dtype=np.bool_)
+    for _i, _ex in enumerate(combined.examples):
+        _key = _ex.position_key or "empty"
+        _h = hashlib.sha256(_key.encode("utf-8")).digest()
+        _bucket = int.from_bytes(_h[:4], "big") % 100
+        if _bucket < _val_bucket_upper:
+            _is_val[_i] = True
+    _n_val = int(_is_val.sum())
+    _n_train = len(_is_val) - _n_val
+    print(f"[v2] §S1 position-level split: train={_n_train:,}  val={_n_val:,}  "
+          f"(target val_fraction {_val_frac_target:.0%}, actual "
+          f"{_n_val / max(1, len(_is_val)):.1%})")
+
     out.parent.mkdir(parents=True, exist_ok=True)
-    combined.save_to_disk(str(out))
+    combined.save_to_disk(str(out), is_val=_is_val)
     size_mb = round(out.stat().st_size / (1024 * 1024), 1)
     print(f"[v2] Wrote {out}  ({size_mb} MB)")
 

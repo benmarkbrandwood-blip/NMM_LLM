@@ -18,7 +18,10 @@ hidden_dims: [128, 64, 32]
 dropout: 0.2
 lr: 0.001
 batch_size: 128
-epochs: 30
+# §S1: bumped 30 → 150 (5×) so training gets a real chance to fit the
+# combined-dataset distribution.  Patience 10 still lets us cut early if val
+# stops improving.
+epochs: 150
 patience: 10
 val_fraction: 0.15
 seed: 42

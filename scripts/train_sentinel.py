@@ -165,15 +165,29 @@ def main() -> int:
             return 1
         print(f"Dataset: {n} examples. Quality: {dataset.quality_distribution()}")
         print(f"Supervision sources: {dataset.source_distribution()}")
-        n_val = max(1, int(n * config.val_fraction)) if n > 1 else 0
-        n_train = n - n_val
-        if n_val > 0:
-            train_ds, val_ds = random_split(
-                dataset, [n_train, n_val],
-                generator=torch.Generator().manual_seed(config.seed),
-            )
+        # §S1 — honour a builder-supplied position/game-level split marker
+        # when it is present.  Prevents ply-level leakage between train/val.
+        _arr_is_val = getattr(dataset, "_arr_is_val", None)
+        if _arr_is_val is not None:
+            import torch as _t
+            _val_idx  = np.nonzero(_arr_is_val)[0].tolist()
+            _train_idx = np.nonzero(~_arr_is_val)[0].tolist()
+            train_ds = _t.utils.data.Subset(dataset, _train_idx)
+            val_ds   = _t.utils.data.Subset(dataset, _val_idx) if _val_idx else None
+            print(f"Using builder-supplied split marker: "
+                  f"train={len(_train_idx):,} val={len(_val_idx):,}  (§S1)")
         else:
-            train_ds, val_ds = dataset, None
+            n_val = max(1, int(n * config.val_fraction)) if n > 1 else 0
+            n_train = n - n_val
+            if n_val > 0:
+                train_ds, val_ds = random_split(
+                    dataset, [n_train, n_val],
+                    generator=torch.Generator().manual_seed(config.seed),
+                )
+            else:
+                train_ds, val_ds = dataset, None
+            print(f"Random per-example split: train={n_train:,} val={n_val:,}  "
+                  "(no is_val marker in dataset — consider rebuilding with §S1 split)")
     else:
         db = ExternalSolvedDB(
             db_path=args.db_path or config.external_db_path,

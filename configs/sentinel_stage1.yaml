@@ -7,8 +7,8 @@ hidden_dims: [128, 64, 32]
 dropout: 0.3
 lr: 0.001
 batch_size: 128
-epochs: 20
-patience: 10   # early-stop after 10 consecutive epochs without val-loss improvement
+epochs: 100   # §S1: 20 → 100 (5×); patience 10 shortens as needed
+patience: 10
 val_fraction: 0.15
 seed: 42
 checkpoint_dir: learned_ai/sentinel/checkpoints/stage1
