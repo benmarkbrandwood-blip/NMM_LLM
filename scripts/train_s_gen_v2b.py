@@ -342,6 +342,7 @@ class GameDiag:
     bucket_endgame:          int
     opponent_search_nodes:   int = 0
     opponent_search_calls:   int = 0
+    opponent_search_depth_mean: float = 0.0   # §Δ — realised opponent search depth per move
     opponent_node_budget:    Optional[int] = None
     recovery_state:          str = ""
     hot_explore_remaining:   int = 0
@@ -897,6 +898,9 @@ class RolloutResult:
     opponent_search_nodes: int = 0
     opponent_search_calls: int = 0
     opponent_node_budget:  Optional[int] = None
+    # §Δ — total depth reached (summed across all opponent moves in this rollout).
+    # Divide by opponent_search_calls at diag build time to get the per-move mean.
+    opponent_search_depth_sum: int = 0
     termination_reason:    str = TerminationReason.DRAW_MAX_PLY_TRUNCATED.value
 
 
@@ -956,6 +960,7 @@ def _rollout(
     learner_moves_notation: list[str] = []
     opponent_search_nodes   = 0
     opponent_search_calls   = 0
+    opponent_search_depth_sum = 0   # §Δ — total plies reached by opponent search
     opponent_node_budget    = getattr(opponent, "node_budget", None)
 
     termination_reason: TerminationReason = TerminationReason.DRAW_MAX_PLY_TRUNCATED
@@ -1163,11 +1168,18 @@ def _rollout(
                 termination_reason = TerminationReason.INFRA_OPPONENT_FAILURE
                 done    = True
                 break
-            if opponent_node_budget is not None:
-                last_nodes = getattr(opponent, "last_search_nodes", None)
+            # §Δ — always tally per-move search realisation (nodes + depth)
+            # whether or not the opponent has a fixed node budget, so we can
+            # log realised difficulty and diagnose the diff-10 plateau.
+            _inner = getattr(opponent, "_inner", opponent)
+            last_nodes = getattr(_inner, "last_search_nodes", None)
+            last_depth = getattr(_inner, "last_depth_reached", None)
+            if last_nodes is not None or last_depth is not None:
+                opponent_search_calls += 1
                 if last_nodes is not None:
                     opponent_search_nodes += int(last_nodes)
-                    opponent_search_calls += 1
+                if last_depth is not None:
+                    opponent_search_depth_sum += int(last_depth)
             move_history.append(opp_move)
             _opp_captured = bool(opp_move.get("capture"))
             board = board.apply_move(opp_move)
@@ -1236,6 +1248,7 @@ def _rollout(
         retry_board=retry_board,
         opponent_search_nodes=opponent_search_nodes,
         opponent_search_calls=opponent_search_calls,
+        opponent_search_depth_sum=opponent_search_depth_sum,
         opponent_node_budget=opponent_node_budget,
         termination_reason=termination_reason.value,
     )
@@ -1320,6 +1333,9 @@ def _build_game_diag(
         bucket_endgame         =bucket_counts.get("endgame",  0),
         opponent_search_nodes  =result.opponent_search_nodes,
         opponent_search_calls  =result.opponent_search_calls,
+        opponent_search_depth_mean = round(
+            result.opponent_search_depth_sum / max(1, result.opponent_search_calls), 3
+        ),
         opponent_node_budget   =result.opponent_node_budget,
         recovery_state         =recovery_state,
         hot_explore_remaining  =hot_explore_remaining,
