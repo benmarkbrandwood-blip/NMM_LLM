@@ -20,6 +20,27 @@ Deduplication: each state_key appears once only — prevents opening positions f
 Fallback: if LOSING category is underpopulated, generate synthetic games using
           GameAI at difficulty 5 with 80% value_net blend (human-like play).
 
+⚠️  §G1 (docs/discussion_plan.md) — target semantics correction:
+    docs/retrain_v2_plan.md previously claimed this builder encodes
+    "HumanPref vs Malom disagreement".  It does NOT.  The actual target is
+    a Sentinel+heuristic composite-quality gap between the "best" candidate
+    and the played candidate.  The composite comes from the current sentinel
+    checkpoint plus a normalised heuristic score.  Two consequences:
+
+      * gap_net trained on this dataset ranks positions where a
+        heuristic+sentinel-composite disagreement exists — not
+        necessarily positions where humans blunder against Malom.
+      * The "blunder" category filter only requires the move to be
+        Malom-losing; it does not require a genuinely better Malom move
+        to exist.  A drawn position with all-drawn candidates plus one
+        loss-in-DTW-14 move currently qualifies.
+
+    A "true Malom-disagreement" rebuild would need per-move Malom queries
+    over all legal candidates plus an explicit "better move exists" gate.
+    See §G1 of docs/discussion_plan.md for the rebuild sketch.  Until that
+    rebuild lands, do NOT promote a v2 gap_net trained from this pipeline
+    into production.
+
 Usage:
     .venv/bin/python scripts/build_gap_dataset.py [options]
     .venv/bin/python scripts/build_gap_dataset.py --samples-per-category 20000
@@ -525,6 +546,19 @@ def main():
     if not db_path.exists():
         print(f"ERROR: DB not found at {db_path}")
         sys.exit(1)
+
+    # §G1 — runtime warning banner, in case someone runs the builder without
+    # reading the module docstring or the discussion plan.
+    print("┌─────────────────────────────────────────────────────────────────┐")
+    print("│ §G1 warning: composite target semantics                        │")
+    print("│                                                                 │")
+    print("│ This dataset does NOT encode 'HumanPref vs Malom disagreement'. │")
+    print("│ Targets are a sentinel+heuristic composite quality gap.  Do NOT │")
+    print("│ promote a gap_net trained from this pipeline into production    │")
+    print("│ until the §G1 Malom-disagreement rebuild lands.                 │")
+    print("│ See docs/discussion_plan.md §G1 for details.                    │")
+    print("└─────────────────────────────────────────────────────────────────┘")
+    print()
 
     X, y, y_hp = build_dataset(db_path, sentinel_path, vn_path,
                                args.samples_per_category, args.dtw_threshold,

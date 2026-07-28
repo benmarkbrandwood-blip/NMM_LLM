@@ -619,6 +619,53 @@ Promotion rules therefore stay observational until:
 Only run promotion (Step 8) after all three arms are green.
 
 
+## HumanPrefNet — Diagnostics + ablation (§H2, §H4)
+
+Once the §H1 splitting + frequency-weighting fix (commit `232f3cb`) has
+been retrained end-to-end, run these diagnostics before drawing
+conclusions from any single Spearman number:
+
+- **Per-position ranking accuracy** on multi-move positions in the
+  held-out slice — a robust view that doesn't average away the tails.
+- **Elo-strata top-1 accuracy** on the highest-Elo subset only —
+  requires per-game Elo which the current `human_db.sqlite` schema
+  does not carry.  Add a `min_elo` column to `human_games` positions
+  during a rebuild before this can run.
+- **Prune-bench** — the heuristic AI drops the bottom-10% ranked moves
+  per HumanPrefNet and plays a bench against unpruned; should show
+  ≤5pp regression.
+
+§H4 — controlled attribution ablation for the integration-test game:
+
+- Arm 1: pure HumanPrefNet (VN/GapNet/Sentinel off).
+- Arm 2: HumanPref sampling (softmax) vs argmax at the same blend %.
+- Arm 3: full stack (as it stands today).
+- Fixed seeds + fixed opening positions across arms.
+- Log per-move source (Malom, HumanPref, VN, Sentinel, variance,
+  book) so the ablation output is diagnosable, not just an aggregate.
+
+
+## Board topology experiment (§M2)
+
+Deferred to a separate branch — not scheduled in the v2 retrain cycle.
+The idea: replace the current numeric board-index representation
+(outer-to-inner numbering, used as raw floats in some feature slots)
+with a topology-aware representation that gives the model adjacency,
+mill-line membership, and D4 symmetry structure as inputs.
+
+When we get to this, DO:
+
+- Fork a fresh branch (`board_topology_exp`), don't mid-stream swap.
+- Rebuild all feature emitters (Sentinel + ValueNet + HumanPrefNet +
+  GapNet) so they use the new representation together — mixing old and
+  new representations across the stack will just look like noise.
+- Use fresh checkpoints in `checkpoints/topology_exp/` so nothing
+  overwrites production.
+- Bench the topology stack against the current production stack at
+  matched compute; only merge if the topology stack wins by ≥ a
+  pre-registered threshold on the same eval suite the v2 promotion uses.
+
+
 ## Reconsider later
 
 Some things were built **before** the first end-to-end retrain run.  Revisit them

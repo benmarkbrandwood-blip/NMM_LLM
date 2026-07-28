@@ -577,6 +577,11 @@ class GameAI:
         # Star square opening mode: restrict placement moves to the 12 cross/junction
         # positions until all are claimed, then open all squares.
         self.star_square_mode: bool = False
+        # §M1 — set True in the placement branch when the Star Square filter
+        # actually pruned the legal-move list.  Read by external logging /
+        # bench code that wants to know "was this move constrained by the
+        # Star Square filter, or was it free choice?"  Cleared per move.
+        self._last_star_filter_applied: bool = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -1068,14 +1073,20 @@ class GameAI:
         if not moves:
             return {}
 
-        # Star square mode: restrict placement moves to the 12 cross/junction positions
-        # until all star squares are occupied, then open all squares.
+        # Star square mode (§M1 of docs/discussion_plan.md) — HARD restriction
+        # during placement while at least one star square is empty.  Once
+        # every star square is taken, the filter turns itself off and normal
+        # placement resumes.  The last-move-source flag `last_move_source`
+        # (set on self below when we return) is stamped 'star_filter' so
+        # downstream fast paths / logging can see when this restriction fired.
+        self._last_star_filter_applied = False
         if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 9:
             _empty_stars = {sq for sq in _STAR_SQUARES if board.positions.get(sq, "") == ""}
             if _empty_stars:
                 _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_stars]
                 if _star_moves:
                     moves = _star_moves
+                    self._last_star_filter_applied = True
 
         if len(moves) == 1:
             self.last_was_blunder = False
