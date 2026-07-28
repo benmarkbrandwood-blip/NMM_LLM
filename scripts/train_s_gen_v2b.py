@@ -673,11 +673,27 @@ def _compute_temperature(games_at_level: int, anneal_games: int,
     return float(temp_start - (temp_start - temp_end) * progress)
 
 
-def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:
-    scale  = max(LR_SCALE_MIN, min(LR_SCALE_MAX, win_rate / LR_SCALE_WIN))
+_LR_WIN_RATE_EMA_ALPHA = 0.3   # §L smoothing: 0 = ignore new, 1 = replace instantly
+
+
+def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float,
+              smoothed_win_rate: float | None = None) -> float:
+    """Scale LR from a smoothed win-rate signal so a single bad log tick does
+    not slam LR to the minimum (§L of docs/discussion_plan.md).
+
+    Returns the updated EMA of the win rate so the caller can persist it
+    across restarts and pass it back on the next tick.
+    """
+    if smoothed_win_rate is None or smoothed_win_rate <= 0.0:
+        smoothed = float(win_rate)
+    else:
+        smoothed = (1.0 - _LR_WIN_RATE_EMA_ALPHA) * float(smoothed_win_rate) \
+                   + _LR_WIN_RATE_EMA_ALPHA * float(win_rate)
+    scale  = max(LR_SCALE_MIN, min(LR_SCALE_MAX, smoothed / LR_SCALE_WIN))
     new_lr = lr_base * scale
     for g in opt.param_groups:
         g["lr"] = new_lr
+    return smoothed
 
 
 def _compute_per_move_reward(
@@ -1580,6 +1596,9 @@ def run(args: argparse.Namespace) -> None:
     _last_log_game = int(_resume_ckpt.get("last_log_game", start_game))   # threshold-based log gate
     _last_advance_print_game = int(_resume_ckpt.get("last_advance_print_game", start_game))
     _last_deep_game          = int(_resume_ckpt.get("last_deep_game", start_game))
+    # §L — smoothed win-rate EMA used to scale LR.  Persisted so a resume
+    # doesn't slam the smoothing state back to a spike value.
+    _lr_win_rate_ema         = float(_resume_ckpt.get("lr_win_rate_ema", LR_SCALE_WIN))
     segment_stop = min(args.max_games, game_count + args.segment_games) if args.segment_games else args.max_games
 
     while game_count < segment_stop:
@@ -2034,7 +2053,7 @@ def run(args: argparse.Namespace) -> None:
                 loss_rate    = sum(1 for x in recent_h if x == 0.0) / max(len(recent_h), 1)
                 win_rate_all = sum(1 for x in win_history  if x == 1.0) / max(len(win_history), 1)
 
-                _adapt_lr(opt, win_rate, args.lr)
+                _lr_win_rate_ema = _adapt_lr(opt, win_rate, args.lr, smoothed_win_rate=_lr_win_rate_ema)
 
                 # Recovery trigger: chess-style score (win + 0.5*draw) with lockout
                 # during Stage 2 grace and a degradation check, so we don't re-trigger
@@ -2231,6 +2250,8 @@ def run(args: argparse.Namespace) -> None:
                     "last_log_game":             _last_log_game,
                     "last_advance_print_game":   _last_advance_print_game,
                     "last_deep_game":            _last_deep_game,
+                    # §L — smoothed win-rate EMA driving LR-adaptation
+                    "lr_win_rate_ema":           float(_lr_win_rate_ema),
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -2358,6 +2379,8 @@ def run(args: argparse.Namespace) -> None:
         "last_log_game":             _last_log_game,
         "last_advance_print_game":   _last_advance_print_game,
         "last_deep_game":            _last_deep_game,
+        # §L
+        "lr_win_rate_ema":           float(_lr_win_rate_ema),
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2b] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
