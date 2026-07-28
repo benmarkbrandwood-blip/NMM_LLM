@@ -1204,7 +1204,10 @@ def _rollout(
     if _saved_sim_ply is not None and lookahead_advisor is not None:
         lookahead_advisor._sim_ply_depth = _saved_sim_ply
 
-    if specialist_db is not None and learner_boards:
+    # §I — never write INFRA rollouts to SpecialistDB: their outcome is a
+    # sentinel value, not a real game result.
+    _is_infra_final = termination_reason.value in _INFRA_REASON_VALUES
+    if specialist_db is not None and learner_boards and not _is_infra_final:
         try:
             _res = "W" if outcome == WIN_REWARD else ("D" if outcome in (DRAW_SHORT, DRAW_LONG) else "L")
             specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "gen", learner_color=learner_color)
@@ -1834,10 +1837,14 @@ def run(args: argparse.Namespace) -> None:
             game_forced_placements = cfg.game_forced_placements
             game_retry_ply         = cfg.retry_ply
 
-            if result.trajectory:
+            # §I — skip RL update for INFRA rollouts: their outcome is a
+            # sentinel value, not a real game result, and rescoring/training
+            # on them would contaminate the policy signal.
+            _primary_is_infra = result.termination_reason in _INFRA_REASON_VALUES
+            if result.trajectory and not _primary_is_infra:
                 _retroactive_rescore(result.trajectory, result.step_diags, result.outcome, _draw_scale)
 
-            if result.outcome == WIN_REWARD:
+            if result.outcome == WIN_REWARD and not _primary_is_infra:
                 ep_steps.extend(result.trajectory)
             elif (not args.minimal_rollouts
                   and result.outcome in (LOSS_REWARD, DRAW_SHORT)
@@ -1862,16 +1869,21 @@ def run(args: argparse.Namespace) -> None:
                     specialist_db=specialist_db,
                     malom_db=db,
                 )
-                if confirm_result.trajectory:
+                # §I — confirm rollout also excluded from rescoring / RL update
+                # when the termination is an infra failure.
+                _confirm_is_infra = confirm_result.termination_reason in _INFRA_REASON_VALUES
+                if confirm_result.trajectory and not _confirm_is_infra:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
                                          confirm_result.outcome, _draw_scale)
                 confirmed = (
-                    (result.outcome == LOSS_REWARD and confirm_result.outcome == LOSS_REWARD) or
-                    (result.outcome == DRAW_SHORT  and confirm_result.outcome == DRAW_SHORT)
+                    not _confirm_is_infra and (
+                        (result.outcome == LOSS_REWARD and confirm_result.outcome == LOSS_REWARD) or
+                        (result.outcome == DRAW_SHORT  and confirm_result.outcome == DRAW_SHORT)
+                    )
                 )
                 if confirmed and result.trajectory:
                     ep_steps.extend(result.trajectory)
-                if confirm_result.outcome in (WIN_REWARD, DRAW_SHORT):
+                if confirm_result.outcome in (WIN_REWARD, DRAW_SHORT) and not _confirm_is_infra:
                     ep_steps.extend(confirm_result.trajectory)
                 game_count += 1
                 games_at_level += 1
@@ -1958,7 +1970,9 @@ def run(args: argparse.Namespace) -> None:
                     specialist_db=specialist_db,
                     malom_db=db,
                 )
-                if retry_result.trajectory:
+                # §I — retry rollout excluded from rescoring / RL update on infra failure.
+                _retry_is_infra = retry_result.termination_reason in _INFRA_REASON_VALUES
+                if retry_result.trajectory and not _retry_is_infra:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
@@ -2017,7 +2031,9 @@ def run(args: argparse.Namespace) -> None:
                     malom_db=db,
                 )
 
-                if branch_result.trajectory:
+                # §I — branch rollout excluded from rescoring / RL update on infra failure.
+                _branch_is_infra = branch_result.termination_reason in _INFRA_REASON_VALUES
+                if branch_result.trajectory and not _branch_is_infra:
                     _retroactive_rescore(branch_result.trajectory, branch_result.step_diags, branch_result.outcome, _draw_scale)
                     if branch_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(branch_result.trajectory)
