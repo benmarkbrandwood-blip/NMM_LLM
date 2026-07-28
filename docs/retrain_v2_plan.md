@@ -577,6 +577,48 @@ HumanPrefNet is additive — leave `data/human_pref_net.npz` in place. Setting
 
 ---
 
+## Sentinel v2 — Stage-1 anchoring A/B (§S3)
+
+Skipping Stage 1 rests on a plateau observation, not a controlled test.
+The proper A/B:
+
+- **Arm A** — heuristic warm-start Stage 1 (Recipe A of
+  `docs/sentinel_stage1_rollback.md`) → Stage 2 → Stage 4.  All three
+  stages use the same v2 combined dataset and the same epoch / patience
+  settings as the default pipeline.
+- **Arm B** — direct Malom training: skip Stage 1 entirely (default
+  wrapper flow) → Stage 2 → Stage 4.
+- Equal compute budget for both arms.  Same seed.  Same
+  `scripts/eval_sentinel_db.py` invocation on the promoted checkpoint
+  from each arm (matched `--seed`, matched sample size).
+- Success signal: whichever arm produces the better held-out score wins.
+  Effect within noise → the anchoring claim is overstated.
+
+Track outputs under distinct `checkpoints/v2b_ab/{armA,armB}` prefixes
+so nothing silently overwrites a production candidate.
+
+
+## Sentinel v2 — Benchmark tightness (§S4)
+
+Current v1-vs-v2 game-bench (`tools/bench_sentinel_v2.py`) runs 40
+games per pair at difficulty 5, single seed.  That's not enough to
+distinguish real strength deltas from opponent-schedule noise.
+Promotion rules therefore stay observational until:
+
+- **Games** — at least 200 games per matchup (or a paired-comparison
+  design that reuses each pair of opening positions across both
+  configs — reduces variance without a larger raw count).
+- **Seeds** — run the bench at ≥3 distinct seeds; take the median or
+  z-tested aggregate as the promotion signal.
+- **Threshold** — pre-registered: e.g. v2 must beat v1 by
+  ≥ 4 percentage points in win rate at each seed with ≥ 95% confidence
+  (Wilson score interval).
+- **Report the seed spread** in every promotion decision.  A v2 that
+  wins on seed 42 but loses on seed 137 is inconclusive, not a win.
+
+Only run promotion (Step 8) after all three arms are green.
+
+
 ## Reconsider later
 
 Some things were built **before** the first end-to-end retrain run.  Revisit them

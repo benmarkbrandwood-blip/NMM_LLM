@@ -46,15 +46,19 @@ Identical to what shipped with `configs/sentinel_stage1.yaml` before the skip:
   --device cuda
 ```
 
-Or, equivalent one-liner via the wrapper:
+**§S2 — the wrapper's `RUN_STAGE1=1` path is NOT equivalent to Recipe A.**
 
-```bash
-RUN_STAGE1=1 DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh
-```
+`RUN_STAGE1=1 ./scripts/train_sentinel_v2_step0.sh` still feeds the
+Malom-labelled combined `.npz` to Stage 1 via `--dataset PATH`, so the
+model learns Malom labels — not the pure heuristic labels the rollback
+scenario cares about.  Recipe A (the explicit command above) is the
+canonical way to reproduce the original heuristic-only warm-start.
 
-The wrapper will run Stage 1 → Stage 2 → Stage 4 in sequence.  If you want
-Stage 1 output only, kill the process after the Stage 1 completion banner
-and copy `v2_stage1/best.pt` where you want it.
+Do not treat the wrapper as an equivalent shortcut for this experiment.
+For A/B comparisons that need the heuristic Stage 1, run Recipe A directly
+and keep its output in the clearly-labelled experimental directory
+(`checkpoints/rollback_stage1`) so it cannot silently overwrite a
+production `best.pt`.
 
 ## Recipe B — Human-only variant (drop AI self-play games)
 
