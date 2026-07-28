@@ -93,8 +93,10 @@ def load_val(human_db: Path, val_fraction: float, limit: int | None) -> tuple[np
 
 
 def evaluate_net(net_path: Path, X: np.ndarray, y: np.ndarray) -> dict:
-    net  = ValueNet()
-    net.load(str(net_path))
+    # §V1 — ValueNet.load is a @classmethod that returns a NEW ValueNet with
+    # the loaded weights; the previous code discarded the return value and
+    # evaluated a freshly-initialised random model instead.  Assign the return.
+    net  = ValueNet.load(str(net_path))
     pred = net.predict_batch(X).ravel().astype(np.float32)
     pred = np.clip(pred, -1.0, 1.0)
     mse       = float(np.mean((pred - y) ** 2))
