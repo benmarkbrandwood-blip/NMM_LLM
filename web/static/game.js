@@ -708,13 +708,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Mutual exclusion: Specialist AI ↔ Generalist AI
-  const _chkSpec = $("chk-overseer-player");
-  const _chkGen  = $("chk-generalist-player");
-  if (_chkSpec && _chkGen) {
-    _chkSpec.addEventListener("change", () => { if (_chkSpec.checked) _chkGen.checked = false; });
-    _chkGen.addEventListener("change",  () => { if (_chkGen.checked)  _chkSpec.checked = false; });
-  }
+  // Specialist AI toggle was removed (failed experiment).  The hidden
+  // #chk-overseer-player input stays False forever, so nothing here needs
+  // to toggle it — Generalist AI is the only learned-player option.
 
   $("rng-replay-speed").addEventListener("input", () => {
     const ms = parseInt($("rng-replay-speed").value);

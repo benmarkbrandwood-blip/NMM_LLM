@@ -317,7 +317,31 @@ def load_generalist(
     if ckpt_dir is None:
         ckpt_dir = root / "learned_ai" / "checkpoints" / "scaffolded"
 
-    gen_path = ckpt_dir / "s_gen_v2" / "best.pt"
+    # Allow the user to swap the generalist checkpoint without editing this
+    # file: `data/training_paths.local.json` optionally provides
+    # `generalist_output_dir` (points at the folder containing best.pt) or a
+    # more explicit `generalist_checkpoint` (absolute path to a .pt file).
+    gen_path: Optional[Path] = None
+    try:
+        import json as _json
+        _paths_file = root / "data" / "training_paths.local.json"
+        if _paths_file.exists():
+            _paths = _json.loads(_paths_file.read_text())
+            _explicit = _paths.get("generalist_checkpoint")
+            if _explicit:
+                gen_path = Path(_explicit)
+                if not gen_path.is_absolute():
+                    gen_path = root / gen_path
+            elif _paths.get("generalist_output_dir"):
+                _folder = Path(_paths["generalist_output_dir"])
+                if not _folder.is_absolute():
+                    _folder = root / _folder
+                gen_path = _folder / "best.pt"
+    except Exception:
+        gen_path = None
+    if gen_path is None:
+        gen_path = ckpt_dir / "s_gen_v2" / "best.pt"
+    log.info("GeneralistAgent: checkpoint path = %s", gen_path)
     m_gen, _ = _load_spec_model(gen_path)
     if m_gen is None:
         log.info("GeneralistAgent: no checkpoint at %s", gen_path)

@@ -329,8 +329,8 @@
             <option value="6" selected>6 — Expert</option>
             <option value="7">7 — Master</option>
             <option value="8">8 — Grandmaster</option>
-            <option value="9">9 — Specialist AI (30 s)</option>
-            <option value="10">10 — Specialist AI (60 s)</option>
+            <option value="9">9 — Deep search (30 s)</option>
+            <option value="10">10 — Deep search (60 s)</option>
           </select>
           <div style="font-size:.72rem; color:var(--text-dim); margin-top:4px;">
             Diff 1-8: classical heuristic with your selected blends (VN / gap net / sentinel).
@@ -450,13 +450,10 @@
           </label>
         </div>
 
-        <div class="form-row" id="row-overseer-player" style="flex-direction:row; align-items:center; gap:8px;">
-          <input type="checkbox" id="chk-overseer-player">
-          <label for="chk-overseer-player" style="color:#f5a623; font-size:.9rem;">
-            Specialist AI
-            <span style="font-size:.75rem; color:var(--text-dim);">(phase-routed specialists — diff 9/10 auto-enable)</span>
-          </label>
-        </div>
+        <!-- Specialist AI toggle removed — failed experiment.  Keep a hidden
+             #chk-overseer-player input so any legacy client script that reads
+             `.checked` doesn't throw, and its value stays false forever. -->
+        <input type="checkbox" id="chk-overseer-player" style="display:none;" aria-hidden="true">
 
         <div class="form-row" id="row-generalist-player" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-generalist-player">

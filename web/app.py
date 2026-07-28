@@ -337,7 +337,7 @@ try:
     _overseer_advisor = _load_specialist_router(
         sentinel_advisor=_sentinel_advisor,
         value_net=_value_net,
-        gap_net=_gap_net, human_pref_net=_human_pref_net,
+        gap_net=_gap_net,
         human_db=_human_db,
         specialist_db=_specialist_db,
         runtime_quarantine=_runtime_game_quarantine,
@@ -353,12 +353,18 @@ try:
     _generalist_advisor = _load_generalist(
         sentinel_advisor=_sentinel_advisor,
         value_net=_value_net,
-        gap_net=_gap_net, human_pref_net=_human_pref_net,
+        gap_net=_gap_net,
         human_db=_human_db,
         specialist_db=_specialist_db,
     )
     if _generalist_advisor is not None:
         log.info("GeneralistAgent (s_gen_v2) loaded")
+        # User request: use the Generalist as the Overseer overlay when it
+        # loads, so the per-move pick-probability overlay is generalist-driven
+        # rather than the (now-deprecated) specialist router / legacy overseer.
+        if _overseer_advisor is None:
+            _overseer_advisor = _generalist_advisor
+            log.info("Overseer overlay: using Generalist advisor as the overlay source")
 except Exception as _gre:
     log.warning("GeneralistAgent load failed (%s)", _gre)
 
@@ -2648,7 +2654,7 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         endgame_solved_db=_endgame_solved_db,
         malom_db=_malom_db,
         value_net=_value_net,
-        gap_net=_gap_net, human_pref_net=_human_pref_net,
+        gap_net=_gap_net,
     )
     _apply_search_depth(_gai)
     return _gai
@@ -2955,18 +2961,13 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         log.error("AI deliberation failed: %s", exc, exc_info=True)
         raise
 
-    # Specialist AI mode: triggered by difficulty 9 or 10 (or by the legacy
-    # use_overseer_player toggle, kept as a hidden test hook).  In specialist
-    # mode the coordinator's alpha-beta search (30 s @ diff 9 / 60 s @ diff 10)
-    # provides the top-K candidates; the phase-routed specialist re-ranks them
-    # and its argmax is the played move.  On specialist failure we fall back
-    # to the coordinator's move but print loudly to stderr so the user sees it.
-    _spec_by_diff = (session.game_ai is not None
-                     and int(getattr(session.game_ai, "difficulty", 0)) >= 9)
-    _spec_by_legacy = bool(session.use_overseer_player)
-    _spec_mode = ((_spec_by_diff or _spec_by_legacy)
-                  and _overseer_advisor is not None
-                  and _overseer_advisor.is_loaded())
+    # Specialist AI mode was removed (failed experiment); this block stays
+    # dormant.  We keep the branch structure so downstream `_spec_mode` reads
+    # do not need to change, but _spec_mode is now always False regardless
+    # of the difficulty setting or the (hidden) legacy overseer toggle.
+    _spec_by_diff = False
+    _spec_by_legacy = False
+    _spec_mode = False
     if _spec_mode:
         try:
             # Attach the just-searched coordinator GameAI so the specialist
@@ -3279,7 +3280,7 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_solved_db=_endgame_solved_db,
                             malom_db=_malom_db,
                             value_net=_value_net,
-                            gap_net=_gap_net, human_pref_net=_human_pref_net,
+                            gap_net=_gap_net,
                         )
                         _apply_search_depth(_re_ai)
 
@@ -3394,7 +3395,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
-                        gap_net=_gap_net, human_pref_net=_human_pref_net,
+                        gap_net=_gap_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
@@ -3559,7 +3560,7 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_solved_db=_endgame_solved_db,
                         malom_db=_malom_db,
                         value_net=_value_net,
-                        gap_net=_gap_net, human_pref_net=_human_pref_net,
+                        gap_net=_gap_net,
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
