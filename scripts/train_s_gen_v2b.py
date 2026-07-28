@@ -1905,7 +1905,17 @@ def run(args: argparse.Namespace) -> None:
                 hdr = sum(1 for x in recent_h if x == 0.5) / max(len(recent_h), 1)
                 _awr = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
                 _oc  = "W" if result.outcome == WIN_REWARD else ("L" if result.outcome == LOSS_REWARD else "D")
-                _gt  = "heur" if game_type == "vs_heuristic" else "self"
+                # §O — explicit opponent-class tag in the console print.  The
+                # JSONL row already carries the full `game_type` string; this
+                # just makes the tail-line distinction visible at a glance.
+                _gt = {
+                    "vs_heuristic":         "heur",
+                    "vs_heuristic_hard":    "hard",   # next higher difficulty
+                    "vs_heuristic_easy":    "easy",   # random lower difficulty
+                    "vs_heuristic_blunder": "blnd",   # blundering heuristic
+                    "vs_heuristic_blend":   "bldd",   # blended-net opponent
+                    "vs_frozen":            "self",
+                }.get(game_type, "?" + game_type[:3])
                 _dif = f"d{game_difficulty}" if game_difficulty != difficulty else f"diff {difficulty}"
                 print(f"[s_gen_v2b] {game_count:6d} {_gt:4s} {learner_color} | {_dif} | {_oc} ply={result.ply:3d} | hwr={hwr:.3f} hdr={hdr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
 
