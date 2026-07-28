@@ -1429,7 +1429,7 @@ def run(args: argparse.Namespace) -> None:
     # Option C: lookahead uses same frozen snapshot for learner-side simulated moves.
     lookahead_advisor.set_frozen_model(frozen_opp._model, device=device)
     print("[s_gen_v2b] LookaheadAdvisor: frozen-model driven learner-side (Option C)")
-    games_since_target_update = 0
+    games_since_target_update = int(_resume_ckpt.get("games_since_target_update", 0))
     games_at_level            = int(_resume_ckpt.get("games_at_level", 0))
     # Cooldown gate: blocks advancement while > 0, and diverts rehearsal outcomes
     # away from level_heuristic_history so they can't drive the next advance.
@@ -1453,6 +1453,31 @@ def run(args: argparse.Namespace) -> None:
     print(f"[s_gen_v2b] Args saved → {_args_file.name}")
 
     opt       = torch.optim.Adam(model.parameters(), lr=args.lr)
+    # §R — restore optimizer state on resume so Adam momentum + variance survive.
+    if _resume_ckpt.get("optimizer_state") is not None:
+        try:
+            opt.load_state_dict(_resume_ckpt["optimizer_state"])
+            print("[s_gen_v2b] Optimizer state restored from checkpoint")
+        except Exception as e:
+            print(f"[s_gen_v2b] Optimizer restore failed ({e}) — starting fresh Adam state")
+    # §R — restore RNG states so trajectory is exactly resumable.
+    for _rng_key, _restore in (
+        ("rng_python", lambda s: random.setstate(s)),
+        ("rng_numpy",  lambda s: np.random.set_state(s)),
+        ("rng_torch",  lambda s: torch.set_rng_state(s)),
+    ):
+        _saved = _resume_ckpt.get(_rng_key)
+        if _saved is not None:
+            try:
+                _restore(_saved)
+            except Exception as e:
+                print(f"[s_gen_v2b] {_rng_key} restore failed ({e})")
+    _saved_cuda_rng = _resume_ckpt.get("rng_torch_cuda")
+    if _saved_cuda_rng is not None and torch.cuda.is_available():
+        try:
+            torch.cuda.set_rng_state_all(_saved_cuda_rng)
+        except Exception as e:
+            print(f"[s_gen_v2b] rng_torch_cuda restore failed ({e})")
     update_fn = scaffolded_ppo_update if args.ppo else scaffolded_a2c_update
 
     game_count             = start_game
@@ -1552,9 +1577,9 @@ def run(args: argparse.Namespace) -> None:
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
 
     batch_count   = 0
-    _last_log_game = start_game   # threshold-based log gate; avoids modulo skip when game_count jumps
-    _last_advance_print_game = start_game   # throttle advance-check reason prints
-    _last_deep_game          = start_game   # threshold-based 1-in-20 deep-batch selector
+    _last_log_game = int(_resume_ckpt.get("last_log_game", start_game))   # threshold-based log gate
+    _last_advance_print_game = int(_resume_ckpt.get("last_advance_print_game", start_game))
+    _last_deep_game          = int(_resume_ckpt.get("last_deep_game", start_game))
     segment_stop = min(args.max_games, game_count + args.segment_games) if args.segment_games else args.max_games
 
     while game_count < segment_stop:
@@ -2194,6 +2219,18 @@ def run(args: argparse.Namespace) -> None:
                     "temp_boost":                float(temp_boost),
                     "entropy_boost":             float(entropy_boost),
                     "temp_boost_last_game":      int(_temp_boost_last_game),
+                    # §R — exact resume state.  Optimizer + RNG + all counters that
+                    # gate periodic actions round-trip so restart doesn't shift the
+                    # trajectory silently.
+                    "optimizer_state":           opt.state_dict(),
+                    "rng_python":                random.getstate(),
+                    "rng_numpy":                 np.random.get_state(),
+                    "rng_torch":                 torch.get_rng_state(),
+                    "rng_torch_cuda":            torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                    "games_since_target_update": games_since_target_update,
+                    "last_log_game":             _last_log_game,
+                    "last_advance_print_game":   _last_advance_print_game,
+                    "last_deep_game":            _last_deep_game,
                 }
                 torch.save(ckpt, out_dir / "latest.pt")
 
@@ -2311,6 +2348,16 @@ def run(args: argparse.Namespace) -> None:
         "temp_boost":                float(temp_boost),
         "entropy_boost":             float(entropy_boost),
         "temp_boost_last_game":      int(_temp_boost_last_game),
+        # §R — exact resume state
+        "optimizer_state":           opt.state_dict(),
+        "rng_python":                random.getstate(),
+        "rng_numpy":                 np.random.get_state(),
+        "rng_torch":                 torch.get_rng_state(),
+        "rng_torch_cuda":            torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+        "games_since_target_update": games_since_target_update,
+        "last_log_game":             _last_log_game,
+        "last_advance_print_game":   _last_advance_print_game,
+        "last_deep_game":            _last_deep_game,
     }
     torch.save(ckpt, out_dir / "latest.pt")
     print(f"\n[s_gen_v2b] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
