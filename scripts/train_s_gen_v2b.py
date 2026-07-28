@@ -766,15 +766,19 @@ def _record_rollout_outcome(
     termination_history: deque,
     is_full_diff: bool,
     advance_cooldown_batches: int,
+    is_advance_reference: bool = False,
 ) -> None:
     """Route a rollout outcome into the appropriate histories.
 
     * INFRA_* reasons: recorded only in termination_history for observability.
       They must never enter W/D/L or advancement statistics.
-    * Regular outcomes: full win_history; win_history_heuristic if is_full_diff.
-    * Cooldown active (advance_cooldown_batches > 0): full-diff outcomes still
-      enter win_history_heuristic (so recovery + display work) but do NOT enter
-      level_heuristic_history — that's the fresh-sample gate for advancement.
+    * Regular outcomes: full win_history; win_history_heuristic if is_full_diff
+      (recovery + display) — includes hard / easy / blunder / blend variants.
+    * §A — level_heuristic_history (the advancement gate) is fed ONLY by
+      games flagged is_advance_reference AND outside the rehearsal cooldown.
+      This excludes blended, blunder, and off-diff opponents from the
+      statistical gate so a level advance is driven purely by primary games
+      against the current-difficulty reference heuristic.
     """
     termination_history.append(reason)
     if reason in _INFRA_REASON_VALUES:
@@ -782,8 +786,8 @@ def _record_rollout_outcome(
     win_history.append(hv)
     if is_full_diff:
         win_history_heuristic.append(hv)
-        if advance_cooldown_batches <= 0:
-            level_heuristic_history.append(hv)
+    if is_advance_reference and advance_cooldown_batches <= 0:
+        level_heuristic_history.append(hv)
 
 
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
@@ -871,6 +875,12 @@ class _GameConfig:
     game_type:              str
     game_difficulty:        int
     is_full_diff:           bool
+    # §A — flag set ONLY for the explicit advancement-reference opponent
+    # (vs_heuristic at exactly the current difficulty).  Only these games
+    # feed level_heuristic_history; other full-diff variants (blend, blunder,
+    # easy, hard) still influence recovery + display but are excluded from
+    # the advancement gate.
+    is_advance_reference:   bool
     game_forced_placements: Optional[list[str]]
     retry_ply:              int
     temperature:            float
@@ -1664,7 +1674,8 @@ def run(args: argparse.Namespace) -> None:
             _oc = "B" if _lc == "W" else "W"
 
             _roll = rng.random()
-            _is_full = True   # most new types count for advancement
+            _is_full = True   # most new types count for advancement (recovery + display)
+            _is_advance_ref = False   # §A — flipped True only for vs_heuristic at current diff
 
             if _roll < 0.10:
                 # Next higher difficulty — harder opponent, same-style evaluation
@@ -1715,6 +1726,7 @@ def run(args: argparse.Namespace) -> None:
                     _h._inner = _make_ga(_oc, _gd)
                     _opp, _gt = _h, "vs_heuristic"
                     _is_full = (_gd == difficulty)
+                    _is_advance_ref = _is_full  # §A — only current-diff heur gates advancement
 
             _fp: Optional[list[str]] = None
             if _OPENING_LINES and rng.random() < BOOK_GAME_PROB:
@@ -1725,6 +1737,7 @@ def run(args: argparse.Namespace) -> None:
                     learner_color=_lc, opp_color=_oc, game_type=_gt,
                     game_difficulty=_gd,
                     is_full_diff=_is_full,
+                    is_advance_reference=_is_advance_ref,
                     game_forced_placements=_fp,
                     retry_ply=rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
                     temperature=temperature,
@@ -1817,6 +1830,7 @@ def run(args: argparse.Namespace) -> None:
             game_type              = cfg.game_type
             game_difficulty        = cfg.game_difficulty
             is_full_diff           = cfg.is_full_diff
+            is_advance_reference   = cfg.is_advance_reference   # §A
             game_forced_placements = cfg.game_forced_placements
             game_retry_ply         = cfg.retry_ply
 
@@ -1867,6 +1881,7 @@ def run(args: argparse.Namespace) -> None:
                     confirm_result.termination_reason, _hv,
                     win_history, win_history_heuristic, level_heuristic_history,
                     termination_history, is_full_diff, advance_cooldown_batches,
+                    is_advance_reference=is_advance_reference,
                 )
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
@@ -1877,6 +1892,7 @@ def run(args: argparse.Namespace) -> None:
                 result.termination_reason, _hv,
                 win_history, win_history_heuristic, level_heuristic_history,
                 termination_history, is_full_diff, advance_cooldown_batches,
+                is_advance_reference=is_advance_reference,
             )
             game_count += 1
             games_at_level += 1
@@ -1951,6 +1967,7 @@ def run(args: argparse.Namespace) -> None:
                     retry_result.termination_reason, _rv,
                     win_history, win_history_heuristic, level_heuristic_history,
                     termination_history, is_full_diff, advance_cooldown_batches,
+                    is_advance_reference=is_advance_reference,
                 )
                 game_count += 1
                 games_at_level += 1
