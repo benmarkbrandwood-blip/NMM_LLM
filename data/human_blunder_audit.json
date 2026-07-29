@@ -1,0 +1,378 @@
+{
+  "meta": {
+    "db": "data/human_db.sqlite",
+    "games_dir": "data/human_games",
+    "elapsed_seconds": 107.1,
+    "elo_bands": {
+      "low": "\u22641200",
+      "mid": "1201\u20131600",
+      "high": "1601+",
+      "unknown": "no elo recorded"
+    }
+  },
+  "corpus": {
+    "games_seen": 97136,
+    "games_kept": 96566,
+    "plies_seen": 4594013,
+    "plies_missing_fen": 0,
+    "plies_state_key_error": 0,
+    "plies_canon_notation_missing": 0
+  },
+  "band_summary": [
+    {
+      "elo_band": "high",
+      "total_moves": 13819,
+      "classified_moves": 13205,
+      "blunders": 408,
+      "correct_moves": 12258,
+      "all_losing": 539,
+      "label_inconsistency": 0,
+      "unlabelled": 614,
+      "blunder_rate_of_classified": 0.030897387353275275
+    },
+    {
+      "elo_band": "low",
+      "total_moves": 1414461,
+      "classified_moves": 1382066,
+      "blunders": 94450,
+      "correct_moves": 1033138,
+      "all_losing": 254478,
+      "label_inconsistency": 0,
+      "unlabelled": 32395,
+      "blunder_rate_of_classified": 0.06833971749540181
+    },
+    {
+      "elo_band": "mid",
+      "total_moves": 3165733,
+      "classified_moves": 3083739,
+      "blunders": 155495,
+      "correct_moves": 2572826,
+      "all_losing": 355418,
+      "label_inconsistency": 0,
+      "unlabelled": 81994,
+      "blunder_rate_of_classified": 0.05042417662454572
+    }
+  ],
+  "cells": [
+    {
+      "elo_band": "high",
+      "transition": "all_losing",
+      "phase": "move",
+      "moves": 484
+    },
+    {
+      "elo_band": "high",
+      "transition": "all_losing",
+      "phase": "place",
+      "moves": 55
+    },
+    {
+      "elo_band": "high",
+      "transition": "draw_preserved",
+      "phase": "move",
+      "moves": 4507
+    },
+    {
+      "elo_band": "high",
+      "transition": "draw_preserved",
+      "phase": "place",
+      "moves": 4584
+    },
+    {
+      "elo_band": "high",
+      "transition": "draw_to_loss",
+      "phase": "move",
+      "moves": 95
+    },
+    {
+      "elo_band": "high",
+      "transition": "draw_to_loss",
+      "phase": "place",
+      "moves": 79
+    },
+    {
+      "elo_band": "high",
+      "transition": "unlabelled",
+      "phase": "move",
+      "moves": 569
+    },
+    {
+      "elo_band": "high",
+      "transition": "unlabelled",
+      "phase": "place",
+      "moves": 45
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_preserved",
+      "phase": "move",
+      "moves": 2318
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_preserved",
+      "phase": "place",
+      "moves": 849
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_to_draw",
+      "phase": "move",
+      "moves": 96
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_to_draw",
+      "phase": "place",
+      "moves": 128
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_to_loss",
+      "phase": "move",
+      "moves": 4
+    },
+    {
+      "elo_band": "high",
+      "transition": "win_to_loss",
+      "phase": "place",
+      "moves": 6
+    },
+    {
+      "elo_band": "low",
+      "transition": "all_losing",
+      "phase": "move",
+      "moves": 201804
+    },
+    {
+      "elo_band": "low",
+      "transition": "all_losing",
+      "phase": "place",
+      "moves": 52674
+    },
+    {
+      "elo_band": "low",
+      "transition": "draw_preserved",
+      "phase": "move",
+      "moves": 463787
+    },
+    {
+      "elo_band": "low",
+      "transition": "draw_preserved",
+      "phase": "place",
+      "moves": 407405
+    },
+    {
+      "elo_band": "low",
+      "transition": "draw_to_loss",
+      "phase": "move",
+      "moves": 22739
+    },
+    {
+      "elo_band": "low",
+      "transition": "draw_to_loss",
+      "phase": "place",
+      "moves": 40163
+    },
+    {
+      "elo_band": "low",
+      "transition": "unlabelled",
+      "phase": "move",
+      "moves": 26442
+    },
+    {
+      "elo_band": "low",
+      "transition": "unlabelled",
+      "phase": "place",
+      "moves": 5953
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_preserved",
+      "phase": "move",
+      "moves": 129557
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_preserved",
+      "phase": "place",
+      "moves": 32389
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_to_draw",
+      "phase": "move",
+      "moves": 12741
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_to_draw",
+      "phase": "place",
+      "moves": 15632
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_to_loss",
+      "phase": "move",
+      "moves": 1454
+    },
+    {
+      "elo_band": "low",
+      "transition": "win_to_loss",
+      "phase": "place",
+      "moves": 1721
+    },
+    {
+      "elo_band": "mid",
+      "transition": "all_losing",
+      "phase": "move",
+      "moves": 309915
+    },
+    {
+      "elo_band": "mid",
+      "transition": "all_losing",
+      "phase": "place",
+      "moves": 45503
+    },
+    {
+      "elo_band": "mid",
+      "transition": "draw_preserved",
+      "phase": "move",
+      "moves": 1186641
+    },
+    {
+      "elo_band": "mid",
+      "transition": "draw_preserved",
+      "phase": "place",
+      "moves": 930223
+    },
+    {
+      "elo_band": "mid",
+      "transition": "draw_to_loss",
+      "phase": "move",
+      "moves": 39719
+    },
+    {
+      "elo_band": "mid",
+      "transition": "draw_to_loss",
+      "phase": "place",
+      "moves": 51388
+    },
+    {
+      "elo_band": "mid",
+      "transition": "unlabelled",
+      "phase": "move",
+      "moves": 72893
+    },
+    {
+      "elo_band": "mid",
+      "transition": "unlabelled",
+      "phase": "place",
+      "moves": 9101
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_preserved",
+      "phase": "move",
+      "moves": 369205
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_preserved",
+      "phase": "place",
+      "moves": 86757
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_to_draw",
+      "phase": "move",
+      "moves": 25870
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_to_draw",
+      "phase": "place",
+      "moves": 34155
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_to_loss",
+      "phase": "move",
+      "moves": 1830
+    },
+    {
+      "elo_band": "mid",
+      "transition": "win_to_loss",
+      "phase": "place",
+      "moves": 2533
+    }
+  ],
+  "coverage_state_keys_per_band_at_min_plays": {
+    "low": {
+      "1": 831202,
+      "5": 23814,
+      "10": 8133,
+      "25": 2074,
+      "100": 318
+    },
+    "mid": {
+      "1": 1590567,
+      "5": 70062,
+      "10": 25168,
+      "25": 6803,
+      "100": 845
+    },
+    "high": {
+      "1": 10529,
+      "5": 105,
+      "10": 34,
+      "25": 16,
+      "100": 5
+    }
+  },
+  "elo_histogram_50bucket": {
+    "700": 85,
+    "750": 341,
+    "800": 1646,
+    "850": 6103,
+    "900": 22744,
+    "950": 48674,
+    "1000": 85853,
+    "1050": 162027,
+    "1100": 324717,
+    "1150": 677187,
+    "1200": 989498,
+    "1250": 852370,
+    "1300": 644794,
+    "1350": 411997,
+    "1400": 209911,
+    "1450": 88483,
+    "1500": 34332,
+    "1550": 19232,
+    "1600": 9185,
+    "1650": 4396,
+    "1700": 438
+  },
+  "elo_percentiles_5pct": {
+    "p5": 1050,
+    "p10": 1100,
+    "p15": 1150,
+    "p20": 1150,
+    "p25": 1150,
+    "p30": 1200,
+    "p35": 1200,
+    "p40": 1200,
+    "p45": 1200,
+    "p50": 1200,
+    "p55": 1250,
+    "p60": 1250,
+    "p65": 1250,
+    "p70": 1300,
+    "p75": 1300,
+    "p80": 1300,
+    "p85": 1350,
+    "p90": 1350,
+    "p95": 1400,
+    "p100": 1700
+  }
+}
