@@ -1044,7 +1044,17 @@ def _rollout(
                 probs     = log_probs.exp()
                 if not torch.isfinite(probs).all():
                     probs = torch.where(torch.isfinite(probs), probs, torch.zeros_like(probs))
-                probs     = probs / probs.sum().clamp(min=1e-9)
+                # Fall back to uniform when the row has zero mass — happens
+                # if the policy head produced NaN/-inf logits (bad update
+                # earlier).  torch.multinomial rejects a zero-sum row.
+                _total = probs.sum()
+                if _total.item() <= 1e-9:
+                    probs = torch.ones_like(probs) / max(probs.numel(), 1)
+                    # Recompute log_probs to match the uniform fallback so
+                    # entropy / log_prob_old below stay consistent.
+                    log_probs = torch.log(probs.clamp(min=1e-12))
+                else:
+                    probs = probs / _total
                 entropy   = float((-(probs * log_probs).sum()).item())
 
                 forced_idx = None
