@@ -590,10 +590,34 @@ def _guard_active_db(output_path: Path) -> None:
 
 
 def _resolve_malom_path(cli_path: str, no_malom: bool) -> str:
+    """Resolve the Malom DB directory, in priority order:
+      1. `--no-malom` → return "" (skip annotation).
+      2. Explicit `--malom-db` CLI argument.
+      3. `NMM_MALOM_DB` environment variable (matches
+         tests/test_malom_db.py convention).
+      4. `malom_db_path` from `data/training_paths.local.json`.
+      5. `learned_ai.sentinel.config` (historical fallback; defaults to "").
+    Returns "" if nothing resolves — the caller then runs without Malom
+    annotation.
+    """
     if no_malom:
         return ""
     if cli_path:
         return cli_path
+    env_path = os.environ.get("NMM_MALOM_DB")
+    if env_path:
+        log.info("Malom path from NMM_MALOM_DB env var: %s", env_path)
+        return env_path
+    local_config = ROOT / "data" / "training_paths.local.json"
+    if local_config.exists():
+        try:
+            cfg = json.loads(local_config.read_text(encoding="utf-8"))
+            configured = cfg.get("malom_db_path")
+            if configured:
+                log.info("Malom path from training_paths.local.json: %s", configured)
+                return configured
+        except Exception as e:
+            log.warning("Failed reading %s: %s", local_config, e)
     try:
         from learned_ai.sentinel.config import load_config as _lc
         return getattr(_lc(), "external_db_path", "") or ""

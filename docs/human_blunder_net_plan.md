@@ -226,14 +226,19 @@ Instead:
     perspective + expected Elo-bin totals).
   - Emits a signed report file with the candidate DB's SHA-256,
     schema version, source manifest hash, and validation outcomes.
-- **Rebuild command (illustrative; do not run against active DB):**
+- **Rebuild command.**  Malom path is auto-resolved (priority order:
+  `--malom-db` CLI arg → `NMM_MALOM_DB` env var → `malom_db_path` in
+  `data/training_paths.local.json` → empty).  The `--candidate-out`
+  flag is required whenever `--output` would resolve to the active
+  HumanDB path (the fail-closed guard is enforced in code).
   ```
   .venv/bin/python tools/build_human_db_sha.py \
-      --update \
+      --rebuild \
       --games-dir data/human_games \
-      --candidate-out data/human_db_candidate.sqlite \
-      --malom-db-config data/training_paths.local.json
+      --candidate-out data/human_db_candidate.sqlite
   ```
+  Add `--no-malom` for a fast pre-Malom smoke pass, or `--malom-db /path`
+  to override the config-resolved path.
 - **Activation** is a subsequent, deliberate action — never automatic:
   ```
   cp data/human_db.sqlite data/human_db.sqlite.pre-v3.bak
