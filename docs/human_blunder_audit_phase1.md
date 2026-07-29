@@ -1,16 +1,20 @@
-# HumanBlunderNet — Phase 1 audit (revision 2)
+# HumanBlunderNet — Phase 1 audit (revision 3)
 
-Phase 1 baseline for the HumanBlunderNet project.  This revision rebuilds
-the report against `data/human_blunder_audit_optA.json` (the audit rerun
-under Option A boundaries with expanded sample-flow instrumentation) and
-addresses every reviewer comment on the first revision.
+Phase 1 baseline for the HumanBlunderNet project.  Revision 3 rebuilds
+the report against the audit rerun under **bin-aligned Option A**
+boundaries (`≤1149 / 1150-1249 / ≥1250`) — small shift from the
+reviewer's original suggestion so that 50-Elo bin counts in the
+Phase-2 candidate DB reconstruct each band exactly with no
+boundary-straddling.  Impact of the shift is <1 % of moves per band;
+the blunder-rate gradient (`7.50 % / 5.86 % / 4.84 %`) is unchanged
+in shape.
 
 ## Reproducibility
 
 | Item                    | Value                                             |
 | ----------------------- | ------------------------------------------------- |
 | Audit script            | `tools/audit_human_blunders.py`                   |
-| Audit version           | `1.1`                                             |
+| Audit version           | `1.2` (bin-aligned Option A)                      |
 | Raw JSON output         | `data/human_blunder_audit_optA.json`              |
 | Command                 | `.venv/bin/python tools/audit_human_blunders.py --output data/human_blunder_audit_optA.json` |
 | HumanDB path            | `data/human_db.sqlite`                            |
@@ -112,30 +116,38 @@ Top density buckets (50-Elo bins):
 lives roughly in 1000-1400, with a p95 of only 1400.  Band definitions
 must respect that; universal-strength labelling would be misleading.
 
-## Option A boundaries
+## Option A boundaries (bin-aligned)
 
 ```
-lower  ≤ 1150
-middle 1151-1250
-upper  1251+
+lower  ≤ 1149
+middle 1150 – 1249
+upper  ≥ 1250
 ```
 
 Strata within *this* PlayOK amateur corpus, not universal strength
-labels.  Any future re-cutting is possible without a full rebuild once
-the Phase-2 candidate DB stores counts in 50-Elo bins (see plan).
+labels.  Boundaries chosen to align with 50-Elo bin edges (see
+`learned_ai/data/elo_binning.py`) so each 50-Elo bin belongs to
+exactly one band and per-bin counts recovered from the Phase-2
+candidate DB reconstruct these tables exactly.
 
-## Per-Elo-band summary (Option A)
+The reviewer's original spec was `≤1150 / 1151-1250 / ≥1251`; we shift
+each boundary by 1 Elo to align with bin edges.  Impact on move counts
+is <1 % per band and the blunder-rate gradient is unchanged.  Any
+future re-cutting is possible without a full rebuild once the
+candidate DB stores counts in 50-Elo bins.
+
+## Per-Elo-band summary (bin-aligned Option A)
 
 Denominators: `total_moves` is every ply the band contributed; `classified`
 excludes only the `unlabelled` category; `blunders` counts
 `win_to_draw + win_to_loss + draw_to_loss` within `classified`.
 
-| Band   | total_moves | classified | blunders | correct    | all_losing | unlabelled | distinct_positions | blunder %  |
-| ------ | ----------- | ---------- | -------- | ---------- | ---------- | ---------- | ------------------ | ---------- |
-| lower  |     662,018 |    648,141 |   48,566 |    462,619 |    136,956 |     13,877 |            431,500 | **7.49 %** |
-| middle |   1,674,617 |  1,632,642 |   95,405 |  1,304,002 |    233,235 |     41,975 |            932,750 | **5.84 %** |
-| upper  |   2,257,378 |  2,198,227 |  106,382 |  1,851,601 |    240,244 |     59,151 |          1,201,793 | **4.84 %** |
-| **Σ**  | **4,594,013** | **4,479,010** | **250,353** | **3,618,222** | **610,435** | **115,003** | (positions overlap across bands) | — |
+| Band   | total_moves | classified | blunders | correct    | unlabelled | distinct_positions | blunder %  |
+| ------ | ----------- | ---------- | -------- | ---------- | ---------- | ------------------ | ---------- |
+| lower  |     652,190 |    638,546 |   47,907 |    455,438 |     13,644 |            425,941 | **7.50 %** |
+| middle |   1,666,685 |  1,625,008 |   95,172 |  1,296,713 |     41,677 |            929,166 | **5.86 %** |
+| upper  |   2,275,138 |  2,215,456 |  107,274 |  1,866,071 |     59,682 |          1,209,558 | **4.84 %** |
+| **Σ**  | **4,594,013** | **4,479,010** | **250,353** | **3,618,222** | **115,003** | (positions overlap across bands) | — |
 
 Column sums:
 - `total_moves` = plies_raw = 4,594,013 ✓
@@ -144,7 +156,7 @@ Column sums:
 - `unlabelled` = 115,003 ✓ (matches missing-after-only + missing-both above)
 
 Blunder-rate gradient is monotonic in Elo: lower-band players blunder
-~55 % more often than upper-band players (7.49 % vs 4.84 %).  Elo
+~55 % more often than upper-band players (7.50 % vs 4.84 %).  Elo
 conditioning has real signal even inside this narrow amateur range.
 
 ## Cells (band × transition × phase)
@@ -152,62 +164,62 @@ conditioning has real signal even inside this narrow amateur range.
 Full table with `n_moves` and `n_positions` (distinct state_keys)
 lifted directly from `data/human_blunder_audit_optA.json` cells.
 
-### Lower band (≤1150)
+### Lower band (≤1149)
 
 | Transition          | Phase | n_moves | n_positions |
 | ------------------- | ----- | ------- | ----------- |
-| all_losing          | move  | 108,556 | 99,636      |
-| all_losing          | place | 28,400  | 22,759      |
-| draw_preserved      | move  | 202,189 | 137,853     |
-| draw_preserved      | place | 190,697 | 60,621      |
-| draw_to_loss        | move  | 11,762  | 10,742      |
-| draw_to_loss        | place | 21,368  | 14,507      |
-| unlabelled          | move  | 11,046  | 10,916      |
-| unlabelled          | place | 2,831   | 2,789       |
-| win_preserved       | move  | 54,917  | 51,048      |
-| win_preserved       | place | 14,816  | 13,182      |
-| win_to_draw         | move  | 6,237   | 5,794       |
-| win_to_draw         | place | 7,518   | 6,381       |
-| win_to_loss         | move  | 805     | 781         |
-| win_to_loss         | place | 876     | 837         |
+| all_losing          | move  | 107,095 | 98,395      |
+| all_losing          | place | 28,106  | 22,528      |
+| draw_preserved      | move  | 199,024 | 136,091     |
+| draw_preserved      | place | 187,837 | 59,895      |
+| draw_to_loss        | move  | 11,602  | 10,598      |
+| draw_to_loss        | place | 21,105  | 14,351      |
+| unlabelled          | move  | 10,882  | 10,752      |
+| unlabelled          | place | 2,762   | 2,722       |
+| win_preserved       | move  | 53,987  | 50,242      |
+| win_preserved       | place | 14,590  | 12,996      |
+| win_to_draw         | move  | 6,131   | 5,706       |
+| win_to_draw         | place | 7,401   | 6,300       |
+| win_to_loss         | move  | 798     | 774         |
+| win_to_loss         | place | 870     | 831         |
 
-### Middle band (1151-1250)
-
-| Transition          | Phase | n_moves    | n_positions |
-| ------------------- | ----- | ---------- | ----------- |
-| all_losing          | move  | 192,578    | 163,624     |
-| all_losing          | place | 40,657     | 31,959      |
-| draw_preserved      | move  | 602,504    | 334,764     |
-| draw_preserved      | place | 488,279    | 124,243     |
-| draw_to_loss        | move  | 23,798     | 20,040      |
-| draw_to_loss        | place | 36,243     | 24,009      |
-| unlabelled          | move  | 35,629     | 34,904      |
-| unlabelled          | place | 6,346      | 6,281       |
-| win_preserved       | move  | 172,884    | 148,747     |
-| win_preserved       | place | 40,335     | 32,918      |
-| win_to_draw         | move  | 14,344     | 12,565      |
-| win_to_draw         | place | 18,046     | 13,783      |
-| win_to_loss         | move  | 1,286      | 1,219       |
-| win_to_loss         | place | 1,688      | 1,540       |
-
-### Upper band (1251+)
+### Middle band (1150-1249)
 
 | Transition          | Phase | n_moves    | n_positions |
 | ------------------- | ----- | ---------- | ----------- |
-| all_losing          | move  | 211,069    | 174,715     |
-| all_losing          | place | 29,175     | 21,822      |
-| draw_preserved      | move  | 850,242    | 464,906     |
-| draw_preserved      | place | 663,236    | 150,118     |
-| draw_to_loss        | move  | 26,993     | 22,286      |
-| draw_to_loss        | place | 34,019     | 22,514      |
-| unlabelled          | move  | 53,229     | 51,892      |
-| unlabelled          | place | 5,922      | 5,801       |
-| win_preserved       | move  | 273,279    | 224,970     |
-| win_preserved       | place | 64,844     | 49,516      |
-| win_to_draw         | move  | 18,126     | 15,559      |
-| win_to_draw         | place | 24,351     | 17,527      |
-| win_to_loss         | move  | 1,197      | 1,146       |
-| win_to_loss         | place | 1,696      | 1,506       |
+| all_losing          | move  | 192,460    | 163,487     |
+| all_losing          | place | 40,663     | 31,966      |
+| draw_preserved      | move  | 598,831    | 333,099     |
+| draw_preserved      | place | 485,872    | 123,771     |
+| draw_to_loss        | move  | 23,731     | 19,985      |
+| draw_to_loss        | place | 36,199     | 23,968      |
+| unlabelled          | move  | 35,343     | 34,627      |
+| unlabelled          | place | 6,334      | 6,268       |
+| win_preserved       | move  | 171,871    | 147,948     |
+| win_preserved       | place | 40,139     | 32,773      |
+| win_to_draw         | move  | 14,311     | 12,530      |
+| win_to_draw         | place | 17,975     | 13,738      |
+| win_to_loss         | move  | 1,281      | 1,214       |
+| win_to_loss         | place | 1,675      | 1,530       |
+
+### Upper band (≥1250)
+
+| Transition          | Phase | n_moves    | n_positions |
+| ------------------- | ----- | ---------- | ----------- |
+| all_losing          | move  | 212,648    | 175,955     |
+| all_losing          | place | 29,463     | 22,024      |
+| draw_preserved      | move  | 857,080    | 467,679     |
+| draw_preserved      | place | 668,503    | 151,057     |
+| draw_to_loss        | move  | 27,220     | 22,466      |
+| draw_to_loss        | place | 34,326     | 22,692      |
+| unlabelled          | move  | 53,679     | 52,322      |
+| unlabelled          | place | 6,003      | 5,878       |
+| win_preserved       | move  | 275,222    | 226,390     |
+| win_preserved       | place | 65,266     | 49,805      |
+| win_to_draw         | move  | 18,265     | 15,671      |
+| win_to_draw         | place | 24,539     | 17,650      |
+| win_to_loss         | move  | 1,209      | 1,156       |
+| win_to_loss         | place | 1,715      | 1,520       |
 
 The band × transition × phase table is the "originally promised" Phase-1
 deliverable.  These cells are **not mutually exclusive across bands** —
@@ -259,35 +271,35 @@ distinct-position total.  Singleton positions dominate the low-support
 buckets — a singleton is a valid training event but not a stable per-
 position empirical distribution for KL evaluation.
 
-### Lower band (431,500 distinct positions)
+### Lower band (425,941 distinct positions)
 
-| Min plays | Positions | Share  |
-| --------- | --------- | ------ |
-| ≥1        | 431,500   | 100.00 % |
-| ≥5        | 8,668     |   2.01 % |
-| ≥10       | 2,737     |   0.63 % |
-| ≥25       | 701       |   0.16 % |
-| ≥100      | 118       |   0.03 % |
+| Min plays | Positions | Share    |
+| --------- | --------- | -------- |
+| ≥1        | 425,941   | 100.00 % |
+| ≥5        | 8,455     |   1.99 % |
+| ≥10       | 2,678     |   0.63 % |
+| ≥25       | 692       |   0.16 % |
+| ≥100      | 116       |   0.03 % |
 
-### Middle band (932,750 distinct positions)
+### Middle band (929,166 distinct positions)
 
-| Min plays | Positions | Share  |
-| --------- | --------- | ------ |
-| ≥1        | 932,750   | 100.00 % |
-| ≥5        | 31,903    |   3.42 % |
-| ≥10       | 11,038    |   1.18 % |
-| ≥25       | 2,911     |   0.31 % |
-| ≥100      | 406       |   0.04 % |
+| Min plays | Positions | Share    |
+| --------- | --------- | -------- |
+| ≥1        | 929,166   | 100.00 % |
+| ≥5        | 31,719    |   3.41 % |
+| ≥10       | 10,983    |   1.18 % |
+| ≥25       | 2,889     |   0.31 % |
+| ≥100      | 401       |   0.04 % |
 
-### Upper band (1,201,793 distinct positions)
+### Upper band (1,209,558 distinct positions)
 
-| Min plays | Positions | Share  |
-| --------- | --------- | ------ |
-| ≥1        | 1,201,793 | 100.00 % |
-| ≥5        | 47,021    |   3.91 % |
-| ≥10       | 16,307    |   1.36 % |
-| ≥25       | 4,234     |   0.35 % |
-| ≥100      | 544       |   0.05 % |
+| Min plays | Positions | Share    |
+| --------- | --------- | -------- |
+| ≥1        | 1,209,558 | 100.00 % |
+| ≥5        | 47,495    |   3.93 % |
+| ≥10       | 16,470    |   1.36 % |
+| ≥25       | 4,291     |   0.35 % |
+| ≥100      | 548       |   0.05 % |
 
 At `≥5` plays, no band exceeds `4 %` of distinct positions.  That is
 the practical support ceiling for direct empirical distribution

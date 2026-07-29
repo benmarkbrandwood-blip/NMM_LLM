@@ -66,7 +66,7 @@ from game.board import BoardState
 # Bumped whenever the audit's sample-flow gates, cell-key definitions, or
 # reported columns change.  Written into the JSON output so downstream
 # consumers can key on it.
-AUDIT_VERSION = "1.1"
+AUDIT_VERSION = "1.2"    # 1.2: Option A boundaries bin-aligned (≤1149/1150-1249/≥1250)
 
 
 # ── WDL helpers ─────────────────────────────────────────────────────────────
@@ -76,17 +76,20 @@ _FLIP = {"W": "L", "L": "W", "D": "D"}
 
 def _elo_band(elo: Optional[int]) -> str:
     """Option A cut-offs (PlayOK amateur corpus):
-        lower  ≤ 1150
-        middle 1151-1250
-        upper  ≥ 1251
+        lower  ≤ 1149
+        middle 1150 – 1249
+        upper  ≥ 1250
     'lower/middle/upper' phrasing follows the reviewer's guidance:
     these are strata within this specific corpus, NOT universal strength labels.
+    Boundaries chosen to align with 50-Elo bin edges (see
+    learned_ai/data/elo_binning.py) so per-bin counts recovered from the
+    Phase-2 candidate DB match the audit's band membership exactly.
     """
     if elo is None:
         return "unknown"
-    if elo <= 1150:
+    if elo <= 1149:
         return "lower"
-    if elo <= 1250:
+    if elo <= 1249:
         return "middle"
     return "upper"
 
@@ -537,11 +540,13 @@ def audit(
             "cwd": str(_ROOT),
             "elapsed_seconds": round(time.time() - t0, 1),
             "elo_bands": {
-                "lower":   "≤1150",
-                "middle":  "1151-1250",
-                "upper":   "1251+",
+                "lower":   "≤1149",
+                "middle":  "1150-1249",
+                "upper":   "1250+",
                 "unknown": "no mover Elo recorded on that side",
                 "note": "Option A boundaries within this PlayOK amateur corpus. "
+                        "Bin-aligned to 50-Elo edges so per-bin counts in the "
+                        "Phase-2 candidate DB reconstruct exactly.  "
                         "Not universal strength labels.",
             },
         },

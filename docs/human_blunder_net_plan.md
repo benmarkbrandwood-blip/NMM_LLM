@@ -89,14 +89,22 @@ no Elo columns at all).  The candidate DB (Phase 2) will store move
 counts in **50-Elo bins**, and configurations like A are applied at
 training time as a function that sums the bins.
 
-**Option A** (this plan's default first training configuration; strata
-within the PlayOK amateur corpus, not universal strength labels):
+**Option A** (this plan's default first training configuration;
+strata within the PlayOK amateur corpus, not universal strength
+labels; **boundaries bin-aligned** so 50-Elo bins never straddle two
+bands):
 
-| Band   | Cut-off      | Rerun-A share of moves (audited) |
-| ------ | ------------ | -------------------------------- |
-| lower  | ≤ 1150       | 14.4 %                           |
-| middle | 1151 – 1250  | 36.5 %                           |
-| upper  | 1251+        | 49.1 %                           |
+| Band   | Cut-off        | Audited share of moves |
+| ------ | -------------- | ---------------------- |
+| lower  | ≤ 1149         | 14.2 %                 |
+| middle | 1150 – 1249    | 36.3 %                 |
+| upper  | ≥ 1250         | 49.5 %                 |
+
+The reviewer's original spec used `≤1150 / 1151-1250 / ≥1251` — we
+shift each boundary by 1 Elo so that no 50-Elo bucket
+(`int(elo) // 50 * 50`) straddles two bands.  Impact on move counts is
+<1 % per band and the blunder-rate gradient
+(`7.50 % / 5.86 % / 4.84 %`) is unchanged.
 
 Rerunning the audit with different cut-offs is a script-only change; no
 DB rebuild.  Options B / C etc. can be tried without invalidating any

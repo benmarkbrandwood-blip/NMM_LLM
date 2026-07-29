@@ -1,16 +1,16 @@
 {
   "meta": {
-    "audit_version": "1.1",
+    "audit_version": "1.2",
     "audit_script": "tools/audit_human_blunders.py",
-    "git_head": "6bb3216628cc720f65d7d70671db65e9a52497c6",
+    "git_head": "b543dcb51111a2beed1dd33e9002715a414301b8",
     "cwd": "/home/benbrandwood/Documents/dev/NMM_ollama",
-    "elapsed_seconds": 140.6,
+    "elapsed_seconds": 120.6,
     "elo_bands": {
-      "lower": "\u22641150",
-      "middle": "1151-1250",
-      "upper": "1251+",
+      "lower": "\u22641149",
+      "middle": "1150-1249",
+      "upper": "1250+",
       "unknown": "no mover Elo recorded on that side",
-      "note": "Option A boundaries within this PlayOK amateur corpus. Not universal strength labels."
+      "note": "Option A boundaries within this PlayOK amateur corpus. Bin-aligned to 50-Elo edges so per-bin counts in the Phase-2 candidate DB reconstruct exactly.  Not universal strength labels."
     }
   },
   "sources": {
@@ -53,39 +53,39 @@
   "band_summary": [
     {
       "elo_band": "lower",
-      "total_moves": 662018,
-      "classified_moves": 648141,
-      "blunders": 48566,
-      "correct_moves": 462619,
-      "all_losing": 136956,
+      "total_moves": 652190,
+      "classified_moves": 638546,
+      "blunders": 47907,
+      "correct_moves": 455438,
+      "all_losing": 135201,
       "label_inconsistency": 0,
-      "unlabelled": 13877,
-      "blunder_rate_of_classified": 0.0749312263843824,
-      "distinct_positions": 431500
+      "unlabelled": 13644,
+      "blunder_rate_of_classified": 0.07502513522909861,
+      "distinct_positions": 425941
     },
     {
       "elo_band": "middle",
-      "total_moves": 1674617,
-      "classified_moves": 1632642,
-      "blunders": 95405,
-      "correct_moves": 1304002,
-      "all_losing": 233235,
+      "total_moves": 1666685,
+      "classified_moves": 1625008,
+      "blunders": 95172,
+      "correct_moves": 1296713,
+      "all_losing": 233123,
       "label_inconsistency": 0,
-      "unlabelled": 41975,
-      "blunder_rate_of_classified": 0.058435958403618184,
-      "distinct_positions": 932750
+      "unlabelled": 41677,
+      "blunder_rate_of_classified": 0.05856709628506444,
+      "distinct_positions": 929166
     },
     {
       "elo_band": "upper",
-      "total_moves": 2257378,
-      "classified_moves": 2198227,
-      "blunders": 106382,
-      "correct_moves": 1851601,
-      "all_losing": 240244,
+      "total_moves": 2275138,
+      "classified_moves": 2215456,
+      "blunders": 107274,
+      "correct_moves": 1866071,
+      "all_losing": 242111,
       "label_inconsistency": 0,
-      "unlabelled": 59151,
-      "blunder_rate_of_classified": 0.048394456077557046,
-      "distinct_positions": 1201793
+      "unlabelled": 59682,
+      "blunder_rate_of_classified": 0.04842073144309794,
+      "distinct_positions": 1209558
     }
   ],
   "cells": [
@@ -93,347 +93,347 @@
       "elo_band": "lower",
       "transition": "all_losing",
       "phase": "move",
-      "n_moves": 108556,
-      "n_positions": 99636
+      "n_moves": 107095,
+      "n_positions": 98395
     },
     {
       "elo_band": "lower",
       "transition": "all_losing",
       "phase": "place",
-      "n_moves": 28400,
-      "n_positions": 22759
+      "n_moves": 28106,
+      "n_positions": 22528
     },
     {
       "elo_band": "lower",
       "transition": "draw_preserved",
       "phase": "move",
-      "n_moves": 202189,
-      "n_positions": 137853
+      "n_moves": 199024,
+      "n_positions": 136091
     },
     {
       "elo_band": "lower",
       "transition": "draw_preserved",
       "phase": "place",
-      "n_moves": 190697,
-      "n_positions": 60621
+      "n_moves": 187837,
+      "n_positions": 59895
     },
     {
       "elo_band": "lower",
       "transition": "draw_to_loss",
       "phase": "move",
-      "n_moves": 11762,
-      "n_positions": 10742
+      "n_moves": 11602,
+      "n_positions": 10598
     },
     {
       "elo_band": "lower",
       "transition": "draw_to_loss",
       "phase": "place",
-      "n_moves": 21368,
-      "n_positions": 14507
+      "n_moves": 21105,
+      "n_positions": 14351
     },
     {
       "elo_band": "lower",
       "transition": "unlabelled",
       "phase": "move",
-      "n_moves": 11046,
-      "n_positions": 10916
+      "n_moves": 10882,
+      "n_positions": 10752
     },
     {
       "elo_band": "lower",
       "transition": "unlabelled",
       "phase": "place",
-      "n_moves": 2831,
-      "n_positions": 2789
+      "n_moves": 2762,
+      "n_positions": 2722
     },
     {
       "elo_band": "lower",
       "transition": "win_preserved",
       "phase": "move",
-      "n_moves": 54917,
-      "n_positions": 51048
+      "n_moves": 53987,
+      "n_positions": 50242
     },
     {
       "elo_band": "lower",
       "transition": "win_preserved",
       "phase": "place",
-      "n_moves": 14816,
-      "n_positions": 13182
+      "n_moves": 14590,
+      "n_positions": 12996
     },
     {
       "elo_band": "lower",
       "transition": "win_to_draw",
       "phase": "move",
-      "n_moves": 6237,
-      "n_positions": 5794
+      "n_moves": 6131,
+      "n_positions": 5706
     },
     {
       "elo_band": "lower",
       "transition": "win_to_draw",
       "phase": "place",
-      "n_moves": 7518,
-      "n_positions": 6381
+      "n_moves": 7401,
+      "n_positions": 6300
     },
     {
       "elo_band": "lower",
       "transition": "win_to_loss",
       "phase": "move",
-      "n_moves": 805,
-      "n_positions": 781
+      "n_moves": 798,
+      "n_positions": 774
     },
     {
       "elo_band": "lower",
       "transition": "win_to_loss",
       "phase": "place",
-      "n_moves": 876,
-      "n_positions": 837
+      "n_moves": 870,
+      "n_positions": 831
     },
     {
       "elo_band": "middle",
       "transition": "all_losing",
       "phase": "move",
-      "n_moves": 192578,
-      "n_positions": 163624
+      "n_moves": 192460,
+      "n_positions": 163487
     },
     {
       "elo_band": "middle",
       "transition": "all_losing",
       "phase": "place",
-      "n_moves": 40657,
-      "n_positions": 31959
+      "n_moves": 40663,
+      "n_positions": 31966
     },
     {
       "elo_band": "middle",
       "transition": "draw_preserved",
       "phase": "move",
-      "n_moves": 602504,
-      "n_positions": 334764
+      "n_moves": 598831,
+      "n_positions": 333099
     },
     {
       "elo_band": "middle",
       "transition": "draw_preserved",
       "phase": "place",
-      "n_moves": 488279,
-      "n_positions": 124243
+      "n_moves": 485872,
+      "n_positions": 123771
     },
     {
       "elo_band": "middle",
       "transition": "draw_to_loss",
       "phase": "move",
-      "n_moves": 23798,
-      "n_positions": 20040
+      "n_moves": 23731,
+      "n_positions": 19985
     },
     {
       "elo_band": "middle",
       "transition": "draw_to_loss",
       "phase": "place",
-      "n_moves": 36243,
-      "n_positions": 24009
+      "n_moves": 36199,
+      "n_positions": 23968
     },
     {
       "elo_band": "middle",
       "transition": "unlabelled",
       "phase": "move",
-      "n_moves": 35629,
-      "n_positions": 34904
+      "n_moves": 35343,
+      "n_positions": 34627
     },
     {
       "elo_band": "middle",
       "transition": "unlabelled",
       "phase": "place",
-      "n_moves": 6346,
-      "n_positions": 6281
+      "n_moves": 6334,
+      "n_positions": 6268
     },
     {
       "elo_band": "middle",
       "transition": "win_preserved",
       "phase": "move",
-      "n_moves": 172884,
-      "n_positions": 148747
+      "n_moves": 171871,
+      "n_positions": 147948
     },
     {
       "elo_band": "middle",
       "transition": "win_preserved",
       "phase": "place",
-      "n_moves": 40335,
-      "n_positions": 32918
+      "n_moves": 40139,
+      "n_positions": 32773
     },
     {
       "elo_band": "middle",
       "transition": "win_to_draw",
       "phase": "move",
-      "n_moves": 14344,
-      "n_positions": 12565
+      "n_moves": 14311,
+      "n_positions": 12530
     },
     {
       "elo_band": "middle",
       "transition": "win_to_draw",
       "phase": "place",
-      "n_moves": 18046,
-      "n_positions": 13783
+      "n_moves": 17975,
+      "n_positions": 13738
     },
     {
       "elo_band": "middle",
       "transition": "win_to_loss",
       "phase": "move",
-      "n_moves": 1286,
-      "n_positions": 1219
+      "n_moves": 1281,
+      "n_positions": 1214
     },
     {
       "elo_band": "middle",
       "transition": "win_to_loss",
       "phase": "place",
-      "n_moves": 1688,
-      "n_positions": 1540
+      "n_moves": 1675,
+      "n_positions": 1530
     },
     {
       "elo_band": "upper",
       "transition": "all_losing",
       "phase": "move",
-      "n_moves": 211069,
-      "n_positions": 174715
+      "n_moves": 212648,
+      "n_positions": 175955
     },
     {
       "elo_band": "upper",
       "transition": "all_losing",
       "phase": "place",
-      "n_moves": 29175,
-      "n_positions": 21822
+      "n_moves": 29463,
+      "n_positions": 22024
     },
     {
       "elo_band": "upper",
       "transition": "draw_preserved",
       "phase": "move",
-      "n_moves": 850242,
-      "n_positions": 464906
+      "n_moves": 857080,
+      "n_positions": 467679
     },
     {
       "elo_band": "upper",
       "transition": "draw_preserved",
       "phase": "place",
-      "n_moves": 663236,
-      "n_positions": 150118
+      "n_moves": 668503,
+      "n_positions": 151057
     },
     {
       "elo_band": "upper",
       "transition": "draw_to_loss",
       "phase": "move",
-      "n_moves": 26993,
-      "n_positions": 22286
+      "n_moves": 27220,
+      "n_positions": 22466
     },
     {
       "elo_band": "upper",
       "transition": "draw_to_loss",
       "phase": "place",
-      "n_moves": 34019,
-      "n_positions": 22514
+      "n_moves": 34326,
+      "n_positions": 22692
     },
     {
       "elo_band": "upper",
       "transition": "unlabelled",
       "phase": "move",
-      "n_moves": 53229,
-      "n_positions": 51892
+      "n_moves": 53679,
+      "n_positions": 52322
     },
     {
       "elo_band": "upper",
       "transition": "unlabelled",
       "phase": "place",
-      "n_moves": 5922,
-      "n_positions": 5801
+      "n_moves": 6003,
+      "n_positions": 5878
     },
     {
       "elo_band": "upper",
       "transition": "win_preserved",
       "phase": "move",
-      "n_moves": 273279,
-      "n_positions": 224970
+      "n_moves": 275222,
+      "n_positions": 226390
     },
     {
       "elo_band": "upper",
       "transition": "win_preserved",
       "phase": "place",
-      "n_moves": 64844,
-      "n_positions": 49516
+      "n_moves": 65266,
+      "n_positions": 49805
     },
     {
       "elo_band": "upper",
       "transition": "win_to_draw",
       "phase": "move",
-      "n_moves": 18126,
-      "n_positions": 15559
+      "n_moves": 18265,
+      "n_positions": 15671
     },
     {
       "elo_band": "upper",
       "transition": "win_to_draw",
       "phase": "place",
-      "n_moves": 24351,
-      "n_positions": 17527
+      "n_moves": 24539,
+      "n_positions": 17650
     },
     {
       "elo_band": "upper",
       "transition": "win_to_loss",
       "phase": "move",
-      "n_moves": 1197,
-      "n_positions": 1146
+      "n_moves": 1209,
+      "n_positions": 1156
     },
     {
       "elo_band": "upper",
       "transition": "win_to_loss",
       "phase": "place",
-      "n_moves": 1696,
-      "n_positions": 1506
+      "n_moves": 1715,
+      "n_positions": 1520
     }
   ],
   "coverage_by_band": {
     "lower": {
       "counts_at_min_plays": {
-        "1": 431500,
-        "5": 8668,
-        "10": 2737,
-        "25": 701,
-        "100": 118
+        "1": 425941,
+        "5": 8455,
+        "10": 2678,
+        "25": 692,
+        "100": 116
       },
-      "total_positions": 431500,
+      "total_positions": 425941,
       "share_at_min_plays": {
         "1": 1.0,
-        "5": 0.020088064889918888,
-        "10": 0.006342989571263036,
-        "25": 0.0016245654692931635,
-        "100": 0.00027346465816917726
+        "5": 0.019850167041914255,
+        "10": 0.006287255746687922,
+        "25": 0.0016246381541105458,
+        "100": 0.0002723381876832707
       }
     },
     "upper": {
       "counts_at_min_plays": {
-        "1": 1201793,
-        "5": 47021,
-        "10": 16307,
-        "25": 4234,
-        "100": 544
+        "1": 1209558,
+        "5": 47495,
+        "10": 16470,
+        "25": 4291,
+        "100": 548
       },
-      "total_positions": 1201793,
+      "total_positions": 1209558,
       "share_at_min_plays": {
         "1": 1.0,
-        "5": 0.03912570634044299,
-        "10": 0.013568892479819737,
-        "25": 0.003523069280649829,
-        "100": 0.0004526569883499072
+        "5": 0.039266409713300233,
+        "10": 0.013616544225245917,
+        "25": 0.0035475768834566015,
+        "100": 0.00045305805922494
       }
     },
     "middle": {
       "counts_at_min_plays": {
-        "1": 932750,
-        "5": 31903,
-        "10": 11038,
-        "25": 2911,
-        "100": 406
+        "1": 929166,
+        "5": 31719,
+        "10": 10983,
+        "25": 2889,
+        "100": 401
       },
-      "total_positions": 932750,
+      "total_positions": 929166,
       "share_at_min_plays": {
         "1": 1.0,
-        "5": 0.03420316269096757,
-        "10": 0.011833824711873492,
-        "25": 0.003120879120879121,
-        "100": 0.00043527204502814257
+        "5": 0.03413706485170572,
+        "10": 0.011820277539212585,
+        "25": 0.0031092398990062056,
+        "100": 0.0004315698163729624
       }
     }
   },

@@ -25,7 +25,9 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import sqlite3
+import subprocess
 import sys
 import time
 from datetime import datetime
@@ -37,6 +39,7 @@ sys.path.insert(0, str(ROOT))
 
 from ai.trajectory_db import make_board_state_key, _norm
 from ai.board_symmetry import transform_notation
+from learned_ai.data.elo_binning import ELO_BIN_SIZE, elo_bin
 from learned_ai.data.malom_label_provenance import (
     ensure_human_db_can_be_annotated,
     write_current_malom_label_version,
@@ -50,15 +53,22 @@ logging.basicConfig(
 )
 log = logging.getLogger("_human_db_build")
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"    # v3 adds Elo-bin sparse tables + provenance meta
 
 
 # ── Schema ────────────────────────────────────────────────────────────────────
-
+# v3 is ADDITIVE — the v2 tables (positions, moves, processed_files, meta) are
+# unchanged in shape so existing readers (ai/human_db.py etc.) keep working
+# against a v3 DB.  v3 adds:
+#   positions_elo_bins    sparse per-(state_key, mover_elo_bin) game count
+#   moves_elo_bins        sparse per-(state_key, notation, mover_elo_bin) event count
+# and provenance rows in `meta` for full source identification.
 _DDL = """
 CREATE TABLE IF NOT EXISTS positions (
     state_key              TEXT PRIMARY KEY,
     total_games            INTEGER NOT NULL DEFAULT 0,
+    -- Below three are HUMAN GAME OUTCOMES for the mover.  Do not confuse
+    -- with Malom W/D/L labels (which live in malom_wdl / malom_wdl_after).
     wins                   INTEGER NOT NULL DEFAULT 0,
     losses                 INTEGER NOT NULL DEFAULT 0,
     draws                  INTEGER NOT NULL DEFAULT 0,
@@ -70,6 +80,7 @@ CREATE TABLE IF NOT EXISTS positions (
 CREATE TABLE IF NOT EXISTS moves (
     state_key        TEXT    NOT NULL,
     notation         TEXT    NOT NULL,
+    -- HUMAN GAME OUTCOMES for the mover, NOT Malom W/D/L.
     wins             INTEGER NOT NULL DEFAULT 0,
     losses           INTEGER NOT NULL DEFAULT 0,
     draws            INTEGER NOT NULL DEFAULT 0,
@@ -93,6 +104,28 @@ CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
     value TEXT
 );
+
+-- v3 additions (Elo bin sparse tables) --------------------------------------
+-- elo_bin is `int(mover_elo) // ELO_BIN_SIZE * ELO_BIN_SIZE` (see
+-- learned_ai/data/elo_binning.py).  Rows only exist for observed bins.
+-- Games where the mover Elo is None are counted in the v2 aggregate columns
+-- above but NOT in the *_elo_bins tables.
+CREATE TABLE IF NOT EXISTS positions_elo_bins (
+    state_key   TEXT NOT NULL,
+    elo_bin     INTEGER NOT NULL,
+    total_games INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (state_key, elo_bin)
+);
+
+CREATE TABLE IF NOT EXISTS moves_elo_bins (
+    state_key   TEXT NOT NULL,
+    notation    TEXT NOT NULL,
+    elo_bin     INTEGER NOT NULL,
+    total       INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (state_key, notation, elo_bin)
+);
+
+CREATE INDEX IF NOT EXISTS idx_moves_bins_state ON moves_elo_bins(state_key);
 """
 
 
@@ -122,6 +155,8 @@ def _clear_db(conn: sqlite3.Connection) -> None:
         """
         DELETE FROM positions;
         DELETE FROM moves;
+        DELETE FROM positions_elo_bins;
+        DELETE FROM moves_elo_bins;
         DELETE FROM processed_files;
         DELETE FROM meta WHERE key != 'schema_version';
         """
@@ -177,8 +212,16 @@ def _process_file(
     move_stats: dict,
     pos_boards: dict,
     move_boards: dict,
+    pos_bins: dict,
+    move_bins: dict,
 ) -> int:
-    """Aggregate one JSONL file into the caller's stat dicts. Returns games indexed."""
+    """Aggregate one JSONL file into the caller's stat dicts.  Returns games indexed.
+
+    `pos_bins` / `move_bins` are (state_key)->{bin: count} and
+    (state_key, notation)->{bin: count} respectively.  A per-ply mover
+    Elo of None contributes to `pos_stats` / `move_stats` (v2 rollup)
+    but NOT to the Elo-bin tables (sparse).
+    """
     games_found = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -193,6 +236,8 @@ def _process_file(
             continue
 
         winner = record.get("winner")
+        w_elo = record.get("white_elo")
+        b_elo = record.get("black_elo")
         games_found += 1
         total_plies = len(moves)
         parsed_plies: list[tuple] = []
@@ -221,9 +266,10 @@ def _process_file(
                         pass
 
             color = move.get("color", "W")
-            parsed_plies.append((state_key, canon_notation, board, next_board, color))
+            mover_elo = w_elo if color == "W" else b_elo
+            parsed_plies.append((state_key, canon_notation, board, next_board, color, mover_elo))
 
-        for i, (state_key, canon_notation, board, next_board, color) in enumerate(parsed_plies):
+        for i, (state_key, canon_notation, board, next_board, color, mover_elo) in enumerate(parsed_plies):
             plies_remaining = total_plies - i
 
             if state_key not in pos_stats:
@@ -257,6 +303,16 @@ def _process_file(
 
             if next_board is not None and key not in move_boards:
                 move_boards[key] = next_board
+
+            # v3 Elo-bin tallies (sparse — no row for unknown-Elo events)
+            bin_start = elo_bin(mover_elo)
+            if bin_start is not None:
+                if state_key not in pos_bins:
+                    pos_bins[state_key] = {}
+                pos_bins[state_key][bin_start] = pos_bins[state_key].get(bin_start, 0) + 1
+                if key not in move_bins:
+                    move_bins[key] = {}
+                move_bins[key][bin_start] = move_bins[key].get(bin_start, 0) + 1
     return games_found
 
 
@@ -371,6 +427,42 @@ def _upsert_moves(conn: sqlite3.Connection, move_stats: dict, move_malom: dict) 
     )
 
 
+def _upsert_positions_elo_bins(conn: sqlite3.Connection, pos_bins: dict) -> None:
+    rows = []
+    for state_key, bins in pos_bins.items():
+        for bin_start, n in bins.items():
+            rows.append((state_key, int(bin_start), int(n)))
+    if not rows:
+        return
+    conn.executemany(
+        """
+        INSERT INTO positions_elo_bins(state_key, elo_bin, total_games)
+        VALUES (?, ?, ?)
+        ON CONFLICT(state_key, elo_bin) DO UPDATE SET
+            total_games = total_games + excluded.total_games
+        """,
+        rows,
+    )
+
+
+def _upsert_moves_elo_bins(conn: sqlite3.Connection, move_bins: dict) -> None:
+    rows = []
+    for (state_key, canon_notation), bins in move_bins.items():
+        for bin_start, n in bins.items():
+            rows.append((state_key, canon_notation, int(bin_start), int(n)))
+    if not rows:
+        return
+    conn.executemany(
+        """
+        INSERT INTO moves_elo_bins(state_key, notation, elo_bin, total)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(state_key, notation, elo_bin) DO UPDATE SET
+            total = total + excluded.total
+        """,
+        rows,
+    )
+
+
 def _recompute_canonical_winning_moves(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -391,6 +483,8 @@ def _update_meta(
     game_count: int,
     file_count: int,
     source_checksum_count: int,
+    *,
+    provenance: Optional[dict] = None,
 ) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO meta(key, value) VALUES ('build_date', ?)",
@@ -412,6 +506,87 @@ def _update_meta(
         "INSERT OR REPLACE INTO meta(key, value) VALUES ('source_sha256_files', ?)",
         (str(source_checksum_count),),
     )
+    for key, value in (provenance or {}).items():
+        if value is None:
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)",
+            (key, str(value)),
+        )
+
+
+# ── Provenance helpers ────────────────────────────────────────────────────────
+
+def _git_head() -> Optional[str]:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip()
+    except Exception:
+        return None
+
+
+def _feature_canonicalisation_version() -> str:
+    """Version tag for the state-key canonicalisation pipeline
+    (make_board_state_key + transform_notation)."""
+    return "d4-canonical-v1"
+
+
+def _sources_manifest_sha256(file_infos: dict) -> str:
+    """SHA-256 of the sorted (relative_path, sha256, mtime) tuples.
+
+    Uses relative paths (relative to ROOT) so a candidate DB built on
+    two different hosts under the same working tree produces the same
+    manifest hash — reviewer's "logical source identity" requirement.
+    """
+    entries: list[tuple[str, float, str]] = []
+    for fp, (mtime, _n, sha) in file_infos.items():
+        try:
+            rel = str(Path(fp).resolve().relative_to(ROOT.resolve()))
+        except Exception:
+            rel = str(Path(fp).name)
+        entries.append((rel, mtime, sha))
+    entries.sort()
+    h = hashlib.sha256()
+    for rel, mtime, sha in entries:
+        h.update(rel.encode()); h.update(b"|")
+        h.update(sha.encode()); h.update(b"|")
+        h.update(f"{mtime:.0f}".encode()); h.update(b"\n")
+    return h.hexdigest()
+
+
+# ── Active-DB fail-closed guard ────────────────────────────────────────────────
+
+def _resolve_active_db_paths() -> set[Path]:
+    """Return every path we must refuse to overwrite: the reviewer's
+    "active" HumanDB(s).  Resolved from `data/training_paths.local.json`
+    (if present) plus the historical default `data/human_db.sqlite`."""
+    paths: set[Path] = {(ROOT / "data" / "human_db.sqlite").resolve()}
+    cfg = ROOT / "data" / "training_paths.local.json"
+    if cfg.exists():
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+            p = data.get("human_db_path")
+            if p:
+                pp = Path(p)
+                paths.add((pp if pp.is_absolute() else ROOT / pp).resolve())
+        except Exception:
+            pass
+    return paths
+
+
+def _guard_active_db(output_path: Path) -> None:
+    """Fail closed if the resolved output path is the active HumanDB.
+    The candidate DB must be written to a separate path."""
+    resolved = output_path.resolve()
+    active = _resolve_active_db_paths()
+    if resolved in active:
+        raise SystemExit(
+            f"REFUSING to write v3 schema to the active HumanDB at {resolved}.\n"
+            f"Pass --candidate-out with a distinct path (e.g. "
+            f"data/human_db_candidate.sqlite).\n"
+            f"Activation is a separate later step; see docs/human_blunder_net_plan.md §2.2."
+        )
 
 
 def _resolve_malom_path(cli_path: str, no_malom: bool) -> str:
@@ -448,6 +623,10 @@ def build_argparser() -> argparse.ArgumentParser:
                     help="Clear DB and reprocess all files from scratch")
     ap.add_argument("--limit-files", type=int, default=None,
                     help="Cap number of JSONL files scanned (fixture / smoke tests).")
+    ap.add_argument("--candidate-out", type=str, default="",
+                    help="Preferred flag for v3 candidate DB output.  Overrides "
+                         "--output when both are given.  Required whenever "
+                         "--output resolves to the active HumanDB path.")
     return ap
 
 
@@ -455,7 +634,13 @@ def run(args: argparse.Namespace, *, emit_sha_sidecar: bool = False) -> None:
     """Execute the build pipeline.  `emit_sha_sidecar=True` produces the
     `<output>.sha256` sidecar file — the sole difference between the two
     entry-point scripts."""
-    output_path = ROOT / args.output
+    # v3 schema is now produced unconditionally.  Fail closed against the
+    # active DB path so a stray --output doesn't overwrite production data.
+    chosen_out = getattr(args, "candidate_out", "") or args.output
+    output_path = Path(chosen_out)
+    if not output_path.is_absolute():
+        output_path = ROOT / output_path
+    _guard_active_db(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(output_path)
@@ -523,6 +708,8 @@ def run(args: argparse.Namespace, *, emit_sha_sidecar: bool = False) -> None:
     move_stats: dict = {}
     pos_boards: dict = {}
     move_boards: dict = {}
+    pos_bins:  dict = {}
+    move_bins: dict = {}
     total_games = 0
     file_info_map: dict[str, tuple[float, int, str]] = {}
 
@@ -530,7 +717,9 @@ def run(args: argparse.Namespace, *, emit_sha_sidecar: bool = False) -> None:
     for i, path in enumerate(all_files):
         mtime, sha256 = pending_hashes[str(path)]
         try:
-            n = _process_file(path, pos_stats, move_stats, pos_boards, move_boards)
+            n = _process_file(path, pos_stats, move_stats,
+                              pos_boards, move_boards,
+                              pos_bins, move_bins)
         except Exception as exc:
             log.warning("Skipping %s — %s", path.name, exc)
             n = 0
@@ -557,11 +746,21 @@ def run(args: argparse.Namespace, *, emit_sha_sidecar: bool = False) -> None:
         )
 
     log.info("Writing to %s …", output_path)
+    provenance = {
+        "elo_bin_size":                     str(ELO_BIN_SIZE),
+        "feature_canonicalisation_version": _feature_canonicalisation_version(),
+        "builder_git_commit":               _git_head() or "",
+        "source_manifest_sha256":           _sources_manifest_sha256(file_info_map),
+        "built_at":                         datetime.now().isoformat(timespec="seconds"),
+    }
     with conn:
         _upsert_positions(conn, pos_stats, pos_malom)
         _upsert_moves(conn, move_stats, move_malom)
+        _upsert_positions_elo_bins(conn, pos_bins)
+        _upsert_moves_elo_bins(conn, move_bins)
         _recompute_canonical_winning_moves(conn)
-        _update_meta(conn, total_games, len(file_info_map), len(file_info_map))
+        _update_meta(conn, total_games, len(file_info_map), len(file_info_map),
+                     provenance=provenance)
         if malom_annotation_completed:
             write_current_malom_label_version(conn)
         conn.executemany(

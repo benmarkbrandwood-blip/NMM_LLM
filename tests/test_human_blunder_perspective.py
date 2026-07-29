@@ -105,20 +105,25 @@ class TestClassifyTransition(unittest.TestCase):
 
 
 class TestEloBanding(unittest.TestCase):
-    """Option A boundaries.  These are strata within the PlayOK amateur
-    corpus; not universal strength labels."""
+    """Option A boundaries — bin-aligned to 50-Elo edges (v1.2).
+    These are strata within the PlayOK amateur corpus; not universal
+    strength labels."""
 
     def test_lower_upper_edge(self):
-        self.assertEqual(ahb._elo_band(1150), "lower")
+        # 1149 is the highest lower-band Elo (bin 1100 upper edge).
+        self.assertEqual(ahb._elo_band(1149), "lower")
 
     def test_middle_lower_edge(self):
-        self.assertEqual(ahb._elo_band(1151), "middle")
+        # 1150 is the first middle-band Elo (bin 1150 lower edge).
+        self.assertEqual(ahb._elo_band(1150), "middle")
 
     def test_middle_upper_edge(self):
-        self.assertEqual(ahb._elo_band(1250), "middle")
+        # 1249 is the highest middle-band Elo (bin 1200 upper edge).
+        self.assertEqual(ahb._elo_band(1249), "middle")
 
     def test_upper_lower_edge(self):
-        self.assertEqual(ahb._elo_band(1251), "upper")
+        # 1250 is the first upper-band Elo (bin 1250 lower edge).
+        self.assertEqual(ahb._elo_band(1250), "upper")
 
     def test_unknown_when_missing(self):
         self.assertEqual(ahb._elo_band(None), "unknown")
