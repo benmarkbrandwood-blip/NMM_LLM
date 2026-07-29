@@ -76,6 +76,9 @@ data/logs/**
 data/human_db.sqlite
 data/human_db.sqlite-shm
 data/human_db.sqlite-wal
+data/human_replay_index.sqlite
+data/human_replay_index.sqlite-shm
+data/human_replay_index.sqlite-wal
 data/specialist_db*.sqlite
 data/specialist_db*.sqlite-shm
 data/specialist_db*.sqlite-wal
