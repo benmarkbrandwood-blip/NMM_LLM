@@ -703,12 +703,19 @@ python tools/import_playok.py  \
 
 ## Human DB — Rebuild from Scratch
 
+> The two entry points (`build_human_db.py` and `build_human_db_sha.py`)
+> share a single library `tools/_human_db_build.py`; they differ only
+> in whether they emit the `.sha256` sidecar (the `_sha` variant does).
+> Both write **schema v3** (adds `positions_elo_bins` / `moves_elo_bins`
+> tables + provenance meta).  A fail-closed guard refuses to write to
+> the active HumanDB at `data/human_db.sqlite` or the
+> `human_db_path` value in `data/training_paths.local.json` — use
+> `--candidate-out` for any new build.
+
 ```
 .venv/bin/python tools/build_human_db.py  \
   --games-dir data/human_games  \
-  --extra-dirs data/games  \
-  --malom-db /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted  \
-  --output data/human_db.sqlite  \
+  --candidate-out data/human_db_candidate.sqlite  \
   --rebuild
 ```
 
@@ -716,34 +723,166 @@ python tools/import_playok.py  \
 | - | - | - |
 | `--games-dir PATH` | `data/human_games` | Primary game directory |
 | `--extra-dirs PATH…` | — | Additional directories |
-| `--output PATH` | `data/human_db.sqlite` | Output SQLite path |
-| `--malom-db PATH` | — | Malom DB directory for WDL annotation |
-| `--no-malom` | off | Skip Malom annotation |
+| `--output PATH` | `data/human_db.sqlite` | Output path (blocked when it resolves to the active DB) |
+| `--candidate-out PATH` | — | Preferred output path for v3 candidate builds; overrides `--output` |
+| `--malom-db PATH` | auto-resolved | Malom DB directory (see resolution order below) |
+| `--no-malom` | off | Skip Malom annotation entirely |
 | `--rebuild` | off | Clear DB and reprocess everything from scratch |
-| `--update` | off | Only process new or changed files |
+| `--update` | off | Only process new / changed files (skips ones in `processed_files` whose SHA-256 matches) |
+| `--limit-files N` | — | Cap number of JSONL files scanned (fixture / smoke tests) |
 
+Malom path resolution (highest priority first): `--no-malom` → `--malom-db` → `NMM_MALOM_DB` env var → `malom_db_path` in `data/training_paths.local.json` → sentinel config default (empty).
 
 > **Note:** Do not use both `--rebuild` and `--update`. Use neither to append without checking.
 
-## Human DB — Incremental Update (SHA-tracked)
+## Human DB — Incremental Update (SHA-tracked, emits .sha256 sidecar)
 
 ```
 .venv/bin/python tools/build_human_db_sha.py  \
   --update  \
   --games-dir data/human_games  \
-  --output data/human_db.sqlite  \
-  --malom-db /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
+  --candidate-out data/human_db_candidate.sqlite
 ```
+
+Same argparse as `build_human_db.py`; differs only in writing
+`<output>.sha256` for download-verification pipelines.  Malom path
+auto-resolves from local config or `NMM_MALOM_DB`.
+
+## Human DB — Validate Candidate
+
+```
+.venv/bin/python tools/validate_human_db_candidate.py  \
+  --candidate data/human_db_candidate.sqlite
+```
+
+Reports SQLite `PRAGMA quick_check`, per-key reconciliation of
+`positions_elo_bins` totals vs `positions.total_games` and
+`moves_elo_bins.total` vs `moves.total`, the new-game Malom semantic
+probe (`outcome='D'`), every required provenance meta row, and the
+candidate's SHA-256.  Emits `<candidate>.validation.json`.  Exits 0
+only when every check passes; activation of the candidate over
+`data/human_db.sqlite` is a separate manual step.
+
+
+## HumanBlunderNet — Phase 1 audit
+
+```
+.venv/bin/python tools/audit_human_blunders.py  \
+  --db data/human_db.sqlite  \
+  --games-dir data/human_games  \
+  --output data/human_blunder_audit_optA.json
+```
+
+Classifies every recorded human move by (Elo band × Malom WDL
+transition × phase).  Reports the full sample-flow gate counts,
+per-cell `n_moves` + `n_positions`, coverage share thresholds
+(≥1/5/10/25/100 plays), Elo histogram + percentiles, and player
+concentration (top 10 movers).  Also captures full provenance: DB
+SHA-256, `malom_label_version`, source-manifest hash, git HEAD.
+Output is used as the audit baseline in
+`docs/human_blunder_audit_phase1.md`.
+
+Uses bin-aligned Option A boundaries (`lower ≤ 1149 · middle 1150-1249
+· upper ≥ 1250`).  Boundaries live in `learned_ai/data/elo_binning.py`
+so the audit and the v3 builder agree on every bin.
 
 | Flag | Default | Description |
 | - | - | - |
-| `--games-dir PATH` | `data/human_games` | Primary game directory |
-| `--extra-dirs PATH…` | — | Additional directories |
-| `--output PATH` | `data/human_db.sqlite` | Output SQLite path |
-| `--malom-db PATH` | — | Malom DB directory |
-| `--no-malom` | off | Skip Malom annotation |
-| `--update` | off | Only process files whose SHA-256 changed |
-| `--rebuild` | off | Clear DB and reprocess from scratch |
+| `--db PATH` | `data/human_db.sqlite` | HumanDB to read Malom labels from (v2 active or v3 candidate) |
+| `--games-dir PATH` | `data/human_games` | JSONL games to replay for Elo attribution |
+| `--output PATH` | `data/human_blunder_audit.json` | Report path |
+| `--top-players N` | 20 | How many top movers to list |
+| `--limit-files N` | — | Cap number of JSONL files scanned (smoke) |
+
+
+## HumanBlunderNet — Dataset extraction
+
+```
+.venv/bin/python tools/extract_human_blunder_dataset.py  \
+  --db data/human_db_candidate.sqlite  \
+  --output-dir data/human_blunder_dataset
+```
+
+Reads the v3 candidate DB, enumerates every legal move at each unique
+`state_key`, encodes successor features from the **original mover's
+perspective** via `board_to_features(succ, mover_color)`, and joins
+with `moves_elo_bins` under Option A band membership.  Successor
+features are dedup'd by `state_key` (bank size ~15× smaller than
+per-sample storage).
+
+Emits two files under `--output-dir`:
+- `succ_feats.f32.bin` — numpy float32 memmap of the successor feature bank
+- `metadata.npz` — offsets, per-sample records, Option-A band index, split
+  flag (`in_val_bucket`), provenance (source DB sha256, feature version,
+  git commit)
+
+Tags each sample with `in_val_bucket(state_key)` so the trainer's split
+matches ValueNet v2 / HumanPrefNet exactly.
+
+| Flag | Default | Description |
+| - | - | - |
+| `--db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB |
+| `--output-dir PATH` | `data/human_blunder_dataset` | Output directory (memmap + metadata.npz) |
+| `--val-fraction FLOAT` | 0.20 | Held-out validation share (via `in_val_bucket`) |
+| `--limit-state-keys N` | — | Cap number of state_keys processed (smoke) |
+
+
+## HumanBlunderNet — Train
+
+```
+.venv/bin/python tools/train_human_blunder_net.py  \
+  --dataset-dir data/human_blunder_dataset  \
+  --output data/human_blunder_net.npz  \
+  --epochs 40  \
+  --patience 6
+```
+
+MLP 82 → 128 → 64 → 32 → 1 (79 board features + 3 Elo band one-hot).
+**Ordinary count-weighted cross-entropy** over observed events;
+softmax over every legal move at each position (unobserved legal
+moves get target 0).  Saves an `.npz` mirroring HumanPrefNet's layout
+with layer weights, feature dims, provenance (dataset lineage, hparams,
+best val NLL, git commit) and a companion `<output>.provenance.json`.
+
+| Flag | Default | Description |
+| - | - | - |
+| `--dataset-dir PATH` | `data/human_blunder_dataset` | Extractor output directory |
+| `--output PATH` | `data/human_blunder_net.npz` | `.npz` output |
+| `--epochs N` | 40 | Max epochs |
+| `--patience N` | 6 | Early-stop patience (0 disables) |
+| `--lr FLOAT` | 3e-4 | Adam learning rate |
+| `--dropout FLOAT` | 0.2 | Dropout on hidden layers |
+| `--batch-positions N` | 512 | (position, band) samples per gradient step |
+| `--grad-clip FLOAT` | 1.0 | Gradient-norm clip |
+| `--seed N` | 42 | RNG seed |
+
+
+## HumanBlunderNet — Evaluate
+
+```
+.venv/bin/python tools/eval_human_blunder_net.py  \
+  --dataset-dir data/human_blunder_dataset  \
+  --model data/human_blunder_net.npz  \
+  --candidate-db data/human_db_candidate.sqlite  \
+  --output data/human_blunder_eval.json
+```
+
+Runs on the position-held-out slice (`sample_is_val == True`).
+Reports event-weighted NLL, top-1 / top-3 / top-5 accuracy, and 10-bin
+ECE calibration, stratified per Elo band (`lower/middle/upper`), per
+phase (`place/move`), and per Malom transition category (via the
+audit's `_classify_transition`).  Also computes empirical KL divergence
+against HumanDB frequencies for positions with ≥ `--min-support`
+observed events.  Provenance from the trained model passes through to
+the report.
+
+| Flag | Default | Description |
+| - | - | - |
+| `--dataset-dir PATH` | `data/human_blunder_dataset` | Extractor output directory |
+| `--model PATH` | `data/human_blunder_net.npz` | Trained model `.npz` |
+| `--candidate-db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB (for Malom transition labels) |
+| `--min-support N` | 10 | Threshold for per-position empirical KL |
+| `--output PATH` | `data/human_blunder_eval.json` | Report path |
 
 
 ## Full Game DB — Build
