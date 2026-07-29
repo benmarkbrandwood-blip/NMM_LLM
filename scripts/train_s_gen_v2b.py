@@ -27,6 +27,7 @@ import argparse
 import copy
 import hashlib
 import json
+import logging
 import math
 import random
 import sys
@@ -160,14 +161,22 @@ def _simple_evaluate(board: BoardState, color: str) -> float:
 
 # ── Difficulty / history helpers ─────────────────────────────────────────────
 
+# Shared per-level time cap applied to BOTH the heuristic opponent and the
+# learner-side lookahead advisor.  Exponential ramp from 0.05 s at L0 to 30 s
+# at L20; uncapped for L > 20 (grows another ~24× per 20 levels).  Formula:
+#   t(L) = 0.05 * 600 ** (L / 20)
 def _heuristic_time_budget(level: int) -> float:
-    """Heuristic opponent time budget: 0.1 s at L1 → 14.0 s at L20 (exponential ramp)."""
-    return 0.1 * (140.0 ** ((level - 1) / 19.0))
+    return 0.05 * (600.0 ** (max(0, level) / 20.0))
 
 
 def _specialist_time_budget(level: int) -> float:
-    """Specialist (learner) alpha-beta time budget: 0.5 s at L1 → 20.0 s at L20."""
-    return 0.5 * (40.0 ** ((level - 1) / 19.0))
+    return _heuristic_time_budget(level)
+
+
+def _heuristic_depth_ceiling(level: int) -> int:
+    """Search-depth ceiling that scales with difficulty so a generous time
+    budget can actually deepen the search.  L0 → 6, L20 → 26, uncapped by 50."""
+    return int(min(50, 6 + max(0, level)))
 
 
 def _build_history_features(history: deque, n: int = 3) -> np.ndarray:
@@ -832,6 +841,20 @@ def _mk_blend_weights():
     )
 
 
+def _mk_humanlike_weights(blend: int):
+    """Return HeuristicWeights for the humanlike-blend opponent slot.
+    `blend` is 0-100 (mix of minimax score vs HumanPrefAdvisor probability)."""
+    import dataclasses
+    hw = sys.modules.get("ai.heuristics")
+    if hw is None:
+        return None
+    return dataclasses.replace(
+        hw.DEFAULT_WEIGHTS,
+        humanlike_blend=max(0, min(100, int(blend))),
+        humanlike_temperature=1.0,
+    )
+
+
 # ── Frozen-model opponent ─────────────────────────────────────────────────────
 
 class FrozenModelOpponent:
@@ -1361,6 +1384,10 @@ def _build_game_diag(
 def run(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2b] Device: {device}")
+    # Silence [Sentinel] observations + intervention log lines during training —
+    # a full run emits thousands per game and drowns the training log.  Only
+    # affects this v2b process; GUI / inference callers keep default levels.
+    logging.getLogger("ai.game_ai").setLevel(logging.ERROR)
     rng = _initialize_training_rngs(args.seed)
 
     # ── Load components ────────────────────────────────────────────────────────
@@ -1422,6 +1449,23 @@ def run(args: argparse.Namespace) -> None:
                 print(f"[s_gen_v2b] Gap net load failed ({e}) — gap features will be 0.5")
         else:
             print("[s_gen_v2b] No gap net — gap features will be 0.5")
+
+    # Humanlike-blend opponent: HumanPrefAdvisor injected into a HeuristicAgent
+    # via HeuristicWeights.humanlike_blend > 0.  Loaded once, reused by the 1 %
+    # humanlike opponent slot.  Missing / disabled → slot is skipped.
+    human_pref_adv = None
+    if not getattr(args, "no_humanlike_opponent", False):
+        try:
+            from ai.human_pref_advisor import try_load as _try_load_pref
+            _pref_path = args.human_pref_net or str(_ROOT / "data" / "human_pref_net.npz")
+            if Path(_pref_path).exists():
+                human_pref_adv = _try_load_pref(_pref_path, temperature=1.0)
+                if human_pref_adv is not None:
+                    print(f"[s_gen_v2b] HumanPrefAdvisor loaded: {_pref_path}")
+        except Exception as e:
+            print(f"[s_gen_v2b] HumanPrefAdvisor load failed ({e}) — humanlike opponent disabled")
+    if human_pref_adv is None:
+        print("[s_gen_v2b] Humanlike opponent unavailable — slot will be skipped")
 
     # v3: HumanDB — for per-candidate human-play-frequency feature
     human_db = None
@@ -1575,12 +1619,17 @@ def run(args: argparse.Namespace) -> None:
             _f.write(json.dumps(row) + "\n")
 
     def _make_ga(color: str, gd: int, **kwargs) -> Any:
-        """Build a GameAI using node budget if requested, else time budget."""
+        """Build a GameAI using node budget if requested, else time budget.
+        Iterative-deepening depth ceiling is raised with difficulty so the
+        (uncapped) time budget can actually deepen the search."""
         node_budget = getattr(args, "heuristic_node_budget", None)
         if node_budget is not None:
-            return _GA(color=color, difficulty=gd, override_node_budget=node_budget, **kwargs)
-        tb = _heuristic_time_budget(gd) if args.time_budget <= 0 else args.time_budget
-        return _GA(color=color, difficulty=gd, override_time_budget=tb, **kwargs)
+            ga = _GA(color=color, difficulty=gd, override_node_budget=node_budget, **kwargs)
+        else:
+            tb = _heuristic_time_budget(gd) if args.time_budget <= 0 else args.time_budget
+            ga = _GA(color=color, difficulty=gd, override_time_budget=tb, **kwargs)
+        ga.max_search_depth = max(int(ga.max_search_depth), _heuristic_depth_ceiling(gd))
+        return ga
 
     # Generalist starts every game from scratch (no position pool)
 
@@ -1630,8 +1679,20 @@ def run(args: argparse.Namespace) -> None:
     _lr_win_rate_ema         = float(_resume_ckpt.get("lr_win_rate_ema", LR_SCALE_WIN))
     segment_stop = min(args.max_games, game_count + args.segment_games) if args.segment_games else args.max_games
 
+    _last_scaled_diff = None
     while game_count < segment_stop:
         batch_count += 1
+        # Learner-side lookahead depth/budget scales with current difficulty so
+        # its tactical requirement grows alongside the opponent's search budget.
+        # (LookaheadAdvisor is shared across the batch; update only on change.)
+        if lookahead_advisor is not None and _last_scaled_diff != difficulty:
+            try:
+                lookahead_advisor._sim_ply_depth = int(
+                    min(30, max(6, args.sim_ply_depth + max(0, difficulty - 1)))
+                )
+            except Exception:
+                pass
+            _last_scaled_diff = difficulty
         # Advancement cooldown: decrement one per batch.  While > 0, rollout
         # outcomes are diverted away from level_heuristic_history (see
         # _record_rollout_outcome).  When it transitions to 0 for the first
@@ -1685,7 +1746,8 @@ def run(args: argparse.Namespace) -> None:
         #   20% — random lower difficulty heuristic (diverse opponent strength)
         #   10% — blunder heuristic (teach exploitation of mistakes)
         #   10% — blended heuristic (value_net 10% + gap_net 30% + sentinel 20%)
-        #   50% — standard logic (self-play or current-difficulty heuristic)
+        #    5% — humanlike-blend heuristic (HumanPrefAdvisor mixed at 50%)
+        #   45% — standard logic (self-play or current-difficulty heuristic)
         # All non-frozen games count toward level-advancement history.
         batch_slots: list[tuple[_GameConfig, Any]] = []
         for _ in range(max(1, min(args.batch_games, args.max_games - game_count))):
@@ -1728,9 +1790,21 @@ def run(args: argparse.Namespace) -> None:
                 _inner = _make_ga(_oc, _gd, value_net=_blend_vn, gap_net=_blend_gap, weights=_bw)
                 if sentinel is not None and difficulty >= 4:
                     _inner.set_sentinel(sentinel, mode="score_adjust")
-                    _inner._sentinel_activation_prob = 0.20
+                    # Check every move; override when opportunity_gap ≥ 20 %.
+                    _inner._sentinel_activation_prob = 1.0
+                    _inner._sentinel_min_gap         = 0.20
                 _h._inner = _inner
                 _opp, _gt = _h, "vs_heuristic_blend"
+
+            elif human_pref_adv is not None and _roll < _lower_diff_hi + 0.25:
+                # 5% humanlike-blend heuristic: HeuristicAgent whose inner GameAI
+                # mixes minimax scores with HumanPrefAdvisor probabilities.
+                # humanlike_blend is a 0-100 weight (default 50 %).
+                _gd  = difficulty
+                _hw  = _mk_humanlike_weights(int(args.humanlike_blend))
+                _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
+                _h._inner = _make_ga(_oc, _gd, human_pref_net=human_pref_adv, weights=_hw)
+                _opp, _gt = _h, "vs_heuristic_humanlike"
 
             else:
                 # Standard 50%: self-play or current-difficulty heuristic
@@ -2463,6 +2537,12 @@ def main() -> None:
     p.add_argument("--malom",    default="", type=str)
     p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
     p.add_argument("--gap-net",  default=str(_ROOT / "data" / "gap_net.npz"),   type=str)
+    p.add_argument("--human-pref-net", default=str(_ROOT / "data" / "human_pref_net.npz"), type=str,
+                   help="HumanPrefNet .npz used by the 1% humanlike opponent slot.")
+    p.add_argument("--no-humanlike-opponent", action="store_true",
+                   help="Disable the 1% humanlike-blend opponent slot even if human_pref_net.npz exists.")
+    p.add_argument("--humanlike-blend", type=int, default=50,
+                   help="humanlike_blend weight (0-100) used by the 5% humanlike opponent slot.")
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument("--seed",                type=int,   default=42)
