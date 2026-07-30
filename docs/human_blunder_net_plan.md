@@ -17,11 +17,18 @@ closed.
 - **rev 2** — first reviewer feedback: granular Elo-bin storage,
   retain all-losing positions, plain count-weighted CE, candidate-DB
   pattern.
-- **rev 3** — second reviewer feedback (this document): correct
+- **rev 3** — second reviewer feedback: correct
   HumanPrefNet description, softmax over all legal moves, mover-POV
   feature contract, deferred/versioned regret, remove WSL absolute
   path, single shared builder implementation, explicit target-
   population definition, provisional filtering only if data exists.
+- **rev 4** (2026-07-30, this document) — Phase 2 and Phase 3 landed
+  end-to-end.  Candidate DB rebuild ran under the shared builder
+  library with Malom auto-resolution; Phase 3 pipeline shipped as
+  three commits (extractor + trainer, advisor, eval) with 23 tests
+  green.  Marks Phase 2 §2.2 and Phase 3 sections COMPLETE; Phase 4
+  eval script implemented.  Phase 5 (GapNet v2 consumption) remains
+  out of scope.
 
 ## Contrast with HumanPrefNet — corrected
 
@@ -245,10 +252,30 @@ Instead:
   mv data/human_db_candidate.sqlite data/human_db.sqlite
   ```
 
-## Phase 3 — HumanBlunderNet training — NOT STARTED
+## Phase 3 — HumanBlunderNet training — COMPLETE (2026-07-30)
 
-`tools/train_human_blunder_net.py`, structurally similar to
-`tools/train_human_pref_net.py` but differing on the axes below.
+Landed as three commits over 2026-07-29 / 2026-07-30:
+
+- **Commit C** `397d828` — extractor + trainer (`tools/extract_human_blunder_dataset.py`,
+  `tools/train_human_blunder_net.py`).  Two-stage design per advisor guidance: extract
+  once (successor feature bank dedup'd by state_key + sample records + provenance),
+  iterate on hyperparameters cheaply.  8 extractor tests + 3 trainer tests, all green.
+- **Commit D** `16571a6` — inference wrapper (`ai/human_blunder_advisor.py`).
+  Pure-numpy MLP forward pass mirroring `ai/human_pref_advisor.py`; adds an
+  `elo_band` parameter to `rank()` / `probs()`.  6 tests including the band-
+  conditioning assertion.
+- **Commit E** `780d3a2` — held-out eval (`tools/eval_human_blunder_net.py`).
+  Event-weighted NLL, top-1/3/5, ECE calibration, per-band + per-phase +
+  per-Malom-transition strata, empirical KL against HumanDB frequencies at
+  `--min-support` support.  6 tests.
+
+Total: 6 new production files, 4 new test files, 23 tests, all green.  End-to-end
+pipeline documented in `script_commands.md` under the HumanBlunderNet sections.
+
+Design axes from the plan below are implemented as originally specified; the
+critical fixes flagged by the reviewer (softmax over EVERY legal move, mover-POV
+board features via the two-argument call, count-weighted CE without focal /
+inverse weighting) are locked in code and asserted by tests.
 
 ### 3.1 Every legal move participates in the softmax (reviewer §9)
 
@@ -353,7 +380,16 @@ Inference wrapper `ai/human_blunder_advisor.py` mirrors
   reviewer's "same canonical state must not appear in both training
   and validation" rule).  Programmatic check in the training loader.
 
-## Phase 4 — evaluation — NOT STARTED
+## Phase 4 — evaluation — COMPLETE (2026-07-30)
+
+Landed in Commit E `780d3a2` as `tools/eval_human_blunder_net.py`.  Every
+metric listed below is reported on the position-held-out slice
+(`sample_is_val == True`).  Game-held-out diagnostic (§3.6) is deferred
+to a follow-up commit — this ships the position-level split that
+HumanPrefNet + ValueNet already share.
+
+Report structure below is the design spec that Commit E implements:
+
 
 `tools/eval_human_blunder_net.py` reports, on both position- and
 game-held-out sets:

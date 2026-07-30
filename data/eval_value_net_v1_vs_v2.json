@@ -1,0 +1,35 @@
+{
+  "val_stats": {
+    "n_seen": 2167498,
+    "n_val": 433365,
+    "n_val_skipped": 1734133,
+    "n_bad": 0,
+    "load_seconds": 9.52
+  },
+  "nets": {
+    "v1": {
+      "path": "data/value_net.npz",
+      "n": 433365,
+      "mse": 0.26413,
+      "sign_accuracy": 0.4286,
+      "sign_acc_W": 0.9022,
+      "sign_acc_D": 0.0,
+      "sign_acc_L": 0.8394,
+      "pred_mean": 0.0916,
+      "pred_std": 0.5121,
+      "name": "v1"
+    },
+    "v2": {
+      "path": "data/value_net_v2.npz",
+      "n": 433365,
+      "mse": 0.20884,
+      "sign_accuracy": 0.4488,
+      "sign_acc_W": 0.9248,
+      "sign_acc_D": 0.0,
+      "sign_acc_L": 0.9036,
+      "pred_mean": 0.0521,
+      "pred_std": 0.515,
+      "name": "v2"
+    }
+  }
+}

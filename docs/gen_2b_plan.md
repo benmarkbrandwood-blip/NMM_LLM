@@ -433,3 +433,78 @@ land as commit-visible edits to this document.
 - [ ] `tests/test_train_s_gen_v2b.py`
 - [ ] `docs/gen_2b_plan.md` (this file)
 - [ ] Sign-off on open decisions in Section 11
+
+---
+
+## 13. Follow-up refinements (2026-07-29 / 2026-07-30)
+
+Landed as separate commits on top of the base plan.
+
+### 13.1 Diff-level ramp for both sides (commit `6bea0aa`)
+
+- Shared per-level time cap: `t(L) = 0.05 · 600^(L/20)` — L0 = 0.05 s,
+  L5 = 0.31 s, L10 = 1.94 s, L15 = 12.11 s, L20 = 30 s.  Uncapped
+  beyond L20 (`L25 ≈ 148 s`).  Same formula for the heuristic opponent
+  and the learner-side `LookaheadAdvisor`.
+- `_make_ga(...)` raises `max_search_depth` to `min(50, 6 + L)` so the
+  generous time budget can actually deepen search rather than
+  stalling at the internal difficulty-clamped ceiling.
+- Learner-side `LookaheadAdvisor._sim_ply_depth` scales as
+  `min(30, max(6, args.sim_ply_depth + (difficulty - 1)))` at every
+  outer-loop iteration where difficulty changes.
+- Rationale: base v2b anneals from L1 (0.10 s) → L20 (14 s) with a
+  fixed learner sim depth.  The user's data showed the AI plateauing
+  because the learner's simulated-lookahead depth stayed constant
+  while opponent search deepened — the ramp closes the gap.
+
+### 13.2 Humanlike-blend opponent slot (commit `6bea0aa`)
+
+- 5 % of games use a `HeuristicAgent` whose inner `GameAI` mixes
+  minimax scores with `HumanPrefAdvisor` probabilities at
+  `humanlike_blend = 50`.
+- Loads `data/human_pref_net.npz` once at startup via
+  `try_load(...)`; falls back gracefully if missing.
+- CLI: `--human-pref-net PATH`, `--no-humanlike-opponent`,
+  `--humanlike-blend N` (default 50).
+- Slot placement: after the blended-nets slot, before the standard
+  slot.  Standard slot shrinks from 50 % → 45 %.
+- Game-type tag: `vs_heuristic_humanlike`.
+- Rationale: expose the learner to human-style play patterns so it
+  learns to counter them, not only textbook heuristic lines.
+
+### 13.3 Sentinel actually overrides above 20 % gap (commit `6bea0aa`)
+
+- Blended-nets opponent slot now sets `_sentinel_activation_prob = 1.0`
+  (check every move) and `_sentinel_min_gap = 0.20` (override when
+  the opportunity gap is ≥ 20 %).  Was previously
+  `_sentinel_activation_prob = 0.20` (probabilistic gate, not gap-
+  based), which meant most gap≥20 % cases were only observed, not
+  corrected.
+- Existing `_sentinel_score_adjust` in `ai/game_ai.py` already routes
+  score-adjust interventions through direct swaps to the sentinel's
+  best move — no change to that path.
+
+### 13.4 Silence sentinel training verbosity (commit `6bea0aa`)
+
+- `logging.getLogger("ai.game_ai").setLevel(logging.ERROR)` at v2b
+  `run()` entry — silences the `[Sentinel] possible_mistake / …` and
+  `[Sentinel] intervened / …` log spam that dominated the training
+  console.  GUI / inference callers keep their default log level.
+
+### 13.5 Uniform fallback when policy row collapses (commit `8358042`)
+
+- `torch.multinomial` rejects zero-sum rows.  The prior guard
+  `probs / probs.sum().clamp(min=1e-9)` prevented division-by-zero
+  but not the degenerate distribution — if `policy_logits` produced
+  NaN or `-inf`, the whole row could still hit multinomial as all
+  zeros.
+- New: detect zero mass explicitly (`_total.item() <= 1e-9`) and
+  fall back to a uniform distribution over legal moves for that ply.
+  `log_probs` is rewritten to match so the entropy / `log_prob_old`
+  bookkeeping stays consistent.
+- Symptom addressed: mid-training crash at game 3920 with
+  `RuntimeError: invalid multinomial distribution (sum of
+  probabilities <= 0)`.  Root cause upstream (bad update pushing
+  policy weights into a NaN region) — the fallback masks the
+  crash so training keeps progressing while gradients pull weights
+  back into finite territory.

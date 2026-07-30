@@ -495,6 +495,100 @@ Winner: higher win rate vs the human proxy. `bench_sentinel.py` needs `--gap-net
 
 ---
 
+## Step 6 — Results (v1 vs v2, 2026-07-30)
+
+Fresh runs of the three eval scripts on active `data/human_db.sqlite`
+(schema v2, `malom_label_version = sector-corrected-v1`) plus the
+current sentinel v1 / v2 checkpoints.  Small-sample sentinel bench
+kept short for iteration speed — the promotion decision requires a
+full-scale rerun matching the Step 6b command in the plan.
+
+### 6c — ValueNet held-out MSE + sign accuracy
+
+Command:
+```bash
+.venv/bin/python scripts/eval_value_net_v2.py \
+    --net data/value_net.npz    --net-name v1 \
+    --net data/value_net_v2.npz --net-name v2 \
+    --output data/eval_value_net_v1_vs_v2.json
+```
+
+Load stats: 433,365 val positions (20 % of 2,167,498), label distribution W=117,424 / D=220,884 / L=95,057.
+
+| Model | MSE     | sign_acc | W-acc | D-acc | L-acc |
+| ----- | ------- | -------- | ----- | ----- | ----- |
+| v1    | 0.26413 | 0.4286   | 0.902 | 0.000 | 0.839 |
+| v2    | 0.20884 | 0.4488   | 0.925 | 0.000 | 0.904 |
+
+**v2 wins on every dimension** except draw accuracy (both zero, expected — the ValueNet output is a scalar and `sign(D)=0` is ambiguous with the tanh output). Sign-accuracy delta: **+2.02 pp**. MSE improves by 0.055 (21 % relative).
+
+Full artefact: `data/eval_value_net_v1_vs_v2.json`.
+
+### 6d — HumanPrefNet held-out top-K + Spearman
+
+Command:
+```bash
+.venv/bin/python scripts/eval_human_pref_net.py \
+    --net data/human_pref_net.npz \
+    --human-db data/human_db.sqlite \
+    --output data/eval_human_pref_net_result.json
+```
+
+Held-out positions: 312,237 (20 % val slice; 109,457 all-losing positions correctly skipped per HumanPrefNet's per-state filter).
+
+| Metric                                            | Value  |
+| ------------------------------------------------- | ------ |
+| top-1 next-move accuracy                          | **48.35 %** |
+| top-3                                             | **79.69 %** |
+| top-5                                             | **90.08 %** |
+| Spearman r on multi-move positions (n = 36,528)   | 0.191  |
+
+**Pass on the plan's floors** (top-1 ≥ 40 %, top-3 ≥ 65 %). Spearman r sits well below the plan's promotion floor (≥ 0.5) — see the "Known caveat" note under Step 7. HumanPrefNet is still usable as the humanlike-blend opponent and as an aux signal, but the low Spearman on multi-move positions suggests the pairwise Bradley-Terry loss produces uncalibrated ranks that cluster near the mode. HumanBlunderNet (`data/human_blunder_net.npz`, Phase 3 pipeline landed 2026-07-29) uses count-weighted cross-entropy explicitly to fix this — its eval metrics live in `docs/human_blunder_net_plan.md`.
+
+Full artefact: `data/eval_human_pref_net_result.json`.
+
+### 6b — Sentinel round-robin
+
+Command (fast smoke — reduced params for iteration):
+```bash
+.venv/bin/python tools/bench_sentinel_v2.py \
+    --diff 3 --budget 0.3 --games-per-pair 2 \
+    --out data/eval_sentinel_v1_vs_v2.json
+```
+
+Total 20 games at difficulty 3, 0.3 s/move budget. 5 configs, 8 games each.
+
+| Config  | Points | W | D | L | Games | Score % |
+| ------- | ------ | - | - | - | ----- | ------- |
+| OldS30  | 5.5    | 4 | 3 | 1 | 8     | **68.8 %** |
+| Base    | 4.5    | 3 | 3 | 2 | 8     | 56.2 %  |
+| NewS20  | 3.5    | 1 | 5 | 2 | 8     | 43.8 %  |
+| NewS30  | 3.5    | 2 | 3 | 3 | 8     | 43.8 %  |
+| OldS20  | 3.0    | 1 | 4 | 3 | 8     | 37.5 %  |
+
+**This is not sufficient evidence for promotion.** Per the Step 7 criteria, sentinel v2 promotion requires `NewS20 vs Base ≥ 50 %` at 40 games/pair, difficulty 5, 3 s/move — the plan's canonical bench.  This smoke shows the OPPOSITE signal (NewS20 at 43.8 %, below Base's 56.2 %), but with 8 games/config and 0.3 s/move the sample noise is dominant.
+
+**Follow-up:** rerun `tools/bench_sentinel_v2.py --diff 5 --budget 3.0 --games-per-pair 40` per the plan (expected ~3 hours) before making a sentinel-v2 promotion / rejection call.
+
+Full artefact: `data/eval_sentinel_v1_vs_v2.json`.
+
+### Summary vs Step 7 criteria
+
+| Criterion (Step 7) | Result | Status |
+| --- | --- | --- |
+| Sentinel 6a | not run this session | pending |
+| Sentinel 6b (NewS20 vs Base ≥ 50 %) | Smoke: 43.8 % vs 56.2 %; needs full bench | **inconclusive** |
+| ValueNet 6c sign accuracy ≥ v1 + 3 pp | +2.02 pp (44.88 vs 42.86) | **near miss** |
+| ValueNet 6c blend bench + blunder rate | not run this session | pending |
+| HumanPrefNet 6d top-1 ≥ 40 % (top-3 ≥ 65 %) | 48.35 % / 79.69 % | **pass** |
+| HumanPrefNet 6d Spearman ≥ 0.5 | 0.191 | **fail** |
+| HumanPrefNet 6d Elo-strata | not run this session | pending |
+| GapNet 6e | not run this session | pending |
+
+**Recommendation:** do not promote yet. Sentinel v2 needs the full-scale 6b bench; ValueNet v2's sign-accuracy improvement is +2.02 pp vs the +3 pp bar (marginal — worth rerunning with the game bench at blends 30/60/80); HumanPrefNet Spearman failure motivates the HumanBlunderNet path already landed as Phase 3 (dedicated calibrated model with count-weighted CE loss instead of pairwise BT).
+
+---
+
 ## Step 7 — Success criteria for promotion
 
 Promote v2 to replace v1 only if **all** conditions hold:

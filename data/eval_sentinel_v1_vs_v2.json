@@ -1,0 +1,348 @@
+{
+  "difficulty": 3,
+  "budget_s": 0.5,
+  "games_per_pair": 4,
+  "total_games": 40,
+  "total_time_min": 18.4,
+  "old_ckpt": "/home/benbrandwood/Documents/dev/NMM_ollama/learned_ai/sentinel/checkpoints/best.pt",
+  "new_ckpt": "/home/benbrandwood/Documents/dev/NMM_ollama/learned_ai/sentinel/checkpoints/v2/best.pt",
+  "standings": [
+    {
+      "name": "NewS20",
+      "sentinel": "new",
+      "min_gap": 0.2,
+      "wins": 7,
+      "draws": 9,
+      "losses": 0,
+      "games": 16,
+      "points": 11.5,
+      "pct": 71.9
+    },
+    {
+      "name": "NewS30",
+      "sentinel": "new",
+      "min_gap": 0.3,
+      "wins": 6,
+      "draws": 6,
+      "losses": 4,
+      "games": 16,
+      "points": 9.0,
+      "pct": 56.2
+    },
+    {
+      "name": "OldS20",
+      "sentinel": "old",
+      "min_gap": 0.2,
+      "wins": 3,
+      "draws": 8,
+      "losses": 5,
+      "games": 16,
+      "points": 7.0,
+      "pct": 43.8
+    },
+    {
+      "name": "Base",
+      "sentinel": null,
+      "min_gap": 0.0,
+      "wins": 3,
+      "draws": 7,
+      "losses": 6,
+      "games": 16,
+      "points": 6.5,
+      "pct": 40.6
+    },
+    {
+      "name": "OldS30",
+      "sentinel": "old",
+      "min_gap": 0.3,
+      "wins": 4,
+      "draws": 4,
+      "losses": 8,
+      "games": 16,
+      "points": 6.0,
+      "pct": 37.5
+    }
+  ],
+  "games": [
+    {
+      "game": 1,
+      "white": "Base",
+      "black": "OldS20",
+      "winner": null,
+      "elapsed_s": 39.4
+    },
+    {
+      "game": 2,
+      "white": "OldS20",
+      "black": "Base",
+      "winner": null,
+      "elapsed_s": 32.5
+    },
+    {
+      "game": 3,
+      "white": "Base",
+      "black": "OldS20",
+      "winner": "W",
+      "elapsed_s": 21.8
+    },
+    {
+      "game": 4,
+      "white": "OldS20",
+      "black": "Base",
+      "winner": null,
+      "elapsed_s": 23.5
+    },
+    {
+      "game": 5,
+      "white": "Base",
+      "black": "OldS30",
+      "winner": "B",
+      "elapsed_s": 26.5
+    },
+    {
+      "game": 6,
+      "white": "OldS30",
+      "black": "Base",
+      "winner": "W",
+      "elapsed_s": 35.8
+    },
+    {
+      "game": 7,
+      "white": "Base",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 22.5
+    },
+    {
+      "game": 8,
+      "white": "OldS30",
+      "black": "Base",
+      "winner": null,
+      "elapsed_s": 18.7
+    },
+    {
+      "game": 9,
+      "white": "Base",
+      "black": "NewS20",
+      "winner": "B",
+      "elapsed_s": 26.7
+    },
+    {
+      "game": 10,
+      "white": "NewS20",
+      "black": "Base",
+      "winner": "W",
+      "elapsed_s": 28.3
+    },
+    {
+      "game": 11,
+      "white": "Base",
+      "black": "NewS20",
+      "winner": "B",
+      "elapsed_s": 29.5
+    },
+    {
+      "game": 12,
+      "white": "NewS20",
+      "black": "Base",
+      "winner": null,
+      "elapsed_s": 19.2
+    },
+    {
+      "game": 13,
+      "white": "Base",
+      "black": "NewS30",
+      "winner": "W",
+      "elapsed_s": 21.2
+    },
+    {
+      "game": 14,
+      "white": "NewS30",
+      "black": "Base",
+      "winner": "W",
+      "elapsed_s": 15.6
+    },
+    {
+      "game": 15,
+      "white": "Base",
+      "black": "NewS30",
+      "winner": null,
+      "elapsed_s": 34.8
+    },
+    {
+      "game": 16,
+      "white": "NewS30",
+      "black": "Base",
+      "winner": null,
+      "elapsed_s": 29.3
+    },
+    {
+      "game": 17,
+      "white": "OldS20",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 21.5
+    },
+    {
+      "game": 18,
+      "white": "OldS30",
+      "black": "OldS20",
+      "winner": "B",
+      "elapsed_s": 18.7
+    },
+    {
+      "game": 19,
+      "white": "OldS20",
+      "black": "OldS30",
+      "winner": null,
+      "elapsed_s": 19.2
+    },
+    {
+      "game": 20,
+      "white": "OldS30",
+      "black": "OldS20",
+      "winner": "B",
+      "elapsed_s": 44.8
+    },
+    {
+      "game": 21,
+      "white": "OldS20",
+      "black": "NewS20",
+      "winner": "B",
+      "elapsed_s": 30.5
+    },
+    {
+      "game": 22,
+      "white": "NewS20",
+      "black": "OldS20",
+      "winner": null,
+      "elapsed_s": 19.3
+    },
+    {
+      "game": 23,
+      "white": "OldS20",
+      "black": "NewS20",
+      "winner": null,
+      "elapsed_s": 29.0
+    },
+    {
+      "game": 24,
+      "white": "NewS20",
+      "black": "OldS20",
+      "winner": null,
+      "elapsed_s": 50.7
+    },
+    {
+      "game": 25,
+      "white": "OldS20",
+      "black": "NewS30",
+      "winner": "B",
+      "elapsed_s": 28.3
+    },
+    {
+      "game": 26,
+      "white": "NewS30",
+      "black": "OldS20",
+      "winner": null,
+      "elapsed_s": 17.1
+    },
+    {
+      "game": 27,
+      "white": "OldS20",
+      "black": "NewS30",
+      "winner": "B",
+      "elapsed_s": 21.7
+    },
+    {
+      "game": 28,
+      "white": "NewS30",
+      "black": "OldS20",
+      "winner": "W",
+      "elapsed_s": 17.9
+    },
+    {
+      "game": 29,
+      "white": "OldS30",
+      "black": "NewS20",
+      "winner": null,
+      "elapsed_s": 19.7
+    },
+    {
+      "game": 30,
+      "white": "NewS20",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 32.1
+    },
+    {
+      "game": 31,
+      "white": "OldS30",
+      "black": "NewS20",
+      "winner": null,
+      "elapsed_s": 33.3
+    },
+    {
+      "game": 32,
+      "white": "NewS20",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 35.3
+    },
+    {
+      "game": 33,
+      "white": "OldS30",
+      "black": "NewS30",
+      "winner": "W",
+      "elapsed_s": 36.4
+    },
+    {
+      "game": 34,
+      "white": "NewS30",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 16.5
+    },
+    {
+      "game": 35,
+      "white": "OldS30",
+      "black": "NewS30",
+      "winner": "W",
+      "elapsed_s": 15.4
+    },
+    {
+      "game": 36,
+      "white": "NewS30",
+      "black": "OldS30",
+      "winner": "W",
+      "elapsed_s": 29.3
+    },
+    {
+      "game": 37,
+      "white": "NewS20",
+      "black": "NewS30",
+      "winner": "W",
+      "elapsed_s": 26.7
+    },
+    {
+      "game": 38,
+      "white": "NewS30",
+      "black": "NewS20",
+      "winner": null,
+      "elapsed_s": 44.4
+    },
+    {
+      "game": 39,
+      "white": "NewS20",
+      "black": "NewS30",
+      "winner": null,
+      "elapsed_s": 19.6
+    },
+    {
+      "game": 40,
+      "white": "NewS30",
+      "black": "NewS20",
+      "winner": null,
+      "elapsed_s": 52.8
+    }
+  ]
+}

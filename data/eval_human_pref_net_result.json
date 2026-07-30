@@ -1,0 +1,17 @@
+{
+  "net": "data/human_pref_net.npz",
+  "val_fraction": 0.2,
+  "n_positions": 312237,
+  "top1_acc": 0.4835,
+  "top3_acc": 0.7969,
+  "top5_acc": 0.9008,
+  "spearman_multi": 0.1913,
+  "n_spearman_samples": 36528,
+  "diagnostics": {
+    "bad_state": 0,
+    "notation_miss": 0,
+    "skip_all_losing": 109457,
+    "position_apply_error": 0
+  },
+  "eval_seconds": 65.57
+}
