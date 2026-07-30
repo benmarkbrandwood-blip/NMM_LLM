@@ -1,6 +1,6 @@
-"""tests/test_human_blunder_eval.py
+"""tests/test_human_move_policy_eval.py
 
-Smoke test for tools/eval_human_blunder_net.py.  Extracts a tiny slice,
+Smoke test for tools/eval_human_move_policy_net.py.  Extracts a tiny slice,
 trains 1 epoch, runs eval, and asserts the report contains every
 promised metric and stratum.
 """
@@ -40,11 +40,11 @@ class TestEvalEndToEnd(unittest.TestCase):
         cls.report      = cls.scratch / "eval.json"
 
         sys.path.insert(0, str(_ROOT / "tools"))
-        import extract_human_blunder_dataset as ext
+        import extract_human_move_policy_dataset as ext
         ext.extract(_CANDIDATE_DB, cls.dataset_dir, limit_state_keys=400)
 
         import argparse
-        from tools.train_human_blunder_net import train
+        from tools.train_human_move_policy_net import train
         train_args = argparse.Namespace(
             dataset_dir=cls.dataset_dir,
             output=cls.model,
@@ -53,7 +53,7 @@ class TestEvalEndToEnd(unittest.TestCase):
         )
         train(train_args)
 
-        from tools.eval_human_blunder_net import evaluate
+        from tools.eval_human_move_policy_net import evaluate
         cls.report_data = evaluate(cls.dataset_dir, cls.model, _CANDIDATE_DB,
                                    min_support=10)
 

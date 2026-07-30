@@ -1,10 +1,10 @@
-"""tests/test_human_blunder_perspective.py — Locks the parent/child Malom
-perspective that HumanBlunderNet's audit script depends on.
+"""tests/test_human_moves_audit_perspective.py — Locks the parent/child Malom
+perspective that HumanMovePolicyNet's audit script depends on.
 
 The reviewer flagged this as a blocker for Phase 2.  Two layers:
 
   1. Unit tests for `_classify_transition` and `_FLIP` in
-     `tools/audit_human_blunders.py` — pure logic, no DB required.
+     `tools/audit_human_moves.py` — pure logic, no DB required.
      Asserts every parent-mover-POV × child-next-mover-POV combination
      resolves to the documented transition category.
 
@@ -18,7 +18,7 @@ The reviewer flagged this as a blocker for Phase 2.  Two layers:
        - HumanPrefNet's actual per-state filter keeps the `L`-after
          records (i.e. does not treat them as blunders).
 
-If either layer fails, HumanBlunderNet Phase 2 must not proceed.
+If either layer fails, HumanMovePolicyNet Phase 2 must not proceed.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools"))
 
-import audit_human_blunders as ahb  # noqa: E402
+import audit_human_moves as ahb  # noqa: E402
 
 
 # ── 1. Unit tests: transition classification ────────────────────────────────
@@ -148,7 +148,7 @@ class TestHumanPrefFilterDirection(unittest.TestCase):
     def test_returns_none_when_all_are_W(self):
         # All records show the human played into a next-mover-W child ⇒
         # every record is a mover-L (all-losing).  HumanPrefNet drops those.
-        # HumanBlunderNet retains them (per reviewer §5).
+        # HumanMovePolicyNet retains them (per reviewer §5).
         from tools.train_human_pref_net import _per_state_filter
         self.assertIsNone(_per_state_filter(["W", "W"]))
 

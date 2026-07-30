@@ -1,6 +1,6 @@
-"""ai/human_blunder_advisor.py — Inference wrapper around HumanBlunderNet.
+"""ai/human_move_policy_advisor.py — Inference wrapper around HumanMovePolicyNet.
 
-Loads the .npz emitted by `tools/train_human_blunder_net.py` and exposes
+Loads the .npz emitted by `tools/train_human_move_policy_net.py` and exposes
 `rank(board, legal_moves, elo_band)` and `probs(board, legal_moves,
 elo_band)` — the calibrated per-move human probability distribution
 that GapNet v2 will consume in the expected-regret formula:
@@ -37,11 +37,11 @@ from game.board import BoardState
 from ai.value_net import board_to_features, _INPUT_DIM
 
 
-# Must match tools/train_human_blunder_net.py: 0=lower, 1=middle, 2=upper.
+# Must match tools/train_human_move_policy_net.py: 0=lower, 1=middle, 2=upper.
 _BAND_TO_IDX = {"lower": 0, "middle": 1, "upper": 2}
 
 
-class HumanBlunderAdvisor:
+class HumanMovePolicyAdvisor:
     """Score / rank / sample candidate moves by predicted human likelihood,
     conditioned on Elo band.  Sibling to `HumanPrefAdvisor`."""
 
@@ -63,12 +63,12 @@ class HumanBlunderAdvisor:
         n_bands   = int(data["n_bands"][0]) if "n_bands" in data.files else 3
         if expected_in != board_dim + n_bands:
             raise ValueError(
-                f"HumanBlunderNet at {npz_path!s} expects input_dim {expected_in}, "
+                f"HumanMovePolicyNet at {npz_path!s} expects input_dim {expected_in}, "
                 f"but board_feature_dim + n_bands = {board_dim + n_bands}."
             )
         if board_dim != _INPUT_DIM:
             raise ValueError(
-                f"HumanBlunderNet at {npz_path!s} expects board_feature_dim "
+                f"HumanMovePolicyNet at {npz_path!s} expects board_feature_dim "
                 f"{board_dim}, but board_to_features emits {_INPUT_DIM}."
             )
         self.input_dim = expected_in
@@ -175,14 +175,14 @@ class HumanBlunderAdvisor:
 
 def try_load(
     npz_path: str | Path, temperature: float = 1.0
-) -> Optional[HumanBlunderAdvisor]:
-    """Return a HumanBlunderAdvisor if the file exists + loads cleanly,
+) -> Optional[HumanMovePolicyAdvisor]:
+    """Return a HumanMovePolicyAdvisor if the file exists + loads cleanly,
     else None.  Mirrors `ai.human_pref_advisor.try_load` so callers can
-    fall back gracefully when the blunder net isn't available."""
+    fall back gracefully when the move-policy net isn't available."""
     path = Path(npz_path)
     if not path.exists():
         return None
     try:
-        return HumanBlunderAdvisor(path, temperature=temperature)
+        return HumanMovePolicyAdvisor(path, temperature=temperature)
     except Exception:
         return None

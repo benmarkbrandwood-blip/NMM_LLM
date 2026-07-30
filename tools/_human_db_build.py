@@ -5,7 +5,7 @@ Underlying implementation for both `tools/build_human_db.py` and
 in whether they emit the `.sha256` sidecar file alongside the finished
 database — everything else lives here so the pipelines cannot drift.
 
-Reviewer requirement (docs/human_blunder_net_plan.md §2.2, Phase 2
+Reviewer requirement (docs/human_move_policy_net_plan.md §2.2, Phase 2
 Commit A):
 
 - one shared implementation
@@ -585,7 +585,7 @@ def _guard_active_db(output_path: Path) -> None:
             f"REFUSING to write v3 schema to the active HumanDB at {resolved}.\n"
             f"Pass --candidate-out with a distinct path (e.g. "
             f"data/human_db_candidate.sqlite).\n"
-            f"Activation is a separate later step; see docs/human_blunder_net_plan.md §2.2."
+            f"Activation is a separate later step; see docs/human_move_policy_net_plan.md §2.2."
         )
 
 

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""tools/audit_human_blunders.py — Phase 1 baseline for HumanBlunderNet.
+"""tools/audit_human_moves.py — Phase 1 baseline for HumanMovePolicyNet.
 
 Reads raw human game JSONL + existing Malom labels in data/human_db.sqlite,
 classifies every recorded human move by (Elo band × WDL transition × phase),
 and prints a coverage / class-balance report.  No network training, no DB
 mutation — this is the auditable baseline described in
-docs/human_blunder_net_plan.md before we commit to the schema rebuild.
+docs/human_move_policy_net_plan.md before we commit to the schema rebuild.
 
 Usage
 -----
-    .venv/bin/python tools/audit_human_blunders.py \\
+    .venv/bin/python tools/audit_human_moves.py \\
         --db data/human_db.sqlite \\
         --games-dir data/human_games \\
-        --output data/human_blunder_audit.json
+        --output data/human_moves_audit.json
 
 Optional: `--limit-files N` to smoke-test on the first N JSONL files.
 
@@ -23,7 +23,7 @@ Transition categories (mover's perspective, using flip on malom_wdl_after)
     W→L  win_to_loss         (blunder)
     D→D  draw_preserved      (correct)
     D→L  draw_to_loss        (blunder)
-    L→L  all_losing          (excluded from BlunderNet training; audited only)
+    L→L  all_losing          (excluded from human-move-policy training; audited only)
     label_inconsistency      (D→W, L→D, L→W: Malom pre/after disagree)
     unlabelled               (Malom lookup missing on pre or after)
 
@@ -535,7 +535,7 @@ def audit(
     report = {
         "meta": {
             "audit_version": AUDIT_VERSION,
-            "audit_script": "tools/audit_human_blunders.py",
+            "audit_script": "tools/audit_human_moves.py",
             "git_head": _git_head(),
             "cwd": str(_ROOT),
             "elapsed_seconds": round(time.time() - t0, 1),
@@ -706,7 +706,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--db",         type=Path, default=Path("data/human_db.sqlite"))
     p.add_argument("--games-dir",  type=Path, default=Path("data/human_games"))
-    p.add_argument("--output",     type=Path, default=Path("data/human_blunder_audit.json"))
+    p.add_argument("--output",     type=Path, default=Path("data/human_moves_audit.json"))
     p.add_argument("--top-players", type=int, default=20,
                    help="How many top movers to list in player concentration report.")
     p.add_argument("--limit-files", type=int, default=None,

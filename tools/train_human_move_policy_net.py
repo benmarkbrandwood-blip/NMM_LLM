@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""tools/train_human_blunder_net.py — HumanBlunderNet Phase 3 trainer.
+"""tools/train_human_move_policy_net.py — HumanMovePolicyNet Phase 3 trainer.
 
 Reads the extracted dataset produced by
-`tools/extract_human_blunder_dataset.py` and trains an 82 → 128 → 64 →
+`tools/extract_human_move_policy_dataset.py` and trains an 82 → 128 → 64 →
 32 → 1 MLP that outputs a per-legal-move score.  Softmax over every
 legal move at the position produces the calibrated human move
 distribution `p(m | position, elo_band)`.
@@ -14,14 +14,14 @@ observed move events.  No focal loss, no per-category reweighting.
        normalised by total event count in the batch.
 
 Saved as `.npz` mirroring `data/human_pref_net.npz` layout so
-`ai/human_blunder_advisor.py` can be a pure-numpy sibling to
+`ai/human_move_policy_advisor.py` can be a pure-numpy sibling to
 `ai/human_pref_advisor.py`.
 
 Usage
 -----
-    .venv/bin/python tools/train_human_blunder_net.py \\
-        --dataset-dir data/human_blunder_dataset \\
-        --output data/human_blunder_net.npz
+    .venv/bin/python tools/train_human_move_policy_net.py \\
+        --dataset-dir data/human_move_policy_dataset \\
+        --output data/human_move_policy_net.npz
 """
 from __future__ import annotations
 
@@ -58,8 +58,8 @@ def _git_head() -> Optional[str]:
 
 # ── Dataset loader ──────────────────────────────────────────────────────────
 
-class BlunderDataset:
-    """Reads the memmap + metadata produced by extract_human_blunder_dataset.
+class MovePolicyDataset:
+    """Reads the memmap + metadata produced by extract_human_move_policy_dataset.
 
     Presents `samples_train` / `samples_val` — each an object exposing
     `state_idx`, `band_idx`, `targets_flat`, `offsets` — for the loop.
@@ -170,7 +170,7 @@ def train(args: argparse.Namespace) -> dict:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[hbn] device={device.type}")
 
-    ds = BlunderDataset(args.dataset_dir)
+    ds = MovePolicyDataset(args.dataset_dir)
     tr = ds.train_idx()
     va = ds.val_idx()
     print(f"[hbn] samples: train={len(tr):,}  val={len(va):,}  total={ds.n_samples:,}")
@@ -298,8 +298,8 @@ def train(args: argparse.Namespace) -> dict:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dataset-dir", type=Path, default=Path("data/human_blunder_dataset"))
-    p.add_argument("--output",      type=Path, default=Path("data/human_blunder_net.npz"))
+    p.add_argument("--dataset-dir", type=Path, default=Path("data/human_move_policy_dataset"))
+    p.add_argument("--output",      type=Path, default=Path("data/human_move_policy_net.npz"))
     p.add_argument("--epochs",      type=int,   default=40)
     p.add_argument("--patience",    type=int,   default=6)
     p.add_argument("--lr",          type=float, default=3e-4)

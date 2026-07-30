@@ -40,7 +40,7 @@ def elo_bin(elo: Optional[int]) -> Optional[int]:
 # ── Option A: PlayOK amateur-corpus strata (not universal strength) ─────────
 
 # Cut-offs are inclusive on the upper edge of each band.  These match
-# tools/audit_human_blunders.py::_elo_band exactly.  Bin-aligned so
+# tools/audit_human_moves.py::_elo_band exactly.  Bin-aligned so
 # every 50-Elo bin belongs to exactly one band (no boundary bins
 # straddle two bands).
 OPTION_A_NAME = "option_a_1149_1249"
@@ -52,7 +52,7 @@ def option_a_band(elo: Optional[int]) -> str:
     """Return 'lower' / 'middle' / 'upper' / 'unknown' under Option A.
 
     Strata within the PlayOK amateur corpus (see
-    docs/human_blunder_audit_phase1.md); not universal strength labels.
+    docs/human_moves_audit_phase1.md); not universal strength labels.
     """
     if elo is None:
         return "unknown"

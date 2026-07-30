@@ -101,7 +101,7 @@ python tools/build_fullgame_db.py \
 **Schema versions:**
 
 - **v2 (active)** — `data/human_db.sqlite`. Tables: `positions`, `moves`, `processed_files`, `meta`.
-- **v3 (candidate)** — additive additions on top of v2 for HumanBlunderNet. Written to a **candidate path** only (`--candidate-out data/human_db_candidate.sqlite`); a **fail-closed guard** in the builder refuses to write v3 schema over the active DB path or the value in `training_paths.local.json`. Activation is a separate later manual step.
+- **v3 (candidate)** — additive additions on top of v2 for HumanMovePolicyNet. Written to a **candidate path** only (`--candidate-out data/human_db_candidate.sqlite`); a **fail-closed guard** in the builder refuses to write v3 schema over the active DB path or the value in `training_paths.local.json`. Activation is a separate later manual step.
 
 **v3 additions:**
 
@@ -280,7 +280,7 @@ Game-level fields: `white_personality`, `black_personality`, `white_vn_blend`, `
 
 ---
 
-## 13. HumanBlunderNet dataset (`data/human_blunder_dataset/`)
+## 13. HumanMovePolicyNet dataset (`data/human_move_policy_dataset/`)
 
 **Directory contents:**
 - `succ_feats.f32.bin` — memory-mapped float32 successor-feature bank, deduplicated per unique `state_key`. Roughly 10 GB at full corpus scale.
@@ -288,23 +288,23 @@ Game-level fields: `white_personality`, `black_personality`, `white_vn_blend`, `
 
 **What it stores:** For every `(state_key, Option-A-band)` in the v3 candidate DB with any observed events: the parent board (implicit via `state_key`), enumerated legal-move list with successor features from the **original mover's** perspective, and per-legal-move human-play count. Every legal move participates in the softmax denominator (unobserved legal moves get target 0, per plan §3.1). Sample is tagged with `in_val_bucket(state_key)` for the same held-out split HumanPrefNet + ValueNet share.
 
-**How it is built:** `tools/extract_human_blunder_dataset.py`. Reads the v3 candidate DB, reconstructs boards via `tools/train_value_net_v2::board_from_state_key`, enumerates legal moves via `game.rules.get_all_legal_moves`, encodes successor features via `ai.value_net.board_to_features(succ, mover_color)`, joins with `moves_elo_bins` under Option A band membership (`learned_ai/data/elo_binning.py`).
+**How it is built:** `tools/extract_human_move_policy_dataset.py`. Reads the v3 candidate DB, reconstructs boards via `tools/train_value_net_v2::board_from_state_key`, enumerates legal moves via `game.rules.get_all_legal_moves`, encodes successor features via `ai.value_net.board_to_features(succ, mover_color)`, joins with `moves_elo_bins` under Option A band membership (`learned_ai/data/elo_binning.py`).
 
-**When consulted:** Read by `tools/train_human_blunder_net.py` and `tools/eval_human_blunder_net.py`. Not read at game-play runtime.
+**When consulted:** Read by `tools/train_human_move_policy_net.py` and `tools/eval_human_move_policy_net.py`. Not read at game-play runtime.
 
 ---
 
-## 14. HumanBlunderNet (`data/human_blunder_net.npz`)
+## 14. HumanMovePolicyNet (`data/human_move_policy_net.npz`)
 
 **Format:** NumPy `.npz` MLP (82 → 128 → 64 → 32 → 1), pure-numpy at inference. Input = 79 board features + 3 Elo-band one-hot (`[lower, middle, upper]`).
 
 **What it stores:** A calibrated per-move human probability distribution `p(m | position, elo_band)` over every legal move at the position. Trained with **ordinary count-weighted cross-entropy** — no focal loss, no per-category reweighting. Represents **unfiltered human choice behaviour** including losing moves, conditioned on Elo band. Sums to 1 across legal moves by construction.
 
-**How it is built:** `tools/train_human_blunder_net.py` reads the extracted dataset (Entry 13), trains with Adam + gradient clip, saves layer weights + full provenance (dataset lineage, hparams, best val NLL, git commit) as `.npz`.
+**How it is built:** `tools/train_human_move_policy_net.py` reads the extracted dataset (Entry 13), trains with Adam + gradient clip, saves layer weights + full provenance (dataset lineage, hparams, best val NLL, git commit) as `.npz`.
 
-**When consulted:** `ai/human_blunder_advisor.py` — `HumanBlunderAdvisor(npz).probs(board, legal_moves, elo_band)`. Primary downstream consumer will be GapNet v2's expected-regret formula: `expected_regret(pos) = Σ probs(m | pos, band) · malom_regret(m)`. Not yet wired into game-play runtime.
+**When consulted:** `ai/human_move_policy_advisor.py` — `HumanMovePolicyAdvisor(npz).probs(board, legal_moves, elo_band)`. Primary downstream consumer will be GapNet v2's expected-regret formula: `expected_regret(pos) = Σ probs(m | pos, band) · malom_regret(m)`. Not yet wired into game-play runtime.
 
-**Eval:** `tools/eval_human_blunder_net.py` reports event-weighted NLL, top-1/3/5, ECE calibration, per-Elo-band + per-phase + per-Malom-transition strata, and empirical KL divergence against HumanDB frequencies where support permits.
+**Eval:** `tools/eval_human_move_policy_net.py` reports event-weighted NLL, top-1/3/5, ECE calibration, per-Elo-band + per-phase + per-Malom-transition strata, and empirical KL divergence against HumanDB frequencies where support permits.
 
 ---
 
@@ -317,7 +317,7 @@ Game-level fields: `white_personality`, `black_personality`, `white_vn_blend`, `
 | EndgameSolvedDB | `data/endgame/*.wdl` | `build_endgame_db.py` | `game_ai.py` | Exact retrograde WDL (3v3+) |
 | FullGameDB | `data/fullgame.bin` | `build_fullgame_db.py` | `game_ai.py` | BFS-expanded position WDL |
 | HumanDB (v2 active) | `data/human_db.sqlite` | `build_human_db.py` | Stage 1 training, sentinel | Human game frequencies + win rates |
-| HumanDB (v3 candidate) | `data/human_db_candidate.sqlite` | `build_human_db.py --candidate-out` | `extract_human_blunder_dataset.py` | + Elo-bin sparse tables + provenance |
+| HumanDB (v3 candidate) | `data/human_db_candidate.sqlite` | `build_human_db.py --candidate-out` | `extract_human_move_policy_dataset.py` | + Elo-bin sparse tables + provenance |
 | AIDB | `data/ai_games/` | `gen_aidb.py` | `train_sentinel.py` | AI-vs-AI games with Malom move labels |
 | Opening Book | `data/openings/*.json` | web server, tools | `opening_book.py` | UCB1-selected opening lines |
 | ChromaDB | `data/chroma/` | `memory_manager.py` | `mills_llm.py` | LLM strategic vector memory |
@@ -325,5 +325,5 @@ Game-level fields: `white_personality`, `black_personality`, `white_vn_blend`, `
 | Value Network | `data/value_net.npz` | `train_value_net.py` | `ai/mcts.py` (dormant) | MLP position evaluator |
 | Sentinel | `learned_ai/sentinel/checkpoints/` | `train_sentinel.py` | `game_ai.py` | Move-quality scorer |
 | HumanPrefNet | `data/human_pref_net.npz` | `train_human_pref_net.py` | `human_pref_advisor.py` | Filtered "competent" human style |
-| HumanBlunderNet dataset | `data/human_blunder_dataset/` | `extract_human_blunder_dataset.py` | `train_human_blunder_net.py` | Per-band per-position legal-move samples |
-| HumanBlunderNet | `data/human_blunder_net.npz` | `train_human_blunder_net.py` | `human_blunder_advisor.py` | Calibrated `p(m \| pos, elo_band)` |
+| HumanMovePolicyNet dataset | `data/human_move_policy_dataset/` | `extract_human_move_policy_dataset.py` | `train_human_move_policy_net.py` | Per-band per-position legal-move samples |
+| HumanMovePolicyNet | `data/human_move_policy_net.npz` | `train_human_move_policy_net.py` | `human_move_policy_advisor.py` | Calibrated `p(m \| pos, elo_band)` |

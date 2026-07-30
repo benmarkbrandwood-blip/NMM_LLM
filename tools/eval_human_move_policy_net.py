@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/eval_human_blunder_net.py — Held-out evaluation for HumanBlunderNet.
+"""tools/eval_human_move_policy_net.py — Held-out evaluation for HumanMovePolicyNet.
 
 Reports every metric flagged by the plan doc §Phase 4:
 
@@ -20,11 +20,11 @@ already share.
 
 Usage
 -----
-    .venv/bin/python tools/eval_human_blunder_net.py \\
-        --dataset-dir data/human_blunder_dataset \\
-        --model       data/human_blunder_net.npz \\
+    .venv/bin/python tools/eval_human_move_policy_net.py \\
+        --dataset-dir data/human_move_policy_dataset \\
+        --model       data/human_move_policy_net.npz \\
         --candidate-db data/human_db_candidate.sqlite \\
-        --output      data/human_blunder_eval.json
+        --output      data/human_move_policy_eval.json
 """
 from __future__ import annotations
 
@@ -42,21 +42,21 @@ import numpy as np
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from ai.human_blunder_advisor import HumanBlunderAdvisor        # noqa: E402
+from ai.human_move_policy_advisor import HumanMovePolicyAdvisor        # noqa: E402
 from ai.value_net import _INPUT_DIM, board_to_features          # noqa: E402
 from game.board import BoardState                               # noqa: E402
 from game.rules import get_all_legal_moves                      # noqa: E402
 from tools.train_value_net_v2 import board_from_state_key       # noqa: E402
 
 
-# Must mirror tools/train_human_blunder_net.py and the extractor.
+# Must mirror tools/train_human_move_policy_net.py and the extractor.
 _BAND_NAMES = ("lower", "middle", "upper")
 
 
 # ── Reuse the audit's transition classifier ─────────────────────────────────
 
 sys.path.insert(0, str(_ROOT / "tools"))
-import audit_human_blunders as ahb   # noqa: E402
+import audit_human_moves as ahb   # noqa: E402
 
 
 # ── Move-notation helper (matches build_human_db_sha.py convention) ─────────
@@ -129,14 +129,14 @@ def evaluate(
     candidate_db: Path,
     min_support: int = 10,
 ) -> dict:
-    from tools.train_human_blunder_net import BlunderDataset
+    from tools.train_human_move_policy_net import MovePolicyDataset
 
     t0 = time.time()
-    ds = BlunderDataset(dataset_dir)
+    ds = MovePolicyDataset(dataset_dir)
     val_idx = ds.val_idx()
     print(f"[eval] {len(val_idx):,} val samples")
 
-    adv = HumanBlunderAdvisor(model_path, temperature=1.0)
+    adv = HumanMovePolicyAdvisor(model_path, temperature=1.0)
 
     # Preload Malom labels for transition classification.
     conn = sqlite3.connect(str(candidate_db))
@@ -307,13 +307,13 @@ def _print_summary(report: dict) -> None:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--dataset-dir", type=Path, default=Path("data/human_blunder_dataset"))
-    p.add_argument("--model",       type=Path, default=Path("data/human_blunder_net.npz"))
+    p.add_argument("--dataset-dir", type=Path, default=Path("data/human_move_policy_dataset"))
+    p.add_argument("--model",       type=Path, default=Path("data/human_move_policy_net.npz"))
     p.add_argument("--candidate-db", type=Path, default=Path("data/human_db_candidate.sqlite"))
     p.add_argument("--min-support", type=int,  default=10,
                    help="Positions with < min_support observed events skip "
                         "the per-position empirical KL metric.")
-    p.add_argument("--output",      type=Path, default=Path("data/human_blunder_eval.json"))
+    p.add_argument("--output",      type=Path, default=Path("data/human_move_policy_eval.json"))
     args = p.parse_args()
 
     report = evaluate(args.dataset_dir, args.model, args.candidate_db,

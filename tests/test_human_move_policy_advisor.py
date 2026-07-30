@@ -1,7 +1,7 @@
-"""tests/test_human_blunder_advisor.py
+"""tests/test_human_move_policy_advisor.py
 
-Unit + smoke tests for `ai/human_blunder_advisor.py`.  Trains a tiny
-HumanBlunderNet under a scratch dir, loads it via the advisor, and
+Unit + smoke tests for `ai/human_move_policy_advisor.py`.  Trains a tiny
+HumanMovePolicyNet under a scratch dir, loads it via the advisor, and
 asserts:
   - probs sums to 1 across all legal moves
   - probs shape matches legal-move count
@@ -32,7 +32,7 @@ _CANDIDATE_AVAILABLE = _CANDIDATE_DB.exists()
 
 class TestTryLoadMissing(unittest.TestCase):
     def test_returns_none_for_missing_file(self):
-        from ai.human_blunder_advisor import try_load
+        from ai.human_move_policy_advisor import try_load
         self.assertIsNone(try_load("/tmp/no_such_hbn.npz"))
 
 
@@ -50,11 +50,11 @@ class TestAdvisorEndToEnd(unittest.TestCase):
         cls.output_npz  = cls.scratch / "hbn.npz"
 
         sys.path.insert(0, str(_ROOT / "tools"))
-        import extract_human_blunder_dataset as ext
+        import extract_human_move_policy_dataset as ext
         ext.extract(_CANDIDATE_DB, cls.dataset_dir, limit_state_keys=200)
 
         import argparse
-        from tools.train_human_blunder_net import train
+        from tools.train_human_move_policy_net import train
         args = argparse.Namespace(
             dataset_dir=cls.dataset_dir,
             output=cls.output_npz,
@@ -77,8 +77,8 @@ class TestAdvisorEndToEnd(unittest.TestCase):
         return get_all_legal_moves(board)
 
     def test_load_and_infer(self):
-        from ai.human_blunder_advisor import HumanBlunderAdvisor
-        adv = HumanBlunderAdvisor(self.output_npz)
+        from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+        adv = HumanMovePolicyAdvisor(self.output_npz)
         # 82 = 79 board features + 3 elo band bits
         self.assertEqual(adv.input_dim, 82)
         self.assertEqual(adv.board_feature_dim, 79)
@@ -86,8 +86,8 @@ class TestAdvisorEndToEnd(unittest.TestCase):
         self.assertIsNotNone(adv.provenance)
 
     def test_probs_sum_to_one_per_band(self):
-        from ai.human_blunder_advisor import HumanBlunderAdvisor
-        adv = HumanBlunderAdvisor(self.output_npz)
+        from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+        adv = HumanMovePolicyAdvisor(self.output_npz)
         board = self._fresh_board()
         legal = self._legal_moves(board)
         self.assertGreater(len(legal), 0)
@@ -102,8 +102,8 @@ class TestAdvisorEndToEnd(unittest.TestCase):
         """Conditioning on band must produce different distributions
         (assuming training was non-trivial — 1 epoch on a real dataset
         will not saturate the band bits to zero effect)."""
-        from ai.human_blunder_advisor import HumanBlunderAdvisor
-        adv = HumanBlunderAdvisor(self.output_npz)
+        from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+        adv = HumanMovePolicyAdvisor(self.output_npz)
         board = self._fresh_board()
         legal = self._legal_moves(board)
         p_lower  = adv.probs(board, legal, "lower")
@@ -119,16 +119,16 @@ class TestAdvisorEndToEnd(unittest.TestCase):
         )
 
     def test_rejects_unknown_band(self):
-        from ai.human_blunder_advisor import HumanBlunderAdvisor
-        adv = HumanBlunderAdvisor(self.output_npz)
+        from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+        adv = HumanMovePolicyAdvisor(self.output_npz)
         board = self._fresh_board()
         legal = self._legal_moves(board)
         with self.assertRaises(ValueError):
             adv.probs(board, legal, "expert")
 
     def test_empty_legal_moves(self):
-        from ai.human_blunder_advisor import HumanBlunderAdvisor
-        adv = HumanBlunderAdvisor(self.output_npz)
+        from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+        adv = HumanMovePolicyAdvisor(self.output_npz)
         board = self._fresh_board()
         p = adv.probs(board, [], "lower")
         self.assertEqual(p.shape, (0,))

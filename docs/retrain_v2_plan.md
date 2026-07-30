@@ -543,7 +543,7 @@ Held-out positions: 312,237 (20 % val slice; 109,457 all-losing positions correc
 | top-5                                             | **90.08 %** |
 | Spearman r on multi-move positions (n = 36,528)   | 0.191  |
 
-**Pass on the plan's floors** (top-1 ≥ 40 %, top-3 ≥ 65 %). Spearman r sits well below the plan's promotion floor (≥ 0.5) — see the "Known caveat" note under Step 7. HumanPrefNet is still usable as the humanlike-blend opponent and as an aux signal, but the low Spearman on multi-move positions suggests the pairwise Bradley-Terry loss produces uncalibrated ranks that cluster near the mode. HumanBlunderNet (`data/human_blunder_net.npz`, Phase 3 pipeline landed 2026-07-29) uses count-weighted cross-entropy explicitly to fix this — its eval metrics live in `docs/human_blunder_net_plan.md`.
+**Pass on the plan's floors** (top-1 ≥ 40 %, top-3 ≥ 65 %). Spearman r sits well below the plan's promotion floor (≥ 0.5) — see the "Known caveat" note under Step 7. HumanPrefNet is still usable as the humanlike-blend opponent and as an aux signal, but the low Spearman on multi-move positions suggests the pairwise Bradley-Terry loss produces uncalibrated ranks that cluster near the mode. HumanMovePolicyNet (`data/human_move_policy_net.npz`, Phase 3 pipeline landed 2026-07-29) uses count-weighted cross-entropy explicitly to fix this — its eval metrics live in `docs/human_move_policy_net_plan.md`.
 
 Full artefact: `data/eval_human_pref_net_result.json`.
 
@@ -585,7 +585,7 @@ Full artefact: `data/eval_sentinel_v1_vs_v2.json`.
 | HumanPrefNet 6d Elo-strata | not run this session | pending |
 | GapNet 6e | not run this session | pending |
 
-**Recommendation:** do not promote yet. Sentinel v2 needs the full-scale 6b bench; ValueNet v2's sign-accuracy improvement is +2.02 pp vs the +3 pp bar (marginal — worth rerunning with the game bench at blends 30/60/80); HumanPrefNet Spearman failure motivates the HumanBlunderNet path already landed as Phase 3 (dedicated calibrated model with count-weighted CE loss instead of pairwise BT).
+**Recommendation:** do not promote yet. Sentinel v2 needs the full-scale 6b bench; ValueNet v2's sign-accuracy improvement is +2.02 pp vs the +3 pp bar (marginal — worth rerunning with the game bench at blends 30/60/80); HumanPrefNet Spearman failure motivates the HumanMovePolicyNet path already landed as Phase 3 (dedicated calibrated model with count-weighted CE loss instead of pairwise BT).
 
 ---
 

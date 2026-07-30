@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """tools/validate_human_db_candidate.py — Phase 2 candidate DB validator.
 
-Reviewer requirement (docs/human_blunder_net_plan.md §2.2): before a
+Reviewer requirement (docs/human_move_policy_net_plan.md §2.2): before a
 Phase-2 candidate HumanDB may be considered for activation, it must
 pass:
 

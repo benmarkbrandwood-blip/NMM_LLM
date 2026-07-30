@@ -1,6 +1,6 @@
-"""tests/test_human_blunder_dataset_extractor.py
+"""tests/test_human_move_policy_dataset_extractor.py
 
-End-to-end tests for tools/extract_human_blunder_dataset.py.  Skipped if
+End-to-end tests for tools/extract_human_move_policy_dataset.py.  Skipped if
 the v3 candidate DB isn't present.  Uses --limit-state-keys to keep
 each test under 5 seconds.
 """
@@ -22,7 +22,7 @@ sys.path.insert(0, str(_ROOT / "tools"))
 from ai.value_net import _INPUT_DIM  # noqa: E402
 from learned_ai.data.elo_binning import OPTION_A_NAME  # noqa: E402
 from learned_ai.data.human_db_split import in_val_bucket  # noqa: E402
-import extract_human_blunder_dataset as ext  # noqa: E402
+import extract_human_move_policy_dataset as ext  # noqa: E402
 
 
 _CANDIDATE_DB = _ROOT / "data" / "human_db_candidate.sqlite"

@@ -1,4 +1,4 @@
-"""tests/test_human_blunder_trainer.py
+"""tests/test_human_move_policy_trainer.py
 
 End-to-end smoke: extract a tiny slice → train 2 epochs → verify the
 .npz artefact is well-formed with the expected shape, provenance, and
@@ -45,12 +45,12 @@ class TestTrainerEndToEnd(unittest.TestCase):
 
         # Extract a small slice.
         sys.path.insert(0, str(_ROOT / "tools"))
-        import extract_human_blunder_dataset as ext
+        import extract_human_move_policy_dataset as ext
         ext.extract(_CANDIDATE_DB, cls.dataset_dir, limit_state_keys=200)
 
         # Train for 2 epochs.
         import argparse
-        from tools.train_human_blunder_net import train
+        from tools.train_human_move_policy_net import train
         args = argparse.Namespace(
             dataset_dir=cls.dataset_dir,
             output=cls.output_npz,

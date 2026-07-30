@@ -764,13 +764,13 @@ only when every check passes; activation of the candidate over
 `data/human_db.sqlite` is a separate manual step.
 
 
-## HumanBlunderNet — Phase 1 audit
+## HumanMovePolicyNet — Phase 1 audit
 
 ```
-.venv/bin/python tools/audit_human_blunders.py  \
+.venv/bin/python tools/audit_human_moves.py  \
   --db data/human_db.sqlite  \
   --games-dir data/human_games  \
-  --output data/human_blunder_audit_optA.json
+  --output data/human_moves_audit_optA.json
 ```
 
 Classifies every recorded human move by (Elo band × Malom WDL
@@ -780,7 +780,7 @@ per-cell `n_moves` + `n_positions`, coverage share thresholds
 concentration (top 10 movers).  Also captures full provenance: DB
 SHA-256, `malom_label_version`, source-manifest hash, git HEAD.
 Output is used as the audit baseline in
-`docs/human_blunder_audit_phase1.md`.
+`docs/human_moves_audit_phase1.md`.
 
 Uses bin-aligned Option A boundaries (`lower ≤ 1149 · middle 1150-1249
 · upper ≥ 1250`).  Boundaries live in `learned_ai/data/elo_binning.py`
@@ -790,17 +790,17 @@ so the audit and the v3 builder agree on every bin.
 | - | - | - |
 | `--db PATH` | `data/human_db.sqlite` | HumanDB to read Malom labels from (v2 active or v3 candidate) |
 | `--games-dir PATH` | `data/human_games` | JSONL games to replay for Elo attribution |
-| `--output PATH` | `data/human_blunder_audit.json` | Report path |
+| `--output PATH` | `data/human_moves_audit.json` | Report path |
 | `--top-players N` | 20 | How many top movers to list |
 | `--limit-files N` | — | Cap number of JSONL files scanned (smoke) |
 
 
-## HumanBlunderNet — Dataset extraction
+## HumanMovePolicyNet — Dataset extraction
 
 ```
-.venv/bin/python tools/extract_human_blunder_dataset.py  \
+.venv/bin/python tools/extract_human_move_policy_dataset.py  \
   --db data/human_db_candidate.sqlite  \
-  --output-dir data/human_blunder_dataset
+  --output-dir data/human_move_policy_dataset
 ```
 
 Reads the v3 candidate DB, enumerates every legal move at each unique
@@ -822,17 +822,17 @@ matches ValueNet v2 / HumanPrefNet exactly.
 | Flag | Default | Description |
 | - | - | - |
 | `--db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB |
-| `--output-dir PATH` | `data/human_blunder_dataset` | Output directory (memmap + metadata.npz) |
+| `--output-dir PATH` | `data/human_move_policy_dataset` | Output directory (memmap + metadata.npz) |
 | `--val-fraction FLOAT` | 0.20 | Held-out validation share (via `in_val_bucket`) |
 | `--limit-state-keys N` | — | Cap number of state_keys processed (smoke) |
 
 
-## HumanBlunderNet — Train
+## HumanMovePolicyNet — Train
 
 ```
-.venv/bin/python tools/train_human_blunder_net.py  \
-  --dataset-dir data/human_blunder_dataset  \
-  --output data/human_blunder_net.npz  \
+.venv/bin/python tools/train_human_move_policy_net.py  \
+  --dataset-dir data/human_move_policy_dataset  \
+  --output data/human_move_policy_net.npz  \
   --epochs 40  \
   --patience 6
 ```
@@ -846,8 +846,8 @@ best val NLL, git commit) and a companion `<output>.provenance.json`.
 
 | Flag | Default | Description |
 | - | - | - |
-| `--dataset-dir PATH` | `data/human_blunder_dataset` | Extractor output directory |
-| `--output PATH` | `data/human_blunder_net.npz` | `.npz` output |
+| `--dataset-dir PATH` | `data/human_move_policy_dataset` | Extractor output directory |
+| `--output PATH` | `data/human_move_policy_net.npz` | `.npz` output |
 | `--epochs N` | 40 | Max epochs |
 | `--patience N` | 6 | Early-stop patience (0 disables) |
 | `--lr FLOAT` | 3e-4 | Adam learning rate |
@@ -857,14 +857,14 @@ best val NLL, git commit) and a companion `<output>.provenance.json`.
 | `--seed N` | 42 | RNG seed |
 
 
-## HumanBlunderNet — Evaluate
+## HumanMovePolicyNet — Evaluate
 
 ```
-.venv/bin/python tools/eval_human_blunder_net.py  \
-  --dataset-dir data/human_blunder_dataset  \
-  --model data/human_blunder_net.npz  \
+.venv/bin/python tools/eval_human_move_policy_net.py  \
+  --dataset-dir data/human_move_policy_dataset  \
+  --model data/human_move_policy_net.npz  \
   --candidate-db data/human_db_candidate.sqlite  \
-  --output data/human_blunder_eval.json
+  --output data/human_move_policy_eval.json
 ```
 
 Runs on the position-held-out slice (`sample_is_val == True`).
@@ -878,11 +878,11 @@ the report.
 
 | Flag | Default | Description |
 | - | - | - |
-| `--dataset-dir PATH` | `data/human_blunder_dataset` | Extractor output directory |
-| `--model PATH` | `data/human_blunder_net.npz` | Trained model `.npz` |
+| `--dataset-dir PATH` | `data/human_move_policy_dataset` | Extractor output directory |
+| `--model PATH` | `data/human_move_policy_net.npz` | Trained model `.npz` |
 | `--candidate-db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB (for Malom transition labels) |
 | `--min-support N` | 10 | Threshold for per-position empirical KL |
-| `--output PATH` | `data/human_blunder_eval.json` | Report path |
+| `--output PATH` | `data/human_move_policy_eval.json` | Report path |
 
 
 ## Full Game DB — Build

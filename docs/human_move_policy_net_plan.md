@@ -1,9 +1,9 @@
-# HumanBlunderNet — design plan (revision 3)
+# HumanMovePolicyNet — design plan (revision 3)
 
 Goal: model the **unfiltered** human move distribution — including losing
 moves — so downstream code (GapNet v2, opponent modelling, humanlike-play
 mode) can reason about which mistakes real players are likely to make.
-Malom remains the sole source of objective move quality; HumanBlunderNet
+Malom remains the sole source of objective move quality; HumanMovePolicyNet
 only estimates likelihood.
 
 The plan is intentionally staged: audit → semantic tests → candidate
@@ -39,9 +39,9 @@ blunders" — that is the reverse of what the code actually does.
 losing ⇒ human found a winning move).  If no `L` exists, it falls back
 to `D`-after.  It drops `W`-after (opponent winning ⇒ human played into
 a losing continuation).  Tests locking this direction are in
-`tests/test_human_blunder_perspective.py::TestHumanPrefFilterDirection`.
+`tests/test_human_moves_audit_perspective.py::TestHumanPrefFilterDirection`.
 
-|                          | HumanPrefNet (existing)                                                     | HumanBlunderNet (new)                                                                            |
+|                          | HumanPrefNet (existing)                                                     | HumanMovePolicyNet (new)                                                                            |
 | ------------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | What it models           | Filtered "competent" human style                                            | Unfiltered human choice behaviour, including losing moves                                        |
 | Data filter              | Prefers `L`-after (winning moves); falls back to `D`-after; drops `W`-after | No filter — every recorded move retained, including all-losing positions                         |
@@ -52,7 +52,7 @@ a losing continuation).  Tests locking this direction are in
 | Elo conditioning         | None                                                                        | Elo band as one-hot input; band membership defined at training time from 50-Elo storage bins     |
 | Downstream consumer      | Humanlike-play opponent, GapNet aux                                         | GapNet v2 expected-regret formula (defined + versioned in the GapNet plan)                       |
 
-Same 79-input board feature vector shape.  HumanBlunderNet adds a 3-way
+Same 79-input board feature vector shape.  HumanMovePolicyNet adds a 3-way
 Elo one-hot → 82-float input.
 
 ## Output form
@@ -126,12 +126,12 @@ must document the boundary-versioning limitation.
 
 Deliverables landed and reviewed:
 
-- `tools/audit_human_blunders.py` (audit version 1.1).
-- `data/human_blunder_audit_optA.json` — machine-readable output.
-- `data/human_blunder_audit.json` — original-boundary snapshot for
+- `tools/audit_human_moves.py` (audit version 1.1).
+- `data/human_moves_audit_optA.json` — machine-readable output.
+- `data/human_moves_audit.json` — original-boundary snapshot for
   reviewer's reconciliation trace.
-- `docs/human_blunder_audit_phase1.md` — reconciled report, revision 2.
-- `tests/test_human_blunder_perspective.py` — 25 tests including 3
+- `docs/human_moves_audit_phase1.md` — reconciled report, revision 2.
+- `tests/test_human_moves_audit_perspective.py` — 25 tests including 3
   Malom-DB integration tests; all pass.
 - Full sample-flow reconciliation, per-cell `n_moves` and
   `n_positions`, coverage counts + shares, per-side Elo attrition
@@ -169,7 +169,7 @@ Phase 2 has been implemented yet beyond §2.1.**
 All 25 tests pass on the current codebase.  Any change to the audit
 script's flip logic will be caught by the fixture suite.
 
-### 2.2 Candidate DB rebuild — NOT STARTED (reviewer §12)
+### 2.2 Candidate DB rebuild — COMPLETE (2026-07-30)
 
 **Do not touch `data/human_db.sqlite`.**  The current builders do not
 enforce a clean schema-version migration and rely on host-path-
@@ -252,25 +252,52 @@ Instead:
   mv data/human_db_candidate.sqlite data/human_db.sqlite
   ```
 
-## Phase 3 — HumanBlunderNet training — COMPLETE (2026-07-30)
+**Validation result (2026-07-30).**  `tools/validate_human_db_candidate.py`
+ran against `data/human_db_candidate.sqlite` and returned `ok: True`:
+
+- `schema_version: 3`
+- `quick_check: ok`
+- `candidate_sha256: df71395f51b9497b5d0916fbcc5a6a8456d082be79c280ecb354d5ba73f87d4f`
+- `missing_tables: []`
+- `missing_meta_rows: []`
+- `positions_elo_bins` reconciliation mismatches: 0
+- `moves_elo_bins` reconciliation mismatches: 0
+- Semantic probe (starting position `malom_wdl`): `D` ✓
+
+Report on disk: `data/human_db_candidate.sqlite.validation.json`.
+**Candidate DB is NOT yet activated** — activation over
+`data/human_db.sqlite` is a separate later decision.
+
+## Phase 3 — HumanMovePolicyNet training — COMPLETE (2026-07-30)
+
+**Training result (2026-07-30).**  `tools/train_human_move_policy_net.py`
+ran to convergence on `data/human_move_policy_dataset/` (2.2 M state keys,
+2.56 M samples from candidate DB SHA `df71395f`):
+
+- Stopped at epoch 22 / 200 (patience=6, grad_clip=1.0, lr=3e-4, dropout=0.2)
+- Best val event NLL: **1.5953**
+- Elapsed: ~11.6 h
+- Output: `data/human_move_policy_net.npz` (trainer_git_commit `5c9ca45`)
+
+Eval report: `data/human_move_policy_eval.json`.
 
 Landed as three commits over 2026-07-29 / 2026-07-30:
 
-- **Commit C** `397d828` — extractor + trainer (`tools/extract_human_blunder_dataset.py`,
-  `tools/train_human_blunder_net.py`).  Two-stage design per advisor guidance: extract
+- **Commit C** `397d828` — extractor + trainer (`tools/extract_human_move_policy_dataset.py`,
+  `tools/train_human_move_policy_net.py`).  Two-stage design per advisor guidance: extract
   once (successor feature bank dedup'd by state_key + sample records + provenance),
   iterate on hyperparameters cheaply.  8 extractor tests + 3 trainer tests, all green.
-- **Commit D** `16571a6` — inference wrapper (`ai/human_blunder_advisor.py`).
+- **Commit D** `16571a6` — inference wrapper (`ai/human_move_policy_advisor.py`).
   Pure-numpy MLP forward pass mirroring `ai/human_pref_advisor.py`; adds an
   `elo_band` parameter to `rank()` / `probs()`.  6 tests including the band-
   conditioning assertion.
-- **Commit E** `780d3a2` — held-out eval (`tools/eval_human_blunder_net.py`).
+- **Commit E** `780d3a2` — held-out eval (`tools/eval_human_move_policy_net.py`).
   Event-weighted NLL, top-1/3/5, ECE calibration, per-band + per-phase +
   per-Malom-transition strata, empirical KL against HumanDB frequencies at
   `--min-support` support.  6 tests.
 
 Total: 6 new production files, 4 new test files, 23 tests, all green.  End-to-end
-pipeline documented in `script_commands.md` under the HumanBlunderNet sections.
+pipeline documented in `script_commands.md` under the HumanMovePolicyNet sections.
 
 Design axes from the plan below are implemented as originally specified; the
 critical fixes flagged by the reviewer (softmax over EVERY legal move, mover-POV
@@ -349,7 +376,7 @@ MLP 82 → 128 → 64 → 32 → 1 (same shape as HumanPrefNet, +3 Elo dims).
 Softmax over legal-successor scores at inference.
 
 Saved as `.npz` sibling to `data/human_pref_net.npz`.  Default output:
-`data/human_blunder_net.npz`.
+`data/human_move_policy_net.npz`.
 
 **Model provenance (reviewer §14)** — the `.npz` records:
 
@@ -364,7 +391,7 @@ Saved as `.npz` sibling to `data/human_pref_net.npz`.  Default output:
 
 Filename alone is not sufficient provenance.
 
-Inference wrapper `ai/human_blunder_advisor.py` mirrors
+Inference wrapper `ai/human_move_policy_advisor.py` mirrors
 `ai/human_pref_advisor.py` but adds an `elo_band: str` parameter.
 
 ### 3.6 Split (reviewer §8)
@@ -382,16 +409,43 @@ Inference wrapper `ai/human_blunder_advisor.py` mirrors
 
 ## Phase 4 — evaluation — COMPLETE (2026-07-30)
 
-Landed in Commit E `780d3a2` as `tools/eval_human_blunder_net.py`.  Every
+Landed in Commit E `780d3a2` as `tools/eval_human_move_policy_net.py`.  Every
 metric listed below is reported on the position-held-out slice
 (`sample_is_val == True`).  Game-held-out diagnostic (§3.6) is deferred
 to a follow-up commit — this ships the position-level split that
 HumanPrefNet + ValueNet already share.
 
+**Eval results (2026-07-30)** — from `data/human_move_policy_eval.json`,
+512 805 val samples, 1 042 147 events:
+
+| Stratum | NLL | Top-1 | Top-3 | Top-5 | ECE |
+| --- | --- | --- | --- | --- | --- |
+| Overall | 1.595 | 45.6 % | 78.5 % | 88.2 % | 0.178 |
+| band=lower | 1.619 | 45.2 % | 77.7 % | 87.8 % | 0.180 |
+| band=middle | 1.579 | 46.3 % | 78.8 % | 88.9 % | 0.180 |
+| band=upper | 1.600 | 45.2 % | 78.5 % | 87.8 % | 0.176 |
+| phase=place | 1.915 | 39.4 % | 71.6 % | 82.2 % | 0.209 |
+| phase=move | 1.341 | 50.5 % | 84.0 % | 92.9 % | 0.171 |
+| trans=win_preserved | 1.633 | 45.0 % | 74.5 % | 86.4 % | 0.188 |
+| trans=win_to_draw | 2.044 | 26.9 % | 61.5 % | 78.3 % | 0.130 |
+| trans=win_to_loss | 2.542 | 16.7 % | 46.4 % | 67.1 % | 0.080 |
+| trans=draw_preserved | 1.590 | 46.4 % | 80.0 % | 88.7 % | 0.187 |
+| trans=draw_to_loss | 2.247 | 21.0 % | 55.5 % | 73.0 % | 0.104 |
+| trans=all_losing | 1.317 | 51.7 % | 83.9 % | 92.8 % | 0.168 |
+
+Empirical KL (≥10-support positions, n=6 157): **mean KL 0.557**.
+
+Notes: Blunder transitions (`win_to_loss`, `draw_to_loss`, `win_to_draw`)
+are harder to predict (lower top-1, higher NLL), as expected — these are
+low-frequency minority decisions that the model's count-weighted CE
+objective down-weights relative to their importance.  ECE on `win_to_loss`
+is low (0.080) because the model is less confident and more dispersed,
+which is actually better-calibrated than the majority class.
+
 Report structure below is the design spec that Commit E implements:
 
 
-`tools/eval_human_blunder_net.py` reports, on both position- and
+`tools/eval_human_move_policy_net.py` reports, on both position- and
 game-held-out sets:
 
 - **Primary:** event-weighted negative log-likelihood.
@@ -461,22 +515,19 @@ Candidate DB v3 additions:
   "occurrences of the side-to-move player" (yes, they do — one
   increment per mover ply at that state_key).
 
-## Blockers before Phase 2.2 (DB rebuild) proceeds
+## Blockers before Phase 2.2 (DB rebuild) — ALL CLOSED
 
 - ✅ Perspective fixture tests pass (2.1).
-- ⏳ User authorises the candidate DB rebuild against a candidate path.
-- ⏳ Shared builder library extraction agreed (reviewer §12) so the two
-  entry points can no longer drift.
-- ⏳ Sparse-table vs JSON-blob decision confirmed (default: sparse).
-- ⏳ Target population — event-weighted default accepted, or a per-
-  player scheme requested.
+- ✅ User authorised the candidate DB rebuild against a candidate path.
+- ✅ Shared builder library extracted to `tools/_human_db_build.py` (reviewer §12).
+- ✅ Sparse-table scheme confirmed (default: sparse).
+- ✅ Target population — event-weighted default accepted.
+- ✅ Candidate DB built, validated (`ok: True`), SHA-256 recorded above.
 
-Phase 3 (network training) has additional blockers on top of these:
+Phase 3 blockers (network training) — all closed:
 
-- ⏳ Regret mapping defined and versioned in the GapNet plan (only if
-  Phase-4 eval needs regret-stratified metrics — otherwise Phase 3 can
-  proceed).
-- ⏳ `split_version` bumped and committed.
+- ✅ Regret mapping defined and versioned in `docs/gap_net_v3_plan.md`.
+- ✅ `split_version` committed via `learned_ai/data/human_db_split.py`.
 
 ## Non-goals
 

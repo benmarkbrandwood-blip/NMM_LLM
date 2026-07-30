@@ -1,6 +1,6 @@
-# HumanBlunderNet — Phase 1 audit (revision 3)
+# HumanMovePolicyNet — Phase 1 audit (revision 3)
 
-Phase 1 baseline for the HumanBlunderNet project.  Revision 3 rebuilds
+Phase 1 baseline for the HumanMovePolicyNet project.  Revision 3 rebuilds
 the report against the audit rerun under **bin-aligned Option A**
 boundaries (`≤1149 / 1150-1249 / ≥1250`) — small shift from the
 reviewer's original suggestion so that 50-Elo bin counts in the
@@ -13,10 +13,10 @@ in shape.
 
 | Item                    | Value                                             |
 | ----------------------- | ------------------------------------------------- |
-| Audit script            | `tools/audit_human_blunders.py`                   |
+| Audit script            | `tools/audit_human_moves.py`                   |
 | Audit version           | `1.2` (bin-aligned Option A)                      |
-| Raw JSON output         | `data/human_blunder_audit_optA.json`              |
-| Command                 | `.venv/bin/python tools/audit_human_blunders.py --output data/human_blunder_audit_optA.json` |
+| Raw JSON output         | `data/human_moves_audit_optA.json`              |
+| Command                 | `.venv/bin/python tools/audit_human_moves.py --output data/human_moves_audit_optA.json` |
 | HumanDB path            | `data/human_db.sqlite`                            |
 | HumanDB SHA-256         | `c2e60f1e86d9133fb4468e90d58e3e35edf6a1a72df40f4575af900766a3c01a` |
 | HumanDB schema_version  | `2`                                               |
@@ -162,7 +162,7 @@ conditioning has real signal even inside this narrow amateur range.
 ## Cells (band × transition × phase)
 
 Full table with `n_moves` and `n_positions` (distinct state_keys)
-lifted directly from `data/human_blunder_audit_optA.json` cells.
+lifted directly from `data/human_moves_audit_optA.json` cells.
 
 ### Lower band (≤1149)
 
@@ -356,11 +356,11 @@ these tables — deleting it is safer than inventing a placeholder.
 
 ## What Phase 1 established (checklist)
 
-- ✅ Audit script preserved on disk (`tools/audit_human_blunders.py`) with
+- ✅ Audit script preserved on disk (`tools/audit_human_moves.py`) with
   version tag, git-HEAD capture, DB SHA-256, manifest SHA-256, DB
   malom_label_version.
 - ✅ Perspective fixture tests live at
-  `tests/test_human_blunder_perspective.py`, 25 tests, all pass
+  `tests/test_human_moves_audit_perspective.py`, 25 tests, all pass
   including the 3 Malom-DB integration tests.  Locks the parent =
   mover-POV / child = opponent-POV convention.
 - ✅ Every totals reconciliation matches its own components (both

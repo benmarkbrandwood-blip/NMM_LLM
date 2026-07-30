@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""tools/extract_human_blunder_dataset.py — one-shot dataset extractor.
+"""tools/extract_human_move_policy_dataset.py — one-shot dataset extractor.
 
 Phase 3 preamble.  Reads the v3 candidate HumanDB, enumerates every
 legal move at each unique state_key, encodes successor features from
@@ -22,12 +22,12 @@ Output layout at `--output-dir`:
 
 Usage
 -----
-    .venv/bin/python tools/extract_human_blunder_dataset.py \\
+    .venv/bin/python tools/extract_human_move_policy_dataset.py \\
         --db data/human_db_candidate.sqlite \\
-        --output-dir data/human_blunder_dataset
+        --output-dir data/human_move_policy_dataset
 
     # Smoke run:
-    .venv/bin/python tools/extract_human_blunder_dataset.py \\
+    .venv/bin/python tools/extract_human_move_policy_dataset.py \\
         --limit-state-keys 500
 """
 from __future__ import annotations
@@ -331,7 +331,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--db",         type=Path, default=Path("data/human_db_candidate.sqlite"))
-    p.add_argument("--output-dir", type=Path, default=Path("data/human_blunder_dataset"))
+    p.add_argument("--output-dir", type=Path, default=Path("data/human_move_policy_dataset"))
     p.add_argument("--limit-state-keys", type=int, default=None,
                    help="Cap the number of state_keys processed (smoke tests).")
     p.add_argument("--val-fraction", type=float, default=DEFAULT_VAL_FRACTION,
