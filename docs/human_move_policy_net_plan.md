@@ -432,6 +432,7 @@ HumanPrefNet + ValueNet already share.
 | trans=draw_preserved | 1.590 | 46.4 % | 80.0 % | 88.7 % | 0.187 |
 | trans=draw_to_loss | 2.247 | 21.0 % | 55.5 % | 73.0 % | 0.104 |
 | trans=all_losing | 1.317 | 51.7 % | 83.9 % | 92.8 % | 0.168 |
+| trans=unlabelled | 1.875 | 37.3 % | 68.1 % | 83.3 % | 0.177 |
 
 Empirical KL (≥10-support positions, n=6 157): **mean KL 0.557**.
 
