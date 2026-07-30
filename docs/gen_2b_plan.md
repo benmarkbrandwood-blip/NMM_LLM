@@ -493,6 +493,7 @@ Landed as separate commits on top of the base plan.
 
 ### 13.5 Uniform fallback when policy row collapses (commit `8358042`)
 
+
 - `torch.multinomial` rejects zero-sum rows.  The prior guard
   `probs / probs.sum().clamp(min=1e-9)` prevented division-by-zero
   but not the degenerate distribution — if `policy_logits` produced
@@ -508,3 +509,128 @@ Landed as separate commits on top of the base plan.
   policy weights into a NaN region) — the fallback masks the
   crash so training keeps progressing while gradients pull weights
   back into finite territory.
+
+---
+
+## 14. Opponent schedule + net-blend reference (current state)
+
+Extracted from `scripts/train_s_gen_v2b.py` and its helpers; kept in
+this doc so a reader can understand the mix without cross-referencing
+the source.  All percentages are per-game roll; every non-frozen game
+counts toward `level_heuristic_history` for advancement.
+
+### 14.1 Opponent slot allocation (per game)
+
+Rolled from a single `rng.random()` at line ~1770:
+
+| Roll range           | Slot / game_type            | Difficulty                                         | Notes |
+| -------------------- | --------------------------- | -------------------------------------------------- | ----- |
+| `< 0.10`             | `vs_heuristic_hard`         | `min(difficulty + 1, DIFF_MAX)`                    | Prevents overfitting to current level. |
+| `0.10 – _lower_diff_hi` | `vs_heuristic_easy`      | random `[1, difficulty - 1]`                       | 20 % in steady state; **expands to `0.10 + args.advance_rehearsal_prob`** while `advance_rehearsal_remaining > 0`.  Default `--advance-rehearsal-prob 0.45` → 55 % of rolls during rehearsal. |
+| `+ 0.10`             | `vs_heuristic_blunder`      | current                                            | `HeuristicAgent(blunder_probability=0.25)`. |
+| `+ 0.10`             | `vs_heuristic_blend`        | current                                            | Nets added progressively by difficulty — see §14.2. |
+| `+ 0.05`             | `vs_heuristic_humanlike`    | current                                            | Slot skipped entirely if `data/human_pref_net.npz` is missing or `--no-humanlike-opponent` is passed. |
+| remainder (~45 %)    | standard mix                | see §14.3                                          | Split between frozen self-play and current-difficulty heuristic. |
+
+`_lower_diff_hi` is computed once per outer batch (line 1746) as
+`0.10 + (advance_rehearsal_prob if rehearsal else 0.20)`.  Steady-state
+schedule therefore sums to 10 + 20 + 10 + 10 + 5 + 45 = 100 %.  During
+rehearsal the easy slot grows and the standard slot shrinks
+symmetrically.
+
+### 14.2 Blended-nets slot (`vs_heuristic_blend`, 10 % steady)
+
+Nets are added progressively by difficulty so early-difficulty runs
+aren't destabilised by weakly-trained auxiliary nets:
+
+| Difficulty | ValueNet | GapNet | Sentinel |
+| ---------- | -------- | ------ | -------- |
+| 1          | —        | —      | —        |
+| 2          | ✓        | —      | —        |
+| 3          | ✓        | ✓      | —        |
+| ≥ 4        | ✓        | ✓      | ✓        |
+
+Blend weights (from `_mk_blend_weights()` in `scripts/train_s_gen_v2b.py:830-841`):
+
+| Weight                | Value (%) |
+| --------------------- | --------- |
+| `value_net_blend`     | 10        |
+| `gap_blend_place`     | 30        |
+| `gap_blend_move`      | 30        |
+| `gap_blend_fly`       | 30        |
+
+Sentinel activation (blend slot only, difficulty ≥ 4):
+- `mode = "score_adjust"` — the sentinel's best move directly replaces
+  the engine's pick when the guard triggers.
+- `_sentinel_activation_prob = 1.0` — evaluated every move.
+- `_sentinel_min_gap = 0.20` — override fires only when the sentinel's
+  opportunity gap ≥ 20 %.  Both settings landed in §13.3.
+
+### 14.3 Standard slot (~45 % steady)
+
+Inside the standard slot, split per line 1808-1820:
+
+- `rng.random() < args.self_play_ratio` (default `SELF_PLAY_RATIO = 0.5`) →
+  `vs_frozen`, opponent = the frozen `FrozenModelOpponent` snapshot.
+  `_is_full = False` so this outcome is excluded from the advancement
+  gate (still logged for display / recovery).
+- Otherwise → `vs_heuristic` at current difficulty.  With 15 %
+  probability the effective difficulty is down-scaled to a random
+  `[1, difficulty - 1]` for additional diversity.  Only exactly-current-
+  difficulty rolls set `_is_advance_reference = True`.
+
+Frozen model refresh cadence: every `--update-target-every` games
+(default `UPDATE_TARGET_EVERY = 50`), the frozen opponent copies weights
+from the live model.
+
+### 14.4 Humanlike slot (`vs_heuristic_humanlike`, 5 % steady)
+
+- `HeuristicAgent` at current difficulty; inner `GameAI` is built with:
+  - `human_pref_net=` loaded `HumanPrefAdvisor` (from
+    `--human-pref-net`, default `data/human_pref_net.npz`)
+  - `weights=` `HeuristicWeights` with `humanlike_blend = args.humanlike_blend`
+    (default 50, valid range 0-100) and `humanlike_temperature = 1.0`
+- Blend semantics: at move-selection time the inner GameAI mixes its
+  minimax score with the HumanPrefAdvisor probability at ratio
+  `humanlike_blend / 100`.
+- Slot skipped if HumanPrefNet failed to load — no crash, just no
+  humanlike games that batch.
+
+### 14.5 Per-difficulty time budget + learner sim depth
+
+All heuristic opponents (every slot above except `vs_frozen`) get a
+`GameAI` with:
+
+- `override_time_budget = _heuristic_time_budget(difficulty)` — the
+  §13.1 shared formula `t(L) = 0.05 · 600^(L/20)`.
+- `max_search_depth = min(50, 6 + difficulty)` — raised so the budget
+  can actually deepen.
+
+Learner side (frozen self-play and the LookaheadAdvisor inside the
+scaffolded encoder):
+
+- `LookaheadAdvisor._sim_ply_depth = min(30, max(6, args.sim_ply_depth
+  + (difficulty - 1)))`  — updated each outer batch when difficulty
+  changes.  `--sim-ply-depth` default = 5.
+
+### 14.6 Book-opening frames
+
+Independent of the opponent-slot logic, `BOOK_GAME_PROB = 0.50` of
+games have `_forced_placements` sampled from `_OPENING_LINES` so the
+early plies replay a known opening for the learner colour.  Applies to
+every slot including self-play — see line ~1823.
+
+### 14.7 CLI knobs that tune the schedule
+
+| Flag                          | Default      | Effect |
+| ----------------------------- | ------------ | ------ |
+| `--self-play-ratio FLOAT`     | 0.5          | Split inside the standard slot. |
+| `--update-target-every N`     | 50           | Frozen opponent refresh cadence. |
+| `--advance-rehearsal-prob F`  | 0.45         | Easy-slot width during post-advancement rehearsal. |
+| `--no-humanlike-opponent`     | off          | Disable the 5 % humanlike slot even if the pref net is present. |
+| `--humanlike-blend N`         | 50           | 0-100 mix inside the humanlike-slot inner GameAI. |
+| `--human-pref-net PATH`       | `data/human_pref_net.npz` | Pref-net loaded at startup for the humanlike slot. |
+| `--sim-ply-depth N`           | 5            | Learner-side lookahead base depth (scales +1 per difficulty). |
+| `--no-sentinel / --no-value-net / --no-gap-net` | off | Disable each aux net; the blend slot degrades gracefully. |
+| `--time-budget FLOAT`         | 0 (auto)     | If > 0, overrides the §13.1 per-level ramp with a flat budget. |
+| `--heuristic-node-budget N`   | none         | Alternative to time budget: deterministic node cap. |
