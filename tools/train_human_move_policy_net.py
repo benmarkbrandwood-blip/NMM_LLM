@@ -71,6 +71,7 @@ class MovePolicyDataset:
         if not meta_path.exists():
             raise FileNotFoundError(f"metadata.npz not found in {dataset_dir}")
         d = np.load(meta_path, allow_pickle=True)
+        self._meta_keys         = set(d.files)
         self.state_keys         = d["state_keys"]
         self.mover_colors       = d["mover_colors"]
         self.state_succ_offsets = d["state_succ_offsets"].astype(np.int64)
@@ -79,6 +80,12 @@ class MovePolicyDataset:
         self.sample_targets     = d["sample_targets"].astype(np.int32)
         self.sample_offsets     = d["sample_offsets"].astype(np.int64)
         self.sample_is_val      = d["sample_is_val"].astype(bool)
+        # v2 three-way split: 0=train, 1=val, 2=test.
+        if "sample_split" in self._meta_keys:
+            self.sample_split = d["sample_split"].astype(np.int8)
+        else:
+            # Synthesise from is_val for v1 backward compat (no test tier).
+            self.sample_split = self.sample_is_val.astype(np.int8)  # 0=train, 1=val
         provenance_raw          = d["provenance"].item()
         if isinstance(provenance_raw, bytes):
             provenance_raw = provenance_raw.decode("utf-8")
@@ -97,11 +104,26 @@ class MovePolicyDataset:
     def n_samples(self) -> int:
         return int(self.sample_state_idx.shape[0])
 
+    @property
+    def _is_v2(self) -> bool:
+        """True if the dataset was extracted with EXTRACT_VERSION="2" (has sample_split)."""
+        return "sample_split" in self._meta_keys
+
     def train_idx(self) -> np.ndarray:
+        if self._is_v2:
+            return np.where(self.sample_split == 0)[0]
         return np.where(~self.sample_is_val)[0]
 
     def val_idx(self) -> np.ndarray:
+        if self._is_v2:
+            return np.where(self.sample_split == 1)[0]
         return np.where(self.sample_is_val)[0]
+
+    def test_idx(self) -> np.ndarray:
+        """Return test-set indices.  Always empty on v1 datasets."""
+        if self._is_v2:
+            return np.where(self.sample_split == 2)[0]
+        return np.array([], dtype=np.int64)
 
     def sample_slice(self, sample_id: int) -> tuple[np.ndarray, np.ndarray, int]:
         """Return (succ_feats_matrix (legal, feat_dim), target_counts (legal,),
@@ -173,7 +195,9 @@ def train(args: argparse.Namespace) -> dict:
     ds = MovePolicyDataset(args.dataset_dir)
     tr = ds.train_idx()
     va = ds.val_idx()
-    print(f"[hbn] samples: train={len(tr):,}  val={len(va):,}  total={ds.n_samples:,}")
+    te = ds.test_idx()
+    split_note = f"(v2 split)" if ds._is_v2 else "(v1 split)"
+    print(f"[hbn] samples: train={len(tr):,}  val={len(va):,}  test={len(te):,}  total={ds.n_samples:,}  {split_note}")
 
     model = _build_model(FEAT_DIM_WITH_BAND, dropout=args.dropout).to(device)
     opt   = torch.optim.Adam(model.parameters(), lr=args.lr)
@@ -299,7 +323,7 @@ def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--dataset-dir", type=Path, default=Path("data/human_move_policy_dataset"))
-    p.add_argument("--output",      type=Path, default=Path("data/human_move_policy_net.npz"))
+    p.add_argument("--output",      type=Path, default=Path("data/human_move_policy_net_v2_candidate.npz"))
     p.add_argument("--epochs",      type=int,   default=40)
     p.add_argument("--patience",    type=int,   default=6)
     p.add_argument("--lr",          type=float, default=3e-4)

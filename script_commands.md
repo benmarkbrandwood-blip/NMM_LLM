@@ -795,7 +795,7 @@ so the audit and the v3 builder agree on every bin.
 | `--limit-files N` | — | Cap number of JSONL files scanned (smoke) |
 
 
-## HumanMovePolicyNet — Dataset extraction
+## HumanMovePolicyNet — Dataset extraction (v2)
 
 ```
 .venv/bin/python tools/extract_human_move_policy_dataset.py  \
@@ -803,53 +803,109 @@ so the audit and the v3 builder agree on every bin.
   --output-dir data/human_move_policy_dataset
 ```
 
-Reads the v3 candidate DB, enumerates every legal move at each unique
-`state_key`, encodes successor features from the **original mover's
-perspective** via `board_to_features(succ, mover_color)`, and joins
-with `moves_elo_bins` under Option A band membership.  Successor
-features are dedup'd by `state_key` (bank size ~15× smaller than
-per-sample storage).
+v2 extractor (EXTRACT_VERSION="2").  Reads the v3 candidate DB,
+enumerates every legal move at each unique `state_key`, encodes
+successor features from the **original mover's perspective** via
+`board_to_features(succ, mover_color)`, and joins with `moves_elo_bins`
+under Option A band membership.  Successor features are dedup'd by
+`state_key`.
 
 Emits two files under `--output-dir`:
 - `succ_feats.f32.bin` — numpy float32 memmap of the successor feature bank
-- `metadata.npz` — offsets, per-sample records, Option-A band index, split
-  flag (`in_val_bucket`), provenance (source DB sha256, feature version,
-  git commit)
+- `metadata.npz` — offsets, per-sample records, Option-A band index,
+  `sample_split` int8 (0=train/1=val/2=test), backward-compat `sample_is_val`,
+  provenance (source DB sha256, feature version, git commit, split counts)
 
-Tags each sample with `in_val_bucket(state_key)` so the trainer's split
-matches ValueNet v2 / HumanPrefNet exactly.
+**v2 split**: `three_way_split(state_key)` — 5 % test (buckets 0–4),
+15 % val (buckets 5–19), 80 % train (buckets 20–99).  `in_val_bucket`
+callers (ValueNet, HumanPrefNet, Sentinel) are unaffected — they never
+see `sample_split`.
+
+Smoke run:
+```
+.venv/bin/python tools/extract_human_move_policy_dataset.py  \
+  --db data/human_db_candidate.sqlite  \
+  --output-dir data/human_move_policy_dataset  \
+  --limit-state-keys 500
+```
 
 | Flag | Default | Description |
 | - | - | - |
 | `--db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB |
 | `--output-dir PATH` | `data/human_move_policy_dataset` | Output directory (memmap + metadata.npz) |
-| `--val-fraction FLOAT` | 0.20 | Held-out validation share (via `in_val_bucket`) |
 | `--limit-state-keys N` | — | Cap number of state_keys processed (smoke) |
+| `--val-fraction FLOAT` | 0.20 | Legacy param kept for compat; v2 ignores it (uses three_way_split) |
 
 
-## HumanMovePolicyNet — Train
+## HumanMovePolicyNet — Session index build
+
+```
+.venv/bin/python tools/build_session_index.py  \
+  --dataset-dir data/human_move_policy_dataset  \
+  --games-dir   data/human_games  \
+  --output      data/human_move_policy_session_index.npz
+```
+
+Scans all 97 138 JSONL game files in `--games-dir`, maps each game to
+a split tier via `game_level_split(session_id)`, and for each move
+maps the board position to its row in the dataset `state_keys` array.
+Builds two uint8 bitmask arrays indexed by dataset row:
+
+- `game_split_mask`: bit 0=appeared in game-train, bit 1=appeared in
+  game-val, bit 2=appeared in game-test game.
+- `player_split_mask`: same but keyed by the mover's player identity.
+
+Positions with `(mask & 0x01)==0` and `(mask & 0x02)!=0` are
+**game-val-only** — not reached by any training game.  The eval script
+uses this to report the `game_val_only` diagnostic stratum.
+
+Saves `data/human_move_policy_session_index.npz.provenance.json`
+alongside the `.npz`.
+
+Smoke run (first 500 files, ~5 s):
+```
+.venv/bin/python tools/build_session_index.py --limit-files 500
+```
+
+| Flag | Default | Description |
+| - | - | - |
+| `--dataset-dir PATH` | `data/human_move_policy_dataset` | Extractor output directory (needs metadata.npz) |
+| `--games-dir PATH` | `data/human_games` | JSONL game files directory |
+| `--output PATH` | `data/human_move_policy_session_index.npz` | Output path |
+| `--limit-files N` | — | Cap number of JSONL files scanned (smoke) |
+
+
+## HumanMovePolicyNet — Train (v2 three-way split)
 
 ```
 .venv/bin/python tools/train_human_move_policy_net.py  \
   --dataset-dir data/human_move_policy_dataset  \
-  --output data/human_move_policy_net.npz  \
-  --epochs 40  \
-  --patience 6
+  --output data/human_move_policy_net_v2_candidate.npz  \
+  --epochs 200  \
+  --patience 10
 ```
 
 MLP 82 → 128 → 64 → 32 → 1 (79 board features + 3 Elo band one-hot).
 **Ordinary count-weighted cross-entropy** over observed events;
 softmax over every legal move at each position (unobserved legal
-moves get target 0).  Saves an `.npz` mirroring HumanPrefNet's layout
-with layer weights, feature dims, provenance (dataset lineage, hparams,
-best val NLL, git commit) and a companion `<output>.provenance.json`.
+moves get target 0).
+
+On v2 datasets (`sample_split` present), train/val indices come from
+the three-way split (train=80 %, val=15 %, test=5 %).  On v1 datasets
+falls back to `sample_is_val` (no test tier).
+
+Default output changed from `human_move_policy_net.npz` to
+`human_move_policy_net_v2_candidate.npz` to protect the first-run
+model.  Saves a companion `<output>.provenance.json`.
+
+First-run result (v1, 22 epochs, early stop): val NLL=1.5953, ~11.6 h.
 
 | Flag | Default | Description |
 | - | - | - |
 | `--dataset-dir PATH` | `data/human_move_policy_dataset` | Extractor output directory |
-| `--output PATH` | `data/human_move_policy_net.npz` | `.npz` output |
-| `--epochs N` | 40 | Max epochs |
-| `--patience N` | 6 | Early-stop patience (0 disables) |
+| `--output PATH` | `data/human_move_policy_net_v2_candidate.npz` | `.npz` output |
+| `--epochs N` | 40 | Max epochs (increase for v2 run: 200 recommended) |
+| `--patience N` | 6 | Early-stop patience (0 disables; 10 recommended for v2) |
 | `--lr FLOAT` | 3e-4 | Adam learning rate |
 | `--dropout FLOAT` | 0.2 | Dropout on hidden layers |
 | `--batch-positions N` | 512 | (position, band) samples per gradient step |
@@ -857,31 +913,62 @@ best val NLL, git commit) and a companion `<output>.provenance.json`.
 | `--seed N` | 42 | RNG seed |
 
 
-## HumanMovePolicyNet — Evaluate
+## HumanMovePolicyNet — Phase 4b Evaluate (full)
 
+Standard val eval (temperature scaling, all strata, all baselines):
 ```
 .venv/bin/python tools/eval_human_move_policy_net.py  \
   --dataset-dir data/human_move_policy_dataset  \
-  --model data/human_move_policy_net.npz  \
+  --model data/human_move_policy_net_v2_candidate.npz  \
   --candidate-db data/human_db_candidate.sqlite  \
-  --output data/human_move_policy_eval.json
+  --session-index data/human_move_policy_session_index.npz  \
+  --output data/gap_v3_prerequisite_eval.json
 ```
 
-Runs on the position-held-out slice (`sample_is_val == True`).
-Reports event-weighted NLL, top-1 / top-3 / top-5 accuracy, and 10-bin
-ECE calibration, stratified per Elo band (`lower/middle/upper`), per
-phase (`place/move`), and per Malom transition category (via the
-audit's `_classify_transition`).  Also computes empirical KL divergence
-against HumanDB frequencies for positions with ≥ `--min-support`
-observed events.  Provenance from the trained model passes through to
-the report.
+Single-shot test set (run **once only** after model is finalised):
+```
+.venv/bin/python tools/eval_human_move_policy_net.py  \
+  --dataset-dir data/human_move_policy_dataset  \
+  --model data/human_move_policy_net_v2_candidate.npz  \
+  --candidate-db data/human_db_candidate.sqlite  \
+  --session-index data/human_move_policy_session_index.npz  \
+  --run-test-set  \
+  --output data/gap_v3_prerequisite_eval.json
+```
+
+Phase 4b reports (per §4.1 GapNet v3 plan):
+- **Temperature scaling**: pass-1 finds T* on val NLL; pass-2 uses T*.
+- **Model strata**: overall, per Elo band, per phase, per Malom
+  transition, per legal-move-count bin (2-5 / 6-10 / 11-20 / 21+),
+  OOD (positions not in train), abstention (encoding failures),
+  game-val-only (with `--session-index`).
+- **Baseline strata**: uniform and empirical (≥ `--min-support`).
+- **Metrics per stratum**: event NLL, Brier, top-1/3/5, ECE.
+- **Empirical KL** (model || empirical, positions ≥ `--min-support`).
+
+Output key `val` = val set results; `test` = test set (only if
+`--run-test-set`).  Report also carries model provenance (dataset
+lineage, hparams, git commit, best val NLL).
+
+Smoke run (skip temperature, fast):
+```
+.venv/bin/python tools/eval_human_move_policy_net.py  \
+  --dataset-dir data/human_move_policy_dataset  \
+  --model data/human_move_policy_net_v2_candidate.npz  \
+  --candidate-db data/human_db_candidate.sqlite  \
+  --skip-temperature  \
+  --output data/human_move_policy_eval_smoke.json
+```
 
 | Flag | Default | Description |
 | - | - | - |
 | `--dataset-dir PATH` | `data/human_move_policy_dataset` | Extractor output directory |
-| `--model PATH` | `data/human_move_policy_net.npz` | Trained model `.npz` |
-| `--candidate-db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB (for Malom transition labels) |
-| `--min-support N` | 10 | Threshold for per-position empirical KL |
+| `--model PATH` | `data/human_move_policy_net_v2_candidate.npz` | Trained model `.npz` |
+| `--candidate-db PATH` | `data/human_db_candidate.sqlite` | v3 candidate DB (Malom transition labels) |
+| `--session-index PATH` | — | Session index `.npz` (enables game-val-only stratum) |
+| `--min-support N` | 10 | Min observed events for empirical baseline + KL |
+| `--run-test-set` | off | Also evaluate untouched test partition (single-shot only) |
+| `--skip-temperature` | off | Skip T* search (use T=1.0); faster smoke runs |
 | `--output PATH` | `data/human_move_policy_eval.json` | Report path |
 
 

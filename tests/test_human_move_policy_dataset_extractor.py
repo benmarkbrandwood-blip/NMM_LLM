@@ -21,7 +21,7 @@ sys.path.insert(0, str(_ROOT / "tools"))
 
 from ai.value_net import _INPUT_DIM  # noqa: E402
 from learned_ai.data.elo_binning import OPTION_A_NAME  # noqa: E402
-from learned_ai.data.human_db_split import in_val_bucket  # noqa: E402
+from learned_ai.data.human_db_split import in_val_bucket, three_way_split  # noqa: E402
 import extract_human_move_policy_dataset as ext  # noqa: E402
 
 
@@ -64,19 +64,19 @@ class TestExtractorEndToEnd(unittest.TestCase):
         self.assertTrue((self.out_dir / "succ_feats.f32.bin").exists())
 
     def test_provenance_recorded(self):
-        # Provenance dict returned by extract() must carry every key the
-        # trainer / advisor needs to identify the dataset.
         required = {
             "extract_version", "candidate_db_sha256", "feature_dim",
             "feature_version", "elo_band_config_name", "split_manifest_version",
             "val_fraction", "extract_git_commit",
             "successor_bank_bin", "successor_bank_rows",
             "n_state_keys", "n_samples", "n_samples_by_band",
+            "n_samples_train", "n_samples_val", "n_samples_test",
         }
         missing = required - set(self.provenance.keys())
         self.assertFalse(missing, f"provenance missing: {missing}")
         self.assertEqual(self.provenance["elo_band_config_name"], OPTION_A_NAME)
         self.assertEqual(int(self.provenance["feature_dim"]), _INPUT_DIM)
+        self.assertEqual(self.provenance["extract_version"], "2")
 
     def test_memmap_shape_matches_provenance(self):
         n = int(self.provenance["successor_bank_rows"])
@@ -106,20 +106,39 @@ class TestExtractorEndToEnd(unittest.TestCase):
         self.assertGreater(int(targets.sum()), 0)
         self.assertEqual(int((targets < 0).sum()), 0)
 
-    def test_split_flag_matches_in_val_bucket(self):
+    def test_split_flag_matches_three_way_split(self):
         meta = self._load_meta()
-        state_keys        = meta["state_keys"]
-        sample_state_idx  = meta["sample_state_idx"]
-        sample_is_val     = meta["sample_is_val"]
-        # Spot-check that each sample's is_val flag matches
-        # in_val_bucket(state_keys[sample_state_idx[i]], val_fraction=0.20).
-        for i in range(min(50, len(sample_is_val))):
+        state_keys       = meta["state_keys"]
+        sample_state_idx = meta["sample_state_idx"]
+        sample_split     = meta["sample_split"]
+        sample_is_val    = meta["sample_is_val"]
+
+        _split_int = {"train": 0, "val": 1, "test": 2}
+        for i in range(min(50, len(sample_split))):
             sk = str(state_keys[int(sample_state_idx[i])])
+            expected_int = _split_int[three_way_split(sk)]
+            self.assertEqual(
+                int(sample_split[i]), expected_int,
+                f"sample {i}: sample_split={sample_split[i]} != {expected_int} for sk={sk!r}",
+            )
+            # sample_is_val must be False only for train (int8==0).
             self.assertEqual(
                 bool(sample_is_val[i]),
-                in_val_bucket(sk, val_fraction=0.20),
-                f"sample {i}: is_val does not match in_val_bucket",
+                int(sample_split[i]) != 0,
+                f"sample {i}: sample_is_val backward-compat mismatch",
             )
+
+    def test_split_counts_sum_to_n_samples(self):
+        meta = self._load_meta()
+        sample_split = meta["sample_split"]
+        n_train = int((sample_split == 0).sum())
+        n_val   = int((sample_split == 1).sum())
+        n_test  = int((sample_split == 2).sum())
+        self.assertEqual(n_train + n_val + n_test, len(sample_split))
+        # All three tiers should be non-empty in a 200-state_key slice.
+        self.assertGreater(n_train, 0)
+        self.assertGreater(n_val, 0)
+        self.assertGreater(n_test, 0)
 
     def test_all_bands_populated(self):
         n_by_band = json.loads(self.provenance["n_samples_by_band"])

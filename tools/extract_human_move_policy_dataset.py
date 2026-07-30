@@ -57,11 +57,15 @@ from learned_ai.data.human_db_split import (             # noqa: E402
     DEFAULT_VAL_FRACTION,
     MANIFEST_VERSION as SPLIT_VERSION,
     in_val_bucket,
+    three_way_split,
 )
 from tools.train_value_net_v2 import board_from_state_key  # noqa: E402
 
 
-EXTRACT_VERSION = "1"
+EXTRACT_VERSION = "2"
+
+# sample_split int8 encoding: 0=train, 1=val, 2=test (v2 three-way split).
+_SPLIT_TO_INT8: dict[str, int] = {"train": 0, "val": 1, "test": 2}
 
 
 # ── Move-notation helper (matches build_human_db_sha.py convention) ─────────
@@ -200,11 +204,11 @@ def extract(
 
     # ── Pass 2: encode successor features into the memmap; join bands.
     print(f"[extract] Pass 2: encoding {total_succ_encodings:,} successor features + joining band counts …")
-    sample_state_idx:  list[int] = []
-    sample_band_idx:   list[int] = []
-    sample_targets:    list[int] = []      # flat
-    sample_offsets:    list[int] = [0]     # per-sample end offset into sample_targets
-    sample_state_keys_val: list[bool] = []
+    sample_state_idx:   list[int] = []
+    sample_band_idx:    list[int] = []
+    sample_targets:     list[int] = []      # flat
+    sample_offsets:     list[int] = [0]     # per-sample end offset into sample_targets
+    sample_split_vals:  list[int] = []      # int8: 0=train 1=val 2=test
 
     n_samples_by_band = {"lower": 0, "middle": 0, "upper": 0}
     unmatched_notation_events = 0
@@ -248,7 +252,7 @@ def extract(
         if state_unmatched_hit:
             unmatched_notation_states += 1
 
-        is_val = in_val_bucket(state_key, val_fraction=val_fraction)
+        split_label = three_way_split(state_key)
         for band, obs in per_band.items():
             targets = np.zeros(legal_count, dtype=np.int32)
             for nt, cnt in obs.items():
@@ -258,7 +262,7 @@ def extract(
             sample_band_idx.append(_BAND_TO_IDX[band])
             sample_targets.extend(int(x) for x in targets)
             sample_offsets.append(sample_offsets[-1] + legal_count)
-            sample_state_keys_val.append(is_val)
+            sample_split_vals.append(_SPLIT_TO_INT8[split_label])
             n_samples_by_band[band] += 1
 
     succ_feats.flush()
@@ -271,11 +275,21 @@ def extract(
     for i, b in enumerate(per_state):
         state_succ_offsets[i + 1] = state_succ_offsets[i] + b["legal_count"]
 
-    sample_state_idx_a = np.asarray(sample_state_idx, dtype=np.int64)
-    sample_band_idx_a  = np.asarray(sample_band_idx,  dtype=np.int8)
-    sample_targets_a   = np.asarray(sample_targets,   dtype=np.int32)
-    sample_offsets_a   = np.asarray(sample_offsets,   dtype=np.int64)
-    sample_is_val_a    = np.asarray(sample_state_keys_val, dtype=bool)
+    sample_state_idx_a = np.asarray(sample_state_idx,  dtype=np.int64)
+    sample_band_idx_a  = np.asarray(sample_band_idx,   dtype=np.int8)
+    sample_targets_a   = np.asarray(sample_targets,    dtype=np.int32)
+    sample_offsets_a   = np.asarray(sample_offsets,    dtype=np.int64)
+    sample_split_a     = np.asarray(sample_split_vals, dtype=np.int8)
+    # Backward-compat alias: "val" in v2 three-way split maps to is_val=True.
+    # Old v1 callers (ValueNet, HumanPrefNet) treat buckets 0..19 as val;
+    # v2 "test" (buckets 0..4) appears here as is_val=True so old code
+    # remains conservative (test positions are never used for training).
+    sample_is_val_a    = sample_split_a != 0  # False only for train (0)
+
+    # Count samples per split tier.
+    n_train = int((sample_split_a == 0).sum())
+    n_val   = int((sample_split_a == 1).sum())
+    n_test  = int((sample_split_a == 2).sum())
 
     provenance = {
         "extract_version":                  EXTRACT_VERSION,
@@ -293,6 +307,9 @@ def extract(
         "n_state_keys":                     int(len(per_state)),
         "n_samples":                        int(len(sample_state_idx)),
         "n_samples_by_band":                json.dumps(n_samples_by_band),
+        "n_samples_train":                  n_train,
+        "n_samples_val":                    n_val,
+        "n_samples_test":                   n_test,
         "unmatched_notation_events":        int(unmatched_notation_events),
         "unmatched_notation_states":        int(unmatched_notation_states),
         "skipped_bad_state_key":            int(skipped_bad_state_key),
@@ -310,6 +327,7 @@ def extract(
         sample_band_idx=sample_band_idx_a,
         sample_targets=sample_targets_a,
         sample_offsets=sample_offsets_a,
+        sample_split=sample_split_a,
         sample_is_val=sample_is_val_a,
         provenance=np.array(json.dumps(provenance), dtype=object),
     )
@@ -318,6 +336,7 @@ def extract(
           f"lower={n_samples_by_band['lower']:,}   "
           f"middle={n_samples_by_band['middle']:,}   "
           f"upper={n_samples_by_band['upper']:,}")
+    print(f"[extract] Split: train={n_train:,}  val={n_val:,}  test={n_test:,}")
     print(f"[extract] Unmatched notation events: {unmatched_notation_events:,}   "
           f"states with any: {unmatched_notation_states:,}")
     print(f"[extract] Elapsed: {time.time() - t0:.1f} s")
@@ -335,7 +354,9 @@ def main() -> int:
     p.add_argument("--limit-state-keys", type=int, default=None,
                    help="Cap the number of state_keys processed (smoke tests).")
     p.add_argument("--val-fraction", type=float, default=DEFAULT_VAL_FRACTION,
-                   help="Held-out validation share (via in_val_bucket).")
+                   help="Legacy parameter kept for backward compat; v2 uses "
+                        "three_way_split (5%% test / 15%% val / 80%% train) "
+                        "regardless of this value.")
     args = p.parse_args()
 
     if not (0.0 < args.val_fraction < 1.0):
