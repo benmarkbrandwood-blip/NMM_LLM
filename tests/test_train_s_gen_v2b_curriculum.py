@@ -288,6 +288,61 @@ def test_advance_reference_but_cooldown_still_blocks():
     assert list(whh) == [1.0]
 
 
+# ── §A: retry + confirmation rollouts must NOT inherit is_advance_reference ──
+
+def test_retry_and_confirmation_call_sites_hardcode_advance_reference_false():
+    """§A — the two derived-rollout _record_rollout_outcome call sites
+    (confirmation rollout after a loss/short-draw, and the retry rollout
+    from the mid-game snapshot) must NOT propagate the parent config's
+    `is_advance_reference` flag into level_heuristic_history.  They are
+    diagnostic re-plays / derived samples, not primary games at the
+    current-difficulty reference heuristic; inheriting the flag would
+    double-count derived outcomes in the advancement gate.
+
+    This is a source-level assertion because the two call sites are deep
+    inside the batch loop and cannot be exercised without a full training
+    rollout.  We assert instead that the training script contains
+    exactly one `_record_rollout_outcome` call marked
+    `is_advance_reference=is_advance_reference` (the primary game) and at
+    least two marked `is_advance_reference=False` (confirmation + retry).
+    """
+    from pathlib import Path
+    src = (Path(__file__).parent.parent / "scripts" / "train_s_gen_v2b.py").read_text()
+
+    # Occurrences of the record-outcome call within the batch loop —
+    # count each call's `is_advance_reference=` line.
+    primary_count = src.count("is_advance_reference=is_advance_reference,")
+    false_count   = src.count("is_advance_reference=False,")
+
+    assert primary_count == 1, (
+        f"exactly ONE _record_rollout_outcome call should inherit the "
+        f"parent's is_advance_reference (the primary-game path); "
+        f"found {primary_count}"
+    )
+    assert false_count >= 2, (
+        f"confirmation + retry rollout call sites must both hardcode "
+        f"is_advance_reference=False; found only {false_count} such lines"
+    )
+
+
+def test_retry_rollout_still_records_via_is_full_diff():
+    """§A — the retry rollout is excluded from level_heuristic_history but
+    STILL contributes to win_history + win_history_heuristic (recovery /
+    display).  The `is_full_diff` argument propagates unchanged; only
+    `is_advance_reference` is forced to False."""
+    record = _load_record_helper()
+    wh, whh, lhh, th = deque(), deque(), deque(), deque()
+    record(
+        TerminationReason.WIN_FEWER_THAN_THREE.value, 1.0,
+        wh, whh, lhh, th,
+        is_full_diff=True, advance_cooldown_batches=0,
+        is_advance_reference=False,
+    )
+    assert list(wh) == [1.0], "retry outcome must still feed win_history"
+    assert list(whh) == [1.0], "retry outcome must still feed win_history_heuristic"
+    assert list(lhh) == [], "retry outcome must NOT feed level_heuristic_history"
+
+
 # ── §R: checkpoint schema contains resume-critical keys ─────────────────────
 
 def test_checkpoint_save_dict_contains_resume_state():

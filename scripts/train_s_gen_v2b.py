@@ -1989,11 +1989,19 @@ def run(args: argparse.Namespace) -> None:
                 games_at_level += 1
                 games_since_target_update += 1
                 _hv = _outcome_to_history_float(confirm_result.outcome)
+                # §A — confirmation rollouts are diagnostic re-plays from the
+                # retry snapshot, not primary games at the current-difficulty
+                # reference heuristic.  They keep contributing to
+                # win_history_heuristic (recovery / display) via is_full_diff
+                # but MUST NOT feed level_heuristic_history — the advancement
+                # gate is a per-primary-game statistic and inheriting the
+                # reference flag from the parent would double-count the
+                # advancement signal.
                 _record_rollout_outcome(
                     confirm_result.termination_reason, _hv,
                     win_history, win_history_heuristic, level_heuristic_history,
                     termination_history, is_full_diff, advance_cooldown_batches,
-                    is_advance_reference=is_advance_reference,
+                    is_advance_reference=False,
                 )
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
@@ -2077,11 +2085,18 @@ def run(args: argparse.Namespace) -> None:
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
                 _rv = _outcome_to_history_float(retry_result.outcome)
+                # §A — retry rollouts start from a mid-game snapshot and are
+                # not a primary game at the current-difficulty reference
+                # heuristic.  They stay in win_history / win_history_heuristic
+                # for recovery + display but MUST NOT feed
+                # level_heuristic_history; inheriting the parent's reference
+                # flag would inflate the advancement statistic with derived
+                # samples.
                 _record_rollout_outcome(
                     retry_result.termination_reason, _rv,
                     win_history, win_history_heuristic, level_heuristic_history,
                     termination_history, is_full_diff, advance_cooldown_batches,
-                    is_advance_reference=is_advance_reference,
+                    is_advance_reference=False,
                 )
                 game_count += 1
                 games_at_level += 1
