@@ -11,7 +11,7 @@ measurement instrument that stays outside the pure-baseline training lineage,
 provides absolute truth within a calibrated support domain, and may serve as a
 curriculum, constraint, or auxiliary teacher in separate experiments**
 
-Last updated: 2026-07-29
+Last updated: 2026-07-30
 
 ## 1. Document Purpose and Authority Boundaries
 
@@ -2820,6 +2820,8 @@ Formal match evaluation at minimum:
 - covers blockade, phase transition, flying, unique replies, and
   strategy-inspired states validated through rules replay;
 - compares multiple frozen Sanmill budgets or versioned external opponents;
+- freezes a fixed-N sample size, or uses only a sequential stopping contract
+  prevalidated under Section 15.9 and frozen before the first game;
 - separately reports win/draw/loss, match score, game length, and performance
   by mode;
 - reports confidence intervals and draws no conclusion from one game or only
@@ -2828,6 +2830,133 @@ Formal match evaluation at minimum:
 Starts from the Oracle, strategy material, or historical failures must obey the
 leakage-component and sealing rules in Section 10.5. Reaching a Sanmill level
 still means only a direct result against that frozen configuration.
+
+### 15.9 Paired Pentanomial GSPRT Stopping Contract
+
+GSPRT is a **statistical stopping mechanism** for a candidate engine against a
+frozen baseline. It is not a playing component, and it does not replace
+correctness, theoretical-safety, latency, or resource gates. The fixed-N
+`nmm.paired-evaluation.v1` contract remains the default and the historically
+comparable baseline. A high-throughput candidate/baseline A/B may instead
+select a separately versioned `nmm.paired-pentanomial-gsprt.v1` contract only
+after representative simulation and reference-vector acceptance. A fixed-N
+experiment must not be converted into a sequential experiment after results
+are visible.
+
+Each statistical update unit must be a complete, strict color-swapped pair
+starting from the same complete-history state or prefix. From the candidate's
+perspective, the nine ordered outcomes of a game pair map to:
+
+$$
+\left[
+n_{LL},
+n_{LD}+n_{DL},
+n_{LW}+n_{DD}+n_{WL},
+n_{DW}+n_{WD},
+n_{WW}
+\right].
+$$
+
+The middle bin therefore **deliberately combines** two draws with one win and
+one loss. Pentanomial modeling is useful because the color-swapped pair is one
+trial and its within-pair correlation is retained, not because `DD` is
+separated from `LW/WL`. Only complete pairs may update the statistic; a
+partial pair must not enter any look.
+
+Before sequential stopping is enabled, all of the following sampling and
+ordering contracts must hold:
+
+- freeze the target population, start sampling frame, source/stratum weights,
+  seed, canonical pair order, look interval, and maximum pair count before the
+  first game; starts must not be selected for a candidate or from interim
+  results;
+- draw starts from a frozen distribution that supplies new sampling units;
+  repeating an identical deterministic start/policy pair must not be presented
+  as additional evidence;
+- in parallel execution, update only when the canonical completed-pair or
+  batch frontier advances, not in raw game-completion order, which may be
+  informative through game length;
+- a finite, deterministic, start-by-start reviewed corpus continues to run its
+  complete fixed-N contract; applying GSPRT to it first requires a repeatable
+  target sampling population and new power simulations;
+- a "sharp opening" set may increase information in screening, but it defines
+  a separate screening estimand; the natural population, release-critical
+  strata, and stress strata retain separate reports and gates;
+- optional-stopping control for one sequential test does not remove
+  many-candidate selection bias. Preregister the experiment family,
+  multiplicity/selection rule, and at least one fresh confirmation not used in
+  screening.
+
+Before any game starts, each contract freezes at least:
+
+- `rule_id`, `elo_model`, `elo0`, `elo1`, $\alpha$, $\beta$, `min_pairs`,
+  `max_pairs`, `batch_pairs`, and the maximum-sample disposition;
+- the pentanomial bin order above, zero-cell regularization, constrained
+  multinomial-MLE solver, and fail-closed conditions;
+- the static/dynamic overshoot rule, canonical pair/order hash, source/stratum
+  weights, and parallel-frontier semantics;
+- code and numerical-dependency identities, the independent implementation
+  hash, the reference fishtest snapshot, and acceptance vectors.
+
+If the gate claims an effect of `+X logistic Elo`, the first contract freezes
+`elo_model=logistic`. Fishtest also supports normalized Elo; that model may
+appear only in a separately versioned, newly simulated contract and must not
+be mixed with logistic thresholds. NMM's `elo0/elo1`, maximum sample, and batch
+size must derive from this project's high draw rate, pair correlation, and
+minimum useful effect, rather than copying Stockfish values.
+
+The nominal log-likelihood-ratio boundaries are:
+
+$$
+\mathrm{LLR}_{lower}=\log\frac{\beta}{1-\alpha},
+\qquad
+\mathrm{LLR}_{upper}=\log\frac{1-\beta}{\alpha}.
+$$
+
+If dynamic overshoot is selected, every look also records the effective
+boundaries and overshoot state at that point because they depend on the full
+path. The only statuses are:
+
+- `h1_pass`: crosses the upper boundary, supporting the preregistered higher-
+  Elo hypothesis;
+- `h0_fail_target`: crosses the lower boundary, supporting the lower
+  hypothesis/failing the `+X` gate;
+- `continue`: remains between the boundaries and may continue;
+- `inconclusive_max`: reaches the maximum pair count without crossing;
+- `invalid_infrastructure`: the pair, order, data, or numerical contract is
+  invalid.
+
+`h0_fail_target` is not synonymous with "the candidate is weaker," and
+`inconclusive_max` does not mean "equal." For example, `elo0=0, elo1=+X` tests
+only whether the positive gate is reached. Claiming that the candidate is
+weaker requires a separately preregistered negative/mirrored test; claiming
+equivalence requires a prevalidated equivalence or three-decision design.
+
+Raw per-game JSONL remains immutable. At every update, an append-only look
+ledger records the pair frontier, five cumulative bin counts, LLR,
+nominal/effective boundaries, overshoot state, and decision. An independent
+recomputer must replay every look in exact canonical order. Formal reports
+include W/D/L, the pentanomial vector, Elo/effect estimate and confidence
+interval, LLR/boundaries, stopping and maximum pair counts, and samples by
+source/stratum. A GSPRT decision does not replace effect-size and CI reporting.
+
+The enablement gate covers all nine ordered-pair mappings, zero-count bins, MLE
+probabilities and constraints, fail-closed solver failure/nonfinite values,
+out-of-order/duplicate/missing/partial pairs, resume/replay, and missed looks.
+Cross-validation must compare every look rather than only the final aggregate,
+and at minimum reproduce:
+
+- pentanomial `[10789, 19328, 33806, 19402, 10543]`, logistic `elo0=-3`,
+  `elo1=1`: LLR `2.131067811785019`;
+- pentanomial `[39, 2226, 31451, 2412, 40]`, logistic `elo0=0.2`,
+  `elo1=0.9`: LLR `2.1625425800483598`.
+
+Finally, run Monte Carlo at H0, the midpoint, and H1, with representative high
+draw rates, pair correlations, stratum mixtures, and batch sizes, to verify
+Type I/II error, maximum-sample disposition, and expected sample size.
+Fishtest is a formula and numerical cross-validation reference only. This
+repository must not depend on a machine-local reference directory or copy or
+vendor its source before license review.
 
 ## 16. Product Route versus Research Route
 
@@ -3255,6 +3384,10 @@ Every formal `run_manifest` freezes at least:
 - dataset, checkpoint, replay, and report output roots;
 - evaluation population, external anchor, effect threshold, and stopping
   conditions;
+- when Section 15.9 is enabled, the versioned statistical contract, Elo
+  model/hypotheses, pentanomial schema, canonical pair/order hash,
+  look/overshoot/maximum-sample rules, experiment-family multiplicity, and
+  accepted code/reference identities;
 - H1 thresholds/windows, the signal-starvation trigger, and the CTRL-0
   three-arm contract;
 - additional Oracle/phase/long/target-arm query and matched-compute ledgers;
@@ -3350,6 +3483,9 @@ This design neither freezes nor authorizes any launch command.
 - phase-covered corpus tooling;
 - Sanmill strict-logical-turn, `statejson`, and fixed-node bridge;
 - v5 rules, history, Oracle, verifier, and evaluation contracts;
+- per-game results, pair identities, immutable JSONL, and independent
+  recomputation experience from `nmm.paired-evaluation.v1`, which can
+  reconstruct pentanomial totals but do not constitute GSPRT acceptance;
 - variable-$k$, per-legal-action policy-scoring implementation;
 - training/evaluation manifests, isolated outputs, and exact-resume
   experience;
@@ -3403,7 +3539,10 @@ primitives materially reduce the environment hot-path work, but a percentage
   been preregistered;
 - exact resume has not yet been verified for the self-play loop;
 - the fixed external anchor and naturally reached evaluation population have
-  not yet been frozen.
+  not yet been frozen;
+- the repository does not yet have a pentanomial MLE/GSPRT, append-only look
+  ledger, canonical-order recomputer, or versioned sequential stopping
+  contract accepted against reference vectors and high-draw Monte Carlo.
 
 ### 19.3 Current Oracle-Arm Gaps
 
@@ -3628,6 +3767,18 @@ only when evidence triggers them.
   [The Bitter Lesson](https://www.incompleteideas.net/IncIdeas/BitterLesson.html):
   supports scalable learning and search; it does not imply ignoring rules,
   Markov state, or verifiable topology.
+- Michel Van den Bergh,
+  [GSPRT approximation](https://www.cantate.be/Fishtest/GSPRT_approximation.pdf)
+  and
+  [Normalized Elo](https://www.cantate.be/Fishtest/normalized_elo_practical.pdf):
+  derive and approximate paired-pentanomial sequential testing and Elo
+  scaling; this design requires revalidation on the NMM distribution rather
+  than direct inheritance of chess parameters.
+- the
+  [official-stockfish/fishtest statistical reference implementation at a frozen snapshot](https://github.com/official-stockfish/fishtest/tree/7b62ef48a1914fd203ac8c827b3fd70cd894dc04/server/fishtest/stats):
+  provides per-look numerical cross-validation for the constrained
+  multinomial MLE, LLR, boundaries, and dynamic overshoot; it is not a runtime
+  dependency of this repository.
 - [Sanmill source code](https://github.com/calcitem/Sanmill):
   serves as a differential reference for rules, topology, actions, symmetry,
   and a fixed-node engine.
