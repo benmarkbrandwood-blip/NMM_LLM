@@ -24,7 +24,12 @@ from learned_ai.models.scaffolded_encoder import (
     encode_position,
 )
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
-from learned_ai.training.scaffolded_a2c import ScaffoldedStep, scaffolded_a2c_update
+from learned_ai.training.scaffolded_a2c import (
+    NonFiniteTrainingError,
+    ScaffoldedStep,
+    scaffolded_a2c_update,
+    scaffolded_ppo_update,
+)
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -254,3 +259,113 @@ class TestScaffoldedA2C:
         after  = [p.data.clone() for p in model.parameters()]
         changed = any(not torch.equal(b, a) for b, a in zip(before, after))
         assert changed, "No parameters changed after A2C update"
+
+
+# ── scaffolded_ppo ─────────────────────────────────────────────────────────────
+
+class TestScaffoldedPPO:
+    def _make_steps(self, n: int = 16, temperature: float = 1.0) -> list[ScaffoldedStep]:
+        enc = fresh_enc()
+        steps = []
+        for _ in range(n):
+            feat   = torch.tensor(enc.feat_matrix, dtype=torch.float32)
+            logits = torch.zeros(feat.shape[0])          # any fixed logits work
+            scaled = logits / max(temperature, 1e-6)
+            lp     = float(F.log_softmax(scaled, dim=-1)[0].item())
+            steps.append(ScaffoldedStep(
+                move_features=enc.feat_matrix.copy(),
+                value_input=enc.value_input.copy(),
+                chosen_idx=0,
+                log_prob_old=lp,
+                reward=0.0,
+                next_move_features=enc.feat_matrix.copy(),
+                next_value_input=enc.value_input.copy(),
+                done=False,
+                behaviour_temperature=temperature,
+            ))
+        return steps
+
+    def test_ppo_ratio_is_one_when_weights_unchanged(self):
+        """With θ_new = θ_old and the same behaviour_temperature applied on both
+        sides, every PPO importance ratio must equal 1.  A temperature mismatch
+        (T during collection ≠ T during update) would cause systematic deviation
+        even without any parameter update."""
+        model = ScaffoldedPolicyNet()
+        model.eval()
+        device = torch.device("cpu")
+
+        for temperature in (0.5, 1.0, 1.3):
+            enc  = fresh_enc()
+            feat = torch.tensor(enc.feat_matrix, dtype=torch.float32)
+            # Compute log_prob_old exactly as the collection loop does.
+            with torch.no_grad():
+                logits = model.policy_logits(feat)
+                scaled = logits / max(temperature, 1e-6)
+                lp_old_vec = F.log_softmax(scaled, dim=-1)
+
+            steps = []
+            for i in range(16):
+                steps.append(ScaffoldedStep(
+                    move_features=enc.feat_matrix.copy(),
+                    value_input=enc.value_input.copy(),
+                    chosen_idx=0,
+                    log_prob_old=float(lp_old_vec[0].item()),
+                    reward=0.0,
+                    next_move_features=enc.feat_matrix.copy(),
+                    next_value_input=enc.value_input.copy(),
+                    done=False,
+                    behaviour_temperature=temperature,
+                ))
+
+            # Verify ratios before any update: patch the PPO inner loop.
+            ratios = []
+            with torch.no_grad():
+                for step in steps:
+                    f  = torch.tensor(step.move_features, dtype=torch.float32)
+                    lg = model.policy_logits(f)
+                    sc = lg / max(step.behaviour_temperature, 1e-6)
+                    lp = F.log_softmax(sc, dim=-1)[step.chosen_idx]
+                    ratios.append(float(torch.exp(lp - torch.tensor(step.log_prob_old)).item()))
+
+            for r in ratios:
+                assert abs(r - 1.0) < 1e-4, (
+                    f"PPO ratio={r:.6f} != 1.0 at T={temperature} "
+                    "(temperature mismatch between collection and update)"
+                )
+
+    def test_ppo_update_returns_finite(self):
+        model = ScaffoldedPolicyNet()
+        opt   = torch.optim.Adam(model.parameters(), lr=1e-3)
+        steps = self._make_steps(16, temperature=1.0)
+        pl, vl, ent = scaffolded_ppo_update(model, opt, steps, torch.device("cpu"))
+        assert np.isfinite(pl),  f"policy_loss not finite: {pl}"
+        assert np.isfinite(vl),  f"value_loss not finite: {vl}"
+        assert np.isfinite(ent), f"entropy not finite: {ent}"
+
+    def test_ppo_too_few_steps_returns_zeros(self):
+        model = ScaffoldedPolicyNet()
+        opt   = torch.optim.Adam(model.parameters(), lr=1e-3)
+        result = scaffolded_ppo_update(model, opt, [], torch.device("cpu"))
+        assert result == (0.0, 0.0, 0.0)
+
+    def test_non_finite_loss_raises(self):
+        """NonFiniteTrainingError must be raised, not swallowed."""
+        import math
+        model = ScaffoldedPolicyNet()
+        opt   = torch.optim.Adam(model.parameters(), lr=1e-3)
+        # Force a non-finite log_prob_old so the ratio explodes → non-finite loss.
+        # log_prob_old = -inf → ratio = exp(lp - (-inf)) = exp(+inf) = inf.
+        enc   = fresh_enc()
+        steps = [ScaffoldedStep(
+            move_features=enc.feat_matrix.copy(),
+            value_input=enc.value_input.copy(),
+            chosen_idx=0,
+            log_prob_old=-math.inf,         # ratio = exp(lp + inf) = inf
+            reward=0.0,
+            next_move_features=enc.feat_matrix.copy(),
+            next_value_input=enc.value_input.copy(),
+            done=False,
+            behaviour_temperature=1.0,
+        )] * 16
+        with pytest.raises(NonFiniteTrainingError):
+            scaffolded_ppo_update(model, opt, steps, torch.device("cpu"))

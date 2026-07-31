@@ -67,6 +67,7 @@ from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.training.scaffolded_a2c import (
+    NonFiniteTrainingError,
     ScaffoldedStep,
     scaffolded_a2c_update,
     scaffolded_ppo_update,
@@ -255,7 +256,9 @@ TEMP_BOOST_DECAY       = 0.97   # legacy per-batch decay, retained for reference
 TEMP_BOOST_PER_GAME_DECAY = 0.995   # multiplicative decay applied per primary game (batch-size invariant)
 TEMP_FLOOR_DEFAULT     = 0.30   # persistent minimum effective temperature to prevent plateau over-cooling
 ENTROPY_BOOST_DECAY    = 0.97   # per-iteration decay for advancement/recovery entropy boost
-HOT_EXPLORE_TEMP_SCALE = 1.3    # hot-explore temperature = temp_start * this multiplier
+HOT_EXPLORE_TEMP_SCALE      = 1.3  # hot-explore temperature = temp_start * this multiplier
+_MAX_UNIFORM_FALLBACKS      = 3    # raise NonFiniteTrainingError after this many fallbacks per rollout
+_PROBE_LOG_EVERY            = 100  # log T=1 probe metric every N primary games
 
 UPDATE_TARGET_EVERY   = 50
 SELF_PLAY_RATIO       = 0.5
@@ -966,12 +969,13 @@ def _rollout(
         _saved_sim_ply = lookahead_advisor._sim_ply_depth
         lookahead_advisor._sim_ply_depth = lookahead_advisor._ply_depth
 
-    board                   = start_board
-    ply                     = 0
-    move_phase_start_ply:   Optional[int] = None
-    game_trajectory:        list[ScaffoldedStep] = []
-    step_diags:             list[StepDiag]       = []
-    branch_candidates:      list[tuple[int, BoardState, str]] = []
+    board                    = start_board
+    ply                      = 0
+    move_phase_start_ply:    Optional[int] = None
+    game_trajectory:         list[ScaffoldedStep] = []
+    step_diags:              list[StepDiag]       = []
+    branch_candidates:       list[tuple[int, BoardState, str]] = []
+    _uniform_fallback_count: int = 0
     done                    = False
     outcome                 = 0.0
     learner_move_count      = 0
@@ -1044,14 +1048,21 @@ def _rollout(
                 probs     = log_probs.exp()
                 if not torch.isfinite(probs).all():
                     probs = torch.where(torch.isfinite(probs), probs, torch.zeros_like(probs))
-                # Fall back to uniform when the row has zero mass — happens
-                # if the policy head produced NaN/-inf logits (bad update
-                # earlier).  torch.multinomial rejects a zero-sum row.
                 _total = probs.sum()
                 if _total.item() <= 1e-9:
-                    probs = torch.ones_like(probs) / max(probs.numel(), 1)
-                    # Recompute log_probs to match the uniform fallback so
-                    # entropy / log_prob_old below stay consistent.
+                    _uniform_fallback_count += 1
+                    logging.warning(
+                        "[s_gen_v2b] non-finite logits at ply=%d "
+                        "(fallback #%d this rollout) — model weights may be corrupted",
+                        ply, _uniform_fallback_count,
+                    )
+                    if _uniform_fallback_count >= _MAX_UNIFORM_FALLBACKS:
+                        raise NonFiniteTrainingError(
+                            f"uniform fallback triggered {_uniform_fallback_count} times "
+                            f"in one rollout at ply={ply} — model weights are non-finite, "
+                            "stopping training"
+                        )
+                    probs     = torch.ones_like(probs) / max(probs.numel(), 1)
                     log_probs = torch.log(probs.clamp(min=1e-12))
                 else:
                     probs = probs / _total
@@ -1145,6 +1156,7 @@ def _rollout(
                 next_move_features=next_mf,
                 next_value_input=next_vi,
                 done=terminal_next,
+                behaviour_temperature=temperature,
             )
             game_trajectory.append(step)
 
@@ -1592,6 +1604,10 @@ def run(args: argparse.Namespace) -> None:
     level_heuristic_history: deque[float] = deque(_persisted_lh, maxlen=_level_hist_cap)
     # Cleared on each difficulty advance and when advance-cooldown expires.
     ep_steps: list[ScaffoldedStep] = []
+    # Fixed probe: first trajectory step captured from the first primary game.
+    # Evaluated at T=1 every _PROBE_LOG_EVERY games to track model health
+    # independent of sampling temperature.
+    _probe_step: Optional[ScaffoldedStep] = None
     last_update_pl  = None
     last_update_vl  = None
     last_update_ent = None
@@ -1937,6 +1953,10 @@ def run(args: argparse.Namespace) -> None:
             game_forced_placements = cfg.game_forced_placements
             game_retry_ply         = cfg.retry_ply
 
+            # Capture probe position once from the first non-empty trajectory.
+            if _probe_step is None and result.trajectory:
+                _probe_step = result.trajectory[0]
+
             # §I — skip RL update for INFRA rollouts: their outcome is a
             # sentinel value, not a real game result, and rescoring/training
             # on them would contaminate the policy signal.
@@ -2202,6 +2222,25 @@ def run(args: argparse.Namespace) -> None:
                 ep_steps.clear()
                 if _imitation_data is not None and not getattr(args, "no_imitation_mix", False):
                     _imitation_mix_step(model, device, _imitation_data, opt)
+
+            # ── Fixed-probe metric at T=1 ─────────────────────────────────────
+            # Logs raw-logit entropy and top-1 prob independent of sampling
+            # temperature, so model damage is distinguishable from temp effects.
+            if _probe_step is not None and game_count % _PROBE_LOG_EVERY == 0:
+                model.eval()
+                with torch.no_grad():
+                    _pf    = torch.tensor(_probe_step.move_features,
+                                          dtype=torch.float32).to(device)
+                    _pl    = model.policy_logits(_pf)          # raw logits, T=1
+                    _plp   = F.log_softmax(_pl, dim=-1)
+                    _pp    = _plp.exp()
+                    _ent   = float(-((_pp * _plp).sum()).item())
+                    _top1  = float(_pp.max().item())
+                model.train()
+                _log_event("probe_t1",
+                           ent=round(_ent, 4),
+                           top1=round(_top1, 4),
+                           k=int(_probe_step.move_features.shape[0]))
 
             # ── Periodic log + checkpoint ──────────────────────────────────────
             if game_count - _last_log_game >= args.log_every and diag_buffer:

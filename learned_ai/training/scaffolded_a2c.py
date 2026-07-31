@@ -14,14 +14,15 @@ Both losses flow through a single backward() call so shared module parameters
 gradients.
 
 ScaffoldedStep dataclass fields:
-  move_features   (k, 62) np.ndarray  — features for current position's legal moves
-  value_input     (23,)  np.ndarray   — board-level features for value head
-  chosen_idx      int                 — which legal move was selected
-  log_prob_old    float               — log P at collection time (for PPO ratio, unused in A2C)
-  reward          float               — per-move shaped reward
-  next_move_features  (k', 62) np.ndarray
-  next_value_input    (23,)  np.ndarray
-  done            bool
+  move_features        (k, 62) np.ndarray  — features for current position's legal moves
+  value_input          (23,)  np.ndarray   — board-level features for value head
+  chosen_idx           int                 — which legal move was selected
+  log_prob_old         float               — log P(chosen | T) at collection time
+  reward               float               — per-move shaped reward
+  next_move_features   (k', 62) np.ndarray
+  next_value_input     (23,)  np.ndarray
+  done                 bool
+  behaviour_temperature float              — sampling temperature T used during collection
 """
 
 from __future__ import annotations
@@ -39,18 +40,23 @@ VALUE_COEF   = 0.5
 GRAD_CLIP    = 1.0
 
 
+class NonFiniteTrainingError(RuntimeError):
+    """Raised when loss, gradients, or parameters become non-finite during training."""
+
+
 @dataclass
 class ScaffoldedStep:
-    """One learner-turn step for the scaffolded A2C update."""
+    """One learner-turn step for the scaffolded A2C / PPO update."""
 
-    move_features:      np.ndarray   # (k, 62)
-    value_input:        np.ndarray   # (23,)
-    chosen_idx:         int
-    log_prob_old:       float
-    reward:             float
-    next_move_features: np.ndarray   # (k', 62) — for optional bootstrapping
-    next_value_input:   np.ndarray   # (23,)
-    done:               bool
+    move_features:        np.ndarray   # (k, 62)
+    value_input:          np.ndarray   # (23,)
+    chosen_idx:           int
+    log_prob_old:         float        # log P(chosen | T) at collection time
+    reward:               float
+    next_move_features:   np.ndarray   # (k', 62) — for bootstrapping
+    next_value_input:     np.ndarray   # (23,)
+    done:                 bool
+    behaviour_temperature: float = 1.0  # sampling temperature T used during collection
 
 
 def scaffolded_a2c_update(
@@ -110,9 +116,10 @@ def scaffolded_a2c_update(
     entropy_terms: list[torch.Tensor] = []
 
     for i, step in enumerate(steps):
-        feat   = torch.tensor(step.move_features, dtype=torch.float32).to(device)
-        logits = model.policy_logits(feat)              # (k,)
-        log_probs = F.log_softmax(logits, dim=-1)       # (k,)
+        feat      = torch.tensor(step.move_features, dtype=torch.float32).to(device)
+        logits    = model.policy_logits(feat)              # (k,)
+        scaled    = logits / max(step.behaviour_temperature, 1e-6)
+        log_probs = F.log_softmax(scaled, dim=-1)          # (k,)
         policy_terms.append(-log_probs[step.chosen_idx] * advantages[i])
         probs = log_probs.exp()
         entropy_terms.append(-(probs * log_probs).sum())
@@ -127,10 +134,28 @@ def scaffolded_a2c_update(
         + value_coef * value_loss
     )
 
+    if not total_loss.isfinite():
+        raise NonFiniteTrainingError(
+            f"A2C: non-finite total_loss={total_loss.item():.6g}"
+        )
+
     optimizer.zero_grad()
     total_loss.backward()
+
+    for _name, _p in model.named_parameters():
+        if _p.grad is not None and not torch.isfinite(_p.grad).all():
+            raise NonFiniteTrainingError(
+                f"A2C: non-finite gradient in {_name}"
+            )
+
     nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
     optimizer.step()
+
+    for _name, _p in model.named_parameters():
+        if not torch.isfinite(_p.data).all():
+            raise NonFiniteTrainingError(
+                f"A2C: non-finite parameter in {_name} after step"
+            )
 
     return (
         float(policy_loss.item()),
@@ -196,7 +221,11 @@ def scaffolded_ppo_update(
         for i, step in enumerate(steps):
             feat      = torch.tensor(step.move_features, dtype=torch.float32).to(device)
             logits    = model.policy_logits(feat)
-            log_probs = F.log_softmax(logits, dim=-1)
+            # Apply the same temperature that was used during collection so that
+            # log_probs_new and log_prob_old live in the same space → ratio = 1
+            # when θ_new = θ_old.
+            scaled    = logits / max(step.behaviour_temperature, 1e-6)
+            log_probs = F.log_softmax(scaled, dim=-1)
             lp        = log_probs[step.chosen_idx]
             ratio     = torch.exp(lp - log_probs_old[i])
             adv       = advantages[i]
@@ -211,10 +240,28 @@ def scaffolded_ppo_update(
         value_loss   = F.mse_loss(v_curr, td_targets)
         total_loss   = policy_loss - entropy_coef * entropy_loss + value_coef * value_loss
 
+        if not total_loss.isfinite():
+            raise NonFiniteTrainingError(
+                f"PPO epoch: non-finite total_loss={total_loss.item():.6g}"
+            )
+
         optimizer.zero_grad()
         total_loss.backward()
+
+        for _name, _p in model.named_parameters():
+            if _p.grad is not None and not torch.isfinite(_p.grad).all():
+                raise NonFiniteTrainingError(
+                    f"PPO epoch: non-finite gradient in {_name}"
+                )
+
         nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
         optimizer.step()
+
+        for _name, _p in model.named_parameters():
+            if not torch.isfinite(_p.data).all():
+                raise NonFiniteTrainingError(
+                    f"PPO epoch: non-finite parameter in {_name} after step"
+                )
 
         pl_acc  += float(policy_loss.item())
         vl_acc  += float(value_loss.item())
