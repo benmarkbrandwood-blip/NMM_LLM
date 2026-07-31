@@ -273,13 +273,16 @@ This evidence supports adding the expert material as a Book candidate subtype,
 not adding all rows or changing the Book quota automatically. Row 11's final
 `c5` is screenshot-derived but unambiguous at original resolution; its visual
 evidence basis remains recorded and is not an expert-confirmation blocker. The
-expert has partially answered the four Mill-domain judgments. The
+expert has now supplied a standalone P14 name, P03 child-level labels, the
+outer/inner Parallel Mill Rush distinction, and primary P03 child 001. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
 records the supplied family and child annotations without inferring missing
 answers. The
 [short follow-up](sanmill-layered-expert-book-review-follow-up.md)
-retains only the unresolved family partition, P14 classification,
-parent-coverage priority, and primary/additional child choices. The
+records that coverage priority and most primary/additional child choices remain
+unanswered. It also separates the objective child-001/006 endpoint
+transposition from the expert's semantic evidence. A concrete shortlist is the
+next review format; the expert is not asked to repeat the abstract tiers. The
 provisional corpus decision must account for that review and the two distinct
 Book subtypes before any list is frozen.
 

@@ -828,12 +828,20 @@ composition. The expert review supplement provides substantial family and
 child semantics, establishes that P03 needs extended-family splitting, and
 identifies P13-A/P13-B as a symmetry pair. It does not provide a standalone
 P14 classification, complete priority tiers, a final P03 partition, or every
-primary-child choice. The
+primary-child choice. A 31 July direct-message follow-up now closes the P14
+name as `Interrupted Knight`, labels the P03 children, distinguishes the outer
+and inner Parallel Mill Rush variants, and selects P03 child 001 as the primary
+Black response. The frozen audit independently proves that children 001/006
+are different-history same-endpoint transpositions and that child 012 exactly
+duplicates 006. Coverage priorities and primary choices for P04, P05, P08,
+P09, and P13-A remain unconfirmed. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
 and
 [short follow-up](../experiments/sanmill-layered-expert-book-review-follow-up.md)
-separate the answered and remaining questions. Status stays `needs_decision`;
-the two Book subtypes have no frozen internal allocation.
+separate expert statements, technical deductions, and remaining choices. The
+next expert-facing artifact should be a concrete shortlist for correction, not
+another abstract tier questionnaire. Status stays `needs_decision`; the two
+Book subtypes have no frozen internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -993,10 +1001,11 @@ training merely because the managed run ended. Proceed in this order:
    `22 Book / 21 HumanDB / 21 Perfect DB` split and the 14 expert parent
    groups using the
    [expert review guide](../experiments/sanmill-layered-expert-book-parent-review.md);
-   do not generate or freeze the final list until the product decision and
-   four narrow expert judgments are recorded. Row 11's screenshot-derived
-   `c5` is source-verified and retains a visual provenance marker. There is no
-   runtime source fallback.
+   use the second expert response and objective P03 transposition evidence to
+   prepare a concrete breadth-first shortlist. Do not generate or freeze the
+   final list until the expert can correct that shortlist and the product
+   decision is recorded. Row 11's screenshot-derived `c5` is source-verified
+   and retains a visual provenance marker. There is no runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions

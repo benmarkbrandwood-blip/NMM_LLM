@@ -1,8 +1,10 @@
 # Expert Book Semantic Review Follow-Up
 
-Status: `partial_response_recorded_needs_decision`
+Status: `second_response_recorded_concrete_proposal_needed`
 
-Date: 2026-07-26
+Initial request: 2026-07-26
+
+Latest response: 2026-07-31
 
 The Mill expert has already provided substantial family and child-line notes.
 This follow-up does not ask him to repeat legality checks, move transcription,
@@ -73,6 +75,28 @@ Pxx same-plan/redundant: rows ...
 The existing annotations already support a strategic difference between the
 two P04 children and between the two P05 children, but they do not select a
 primary.
+
+## Response disposition
+
+The expert supplied `Interrupted Knight` for P14 and a child-level P03
+classification. A later clarification identifies P03 child 003 as the outer
+Parallel Mill Rush variant and child 004 as the inner variant. He explicitly
+selects child 001, source row 3, as the primary Black response.
+
+The frozen source audit establishes a stronger technical relationship for the
+ambiguous child 006 note. Child 001 uses `b2 c5 c4 e5` at plies 9-12, while
+child 006 uses `c4 e5 b2 c5`. They have different exact histories but the same
+final FEN and `ring16` orbit. Child 012 is an exact-history duplicate of child
+006. Children 006 and 012 are therefore retained as provenance but proposed as
+same-plan redundant continuations behind primary child 001.
+
+The response does not assign coverage tiers and does not select primary rows
+for P04, P05, P08, P09, or P13-A. Rather than repeat the abstract questions,
+the next artifact will present a concrete breadth-first shortlist and explicit
+primary choices for correction. The expert's difficulty distinguishing lines
+from their common eight-ply parent is supporting evidence for retaining the
+twelve-ply child boundary, not a reason to collapse the v2 contract back to
+eight plies.
 
 ## Product decision after expert input
 

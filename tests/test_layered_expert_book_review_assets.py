@@ -107,6 +107,39 @@ def test_reviewed_model_keeps_row_18_and_row_19_distinct() -> None:
     )
 
 
+def test_p03_primary_and_sixth_child_are_endpoint_transpositions() -> None:
+    audit = json.loads(REVIEWED_AUDIT.read_text(encoding="utf-8"))
+    records = {
+        (item["source_row"], item["variation_id"]): item
+        for item in audit["records"]
+    }
+
+    primary = records[(3, "expert-book-play-003")]
+    sixth = records[(14, "expert-book-play-014")]
+    duplicate = records[(20, "expert-book-play-020")]
+
+    assert primary["resolved_logical_turns"][8:] == [
+        ["b2"],
+        ["c5"],
+        ["c4"],
+        ["e5"],
+    ]
+    assert sixth["resolved_logical_turns"][8:] == [
+        ["c4"],
+        ["e5"],
+        ["b2"],
+        ["c5"],
+    ]
+    assert primary["exact_history_sha256"] != sixth["exact_history_sha256"]
+    assert sixth["exact_history_sha256"] == duplicate["exact_history_sha256"]
+    assert primary["prefix_record"]["final"]["nmm_fen"] == (
+        sixth["prefix_record"]["final"]["nmm_fen"]
+    )
+    assert primary["prefix_record"]["final"]["ring16_canonical_fen"] == (
+        sixth["prefix_record"]["final"]["ring16_canonical_fen"]
+    )
+
+
 def test_frozen_reviewed_assets_match_source_and_renderer() -> None:
     manifest = json.loads(
         (REVIEWED_ASSETS / "manifest.json").read_text(encoding="utf-8")

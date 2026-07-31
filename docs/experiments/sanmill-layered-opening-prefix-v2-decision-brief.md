@@ -4,7 +4,7 @@ Status: `needs_decision`
 
 Initial decision date: 2026-07-25
 
-Evidence update: 2026-07-26
+Latest evidence update: 2026-07-31
 
 This brief compares the completed source-only Sanmill Book, expert-curated
 Book, HumanDB, and Perfect DB audits and proposes, but does not freeze, a
@@ -172,6 +172,12 @@ The proposed later selection rules are:
    row 11's visual `c5`
    provenance, use no more than one record per exact history, and maximise
    exact-FEN/`ring16` diversity under a predeclared deterministic tiebreak.
+   The second expert response names P14 `Interrupted Knight`, labels the P03
+   children, distinguishes outer/inner Parallel Mill Rush variants, and makes
+   P03 child 001 primary. The audit independently proves that children
+   001/006 are same-endpoint transpositions and child 012 duplicates 006.
+   Coverage tiers and the other multi-child primaries remain proposals rather
+   than expert decisions.
 2. **HumanDB:** rank complete histories by distinct-game count, then occurrence
    count, then history identity; skip cross-stratum endpoint/ring16 duplicates
    and take the first 21 remaining histories. Preserve their empirical outcome
@@ -208,23 +214,25 @@ The recommended product decision remains to accept the provisional
 `22 Book / 21 HumanDB / 21 Perfect DB` composition. The newly measured expert
 source does not justify changing that overall split.
 
-The Mill expert has partially answered the original
+The Mill expert has now answered the standalone P14 question and materially
+advanced the original
 [parent-and-child review guide](sanmill-layered-expert-book-parent-review.md).
 The response is preserved in the
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md),
 and the
 [short follow-up](sanmill-layered-expert-book-review-follow-up.md)
-limits the remaining gate to four concrete outputs:
+records the remaining gate:
 
-1. a standalone family or plan description for P14;
-2. the final P03 extended-family partition and any other combine/split
-   correction;
-3. `core`, `useful`, or `optional/niche` coverage tiers; and
-4. primary, additional-distinct, and redundant child choices for the remaining
-   multi-child exact parents.
+1. correction or acceptance of a concrete P03 extended-family proposal;
+2. breadth priorities expressed as `must keep`, `keep if space`, or optional;
+   and
+3. correction or acceptance of proposed primary/additional choices for P04,
+   P05, P08, P09, and P13-A.
 
 The expert does not need to recheck legality, hashes, HumanDB frequency,
-row 11, Sanmill replay, or objective strength.
+row 11, Sanmill replay, P14, the P03-001/006 transposition, or objective
+strength. The next review should be a concrete shortlist to correct rather than
+another abstract questionnaire.
 
 Until that decision is recorded, status remains `needs_decision`; no final
 prefix list, final corpus image-review package, candidate-versus-baseline run,
