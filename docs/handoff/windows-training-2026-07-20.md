@@ -840,8 +840,14 @@ and
 [short follow-up](../experiments/sanmill-layered-expert-book-review-follow-up.md)
 separate expert statements, technical deductions, and remaining choices. The
 next expert-facing artifact should be a concrete shortlist for correction, not
-another abstract tier questionnaire. Status stays `needs_decision`; the two
-Book subtypes have no frozen internal allocation.
+another abstract tier questionnaire. That
+[shortlist](../experiments/sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+now proposes one endpoint-unique representative per P01-P14 parent, six P03
+extended families, and explicit technical tie-breaks. Fourteen expert-parent
+representatives plus seven Sanmill family representatives consume 21 of the 22
+proposed Book places, leaving only one place for five additional P03 family
+primaries before cross-source deduplication. Status stays `needs_decision`;
+the two Book subtypes have no frozen internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -1003,9 +1009,11 @@ training merely because the managed run ended. Proceed in this order:
    [expert review guide](../experiments/sanmill-layered-expert-book-parent-review.md);
    use the second expert response and objective P03 transposition evidence to
    prepare a concrete breadth-first shortlist. Do not generate or freeze the
-   final list until the expert can correct that shortlist and the product
-   decision is recorded. Row 11's screenshot-derived `c5` is source-verified
-   and retains a visual provenance marker. There is no runtime source fallback.
+   final list until the expert can correct the
+   [shortlist proposal](../experiments/sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+   and the product decision is recorded. Row 11's screenshot-derived `c5` is
+   source-verified and retains a visual provenance marker. There is no runtime
+   source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions

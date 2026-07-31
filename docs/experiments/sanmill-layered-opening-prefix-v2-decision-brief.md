@@ -232,7 +232,11 @@ records the remaining gate:
 The expert does not need to recheck legality, hashes, HumanDB frequency,
 row 11, Sanmill replay, P14, the P03-001/006 transposition, or objective
 strength. The next review should be a concrete shortlist to correct rather than
-another abstract questionnaire.
+another abstract questionnaire. That
+[shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+now records one endpoint-unique breadth representative per P01-P14 parent,
+proposed P03 extended families, unconfirmed sibling tie-breaks, and the Book
+quota conflict without freezing any member.
 
 Until that decision is recorded, status remains `needs_decision`; no final
 prefix list, final corpus image-review package, candidate-versus-baseline run,

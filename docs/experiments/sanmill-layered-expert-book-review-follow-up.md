@@ -1,6 +1,6 @@
 # Expert Book Semantic Review Follow-Up
 
-Status: `second_response_recorded_concrete_proposal_needed`
+Status: `concrete_proposal_ready_for_expert_correction`
 
 Initial request: 2026-07-26
 
@@ -92,11 +92,12 @@ same-plan redundant continuations behind primary child 001.
 
 The response does not assign coverage tiers and does not select primary rows
 for P04, P05, P08, P09, or P13-A. Rather than repeat the abstract questions,
-the next artifact will present a concrete breadth-first shortlist and explicit
-primary choices for correction. The expert's difficulty distinguishing lines
-from their common eight-ply parent is supporting evidence for retaining the
-twelve-ply child boundary, not a reason to collapse the v2 contract back to
-eight plies.
+the
+[breadth-first shortlist](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+presents a concrete grouping and explicit primary choices for correction. The
+expert's difficulty distinguishing lines from their common eight-ply parent is
+supporting evidence for retaining the twelve-ply child boundary, not a reason
+to collapse the v2 contract back to eight plies.
 
 ## Product decision after expert input
 

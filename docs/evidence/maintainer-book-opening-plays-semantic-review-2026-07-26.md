@@ -164,6 +164,10 @@ redundant candidates for a diversity-oriented corpus.
 The P04 and P05 descriptions support treating their two children as
 strategically different. They do not state which child is primary.
 
+The resulting technical tie-breaks and proposed groupings are presented in the
+[breadth-first shortlist](../experiments/sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md).
+That document is a correction sheet, not an expert-approved tier assignment.
+
 ## Supplemental examples outside the current twelve-ply candidates
 
 The expert separately supplied two longer examples described as a P05 child
@@ -192,5 +196,6 @@ semantics. It does not establish:
   composition.
 
 These are the currently identified remaining Book-semantic and product
-decisions. No candidate model, game, final 64-prefix freeze, or evaluation
-authority follows from this review.
+decisions. The concrete shortlist replaces another abstract questionnaire, but
+silence or general approval still cannot freeze membership. No candidate model,
+game, final 64-prefix freeze, or evaluation authority follows from this review.

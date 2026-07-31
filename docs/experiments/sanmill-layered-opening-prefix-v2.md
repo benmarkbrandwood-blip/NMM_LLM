@@ -283,6 +283,9 @@ records that coverage priority and most primary/additional child choices remain
 unanswered. It also separates the objective child-001/006 endpoint
 transposition from the expert's semantic evidence. A concrete shortlist is the
 next review format; the expert is not asked to repeat the abstract tiers. The
+[shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+covers all fourteen parents, proposes six P03 extended families, and keeps every
+unconfirmed primary visibly provisional. The
 provisional corpus decision must account for that review and the two distinct
 Book subtypes before any list is frozen.
 

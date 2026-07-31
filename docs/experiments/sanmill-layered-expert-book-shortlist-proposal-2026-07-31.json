@@ -1,0 +1,362 @@
+{
+  "schema_version": "nmm.layered-expert-book-shortlist-proposal.v1",
+  "status": "proposal_for_expert_correction_not_frozen",
+  "date": "2026-07-31",
+  "source_audit_identity": "1f6f9ceb8df36150ea401145e16c88cc25550622c1ad85a1b54a067183b9978d",
+  "source_record_count": 36,
+  "candidate_loaded": false,
+  "games_played": 0,
+  "fallback": "none",
+  "selection_principles": [
+    "Preserve one representative for each expert structural parent before adding a second child.",
+    "Use explicit expert primary choices before technical tie-breaks.",
+    "Prefer exact HumanDB support only as occurrence evidence, never as a strength label.",
+    "Prefer a non-overlapping final FEN and ring16 orbit when expert evidence does not distinguish candidates.",
+    "Retain exact-history provenance while excluding same-plan endpoint transpositions and exact duplicates from diversity slots."
+  ],
+  "breadth_first_parent_primaries": [
+    {
+      "review_id": "P01",
+      "source_row": 1,
+      "variation_id": "expert-book-play-001-better-d1",
+      "priority_proposal": "must_keep",
+      "basis": "The source explicitly labels this continuation better than the sibling trap."
+    },
+    {
+      "review_id": "P02",
+      "source_row": 2,
+      "variation_id": "expert-book-play-002",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the Delayed Black L parent."
+    },
+    {
+      "review_id": "P03",
+      "source_row": 3,
+      "variation_id": "expert-book-play-003",
+      "priority_proposal": "must_keep",
+      "basis": "The expert explicitly selected child 001 as the primary Black response."
+    },
+    {
+      "review_id": "P04",
+      "source_row": 5,
+      "variation_id": "expert-book-play-005",
+      "priority_proposal": "must_keep",
+      "basis": "Technical tie-break: four-game exact HumanDB support; expert primary remains unconfirmed."
+    },
+    {
+      "review_id": "P05",
+      "source_row": 7,
+      "variation_id": "expert-book-play-007",
+      "priority_proposal": "must_keep",
+      "basis": "Technical tie-break: two-game exact HumanDB support; expert primary remains unconfirmed."
+    },
+    {
+      "review_id": "P06",
+      "source_row": 12,
+      "variation_id": "expert-book-play-012",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the Black Rush response parent."
+    },
+    {
+      "review_id": "P07",
+      "source_row": 13,
+      "variation_id": "expert-book-play-013",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the Black L parent."
+    },
+    {
+      "review_id": "P08",
+      "source_row": 25,
+      "variation_id": "expert-book-play-025",
+      "priority_proposal": "must_keep",
+      "basis": "Technical tie-break: unique against current HumanDB final-FEN and ring16 overlap; expert trap mapping remains unconfirmed."
+    },
+    {
+      "review_id": "P09",
+      "source_row": 27,
+      "variation_id": "expert-book-play-027",
+      "priority_proposal": "must_keep",
+      "basis": "Technical tie-break: avoids the Sanmill Book endpoint and ring16 overlap of row 26."
+    },
+    {
+      "review_id": "P10",
+      "source_row": 29,
+      "variation_id": "expert-book-play-029",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the Black Into White parent."
+    },
+    {
+      "review_id": "P11",
+      "source_row": 30,
+      "variation_id": "expert-book-play-030",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the Black From White parent."
+    },
+    {
+      "review_id": "P12",
+      "source_row": 31,
+      "variation_id": "expert-book-play-031",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the T Start / Knight Moves parent."
+    },
+    {
+      "review_id": "P13",
+      "source_row": 32,
+      "variation_id": "expert-book-play-032",
+      "priority_proposal": "must_keep",
+      "basis": "Technical source-order tie-break for Knight Attack; expert primary remains unconfirmed."
+    },
+    {
+      "review_id": "P14",
+      "source_row": 34,
+      "variation_id": "expert-book-play-034",
+      "priority_proposal": "must_keep",
+      "basis": "Only candidate for the expert-named Interrupted Knight parent."
+    }
+  ],
+  "p03_extended_family_proposals": [
+    {
+      "family_id": "closed_z_inner_wrap",
+      "primary": {
+        "child": 1,
+        "source_row": 3,
+        "variation_id": "expert-book-play-003"
+      },
+      "members": [
+        {
+          "child": 1,
+          "source_row": 3,
+          "variation_id": "expert-book-play-003",
+          "disposition": "must_keep_primary"
+        },
+        {
+          "child": 6,
+          "source_row": 14,
+          "variation_id": "expert-book-play-014",
+          "disposition": "same_plan_endpoint_transposition"
+        },
+        {
+          "child": 12,
+          "source_row": 20,
+          "variation_id": "expert-book-play-020",
+          "disposition": "exact_history_duplicate"
+        }
+      ]
+    },
+    {
+      "family_id": "perpendicular_mill_rush",
+      "primary": {
+        "child": 2,
+        "source_row": 8,
+        "variation_id": "expert-book-play-008"
+      },
+      "members": [
+        {
+          "child": 2,
+          "source_row": 8,
+          "variation_id": "expert-book-play-008",
+          "disposition": "keep_if_space_primary"
+        },
+        {
+          "child": 5,
+          "source_row": 11,
+          "variation_id": "expert-book-play-011-visual-c5",
+          "disposition": "keep_if_space_alternate"
+        }
+      ]
+    },
+    {
+      "family_id": "parallel_mill_rush",
+      "primary": {
+        "child": 3,
+        "source_row": 9,
+        "variation_id": "expert-book-play-009"
+      },
+      "members": [
+        {
+          "child": 3,
+          "source_row": 9,
+          "variation_id": "expert-book-play-009",
+          "disposition": "keep_if_space_outer"
+        },
+        {
+          "child": 4,
+          "source_row": 10,
+          "variation_id": "expert-book-play-010",
+          "disposition": "keep_if_space_inner"
+        }
+      ]
+    },
+    {
+      "family_id": "open_z_outer_wrap",
+      "primary": {
+        "child": 7,
+        "source_row": 15,
+        "variation_id": "expert-book-play-015"
+      },
+      "members": [
+        {
+          "child": 7,
+          "source_row": 15,
+          "variation_id": "expert-book-play-015",
+          "disposition": "keep_if_space_primary_label_conflict"
+        },
+        {
+          "child": 8,
+          "source_row": 16,
+          "variation_id": "expert-book-play-016",
+          "disposition": "optional_ring16_duplicate_with_primary_p03"
+        },
+        {
+          "child": 9,
+          "source_row": 17,
+          "variation_id": "expert-book-play-017",
+          "disposition": "optional_sanmill_book_overlap"
+        }
+      ]
+    },
+    {
+      "family_id": "open_z_c4_e3",
+      "primary": {
+        "child": 10,
+        "source_row": 18,
+        "variation_id": "expert-book-play-018"
+      },
+      "members": [
+        {
+          "child": 10,
+          "source_row": 18,
+          "variation_id": "expert-book-play-018",
+          "disposition": "keep_if_space_outer_cardinal"
+        },
+        {
+          "child": 11,
+          "source_row": 19,
+          "variation_id": "expert-book-play-019",
+          "disposition": "optional_inner_cardinal_cross_source_overlap"
+        },
+        {
+          "child": 13,
+          "source_row": 21,
+          "variation_id": "expert-book-play-021",
+          "disposition": "optional_inner_corner_sanmill_book_overlap"
+        }
+      ]
+    },
+    {
+      "family_id": "open_z_c4_d3_black_forcing",
+      "primary": {
+        "child": 15,
+        "source_row": 23,
+        "variation_id": "expert-book-play-023"
+      },
+      "members": [
+        {
+          "child": 14,
+          "source_row": 22,
+          "variation_id": "expert-book-play-022",
+          "disposition": "optional_black_l_human_orbit_overlap"
+        },
+        {
+          "child": 15,
+          "source_row": 23,
+          "variation_id": "expert-book-play-023",
+          "disposition": "keep_if_space_black_double_mill"
+        },
+        {
+          "child": 16,
+          "source_row": 28,
+          "variation_id": "expert-book-play-028",
+          "disposition": "optional_inner_cardinals_sanmill_book_overlap"
+        }
+      ]
+    }
+  ],
+  "other_multi_child_proposals": [
+    {
+      "review_id": "P01",
+      "primary_variation_id": "expert-book-play-001-better-d1",
+      "additional_variation_ids": [
+        "expert-book-play-001-trap-c5"
+      ],
+      "expert_confirmed_primary": true
+    },
+    {
+      "review_id": "P04",
+      "primary_variation_id": "expert-book-play-005",
+      "additional_variation_ids": [
+        "expert-book-play-004"
+      ],
+      "expert_confirmed_primary": false
+    },
+    {
+      "review_id": "P05",
+      "primary_variation_id": "expert-book-play-007",
+      "additional_variation_ids": [
+        "expert-book-play-006"
+      ],
+      "expert_confirmed_primary": false
+    },
+    {
+      "review_id": "P08",
+      "primary_variation_id": "expert-book-play-025",
+      "additional_variation_ids": [
+        "expert-book-play-024"
+      ],
+      "expert_confirmed_primary": false
+    },
+    {
+      "review_id": "P09",
+      "primary_variation_id": "expert-book-play-027",
+      "additional_variation_ids": [
+        "expert-book-play-026"
+      ],
+      "expert_confirmed_primary": false
+    },
+    {
+      "review_id": "P13-A",
+      "primary_variation_id": "expert-book-play-032",
+      "additional_variation_ids": [
+        "expert-book-play-033"
+      ],
+      "expert_confirmed_primary": false
+    },
+    {
+      "review_id": "P13-B",
+      "primary_variation_id": "expert-book-play-035",
+      "additional_variation_ids": [],
+      "expert_confirmed_primary": false,
+      "disposition": "optional_symmetry_related_exact_parent"
+    }
+  ],
+  "recommended_extra_order": [
+    "expert-book-play-008",
+    "expert-book-play-018",
+    "expert-book-play-023",
+    "expert-book-play-009",
+    "expert-book-play-015"
+  ],
+  "capacity_analysis": {
+    "book_slots_proposed": 22,
+    "expert_parent_breadth_candidates": 14,
+    "sanmill_declared_family_minimum": 7,
+    "base_slots_consumed": 21,
+    "slots_remaining_before_cross_source_deduplication": 1,
+    "additional_p03_family_primaries_proposed": 5,
+    "interpretation": "The current Book quota cannot cover every expert parent, every Sanmill family, and every proposed P03 extended family. The expert may correct priorities; the product owner must approve the subtype allocation or quota."
+  },
+  "unresolved": [
+    "Expert correction or acceptance of the six proposed P03 family groups.",
+    "Expert correction or acceptance of P04, P05, P08, P09, and P13-A primary rows.",
+    "Exact mapping of the P08 trap and better-response wording.",
+    "Resolution of older/newer open-closed and inner-outer wording for P03 children 007 and 008 if those candidates are retained.",
+    "Product approval of the 22/21/21 source split and internal Book subtype allocation."
+  ],
+  "decision": {
+    "book_subtype_allocation_frozen": false,
+    "book_membership_frozen": false,
+    "final_64_frozen": false,
+    "evaluation_authorized": false,
+    "training_authorized": false
+  }
+}

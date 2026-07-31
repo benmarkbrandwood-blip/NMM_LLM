@@ -13,7 +13,9 @@ used for current selection. See the
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
 and the
 [reviewed-source follow-up](sanmill-layered-expert-book-review-follow-up.md)
-for current evidence, corrected images, and the remaining questions.
+for current evidence and corrected images. The later
+[breadth-first shortlist](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
+turns the remaining abstract questions into concrete choices for correction.
 
 This guide asks for a narrow Mill-domain review of the expert-curated
 `Book Opening Plays.docx` delivery. The source has already been transcribed,
