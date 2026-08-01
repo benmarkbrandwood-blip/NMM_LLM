@@ -318,7 +318,11 @@ freezes the internal Book allocation as 15 expert-curated plays and seven
 Sanmill named variations. It covers all 14 expert parent orbits, adds the first
 structurally distinct P03 extended-family priority, covers all seven Sanmill
 declared families, and retains 22 distinct final `ring16` structures. HumanDB
-and Perfect DB membership remain pending.
+and Perfect DB membership remain pending. The later
+[HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
+freezes 21 genuine PlayOK histories after skipping Book and earlier-HumanDB
+structural duplicates. Their complete strict-Sanmill execution records remain
+pending.
 
 ## Explicit exclusions
 

@@ -78,6 +78,7 @@ is unchanged. Its remaining patterns continue to belong to the expert
 diagnostic layer even though they do not all fit inside the balanced core's 22
 Book places.
 
-The next source-only step is to select 21 genuine HumanDB histories in frozen
-frequency order while excluding these 22 structures, then take 21 routes from
-the already frozen Perfect DB audit pool.
+The subsequent
+[HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
+selects 21 genuine histories in frozen frequency order while excluding these
+22 structures. Perfect DB membership remains the next source-only step.

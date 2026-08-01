@@ -240,6 +240,9 @@ remains the historical correction sheet he reviewed.
 Status is now `composition_frozen_membership_pending`. The
 [Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members with 22 unique
-exact histories, final FENs, and `ring16` orbits. HumanDB and Perfect DB
-membership, the final core list, and the final image package remain pending.
-No candidate-versus-baseline run or launch authorization exists.
+exact histories, final FENs, and `ring16` orbits. The
+[HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
+also freezes 21 genuine PlayOK histories after frequency-ordered structural
+deduplication. Perfect DB membership, the final core list, and the final image
+package remain pending. No candidate-versus-baseline run or launch
+authorization exists.

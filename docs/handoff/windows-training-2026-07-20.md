@@ -852,8 +852,13 @@ the subsequent
 [Book core decision](../experiments/sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members. The 22 records
 cover all 14 expert parent orbits and all seven Sanmill declared families and
-are unique by exact history, final FEN, and `ring16` orbit. HumanDB, Perfect DB,
-the combined 64-member identity, and review package remain pending.
+are unique by exact history, final FEN, and `ring16` orbit. The subsequent
+[HumanDB core decision](../experiments/sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
+freezes 21 genuine PlayOK histories. Frequency-ordered selection reaches
+ledger rank 31 after ten `ring16` skips; selected support ranges from 16 to 27
+distinct games. Complete strict-Sanmill replay for those histories, Perfect DB
+membership, the combined 64-member identity, and review package remain
+pending.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned

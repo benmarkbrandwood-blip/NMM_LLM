@@ -63,4 +63,6 @@ No candidate model is loaded and no game is played by recording this decision.
 The internal Book allocation and its 22 members were subsequently frozen in
 the
 [Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md).
-That later record does not change the composition identity above.
+The 21 HumanDB source members were then frozen in the
+[HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md).
+Those later records do not change the composition identity above.
