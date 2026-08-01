@@ -2,18 +2,19 @@
 
 Initial evidence date: 2026-07-26
 
-Latest expert follow-up: 2026-07-31
+Latest expert follow-up: 2026-08-01
 
-Status: second expert response recorded; a concrete shortlist and the final
-corpus remain `needs_decision`.
+Status: expert coverage scope resolved and technical arrangement delegated;
+the balanced core corpus remains `needs_decision`.
 
 ## Evidence boundary
 
 The `main` maintainer and Mill-domain expert supplied the seven semantic
 tables in `Book Opening Plays (2).docx` after reviewing the original parent
 and child package. He later answered the four-point follow-up through direct
-messages relayed by the product owner on 31 July. The exact document delivery
-identity and visual inspection are recorded in the
+messages relayed by the product owner on 31 July, then clarified the intended
+selection unit on 1 August. The exact document delivery identity and visual
+inspection are recorded in the
 [review delivery evidence](maintainer-book-opening-plays-review-delivery-2026-07-26.md).
 
 The same document supplied one move-history correction. That correction is
@@ -34,12 +35,12 @@ remain the review-only `Pxx` aliases and original source-row numbers.
 | Requested review point | State | Evidence received | Still needed |
 | --- | --- | --- | --- |
 | 1. Name or classify each human opening family | Answered | P14 is `Interrupted Knight`; the follow-up also refines P03, P04, P05, P09, and P13 names | Nothing further for P14 |
-| 2. Correct structural-group versus human-family relationships | Partial | P03 receives child-level plan labels; children 001/006 are identified as the same plan at the shared parent, and 003/004 are outer/inner Parallel Mill Rush variants | Review or correct the concrete grouping derived from those labels; do not infer resolution of conflicting older/newer wording |
-| 3. Assign `core`, `useful`, or `optional/niche` coverage priority | Unanswered | The block labelled `3)` describes plans and one primary child but supplies no coverage tiers | Review a concrete breadth-first shortlist instead of repeating the abstract tier request |
-| 4. Select a primary child and strategically distinct additions | Partial | P03 child 001 is the primary Black response; technical evidence makes child 006 a same-endpoint transposition and child 012 its exact-history duplicate | Primary/additional choices for P04, P05, P08, P09, and P13-A, plus correction of proposed P03 additions |
+| 2. Correct structural-group versus human-family relationships | Answered for selection; labels remain descriptive | P03 receives child-level plan labels; children 001/006 are identified as the same plan at the shared parent, and 003/004 are outer/inner Parallel Mill Rush variants | No further expert partition is required to retain unique placement patterns; unresolved wording remains visible as provenance |
+| 3. Assign `core`, `useful`, or `optional/niche` coverage priority | Superseded | The expert first said every family should be kept, then clarified that this means every unique placement pattern rather than every route | Technical arrangement may choose representatives; no family is discarded from full coverage |
+| 4. Select a primary child and strategically distinct additions | Delegated | P03 child 001 is the explicit primary; the expert asked the project to arrange the remaining unique patterns as it judges best | Apply a documented deterministic representative rule; no further expert primary-row answer is required |
 
-The response therefore materially advances the review but does not close the
-Book-selection gate.
+The expert-selection gate is closed. This does not by itself freeze the
+balanced core corpus, its Book subtype allocation, or an evaluation.
 
 ## Parent-family evidence
 
@@ -89,6 +90,33 @@ children 003 and 004. Other differences from the earlier supplement remain
 visible rather than being silently treated as corrections. In particular, the
 new message calls child 007 an outer wrap where the supplement called it an
 inner wrap, and calls child 008 open where the supplement called it closed.
+
+## 1 August selection clarification
+
+After reading the concrete shortlist, the expert initially said all of the
+families should be kept. He explained that Mill openings sharing an early
+parent can demand materially different replies after twelve plies: parallel,
+perpendicular, delayed, and inverted Mill Rush lines have different quirks;
+Battle Lines teaches abandoning an unreachable goal and creating a new threat;
+and Knight patterns bridge structured recognition to freer play.
+
+He then narrowed `keep them all`: a route that reaches the same placement by a
+different method does not need its own place. The required unit is the unique
+placement pattern, and he delegated the arrangement of representatives to the
+project. This is expert evidence about selection intent. The choice to use an
+exact FEN or a symmetry-normalized identity as the technical equality key must
+still be stated by the owning corpus decision rather than attributed to him.
+
+The frozen reviewed-source audit already supplies the objective boundary:
+
+- 36 source records remain preserved as provenance;
+- 35 exact histories remain after one exact duplicate is collapsed;
+- 34 exact final FENs remain after same-board transpositions are collapsed;
+  and
+- 33 final `ring16` orbits remain after D4 normalization.
+
+No source history is deleted by selecting one representative per placement
+pattern.
 
 ## P03 extended-family evidence
 
@@ -183,19 +211,18 @@ into it.
 ## Current decision boundary
 
 The source evidence now establishes legal histories, the reviewed row-19
-correction, structural identities, cross-source overlap, and partial human
-semantics. It does not establish:
+correction, structural identities, cross-source overlap, human semantics, and
+the expert's required coverage unit. The remaining decisions are technical and
+product decisions:
 
-- expert approval of the concrete human-family partition proposed from the
-  P03 child labels;
-- `core`, `useful`, or `optional/niche` tiers;
-- a primary and any additional distinct child for P04, P05, P08, P09, and
-  P13-A;
-- the allocation between corrected Sanmill Book and expert-curated Book; or
-- acceptance of the provisional `22 Book / 21 HumanDB / 21 Perfect DB`
+- define the canonical placement-pattern key and deterministic representative
+  policy;
+- distinguish complete expert coverage from membership in the balanced core;
+- divide the core Book places between corrected Sanmill Book and
+  expert-curated Book; and
+- accept or revise the provisional `22 Book / 21 HumanDB / 21 Perfect DB`
   composition.
 
-These are the currently identified remaining Book-semantic and product
-decisions. The concrete shortlist replaces another abstract questionnaire, but
-silence or general approval still cannot freeze membership. No candidate model,
-game, final 64-prefix freeze, or evaluation authority follows from this review.
+No further expert tier or primary-row response is required. No candidate
+model, game, final 64-prefix freeze, or evaluation authority follows from this
+review.

@@ -1,10 +1,10 @@
 # Expert Book Semantic Review Follow-Up
 
-Status: `concrete_proposal_ready_for_expert_correction`
+Status: `expert_scope_resolved_arrangement_delegated`
 
 Initial request: 2026-07-26
 
-Latest response: 2026-07-31
+Latest response: 2026-08-01
 
 The Mill expert has already provided substantial family and child-line notes.
 This follow-up does not ask him to repeat legality checks, move transcription,
@@ -23,7 +23,11 @@ It preserves all 14 parent groups and corrects P03 row 19 to `c4 d5 e3 d1`.
 
 [![Reviewed parent overview](assets/sanmill-layered-expert-book-parent-review-reviewed-source-2026-07-26/parent-overview.png)](assets/sanmill-layered-expert-book-parent-review-reviewed-source-2026-07-26/parent-overview.png)
 
-## Remaining expert inputs
+## Original expert inputs
+
+The four questions below are retained as the request the expert answered. The
+1 August clarification in the response disposition supersedes them as open
+selection gates.
 
 ### 1. P14
 
@@ -90,23 +94,37 @@ final FEN and `ring16` orbit. Child 012 is an exact-history duplicate of child
 006. Children 006 and 012 are therefore retained as provenance but proposed as
 same-plan redundant continuations behind primary child 001.
 
-The response does not assign coverage tiers and does not select primary rows
-for P04, P05, P08, P09, or P13-A. Rather than repeat the abstract questions,
-the
+The 31 July response did not assign coverage tiers or select primary rows for
+P04, P05, P08, P09, or P13-A. Rather than repeat the abstract questions, the
 [breadth-first shortlist](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
 presents a concrete grouping and explicit primary choices for correction. The
 expert's difficulty distinguishing lines from their common eight-ply parent is
 supporting evidence for retaining the twelve-ply child boundary, not a reason
 to collapse the v2 contract back to eight plies.
 
+After reading that concrete shortlist, the expert said all families should be
+kept and explained why the twelve-ply children teach distinct counterplay. He
+then clarified that a different route ending in the same placement does not
+need a separate place: retain unique placement patterns and let the project
+arrange their representatives. The repository preserves his statement at that
+level. D4 normalization and representative tie-breaks are technical policy,
+not words attributed to the expert.
+
+This closes the request for coverage tiers and remaining primary-row choices.
+Every raw history remains provenance, while redundant routes may share one
+coverage representative. No additional expert response is required unless he
+later chooses to correct a family label.
+
 ## Product decision after expert input
 
-Even after this semantic review closes, the product owner must still approve:
+The semantic review is now closed. The product owner must still approve:
 
 - the provisional `22 Book / 21 HumanDB / 21 Perfect DB` composition; and
 - how the 22 Book places are divided between the corrected Sanmill named-line
   subtype and the expert-curated subtype.
 
-Only after both decisions may the repository generate a proposed immutable
-64-prefix list and final review images. No candidate evaluation or training is
-authorized by this follow-up.
+The project may now build a complete unique-pattern expert coverage catalogue
+and propose representatives without another expert round. Only after the two
+product decisions may it generate a proposed immutable 64-prefix core list and
+final review images. No candidate evaluation or training is authorized by
+this follow-up.
