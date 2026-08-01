@@ -414,13 +414,13 @@ export class Board {
       if (!showSentinel || sentinelScore == null) return null;
       return `S:${Math.round(sentinelScore * 100)}%`;
     };
-    // Helper: overseer pick-probability label ("O:45%"), or null when not applicable.
+    // Helper: overseer pick-probability label ("AI:45%"), or null when not applicable.
     // Suppress when prob < 1% (noise) — k==1 always hits 100% and is also suppressed.
     const overseerLabel = (prob) => {
       if (!showOverseer || prob == null) return null;
       const pct = Math.round(prob * 100);
       if (pct < 1) return null;
-      return `O:${pct}%`;
+      return `AI:${pct}%`;
     };
     // Helper: predicted-human probability label ("P:37%"), blue. Only shown when
     // showPredHuman is on AND there is no real trajectory data for this position.
