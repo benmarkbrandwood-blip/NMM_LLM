@@ -156,7 +156,7 @@
         <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB: WIN (green) / LOSS (red) arrows">DB Lines</button>
         <button id="diag-btn-sentinel" class="diag-chip" title="Sentinel AI: move quality overlay (green=good, red=bad) — mutually exclusive with DB Lines">Sentinel</button>
         <span id="diag-sentinel-status" style="font-size:.75rem;color:#888;display:none" title="Sentinel checkpoint not loaded">(no model)</span>
-        <button id="diag-btn-overseer" class="diag-chip" title="Overseer: ScaffoldedPolicyNet pick probability per move (O:XX%)">Overseer</button>
+        <button id="diag-btn-overseer" class="diag-chip" title="AI choice: ScaffoldedPolicyNet pick probability per move (O:XX%)">AI choice</button>
         <span id="diag-overseer-status" style="font-size:.75rem;color:#888;display:none" title="Overseer checkpoint not loaded">(no model)</span>
       </div>
 
@@ -445,7 +445,7 @@
         <div class="form-row" id="row-overseer" style="flex-direction:row; align-items:center; gap:8px; display:none">
           <input type="checkbox" id="chk-overseer" disabled>
           <label for="chk-overseer" style="color:var(--text); font-size:.9rem;">
-            Overseer overlay
+            AI choice overlay
             <span style="font-size:.75rem; color:var(--text-dim);">(policy probabilities — requires trained checkpoint)</span>
           </label>
         </div>

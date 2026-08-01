@@ -3189,7 +3189,7 @@ function _diagRender() {
   if (diagTraj) modeLabel.push("traj");
   if (diagDB)   modeLabel.push("DB");
   if (diagSentinel) modeLabel.push("Sentinel");
-  if (diagOverseer) modeLabel.push("Overseer");
+  if (diagOverseer) modeLabel.push("AI choice");
   $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
 
   // Score label overlay (heuristic / negamax numbers)

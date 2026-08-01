@@ -2905,12 +2905,13 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session) -> None:
             })
         moves_out.sort(key=lambda x: x["score"], reverse=True)
 
+        candidates = [
+            {"from": m.get("from"), "to": m["to"], "capture": m.get("capture")}
+            for m in moves_out
+        ]
+
         if _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
             try:
-                candidates = [
-                    {"from": m.get("from"), "to": m["to"], "capture": m.get("capture")}
-                    for m in moves_out
-                ]
                 sent_advice = await asyncio.to_thread(
                     _sentinel_advisor.advise, board, candidates, color, 0,
                 )
@@ -2923,15 +2924,63 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session) -> None:
         for m in moves_out:
             m.setdefault("sentinel_score", None)
 
+        # ── Overseer ──────────────────────────────────────────────────────────
+        if _overseer_advisor is not None and _overseer_advisor.is_loaded():
+            try:
+                ov_probs = await asyncio.to_thread(
+                    _overseer_advisor.score_moves, board, candidates, color,
+                )
+                if ov_probs is not None:
+                    for i, m in enumerate(moves_out):
+                        if i < len(ov_probs):
+                            m["overseer_prob"] = round(ov_probs[i], 4)
+            except Exception as _oe:
+                log.debug("Pre-AI overseer scoring failed: %s", _oe)
+        for m in moves_out:
+            m.setdefault("overseer_prob", None)
+
+        # ── Trajectory + Pred Human fallback ──────────────────────────────────
+        def _pre_ntn(mv_e):
+            frm = mv_e.get("from"); to = mv_e.get("to") or ""
+            cap = mv_e.get("capture")
+            s = f"{frm}-{to}" if frm else to
+            return s + (f"x{cap}" if cap else "")
+
+        traj_freqs: dict = {}
+        if _effective_tdb:
+            try:
+                traj_freqs = _effective_tdb.query_all_frequencies(board)
+            except Exception:
+                pass
+        for m in moves_out:
+            m["traj_freq"] = round(float(traj_freqs.get(_pre_ntn(m), 0.0)), 3)
+
+        has_traj_data = any((m.get("traj_freq") or 0) > 0 for m in moves_out)
+        if not has_traj_data and _human_move_policy_advisor is not None:
+            try:
+                _hmpa_probs = await asyncio.to_thread(
+                    _human_move_policy_advisor.probs, board, candidates, "middle",
+                )
+                for m, prob in zip(moves_out, _hmpa_probs):
+                    m["pred_human_prob"] = round(float(prob), 4)
+            except Exception as _pe:
+                log.debug("Pre-AI human policy failed: %s", _pe)
+                for m in moves_out:
+                    m["pred_human_prob"] = None
+        else:
+            for m in moves_out:
+                m["pred_human_prob"] = None
+
         await _send(ws, {
-            "type":   "diagnostic",
-            "seq":    0,
-            "mode":   "static",
-            "color":  color,
-            "eval_w": eval_w,
-            "eval_b": eval_b,
-            "moves":  moves_out,
-            "fen":    board.to_fen_string(),
+            "type":          "diagnostic",
+            "seq":           0,
+            "mode":          "static",
+            "color":         color,
+            "eval_w":        eval_w,
+            "eval_b":        eval_b,
+            "moves":         moves_out,
+            "has_traj_data": has_traj_data,
+            "fen":           board.to_fen_string(),
         })
     except Exception as exc:
         log.debug("Pre-AI static diagnostic failed: %s", exc)

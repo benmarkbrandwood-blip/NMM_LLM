@@ -883,11 +883,16 @@ function showTooltip(cx, cy, mv) {
     <div class="tt-row"><span class="tt-label">Malom (after)</span><span>${wdlText}</span></div>`;
   }
 
+  const predRow = mv.pred_human_prob != null
+    ? `<div class="tt-row"><span class="tt-label" style="color:#5591c7">Pred Human</span><span>${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
+    : '';
+
   tooltip.innerHTML = `
     <div class="tt-notation">${mv.notation}</div>
     ${dbRows}
     <div class="tt-row"><span class="tt-label">Sentinel</span><span>${sentText}</span></div>
     <div class="tt-row"><span class="tt-label">Heuristic</span><span>${heurText}</span></div>
+    ${predRow}
   `;
   const wr = wrap.getBoundingClientRect();
   let tx = cx - wr.left + 14;
