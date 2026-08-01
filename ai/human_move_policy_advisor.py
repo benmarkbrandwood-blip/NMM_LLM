@@ -179,6 +179,63 @@ class HumanMovePolicyAdvisor:
             return np.full(len(legal_moves), 1.0 / len(legal_moves), dtype=np.float32)
         return exp_s / total
 
+    def raw_logits_strict(
+        self, board: BoardState, legal_moves: list[dict], elo_band: str
+    ) -> np.ndarray:
+        """Return raw unnormalized logits (before temperature and softmax).
+
+        Raises on any of: successor application failure, feature-encoding failure,
+        non-finite features, non-finite logits, output shape mismatch.
+        Unlike rank(), does not catch apply_move or board_to_features exceptions.
+        Unlike probs(), never falls back to a uniform distribution.
+        """
+        if not legal_moves:
+            return np.zeros(0, dtype=np.float32)
+        mover_color = board.turn
+        rows: list[np.ndarray] = []
+        for m in legal_moves:
+            succ = board.apply_move(m)   # raises on failure — intentional
+            feat = np.asarray(board_to_features(succ, mover_color), dtype=np.float32)
+            if not np.isfinite(feat).all():
+                raise ValueError(f"Non-finite features for move {m}")
+            rows.append(feat)
+        board_feats = np.stack(rows)
+        if board_feats.shape != (len(legal_moves), self.board_feature_dim):
+            raise ValueError(
+                f"board_feats shape {board_feats.shape} != "
+                f"({len(legal_moves)}, {self.board_feature_dim})"
+            )
+        band_bits = self._band_row(elo_band, board_feats.shape[0])
+        x = np.concatenate([board_feats, band_bits], axis=1)
+        logits = self._score_batch(x)
+        if logits.shape != (len(legal_moves),):
+            raise ValueError(f"Logit shape {logits.shape} != ({len(legal_moves)},)")
+        if not np.isfinite(logits).all():
+            raise ValueError("Non-finite raw logits from model")
+        return logits
+
+    def probs_strict(
+        self, board: BoardState, legal_moves: list[dict], elo_band: str
+    ) -> np.ndarray:
+        """Like probs() but raises on any encoding, inference, or normalization failure.
+
+        Never returns a uniform fallback.  The existing probs() fallback path
+        remains available for gameplay overlays that can tolerate silent degradation.
+        """
+        if not legal_moves:
+            return np.zeros(0, dtype=np.float32)
+        logits = self.raw_logits_strict(board, legal_moves, elo_band)
+        scaled = logits / self.temperature
+        scaled = scaled - scaled.max()
+        exp_s = np.exp(scaled).astype(np.float32)
+        total = float(exp_s.sum())
+        if total <= 0.0 or not np.isfinite(total):
+            raise ValueError("Policy softmax total is zero or non-finite")
+        p = exp_s / total
+        if not np.isfinite(p).all() or (p < 0.0).any():
+            raise ValueError("Non-finite or negative probabilities after softmax")
+        return p
+
     def probs_for_display(
         self, board: BoardState, legal_moves: list[dict], elo_band: str
     ) -> np.ndarray:
