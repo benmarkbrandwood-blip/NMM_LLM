@@ -1095,7 +1095,7 @@ def _print_summary(report: dict) -> None:
         dc = data["degrade_calibration"]
         print(f"\nDegrade calibration (skip_partial_labels={dc['formal'].get('n_skipped_partial_labels',0):,}):")
         _dc(dc["formal"], "formal (T*)")
-        _dc(dc["t_1_comparison"]["formal_degrade_calibration"], "formal (T=1)")
+        _dc(data["t_1_comparison"]["formal_degrade_calibration"], "formal (T=1)")
         _dc(dc["diagnostic"], "diagnostic (T*, conditional on labelled)")
         kl = data["observed_distribution_kl_to_model"]
         print(f"\nObserved distribution KL to model (≥{kl['min_support']} events): "
