@@ -83,6 +83,13 @@ import audit_human_moves as ahb   # noqa: E402
 
 _BAND_NAMES = ("lower", "middle", "upper")
 
+_DEGRADE_CATS = frozenset({"win_to_draw", "win_to_loss", "draw_to_loss"})
+_REGRET_WEIGHTS: dict[str, float] = {
+    "win_to_loss": 1.0,   # worst blunder
+    "win_to_draw": 0.5,
+    "draw_to_loss": 0.5,
+}
+
 
 # ── Move notation (matches extractor convention) ────────────────────────────
 
@@ -130,6 +137,10 @@ class Stratum:
         p = probs.astype(np.float64)
         self.brier_sum += float(np.sum((p - y) ** 2))
 
+        # Top-label confidence: model's probability for its own top-1 prediction.
+        # All events from this position share the same top_conf, so they land
+        # in the same ECE bin — this is standard top-label multiclass ECE.
+        top_conf = float(probs.max())
         for j, count in enumerate(targets):
             if count == 0:
                 continue
@@ -144,9 +155,9 @@ class Stratum:
                 self.top1     += int(was_top1)
                 self.top3     += int(was_top3)
                 self.top5     += int(was_top5)
-                bin_idx = min(9, max(0, int(prob_j * 10)))
+                bin_idx = min(9, max(0, int(top_conf * 10)))
                 self.calib_bin_n[bin_idx]     += 1
-                self.calib_bin_probs[bin_idx] += prob_j
+                self.calib_bin_probs[bin_idx] += top_conf
                 self.calib_bin_hits[bin_idx]  += int(was_top1)
 
     def finalize(self) -> dict:
@@ -169,6 +180,88 @@ class Stratum:
             "top3":       float(self.top3 / n),
             "top5":       float(self.top5 / n),
             "ece":        float(ece),
+        }
+
+
+# ── Degrading-move calibration ──────────────────────────────────────────────
+
+class DegradeCal:
+    """Per-position calibration of P(degrade) and E[regret] vs observed frequency.
+
+    For each position with Malom labels we compute:
+      pred_degrade = Σ_j probs[j]  for j ∈ {W→D, W→L, D→L}
+      pred_regret  = Σ_j probs[j] * w_j   w: W→L=1, W→D=0.5, D→L=0.5
+      obs_degrade  = count of observed degrading events / total events
+      obs_regret   = Σ_j count[j]*w_j / total events
+
+    Both are binned into 10 equal-width bins on [0, 1] and compared
+    per-bin (ECE-style: weighted mean abs difference).
+    """
+    N_BINS = 10
+
+    def __init__(self) -> None:
+        self.n_pos              = 0
+        self.total_pred_degrade = 0.0
+        self.total_obs_degrade  = 0
+        self.total_events       = 0
+        self.total_pred_regret  = 0.0
+        self.total_obs_regret   = 0.0
+        self.pd_bin_n    = np.zeros(self.N_BINS, dtype=np.int64)
+        self.pd_bin_pred = np.zeros(self.N_BINS, dtype=np.float64)
+        self.pd_bin_obs  = np.zeros(self.N_BINS, dtype=np.float64)
+        self.er_bin_n    = np.zeros(self.N_BINS, dtype=np.int64)
+        self.er_bin_pred = np.zeros(self.N_BINS, dtype=np.float64)
+        self.er_bin_obs  = np.zeros(self.N_BINS, dtype=np.float64)
+
+    def add_position(
+        self,
+        prob_degrade: float,
+        pred_regret: float,
+        obs_degrade: int,
+        obs_regret: float,
+        obs_total: int,
+    ) -> None:
+        self.n_pos              += 1
+        self.total_pred_degrade += prob_degrade
+        self.total_obs_degrade  += obs_degrade
+        self.total_events       += obs_total
+        self.total_pred_regret  += pred_regret
+        self.total_obs_regret   += obs_regret
+
+        obs_freq    = obs_degrade / max(obs_total, 1)
+        obs_reg_avg = obs_regret  / max(obs_total, 1)
+
+        pd_idx = min(self.N_BINS - 1, int(prob_degrade * self.N_BINS))
+        self.pd_bin_n[pd_idx]    += 1
+        self.pd_bin_pred[pd_idx] += prob_degrade
+        self.pd_bin_obs[pd_idx]  += obs_freq
+
+        er_idx = min(self.N_BINS - 1, int(pred_regret * self.N_BINS))
+        self.er_bin_n[er_idx]    += 1
+        self.er_bin_pred[er_idx] += pred_regret
+        self.er_bin_obs[er_idx]  += obs_reg_avg
+
+    def finalize(self) -> dict:
+        n = max(self.n_pos, 1)
+
+        def _ece(bin_n, bin_pred, bin_obs) -> float:
+            ece = 0.0
+            for i in range(self.N_BINS):
+                if bin_n[i] == 0:
+                    continue
+                avg_p = bin_pred[i] / bin_n[i]
+                avg_o = bin_obs[i]  / bin_n[i]
+                ece  += (bin_n[i] / n) * abs(avg_p - avg_o)
+            return float(ece)
+
+        return {
+            "n_positions_labelled":   int(self.n_pos),
+            "mean_pred_prob_degrade": float(self.total_pred_degrade / n),
+            "obs_degrade_freq":       float(self.total_obs_degrade / max(self.total_events, 1)),
+            "degrade_ece":            _ece(self.pd_bin_n, self.pd_bin_pred, self.pd_bin_obs),
+            "mean_pred_regret":       float(self.total_pred_regret / n),
+            "obs_regret":             float(self.total_obs_regret  / max(self.total_events, 1)),
+            "regret_ece":             _ece(self.er_bin_n, self.er_bin_pred, self.er_bin_obs),
         }
 
 
@@ -331,6 +424,9 @@ def _run_eval_loop(
     kl_sum = 0.0
     kl_n   = 0
 
+    # Degrading-move calibration.
+    degrade_cal = DegradeCal()
+
     MASK_TRAIN = np.uint8(0x01)
     MASK_VAL   = np.uint8(0x02)
 
@@ -396,20 +492,42 @@ def _run_eval_loop(
             if (mask & MASK_TRAIN) == 0 and (mask & MASK_VAL) != 0:
                 _add(game_val_only_stratum)
 
-        # Malom transition strata.
+        # Malom transition strata + per-position degrading calibration.
+        # Iterates ALL legal moves (not just observed) so prob_degrade
+        # sums over the full distribution, not just observed moves.
+        pre          = pos_wdl.get(state_key)
+        prob_degrade = 0.0
+        pred_regret  = 0.0
+        obs_degrade  = 0
+        obs_regret   = 0.0
+        n_classified = 0
+
         for j, count in enumerate(targets):
-            if count == 0:
-                continue
-            notation = notations[j]
-            pre  = pos_wdl.get(state_key)
-            aft  = move_wdl.get((state_key, notation))
-            cat  = ahb._classify_transition(pre, aft)
-            st   = by_trans.setdefault(cat, Stratum(f"trans={cat}"))
-            # add_sample per-move is a shortcut: build a singleton target.
-            singleton_targets = np.zeros(legal_count, dtype=np.int64)
-            singleton_targets[j] = count
-            st.add_sample(probs, singleton_targets, notations,
-                          top1_notation, top3_notations, top5_notations)
+            notation   = notations[j]
+            aft        = move_wdl.get((state_key, notation))
+            cat        = ahb._classify_transition(pre, aft)
+            is_degrade = cat in _DEGRADE_CATS
+            w          = _REGRET_WEIGHTS.get(cat, 0.0)
+
+            if cat != "unlabelled":
+                n_classified += 1
+                prob_degrade += float(probs[j]) * (1.0 if is_degrade else 0.0)
+                pred_regret  += float(probs[j]) * w
+
+            if count > 0:
+                if cat != "unlabelled":
+                    obs_degrade += int(is_degrade) * int(count)
+                    obs_regret  += w * int(count)
+                st = by_trans.setdefault(cat, Stratum(f"trans={cat}"))
+                singleton_targets = np.zeros(legal_count, dtype=np.int64)
+                singleton_targets[j] = count
+                st.add_sample(probs, singleton_targets, notations,
+                              top1_notation, top3_notations, top5_notations)
+
+        if n_classified > 0 and total_events > 0:
+            degrade_cal.add_position(
+                prob_degrade, pred_regret, obs_degrade, obs_regret, total_events
+            )
 
         # ── Uniform baseline ──
         uni = _uniform_probs(legal_count)
@@ -458,6 +576,7 @@ def _run_eval_loop(
             "ood":              ood_stratum.finalize(),
             "abstention":       abstention_stratum.finalize(),
         },
+        "degrade_calibration":  degrade_cal.finalize(),
         "baseline_uniform": {
             "overall":  uni_overall.finalize(),
             "by_band":  {b: s.finalize() for b, s in uni_by_band.items()},
@@ -624,6 +743,15 @@ def _print_summary(report: dict) -> None:
         ek = data["empirical_kl_supported"]
         print(f"\nEmpirical KL (≥{ek['min_support']} events): "
               f"n={ek['n_samples']:,}  mean_kl={ek['mean_kl']:.4f}")
+        dc = data["degrade_calibration"]
+        print(f"\nDegrading-move calibration "
+              f"(n_pos={dc['n_positions_labelled']:,}):")
+        print(f"  P(degrade):  pred={dc['mean_pred_prob_degrade']:.4f}  "
+              f"obs={dc['obs_degrade_freq']:.4f}  "
+              f"ece={dc['degrade_ece']:.4f}")
+        print(f"  E[regret]:   pred={dc['mean_pred_regret']:.4f}  "
+              f"obs={dc['obs_regret']:.4f}  "
+              f"ece={dc['regret_ece']:.4f}")
 
     _section("VAL", report["val"])
     if "test" in report:

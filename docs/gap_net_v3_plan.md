@@ -179,7 +179,7 @@ Required before `P\_h` is trusted as a v3 dependency (§7):
 
 4. ✅ **DONE (2026-07-31)** — Provenance chain already inherited via `.npz`-embedded `provenance\_json` (verified: candidate DB SHA-256, dataset git commit, feature version, elo band config all present in `data/human\_move\_policy\_dataset/provenance.json` and model .npz). The split-manifest version is now "v2" (bumped from "v1").
 
-Owning document: this plan; `docs/human\_move\_policy\_net\_plan.md` §Phase 4b documents the extended eval requirements.  `data/gap\_v3\_prerequisite\_eval.json` produced 2026-08-01 — NLL sub-gate ✅ closed; ECE sub-gate threshold requires revision (see §16 gate table).
+Owning document: this plan; `docs/human\_move\_policy\_net\_plan.md` §Phase 4b documents the extended eval requirements.  `data/gap\_v3\_prerequisite\_eval.json` re-produced 2026-08-01 with corrected top-label ECE (scipy installed; T*=0.767). NLL sub-gate ✅ closed; ECE sub-gate ✅ closed (0.022–0.037 per band, under 0.05); OOD gate wording to be revised (see §16).
 
 ### 4.2 Candidate database
 
@@ -678,7 +678,7 @@ Every stage produces a discrete artefact.  Every artefact is committed alongsid
 | Gate | Threshold |
 | - | - |
 | Stage A tests | All pass; golden corpus has ≥ 3 rows per category in §6.1 |
-| Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; OOD rate \< 10 % | · ✅ NLL: 30–33 % per band (lower/mid/upper 30.4/33.0/33.0 %). ❌ ECE: 0.174–0.177 per band; T\xe2\x81\x8e=1.0 (no scaling benefit) — gate 0.05 is unreachable: uniform model achieves 0.020. Gate threshold needs revision. ✅ Abstention: 0 samples. Net: NLL and coverage pass; ECE gate flags miscalibration but threshold must be revised. |
+| Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; OOD rate \< 10 % | · ✅ NLL: 31–34 % per band (lower/mid/upper 31.4/34.2/34.3 %). ✅ ECE: 0.037/0.028/0.022 (lower/mid/upper); T*=0.767 after scaling — passes ≤ 0.05 with corrected top-label metric. ✅ Abstention: 0 samples. ❓ OOD gate: 100 % by construction (v2 split assigns each state_key to one partition); replace with game_val_only NLL gap ≤ 0.05 (observed 0.009 ✅). Note: model underpredicts P(degrade) — 1.87 % vs 4.98 % observed (degrade_ece=0.051) — relevant to GapNet Stage C. Net: NLL and ECE gates pass; OOD threshold requires rewording. |
 | Stage C direct `G\_v` | Sanity: `G\_v\_wdl\_utility\_loss` is monotonic decreasing in Elo band (upper \< middle \< lower) |
 | Stage D extraction | Coverage ≥ 60 % of `moves\_elo\_bins`-eligible `(state\_key, band)` samples; `abstained.jsonl` reasons summable |
 | Stage E training | Per-component held-out MSE improves over: (a) uniform-`P\_h` baseline by ≥ 30 % relative, (b) empirical-`P\_h` baseline (where support permits) by ≥ 10 % relative |
