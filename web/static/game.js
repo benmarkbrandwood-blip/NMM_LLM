@@ -3133,6 +3133,12 @@ function _diagOnReceive(msg) {
       drawEvalGraph();
     }
   }
+  const humanLabel = document.getElementById("to-move-human-label");
+  if (humanLabel && msg.mode !== "capture") {
+    const hasTrajData = msg.has_traj_data !== false;
+    humanLabel.textContent = hasTrajData ? "HumanDB best" : "Pred Human";
+    humanLabel.style.color = hasTrajData ? "#a86fdf" : "#5591c7";
+  }
   _diagRender();
 }
 
@@ -3208,6 +3214,8 @@ function _diagRender() {
         phase:              curPhase,
         selectedSrc:        board.selected,
         showTraj:           diagTraj,
+        showPredHuman:      diagTraj,
+        hasTrajData:        dbSource.has_traj_data !== false,
         showDB:             diagDB,
         showSentinel:       diagSentinel,
         showOverseer:       diagOverseer,

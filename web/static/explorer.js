@@ -503,7 +503,7 @@ function makeHintRing(sq, hexColor) {
   return ring;
 }
 
-function rebuildHints(allMoves) {
+function rebuildHints(allMoves, hasTrajData) {
   hintGroup.clear();
   if (!allMoves) return;
 
@@ -521,7 +521,7 @@ function rebuildHints(allMoves) {
     return;
   }
 
-  // idle / piece_selected — HumanDB best (gold) and Sentinel best (blue)
+  // idle / piece_selected — HumanDB best (gold) or Pred Human (blue-purple) and Sentinel best (blue)
   const visibleMoves = (selectionState === 'piece_selected' && selectedPieceSq)
     ? allMoves.filter(m => m.from_sq === selectedPieceSq)
     : allMoves;
@@ -529,10 +529,18 @@ function rebuildHints(allMoves) {
 
   const dbMoves = visibleMoves.filter(m => m.has_db_data && (m.total || 0) > 0);
   let humanBestSq = null;
-  if (dbMoves.length > 0) {
+  if (hasTrajData !== false && dbMoves.length > 0) {
     humanBestSq = [...dbMoves].sort((a, b) => wilsonLower(b.wins, b.total) - wilsonLower(a.wins, a.total))[0].to_sq;
     const ring = makeHintRing(humanBestSq, 0xffd700);
     if (ring) hintGroup.add(ring);
+  } else if (hasTrajData === false) {
+    // Pred Human fallback: blue ring on the predicted best move
+    const predBest = visibleMoves.find(m => m.is_pred_human_best && m.to_sq);
+    if (predBest) {
+      humanBestSq = predBest.to_sq;
+      const ring = makeHintRing(humanBestSq, 0x5591c7);
+      if (ring) hintGroup.add(ring);
+    }
   }
 
   const sentMoves = visibleMoves.filter(m => m.sentinel_score != null);
@@ -626,7 +634,7 @@ function _refreshAfterStateChange() {
   const filtered = filterMovesForState();
   rebuildBars(filtered);
   rebuildArrows(filtered);
-  rebuildHints(currentData?.moves || []);
+  rebuildHints(currentData?.moves || [], currentData?.has_traj_data);
   updatePieceHighlights();
   updateStatusIndicator();
 }
@@ -1021,7 +1029,7 @@ async function loadPosition(fen) {
     rebuildBars(initialMoves);
     rebuildArrows(initialMoves);
     rebuildMalomOverlay(data.moves || []);
-    rebuildHints(data.moves || []);
+    rebuildHints(data.moves || [], data.has_traj_data);
     updatePanel(data);
     updatePieceHighlights();
     updateStatusIndicator();

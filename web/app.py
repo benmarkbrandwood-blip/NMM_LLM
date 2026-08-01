@@ -273,6 +273,17 @@ if _human_pref_net is not None:
 else:
     log.info("HumanPrefNet: not found at %s — humanlike-play slider will be a no-op", _human_pref_path)
 
+# Load HumanMovePolicyAdvisor — predicted-move probabilities for the diagnostic
+# overlay when no real trajectory data exists.  Optional; fails safe.
+from ai.human_move_policy_advisor import try_load as _try_load_hmpa
+_human_move_policy_path = _ROOT / "data" / "human_move_policy_net_v2_candidate.npz"
+_human_move_policy_advisor = _try_load_hmpa(_human_move_policy_path)
+if _human_move_policy_advisor is not None:
+    _hmpa_kb = round(_human_move_policy_path.stat().st_size / 1024, 1)
+    log.info("HumanMovePolicyAdvisor: loaded from %s (%s KB)", _human_move_policy_path, _hmpa_kb)
+else:
+    log.info("HumanMovePolicyAdvisor: not found at %s — pred-human overlay disabled", _human_move_policy_path)
+
 
 # ── Sentinel overlay (optional — only loads if checkpoint exists) ─────────────
 _sentinel_advisor = None
@@ -2031,6 +2042,30 @@ async def explorer_position(fen: str = "........................|W|0|0"):
         except Exception as _e:
             log.debug("Explorer sentinel scoring failed: %s", _e)
 
+    # ── Human Move Policy fallback for explorer ───────────────────────────────
+    has_traj_data = any(m.get("has_db_data") for m in moves_out)
+    if not has_traj_data and _human_move_policy_advisor is not None and candidates_ordered:
+        try:
+            _exp_probs = await asyncio.to_thread(
+                _human_move_policy_advisor.probs,
+                board, candidates_ordered, "middle",
+            )
+            best_p = max((float(p) for p in _exp_probs), default=0.0)
+            for m, prob in zip(moves_out, _exp_probs):
+                p = round(float(prob), 4)
+                m["pred_human_prob"] = p
+                m["is_pred_human_best"] = abs(p - best_p) < 1e-6
+                m["is_human_best"] = False
+        except Exception as _exp_e:
+            log.debug("Explorer human policy fallback failed: %s", _exp_e)
+            for m in moves_out:
+                m["pred_human_prob"] = None
+                m["is_pred_human_best"] = False
+    else:
+        for m in moves_out:
+            m["pred_human_prob"] = None
+            m["is_pred_human_best"] = False
+
     # ── Sort: DB moves first (by total desc), then non-DB (by heuristic desc) ─
     db_moves    = sorted([m for m in moves_out if m["has_db_data"]],
                          key=lambda x: x["total"], reverse=True)
@@ -2045,6 +2080,7 @@ async def explorer_position(fen: str = "........................|W|0|0"):
         "board":          board_dict,
         "position_stats": pos_stats,
         "moves":          moves_out,
+        "has_traj_data":  has_traj_data,
         "winning_line":   winning_line,
     }
 
@@ -4021,15 +4057,41 @@ async def ws_endpoint(websocket: WebSocket):
                     if "overseer_prob" not in mv_e:
                         mv_e["overseer_prob"] = None
 
+                # ── Human Move Policy fallback ─────────────────────────────────
+                # Active only when no move has real trajectory coverage AND we
+                # are not in capture mode (net trained on moves, not captures).
+                has_traj_data = any((mv.get("traj_freq") or 0) > 0 for mv in moves_out)
+                if not has_traj_data and _human_move_policy_advisor is not None and diag_mode != "capture":
+                    try:
+                        _hmpa_cands = [
+                            {"from": mv.get("from"), "to": mv.get("to"),
+                             "capture": mv.get("capture")}
+                            for mv in moves_out
+                        ]
+                        _hmpa_probs = await asyncio.to_thread(
+                            _human_move_policy_advisor.probs,
+                            diag_board, _hmpa_cands, "middle",
+                        )
+                        for mv, prob in zip(moves_out, _hmpa_probs):
+                            mv["pred_human_prob"] = round(float(prob), 4)
+                    except Exception as _hmpa_e:
+                        log.debug("Human policy fallback failed: %s", _hmpa_e)
+                        for mv in moves_out:
+                            mv["pred_human_prob"] = None
+                else:
+                    for mv in moves_out:
+                        mv["pred_human_prob"] = None
+
                 await _send(websocket, {
-                    "type":    "diagnostic",
-                    "seq":     diag_seq,
-                    "mode":    diag_mode,
-                    "color":   color,
-                    "eval_w":  eval_w,
-                    "eval_b":  eval_b,
-                    "moves":   moves_out,
-                    "fen":     fen_override or diag_board.to_fen_string(),
+                    "type":         "diagnostic",
+                    "seq":          diag_seq,
+                    "mode":         diag_mode,
+                    "color":        color,
+                    "eval_w":       eval_w,
+                    "eval_b":       eval_b,
+                    "moves":        moves_out,
+                    "has_traj_data": has_traj_data,
+                    "fen":          fen_override or diag_board.to_fen_string(),
                 })
 
             # ── good_game — elevate a draw to win-like status in trajectory ────
