@@ -1,15 +1,18 @@
 # Twelve-ply layered opening-prefix corpus decision brief
 
-Status: `needs_decision`
+Status: `composition_frozen_membership_pending`
 
 Initial decision date: 2026-07-25
 
 Latest evidence update: 2026-08-01
 
 This brief compares the completed source-only Sanmill Book, expert-curated
-Book, HumanDB, and Perfect DB audits and proposes, but does not freeze, a
-64-prefix composition. It does not load a candidate model, play games, replace
-the movement/flying corpus, or authorize an evaluation launch.
+Book, HumanDB, and Perfect DB audits. The product owner accepted its
+64-prefix composition on 1 August 2026; the separate
+[composition decision](sanmill-layered-opening-prefix-v2-composition-decision-2026-08-01.md)
+freezes the counts but not membership. This brief does not load a candidate
+model, play games, replace the movement/flying corpus, or authorize an
+evaluation launch.
 
 ## Frozen evidence inputs
 
@@ -152,9 +155,9 @@ make side-to-move half White and half Black without violating the fixed-length
 contract. Agent colour balance must therefore come from a paired evaluation
 that assigns each tested system to both colours on the same immutable history.
 
-## Recommended provisional composition
+## Accepted composition
 
-The recommended default is:
+The accepted balanced-core composition is:
 
 | Stratum | Prefixes |
 | --- | ---: |
@@ -197,10 +200,10 @@ The proposed later selection rules are:
    deduplication. Do not regenerate routes in response to the observed
    candidate.
 
-These rules are a proposal, not an executable freeze. The 22 Book slots are
-not yet divided between the two subtypes. The expert gate is closed, but the
-subtype allocation, selected core identities, list hash, and review images
-must be generated only after the product owner accepts the composition.
+These rules now control the source-only membership derivation. The 22 Book
+slots are not yet divided between the two subtypes. The expert gate is closed,
+but the subtype allocation, selected core identities, list hash, and review
+images remain pending and must be recorded separately.
 
 ## Inputs that remain excluded
 
@@ -217,11 +220,12 @@ contextual and cannot rank candidates or change source weights.
 The existing movement/flying phase-coverage corpus also remains separate.
 Placement-prefix selection cannot replace its later-phase coverage.
 
-## Decision requested
+## Decision disposition
 
-The recommended product decision remains to accept the provisional
-`22 Book / 21 HumanDB / 21 Perfect DB` composition. The newly measured expert
-source does not justify changing that overall split.
+The product owner accepted the recommended
+`22 Book / 21 HumanDB / 21 Perfect DB` composition on 1 August 2026. The
+machine-readable decision freezes only those counts; it does not freeze any
+member or authorize execution.
 
 The Mill expert has closed the semantic selection gate. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
@@ -233,6 +237,7 @@ earlier
 [shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
 remains the historical correction sheet he reviewed.
 
-Status remains `needs_decision` only for the balanced core composition and its
-internal Book subtype allocation. No final core prefix list, final core image
-review package, candidate-versus-baseline run, or launch authorization exists.
+Status is now `composition_frozen_membership_pending`. The internal Book
+subtype allocation and all individual members still require deterministic
+derivation. No final core prefix list, final core image review package,
+candidate-versus-baseline run, or launch authorization exists.

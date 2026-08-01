@@ -1,0 +1,56 @@
+{
+  "schema_version": "nmm.layered-opening-prefix-composition-decision.v1",
+  "status": "composition_frozen_membership_pending",
+  "decision_date": "2026-08-01",
+  "candidate_loaded": false,
+  "games_played": 0,
+  "fallback": "none",
+  "authority": {
+    "kind": "product_owner_direct_confirmation",
+    "decision": "accept_recommended_22_21_21_composition"
+  },
+  "inputs": {
+    "decision_brief": "sanmill-layered-opening-prefix-v2-decision-brief.md",
+    "sanmill_book_audit_identity": "b0d3bd526b7ab951c7dbd10552c77e8f6db5f1e69510829bdd642049bff72c48",
+    "expert_book_audit_identity": "29293523ba211775827bfd903ef8dd0a0220bcd958a46974e37809a55dd51ff4",
+    "expert_coverage_catalog_identity": "44519385ebfcb0e15207a23ec3914abb353c1638e5df6a52c4ffe3c53dba4617",
+    "human_db_audit_identity": "15aa81528a93d0777cc6479a285ff41058ae5860383b24d2629038cd779478fa",
+    "perfect_db_audit_identity": "fcac7e8e864e345669a497c600e4a901eff1f9203e3b83baf6895a89c2b0be56"
+  },
+  "composition": {
+    "total_prefixes": 64,
+    "strata": [
+      {
+        "stratum": "book",
+        "count": 22
+      },
+      {
+        "stratum": "human_db",
+        "count": 21
+      },
+      {
+        "stratum": "perfect_db",
+        "count": 21
+      }
+    ],
+    "book_subtype_allocation": "derive_after_composition_freeze",
+    "report_each_stratum_separately": true,
+    "movement_flying_corpus_replaced": false
+  },
+  "composition_identity": "dc856c150624c6f123b01b4be8e0ea1221272953a14ce9ecabcc5332064bf291",
+  "selection_gates": {
+    "book": "select across Sanmill named lines and the frozen expert pattern catalogue with family, parent, exact-history, final-FEN, and ring16 controls",
+    "human_db": "rank genuine complete PlayOK histories by the frozen frequency order and skip selected Book endpoint or ring16 duplicates",
+    "perfect_db": "select from the frozen 128-route StrictSteps pool without regenerating routes",
+    "candidate_conditioned_selection_allowed": false
+  },
+  "decision": {
+    "composition_frozen": true,
+    "book_subtype_allocation_frozen": false,
+    "membership_frozen": false,
+    "final_64_frozen": false,
+    "review_package_frozen": false,
+    "evaluation_authorized": false,
+    "training_authorized": false
+  }
+}

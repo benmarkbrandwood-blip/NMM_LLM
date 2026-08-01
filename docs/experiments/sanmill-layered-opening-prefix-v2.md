@@ -1,12 +1,13 @@
 # Sanmill Layered Opening Prefix v2
 
-Status: `needs_decision`
+Status: `composition_frozen_membership_pending`
 
 Decision date: 2026-07-25
 
 This document freezes the source-only preparation contract for twelve-logical-
-ply opening prefixes. It does not freeze a final corpus, a source ratio, an
-evaluation baseline, or a match launch.
+ply opening prefixes. The source ratio was subsequently frozen as
+`22 Book / 21 HumanDB / 21 Perfect DB`; this document still does not freeze a
+final member list, an evaluation baseline, or a match launch.
 
 ## Expert and product decisions
 
@@ -191,9 +192,10 @@ visual interpretations distinguishable, and pass the same twelve-ply replay
 and cross-source overlap gates. It must not be silently merged into the
 corrected Sanmill asset.
 
-## Decision gate
+## Source-audit decision gate
 
-The final 64-prefix composition remains unset until the source audits report:
+The final 64-prefix composition remained unset until the source audits
+reported:
 
 - the number of pure Book variations with complete twelve-ply histories;
 - the number and concentration of repeated HumanDB histories;
@@ -206,7 +208,9 @@ reducing the Perfect DB allocation. If exact HumanDB histories are too diffuse,
 the audit must present that evidence and a separately named alternative. It
 must not manufacture synthetic human lines.
 
-Until that gate is resolved, the state remains `needs_decision`.
+Those audits are complete. The product owner accepted the recommended
+composition on 1 August 2026, closing this source-count gate while leaving
+membership derivation pending.
 
 ## Current Book evidence
 
@@ -299,13 +303,14 @@ The two Book files duplicate tracked assets. The 15 learned additions remain
 an unmerged, low-confidence candidate pool and are not part of the current
 three-stratum decision.
 
-The completed source comparison and provisional `22 Book / 21 HumanDB /
-21 Perfect DB` recommendation are recorded in the
+The completed source comparison is recorded in the
 [corpus decision brief](sanmill-layered-opening-prefix-v2-decision-brief.md).
-That composition is not frozen. Product confirmation is required before an
-immutable list or final corpus image-review material is generated. The
-33-pattern expert diagnostic membership is frozen separately and does not
-select balanced-core members.
+The product owner's accepted `22 Book / 21 HumanDB / 21 Perfect DB` counts are
+frozen in the
+[composition decision](sanmill-layered-opening-prefix-v2-composition-decision-2026-08-01.md).
+Membership and final image-review material remain pending. The 33-pattern
+expert diagnostic membership is frozen separately and does not itself select
+balanced-core members.
 
 ## Explicit exclusions
 

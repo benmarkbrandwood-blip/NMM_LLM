@@ -821,10 +821,11 @@ FENs and orbits overlap. Row 11's final `c5` is screenshot-derived and remains
 explicitly identified as visual evidence, but the original-resolution move
 panel is unambiguous and it is not an expert-confirmation blocker.
 
-The updated
-[twelve-ply decision brief](../experiments/sanmill-layered-opening-prefix-v2-decision-brief.md)
-recommends a non-frozen near-balanced `22 Book / 21 HumanDB / 21 Perfect DB`
-composition. The expert review supplement provides substantial family and
+The product owner accepted the near-balanced
+`22 Book / 21 HumanDB / 21 Perfect DB` counts on 1 August; the
+[composition decision](../experiments/sanmill-layered-opening-prefix-v2-composition-decision-2026-08-01.md)
+freezes the ratio while leaving membership pending. The expert review
+supplement provides substantial family and
 child semantics, establishes that P03 needs extended-family splitting, and
 identifies P13-A/P13-B as a symmetry pair. It does not provide a standalone
 P14 classification, complete priority tiers, a final P03 partition, or every
@@ -845,9 +846,9 @@ records the correction sheet he reviewed. The subsequent
 [coverage decision](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
 freezes 33 D4-unique representatives as the complete Expert Book catalogue and
 diagnostic membership while preserving all 36 raw records as provenance. Its
-execution contract is not frozen. Status stays `needs_decision` for the
-balanced 64-prefix core, and the two Book subtypes have no frozen internal
-allocation.
+execution contract is not frozen. Status is
+`composition_frozen_membership_pending` for the balanced 64-prefix core, and
+the two Book subtypes have no frozen internal allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -1008,8 +1009,9 @@ training merely because the managed run ended. Proceed in this order:
    is closed: preserve the frozen
    [33-pattern coverage catalogue](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
    and select any core subset without changing that catalogue. Do not freeze
-   the core list until the product composition and internal Book allocation
-   are recorded. Row 11's screenshot-derived `c5` is source-verified and
+   the core list until the now-accepted product composition and internal Book
+   allocation are recorded. Row 11's screenshot-derived `c5` is
+   source-verified and
    retains a visual provenance marker. There is no runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
@@ -1079,8 +1081,8 @@ The following choices are recorded for the next formal-evaluation design:
   player moves as a historical provisional smoke design, not a frozen formal
   decision; the later eight-ply 7/57 diversity proposal is also historical;
 - use twelve logical plies and separately report Book, genuine HumanDB, and
-  StrictSteps Perfect DB strata for the current design; the provisional
-  22/21/21 composition still requires product confirmation;
+  StrictSteps Perfect DB strata for the current design; the 22/21/21
+  composition is frozen while member identities remain pending;
 - preserve all 33 D4-unique expert-curated Book placement patterns in a
   separately reported diagnostic catalogue while retaining all 36 source
   records as provenance; its execution protocol is not yet frozen;
