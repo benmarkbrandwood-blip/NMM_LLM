@@ -1,0 +1,46 @@
+{
+  "ok": true,
+  "candidate_path": "data/human_db_candidate.sqlite",
+  "candidate_sha256": "df71395f51b9497b5d0916fbcc5a6a8456d082be79c280ecb354d5ba73f87d4f",
+  "candidate_size_bytes": 1668071424,
+  "elapsed_seconds": 53.1,
+  "quick_check": "ok",
+  "schema_version": "3",
+  "missing_tables": [],
+  "missing_meta_rows": [],
+  "meta": {
+    "schema_version": "3",
+    "build_date": "2026-07-29T19:57:05",
+    "total_games": "97427",
+    "total_files": "97998",
+    "source_sha256_files": "97998",
+    "elo_bin_size": "50",
+    "feature_canonicalisation_version": "d4-canonical-v1",
+    "builder_git_commit": "83580426466320e4db82fb9272b07785eb0d12c2",
+    "source_manifest_sha256": "0bade8a571c35ff36d3d254237b01d52c9b47895e4dd545cabed5cf18b3fdee0",
+    "built_at": "2026-07-29T19:54:52",
+    "malom_label_version": "sector-corrected-v1"
+  },
+  "row_counts": {
+    "positions": 2209726,
+    "moves": 2584804,
+    "positions_elo_bins": 2962525,
+    "moves_elo_bins": 3284928,
+    "processed_files": 97998,
+    "meta": 11
+  },
+  "positions_reconcile": {
+    "mismatch_count": 0,
+    "sample": []
+  },
+  "moves_reconcile": {
+    "mismatch_count": 0,
+    "sample": []
+  },
+  "semantic_probe": {
+    "ok": true,
+    "state_key": "........................|W|place|0|0|0|0",
+    "expected": "D",
+    "actual": "D"
+  }
+}

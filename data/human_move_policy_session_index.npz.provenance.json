@@ -1,0 +1,16 @@
+{
+  "builder_version": "1",
+  "builder_git_commit": "932c30331160928adbcf335573a4bddd543d0d76",
+  "dataset_dir": "data/human_move_policy_dataset",
+  "dataset_meta_sha256": "c1645eb94699ed2690a5f68c4339a4d335b1ca5b3304e17926b4835c856f6c6d",
+  "games_dir": "data/human_games",
+  "n_jsonl_files_scanned": 97136,
+  "n_games_seen": 97136,
+  "n_games_skipped": 0,
+  "n_moves_seen": 4594013,
+  "n_hits": 4594013,
+  "n_state_keys_covered": 2209399,
+  "n_game_val_only": 280667,
+  "mask_encoding": "uint8: bit0=train bit1=val bit2=test",
+  "elapsed_seconds": 97.5
+}

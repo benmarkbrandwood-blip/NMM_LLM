@@ -1,0 +1,84 @@
+{
+  "engine_v2": "Rust search + evaluate_v2 + EvalScale + FGOP",
+  "engine_v1": "Python negamax + evaluate()",
+  "budget_s": 3.0,
+  "n_games": 10,
+  "v2_wins": 7,
+  "v1_wins": 2,
+  "draws": 1,
+  "v2_score": 7.5,
+  "v2_pct": 75.0,
+  "total_time_min": 16.8,
+  "games": [
+    {
+      "game": 1,
+      "v2_color": "W",
+      "winner": "W",
+      "outcome": "V2",
+      "elapsed_s": 113.7
+    },
+    {
+      "game": 2,
+      "v2_color": "B",
+      "winner": "B",
+      "outcome": "V2",
+      "elapsed_s": 125.7
+    },
+    {
+      "game": 3,
+      "v2_color": "W",
+      "winner": "B",
+      "outcome": "V1",
+      "elapsed_s": 95.5
+    },
+    {
+      "game": 4,
+      "v2_color": "B",
+      "winner": "B",
+      "outcome": "V2",
+      "elapsed_s": 72.4
+    },
+    {
+      "game": 5,
+      "v2_color": "W",
+      "winner": null,
+      "outcome": "draw",
+      "elapsed_s": 137.4
+    },
+    {
+      "game": 6,
+      "v2_color": "B",
+      "winner": "B",
+      "outcome": "V2",
+      "elapsed_s": 64.3
+    },
+    {
+      "game": 7,
+      "v2_color": "W",
+      "winner": "W",
+      "outcome": "V2",
+      "elapsed_s": 63.0
+    },
+    {
+      "game": 8,
+      "v2_color": "B",
+      "winner": "B",
+      "outcome": "V2",
+      "elapsed_s": 114.1
+    },
+    {
+      "game": 9,
+      "v2_color": "W",
+      "winner": "B",
+      "outcome": "V1",
+      "elapsed_s": 108.6
+    },
+    {
+      "game": 10,
+      "v2_color": "B",
+      "winner": "B",
+      "outcome": "V2",
+      "elapsed_s": 114.6
+    }
+  ]
+}

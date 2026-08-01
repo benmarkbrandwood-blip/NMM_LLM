@@ -1,0 +1,42 @@
+{
+  "trainer_version": "1",
+  "trainer_git_commit": "5c9ca452660d3507c736e6449cab3b54ba9fb412",
+  "dataset_provenance": {
+    "extract_version": "1",
+    "candidate_db_path": "data/human_db_candidate.sqlite",
+    "candidate_db_sha256": "df71395f51b9497b5d0916fbcc5a6a8456d082be79c280ecb354d5ba73f87d4f",
+    "feature_dim": 79,
+    "feature_version": "value_net_v2_input_v1",
+    "elo_band_config_name": "option_a_1149_1249",
+    "split_manifest_version": "v1",
+    "val_fraction": 0.2,
+    "extract_git_commit": "b787873c78da0f22a33d246fa0742018fe37ebdf",
+    "successor_bank_bin": "succ_feats.f32.bin",
+    "successor_bank_dtype": "float32",
+    "successor_bank_rows": 23173826,
+    "n_state_keys": 2209726,
+    "n_samples": 2563413,
+    "n_samples_by_band": "{\"lower\": 425850, \"middle\": 928795, \"upper\": 1208768}",
+    "unmatched_notation_events": 1805,
+    "unmatched_notation_states": 1781,
+    "skipped_bad_state_key": 0,
+    "skipped_no_legal_moves": 0,
+    "elapsed_seconds": 399.5
+  },
+  "feature_dim": 79,
+  "n_bands": 3,
+  "elo_band_config_name": "option_a_1149_1249",
+  "training_objective": "count_weighted_ce",
+  "hparams": {
+    "lr": 0.0003,
+    "dropout": 0.2,
+    "batch_positions": 512,
+    "epochs": 200,
+    "patience": 6,
+    "grad_clip": 1.0,
+    "seed": 42
+  },
+  "best_val_event_nll": 1.595265322133564,
+  "final_epochs_run": 22,
+  "elapsed_seconds": 41679.8
+}
