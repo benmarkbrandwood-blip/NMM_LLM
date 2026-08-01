@@ -879,26 +879,34 @@ function showTooltip(cx, cy, mv) {
     ? `${(Math.abs(mv.heuristic_score) / allHAbsMax * 100).toFixed(0)}% (${mv.heuristic_score >= 0 ? '+' : ''}${mv.heuristic_score})`
     : '—';
 
+  const hasTrajData = currentData?.has_traj_data;
+  const posTotal = (currentData?.moves || []).reduce((s, m) => s + (m.total || 0), 0);
+
   let dbRows = '';
+  let trajRow = '';
   if (mv.has_db_data) {
     const wdlText = mv.malom_wdl_after
       ? `${mv.malom_wdl_after}${mv.malom_dtw_after != null ? ` (${mv.malom_dtw_after > 0 ? '+' : ''}${mv.malom_dtw_after} DTW)` : ''}`
       : '—';
+    const tPct = posTotal > 0 ? (mv.total / posTotal * 100).toFixed(1) : '—';
     dbRows = `
     <div class="tt-row"><span class="tt-label">Win%</span><span>${(mv.win_pct*100).toFixed(1)}%</span></div>
     <div class="tt-row"><span class="tt-label">W/D/L</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
-    <div class="tt-row"><span class="tt-label">Games</span><span>${mv.total}</span></div>
+    <div class="tt-row"><span class="tt-label" style="color:#5a10c0">T choice</span><span style="color:#5a10c0">T:${tPct}% (n=${mv.total})</span></div>
     <div class="tt-row"><span class="tt-label">Avg plies left</span><span>${mv.avg_moves_to_end.toFixed(0)}</span></div>
     <div class="tt-row"><span class="tt-label">Malom (after)</span><span>${wdlText}</span></div>`;
+  } else if (hasTrajData) {
+    trajRow = `<div class="tt-row"><span class="tt-label" style="color:#5a10c0;opacity:0.55">T choice</span><span style="color:#5a10c0;opacity:0.55">T:— not observed</span></div>`;
   }
 
   const predRow = mv.pred_human_prob != null
-    ? `<div class="tt-row"><span class="tt-label" style="color:#5591c7">Pred Human</span><span>${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
+    ? `<div class="tt-row"><span class="tt-label" style="color:#5591c7">Pred Human</span><span style="color:#5591c7">P:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
     : '';
 
   tooltip.innerHTML = `
     <div class="tt-notation">${mv.notation}</div>
     ${dbRows}
+    ${trajRow}
     <div class="tt-row"><span class="tt-label">Sentinel</span><span>${sentText}</span></div>
     <div class="tt-row"><span class="tt-label">Heuristic</span><span>${heurText}</span></div>
     ${predRow}

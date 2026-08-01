@@ -2046,7 +2046,7 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
     if elo_band not in ("lower", "middle", "upper", "all"):
         elo_band = "middle"
     has_traj_data = any(m.get("has_db_data") for m in moves_out)
-    if not has_traj_data and _human_move_policy_advisor is not None and candidates_ordered:
+    if _human_move_policy_advisor is not None and candidates_ordered:
         try:
             _exp_probs = await asyncio.to_thread(
                 _human_move_policy_advisor.probs_for_display,
@@ -2057,9 +2057,8 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
                 p = round(float(prob), 4)
                 m["pred_human_prob"] = p
                 m["is_pred_human_best"] = abs(p - best_p) < 1e-6
-                m["is_human_best"] = False
         except Exception as _exp_e:
-            log.debug("Explorer human policy fallback failed: %s", _exp_e)
+            log.debug("Explorer human policy failed: %s", _exp_e)
             for m in moves_out:
                 m["pred_human_prob"] = None
                 m["is_pred_human_best"] = False
@@ -2941,7 +2940,7 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "mi
         for m in moves_out:
             m.setdefault("overseer_prob", None)
 
-        # ── Trajectory + Pred Human fallback ──────────────────────────────────
+        # ── Trajectory + Pred Human ───────────────────────────────────────────
         def _pre_ntn(mv_e):
             frm = mv_e.get("from"); to = mv_e.get("to") or ""
             cap = mv_e.get("capture")
@@ -2958,7 +2957,7 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "mi
             m["traj_freq"] = round(float(traj_freqs.get(_pre_ntn(m), 0.0)), 3)
 
         has_traj_data = any((m.get("traj_freq") or 0) > 0 for m in moves_out)
-        if not has_traj_data and _human_move_policy_advisor is not None:
+        if _human_move_policy_advisor is not None:
             try:
                 _hmpa_probs = await asyncio.to_thread(
                     _human_move_policy_advisor.probs_for_display, board, candidates, elo_band,
@@ -4113,10 +4112,10 @@ async def ws_endpoint(websocket: WebSocket):
                         mv_e["overseer_prob"] = None
 
                 # ── Human Move Policy fallback ─────────────────────────────────
-                # Active only when no move has real trajectory coverage AND we
-                # are not in capture mode (net trained on moves, not captures).
+                # Pred Human: computed for all positions (not capture mode — net
+                # trained on moves, not captures). Shown alongside T: not instead.
                 has_traj_data = any((mv.get("traj_freq") or 0) > 0 for mv in moves_out)
-                if not has_traj_data and _human_move_policy_advisor is not None and diag_mode != "capture":
+                if _human_move_policy_advisor is not None and diag_mode != "capture":
                     try:
                         _hmpa_cands = [
                             {"from": mv.get("from"), "to": mv.get("to"),
@@ -4130,7 +4129,7 @@ async def ws_endpoint(websocket: WebSocket):
                         for mv, prob in zip(moves_out, _hmpa_probs):
                             mv["pred_human_prob"] = round(float(prob), 4)
                     except Exception as _hmpa_e:
-                        log.debug("Human policy fallback failed: %s", _hmpa_e)
+                        log.debug("Human policy failed: %s", _hmpa_e)
                         for mv in moves_out:
                             mv["pred_human_prob"] = None
                 else:

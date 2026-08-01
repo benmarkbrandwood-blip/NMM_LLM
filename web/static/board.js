@@ -452,13 +452,14 @@ export class Board {
         const olbl = overseerLabel(mv.overseer_prob);
         const dlbl = dtwLabel(mv.eg_dtw);
         const plbl = predLabel(mv.pred_human_prob);
+        const showDash = hasTrajData && showTraj && freq === 0;
 
         if (col) {
           const [x, y] = nodeXY(pos);
           this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 9,
             fill: "none", stroke: col, "stroke-width": 2.5, opacity: 0.7 }));
         }
-        if (slbl || olbl || dlbl || plbl || freq > 0) {
+        if (slbl || olbl || dlbl || plbl || freq > 0 || showDash) {
           const [x, y] = nodeXY(pos);
           const hasPiece = !!this.grid[pos];
           let ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
@@ -468,6 +469,14 @@ export class Board {
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = `T:${Math.round(freq * 100)}%`;
+            this._dbGroup.appendChild(t);
+            ty -= 11;
+          } else if (showDash) {
+            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#5a10c0",
+              "text-anchor":"middle", "font-family":"monospace", opacity: 0.45,
+              stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = "T:—";
             this._dbGroup.appendChild(t);
             ty -= 11;
           }
@@ -531,7 +540,8 @@ export class Board {
         const olbl = selSrc ? overseerLabel(mv.overseer_prob)  : null;
         const dlbl = selSrc ? dtwLabel(mv.eg_dtw) : null;
         const plbl = selSrc ? predLabel(mv.pred_human_prob) : null;
-        if (!col && freq === 0 && !slbl && !olbl && !dlbl && !plbl) continue;
+        const showDashMv = selSrc && hasTrajData && showTraj && freq === 0;
+        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl) continue;
 
         const [x1, y1] = nodeXY(mv.from);
         const [x2, y2] = nodeXY(mv.to);
@@ -554,7 +564,7 @@ export class Board {
             }));
           }
         }
-        if (slbl || olbl || dlbl || plbl || freq > 0) {
+        if (slbl || olbl || dlbl || plbl || freq > 0 || showDashMv) {
           const [x, y] = nodeXY(mv.to);
           let ty = y - PIECE_R - 4;
           if (freq > 0 && (!selSrc || mv.from === selSrc)) {
@@ -563,6 +573,14 @@ export class Board {
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = `T:${Math.round(freq * 100)}%`;
+            this._dbGroup.appendChild(t);
+            ty -= 10;
+          } else if (showDashMv) {
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#5a10c0",
+              "text-anchor":"middle", "font-family":"monospace", opacity: 0.45,
+              stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = "T:—";
             this._dbGroup.appendChild(t);
             ty -= 10;
           }
