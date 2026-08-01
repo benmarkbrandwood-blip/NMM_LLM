@@ -1,6 +1,6 @@
 # Sanmill Layered Opening Prefix v2
 
-Status: `composition_frozen_membership_pending`
+Status: `all_source_membership_frozen_execution_corpus_pending`
 
 Decision date: 2026-07-25
 
@@ -322,7 +322,11 @@ and Perfect DB membership remain pending. The later
 [HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
 freezes 21 genuine PlayOK histories after skipping Book and earlier-HumanDB
 structural duplicates. Their complete strict-Sanmill execution records remain
-pending.
+pending. The later
+[Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
+freezes audit routes 000 through 020. All 64 source memberships are now frozen
+and structurally disjoint; the executable corpus remains pending on HumanDB
+strict replay.
 
 ## Explicit exclusions
 

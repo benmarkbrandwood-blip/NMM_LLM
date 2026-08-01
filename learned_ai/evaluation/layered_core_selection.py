@@ -12,6 +12,7 @@ BOOK_CORE_COUNT = 22
 EXPERT_BOOK_CORE_COUNT = 15
 SANMILL_BOOK_CORE_COUNT = 7
 HUMAN_CORE_COUNT = 21
+PERFECT_CORE_COUNT = 21
 
 
 class LayeredCoreSelectionError(ValueError):
@@ -572,6 +573,268 @@ def derive_human_core(
             "skipped_before_quota": sum(
                 item["disposition"] == "skipped_duplicate"
                 for item in candidate_window
+            ),
+        },
+    }
+
+
+def _selected_structure_sets(
+    selections: Sequence[Mapping[str, Any]],
+) -> tuple[set[tuple[Any, ...]], set[str], set[str]]:
+    histories: set[tuple[Any, ...]] = set()
+    fens: set[str] = set()
+    orbits: set[str] = set()
+    for selection in selections:
+        for raw in _sequence(selection.get("members"), context="core members"):
+            member = _mapping(raw, context="core member")
+            histories.add(
+                tuple(
+                    _sequence(
+                        member.get("action_tokens"),
+                        context="core action tokens",
+                    )
+                )
+            )
+            final = _mapping(member.get("final"), context="core final")
+            fens.add(
+                _string(final.get("nmm_fen"), context="core final nmm_fen")
+            )
+            orbits.add(
+                _string(
+                    final.get("ring16_canonical_fen"),
+                    context="core final ring16",
+                )
+            )
+    return histories, fens, orbits
+
+
+def derive_perfect_core(
+    *,
+    perfect_audit: Mapping[str, Any],
+    book_selection: Mapping[str, Any],
+    human_selection: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Take 21 fixed StrictSteps routes after source-order deduplication."""
+
+    perfect_identity = _string(
+        perfect_audit.get("audit_identity"),
+        context="Perfect DB audit identity",
+    )
+    generator = _mapping(
+        perfect_audit.get("generator"),
+        context="Perfect DB generator",
+    )
+    if generator.get("route_pool_is_final_corpus") is not False:
+        raise LayeredCoreSelectionError("Perfect audit pool boundary drifted")
+    if generator.get("base_seed") != 42 or generator.get("route_count") != 128:
+        raise LayeredCoreSelectionError("Perfect audit route contract drifted")
+    overlap = _mapping(
+        perfect_audit.get("overlap"),
+        context="Perfect DB overlap",
+    )
+    for source in ("with_book", "with_human_db"):
+        counts = _mapping(overlap.get(source), context=f"Perfect {source}")
+        if any(counts.get(field) != 0 for field in counts):
+            raise LayeredCoreSelectionError(
+                f"Perfect audit {source} overlap is no longer zero"
+            )
+
+    seen_histories, seen_fens, seen_orbits = _selected_structure_sets(
+        [book_selection, human_selection]
+    )
+    members: list[dict[str, Any]] = []
+    candidate_window: list[dict[str, Any]] = []
+    routes = _sequence(perfect_audit.get("routes"), context="Perfect routes")
+    for route_index, raw_value in enumerate(routes):
+        route = _mapping(raw_value, context="Perfect route")
+        route_id = _string(route.get("route_id"), context="Perfect route_id")
+        expected_route_id = f"perfect-audit-route-{route_index:03d}"
+        if route_id != expected_route_id:
+            raise LayeredCoreSelectionError("Perfect route order drifted")
+        if route.get("route_seed") != 42 + route_index:
+            raise LayeredCoreSelectionError("Perfect route seed drifted")
+        prefix = _mapping(
+            route.get("prefix_record"),
+            context="Perfect prefix record",
+        )
+        history_id, final_fen, ring16 = _prefix_key(prefix)
+        if route.get("exact_history_sha256") != history_id:
+            raise LayeredCoreSelectionError("Perfect history identity drifted")
+        if prefix.get("logical_ply_count") != 12 or list(
+            _sequence(
+                prefix.get("logical_plies_by_side"),
+                context="Perfect logical_plies_by_side",
+            )
+        ) != [6, 6]:
+            raise LayeredCoreSelectionError("Perfect prefix target drifted")
+        actions = list(
+            _sequence(
+                prefix.get("action_tokens"),
+                context="Perfect action_tokens",
+            )
+        )
+        steps = [
+            _mapping(step, context="Perfect step")
+            for step in _sequence(prefix.get("steps"), context="Perfect steps")
+        ]
+        if len(steps) != 12:
+            raise LayeredCoreSelectionError("Perfect step count drifted")
+        logical_turns = [
+            list(
+                _sequence(
+                    step.get("action_tokens"),
+                    context="Perfect step actions",
+                )
+            )
+            for step in steps
+        ]
+        if [token for turn in logical_turns for token in turn] != actions:
+            raise LayeredCoreSelectionError("Perfect steps do not flatten")
+
+        step_evidence = [
+            _mapping(
+                step.get("source_evidence"),
+                context="Perfect step source evidence",
+            )
+            for step in steps
+        ]
+        tied_steps = 0
+        pool_sizes: list[int] = []
+        for evidence in step_evidence:
+            selected_candidate = _mapping(
+                evidence.get("selected_candidate"),
+                context="Perfect selected candidate",
+            )
+            perfect = _mapping(
+                selected_candidate.get("perfect"),
+                context="Perfect selected value",
+            )
+            if perfect.get("mode") != "strict_steps" or perfect.get("wdl") != 0:
+                raise LayeredCoreSelectionError("Perfect selected value drifted")
+            query = _mapping(
+                evidence.get("query_contract"),
+                context="Perfect query contract",
+            )
+            if query.get("query_mode") != "strict_steps" or query.get(
+                "fallback"
+            ) != "none":
+                raise LayeredCoreSelectionError("Perfect query contract drifted")
+            tie = _mapping(
+                evidence.get("theoretical_tie"),
+                context="Perfect theoretical tie",
+            )
+            pool_size = tie.get("candidate_count")
+            if not isinstance(pool_size, int) or pool_size <= 0:
+                raise LayeredCoreSelectionError("Perfect candidate pool drifted")
+            pool_sizes.append(pool_size)
+            tied_steps += int(tie.get("multiple_tied_best") is True)
+
+        history_key = tuple(actions)
+        collisions: list[str] = []
+        if history_key in seen_histories:
+            collisions.append("exact_history")
+        if final_fen in seen_fens:
+            collisions.append("final_fen")
+        if ring16 in seen_orbits:
+            collisions.append("ring16")
+        trace = {
+            "audit_route_index": route_index,
+            "route_id": route_id,
+            "route_seed": route["route_seed"],
+            "disposition": "skipped_duplicate" if collisions else "selected",
+            "collision_dimensions": collisions,
+        }
+        if not collisions:
+            final = _mapping(prefix.get("final"), context="Perfect final")
+            member = {
+                "core_id": f"perfect-core-{len(members) + 1:03d}",
+                "stratum": "perfect_db",
+                "source_subtype": _string(
+                    prefix.get("source_subtype"),
+                    context="Perfect source_subtype",
+                ),
+                "source_audit_identity": perfect_identity,
+                "route_id": route_id,
+                "route_seed": route["route_seed"],
+                "source_history_id": history_id,
+                "prefix_identity": _string(
+                    prefix.get("prefix_identity"),
+                    context="Perfect prefix_identity",
+                ),
+                "logical_ply_count": 12,
+                "logical_plies_by_side": [6, 6],
+                "action_tokens": actions,
+                "logical_turns": logical_turns,
+                "strict_steps_trace_identity": canonical_sha256(
+                    step_evidence
+                ),
+                "theory_summary": {
+                    "selected_wdl": 0,
+                    "selected_category": "draw",
+                    "tied_best_step_count": tied_steps,
+                    "single_best_step_count": 12 - tied_steps,
+                    "minimum_candidate_pool_size": min(pool_sizes),
+                    "maximum_candidate_pool_size": max(pool_sizes),
+                },
+                "final": {
+                    "nmm_fen": final_fen,
+                    "ring16_canonical_fen": ring16,
+                    "history_sha256": _string(
+                        final.get("history_sha256"),
+                        context="Perfect final history_sha256",
+                    ),
+                },
+                "selection_basis": (
+                    "frozen_audit_route_order_then_structural_deduplication"
+                ),
+                "execution_record_status": "frozen_source_prefix_available",
+            }
+            members.append(member)
+            trace["core_id"] = member["core_id"]
+            seen_histories.add(history_key)
+            seen_fens.add(final_fen)
+            seen_orbits.add(ring16)
+        candidate_window.append(trace)
+        if len(members) == PERFECT_CORE_COUNT:
+            break
+
+    if len(members) != PERFECT_CORE_COUNT:
+        raise LayeredCoreSelectionError("Perfect DB core quota is incomplete")
+    if len({tuple(item["action_tokens"]) for item in members}) != 21:
+        raise LayeredCoreSelectionError("Perfect exact-history diversity drifted")
+    if len({item["final"]["nmm_fen"] for item in members}) != 21:
+        raise LayeredCoreSelectionError("Perfect final-FEN diversity drifted")
+    if len(
+        {item["final"]["ring16_canonical_fen"] for item in members}
+    ) != 21:
+        raise LayeredCoreSelectionError("Perfect ring16 diversity drifted")
+
+    return {
+        "selection_schema": "nmm.layered-opening-prefix-perfect-core.v1",
+        "route_pool_audit_identity": perfect_identity,
+        "selection_rule": (
+            "frozen_route_order_then_exact_history_final_fen_ring16_dedup"
+        ),
+        "candidate_window": candidate_window,
+        "candidate_window_identity": canonical_sha256(candidate_window),
+        "members": members,
+        "membership_identity": canonical_sha256(members),
+        "summary": {
+            "member_count": len(members),
+            "last_selected_audit_route_index": candidate_window[-1][
+                "audit_route_index"
+            ],
+            "skipped_before_quota": sum(
+                item["disposition"] == "skipped_duplicate"
+                for item in candidate_window
+            ),
+            "tied_best_step_count": sum(
+                item["theory_summary"]["tied_best_step_count"]
+                for item in members
+            ),
+            "single_best_step_count": sum(
+                item["theory_summary"]["single_best_step_count"]
+                for item in members
             ),
         },
     }

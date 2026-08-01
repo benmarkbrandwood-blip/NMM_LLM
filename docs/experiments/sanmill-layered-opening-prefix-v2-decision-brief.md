@@ -1,6 +1,6 @@
 # Twelve-ply layered opening-prefix corpus decision brief
 
-Status: `composition_frozen_membership_pending`
+Status: `all_source_membership_frozen_execution_corpus_pending`
 
 Initial decision date: 2026-07-25
 
@@ -243,6 +243,10 @@ freezes 15 expert-curated and seven Sanmill named-line members with 22 unique
 exact histories, final FENs, and `ring16` orbits. The
 [HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
 also freezes 21 genuine PlayOK histories after frequency-ordered structural
-deduplication. Perfect DB membership, the final core list, and the final image
-package remain pending. No candidate-versus-baseline run or launch
-authorization exists.
+deduplication. The
+[Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
+freezes audit routes 000 through 020 as the final 21 source members. All 64
+source members are unique by exact history, final FEN, and `ring16` orbit.
+HumanDB strict replay, the executable corpus, and the final image package
+remain pending. No candidate-versus-baseline run or launch authorization
+exists.

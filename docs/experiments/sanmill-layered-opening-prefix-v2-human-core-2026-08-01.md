@@ -70,6 +70,8 @@ The selected HumanDB histories still require complete per-step replay through
 the pinned strict Sanmill bridge before their v2 prefix records can be frozen.
 No random or alternate-source repair is permitted if replay fails.
 
-No candidate was loaded and no game was played. Perfect DB membership, the
-combined 64-member identity, review images, evaluation, and training remain
-unfrozen and unauthorised.
+No candidate was loaded and no game was played. The subsequent
+[Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
+freezes the final 21 source members. The combined source manifest, HumanDB
+execution records, review images, evaluation, and training remain pending or
+unauthorised as applicable.

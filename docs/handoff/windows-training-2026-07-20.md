@@ -847,7 +847,8 @@ records the correction sheet he reviewed. The subsequent
 freezes 33 D4-unique representatives as the complete Expert Book catalogue and
 diagnostic membership while preserving all 36 raw records as provenance. Its
 execution contract is not frozen. Status is
-`composition_frozen_membership_pending` for the balanced 64-prefix core, and
+`all_source_membership_frozen_execution_corpus_pending` for the balanced
+64-prefix core, and
 the subsequent
 [Book core decision](../experiments/sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members. The 22 records
@@ -856,9 +857,11 @@ are unique by exact history, final FEN, and `ring16` orbit. The subsequent
 [HumanDB core decision](../experiments/sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
 freezes 21 genuine PlayOK histories. Frequency-ordered selection reaches
 ledger rank 31 after ten `ring16` skips; selected support ranges from 16 to 27
-distinct games. Complete strict-Sanmill replay for those histories, Perfect DB
-membership, the combined 64-member identity, and review package remain
-pending.
+distinct games. The subsequent
+[Perfect DB core decision](../experiments/sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
+freezes audit routes 000 through 020. All 64 source members are now unique by
+exact history, final FEN, and `ring16`; HumanDB strict replay, the combined
+manifest, and review package remain pending.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
