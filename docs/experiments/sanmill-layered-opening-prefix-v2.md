@@ -6,8 +6,9 @@ Decision date: 2026-07-25
 
 This document freezes the source-only preparation contract for twelve-logical-
 ply opening prefixes. The source ratio was subsequently frozen as
-`22 Book / 21 HumanDB / 21 Perfect DB`; this document still does not freeze a
-final member list, an evaluation baseline, or a match launch.
+`22 Book / 21 HumanDB / 21 Perfect DB`, and the later source-core decision
+freezes all 64 source memberships. This document still does not freeze an
+executable corpus, an evaluation baseline, or a match launch.
 
 ## Expert and product decisions
 
@@ -209,8 +210,9 @@ the audit must present that evidence and a separately named alternative. It
 must not manufacture synthetic human lines.
 
 Those audits are complete. The product owner accepted the recommended
-composition on 1 August 2026, closing this source-count gate while leaving
-membership derivation pending.
+composition on 1 August 2026, closing the source-count gate. The later stratum
+and source-core decisions also close source membership; strict HumanDB replay
+still gates the executable corpus.
 
 ## Current Book evidence
 
@@ -308,17 +310,17 @@ The completed source comparison is recorded in the
 The product owner's accepted `22 Book / 21 HumanDB / 21 Perfect DB` counts are
 frozen in the
 [composition decision](sanmill-layered-opening-prefix-v2-composition-decision-2026-08-01.md).
-Membership and final image-review material remain pending. The 33-pattern
-expert diagnostic membership is frozen separately and does not itself select
-balanced-core members.
+The 33-pattern expert diagnostic membership is frozen separately and does not
+itself select balanced-core members. The later source-core decision freezes the
+balanced membership, and its review material is now available under a separate
+manifest.
 
 The later
 [Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes the internal Book allocation as 15 expert-curated plays and seven
 Sanmill named variations. It covers all 14 expert parent orbits, adds the first
 structurally distinct P03 extended-family priority, covers all seven Sanmill
-declared families, and retains 22 distinct final `ring16` structures. HumanDB
-and Perfect DB membership remain pending. The later
+declared families, and retains 22 distinct final `ring16` structures. The later
 [HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
 freezes 21 genuine PlayOK histories after skipping Book and earlier-HumanDB
 structural duplicates. Their complete strict-Sanmill execution records remain
@@ -327,7 +329,10 @@ pending. The later
 freezes audit routes 000 through 020. All 64 source memberships are now frozen
 and structurally disjoint in the
 [source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md);
-the executable corpus remains pending on HumanDB strict replay.
+the executable corpus remains pending on HumanDB strict replay. The
+[source-core review package](sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
+provides 64 individual panels and six contact sheets for membership review;
+those images are not execution evidence.
 
 ## Explicit exclusions
 
@@ -335,7 +340,8 @@ This preparation must not:
 
 - load a candidate model;
 - play candidate-versus-baseline games;
-- freeze a 64-prefix list or source ratio;
+- alter the frozen 64-member source list or 22/21/21 source ratio without a
+  new recorded decision;
 - modify or relabel v1 eight-ply evidence;
 - substitute another source after a Book miss;
 - delete active HumanDB WAL or SHM files;

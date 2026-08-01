@@ -200,10 +200,11 @@ The proposed later selection rules are:
    deduplication. Do not regenerate routes in response to the observed
    candidate.
 
-These rules now control the source-only membership derivation. The 22 Book
-slots are not yet divided between the two subtypes. The expert gate is closed,
-but the subtype allocation, selected core identities, list hash, and review
-images remain pending and must be recorded separately.
+These rules controlled the source-only membership derivation. The completed
+Book decision divides the 22 places into 15 expert-curated and seven Sanmill
+named-line members. The three stratum decisions, combined source-core identity,
+and review-image manifest now record the resulting membership without changing
+the separate 33-pattern expert diagnostic catalogue.
 
 ## Inputs that remain excluded
 
@@ -224,8 +225,9 @@ Placement-prefix selection cannot replace its later-phase coverage.
 
 The product owner accepted the recommended
 `22 Book / 21 HumanDB / 21 Perfect DB` composition on 1 August 2026. The
-machine-readable decision freezes only those counts; it does not freeze any
-member or authorize execution.
+machine-readable composition decision freezes only those counts. The later
+stratum and source-core decisions freeze membership separately; neither step
+authorizes execution.
 
 The Mill expert has closed the semantic selection gate. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
@@ -237,7 +239,7 @@ earlier
 [shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
 remains the historical correction sheet he reviewed.
 
-Status is now `composition_frozen_membership_pending`. The
+Status is now `all_source_membership_frozen_execution_corpus_pending`. The
 [Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members with 22 unique
 exact histories, final FENs, and `ring16` orbits. The
@@ -249,6 +251,8 @@ freezes audit routes 000 through 020 as the final 21 source members. All 64
 source members are unique by exact history, final FEN, and `ring16` orbit.
 The combined identities are frozen in the
 [source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md).
-HumanDB strict replay, the executable corpus, and the final image package
-remain pending. No candidate-versus-baseline run or launch authorization
-exists.
+The deterministic
+[review package](sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
+contains 64 individual panels and six contact sheets under a frozen manifest.
+HumanDB strict replay and the executable corpus remain pending. No
+candidate-versus-baseline run or launch authorization exists.

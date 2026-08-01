@@ -862,8 +862,13 @@ distinct games. The subsequent
 freezes audit routes 000 through 020. All 64 source members are now unique by
 exact history, final FEN, and `ring16`. The
 [source core decision](../experiments/sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md)
-freezes their combined identity. HumanDB strict replay and the review package
-remain pending.
+freezes their combined identity. The deterministic
+[review package](../experiments/sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
+contains all 64 individual panels and six visually inspected contact sheets;
+its manifest identity is
+`db37224db6e400a32df9275e5e0665647541c4aa589b327b4317235e2eb27fba`.
+HumanDB strict replay remains pending, so the package is not execution
+authority.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -1020,12 +1025,12 @@ training merely because the managed run ended. Proceed in this order:
    For current work, use the twelve-ply v2 contract and completed Sanmill Book,
    expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
    was created without deleting active sidecars. Review the proposed
-   `22 Book / 21 HumanDB / 21 Perfect DB` balanced-core split. The expert gate
-   is closed: preserve the frozen
+   `22 Book / 21 HumanDB / 21 Perfect DB` balanced-core split. Its 64 source
+   members and review manifest are now frozen; HumanDB strict replay still
+   gates an executable corpus. The expert gate is closed: preserve the frozen
    [33-pattern coverage catalogue](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
-   and select any core subset without changing that catalogue. Do not freeze
-   the core list until the now-accepted product composition and internal Book
-   allocation are recorded. Row 11's screenshot-derived `c5` is
+   and keep the separately frozen balanced-core subset without changing that
+   catalogue. Row 11's screenshot-derived `c5` is
    source-verified and
    retains a visual provenance marker. There is no runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
@@ -1097,7 +1102,8 @@ The following choices are recorded for the next formal-evaluation design:
   decision; the later eight-ply 7/57 diversity proposal is also historical;
 - use twelve logical plies and separately report Book, genuine HumanDB, and
   StrictSteps Perfect DB strata for the current design; the 22/21/21
-  composition is frozen while member identities remain pending;
+  composition and 64 source-member identities are frozen, while HumanDB strict
+  replay and the executable corpus remain pending;
 - preserve all 33 D4-unique expert-curated Book placement patterns in a
   separately reported diagnostic catalogue while retaining all 36 source
   records as provenance; its execution protocol is not yet frozen;

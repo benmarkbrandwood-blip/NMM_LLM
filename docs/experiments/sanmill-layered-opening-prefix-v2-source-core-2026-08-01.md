@@ -53,6 +53,10 @@ need complete per-step replay with the pinned strict Sanmill bridge. Therefore:
   Perfect DB fallback; and
 - no evaluation, training, publication, or promotion is authorised.
 
-A review-image package may render these frozen final states before HumanDB
-execution replay. Such images are membership-review material only, not replay
-or rules acceptance evidence.
+The deterministic
+[review package](sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
+renders all 64 frozen final states as individual panels and six contact sheets.
+Its manifest identity is
+`db37224db6e400a32df9275e5e0665647541c4aa589b327b4317235e2eb27fba`.
+Those images are membership-review material only, not replay or rules
+acceptance evidence.
