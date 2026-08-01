@@ -1,0 +1,56 @@
+{
+  "authorization": {
+    "candidate_loaded": false,
+    "evaluation": false,
+    "games_played": 0,
+    "training": false
+  },
+  "binary": {
+    "build_command": "cargo build --release -p tgf-cli",
+    "byte_length": 4109312,
+    "relative_path": "target/release/tgf.exe",
+    "sha256": "6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53"
+  },
+  "build_environment": {
+    "cargo_lock_sha256": "f99e2a79cc8d1bd6c3b2a2066fd79070958c219848dcc8b954f1b68a633ce391",
+    "cargo_version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+    "host": "x86_64-pc-windows-msvc",
+    "llvm_version": "22.1.2",
+    "rustc_commit": "59807616e1fa2540724bfbac14d7976d7e4a3860",
+    "rustc_version": "rustc 1.95.0 (59807616e 2026-04-14)"
+  },
+  "decision_date": "2026-08-01",
+  "historical_binary_boundary": {
+    "historical_smoke_v2_binary_available": false,
+    "historical_smoke_v2_sha256": "cac2ec6fe45a9d798a89c6b8a5f52c767aa1c885a1156a96269b44ebf81976cc",
+    "replacement_for_historical_evidence": false,
+    "same_source_same_toolchain_build_observation": {
+      "all_byte_lengths": [
+        4109312,
+        4109312
+      ],
+      "sha256_values": [
+        "fe411ed06891df3f09f69162ca47d62310a4c3ddfc90eeda1eb9bf0ef3ec350e",
+        "6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53"
+      ],
+      "verdict": "binary_bytes_not_assumed_reproducible_across_checkout_paths"
+    }
+  },
+  "protocol": {
+    "data_query_version": 1,
+    "failure_policy": "fail_closed",
+    "history_origin": "game_start",
+    "required_fresh_processes": 2,
+    "strict_failure_protocol_version": 1
+  },
+  "purpose": "complete_strict_sanmill_replay_of_21_frozen_human_db_prefixes",
+  "runtime_identity": "645aab8157458ca9ff70f47fc39385c3ef28affda2e22c83e3a4d9ae84af1df8",
+  "schema_version": "nmm.sanmill-prefix12-human-replay-runtime.v1",
+  "source": {
+    "checkout_policy": "exact_pinned_head_clean_worktree",
+    "commit": "db65eb3e73189d934d615d0f47519d395193c646",
+    "path_lookup_key": "sanmill_prefix12_checkout",
+    "tree": "b8fa6c0119c2dec4443efc59deab8b7d835e0c88"
+  },
+  "status": "pinned_for_source_only_human_history_replay"
+}

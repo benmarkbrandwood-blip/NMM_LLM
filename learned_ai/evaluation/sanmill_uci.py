@@ -132,6 +132,49 @@ class SanmillProtocolError(SanmillBridgeError):
 
 
 @dataclass(frozen=True)
+class SanmillInstallationContract:
+    """Explicit local checkout and binary identity accepted by one workflow."""
+
+    contract_id: str
+    path_lookup_key: str
+    expected_binary_sha256: str
+    expected_binary_size: int
+    require_exact_head: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.contract_id or not self.path_lookup_key:
+            raise ValueError("Sanmill installation contract names must be non-empty")
+        if (
+            len(self.expected_binary_sha256) != 64
+            or any(
+                character not in "0123456789abcdef"
+                for character in self.expected_binary_sha256
+            )
+        ):
+            raise ValueError("Sanmill installation contract SHA-256 is invalid")
+        if self.expected_binary_size <= 0:
+            raise ValueError("Sanmill installation contract size must be positive")
+
+
+STRICT_SMOKE_V2_INSTALLATION_CONTRACT = SanmillInstallationContract(
+    contract_id="sanmill-strict-uci-bridge-smoke-v2",
+    path_lookup_key="sanmill_checkout",
+    expected_binary_sha256=EXPECTED_SANMILL_BINARY_SHA256,
+    expected_binary_size=EXPECTED_SANMILL_BINARY_SIZE,
+)
+
+PREFIX12_REPLAY_INSTALLATION_CONTRACT = SanmillInstallationContract(
+    contract_id="sanmill-prefix12-human-replay-v1",
+    path_lookup_key="sanmill_prefix12_checkout",
+    expected_binary_sha256=(
+        "6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53"
+    ),
+    expected_binary_size=4_109_312,
+    require_exact_head=True,
+)
+
+
+@dataclass(frozen=True)
 class SanmillInstallation:
     checkout: Path
     commit: str
@@ -141,15 +184,22 @@ class SanmillInstallation:
     binary_sha256: str
     binary_size: int
     license_sha256: str
+    path_lookup_key: str = "sanmill_checkout"
+    require_exact_head: bool = False
 
     def portable_record(self) -> dict[str, Any]:
         return {
-            "path_lookup_key": "sanmill_checkout",
+            "path_lookup_key": self.path_lookup_key,
             "commit": self.commit,
             "checkout_head": self.checkout_head,
             "checkout_policy": (
-                "pinned commit or descendant with no changes in the pinned "
-                "CLI, rule, build, bridge-document, or opening-book scope"
+                "exact pinned commit with a clean worktree"
+                if self.require_exact_head
+                else (
+                    "pinned commit or descendant with no changes in the "
+                    "pinned CLI, rule, build, bridge-document, or "
+                    "opening-book scope"
+                )
             ),
             "tree": self.tree,
             "binary_relative_path": SANMILL_BINARY_RELATIVE.as_posix(),
@@ -1096,15 +1146,20 @@ def _git_output(checkout: Path, *arguments: str) -> str:
 def inspect_sanmill_installation(
     paths_config: str | Path,
     *,
+    contract: SanmillInstallationContract = (
+        STRICT_SMOKE_V2_INSTALLATION_CONTRACT
+    ),
     binary_override: str | Path | None = None,
 ) -> SanmillInstallation:
     """Verify the pinned source and release binary without changing Sanmill."""
     config = _strict_json_object(Path(paths_config))
     checkout = _resolve_registry_path(
-        config.get("sanmill_checkout"), field="sanmill_checkout"
+        config.get(contract.path_lookup_key), field=contract.path_lookup_key
     )
     if not checkout.is_dir():
-        raise SanmillBridgeError("sanmill_checkout is not a directory")
+        raise SanmillBridgeError(
+            f"{contract.path_lookup_key} is not a directory"
+        )
 
     head = _git_output(checkout, "rev-parse", "HEAD")
     pinned_tree = _git_output(
@@ -1117,6 +1172,10 @@ def inspect_sanmill_installation(
             "the pinned Sanmill commit no longer resolves to its recorded tree"
         )
     if head != PINNED_SANMILL_COMMIT:
+        if contract.require_exact_head:
+            raise SanmillBridgeError(
+                f"Sanmill HEAD is not the exact replay pin: {head}"
+            )
         try:
             _git_output(
                 checkout,
@@ -1157,11 +1216,12 @@ def inspect_sanmill_installation(
     if os.name != "nt":
         raise SanmillBridgeError("the pinned Sanmill binary identity is Windows-only")
     if (
-        len(binary_bytes) != EXPECTED_SANMILL_BINARY_SIZE
-        or binary_sha256 != EXPECTED_SANMILL_BINARY_SHA256
+        len(binary_bytes) != contract.expected_binary_size
+        or binary_sha256 != contract.expected_binary_sha256
     ):
         raise SanmillBridgeError(
-            "Sanmill UCI binary identity differs from the pinned strict build"
+            "Sanmill UCI binary identity differs from installation contract "
+            f"{contract.contract_id}"
         )
 
     license_path = checkout / SANMILL_LICENSE_RELATIVE
@@ -1179,6 +1239,8 @@ def inspect_sanmill_installation(
         binary_sha256=binary_sha256,
         binary_size=len(binary_bytes),
         license_sha256=license_sha256,
+        path_lookup_key=contract.path_lookup_key,
+        require_exact_head=contract.require_exact_head,
     )
 
 

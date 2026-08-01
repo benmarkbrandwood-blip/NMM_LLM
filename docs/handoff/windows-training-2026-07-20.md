@@ -876,6 +876,18 @@ installation audit and 60 Sanmill UCI/data-query/prefix regressions then passed
 again. No file was imported from the other workspace. The active HumanDB
 sidecar remains a separate unresolved local-data condition.
 
+The reference Sanmill checkout has since advanced through protected CLI and
+rules paths and its release binary no longer matches the historical strict-v2
+identity. The old binary bytes are unavailable. A clean isolated checkout at
+the same pinned commit and tree was therefore built and frozen under the
+separate
+[prefix12 replay runtime decision](../experiments/sanmill-prefix12-human-replay-runtime-2026-08-01.md).
+It is resolved through `sanmill_prefix12_checkout` and has release-binary
+SHA-256
+`6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53`.
+This new identity does not replace the historical smoke evidence and is
+authorised only for strict source-history replay.
+
 ## Live Malom and Legacy-model Boundary
 
 The old note says `specialist_router.py` was a temporary containment against a
