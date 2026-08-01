@@ -1,14 +1,15 @@
 # Sanmill Layered Opening Prefix v2
 
-Status: `all_source_membership_frozen_execution_corpus_pending`
+Status: `all_source_membership_and_execution_records_frozen_corpus_pending`
 
 Decision date: 2026-07-25
 
 This document freezes the source-only preparation contract for twelve-logical-
 ply opening prefixes. The source ratio was subsequently frozen as
 `22 Book / 21 HumanDB / 21 Perfect DB`, and the later source-core decision
-freezes all 64 source memberships. This document still does not freeze an
-executable corpus, an evaluation baseline, or a match launch.
+freezes all 64 source memberships. Complete execution records now exist for
+all members, but this document still does not freeze their combined executable
+corpus, an evaluation baseline, or a match launch.
 
 ## Expert and product decisions
 
@@ -211,8 +212,9 @@ must not manufacture synthetic human lines.
 
 Those audits are complete. The product owner accepted the recommended
 composition on 1 August 2026, closing the source-count gate. The later stratum
-and source-core decisions also close source membership; strict HumanDB replay
-still gates the executable corpus.
+and source-core decisions also close source membership. The later HumanDB
+execution overlay closes the strict replay gate; deterministic assembly and
+identity freeze of the combined executable corpus remain pending.
 
 ## Current Book evidence
 
@@ -323,13 +325,16 @@ structurally distinct P03 extended-family priority, covers all seven Sanmill
 declared families, and retains 22 distinct final `ring16` structures. The later
 [HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md)
 freezes 21 genuine PlayOK histories after skipping Book and earlier-HumanDB
-structural duplicates. Their complete strict-Sanmill execution records remain
-pending. The later
+structural duplicates. Their complete strict-Sanmill execution records are
+frozen in the later
+[HumanDB execution overlay](sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md).
+The later
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
 freezes audit routes 000 through 020. All 64 source memberships are now frozen
 and structurally disjoint in the
 [source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md);
-the executable corpus remains pending on HumanDB strict replay. The
+all source-member execution records now exist, while assembly and identity
+freeze of the combined executable corpus remain pending. The
 [source-core review package](sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
 provides 64 individual panels and six contact sheets for membership review;
 those images are not execution evidence.

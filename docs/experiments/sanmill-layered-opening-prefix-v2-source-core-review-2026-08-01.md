@@ -40,11 +40,15 @@ is already distinct by exact history, final FEN, and D4/`ring16` structure.
 
 ## Evidence boundary
 
-The diagrams show final states only. They do not prove that the displayed
-state was reached by a complete legal replay. The Book and Perfect DB members
-already reference frozen source-prefix records. The 21 HumanDB members still
-need complete per-step replay through the pinned strict Sanmill bridge before
-an executable corpus can be frozen.
+The diagrams show final states only. They do not themselves prove that the
+displayed state was reached by a complete legal replay. The Book and Perfect
+DB members already referenced frozen source-prefix records when this package
+was created. The subsequent
+[HumanDB execution overlay](sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md)
+now freezes complete replay evidence for the other 21 members and confirms
+their displayed final FENs. The HumanDB panel footer
+`full_sanmill_replay_pending` records package-time state; this frozen image
+package is not regenerated or relabelled by the later evidence.
 
 This package does not load a candidate model, play games, measure strength,
 replace the separate movement/flying phase corpus, or authorise evaluation or

@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix source core
 
-Status: `source_membership_frozen_execution_replay_pending`
+Status: `source_membership_and_human_execution_frozen_corpus_pending`
 
 Decision date: 2026-08-01
 
@@ -44,11 +44,14 @@ policy; later reports still separate the three strata.
 ## Execution boundary
 
 Forty-three records—the 22 Book and 21 Perfect DB members—already reference
-complete frozen v2 source-prefix records. The 21 HumanDB source members still
-need complete per-step replay with the pinned strict Sanmill bridge. Therefore:
+complete frozen v2 source-prefix records. A subsequent
+[HumanDB execution overlay](sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md)
+now supplies complete strict-Sanmill v2 records for the remaining 21 members.
+Therefore:
 
 - source membership is frozen;
-- the executable 64-prefix corpus is not frozen;
+- all source-member execution records now exist;
+- the combined executable 64-prefix corpus is not yet assembled or frozen;
 - no replay failure may be repaired with random, search, Book, HumanDB, or
   Perfect DB fallback; and
 - no evaluation, training, publication, or promotion is authorised.

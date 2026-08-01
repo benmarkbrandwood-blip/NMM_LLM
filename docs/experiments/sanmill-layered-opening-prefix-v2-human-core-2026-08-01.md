@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix HumanDB core
 
-Status: `human_membership_frozen_perfect_pending`
+Status: `human_membership_and_execution_frozen_corpus_pending`
 
 Decision date: 2026-08-01
 
@@ -66,12 +66,14 @@ path-registry key.
 ## Execution boundary
 
 This decision freezes source membership, not an executable evaluation corpus.
-The selected HumanDB histories still require complete per-step replay through
-the pinned strict Sanmill bridge before their v2 prefix records can be frozen.
-No random or alternate-source repair is permitted if replay fails.
+The subsequent
+[HumanDB execution overlay](sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md)
+now freezes complete per-step records for all 21 histories through two fresh
+processes of the separately pinned strict Sanmill runtime. It does not modify
+this membership decision, and no random or alternate-source repair was used.
 
 No candidate was loaded and no game was played. The subsequent
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
-freezes the final 21 source members. The combined source manifest, HumanDB
-execution records, review images, evaluation, and training remain pending or
-unauthorised as applicable.
+freezes the final 21 source members. The combined source manifest and review
+images are also frozen. Assembly of those records into one executable
+64-prefix corpus remains pending; evaluation and training remain unauthorised.

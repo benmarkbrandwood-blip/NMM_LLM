@@ -847,8 +847,8 @@ records the correction sheet he reviewed. The subsequent
 freezes 33 D4-unique representatives as the complete Expert Book catalogue and
 diagnostic membership while preserving all 36 raw records as provenance. Its
 execution contract is not frozen. Status is
-`all_source_membership_frozen_execution_corpus_pending` for the balanced
-64-prefix core, and
+`all_source_membership_and_execution_records_frozen_corpus_pending` for the
+balanced 64-prefix core, and
 the subsequent
 [Book core decision](../experiments/sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members. The 22 records
@@ -867,8 +867,10 @@ freezes their combined identity. The deterministic
 contains all 64 individual panels and six visually inspected contact sheets;
 its manifest identity is
 `db37224db6e400a32df9275e5e0665647541c4aa589b327b4317235e2eb27fba`.
-HumanDB strict replay remains pending, so the package is not execution
-authority.
+The later
+[HumanDB execution overlay](../experiments/sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md)
+freezes all 21 missing per-step records. The review images remain visual
+membership material rather than execution authority.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -887,6 +889,16 @@ SHA-256
 `6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53`.
 This new identity does not replace the historical smoke evidence and is
 authorised only for strict source-history replay.
+
+That runtime replay is now complete. Two fresh processes produced exactly
+equal ordered transcripts for all 21 HumanDB histories: 273 requests and 273
+responses per process, covering 252 logical plies and 13 compound
+Mill-and-removal turns. The transcript identity is
+`e61bef7940fb1dd9a6fffb67b98640825d72a0ebcfb105627fdaa871173c13fd`;
+the frozen HumanDB execution identity is
+`1cf88ab8b3afb7c62112a0f2866eed9052587bbf2ef44dc57efa64c2749021d6`.
+All 64 source-member execution records now exist, but their combined
+executable-corpus manifest and identity remain pending.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -1036,10 +1048,11 @@ training merely because the managed run ended. Proceed in this order:
 8. Preserve the eight-ply implementation and 7/57 evidence as v1 history.
    For current work, use the twelve-ply v2 contract and completed Sanmill Book,
    expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
-   was created without deleting active sidecars. Review the proposed
+   was created without deleting active sidecars. Preserve the accepted
    `22 Book / 21 HumanDB / 21 Perfect DB` balanced-core split. Its 64 source
-   members and review manifest are now frozen; HumanDB strict replay still
-   gates an executable corpus. The expert gate is closed: preserve the frozen
+   members, review manifest, and all source-member execution records are now
+   frozen; next assemble and identity-freeze the combined executable corpus.
+   The expert gate is closed: preserve the frozen
    [33-pattern coverage catalogue](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
    and keep the separately frozen balanced-core subset without changing that
    catalogue. Row 11's screenshot-derived `c5` is
