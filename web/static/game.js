@@ -671,6 +671,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     _diagRender();
   });
 
+  const _predBandSel = $("pred-band-select");
+  if (_predBandSel) {
+    _predBandSel.addEventListener("change", () => {
+      diagEloBand = _predBandSel.value;
+      if (diagEnabled && diagTraj) _diagRequestStatic();
+    });
+  }
+
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
@@ -3062,14 +3070,17 @@ function _renderProfile(p) {
 
 // ── Diagnostic overlay ────────────────────────────────────────────────────────
 
+let diagEloBand = "middle";
+
 function _diagSend(mode, extraOpts = {}) {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;
   _diagSeq++;
   ws.send(JSON.stringify({
-    type:  "get_diagnostic",
+    type:     "get_diagnostic",
     mode,
-    depth: diagDepth,
-    seq:   _diagSeq,
+    depth:    diagDepth,
+    seq:      _diagSeq,
+    elo_band: diagEloBand,
     ...extraOpts,
   }));
 }

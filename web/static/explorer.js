@@ -236,6 +236,7 @@ let pendingCaptureMoves = [];     // move variants waiting for capture-sq pick
 let captureReturnState  = 'idle'; // state to restore on capture cancel
 let currentPhase        = 'place';
 let currentTurn         = 'W';
+let explorerEloBand     = 'middle';
 
 // ── Piece rebuild — per-piece materials for individual highlighting ────────────
 
@@ -486,6 +487,14 @@ const malomToggle = document.getElementById('malom-toggle');
 if (malomToggle) {
   malomToggle.addEventListener('change', () => {
     malomGroup.visible = malomToggle.checked;
+  });
+}
+
+const _explorerBandSel = document.getElementById('pred-band-select');
+if (_explorerBandSel) {
+  _explorerBandSel.addEventListener('change', () => {
+    explorerEloBand = _explorerBandSel.value;
+    if (currentData?.fen) loadPosition(currentData.fen);
   });
 }
 
@@ -1022,7 +1031,7 @@ async function loadPosition(fen) {
   tooltip.style.display = 'none';
 
   try {
-    const res  = await fetch('/api/explorer/position?fen=' + encodeURIComponent(fen));
+    const res  = await fetch('/api/explorer/position?fen=' + encodeURIComponent(fen) + '&elo_band=' + explorerEloBand);
     const data = await res.json();
     if (data.error) { alert('Error: ' + data.error); return; }
     currentData  = data;

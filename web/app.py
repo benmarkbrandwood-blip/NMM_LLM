@@ -1925,7 +1925,7 @@ def _mv_notation(mv: dict) -> str:
 
 
 @app.get("/api/explorer/position")
-async def explorer_position(fen: str = "........................|W|0|0"):
+async def explorer_position(fen: str = "........................|W|0|0", elo_band: str = "middle"):
     """Return position stats + move stats + winning line for the 3D explorer.
 
     Always returns ALL legal moves merged with:
@@ -2043,12 +2043,14 @@ async def explorer_position(fen: str = "........................|W|0|0"):
             log.debug("Explorer sentinel scoring failed: %s", _e)
 
     # ── Human Move Policy fallback for explorer ───────────────────────────────
+    if elo_band not in ("lower", "middle", "upper"):
+        elo_band = "middle"
     has_traj_data = any(m.get("has_db_data") for m in moves_out)
     if not has_traj_data and _human_move_policy_advisor is not None and candidates_ordered:
         try:
             _exp_probs = await asyncio.to_thread(
-                _human_move_policy_advisor.probs,
-                board, candidates_ordered, "middle",
+                _human_move_policy_advisor.probs_for_display,
+                board, candidates_ordered, elo_band,
             )
             best_p = max((float(p) for p in _exp_probs), default=0.0)
             for m, prob in zip(moves_out, _exp_probs):
@@ -2871,7 +2873,7 @@ def _nollm_choose_move(session: Session, board: BoardState) -> dict:
     return game_ai.choose_move(board, **kwargs)
 
 
-async def _pre_ai_static_diag(ws: WebSocket, board, session) -> None:
+async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "middle") -> None:
     """Compute and send the static overlay immediately after 'thinking' is sent.
 
     This guarantees the client sees heuristic + sentinel scores before the AI
@@ -2959,7 +2961,7 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session) -> None:
         if not has_traj_data and _human_move_policy_advisor is not None:
             try:
                 _hmpa_probs = await asyncio.to_thread(
-                    _human_move_policy_advisor.probs, board, candidates, "middle",
+                    _human_move_policy_advisor.probs_for_display, board, candidates, elo_band,
                 )
                 for m, prob in zip(moves_out, _hmpa_probs):
                     m["pred_human_prob"] = round(float(prob), 4)
@@ -2986,7 +2988,7 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session) -> None:
         log.debug("Pre-AI static diagnostic failed: %s", exc)
 
 
-async def _ai_turn(ws: WebSocket, session: Session) -> None:
+async def _ai_turn(ws: WebSocket, session: Session, elo_band: str = "middle") -> None:
     import time as _time
     board = session.engine.board
     diff  = session.game_ai.difficulty if session.game_ai else 3
@@ -3012,7 +3014,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
 
     # Pre-compute static overlay so client sees scores before the AI move arrives.
     # Essential at high difficulty where ponder hits complete synchronously.
-    await _pre_ai_static_diag(ws, board, session)
+    await _pre_ai_static_diag(ws, board, session, elo_band)
 
     # B-75/B-94: stop any running ponder; check if we pre-computed this position.
     _ponder_hit: dict | None = None
@@ -3235,6 +3237,7 @@ async def ws_endpoint(websocket: WebSocket):
     tournament: Optional[TournamentState] = None
     player_name: str = ""          # set from new_game; persists for the connection
     player_elo:  int = 1000        # updated when profile is loaded; used for hint cap
+    diag_elo_band: str = "middle"  # updated from get_diagnostic; used by pre-AI overlay
 
     async def _after_game_end() -> None:
         nonlocal session_games
@@ -3293,7 +3296,7 @@ async def ws_endpoint(websocket: WebSocket):
 
         auto_task = asyncio.create_task(_auto_force())
         try:
-            await _ai_turn(websocket, session)
+            await _ai_turn(websocket, session, elo_band=diag_elo_band)
             if session and session.engine.finished:
                 await _after_game_end()
         except Exception as exc:
@@ -3843,6 +3846,9 @@ async def ws_endpoint(websocket: WebSocket):
                 diag_depth  = max(1, min(5, int(msg.get("depth", 3))))
                 diag_seq    = msg.get("seq", 0)
                 fen_override = msg.get("fen")             # replay positions
+                _req_band = msg.get("elo_band", "middle")
+                if _req_band in ("lower", "middle", "upper"):
+                    diag_elo_band = _req_band             # persist for pre-AI overlay
 
                 # Server-side guard: skip negamax diagnostics while AI search is running
                 # to prevent race conditions on shared GameAI state (TT, killers, history)
@@ -4118,8 +4124,8 @@ async def ws_endpoint(websocket: WebSocket):
                             for mv in moves_out
                         ]
                         _hmpa_probs = await asyncio.to_thread(
-                            _human_move_policy_advisor.probs,
-                            diag_board, _hmpa_cands, "middle",
+                            _human_move_policy_advisor.probs_for_display,
+                            diag_board, _hmpa_cands, diag_elo_band,
                         )
                         for mv, prob in zip(moves_out, _hmpa_probs):
                             mv["pred_human_prob"] = round(float(prob), 4)
@@ -4579,7 +4585,7 @@ async def ws_endpoint(websocket: WebSocket):
                     })
                     await _send(websocket, _state(session))
                     if _is_ai_turn(session):
-                        await _ai_turn(websocket, session)
+                        await _ai_turn(websocket, session, elo_band=diag_elo_band)
 
                 else:
                     # "auto" — AI vs AI watch mode

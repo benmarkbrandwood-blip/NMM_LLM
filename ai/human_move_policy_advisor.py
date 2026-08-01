@@ -155,7 +155,8 @@ class HumanMovePolicyAdvisor:
         `p(m | position, elo_band)`.  Sums to 1 across `legal_moves`.
 
         Falls back to a uniform distribution if the score head is
-        degenerate (all inf / nan / equal / etc)."""
+        degenerate (all inf / nan / equal / etc).  Use `probs_for_display`
+        for overlays where a silent fallback is misleading."""
         if not legal_moves:
             return np.zeros(0, dtype=np.float32)
         board_feats = self._successor_features(board, legal_moves)
@@ -170,6 +171,38 @@ class HumanMovePolicyAdvisor:
         total = float(exp_s.sum())
         if total <= 0.0 or not np.isfinite(total):
             return np.full(len(legal_moves), 1.0 / len(legal_moves), dtype=np.float32)
+        return exp_s / total
+
+    def probs_for_display(
+        self, board: BoardState, legal_moves: list[dict], elo_band: str
+    ) -> np.ndarray:
+        """Like `probs()` but raises ValueError instead of silently degrading.
+
+        A failed successor encoding or non-finite model output are technical
+        failures, not a uniform prior.  Callers that use these probabilities
+        for an explanatory overlay should call this method and treat any
+        exception as visibly unavailable rather than letting a zero-row or
+        uniform distribution masquerade as a real prediction."""
+        if not legal_moves:
+            return np.zeros(0, dtype=np.float32)
+        mover_color = board.turn
+        rows: list[np.ndarray] = []
+        for m in legal_moves:
+            succ = board.apply_move(m)   # raises on failure — intentional, no catch
+            rows.append(
+                np.asarray(board_to_features(succ, mover_color), dtype=np.float32)
+            )
+        board_feats = np.stack(rows)
+        band_bits   = self._band_row(elo_band, board_feats.shape[0])
+        x           = np.concatenate([board_feats, band_bits], axis=1)
+        scores      = self._score_batch(x) / self.temperature
+        if not np.isfinite(scores).all():
+            raise ValueError("Non-finite policy scores — model output unusable for display")
+        scores -= scores.max(initial=0.0)
+        exp_s = np.exp(scores).astype(np.float32)
+        total = float(exp_s.sum())
+        if total <= 0.0 or not np.isfinite(total):
+            raise ValueError("Policy score exponents underflowed — output unusable")
         return exp_s / total
 
 
