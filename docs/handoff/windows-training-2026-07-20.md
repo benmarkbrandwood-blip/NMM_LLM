@@ -860,8 +860,10 @@ ledger rank 31 after ten `ring16` skips; selected support ranges from 16 to 27
 distinct games. The subsequent
 [Perfect DB core decision](../experiments/sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
 freezes audit routes 000 through 020. All 64 source members are now unique by
-exact history, final FEN, and `ring16`; HumanDB strict replay, the combined
-manifest, and review package remain pending.
+exact history, final FEN, and `ring16`. The
+[source core decision](../experiments/sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md)
+freezes their combined identity. HumanDB strict replay and the review package
+remain pending.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned

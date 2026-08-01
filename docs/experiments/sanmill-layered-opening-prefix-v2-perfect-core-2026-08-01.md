@@ -59,7 +59,9 @@ regenerate Perfect DB routes; it selects only from the already frozen audit.
 All 64 source memberships are now frozen and structurally disjoint. The final
 execution corpus is not yet frozen because the 21 HumanDB histories still need
 complete replay through the pinned strict Sanmill bridge. The combined source
-manifest and review images can be generated independently, but neither is an
+manifest is frozen in the
+[source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md).
+Review images can be generated independently, but neither artifact is an
 evaluation launch.
 
 No candidate was loaded and no game was played. Evaluation and training remain

@@ -67,4 +67,6 @@ The 21 HumanDB source members were then frozen in the
 [HumanDB core decision](sanmill-layered-opening-prefix-v2-human-core-2026-08-01.md).
 The 21 Perfect DB members were frozen in the
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md).
+The resulting 64 source members are combined in the
+[source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md).
 Those later records do not change the composition identity above.

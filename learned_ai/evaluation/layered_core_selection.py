@@ -838,3 +838,129 @@ def derive_perfect_core(
             ),
         },
     }
+
+
+def build_layered_source_core(
+    *,
+    composition_decision: Mapping[str, Any],
+    book_decision: Mapping[str, Any],
+    human_decision: Mapping[str, Any],
+    perfect_decision: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Combine the three frozen source memberships without making them runnable."""
+
+    composition = _mapping(
+        composition_decision.get("composition"),
+        context="composition decision",
+    )
+    expected_strata = [
+        {"stratum": "book", "count": 22},
+        {"stratum": "human_db", "count": 21},
+        {"stratum": "perfect_db", "count": 21},
+    ]
+    if composition.get("total_prefixes") != 64 or composition.get(
+        "strata"
+    ) != expected_strata:
+        raise LayeredCoreSelectionError("accepted composition drifted")
+    if composition_decision.get("composition_identity") != canonical_sha256(
+        composition
+    ):
+        raise LayeredCoreSelectionError("composition identity drifted")
+
+    source_decisions = [
+        ("book", 22, book_decision),
+        ("human_db", 21, human_decision),
+        ("perfect_db", 21, perfect_decision),
+    ]
+    records: list[dict[str, Any]] = []
+    for stratum, count, decision in source_decisions:
+        selection = _mapping(
+            decision.get("selection"),
+            context=f"{stratum} selection",
+        )
+        members = _sequence(
+            selection.get("members"),
+            context=f"{stratum} members",
+        )
+        if len(members) != count:
+            raise LayeredCoreSelectionError(f"{stratum} quota drifted")
+        for raw in members:
+            member = dict(_mapping(raw, context=f"{stratum} member"))
+            stratum_member_id = _string(
+                member.pop("core_id", None),
+                context=f"{stratum} core_id",
+            )
+            if member.get("stratum") != stratum:
+                raise LayeredCoreSelectionError(f"{stratum} label drifted")
+            if stratum == "book":
+                execution_status = "frozen_source_prefix_available"
+            else:
+                execution_status = _string(
+                    member.get("execution_record_status"),
+                    context=f"{stratum} execution status",
+                )
+            records.append(
+                {
+                    "source_core_id": f"source-core-{len(records) + 1:03d}",
+                    "stratum_member_id": stratum_member_id,
+                    **member,
+                    "execution_record_status": execution_status,
+                }
+            )
+
+    histories = {tuple(item["action_tokens"]) for item in records}
+    fens = {item["final"]["nmm_fen"] for item in records}
+    orbits = {item["final"]["ring16_canonical_fen"] for item in records}
+    if len(records) != 64 or len(histories) != 64:
+        raise LayeredCoreSelectionError("combined exact-history diversity drifted")
+    if len(fens) != 64 or len(orbits) != 64:
+        raise LayeredCoreSelectionError("combined structural diversity drifted")
+    if any(not str(fen).endswith("|W|6|6") for fen in fens):
+        raise LayeredCoreSelectionError("combined side/count boundary drifted")
+
+    status_counts: dict[str, int] = {}
+    for item in records:
+        status = item["execution_record_status"]
+        status_counts[status] = status_counts.get(status, 0) + 1
+    expected_status = {
+        "frozen_source_prefix_available": 43,
+        "full_sanmill_replay_pending": 21,
+    }
+    if status_counts != expected_status:
+        raise LayeredCoreSelectionError("execution-record status drifted")
+
+    source_inputs = {
+        "composition_identity": composition_decision["composition_identity"],
+        "book_membership_identity": book_decision["selection"][
+            "membership_identity"
+        ],
+        "human_db_membership_identity": human_decision["selection"][
+            "membership_identity"
+        ],
+        "perfect_db_membership_identity": perfect_decision["selection"][
+            "membership_identity"
+        ],
+    }
+    return {
+        "source_core_schema": "nmm.layered-opening-prefix-source-core.v1",
+        "composition": {
+            "total": 64,
+            "book": 22,
+            "human_db": 21,
+            "perfect_db": 21,
+        },
+        "source_inputs": source_inputs,
+        "source_inputs_identity": canonical_sha256(source_inputs),
+        "records": records,
+        "source_membership_identity": canonical_sha256(records),
+        "summary": {
+            "record_count": 64,
+            "unique_exact_history_count": 64,
+            "unique_final_fen_count": 64,
+            "unique_ring16_count": 64,
+            "side_to_move": "white",
+            "logical_ply_count": 12,
+            "logical_plies_by_side": [6, 6],
+            "execution_record_status_counts": status_counts,
+        },
+    }

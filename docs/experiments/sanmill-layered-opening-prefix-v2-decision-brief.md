@@ -247,6 +247,8 @@ deduplication. The
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
 freezes audit routes 000 through 020 as the final 21 source members. All 64
 source members are unique by exact history, final FEN, and `ring16` orbit.
+The combined identities are frozen in the
+[source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md).
 HumanDB strict replay, the executable corpus, and the final image package
 remain pending. No candidate-versus-baseline run or launch authorization
 exists.

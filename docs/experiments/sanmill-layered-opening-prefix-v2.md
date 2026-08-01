@@ -325,8 +325,9 @@ structural duplicates. Their complete strict-Sanmill execution records remain
 pending. The later
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
 freezes audit routes 000 through 020. All 64 source memberships are now frozen
-and structurally disjoint; the executable corpus remains pending on HumanDB
-strict replay.
+and structurally disjoint in the
+[source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md);
+the executable corpus remains pending on HumanDB strict replay.
 
 ## Explicit exclusions
 
