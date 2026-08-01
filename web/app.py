@@ -2043,7 +2043,7 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
             log.debug("Explorer sentinel scoring failed: %s", _e)
 
     # ── Human Move Policy fallback for explorer ───────────────────────────────
-    if elo_band not in ("lower", "middle", "upper"):
+    if elo_band not in ("lower", "middle", "upper", "all"):
         elo_band = "middle"
     has_traj_data = any(m.get("has_db_data") for m in moves_out)
     if not has_traj_data and _human_move_policy_advisor is not None and candidates_ordered:
@@ -3847,7 +3847,7 @@ async def ws_endpoint(websocket: WebSocket):
                 diag_seq    = msg.get("seq", 0)
                 fen_override = msg.get("fen")             # replay positions
                 _req_band = msg.get("elo_band", "middle")
-                if _req_band in ("lower", "middle", "upper"):
+                if _req_band in ("lower", "middle", "upper", "all"):
                     diag_elo_band = _req_band             # persist for pre-AI overlay
 
                 # Server-side guard: skip negamax diagnostics while AI search is running

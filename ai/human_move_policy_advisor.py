@@ -154,11 +154,17 @@ class HumanMovePolicyAdvisor:
         """Softmax over every legal move → calibrated
         `p(m | position, elo_band)`.  Sums to 1 across `legal_moves`.
 
-        Falls back to a uniform distribution if the score head is
-        degenerate (all inf / nan / equal / etc).  Use `probs_for_display`
-        for overlays where a silent fallback is misleading."""
+        Pass ``elo_band="all"`` to get an equal-weight average across all
+        three bands.  Falls back to a uniform distribution if the score
+        head is degenerate.  Use `probs_for_display` for overlays where a
+        silent fallback is misleading."""
         if not legal_moves:
             return np.zeros(0, dtype=np.float32)
+        if elo_band == "all":
+            return np.stack([
+                self.probs(board, legal_moves, b)
+                for b in ("lower", "middle", "upper")
+            ]).mean(axis=0)
         board_feats = self._successor_features(board, legal_moves)
         band_bits   = self._band_row(elo_band, board_feats.shape[0])
         x           = np.concatenate([board_feats, band_bits], axis=1)
@@ -182,9 +188,16 @@ class HumanMovePolicyAdvisor:
         failures, not a uniform prior.  Callers that use these probabilities
         for an explanatory overlay should call this method and treat any
         exception as visibly unavailable rather than letting a zero-row or
-        uniform distribution masquerade as a real prediction."""
+        uniform distribution masquerade as a real prediction.
+
+        Pass ``elo_band="all"`` to average across all three bands."""
         if not legal_moves:
             return np.zeros(0, dtype=np.float32)
+        if elo_band == "all":
+            return np.stack([
+                self.probs_for_display(board, legal_moves, b)
+                for b in ("lower", "middle", "upper")
+            ]).mean(axis=0)
         mover_color = board.turn
         rows: list[np.ndarray] = []
         for m in legal_moves:
