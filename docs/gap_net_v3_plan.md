@@ -2,18 +2,18 @@
 
 *Compiled 2026-07-30.  Read-only planning artefact.  This document* *does not modify code, activate any database, retrain any model,* *change gameplay, or connect the proposed signal to gen 2b or gen 3.* *Every downstream action is gated by the promotion criteria at the* *end of the plan.*
 
-The plan supersedes `Downloads/gap\_net\_v3\_pre\_plan.md` as authoritative; the pre-plan is treated as non-authoritative research notes.  Where the pre-plan and the current code disagreed, the code wins and the discrepancy is recorded in §3.  
+The plan supersedes `Downloads/gap_net_v3_pre_plan.md` as authoritative; the pre-plan is treated as non-authoritative research notes.  Where the pre-plan and the current code disagreed, the code wins and the discrepancy is recorded in §3.  
   
 I also found several internal conflicts in the current GapNet plan:  
   
-- G\_v is defined separately by Elo band, but the proposed 79-feature GapNet has no band input. The same position can therefore have three different targets for one identical input, forcing the network to average them. We need either band conditioning, separate per-band models, or one explicitly frozen population mixture.  
+- G_v is defined separately by Elo band, but the proposed 79-feature GapNet has no band input. The same position can therefore have three different targets for one identical input, forcing the network to average them. We need either band conditioning, separate per-band models, or one explicitly frozen population mixture.  
 - Component D is defined only when all legal moves remain in the same W/D/L class, while the global fail-closed rule rejects a position if any component is unavailable. That would remove the mixed-tier W→D, W→L and D→L positions that are the most important examples.  
 - Component D also subtracts distance values across successor positions, which conflicts with the plan’s own prohibition on cross-sector DTW/DTM subtraction. I think Component D should be deferred entirely.  
 - Equal OracleMoveValue alternatives must receive equal zero rank regret. A deterministic notation tie-break may order serialization, but it must not create artificial regret.  
 - A game-level split has to occur before human move counts are aggregated. The present v3 database stores aggregated state/move/Elo counts and no session or player identity, so assigning aggregated states to games afterwards cannot prevent leakage and cannot support the proposed player-held-out test.  
-- Objective Oracle regret is symmetry-invariant, but human move probability may contain genuine orientation, colour or UI biases. D4 invariance should therefore be an ablation, not a mandatory promotion gate for G\_v.  
-- The plan says the current GapNet leaf default is ai\_side, but the code at 5c9ca45 actually defaults to opp\_side. Because human\_correction adds a positive value from the side-to-move perspective and negamax then changes sign, the current route may avoid rather than exploit opponent blunder zones. A hand-computed two-ply sign regression is needed before reusing this path.  
-- Terminal child values should remain exact, but expectimax should still average those exact child values under P\_h. One terminal continuation should not automatically make the whole node equal pure minimax.  
+- Objective Oracle regret is symmetry-invariant, but human move probability may contain genuine orientation, colour or UI biases. D4 invariance should therefore be an ablation, not a mandatory promotion gate for G_v.  
+- The plan says the current GapNet leaf default is ai_side, but the code at 5c9ca45 actually defaults to opp_side. Because human_correction adds a positive value from the side-to-move perspective and negamax then changes sign, the current route may avoid rather than exploit opponent blunder zones. A hand-computed two-ply sign regression is needed before reusing this path.  
+- Terminal child values should remain exact, but expectimax should still average those exact child values under P_h. One terminal continuation should not automatically make the whole node equal pure minimax.  
   
 I therefore agree with the thin-slice recommendation, with one adjustment: I would keep W→D, W→L and D→L as three separate outputs rather than collapsing every downgrade into one binary component.
 
@@ -26,13 +26,13 @@ I therefore agree with the thin-slice recommendation, with one adjustment: I wou
 
 - Retrain ValueNet, HumanPrefNet, or Sentinel.
 
-- Rebuild or modify the current active `data/human\_db.sqlite`.
+- Rebuild or modify the current active `data/human_db.sqlite`.
 
-- Activate `data/human\_db\_candidate.sqlite` over the active DB.
+- Activate `data/human_db_candidate.sqlite` over the active DB.
 
-- Overwrite or replace `data/gap\_net.npz` (the artefact `web/app.py` loads today; verified `web/app.py:256-262`).
+- Overwrite or replace `data/gap_net.npz` (the artefact `web/app.py` loads today; verified `web/app.py:256-262`).
 
-- Wire any v3 signal into `ai/game\_ai.py`, `ai/heuristics.py`, `scripts/train\_s\_gen\_v2b.py`, or a future gen 3 trainer.
+- Wire any v3 signal into `ai/game_ai.py`, `ai/heuristics.py`, `scripts/train_s_gen_v2b.py`, or a future gen 3 trainer.
 
 - Choose a topology-aware board encoder; §M2 of the archived discussion plan explicitly defers this to a fresh branch.
 
@@ -41,49 +41,49 @@ I therefore agree with the thin-slice recommendation, with one adjustment: I wou
 
 The pre-plan blurred several concepts under the single word "regret". The plan requires them to remain formally distinct.  Every downstream artefact must state which of these five it produces.
 
-### 2.1 Human move policy — `P\_h`
+### 2.1 Human move policy — `P_h`
 
-> `P\_h(move | state, band-or-profile) ∈ \[0, 1\]`, summing to 1 over every legal move at `state`.
+> `P_h(move | state, band-or-profile) ∈ \[0, 1\]`, summing to 1 over every legal move at `state`.
 
-Produced today by **HumanMovePolicyNet** (`ai/human\_move\_policy\_advisor.py`, 82-input MLP, softmax over every legal move, count-weighted CE loss per `docs/human\_move\_policy\_net\_plan.md`).  Also derivable directly from `data/human\_db\_candidate.sqlite:moves\_elo\_bins` where support is sufficient (see §7.1).
+Produced today by **HumanMovePolicyNet** (`ai/human_move_policy_advisor.py`, 82-input MLP, softmax over every legal move, count-weighted CE loss per `docs/human_move_policy_net_plan.md`).  Also derivable directly from `data/human_db_candidate.sqlite:moves_elo_bins` where support is sufficient (see §7.1).
 
-- Elo band today is `lower / middle / upper` per `learned\_ai/data/elo\_binning.py`.
+- Elo band today is `lower / middle / upper` per `learned_ai/data/elo_binning.py`.
 
-- A `PlayerProfile`-conditioned variant (`ai/player\_profile.py`) is proposed as a later ablation, per the Toronto blunder-prediction finding that position-complexity dominates player-skill features — but v3 ships with band-only conditioning to keep the input shape and provenance chain honest.
+- A `PlayerProfile`-conditioned variant (`ai/player_profile.py`) is proposed as a later ablation, per the Toronto blunder-prediction finding that position-complexity dominates player-skill features — but v3 ships with band-only conditioning to keep the input shape and provenance chain honest.
 
-### 2.2 Objective move regret — `R\_v`
+### 2.2 Objective move regret — `R_v`
 
-> `R\_v(state, move) ∈ ObjectiveQuality`, derived only from `malom\_label\_version = "sector-corrected-v1"` Malom values via the complete `OracleValue` / `OracleMoveValue` ordering, evaluated from the **original mover's perspective**, with rules-terminal successors resolved.
+> `R_v(state, move) ∈ ObjectiveQuality`, derived only from `malom_label_version = "sector-corrected-v1"` Malom values via the complete `OracleValue` / `OracleMoveValue` ordering, evaluated from the **original mover's perspective**, with rules-terminal successors resolved.
 
-`R\_v` is a **direct offline computation**, not a learned model.  It is undefined when either the parent or the successor is not covered by Malom.  It is versioned.  §5 specifies it.
+`R_v` is a **direct offline computation**, not a learned model.  It is undefined when either the parent or the successor is not covered by Malom.  It is versioned.  §5 specifies it.
 
-Key discipline (reviewer §11 in `human\_move\_policy\_net\_plan.md`; §G1 in `docs/archive/discussion\_plan.md`):
+Key discipline (reviewer §11 in `human_move_policy_net_plan.md`; §G1 in `docs/archive/discussion_plan.md`):
 
-- **Never** compute `R\_v` from raw `key2` subtraction.  Malom's `key2` is context-dependent (`ai/malom\_db.py:598-604` — the ordering flips at `key1 = 0` and reverses on the `key1 \> 0` branch).
+- **Never** compute `R_v` from raw `key2` subtraction.  Malom's `key2` is context-dependent (`ai/malom_db.py:598-604` — the ordering flips at `key1 = 0` and reverses on the `key1 \> 0` branch).
 
-- **Never** compute `R\_v` from `dtw` subtraction across positions with different sectors.
+- **Never** compute `R_v` from `dtw` subtraction across positions with different sectors.
 
-- **Never** silently substitute `R\_v = 0` for a missing lookup.  Return an explicit `unavailable`.
+- **Never** silently substitute `R_v = 0` for a missing lookup.  Return an explicit `unavailable`.
 
-### 2.3 Expected human regret — `G\_v`
+### 2.3 Expected human regret — `G_v`
 
-> `G\_v(state, band-or-profile) = Σ\_\{m ∈ legal(state)\} P\_h(m | state, band) · R\_v(state, m)`
+> `G_v(state, band-or-profile) = Σ_\{m ∈ legal(state)\} P_h(m | state, band) · R_v(state, m)`
 
-`G\_v` is the composite target the GapNet v3 candidate model learns to produce.  It is defined **only where every `R\_v(state, m)` for every** **legal `m` at `state` is available** (see §5.5 fail-closed rule).  It inherits the unit and ordering of `R\_v` — no new scalar mapping is introduced by the composition.
+`G_v` is the composite target the GapNet v3 candidate model learns to produce.  It is defined **only where every `R_v(state, m)` for every** **legal `m` at `state` is available** (see §5.5 fail-closed rule).  It inherits the unit and ordering of `R_v` — no new scalar mapping is introduced by the composition.
 
-**`G\_v` is not a probability.**  It is a scalar in the objective quality space (unit chosen in §5.3) or an ordered tuple of separately tracked components.
+**`G_v` is not a probability.**  It is a scalar in the objective quality space (unit chosen in §5.3) or an ordered tuple of separately tracked components.
 
 ### 2.4 Gameplay exploitation
 
-How a search algorithm at play time may consume `P\_h`, `R\_v`, or `G\_v` without corrupting negamax signs, terminal-value dominance, or worst-case safety.  §9 lists the four candidate consumption modes (pure minimax baseline, human-policy expectimax at opponent nodes, bounded mixture, shadow mode).  This is **separate from the signal** **definition** — the same `G\_v` can be consumed by any of the four modes and the plan does not require choosing one at signal-training time.
+How a search algorithm at play time may consume `P_h`, `R_v`, or `G_v` without corrupting negamax signs, terminal-value dominance, or worst-case safety.  §9 lists the four candidate consumption modes (pure minimax baseline, human-policy expectimax at opponent nodes, bounded mixture, shadow mode).  This is **separate from the signal** **definition** — the same `G_v` can be consumed by any of the four modes and the plan does not require choosing one at signal-training time.
 
 ### 2.5 Training consumption
 
-Whether and how gen 3 (or a later cycle) uses `P\_h` / `R\_v` / `G\_v` during training.  Four consumption modes, in the recommended order of increasing risk (§10):
+Whether and how gen 3 (or a later cycle) uses `P_h` / `R_v` / `G_v` during training.  Four consumption modes, in the recommended order of increasing risk (§10):
 
-- Logged diagnostic (write to `train\_log.jsonl`, do not touch loss).
+- Logged diagnostic (write to `train_log.jsonl`, do not touch loss).
 
-- Auxiliary prediction head (learner predicts `G\_v`, does not use it).
+- Auxiliary prediction head (learner predicts `G_v`, does not use it).
 
 - Input feature to policy / value network (learner conditions on it).
 
@@ -100,41 +100,41 @@ Every row below was verified against the current commit (`HEAD = 5c9ca45` at pl
 
 | Pre-plan claim | Verification |
 | - | - |
-| HumanPrefNet has top-1 = 48.35 %, Spearman r = 0.191 | `data/eval\_human\_pref\_net\_result.json`; §6d of `retrain\_v2\_plan.md` |
-| HumanMovePolicyNet code + tests landed (23 tests green) | Commits `397d828`, `16571a6`, `780d3a2` (rename `5c9ca45`); Phase 3 marked COMPLETE in `human\_move\_policy\_net\_plan.md:255-278` |
-| HumanMovePolicyNet has NOT been trained at scale yet | `data/human\_move\_policy\_dataset/` exists (metadata + memmap); `data/human\_move\_policy\_net.npz` does NOT exist on disk |
-| `data/human\_db\_candidate.sqlite` (v3) exists, not activated | `docs/DATABASES.md` §5; validator report `data/human\_db\_candidate.sqlite.validation.json` reports `ok=True` at candidate SHA `df71395f…` |
-| Current GapNet is loaded live by `web/app.py` | `web/app.py:256-262` loads `data/gap\_net.npz` and passes to every `GameAI` construction |
-| Current GapNet is applied only at leaf nodes (depth==0) | `ai/game\_ai.py:1953-1997` — `\_negamax` depth-zero path applies `human\_correction()` conditionally on `gap\_net\_leaf\_mode`; verified default is `"ai\_side"` (`ai/game\_ai.py:492`) |
-| `human\_correction()` is additive, capped by phase | `ai/heuristics.py:3609-3652`; `\_GAP\_SCALE = 3000`; phase-cap map at line 3632 uses `gap\_blend\_place/move/fly` (12/20/5 %); returns `e\_v2 + bonus` |
-| Malom `OracleMoveValue` ordering is context-dependent | `ai/malom\_db.py:580-604`: `compare\_oracle\_move\_values` uses key1 primary, key2 secondary with flip rules at key1==0 and reverse on key1\>0 |
-| Malom `move\_value()` handles child probes with sector correction | `ai/malom\_db.py:966-981`; `undo\_negate\_oracle\_value` at 581-644 |
-| §G1 target-semantics blocker on current GapNet | `docs/archive/discussion\_plan.md:272-285` and `scripts/build\_gap\_dataset.py:11-31` — dataset uses `SENTINEL\_WEIGHT × sentinel\_q + (1-SENTINEL\_WEIGHT) × heuristic\_q\_norm` composite, NOT `malom\_top\_q − malom\_q\_of\_hp\_top` |
+| HumanPrefNet has top-1 = 48.35 %, Spearman r = 0.191 | `data/eval_human_pref_net_result.json`; §6d of `retrain_v2_plan.md` |
+| HumanMovePolicyNet code + tests landed (23 tests green) | Commits `397d828`, `16571a6`, `780d3a2` (rename `5c9ca45`); Phase 3 marked COMPLETE in `human_move_policy_net_plan.md:255-278` |
+| HumanMovePolicyNet has NOT been trained at scale yet | `data/human_move_policy_dataset/` exists (metadata + memmap); `data/human_move_policy_net.npz` does NOT exist on disk |
+| `data/human_db_candidate.sqlite` (v3) exists, not activated | `docs/DATABASES.md` §5; validator report `data/human_db_candidate.sqlite.validation.json` reports `ok=True` at candidate SHA `df71395f…` |
+| Current GapNet is loaded live by `web/app.py` | `web/app.py:256-262` loads `data/gap_net.npz` and passes to every `GameAI` construction |
+| Current GapNet is applied only at leaf nodes (depth==0) | `ai/game_ai.py:1953-1997` — `_negamax` depth-zero path applies `human_correction()` conditionally on `gap_net_leaf_mode`; verified default is `"ai_side"` (`ai/game_ai.py:492`) |
+| `human_correction()` is additive, capped by phase | `ai/heuristics.py:3609-3652`; `_GAP_SCALE = 3000`; phase-cap map at line 3632 uses `gap_blend_place/move/fly` (12/20/5 %); returns `e_v2 + bonus` |
+| Malom `OracleMoveValue` ordering is context-dependent | `ai/malom_db.py:580-604`: `compare_oracle_move_values` uses key1 primary, key2 secondary with flip rules at key1==0 and reverse on key1\>0 |
+| Malom `move_value()` handles child probes with sector correction | `ai/malom_db.py:966-981`; `undo_negate_oracle_value` at 581-644 |
+| §G1 target-semantics blocker on current GapNet | `docs/archive/discussion_plan.md:272-285` and `scripts/build_gap_dataset.py:11-31` — dataset uses `SENTINEL_WEIGHT × sentinel_q + (1-SENTINEL_WEIGHT) × heuristic_q_norm` composite, NOT `malom_top_q − malom_q_of_hp_top` |
 
 
 ### 3.2 Discrepancies
 
-**DISCREPANCY-1.**  Pre-plan §2 row "Current GapNet models opportunity gap = Malom best-move quality minus weighted quality of human moves actually played".  The current `scripts/build\_gap\_dataset.py` (`SENTINEL\_WEIGHT = 0.6`, lines 71, 203) computes gap from a **sentinel + heuristic composite**, not from Malom values at all. The `y\_hp` auxiliary label (line 407, `\# per-plan: |malom\_optimal\_q - malom\_q\_of\_hp\_top|`) is stored **separately** and only mixed in at training time when `tools/train\_gap\_net.py --hp-blend \> 0` is passed (default 0.0, line 42-43).  The dataset target and the `y\_hp` label are two different things.
+**DISCREPANCY-1.**  Pre-plan §2 row "Current GapNet models opportunity gap = Malom best-move quality minus weighted quality of human moves actually played".  The current `scripts/build_gap_dataset.py` (`SENTINEL_WEIGHT = 0.6`, lines 71, 203) computes gap from a **sentinel + heuristic composite**, not from Malom values at all. The `y_hp` auxiliary label (line 407, `\# per-plan: |malom_optimal_q - malom_q_of_hp_top|`) is stored **separately** and only mixed in at training time when `tools/train_gap_net.py --hp-blend \> 0` is passed (default 0.0, line 42-43).  The dataset target and the `y_hp` label are two different things.
 
-- **Owning document to fix:** `docs/archive/discussion\_plan.md` §G1 already flags this — the pre-plan's summary of that concern is imprecise.  This plan is now the authoritative statement.
+- **Owning document to fix:** `docs/archive/discussion_plan.md` §G1 already flags this — the pre-plan's summary of that concern is imprecise.  This plan is now the authoritative statement.
 
-**DISCREPANCY-2.**  Pre-plan §2 row "GapNet ... wired into `ai/game\_ai.py`, `ai/heuristics.py` (`gap\_blend\_place`, `gap\_blend\_move` caps)" implies HumanPrefNet participates in the leaf correction.  It does not — `human\_correction()`'s signature (`ai/heuristics.py:3609-3617`) takes `gap\_net` only.  HumanPrefNet is used **elsewhere** in `ai/game\_ai.py` at lines 1643-1666 and 2646, for the `humanlike\_blend` re-ranking of the top candidates *after* the negamax has finished — a different code path.
+**DISCREPANCY-2.**  Pre-plan §2 row "GapNet ... wired into `ai/game_ai.py`, `ai/heuristics.py` (`gap_blend_place`, `gap_blend_move` caps)" implies HumanPrefNet participates in the leaf correction.  It does not — `human_correction()`'s signature (`ai/heuristics.py:3609-3617`) takes `gap_net` only.  HumanPrefNet is used **elsewhere** in `ai/game_ai.py` at lines 1643-1666 and 2646, for the `humanlike_blend` re-ranking of the top candidates *after* the negamax has finished — a different code path.
 
 - **Owning document to fix:** none needed; this plan documents the actual wiring so v3 will not misroute.
 
-**DISCREPANCY-3.**  Pre-plan §3 item 6 asks "is GapNet v2's existing `opportunity gap` signal now redundant with expected-regret?".  There is no `gap\_net\_v2.npz` on disk; the currently-live model is at `data/gap\_net.npz` and was trained on a legacy pipeline.  A "v2" dataset builder exists (`build\_gap\_dataset.py:6-8` mentions v2) but its output has never been promoted per §G1.  So the redundancy question is malformed: v3 is not competing with a shipped v2, it is competing with **an unshipped-and-blocked v2 concept** and the currently-live v1-composite artefact.
+**DISCREPANCY-3.**  Pre-plan §3 item 6 asks "is GapNet v2's existing `opportunity gap` signal now redundant with expected-regret?".  There is no `gap_net_v2.npz` on disk; the currently-live model is at `data/gap_net.npz` and was trained on a legacy pipeline.  A "v2" dataset builder exists (`build_gap_dataset.py:6-8` mentions v2) but its output has never been promoted per §G1.  So the redundancy question is malformed: v3 is not competing with a shipped v2, it is competing with **an unshipped-and-blocked v2 concept** and the currently-live v1-composite artefact.
 
 - **Owning document to fix:** none — v3 will not overwrite either.
 
-**DISCREPANCY-4.**  Pre-plan §3 item 7 states current GapNet correction is "applied only at the AI's own leaf nodes ... exclusive to AI side".  Verified partially: the default `gap\_net\_leaf\_mode` IS `"ai\_side"` (`ai/game\_ai.py:492`), but the attribute is public and supports `"opp\_side"`, `"both"`, and `"off"` (verified at `ai/game\_ai.py:1974-1983`).  Symmetric application is already possible today; nothing needs to be added to `\_negamax` to try it. The pre-plan's implication that "symmetric application would be a new code path" is wrong.
+**DISCREPANCY-4.**  Pre-plan §3 item 7 states current GapNet correction is "applied only at the AI's own leaf nodes ... exclusive to AI side".  Verified partially: the default `gap_net_leaf_mode` IS `"ai_side"` (`ai/game_ai.py:492`), but the attribute is public and supports `"opp_side"`, `"both"`, and `"off"` (verified at `ai/game_ai.py:1974-1983`).  Symmetric application is already possible today; nothing needs to be added to `_negamax` to try it. The pre-plan's implication that "symmetric application would be a new code path" is wrong.
 
-- **Owning document to fix:** `AI\_INTERNALS.md` (not in scope of this edit — flag for future doc sweep).
+- **Owning document to fix:** `AI_INTERNALS.md` (not in scope of this edit — flag for future doc sweep).
 
-**DISCREPANCY-5.**  Pre-plan §2 row "Malom regret — `docs/human\_move\_policy\_net\_plan.md` and the Phase-1 audit both say: raw `key2` subtraction is not a valid regret target".  Verified against `docs/human\_move\_policy\_net\_plan.md:418-441` and `docs/human\_moves\_audit\_phase1.md:343-355`.  Correct.
+**DISCREPANCY-5.**  Pre-plan §2 row "Malom regret — `docs/human_move_policy_net_plan.md` and the Phase-1 audit both say: raw `key2` subtraction is not a valid regret target".  Verified against `docs/human_move_policy_net_plan.md:418-441` and `docs/human_moves_audit_phase1.md:343-355`.  Correct.
 
-**DISCREPANCY-6.**  Pre-plan §5 "framing" item 4 says "HumanMovePolicyNet Phase 4 eval must show acceptable calibration ... before GapNet v3 consumes it as ground truth for where humans will falter".  The eval script that was landed (`tools/eval\_human\_move\_policy\_net.py`) reports event NLL, top-1/3/5, ECE, per-band + per-phase + per-transition strata.  It does **NOT** report Brier score, corrected multiclass calibration, uniform / empirical-frequency baselines side-by-side, per-legal-move-count stratum, an independent test partition, OOD / coverage / abstention diagnostics, or immutable hashes (verified: `grep OOD | abstain | coverage tools/eval\_human\_move\_policy\_net.py` returns no matches). This plan's §7.1 lists what has to be added to that script before HumanMovePolicyNet becomes a v3 dependency.
+**DISCREPANCY-6.**  Pre-plan §5 "framing" item 4 says "HumanMovePolicyNet Phase 4 eval must show acceptable calibration ... before GapNet v3 consumes it as ground truth for where humans will falter".  The eval script that was landed (`tools/eval_human_move_policy_net.py`) reports event NLL, top-1/3/5, ECE, per-band + per-phase + per-transition strata.  It does **NOT** report Brier score, corrected multiclass calibration, uniform / empirical-frequency baselines side-by-side, per-legal-move-count stratum, an independent test partition, OOD / coverage / abstention diagnostics, or immutable hashes (verified: `grep OOD | abstain | coverage tools/eval_human_move_policy_net.py` returns no matches). This plan's §7.1 lists what has to be added to that script before HumanMovePolicyNet becomes a v3 dependency.
 
-- **Owning document to fix:** `docs/human\_move\_policy\_net\_plan.md` Phase 4 section is optimistic about eval completeness.  A follow-up revision to that doc will note the missing metrics under a new "Phase 4b — additional diagnostics" heading.
+- **Owning document to fix:** `docs/human_move_policy_net_plan.md` Phase 4 section is optimistic about eval completeness.  A follow-up revision to that doc will note the missing metrics under a new "Phase 4b — additional diagnostics" heading.
 
 
 ## 4. Blockers that must close before v3 proceeds
@@ -143,21 +143,21 @@ The plan does not authorise any of the following work until every blocker in th
 
 ### 4.1 HumanMovePolicyNet Phase 4 gates
 
-Required before `P\_h` is trusted as a v3 dependency (§7):
+Required before `P_h` is trusted as a v3 dependency (§7):
 
-1. ✅ **DONE (2026-07-30/31 + 2026-08-01)** — Train to convergence on `data/human\_move\_policy\_dataset/` (v1, 22 epochs, val NLL 1.5953, ~11.6 h). First-run model saved as `data/human\_move\_policy\_net.npz`. v2 re-extraction (515\xc2\xa0s) + re-train (65\xe2\x80\x8a150\xc2\xa0s, 26 epochs, val NLL **1.5816**) complete 2026-08-01. v2 candidate saved as `data/human\_move\_policy\_net\_v2\_candidate.npz`.
+1. ✅ **DONE (2026-07-30/31 + 2026-08-01)** — Train to convergence on `data/human_move_policy_dataset/` (v1, 22 epochs, val NLL 1.5953, ~11.6 h). First-run model saved as `data/human_move_policy_net.npz`. v2 re-extraction (515\xc2\xa0s) + re-train (65\xe2\x80\x8a150\xc2\xa0s, 26 epochs, val NLL **1.5816**) complete 2026-08-01. v2 candidate saved as `data/human_move_policy_net_v2_candidate.npz`.
 
-2. ✅ **DONE (2026-07-31)** — `tools/eval\_human\_move\_policy\_net.py` rewritten (Phase 4b).  Now reports:
+2. ✅ **DONE (2026-07-31)** — `tools/eval_human_move_policy_net.py` rewritten (Phase 4b).  Now reports:
 
    - **Brier score** per band, phase, transition, lmc.
 
-   - **Temperature scaling** (pass-1 logit collection, `scipy` `minimize\_scalar` on val NLL, pass-2 full eval with T\*).
+   - **Temperature scaling** (pass-1 logit collection, `scipy` `minimize_scalar` on val NLL, pass-2 full eval with T\*).
 
    - **Uniform** baseline in every stratum (NLL, Brier, top-k, ECE).
 
-   - **Empirical-frequency** baseline at `≥ min\_support` positions, side-by-side with the model.
+   - **Empirical-frequency** baseline at `≥ min_support` positions, side-by-side with the model.
 
-   - **Per-legal-move-count** strata: `lmc\_2-5`, `lmc\_6-10`, `lmc\_11-20`, `lmc\_21+`.
+   - **Per-legal-move-count** strata: `lmc_2-5`, `lmc_6-10`, `lmc_11-20`, `lmc_21+`.
 
    - **OOD** row: positions not reached by any train-split sample.
 
@@ -165,79 +165,79 @@ Required before `P\_h` is trusted as a v3 dependency (§7):
 
    - **Game-val-only** diagnostic stratum (requires `--session-index`).
 
-   - **Test set** (`--run-test-set`, single-shot, v2 datasets only). Files: `tools/eval\_human\_move\_policy\_net.py`.
+   - **Test set** (`--run-test-set`, single-shot, v2 datasets only). Files: `tools/eval_human_move_policy_net.py`.
 
 3. ✅ **DONE (2026-07-31)** — Split rework:
 
-   - `learned\_ai/data/human\_db\_split.py` v2 adds `three\_way\_split()` (5 % test / 15 % val / 80 % train) and `game\_level\_split()`. `in\_val\_bucket` unchanged (all other consumers unaffected).
+   - `learned_ai/data/human_db_split.py` v2 adds `three_way_split()` (5 % test / 15 % val / 80 % train) and `game_level_split()`. `in_val_bucket` unchanged (all other consumers unaffected).
 
-   - `tools/extract\_human\_move\_policy\_dataset.py` v2 emits `sample\_split` int8 array (0=train, 1=val, 2=test) and backward-compat `sample\_is\_val`.
+   - `tools/extract_human_move_policy_dataset.py` v2 emits `sample_split` int8 array (0=train, 1=val, 2=test) and backward-compat `sample_is_val`.
 
-   - `tools/build\_session\_index.py` (new) scans 97 138 JSONL game files → `game\_split\_mask` + `player\_split\_mask` uint8 bitmask arrays.
+   - `tools/build_session_index.py` (new) scans 97 138 JSONL game files → `game_split_mask` + `player_split_mask` uint8 bitmask arrays.
 
-   - `tools/train\_human\_move\_policy\_net.py` updated: detects v2 dataset, uses `sample\_split` for train/val/test; new default output `data/human\_move\_policy\_net\_v2\_candidate.npz`. ✅ **DONE (2026-08-01):** re-extraction 515 s; re-train 65 150 s (~18.1 h); session-index built; Phase 4b eval complete → `data/gap\_v3\_prerequisite\_eval.json` produced.
+   - `tools/train_human_move_policy_net.py` updated: detects v2 dataset, uses `sample_split` for train/val/test; new default output `data/human_move_policy_net_v2_candidate.npz`. ✅ **DONE (2026-08-01):** re-extraction 515 s; re-train 65 150 s (~18.1 h); session-index built; Phase 4b eval complete → `data/gap_v3_prerequisite_eval.json` produced.
 
-4. ✅ **DONE (2026-07-31)** — Provenance chain already inherited via `.npz`-embedded `provenance\_json` (verified: candidate DB SHA-256, dataset git commit, feature version, elo band config all present in `data/human\_move\_policy\_dataset/provenance.json` and model .npz). The split-manifest version is now "v2" (bumped from "v1").
+4. ✅ **DONE (2026-07-31)** — Provenance chain already inherited via `.npz`-embedded `provenance_json` (verified: candidate DB SHA-256, dataset git commit, feature version, elo band config all present in `data/human_move_policy_dataset/provenance.json` and model .npz). The split-manifest version is now "v2" (bumped from "v1").
 
-Owning document: this plan; `docs/human\_move\_policy\_net\_plan.md` §Phase 4b documents the extended eval requirements.  `data/gap\_v3\_prerequisite\_eval\_V2.json` produced 2026-08-01 with strict V2 evaluator (zero-skip, single-pass logits, two-tier degrade semantics, split-integrity check replacing superseded OOD threshold).  All HumanMovePolicyNet prerequisite gates ✅ **PASSED** — NLL: 31–34 % per band; ECE: 0.037/0.028/0.022 lower/mid/upper at T*=0.7674 (all ≤ 0.05); split integrity: 0 val keys in train; abstention: 0 inference skips.  Formal degrade cal: n=2,617 fully-labelled samples (fly n=0 — no fly position has all legal moves Malom-labelled); diagnostic (n=376,037, labelled-subset only): macro pred P(degrade) 0.068 vs obs 0.069 — well aligned.  Stage B closed; see §16 for gate table.
+Owning document: this plan; `docs/human_move_policy_net_plan.md` §Phase 4b documents the extended eval requirements.  `data/gap_v3_prerequisite_eval_V2.json` produced 2026-08-01 with strict V2 evaluator (zero-skip, single-pass logits, two-tier degrade semantics, split-integrity check replacing superseded OOD threshold).  All HumanMovePolicyNet prerequisite gates ✅ **PASSED** — NLL: 31–34 % per band; ECE: 0.037/0.028/0.022 lower/mid/upper at T*=0.7674 (all ≤ 0.05); split integrity: 0 val keys in train; abstention: 0 inference skips.  Formal degrade cal: n=2,617 fully-labelled samples (fly n=0 — no fly position has all legal moves Malom-labelled); diagnostic (n=376,037, labelled-subset only): macro pred P(degrade) 0.068 vs obs 0.069 — well aligned.  Stage B closed; see §16 for gate table.
 
 ### 4.2 Candidate database
 
-Before the v3 dataset extraction reads from `data/human\_db\_candidate.sqlite`:
+Before the v3 dataset extraction reads from `data/human_db_candidate.sqlite`:
 
-1. **Do not activate** the candidate DB over the active DB.  A validated candidate may be **read directly** for experimentation without activation (per plan preamble).  The v3 extractor will read from `data/human\_db\_candidate.sqlite` and record its SHA-256 into the extracted dataset provenance.
+1. **Do not activate** the candidate DB over the active DB.  A validated candidate may be **read directly** for experimentation without activation (per plan preamble).  The v3 extractor will read from `data/human_db_candidate.sqlite` and record its SHA-256 into the extracted dataset provenance.
 
-2. **Malom-version enforcement gap.**  The current builder writes `malom\_label\_version` into `meta` only after `\_annotate\_malom(...)` completes without error (`tools/\_human\_db\_build.py:642`), but the validator (`tools/validate\_human\_db\_candidate.py`) treats a missing `malom\_label\_version` as absent — it does not fail closed on presence of `malom\_wdl` rows without a version stamp.  Follow-up fix (out of scope for v3 code, in scope for a v3 blocker): validator must fail when `positions.malom\_wdl IS NOT NULL` and `meta.malom\_label\_version IS NULL`.  Until that lands, the v3 dataset must abort if the candidate DB has any Malom-labelled row with a missing / non-`sector-corrected-v1` version.
+2. **Malom-version enforcement gap.**  The current builder writes `malom_label_version` into `meta` only after `_annotate_malom(...)` completes without error (`tools/_human_db_build.py:642`), but the validator (`tools/validate_human_db_candidate.py`) treats a missing `malom_label_version` as absent — it does not fail closed on presence of `malom_wdl` rows without a version stamp.  Follow-up fix (out of scope for v3 code, in scope for a v3 blocker): validator must fail when `positions.malom_wdl IS NOT NULL` and `meta.malom_label_version IS NULL`.  Until that lands, the v3 dataset must abort if the candidate DB has any Malom-labelled row with a missing / non-`sector-corrected-v1` version.
 
-3. **Update double-count risk.**  `--update` uses `file\_path` as `processed\_files` PK (`tools/\_human\_db\_build.py:98`, verified) and only checks per-file SHA-256.  A host-path collision would double-count.  Reviewer §12 already asked for logical-source-identity — deferred.  V3 requires the DB it reads to have been built with **`--rebuild`** (not `--update`) on the same host as the extraction, and records the `processed\_files.sha256` list SHA into the dataset provenance.
+3. **Update double-count risk.**  `--update` uses `file_path` as `processed_files` PK (`tools/_human_db_build.py:98`, verified) and only checks per-file SHA-256.  A host-path collision would double-count.  Reviewer §12 already asked for logical-source-identity — deferred.  V3 requires the DB it reads to have been built with **`--rebuild`** (not `--update`) on the same host as the extraction, and records the `processed_files.sha256` list SHA into the dataset provenance.
 
 ### 4.3 Existing GapNet — §G1 discipline
 
-The currently-live `data/gap\_net.npz` will remain live throughout v3 development.  §G1 remains open; v3 does not close it (v3 is a different target, not a rebuild of the existing composite).
+The currently-live `data/gap_net.npz` will remain live throughout v3 development.  §G1 remains open; v3 does not close it (v3 is a different target, not a rebuild of the existing composite).
 
-The v3 candidate .npz filename is **`data/gap\_net\_v3\_candidate.npz`**. The un-suffixed `data/gap\_net.npz` is not touched. `data/gap\_net\_v2.npz` (if it appears) is not touched.  A `.pre-v3` backup rule mirrors the DB pattern.
+The v3 candidate .npz filename is **`data/gap_net_v3_candidate.npz`**. The un-suffixed `data/gap_net.npz` is not touched. `data/gap_net_v2.npz` (if it appears) is not touched.  A `.pre-v3` backup rule mirrors the DB pattern.
 
-### 4.4 `malom.query\_regret` does not exist
+### 4.4 `malom.query_regret` does not exist
 
-The pre-plan cites `malom.query\_regret(board, move)` as if it were an existing API.  It is not (verified: no such method in `ai/malom\_db.py`).  The v3 plan requires this API to be added **offline first**, tested against a golden corpus (§6), and versioned, before any dataset extraction proceeds.  §5.4 specifies the contract.
+The pre-plan cites `malom.query_regret(board, move)` as if it were an existing API.  It is not (verified: no such method in `ai/malom_db.py`).  The v3 plan requires this API to be added **offline first**, tested against a golden corpus (§6), and versioned, before any dataset extraction proceeds.  §5.4 specifies the contract.
 
 
-## 5. Objective move regret — `R\_v` specification
+## 5. Objective move regret — `R_v` specification
 
 ### 5.1 Contract
 
 ```
-malom\_db.query\_regret(  
-    parent\_board:  BoardState,     \# the position from which the move is played  
-    move:          dict,           \# legal move dict as returned by get\_all\_legal\_moves  
+malom_db.query_regret(  
+    parent_board:  BoardState,     \# the position from which the move is played  
+    move:          dict,           \# legal move dict as returned by get_all_legal_moves  
 ) -\> RegretResult
 ```
 
 Where `RegretResult` is a **dataclass** carrying:
 
-- `available: bool` — True iff both `parent\_board` and `parent\_board.apply\_move(move)` returned a non-None `OracleValue` OR the child is a rules-terminal (§5.4 handling).
+- `available: bool` — True iff both `parent_board` and `parent_board.apply_move(move)` returned a non-None `OracleValue` OR the child is a rules-terminal (§5.4 handling).
 
-- `omv: OracleMoveValue | None` — the complete oracle move value from the parent's perspective, produced via `malom.move\_value(parent\_val, child\_val)` or `malom.terminal\_move\_value(parent\_val, terminal\_outcome)`.
+- `omv: OracleMoveValue | None` — the complete oracle move value from the parent's perspective, produced via `malom.move_value(parent_val, child_val)` or `malom.terminal_move_value(parent_val, terminal_outcome)`.
 
-- `wdl\_transition: str | None` — one of the 6 audit categories from `tools/audit\_human\_moves.py::\_classify\_transition`.
+- `wdl_transition: str | None` — one of the 6 audit categories from `tools/audit_human_moves.py::_classify_transition`.
 
-- `best\_omv: OracleMoveValue` — the maximum `OracleMoveValue` over all legal moves at `parent\_board`, computed via `compare\_oracle\_move\_values`.  `None` iff any legal successor's OMV is unavailable (fail-closed rule §5.5).
+- `best_omv: OracleMoveValue` — the maximum `OracleMoveValue` over all legal moves at `parent_board`, computed via `compare_oracle_move_values`.  `None` iff any legal successor's OMV is unavailable (fail-closed rule §5.5).
 
 - `components: dict\[str, float | None\]` — the versioned scalarizations of §5.3, EACH computed independently.  Any component that cannot be computed reports `None` (never `0.0`).
 
-- `regret\_version: str` — a hard-coded module-level constant such as `"regret\_v1"`; loaded at import time; recorded in every downstream artefact.
+- `regret_version: str` — a hard-coded module-level constant such as `"regret_v1"`; loaded at import time; recorded in every downstream artefact.
 
-- `malom\_label\_version: str` — passed through from the DB; asserted equal to `sector-corrected-v1` (fail-closed).
+- `malom_label_version: str` — passed through from the DB; asserted equal to `sector-corrected-v1` (fail-closed).
 
 The function **must never** return a valid result when either input probe fails and the child is not a rules-terminal.  It must never return a `float` or `int` as a top-level scalar — only the ordered tuple.  A caller can extract a component after acknowledging its version.
 
 ### 5.2 Never do
 
-- `key2` subtraction across two `OracleValue`s (`ai/malom\_db.py:598-604` ordering flips on `key1` sign — subtraction is not meaningful).
+- `key2` subtraction across two `OracleValue`s (`ai/malom_db.py:598-604` ordering flips on `key1` sign — subtraction is not meaningful).
 
 - `dtw` subtraction across parent and child.
 
-- `sector\_value` arithmetic across different sectors.
+- `sector_value` arithmetic across different sectors.
 
 - Silent zero substitution.
 
@@ -245,27 +245,27 @@ The function **must never** return a valid result when either input probe fails
 
 - Silent neutral-default of any kind.
 
-Any code path that would compute one of the above must instead return `available = False` with an `unavailable\_reason` string.
+Any code path that would compute one of the above must instead return `available = False` with an `unavailable_reason` string.
 
 ### 5.3 Candidate scalarizations — kept as separate components
 
 **Rationale (reviewer request):** do not collapse regret into a single arbitrary scalar until the dataset has been trained and evaluated with each component as a candidate target.  Retain as separate outputs in the first dataset so the training pipeline can select between them or train multi-head.
 
-Version each component with a suffix (e.g. `regret\_v1.rank\_loss`).
+Version each component with a suffix (e.g. `regret_v1.rank_loss`).
 
-**Component A — probability of outcome-class downgrade** **(`class\_downgrade\_prob`).**  Zero or one.  The move's `wdl\_transition` under the mover's POV; `1.0` iff the transition is in the set `\{win\_to\_draw, win\_to\_loss, draw\_to\_loss\}`; `0.0` iff in `\{win\_preserved, draw\_preserved, all\_losing\}`; `None` iff `label\_inconsistency` or `unlabelled`.  Simplest possible target; used as a baseline.
+**Component A — probability of outcome-class downgrade** **(`class_downgrade_prob`).**  Zero or one.  The move's `wdl_transition` under the mover's POV; `1.0` iff the transition is in the set `\{win_to_draw, win_to_loss, draw_to_loss\}`; `0.0` iff in `\{win_preserved, draw_preserved, all_losing\}`; `None` iff `label_inconsistency` or `unlabelled`.  Simplest possible target; used as a baseline.
 
-**Component B — expected frozen W/D/L utility loss** **(`wdl\_utility\_loss`).**  Given `U(W)=+1, U(D)=0, U(L)=-1`, this is `U(best\_move\_after\_mover\_pov) − U(this\_move\_after\_mover\_pov)` where the "mover POV" outcome is the flipped `malom\_wdl\_after`.  Range `\[0, 2\]`.  Frozen — the utility mapping is a versioned constant; do not tune it during training.
+**Component B — expected frozen W/D/L utility loss** **(`wdl_utility_loss`).**  Given `U(W)=+1, U(D)=0, U(L)=-1`, this is `U(best_move_after_mover_pov) − U(this_move_after_mover_pov)` where the "mover POV" outcome is the flipped `malom_wdl_after`.  Range `\[0, 2\]`.  Frozen — the utility mapping is a versioned constant; do not tune it during training.
 
-**Component C — normalised ordinal rank loss** **(`ordinal\_rank\_loss`).**  Sort the legal moves by `compare\_oracle\_move\_values` (ties broken deterministically by canonical notation).  `rank(this\_move) − rank(best\_move)` divided by `(n\_legal\_moves − 1)` if `n\_legal\_moves ≥ 2`, else `0.0`.  Range `\[0, 1\]`.  Directly uses the OracleMoveValue ordering as the reviewer required.
+**Component C — normalised ordinal rank loss** **(`ordinal_rank_loss`).**  Sort the legal moves by `compare_oracle_move_values` (ties broken deterministically by canonical notation).  `rank(this_move) − rank(best_move)` divided by `(n_legal_moves − 1)` if `n_legal_moves ≥ 2`, else `0.0`.  Range `\[0, 1\]`.  Directly uses the OracleMoveValue ordering as the reviewer required.
 
-**Component D — within-class distance component** **(`within\_class\_distance`).**  **Only** where its ordering and scale are formally specified.  Candidate spec: for two moves with the same mover-POV WDL, the distance is `sign(mover\_pov\_wdl) × (dtw\_this − dtw\_best) / max\_dtw\_in\_position` where `max\_dtw\_in\_position` is the largest `abs(dtw)` observed across the legal moves.  Only defined when all legal moves share the same mover-POV WDL — otherwise `None`.
+**Component D — within-class distance component** **(`within_class_distance`).**  **Only** where its ordering and scale are formally specified.  Candidate spec: for two moves with the same mover-POV WDL, the distance is `sign(mover_pov_wdl) × (dtw_this − dtw_best) / max_dtw_in_position` where `max_dtw_in_position` is the largest `abs(dtw)` observed across the legal moves.  Only defined when all legal moves share the same mover-POV WDL — otherwise `None`.
 
 Component D is the highest-risk of the four (any within-class metric depends on Malom internals) and is retained separately so the trainer can be evaluated with and without it.
 
 ### 5.4 Rules-terminal handling
 
-If `parent\_board.apply\_move(move)` yields a rules-terminal successor (no legal moves, or captured piece count breaches rules), the caller must use `malom.terminal\_move\_value(parent\_val, terminal\_outcome)` (`ai/malom\_db.py:983`) instead of probing the child.  `R\_v` for a terminal child inherits the terminal outcome via the parent's oracle value.  §6 requires the golden corpus to cover:
+If `parent_board.apply_move(move)` yields a rules-terminal successor (no legal moves, or captured piece count breaches rules), the caller must use `malom.terminal_move_value(parent_val, terminal_outcome)` (`ai/malom_db.py:983`) instead of probing the child.  `R_v` for a terminal child inherits the terminal outcome via the parent's oracle value.  §6 requires the golden corpus to cover:
 
 - placement-terminal (piece reduces to 2)
 
@@ -273,20 +273,20 @@ If `parent\_board.apply\_move(move)` yields a rules-terminal successor (no lega
 
 - capture-terminal (own piece falls to 2 after opponent capture)
 
-with the correct `terminal\_outcome` supplied.
+with the correct `terminal_outcome` supplied.
 
 ### 5.5 Fail-closed rule
 
-A single unavailable component in a single position makes `G\_v` unavailable for that position.  The extractor must record it under `positions\_abstained\_reason` and **not** include the position in the training set.  There is no zero-imputation, no uniform-imputation, no neutral-default.  Coverage of the resulting dataset is reported as an artefact (§15) so the reader can see what fraction of the candidate DB is trainable.
+A single unavailable component in a single position makes `G_v` unavailable for that position.  The extractor must record it under `positions_abstained_reason` and **not** include the position in the training set.  There is no zero-imputation, no uniform-imputation, no neutral-default.  Coverage of the resulting dataset is reported as an artefact (§15) so the reader can see what fraction of the candidate DB is trainable.
 
 
 ## 6. Golden corpus for oracle-regret validation
 
-Before `malom.query\_regret` is trusted for dataset extraction, it must be proved correct on a hand-verified corpus.  Location: `tests/fixtures/malom\_regret\_golden.json` (new file, populated by Stage A).
+Before `malom.query_regret` is trusted for dataset extraction, it must be proved correct on a hand-verified corpus.  Location: `tests/fixtures/malom_regret_golden.json` (new file, populated by Stage A).
 
 ### 6.1 Categories the corpus must cover
 
-Each row records: `state\_key`, `move\_notation`, `expected\_wdl\_transition`, `expected\_regret\_v1\_class\_downgrade\_prob`, `expected\_regret\_v1\_wdl\_utility\_loss`, `expected\_regret\_v1\_ordinal\_rank` (as fraction of tie-broken position), `expected\_regret\_v1\_within\_class\_distance` (nullable), plus a human comment.
+Each row records: `state_key`, `move_notation`, `expected_wdl_transition`, `expected_regret_v1_class_downgrade_prob`, `expected_regret_v1_wdl_utility_loss`, `expected_regret_v1_ordinal_rank` (as fraction of tie-broken position), `expected_regret_v1_within_class_distance` (nullable), plus a human comment.
 
 - **Placement phase — early**: opening moves at plies 1-5, both a known winning selection and a known drawing alternative.
 
@@ -300,36 +300,36 @@ Each row records: `state\_key`, `move\_notation`, `expected\_wdl\_transition`, 
 
 - **Terminal successors**: three terminal-outcome cases (each of the three rules-terminals above); asserts the terminal-move-value path.
 
-- **Every W/D/L transition category** as classified by `\_classify\_transition`: win\_preserved, win\_to\_draw, win\_to\_loss, draw\_preserved, draw\_to\_loss, all\_losing.  A position for each, with the expected regret values.
+- **Every W/D/L transition category** as classified by `_classify_transition`: win_preserved, win_to_draw, win_to_loss, draw_preserved, draw_to_loss, all_losing.  A position for each, with the expected regret values.
 
-- **Equal-value alternatives**: at least one position where two moves have identical `OracleMoveValue`; assert `rank\_loss = 0` for the second-picked move under the tie-break rule.
+- **Equal-value alternatives**: at least one position where two moves have identical `OracleMoveValue`; assert `rank_loss = 0` for the second-picked move under the tie-break rule.
 
-- **Symmetry transforms**: for two positions, hand-write the D4-mirror variant and assert `R\_v` is invariant modulo notation-transform (Stage A must include a test that runs each golden row through all 8 D4 symmetries and asserts unchanged output).
+- **Symmetry transforms**: for two positions, hand-write the D4-mirror variant and assert `R_v` is invariant modulo notation-transform (Stage A must include a test that runs each golden row through all 8 D4 symmetries and asserts unchanged output).
 
-- **Missing Malom coverage**: a position deliberately picked from a sector not present on the developer's machine (verified by `malom.query\_value(board)` returning None); assert `RegretResult.available = False` and the correct `unavailable\_reason`.
+- **Missing Malom coverage**: a position deliberately picked from a sector not present on the developer's machine (verified by `malom.query_value(board)` returning None); assert `RegretResult.available = False` and the correct `unavailable_reason`.
 
 ### 6.2 Fixture-test discipline
 
 - Golden rows carry no computed values — only human-verified ground truth.
 
-- The test file loads each row, runs `malom.query\_regret`, asserts on every recorded field.
+- The test file loads each row, runs `malom.query_regret`, asserts on every recorded field.
 
-- A test that fails because Malom is unavailable on the CI runner skips (per repo convention with `\_MALOM\_AVAILABLE`) rather than emitting a false pass.
+- A test that fails because Malom is unavailable on the CI runner skips (per repo convention with `_MALOM_AVAILABLE`) rather than emitting a false pass.
 
 - The corpus is versioned in git; every subsequent Malom-fix commit must run this suite.
 
 
-## 7. Human move policy — `P\_h` source and ablation
+## 7. Human move policy — `P_h` source and ablation
 
 ### 7.1 What v3 depends on
 
-**Primary:** the `HumanMovePolicyAdvisor.probs(board, legal\_moves, elo\_band)` API (`ai/human\_move\_policy\_advisor.py:126-171` at rename head).  Verified: pure numpy, softmax over every legal move, uniform-fallback on degenerate scores.
+**Primary:** the `HumanMovePolicyAdvisor.probs(board, legal_moves, elo_band)` API (`ai/human_move_policy_advisor.py:126-171` at rename head).  Verified: pure numpy, softmax over every legal move, uniform-fallback on degenerate scores.
 
-**Secondary:** for positions with `≥ min\_support` observed events in `data/human\_db\_candidate.sqlite:moves\_elo\_bins`, v3 will additionally compute the **direct empirical `P\_h`** as `total\_band(m) / Σ\_m' total\_band(m')`.  The extractor stores both. Downstream can then choose:
+**Secondary:** for positions with `≥ min_support` observed events in `data/human_db_candidate.sqlite:moves_elo_bins`, v3 will additionally compute the **direct empirical `P_h`** as `total_band(m) / Σ_m' total_band(m')`.  The extractor stores both. Downstream can then choose:
 
 - Model-only training target: use `HumanMovePolicyAdvisor.probs`.
 
-- Empirical-baseline `G\_v`: use `moves\_elo\_bins`-derived `P\_h`.
+- Empirical-baseline `G_v`: use `moves_elo_bins`-derived `P_h`.
 
 - Hybrid: use empirical where support permits, model elsewhere, reporting fraction of each in the training set.
 
@@ -339,15 +339,15 @@ The reviewer requires an ablation that shows HumanPrefNet does **not** add inde
 
 Ablation protocol:
 
-- Compute `G\_v` three ways on a hand-picked stratified sample of positions (~500 per band):
+- Compute `G_v` three ways on a hand-picked stratified sample of positions (~500 per band):
 
-  - `G\_v(band)` from HumanMovePolicyNet alone.
+  - `G_v(band)` from HumanMovePolicyNet alone.
 
-  - `G\_v(band)` from HumanMovePolicyNet mixed with HumanPrefNet's softmax at a temperature range (`\{0.5, 1.0, 2.0\}`), with the mix weight swept.
+  - `G_v(band)` from HumanMovePolicyNet mixed with HumanPrefNet's softmax at a temperature range (`\{0.5, 1.0, 2.0\}`), with the mix weight swept.
 
-  - `G\_v(band)` from HumanPrefNet alone (as a baseline).
+  - `G_v(band)` from HumanPrefNet alone (as a baseline).
 
-- Compare to a ground-truth `G\_v\_empirical(band)` computed from `moves\_elo\_bins` on the subset with `≥ 25` plays.
+- Compare to a ground-truth `G_v_empirical(band)` computed from `moves_elo_bins` on the subset with `≥ 25` plays.
 
 - Report **per-band MAE** and **per-band Spearman r** between each variant and the empirical ground truth.
 
@@ -359,26 +359,26 @@ Success criterion for keeping HumanPrefNet in v3: HumanPrefNet mix must reduce 
 
 - Position-complexity features (Toronto blunder-prediction finding). Deferred to a later ablation.
 
-- Any HumanPrefNet retrain.  §H2 / §H4 in `discussion\_plan.md` are out of scope.
+- Any HumanPrefNet retrain.  §H2 / §H4 in `discussion_plan.md` are out of scope.
 
 
-## 8. Expected human regret — `G\_v` dataset
+## 8. Expected human regret — `G_v` dataset
 
 ### 8.1 Formula
 
 ```
-G\_v(state, band, component\_c) = Σ\_\{m ∈ legal(state)\} P\_h(m | state, band) · R\_v(state, m).components\[c\]
+G_v(state, band, component_c) = Σ_\{m ∈ legal(state)\} P_h(m | state, band) · R_v(state, m).components\[c\]
 ```
 
 Where `c` ranges over the components of §5.3.  The training target per `(state, band)` sample is a **length-4 vector** (four components), not a single scalar.
 
 **Undefined when:**
 
-- Any `R\_v(state, m)` component `c` returns `None` (fail-closed §5.5).
+- Any `R_v(state, m)` component `c` returns `None` (fail-closed §5.5).
 
-- `state`'s canonical `state\_key` is present in a held-out split.
+- `state`'s canonical `state_key` is present in a held-out split.
 
-- `state` has `n\_legal\_moves \< 2` (no gap possible).
+- `state` has `n_legal_moves \< 2` (no gap possible).
 
 ### 8.2 Multiple outputs, not one scalar
 
@@ -394,35 +394,35 @@ This preserves the reviewer's requirement that the plan not collapse regret int
 
 **Extraction pipeline (Stage D):**
 
-1. Enumerate every `(state\_key, band)` with `≥ 1` legal move at the parent and full Malom coverage over every legal successor.
+1. Enumerate every `(state_key, band)` with `≥ 1` legal move at the parent and full Malom coverage over every legal successor.
 
-2. For each such `(state\_key, band)`:
+2. For each such `(state_key, band)`:
 
-   - Reconstruct `parent\_board` via `board\_from\_state\_key`.
+   - Reconstruct `parent_board` via `board_from_state_key`.
 
-   - Enumerate `legal\_moves`.
+   - Enumerate `legal_moves`.
 
-   - Compute `P\_h(m | band)` per §7.1.
+   - Compute `P_h(m | band)` per §7.1.
 
-   - Compute `R\_v(state, m).components` per §5.  If any component is unavailable for any legal `m`, abstain from this `(state\_key, band)` — write a row to `abstained.jsonl` with the reason and continue.
+   - Compute `R_v(state, m).components` per §5.  If any component is unavailable for any legal `m`, abstain from this `(state_key, band)` — write a row to `abstained.jsonl` with the reason and continue.
 
-   - Compute the four `G\_v` components.
+   - Compute the four `G_v` components.
 
-   - Record: `(state\_key, band, mover\_color, n\_legal\_moves, phase, G\_v\_class\_downgrade, G\_v\_wdl\_utility, G\_v\_ordinal\_rank, G\_v\_within\_class\_distance, P\_h\_source ∈ \{"model", "empirical", "hybrid"\})`.
+   - Record: `(state_key, band, mover_color, n_legal_moves, phase, G_v_class_downgrade, G_v_wdl_utility, G_v_ordinal_rank, G_v_within_class_distance, P_h_source ∈ \{"model", "empirical", "hybrid"\})`.
 
-3. Save as a numpy memmap keyed by sample index; save metadata to `data/gap\_net\_v3\_dataset/metadata.npz`.
+3. Save as a numpy memmap keyed by sample index; save metadata to `data/gap_net_v3_dataset/metadata.npz`.
 
-4. Provenance: `candidate\_db\_sha256`, `malom\_label\_version`, `regret\_version`, `human\_move\_policy\_net\_sha256`, `human\_pref\_net\_sha256` (if used per §7.2 ablation), `feature\_version`, `git\_commit`, `built\_at`.  Every one required or extraction aborts.
+4. Provenance: `candidate_db_sha256`, `malom_label_version`, `regret_version`, `human_move_policy_net_sha256`, `human_pref_net_sha256` (if used per §7.2 ablation), `feature_version`, `git_commit`, `built_at`.  Every one required or extraction aborts.
 
 ### 8.4 Splits and provenance
 
-- **Train / validation / test** partitions grouped by `session\_id` (game-level split), NOT by `state\_key`.  A position that appears in multiple games is assigned to the split of the game with the smallest deterministic hash.
+- **Train / validation / test** partitions grouped by `session_id` (game-level split), NOT by `state_key`.  A position that appears in multiple games is assigned to the split of the game with the smallest deterministic hash.
 
 - **Player-level held-out slice** — a diagnostic split.  Reserve the top-10 most prolific movers to a held-out slice reported separately.
 
-- **Untouched final test set** — 5 % of `session\_id`s reserved before any model selection.  Never loaded except for the final report.
+- **Untouched final test set** — 5 % of `session_id`s reserved before any model selection.  Never loaded except for the final report.
 
-- Provenance record inherits from the extracted dataset (§8.3) plus a `split\_version` constant and the immutable seed for the game-hash.
+- Provenance record inherits from the extracted dataset (§8.3) plus a `split_version` constant and the immutable seed for the game-hash.
 
 
 ## 9. Gameplay exploitation — approaches to compare
@@ -431,42 +431,42 @@ Do not simply extend the current additive leaf bonus.  Compare the four modes b
 
 ### 9.1 Baseline — pure minimax
 
-Search runs unchanged; `G\_v` is computed at every ply but not consumed.  Establishes the "no signal" reference line.  The metric reported is expected score at difficulty 5 across 40 games / colour against the humanlike-blend opponent, per Step 6e of `retrain\_v2\_plan.md`.
+Search runs unchanged; `G_v` is computed at every ply but not consumed.  Establishes the "no signal" reference line.  The metric reported is expected score at difficulty 5 across 40 games / colour against the humanlike-blend opponent, per Step 6e of `retrain_v2_plan.md`.
 
 ### 9.2 Human-policy expectimax at opponent nodes
 
 At opponent nodes (`board.turn != self.color`), replace the negamax minimum with
 
 ```
-V\_opp(board) = Σ\_\{m ∈ legal(board)\} P\_h(m | band) · V\_child(board.apply\_move(m))
+V_opp(board) = Σ_\{m ∈ legal(board)\} P_h(m | band) · V_child(board.apply_move(m))
 ```
 
-Requires an explicit expectimax path in `\_negamax` — verified absent in current code (Agent report §8).  Design constraints:
+Requires an explicit expectimax path in `_negamax` — verified absent in current code (Agent report §8).  Design constraints:
 
-- **Sign discipline:** the expectimax value at an opponent node is the expected score of the resulting position **from the mover's POV** at that node, negated once (matching negamax convention).  A test must confirm that at a two-ply horizon with a known `P\_h` and a known `V\_child`, the returned root score matches the hand-computed expectimax value to full precision.
+- **Sign discipline:** the expectimax value at an opponent node is the expected score of the resulting position **from the mover's POV** at that node, negated once (matching negamax convention).  A test must confirm that at a two-ply horizon with a known `P_h` and a known `V_child`, the returned root score matches the hand-computed expectimax value to full precision.
 
-- **Terminal outcomes dominate.**  When `V\_child` is a terminal win or loss (Malom-terminal or rules-terminal), the expectimax value must never be smoothed by `P\_h` — the terminal score is returned exactly.  A test locks this: a position where `P\_h` puts 0.1 on a loss and 0.9 on a draw at ply 1 must return exactly the same value as pure minimax at ply 2 if the ply-1 loss is Malom-terminal.
+- **Terminal outcomes dominate.**  When `V_child` is a terminal win or loss (Malom-terminal or rules-terminal), the expectimax value must never be smoothed by `P_h` — the terminal score is returned exactly.  A test locks this: a position where `P_h` puts 0.1 on a loss and 0.9 on a draw at ply 1 must return exactly the same value as pure minimax at ply 2 if the ply-1 loss is Malom-terminal.
 
 ### 9.3 Bounded mixture (worst-case ⊕ human-policy)
 
 ```
-V\_opp(board) = (1-α) · min\_\{m\} V\_child(...) + α · E\_\{m ~ P\_h\} V\_child(...)
+V_opp(board) = (1-α) · min_\{m\} V_child(...) + α · E_\{m ~ P_h\} V_child(...)
 ```
 
-`α ∈ \[0, 1\]`, capped at a small value (`α\_max = 0.30`).  Never approaches 1: worst-case safety must dominate at high confidence. The cap is a **hard constant** in code, not a search parameter. Tests must confirm the mixture is always dominated by the worst-case value on positions where the worst legal move is a Malom loss.
+`α ∈ \[0, 1\]`, capped at a small value (`α_max = 0.30`).  Never approaches 1: worst-case safety must dominate at high confidence. The cap is a **hard constant** in code, not a search parameter. Tests must confirm the mixture is always dominated by the worst-case value on positions where the worst legal move is a Malom loss.
 
 ### 9.4 Shadow mode
 
-Search runs pure minimax (§9.1) as the authoritative selector.  In parallel, the same position is scored under each of the other three modes and the resulting score differences are logged to `data/logs/gap\_v3\_shadow\_YYYYMMDD.jsonl`:
+Search runs pure minimax (§9.1) as the authoritative selector.  In parallel, the same position is scored under each of the other three modes and the resulting score differences are logged to `data/logs/gap_v3_shadow_YYYYMMDD.jsonl`:
 
 ```
 \{  
-  "state\_key": ...,  
-  "chosen\_move\_by\_minimax": ...,  
-  "would\_have\_chosen\_by\_expectimax": ...,  
-  "would\_have\_chosen\_by\_mixture\_alpha\_0.3": ...,  
-  "shadow\_score\_delta\_expectimax": ...,  
-  "shadow\_score\_delta\_mixture": ...  
+  "state_key": ...,  
+  "chosen_move_by_minimax": ...,  
+  "would_have_chosen_by_expectimax": ...,  
+  "would_have_chosen_by_mixture_alpha_0.3": ...,  
+  "shadow_score_delta_expectimax": ...,  
+  "shadow_score_delta_mixture": ...  
 \}
 ```
 
@@ -476,43 +476,43 @@ Search runs pure minimax (§9.1) as the authoritative selector.  In parallel, t
 
 Every consumption path must record and assert:
 
-- `parent\_board.turn` — the mover at the parent position.
+- `parent_board.turn` — the mover at the parent position.
 
 - `move` — from the mover's move set.
 
 - `successor.turn` — the opponent (mover flipped).
 
-- `board\_to\_features(successor, parent\_board.turn)` — successor features from the ORIGINAL MOVER'S POV (matches the training contract in `docs/human\_move\_policy\_net\_plan.md:302-311`).
+- `board_to_features(successor, parent_board.turn)` — successor features from the ORIGINAL MOVER'S POV (matches the training contract in `docs/human_move_policy_net_plan.md:302-311`).
 
-- `P\_h(m | state, band)` — probability that the current-node mover plays `m`.
+- `P_h(m | state, band)` — probability that the current-node mover plays `m`.
 
-- `R\_v(state, m).omv` — the OracleMoveValue is in the current-node mover's perspective.  Negated once when compared against a sibling-node score (negamax convention).
+- `R_v(state, m).omv` — the OracleMoveValue is in the current-node mover's perspective.  Negated once when compared against a sibling-node score (negamax convention).
 
-- Malom `outcome` fields — child returns opponent's-POV; mover-POV is `\_FLIP\[after\]`.
+- Malom `outcome` fields — child returns opponent's-POV; mover-POV is `_FLIP\[after\]`.
 
-A dedicated test file `tests/test\_gap\_v3\_perspective\_conversions.py` locks these six conversions with concrete assertions.
+A dedicated test file `tests/test_gap_v3_perspective_conversions.py` locks these six conversions with concrete assertions.
 
 ### 9.6 Two-ply regression tests
 
 Required for §9.2 and §9.3.  Construction:
 
-- Position where the AI (root) has two legal moves: `M\_safe` leads to a drawn position, `M\_trap` leads to a position where the opponent has a plausible-but-losing continuation.
+- Position where the AI (root) has two legal moves: `M_safe` leads to a drawn position, `M_trap` leads to a position where the opponent has a plausible-but-losing continuation.
 
 - Under pure minimax at depth 2, both root moves score identically (opponent plays optimally so the trap doesn't fire).
 
-- Under expectimax with a known `P\_h` at the opponent node that places significant mass on the losing continuation, `M\_trap` scores higher at the root than `M\_safe`.
+- Under expectimax with a known `P_h` at the opponent node that places significant mass on the losing continuation, `M_trap` scores higher at the root than `M_safe`.
 
-- The test constructs three cases: expected `M\_trap` preferred, expected `M\_safe` preferred, expected tie.
+- The test constructs three cases: expected `M_trap` preferred, expected `M_safe` preferred, expected tie.
 
 If any of the three fails, the code path is disabled and the test records the failure signature.
 
 ### 9.7 Terminal-outcome dominance
 
-Explicit assertions in the code path (via `assert` statements guarded by a `SEARCH\_INVARIANT\_CHECKS` env var so they can be turned off in production runs):
+Explicit assertions in the code path (via `assert` statements guarded by a `SEARCH_INVARIANT_CHECKS` env var so they can be turned off in production runs):
 
-- `V\_opp(board) == V\_child(board)` when `board` has a single legal successor.
+- `V_opp(board) == V_child(board)` when `board` has a single legal successor.
 
-- `V\_opp(board)` at a Malom-terminal opponent node equals the terminal outcome exactly (no smoothing).
+- `V_opp(board)` at a Malom-terminal opponent node equals the terminal outcome exactly (no smoothing).
 
 - The shadow-mode logged deltas never exceed a hard cap (positions where the delta exceeds the cap are flagged as candidates for bugs).
 
@@ -523,25 +523,25 @@ Progression from low-risk to high-risk.  Each step is a separate experiment, se
 
 ### 10.1 Logged feature (default)
 
-`G\_v(state, band)` (all four components) is computed per ply and written to `train\_log.jsonl` under a new column `gap\_v3.\<component\>`.  The training loop **does not consume it**. The offline plotter (`tools/plot\_specialist\_training.py`) can render its distribution over training.
+`G_v(state, band)` (all four components) is computed per ply and written to `train_log.jsonl` under a new column `gap_v3.\<component\>`.  The training loop **does not consume it**. The offline plotter (`tools/plot_specialist_training.py`) can render its distribution over training.
 
-Purpose: verify the signal is stable, correlated with observed outcomes, and not degenerate.  Success signal: after N games, plotted `G\_v` correlates positively with subsequent-ply Malom regret at significance `p \< 0.001`.
+Purpose: verify the signal is stable, correlated with observed outcomes, and not degenerate.  Success signal: after N games, plotted `G_v` correlates positively with subsequent-ply Malom regret at significance `p \< 0.001`.
 
 ### 10.2 Auxiliary prediction head
 
-The gen 3 policy net grows an additional head that predicts `G\_v` (any single component chosen by an offline ablation).  The auxiliary loss is added with a small hard-coded weight (`aux\_loss\_weight = 0.05`) and does **not** back-prop into the value or policy heads.
+The gen 3 policy net grows an additional head that predicts `G_v` (any single component chosen by an offline ablation).  The auxiliary loss is added with a small hard-coded weight (`aux_loss_weight = 0.05`) and does **not** back-prop into the value or policy heads.
 
 Purpose: build a compact learned representation of expected human regret without letting it modify the policy directly.
 
-Success signal: the auxiliary head's held-out MSE matches the offline oracle `G\_v` computation within a documented tolerance; the policy / value heads remain unchanged on frozen-model bench.
+Success signal: the auxiliary head's held-out MSE matches the offline oracle `G_v` computation within a documented tolerance; the policy / value heads remain unchanged on frozen-model bench.
 
 ### 10.3 Input feature to policy / value network
 
-The gen 3 policy net conditions on `G\_v` as an input feature.  The signal enters through concatenation with the board features (dim +4), not through a gate.  Trained end-to-end.
+The gen 3 policy net conditions on `G_v` as an input feature.  The signal enters through concatenation with the board features (dim +4), not through a gate.  Trained end-to-end.
 
 Purpose: allow the policy to steer toward positions where opponents have high expected regret, while retaining terminal-outcome dominance through the existing minimax structure.
 
-Success signal: gen 3 with `G\_v` input outperforms gen 3 without `G\_v` input on the humanlike-blend-opponent bench at Step 6e.
+Success signal: gen 3 with `G_v` input outperforms gen 3 without `G_v` input on the humanlike-blend-opponent bench at Step 6e.
 
 ### 10.4 Bounded reward shaping (separately authorised)
 
@@ -549,80 +549,80 @@ Not part of this plan.  Requires:
 
 - Successful landings of §10.1, §10.2, §10.3 in that order.
 
-- Explicit tests for reward hacking (positions where the policy learns to force `G\_v` up in ways that reduce actual win rate).
+- Explicit tests for reward hacking (positions where the policy learns to force `G_v` up in ways that reduce actual win rate).
 
-- A hard bound: `reward\_shaping\_term\_magnitude ≤ 0.1 · terminal\_reward\_magnitude` at every training step.
+- A hard bound: `reward_shaping_term_magnitude ≤ 0.1 · terminal_reward_magnitude` at every training step.
 
 - Terminal-outcome dominance test: on positions where the terminal outcome is known, the shaping term is exactly zero.
 
-Owning document to author when this experiment is authorised: a separate `gap\_net\_v3\_reward\_shaping\_plan.md`.
+Owning document to author when this experiment is authorised: a separate `gap_net_v3_reward_shaping_plan.md`.
 
 
 ## 11. Architecture — v3 candidate model
 
 ### 11.1 The 79-feature MLP as a compatibility baseline
 
-The current shared 79-feature encoding (`ai/value\_net.board\_to\_features`) is the baseline input; the four regret-component heads sit on top.  The baseline model is `79 → 128 → 64 → 32 → 4` (input dim = 79 for the state — no band one-hot in the baseline; band is applied at target computation time via §7).
+The current shared 79-feature encoding (`ai/value_net.board_to_features`) is the baseline input; the four regret-component heads sit on top.  The baseline model is `79 → 128 → 64 → 32 → 4` (input dim = 79 for the state — no band one-hot in the baseline; band is applied at target computation time via §7).
 
 **This shape is not declared permanent.**  It is retained for comparability with HumanMovePolicyNet, ValueNet, and the current GapNet.  Ablations against alternative encoders are permitted in subsequent revisions.
 
 ### 11.2 Symmetry augmentation + invariance tests
 
-- Data augmentation: for each `(state\_key, band)` sample, generate its 7 non-identity D4 transforms during training with probability 1/8.  Every transformed sample carries the same targets (verified invariant to symmetry by §6 golden corpus).
+- Data augmentation: for each `(state_key, band)` sample, generate its 7 non-identity D4 transforms during training with probability 1/8.  Every transformed sample carries the same targets (verified invariant to symmetry by §6 golden corpus).
 
 - Invariance test: after training, held-out positions and their symmetry transforms must produce identical head outputs to within a tolerance of `1e-3`.  A test file locks this.
 
 ### 11.3 Topology / graph-aware encoding — deferred
 
-`docs/archive/discussion\_plan.md` §M2 explicitly defers topology- aware board representations to a fresh branch.  V3 respects that deferral; a topology encoder ablation is a candidate for a v4-style follow-up.
+`docs/archive/discussion_plan.md` §M2 explicitly defers topology- aware board representations to a fresh branch.  V3 respects that deferral; a topology encoder ablation is a candidate for a v4-style follow-up.
 
 
 ## 12. Naming, filenames, activation discipline
 
-- Candidate model: `data/gap\_net\_v3\_candidate.npz`.
+- Candidate model: `data/gap_net_v3_candidate.npz`.
 
-- Candidate dataset: `data/gap\_net\_v3\_dataset/` (memmap + metadata).
+- Candidate dataset: `data/gap_net_v3_dataset/` (memmap + metadata).
 
-- Log outputs: `data/logs/gap\_v3\_shadow\_YYYYMMDD.jsonl`.
+- Log outputs: `data/logs/gap_v3_shadow_YYYYMMDD.jsonl`.
 
-- Golden fixture: `tests/fixtures/malom\_regret\_golden.json`.
+- Golden fixture: `tests/fixtures/malom_regret_golden.json`.
 
-- Regret-version constant: `learned\_ai/data/regret\_version.py` with `REGRET\_VERSION = "regret\_v1"`.
+- Regret-version constant: `learned_ai/data/regret_version.py` with `REGRET_VERSION = "regret_v1"`.
 
 **Never** overwritten by any v3 code:
 
-- `data/gap\_net.npz` (loaded live by `web/app.py:256-262`).
+- `data/gap_net.npz` (loaded live by `web/app.py:256-262`).
 
-- `data/gap\_net\_v2.npz` (if present — reserved for a hypothetical §G1 fix, not for v3).
+- `data/gap_net_v2.npz` (if present — reserved for a hypothetical §G1 fix, not for v3).
 
-- `data/human\_db.sqlite` (active DB).
+- `data/human_db.sqlite` (active DB).
 
-- `data/human\_pref\_net.npz`, `data/human\_move\_policy\_net.npz`.
+- `data/human_pref_net.npz`, `data/human_move_policy_net.npz`.
 
-Promotion of `gap\_net\_v3\_candidate.npz` to `gap\_net.npz` is a **separate later decision** (see §16).
+Promotion of `gap_net_v3_candidate.npz` to `gap_net.npz` is a **separate later decision** (see §16).
 
 
 ## 13. Implementation stages — atomic
 
 Each stage is a single reviewable commit or a small commit series that lands a discrete deliverable.  Stages are gated: no stage may proceed while its predecessor's evidence is missing.
 
-**Stage A — `malom.query\_regret` API + golden corpus.**  Adds the API in §5.1 to `ai/malom\_db.py` behind a versioned constant.  Populates the golden fixture in `tests/fixtures/malom\_regret\_golden.json`. Ships `tests/test\_malom\_regret\_v1.py` locking every category in §6.1 including symmetry invariance and the missing-Malom abstention path.
+**Stage A — `malom.query_regret` API + golden corpus.**  Adds the API in §5.1 to `ai/malom_db.py` behind a versioned constant.  Populates the golden fixture in `tests/fixtures/malom_regret_golden.json`. Ships `tests/test_malom_regret_v1.py` locking every category in §6.1 including symmetry invariance and the missing-Malom abstention path.
 
-**Stage B — HumanMovePolicyNet Phase 4b diagnostics.**  Extends `tools/eval\_human\_move\_policy\_net.py` with the metrics in §4.1 (Brier, corrected calibration, uniform / empirical baselines, per- legal-move-count, OOD, abstention).  Reworks `learned\_ai/data/human\_db\_split.py` to add game-level and player-level splits.  Trains the current dataset to convergence, saves `data/human\_move\_policy\_net\_candidate.npz`, runs the full eval, produces `data/gap\_v3\_prerequisite\_eval.json`.
+**Stage B — HumanMovePolicyNet Phase 4b diagnostics.**  Extends `tools/eval_human_move_policy_net.py` with the metrics in §4.1 (Brier, corrected calibration, uniform / empirical baselines, per- legal-move-count, OOD, abstention).  Reworks `learned_ai/data/human_db_split.py` to add game-level and player-level splits.  Trains the current dataset to convergence, saves `data/human_move_policy_net_candidate.npz`, runs the full eval, produces `data/gap_v3_prerequisite_eval.json`.
 
-**Stage C — Direct-lookup `G\_v` computation script.**  Offline computation on the candidate DB's high-support positions. `tools/compute\_g\_v\_direct.py` reads `moves\_elo\_bins` and the `query\_regret` API, produces `data/gap\_v3\_direct\_gv.parquet` with per- component `G\_v` values.  This is the empirical baseline that all subsequent model training must beat.
+**Stage C — Direct-lookup `G_v` computation script.**  Offline computation on the candidate DB's high-support positions. `tools/compute_g_v_direct.py` reads `moves_elo_bins` and the `query_regret` API, produces `data/gap_v3_direct_gv.parquet` with per- component `G_v` values.  This is the empirical baseline that all subsequent model training must beat.
 
-**Stage D — Extract v3 dataset.**  `tools/extract\_gap\_v3\_dataset.py` executes the extraction pipeline in §8.3.  Emits `metadata.npz` + memmap + provenance JSON at `data/gap\_net\_v3\_dataset/`.  Emits `abstained.jsonl` with a coverage summary.  A regression test on a tiny synthetic slice locks the four-component structure and the fail-closed rule.
+**Stage D — Extract v3 dataset.**  `tools/extract_gap_v3_dataset.py` executes the extraction pipeline in §8.3.  Emits `metadata.npz` + memmap + provenance JSON at `data/gap_net_v3_dataset/`.  Emits `abstained.jsonl` with a coverage summary.  A regression test on a tiny synthetic slice locks the four-component structure and the fail-closed rule.
 
-**Stage E — Train v3 candidate model.**  `tools/train\_gap\_net\_v3.py` implements the four-head MLP in §11.  Saves `data/gap\_net\_v3\_candidate.npz` with full provenance.  Trains against the game-split train partition; monitors validation loss on the game-split val partition; never touches the game-split test partition during selection.
+**Stage E — Train v3 candidate model.**  `tools/train_gap_net_v3.py` implements the four-head MLP in §11.  Saves `data/gap_net_v3_candidate.npz` with full provenance.  Trains against the game-split train partition; monitors validation loss on the game-split val partition; never touches the game-split test partition during selection.
 
-**Stage F — Held-out evaluation.**  `tools/eval\_gap\_net\_v3.py` executes the full evaluation on the untouched test partition, including the player-level diagnostic slice.  Reports every metric in §15.  The test partition is not run more than once per candidate model — a second run would leak.
+**Stage F — Held-out evaluation.**  `tools/eval_gap_net_v3.py` executes the full evaluation on the untouched test partition, including the player-level diagnostic slice.  Reports every metric in §15.  The test partition is not run more than once per candidate model — a second run would leak.
 
-**Stage G — Shadow-mode integration.**  Adds a shadow-mode flag to `ai/game\_ai.py` gated behind an env var; the flag routes the game through the shadow-mode logger (§9.4).  A dedicated regression test plays a seeded deterministic game with and without shadow mode enabled; the game outcome and move sequence must be identical.
+**Stage G — Shadow-mode integration.**  Adds a shadow-mode flag to `ai/game_ai.py` gated behind an env var; the flag routes the game through the shadow-mode logger (§9.4).  A dedicated regression test plays a seeded deterministic game with and without shadow mode enabled; the game outcome and move sequence must be identical.
 
-**Stage H — Two-ply regression tests.**  `tests/test\_gap\_v3\_two\_ply.py` locks the three tests in §9.6, plus the perspective-conversion tests in §9.5.
+**Stage H — Two-ply regression tests.**  `tests/test_gap_v3_two_ply.py` locks the three tests in §9.6, plus the perspective-conversion tests in §9.5.
 
-**Stage I — Logged-feature training experiment.**  Adds the log column in §10.1 to `scripts/train\_s\_gen\_v2b.py`'s `train\_log.jsonl` under a flag `--log-gap-v3 \<path-to-candidate\>`.  The gen 3 trainer, when it exists, inherits this hook.
+**Stage I — Logged-feature training experiment.**  Adds the log column in §10.1 to `scripts/train_s_gen_v2b.py`'s `train_log.jsonl` under a flag `--log-gap-v3 \<path-to-candidate\>`.  The gen 3 trainer, when it exists, inherits this hook.
 
 Later stages (§10.2 auxiliary head, §10.3 input feature) are authored as separate plans after Stage I lands its first analysis.
 
@@ -631,25 +631,25 @@ Later stages (§10.2 auxiliary head, §10.3 input feature) are authored as sepa
 
 Every test file below is required before its stage promotes.
 
-- `tests/test\_malom\_regret\_v1.py` — the §6 golden corpus, symmetry invariance, missing-Malom abstention (Stage A).
+- `tests/test_malom_regret_v1.py` — the §6 golden corpus, symmetry invariance, missing-Malom abstention (Stage A).
 
-- `tests/test\_gap\_v3\_perspective\_conversions.py` — the six conversions in §9.5 (Stage G, imported earlier for CI).
+- `tests/test_gap_v3_perspective_conversions.py` — the six conversions in §9.5 (Stage G, imported earlier for CI).
 
-- `tests/test\_gap\_v3\_two\_ply.py` — the three two-ply scenarios in §9.6 (Stage H).
+- `tests/test_gap_v3_two_ply.py` — the three two-ply scenarios in §9.6 (Stage H).
 
-- `tests/test\_gap\_v3\_dataset\_faillclosed.py` — assert the extractor abstains on positions with any missing `R\_v` component (Stage D).
+- `tests/test_gap_v3_dataset_faillclosed.py` — assert the extractor abstains on positions with any missing `R_v` component (Stage D).
 
-- `tests/test\_gap\_v3\_provenance.py` — assert the .npz carries every provenance field (Stage E).
+- `tests/test_gap_v3_provenance.py` — assert the .npz carries every provenance field (Stage E).
 
-- `tests/test\_gap\_v3\_symmetry\_invariance.py` — assert model output is identical modulo D4 transforms (Stage E).
+- `tests/test_gap_v3_symmetry_invariance.py` — assert model output is identical modulo D4 transforms (Stage E).
 
-- `tests/test\_gap\_v3\_shadow\_mode.py` — assert shadow mode does not change move sequences on a seeded game (Stage G).
+- `tests/test_gap_v3_shadow_mode.py` — assert shadow mode does not change move sequences on a seeded game (Stage G).
 
-- `tests/test\_gap\_v3\_no\_zero\_default.py` — assert missing Malom never becomes 0 anywhere in the pipeline (imported at every stage; each stage adds its own assertions).
+- `tests/test_gap_v3_no_zero_default.py` — assert missing Malom never becomes 0 anywhere in the pipeline (imported at every stage; each stage adds its own assertions).
 
-- `tests/test\_gap\_v3\_terminal\_dominance.py` — assert Malom-terminal and rules-terminal successors are never smoothed by `P\_h` (Stage G / H).
+- `tests/test_gap_v3_terminal_dominance.py` — assert Malom-terminal and rules-terminal successors are never smoothed by `P_h` (Stage G / H).
 
-- `tests/test\_gap\_v3\_ph\_source\_documented.py` — assert every dataset row records `P\_h\_source ∈ \{model, empirical, hybrid\}` (Stage D).
+- `tests/test_gap_v3_ph_source_documented.py` — assert every dataset row records `P_h_source ∈ \{model, empirical, hybrid\}` (Stage D).
 
 
 ## 15. Evidence artefacts
@@ -658,30 +658,30 @@ Every stage produces a discrete artefact.  Every artefact is committed alongsid
 
 | Stage | Artefact | Content |
 | - | - | - |
-| A | `data/malom\_regret\_v1\_report.json` | Golden-corpus test outcomes; hashes of the fixture and the API |
-| B | `data/gap\_v3\_prerequisite\_eval.json` | Full Phase 4b eval of HumanMovePolicyNet: NLL, Brier, ECE, per-band, per-phase, per-transition, per-legal-move-count, OOD, abstention, uniform/empirical baselines, temperature-scaling report |
-| B (side) | `data/human\_move\_policy\_net\_candidate.npz` | Trained candidate model (do NOT rename until v3 gates open) |
-| C | `data/gap\_v3\_direct\_gv.parquet` | Empirical `G\_v` from high-support positions; the training-time baseline the model must beat |
-| D | `data/gap\_net\_v3\_dataset/` | Memmap + metadata + provenance + abstained.jsonl |
-| E | `data/gap\_net\_v3\_candidate.npz` | Trained candidate model with full provenance |
-| F | `data/gap\_v3\_test\_report.json` | Untouched-test-set metrics per component per band per phase per stratum, with a plain-language "did the model beat baselines" summary |
-| G | `data/logs/gap\_v3\_shadow\_YYYYMMDD.jsonl` | Shadow-mode logs from a seeded game batch |
+| A | `data/malom_regret_v1_report.json` | Golden-corpus test outcomes; hashes of the fixture and the API |
+| B | `data/gap_v3_prerequisite_eval.json` | Full Phase 4b eval of HumanMovePolicyNet: NLL, Brier, ECE, per-band, per-phase, per-transition, per-legal-move-count, OOD, abstention, uniform/empirical baselines, temperature-scaling report |
+| B (side) | `data/human_move_policy_net_candidate.npz` | Trained candidate model (do NOT rename until v3 gates open) |
+| C | `data/gap_v3_direct_gv.parquet` | Empirical `G_v` from high-support positions; the training-time baseline the model must beat |
+| D | `data/gap_net_v3_dataset/` | Memmap + metadata + provenance + abstained.jsonl |
+| E | `data/gap_net_v3_candidate.npz` | Trained candidate model with full provenance |
+| F | `data/gap_v3_test_report.json` | Untouched-test-set metrics per component per band per phase per stratum, with a plain-language "did the model beat baselines" summary |
+| G | `data/logs/gap_v3_shadow_YYYYMMDD.jsonl` | Shadow-mode logs from a seeded game batch |
 | H | (no dataset artefact; tests are the artefact) | — |
-| I | `data/gap\_v3\_logged\_feature\_summary.json` | Distribution of the logged `G\_v` component over a training run; correlation with subsequent-ply Malom regret |
+| I | `data/gap_v3_logged_feature_summary.json` | Distribution of the logged `G_v` component over a training run; correlation with subsequent-ply Malom regret |
 
 
 
 ## 16. Promotion gates
 
-`data/gap\_net\_v3\_candidate.npz` may be renamed to `data/gap\_net\_v3.npz` (the promoted-but-not-live name) **only** if every one of the following holds against the Stage F artefact.  The promoted `gap\_net\_v3.npz` may be renamed to `data/gap\_net.npz` (the live name, replacing the current file) **only** after a further round of live-adjacent testing that is not authorised by this plan.
+`data/gap_net_v3_candidate.npz` may be renamed to `data/gap_net_v3.npz` (the promoted-but-not-live name) **only** if every one of the following holds against the Stage F artefact.  The promoted `gap_net_v3.npz` may be renamed to `data/gap_net.npz` (the live name, replacing the current file) **only** after a further round of live-adjacent testing that is not authorised by this plan.
 
 | Gate | Threshold |
 | - | - |
 | Stage A tests | All pass; golden corpus has ≥ 3 rows per category in §6.1 |
 | Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; split integrity: 0 val keys in train (supersedes OOD rate < 10 % threshold) | ✅ **PASSED** (2026-08-01, `gap_v3_prerequisite_eval_V2.json`).  ✅ NLL: 31–34 % per band (31.4 / 34.2 / 34.3 % lower/mid/upper).  ✅ ECE: 0.037/0.028/0.022 lower/mid/upper at T*=0.7674 (all ≤ 0.05).  ✅ Split integrity: 0 val keys in train (OOD = 100 % by construction in v2 split — threshold superseded).  ✅ Zero skips: 0 inference / 0 board / 0 legal-count / 0 zero-target.  Formal degrade cal: n=2,617 fully-labelled samples (macro pred P(degrade) 0.0051 vs obs 0.0054; macro WDL-severity 0.0026 vs obs 0.0027; fly formal n=0).  Diagnostic (n=376,037, labelled-subset only, `diagnostic_only: true`): macro pred P(degrade) 0.0676 vs obs 0.0692, macro WDL-severity 0.0351 vs obs 0.0360 — well aligned.  Old underprediction claim (1.87 % vs 4.98 %) superseded by V2 matched macro/micro degrade calibration. |
-| Stage C direct `G\_v` | Sanity: `G\_v\_wdl\_utility\_loss` is monotonic decreasing in Elo band (upper \< middle \< lower) |
-| Stage D extraction | Coverage ≥ 60 % of `moves\_elo\_bins`-eligible `(state\_key, band)` samples; `abstained.jsonl` reasons summable |
-| Stage E training | Per-component held-out MSE improves over: (a) uniform-`P\_h` baseline by ≥ 30 % relative, (b) empirical-`P\_h` baseline (where support permits) by ≥ 10 % relative |
+| Stage C direct `G_v` | Sanity: `G_v_wdl_utility_loss` is monotonic decreasing in Elo band (upper \< middle \< lower) |
+| Stage D extraction | Coverage ≥ 60 % of `moves_elo_bins`-eligible `(state_key, band)` samples; `abstained.jsonl` reasons summable |
+| Stage E training | Per-component held-out MSE improves over: (a) uniform-`P_h` baseline by ≥ 30 % relative, (b) empirical-`P_h` baseline (where support permits) by ≥ 10 % relative |
 | Stage F test-set | Same thresholds on the untouched test partition |
 | Stage F symmetry | D4-invariance test tolerance ≤ 1e-3 across held-out positions |
 | Stage G shadow mode | Zero move-sequence divergences on a 100-game seeded batch |
@@ -697,29 +697,29 @@ If any gate misses by less than 1 pp / 1 % relative, the case is re-run once wi
 
 **During development.**  Any Stage may be reverted independently; the git history keeps the artefacts.  Rolling back Stage E is a `git revert` of that commit; no data is lost.
 
-**After live promotion (not authorised by this plan).**  If a future `data/gap\_net.npz` promotion later needs to be undone:
+**After live promotion (not authorised by this plan).**  If a future `data/gap_net.npz` promotion later needs to be undone:
 
 ```
-cp data/gap\_net.npz data/gap\_net.v3.YYYYMMDD.bak  
-mv data/gap\_net.v1.pre-v3.YYYYMMDD.bak data/gap\_net.npz
+cp data/gap_net.npz data/gap_net.v3.YYYYMMDD.bak  
+mv data/gap_net.v1.pre-v3.YYYYMMDD.bak data/gap_net.npz
 ```
 
-The current `data/gap\_net.npz` must be backed up to `data/gap\_net.v1.pre-v3.YYYYMMDD.bak` **before** any promotion.
+The current `data/gap_net.npz` must be backed up to `data/gap_net.v1.pre-v3.YYYYMMDD.bak` **before** any promotion.
 
 
 ## 18. Unresolved decisions
 
 Each row records what evidence would resolve it.  These are not authorised for silent selection during implementation; they are either pinned to Stage-B evidence or escalated to a separate ask.
 
-**D-1.  Which `R\_v` component becomes the primary training target?** Evidence needed: Stage E per-component MSE deltas, cross-referenced with Stage F test-set improvements.  If two components are close (within 5 % relative), retain both as separate heads at inference.
+**D-1.  Which `R_v` component becomes the primary training target?** Evidence needed: Stage E per-component MSE deltas, cross-referenced with Stage F test-set improvements.  If two components are close (within 5 % relative), retain both as separate heads at inference.
 
-**D-2.  Does HumanPrefNet stay in the pipeline?** Evidence: §7.2 ablation.  Default action if ablation is inconclusive: drop HumanPrefNet from v3, keep it available for the humanlike-blend game inference path (which does use it — verified `ai/game\_ai.py:2646`).
+**D-2.  Does HumanPrefNet stay in the pipeline?** Evidence: §7.2 ablation.  Default action if ablation is inconclusive: drop HumanPrefNet from v3, keep it available for the humanlike-blend game inference path (which does use it — verified `ai/game_ai.py:2646`).
 
-**D-3.  Does the model condition on Elo band explicitly (input** **feature) or use `G\_v(band)` externally (target only)?** Default: **target only** — the model learns per-position `G\_v` as if band were a training-time query.  A band-conditioned model becomes a Stage-F ablation.
+**D-3.  Does the model condition on Elo band explicitly (input** **feature) or use `G_v(band)` externally (target only)?** Default: **target only** — the model learns per-position `G_v` as if band were a training-time query.  A band-conditioned model becomes a Stage-F ablation.
 
 **D-4.  Is Component D (within-class distance) shipped?** Evidence: Stage F per-component test-set MSE and its correlation with observed outcomes.  If Component D adds noise, drop it.
 
-**D-5.  Coverage-vs-quality tradeoff.** Higher `min\_support` for direct `P\_h` gives cleaner ground truth but smaller training set.  Sweep `min\_support ∈ \{5, 10, 25\}` at Stage C and record the coverage-vs-noise curve.  Choose the operating point that maximises Stage E improvement.
+**D-5.  Coverage-vs-quality tradeoff.** Higher `min_support` for direct `P_h` gives cleaner ground truth but smaller training set.  Sweep `min_support ∈ \{5, 10, 25\}` at Stage C and record the coverage-vs-noise curve.  Choose the operating point that maximises Stage E improvement.
 
 **D-6.  Player-profile conditioning (§7.3).** Requires per-account history in the JSONL (not currently stored in HumanDB).  Deferred until a schema change is authorised.
 
@@ -730,11 +730,11 @@ Each row records what evidence would resolve it.  These are not authorised for 
 
 - Not retraining ValueNet, HumanPrefNet, Sentinel.
 
-- Not activating the candidate DB over `data/human\_db.sqlite`.
+- Not activating the candidate DB over `data/human_db.sqlite`.
 
-- Not overwriting `data/gap\_net.npz` at any stage.
+- Not overwriting `data/gap_net.npz` at any stage.
 
-- Not wiring v3 into `ai/game\_ai.py`, `ai/heuristics.py`, or `scripts/train\_s\_gen\_v2b.py` until every Stage F, G, H gate passes.
+- Not wiring v3 into `ai/game_ai.py`, `ai/heuristics.py`, or `scripts/train_s_gen_v2b.py` until every Stage F, G, H gate passes.
 
 - Not choosing a topology-aware encoder (§M2 deferred).
 
