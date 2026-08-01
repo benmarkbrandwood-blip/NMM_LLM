@@ -237,7 +237,9 @@ earlier
 [shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
 remains the historical correction sheet he reviewed.
 
-Status is now `composition_frozen_membership_pending`. The internal Book
-subtype allocation and all individual members still require deterministic
-derivation. No final core prefix list, final core image review package,
-candidate-versus-baseline run, or launch authorization exists.
+Status is now `composition_frozen_membership_pending`. The
+[Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
+freezes 15 expert-curated and seven Sanmill named-line members with 22 unique
+exact histories, final FENs, and `ring16` orbits. HumanDB and Perfect DB
+membership, the final core list, and the final image package remain pending.
+No candidate-versus-baseline run or launch authorization exists.

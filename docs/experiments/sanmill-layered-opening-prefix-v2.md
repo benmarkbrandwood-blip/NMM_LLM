@@ -312,6 +312,14 @@ Membership and final image-review material remain pending. The 33-pattern
 expert diagnostic membership is frozen separately and does not itself select
 balanced-core members.
 
+The later
+[Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
+freezes the internal Book allocation as 15 expert-curated plays and seven
+Sanmill named variations. It covers all 14 expert parent orbits, adds the first
+structurally distinct P03 extended-family priority, covers all seven Sanmill
+declared families, and retains 22 distinct final `ring16` structures. HumanDB
+and Perfect DB membership remain pending.
+
 ## Explicit exclusions
 
 This preparation must not:

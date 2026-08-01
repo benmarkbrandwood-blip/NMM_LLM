@@ -57,3 +57,10 @@ Membership remains source-only and candidate-independent:
 
 The placement-prefix layer still does not replace the movement/flying corpus.
 No candidate model is loaded and no game is played by recording this decision.
+
+## Subsequent membership decision
+
+The internal Book allocation and its 22 members were subsequently frozen in
+the
+[Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md).
+That later record does not change the composition identity above.
