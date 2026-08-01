@@ -38,13 +38,21 @@ _VN_SCALE = 3000
 _MAX_OPP_PLIES    = 2
 _MAX_OPP_PLIES_V2 = 6   # deeper path-buffer tracking when v2 heuristics are active
 
-# Star square mode: the 12 cross/junction positions (3-way connectivity) used to
-# force structured openings. Both rings' cross points: outer d7/g4/d1/a4,
-# middle d6/f4/d2/b4, inner d5/e4/d3/c4.
+# Star square opening modes: two named position sets for structured openings.
+# "cardinal" — the 12 cross/junction positions (row-4 / col-d intersections):
+#   outer d7/g4/d1/a4, middle d6/f4/d2/b4, inner d5/e4/d3/c4.
+# "inner_square" — all 8 positions of the middle ring (lines b/f × 2/6):
+#   corners b6/f6/f2/b2 and edge midpoints d6/f4/d2/b4.
 _STAR_SQUARES: frozenset[str] = frozenset({
     "d7", "g4", "d1", "a4",  # outer ring crosses
     "d6", "f4", "d2", "b4",  # middle ring crosses
     "d5", "e4", "d3", "c4",  # inner ring crosses
+})
+_INNER_SQUARE_POSITIONS: frozenset[str] = frozenset({
+    "b6", "d6", "f6",  # top edge of middle ring
+    "f4", "f2",         # right edge
+    "d2", "b2",         # bottom edge
+    "b4",               # left edge
 })
 
 
@@ -576,7 +584,7 @@ class GameAI:
         self._variety_weights: HeuristicWeights | None = None  # lazily built
         # Star square opening mode: restrict placement moves to the 12 cross/junction
         # positions until all are claimed, then open all squares.
-        self.star_square_mode: bool = False
+        self.star_square_mode: str = ""  # "" | "inner_square" | "cardinal"
         # §M1 — set True in the placement branch when the Star Square filter
         # actually pruned the legal-move list.  Read by external logging /
         # bench code that wants to know "was this move constrained by the
@@ -1080,10 +1088,14 @@ class GameAI:
         # (set on self below when we return) is stamped 'star_filter' so
         # downstream fast paths / logging can see when this restriction fired.
         self._last_star_filter_applied = False
-        if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 9:
-            _empty_stars = {sq for sq in _STAR_SQUARES if board.positions.get(sq, "") == ""}
-            if _empty_stars:
-                _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_stars]
+        if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 3:
+            _pool = (
+                _INNER_SQUARE_POSITIONS if self.star_square_mode == "inner_square"
+                else _STAR_SQUARES
+            )
+            _empty_pool = {sq for sq in _pool if board.positions.get(sq, "") == ""}
+            if _empty_pool:
+                _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_pool]
                 if _star_moves:
                     moves = _star_moves
                     self._last_star_filter_applied = True

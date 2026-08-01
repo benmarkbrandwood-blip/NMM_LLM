@@ -3430,7 +3430,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
                 use_generalist_player = bool(msg.get("use_generalist_player", False))
-                star_square_mode = bool(msg.get("star_square_mode", False))
+                star_square_mode = str(msg.get("star_square_mode", ""))
                 settings  = _load_settings()
 
                 engine   = GameEngine(human_color=hc)
@@ -3590,7 +3590,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
                 use_generalist_player = bool(msg.get("use_generalist_player", False))
-                star_square_mode = bool(msg.get("star_square_mode", False))
+                star_square_mode = str(msg.get("star_square_mode", ""))
                 setup_fen_str = msg.get("setup_fen", "")
                 if setup_fen_str:
                     setup_board = BoardState.from_fen_string(setup_fen_str)

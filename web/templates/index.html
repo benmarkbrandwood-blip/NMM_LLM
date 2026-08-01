@@ -434,11 +434,13 @@
         </div>
 
         <div class="form-row" id="row-star-square" style="flex-direction:row; align-items:center; gap:8px;">
-          <input type="checkbox" id="chk-star-square">
-          <label for="chk-star-square" style="color:var(--text); font-size:.9rem;">
-            Star square opening
-            <span style="font-size:.75rem; color:var(--text-dim);">(restrict placements to 12 cross-junction squares until all are claimed)</span>
-          </label>
+          <label for="sel-star-square" style="color:var(--text); font-size:.9rem;">Star square opening</label>
+          <select id="sel-star-square" style="font-size:.82rem;padding:2px 4px;background:var(--input-bg,#2a2016);color:var(--text);border:1px solid var(--border,#5a4a2a);border-radius:3px;cursor:pointer;">
+            <option value="">Off</option>
+            <option value="inner_square">Inner square (b/f × 2/6)</option>
+            <option value="cardinal">Cardinal (row 4 / col d)</option>
+          </select>
+          <span style="font-size:.72rem; color:var(--text-dim);">— restricts first 3 AI placements</span>
         </div>
 
         <div class="form-row" id="row-ngram" style="flex-direction:row; align-items:center; gap:8px;">
