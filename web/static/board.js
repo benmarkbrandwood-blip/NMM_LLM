@@ -384,6 +384,7 @@ export class Board {
     const showOverseer  = opts.showOverseer || false;
     const showPredHuman = opts.showPredHuman || false;
     const hasTrajData   = opts.hasTrajData !== false;
+    const showTrajN     = opts.showTrajN || false;
     const visFrac       = opts.visibilityFraction != null ? opts.visibilityFraction : 1.0;
 
     // Deterministic per-move hash for stable visibility thinning (no flicker on redraws)
@@ -464,11 +465,13 @@ export class Board {
           const hasPiece = !!this.grid[pos];
           let ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
           if (freq > 0) {
+            const pct = Math.round(freq * 100);
+            const nSuffix = showTrajN && mv.traj_count != null ? `(n=${mv.traj_count})` : "";
             const t = _el("text", { x, y: ty, "font-size":"9", fill:"#5a10c0",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
-            t.textContent = `T:${Math.round(freq * 100)}%`;
+            t.textContent = `T:${pct}%${nSuffix}`;
             this._dbGroup.appendChild(t);
             ty -= 11;
           } else if (showDash) {
@@ -568,11 +571,13 @@ export class Board {
           const [x, y] = nodeXY(mv.to);
           let ty = y - PIECE_R - 4;
           if (freq > 0 && (!selSrc || mv.from === selSrc)) {
+            const pct = Math.round(freq * 100);
+            const nSuffix = showTrajN && mv.traj_count != null ? `(n=${mv.traj_count})` : "";
             const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#5a10c0",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
-            t.textContent = `T:${Math.round(freq * 100)}%`;
+            t.textContent = `T:${pct}%${nSuffix}`;
             this._dbGroup.appendChild(t);
             ty -= 10;
           } else if (showDashMv) {

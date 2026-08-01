@@ -2948,13 +2948,19 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "mi
             return s + (f"x{cap}" if cap else "")
 
         traj_freqs: dict = {}
+        traj_counts: dict = {}
+        traj_total: int = 0
         if _effective_tdb:
             try:
                 traj_freqs = _effective_tdb.query_all_frequencies(board)
+                if hasattr(_effective_tdb, "query_all_move_counts"):
+                    traj_counts, traj_total = _effective_tdb.query_all_move_counts(board)
             except Exception:
                 pass
         for m in moves_out:
-            m["traj_freq"] = round(float(traj_freqs.get(_pre_ntn(m), 0.0)), 3)
+            ntn = _pre_ntn(m)
+            m["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
+            m["traj_count"] = traj_counts.get(ntn)
 
         has_traj_data = any((m.get("traj_freq") or 0) > 0 for m in moves_out)
         if _human_move_policy_advisor is not None:
@@ -2981,6 +2987,7 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "mi
             "eval_b":        eval_b,
             "moves":         moves_out,
             "has_traj_data": has_traj_data,
+            "traj_total":    traj_total,
             "fen":           board.to_fen_string(),
         })
     except Exception as exc:
@@ -3928,11 +3935,15 @@ async def ws_endpoint(websocket: WebSocket):
                         s += f"x{cap}"
                     return s
 
-                # Trajectory DB: per-move relative frequency at this board state
+                # Trajectory DB: per-move relative frequency and raw counts
                 traj_freqs: dict = {}
+                traj_counts: dict = {}
+                traj_total: int = 0
                 if _effective_tdb:
                     try:
                         traj_freqs = _effective_tdb.query_all_frequencies(diag_board)
+                        if hasattr(_effective_tdb, "query_all_move_counts"):
+                            traj_counts, traj_total = _effective_tdb.query_all_move_counts(diag_board)
                     except Exception:
                         pass
 
@@ -4048,6 +4059,7 @@ async def ws_endpoint(websocket: WebSocket):
                 for mv_e in moves_out:
                     ntn = _diag_ntn(mv_e)
                     mv_e["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
+                    mv_e["traj_count"] = traj_counts.get(ntn)
                     _dd = db_deltas.get(ntn)
                     mv_e["db_delta"]  = float(_dd) if _dd is not None else None
                     # Capture mode eg_flags keyed by captured square
@@ -4145,6 +4157,7 @@ async def ws_endpoint(websocket: WebSocket):
                     "eval_b":       eval_b,
                     "moves":        moves_out,
                     "has_traj_data": has_traj_data,
+                    "traj_total":   traj_total,
                     "fen":          fen_override or diag_board.to_fen_string(),
                 })
 

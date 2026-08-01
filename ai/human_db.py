@@ -340,6 +340,38 @@ class HumanDB:
             return ()
         return tuple((r[0], r[1] / total_all) for r in rows if r[1] > 0)
 
+    def query_all_move_counts(
+        self,
+        board: "BoardState",
+    ) -> tuple[dict[str, int], int]:
+        """Return (per-notation raw count, position total) with no min_samples filter.
+
+        Only includes moves with count > 0.  Returns ({}, 0) when unavailable
+        or no observations exist.  Used to annotate board overlay labels with
+        the sample size behind each T:XX% figure.
+        """
+        if not self.is_available():
+            return {}, 0
+        state_key, sym_idx = make_board_state_key(board)
+        rows = self._conn.execute(
+            "SELECT notation, total FROM moves WHERE state_key = ?",
+            (state_key,),
+        ).fetchall()
+        if not rows:
+            return {}, 0
+        total_all = sum(r[1] for r in rows)
+        if total_all == 0:
+            return {}, 0
+        inv = SYM_INVERSE[sym_idx]
+        result: dict[str, int] = {}
+        for r in rows:
+            if r[1] == 0:
+                continue
+            actual = transform_notation(r[0], inv)
+            if actual:
+                result[actual] = r[1]
+        return result, total_all
+
     def query_opponent_loss(
         self,
         board: "BoardState",

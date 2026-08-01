@@ -512,6 +512,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "chk-value-net",       type: "checkbox" },
     { id: "rng-value-net-blend", type: "range" },
     { id: "chk-ext-qsearch",     type: "checkbox" },
+    { id: "sel-traj-n",          type: "select" },
     { id: "sel-star-square",      type: "select" },
     { id: "chk-ngram",           type: "checkbox" },
     { id: "chk-perfect-db",      type: "checkbox" },
@@ -677,6 +678,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       diagEloBand = _predBandSel.value;
       if (diagEnabled && diagTraj) _diagRequestStatic();
     });
+  }
+
+  const _trajNSel = $("sel-traj-n");
+  if (_trajNSel) {
+    _trajNSel.addEventListener("change", () => { if (diagEnabled) _diagRender(); });
   }
 
   $("diag-btn-db").addEventListener("click", () => {
@@ -3227,6 +3233,7 @@ function _diagRender() {
         showTraj:           diagTraj,
         showPredHuman:      diagTraj,
         hasTrajData:        dbSource.has_traj_data !== false,
+        showTrajN:          $("sel-traj-n") ? $("sel-traj-n").value === "n" : false,
         showDB:             diagDB,
         showSentinel:       diagSentinel,
         showOverseer:       diagOverseer,

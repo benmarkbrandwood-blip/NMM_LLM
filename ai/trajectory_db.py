@@ -417,6 +417,33 @@ class TrajectoryDB:
                 result[actual_n] = c["total"] / total_all
         return result
 
+    def query_all_move_counts(
+        self,
+        board: "BoardState",
+    ) -> tuple[dict[str, int], int]:
+        """Return (per-notation raw count, position total) with no min_samples filter.
+
+        Only includes moves with count > 0.  Returns ({}, 0) when no data.
+        Used to annotate board overlay labels with the sample size behind
+        each T:XX% figure.
+        """
+        state_key, sym_idx = make_board_state_key(board)
+        candidates = self._index.get(state_key)
+        if not candidates:
+            return {}, 0
+        total_all = sum(c["total"] for c in candidates.values())
+        if total_all == 0:
+            return {}, 0
+        inv = _SYM_INVERSE[sym_idx]
+        result: dict[str, int] = {}
+        for canon_n, c in candidates.items():
+            if c["total"] == 0:
+                continue
+            actual_n = _transform_notation(canon_n, inv)
+            if actual_n:
+                result[actual_n] = c["total"]
+        return result, total_all
+
     # ── Diagnostics ───────────────────────────────────────────────────────────
 
     @property
