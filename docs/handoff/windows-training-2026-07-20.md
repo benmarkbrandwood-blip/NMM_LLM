@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 25 July 2026)
+# Windows Training Handover — 20 July 2026 (updated 1 August 2026)
 
 ## Executive Summary
 
@@ -833,21 +833,21 @@ name as `Interrupted Knight`, labels the P03 children, distinguishes the outer
 and inner Parallel Mill Rush variants, and selects P03 child 001 as the primary
 Black response. The frozen audit independently proves that children 001/006
 are different-history same-endpoint transpositions and that child 012 exactly
-duplicates 006. Coverage priorities and primary choices for P04, P05, P08,
-P09, and P13-A remain unconfirmed. The
+duplicates 006. On 1 August the expert clarified the selection rule: retain
+every unique placement pattern, do not spend another place on a different
+route to the same placement, and let the project arrange representatives. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
 and
 [short follow-up](../experiments/sanmill-layered-expert-book-review-follow-up.md)
-separate expert statements, technical deductions, and remaining choices. The
-next expert-facing artifact should be a concrete shortlist for correction, not
-another abstract tier questionnaire. That
+separate that expert statement from project D4 normalization. The historical
 [shortlist](../experiments/sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
-now proposes one endpoint-unique representative per P01-P14 parent, six P03
-extended families, and explicit technical tie-breaks. Fourteen expert-parent
-representatives plus seven Sanmill family representatives consume 21 of the 22
-proposed Book places, leaving only one place for five additional P03 family
-primaries before cross-source deduplication. Status stays `needs_decision`;
-the two Book subtypes have no frozen internal allocation.
+records the correction sheet he reviewed. The subsequent
+[coverage decision](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+freezes 33 D4-unique representatives as the complete Expert Book catalogue and
+diagnostic membership while preserving all 36 raw records as provenance. Its
+execution contract is not frozen. Status stays `needs_decision` for the
+balanced 64-prefix core, and the two Book subtypes have no frozen internal
+allocation.
 
 The two untracked interchange-format drafts that temporarily dirtied the
 referenced Sanmill checkout were removed by its workspace owner. The pinned
@@ -1004,16 +1004,13 @@ training merely because the managed run ended. Proceed in this order:
    For current work, use the twelve-ply v2 contract and completed Sanmill Book,
    expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
    was created without deleting active sidecars. Review the proposed
-   `22 Book / 21 HumanDB / 21 Perfect DB` split and the 14 expert parent
-   groups using the
-   [expert review guide](../experiments/sanmill-layered-expert-book-parent-review.md);
-   use the second expert response and objective P03 transposition evidence to
-   prepare a concrete breadth-first shortlist. Do not generate or freeze the
-   final list until the expert can correct the
-   [shortlist proposal](../experiments/sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
-   and the product decision is recorded. Row 11's screenshot-derived `c5` is
-   source-verified and retains a visual provenance marker. There is no runtime
-   source fallback.
+   `22 Book / 21 HumanDB / 21 Perfect DB` balanced-core split. The expert gate
+   is closed: preserve the frozen
+   [33-pattern coverage catalogue](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+   and select any core subset without changing that catalogue. Do not freeze
+   the core list until the product composition and internal Book allocation
+   are recorded. Row 11's screenshot-derived `c5` is source-verified and
+   retains a visual provenance marker. There is no runtime source fallback.
 9. Record the Mill expert's completed first-pass review of all 64 panels. He
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions
@@ -1084,6 +1081,9 @@ The following choices are recorded for the next formal-evaluation design:
 - use twelve logical plies and separately report Book, genuine HumanDB, and
   StrictSteps Perfect DB strata for the current design; the provisional
   22/21/21 composition still requires product confirmation;
+- preserve all 33 D4-unique expert-curated Book placement patterns in a
+  separately reported diagnostic catalogue while retaining all 36 source
+  records as provenance; its execution protocol is not yet frozen;
 - use 60 complete turns only as a bridge/performance smoke ceiling; it is not a
   rules draw or a formal match-length decision; and
 - do not run candidate-versus-baseline games until a later immutable contract

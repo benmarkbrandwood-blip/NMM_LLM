@@ -4,7 +4,7 @@ Status: `needs_decision`
 
 Initial decision date: 2026-07-25
 
-Latest evidence update: 2026-07-31
+Latest evidence update: 2026-08-01
 
 This brief compares the completed source-only Sanmill Book, expert-curated
 Book, HumanDB, and Perfect DB audits and proposes, but does not freeze, a
@@ -66,6 +66,15 @@ have exact support in 29 distinct games in the frozen PlayOK sample, with a
 maximum of nine games for one history. This corroborates that some lines occur
 in human play, but it does not make the whole delivery a HumanDB-frequency
 source.
+
+The expert has now clarified that every unique placement pattern should be
+kept, while a different route reaching the same placement does not require its
+own place, and delegated the arrangement. The
+[coverage decision](sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+therefore freezes one representative for each of the 33 D4/`ring16` patterns
+as a separately reportable Expert Book diagnostic catalogue. All 36 raw
+records remain provenance. That full catalogue does not automatically occupy
+33 places in the balanced core.
 
 The expert subtype has no exact-history overlap with the Sanmill named lines.
 It shares nine unique final FENs and nine unique final `ring16` orbits with
@@ -166,18 +175,18 @@ The proposed later selection rules are:
    separately identified subtypes inside the 22-slot Book stratum. Cover
    expert eight-ply parents before adding a second child from one parent, and
    cover every Sanmill declared family before adding another member of a
-   covered family. The partial expert review establishes that P03 needs
-   extended-family splitting and that P13-A/P13-B are symmetry-related, but
-   it does not supply the complete family partition or priority tiers. Retain
+   covered family. The expert review establishes that P03 needs
+   extended-family reporting and that P13-A/P13-B are symmetry-related. Retain
    row 11's visual `c5`
    provenance, use no more than one record per exact history, and maximise
    exact-FEN/`ring16` diversity under a predeclared deterministic tiebreak.
    The second expert response names P14 `Interrupted Knight`, labels the P03
    children, distinguishes outer/inner Parallel Mill Rush variants, and makes
-   P03 child 001 primary. The audit independently proves that children
-   001/006 are same-endpoint transpositions and child 012 duplicates 006.
-   Coverage tiers and the other multi-child primaries remain proposals rather
-   than expert decisions.
+   P03 child 001 primary. The later clarification requires all unique
+   placement patterns to remain in full coverage, permits redundant routes to
+   share one representative, and delegates arrangement. Use the frozen
+   33-pattern expert catalogue for the separate diagnostic layer; select a
+   documented subset for the balanced core without changing the catalogue.
 2. **HumanDB:** rank complete histories by distinct-game count, then occurrence
    count, then history identity; skip cross-stratum endpoint/ring16 duplicates
    and take the first 21 remaining histories. Preserve their empirical outcome
@@ -189,10 +198,9 @@ The proposed later selection rules are:
    candidate.
 
 These rules are a proposal, not an executable freeze. The 22 Book slots are
-not yet divided between the two subtypes. The exact parent/family mapping,
-subtype allocation, selected identities, list hash, and review images must be
-generated only after the product owner accepts the composition and the expert
-closes the remaining family, priority, and child-selection questions.
+not yet divided between the two subtypes. The expert gate is closed, but the
+subtype allocation, selected core identities, list hash, and review images
+must be generated only after the product owner accepts the composition.
 
 ## Inputs that remain excluded
 
@@ -201,9 +209,10 @@ an independent low-confidence candidate pool. They are not HumanDB frequency
 evidence, the corrected Sanmill Book, or Perfect DB routes, and they are not
 included in the proposed 64.
 
-The expert Book delivery is no longer excluded as an unaudited input, but none
-of its rows has automatic membership. Its uncontrolled app-play observations
-remain contextual and cannot rank candidates or change source weights.
+The expert Book delivery is no longer excluded as an unaudited input. Its 33
+unique patterns have frozen diagnostic membership, but none has automatic
+balanced-core membership. Its uncontrolled app-play observations remain
+contextual and cannot rank candidates or change source weights.
 
 The existing movement/flying phase-coverage corpus also remains separate.
 Placement-prefix selection cannot replace its later-phase coverage.
@@ -214,30 +223,16 @@ The recommended product decision remains to accept the provisional
 `22 Book / 21 HumanDB / 21 Perfect DB` composition. The newly measured expert
 source does not justify changing that overall split.
 
-The Mill expert has now answered the standalone P14 question and materially
-advanced the original
-[parent-and-child review guide](sanmill-layered-expert-book-parent-review.md).
-The response is preserved in the
-[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md),
-and the
-[short follow-up](sanmill-layered-expert-book-review-follow-up.md)
-records the remaining gate:
-
-1. correction or acceptance of a concrete P03 extended-family proposal;
-2. breadth priorities expressed as `must keep`, `keep if space`, or optional;
-   and
-3. correction or acceptance of proposed primary/additional choices for P04,
-   P05, P08, P09, and P13-A.
-
-The expert does not need to recheck legality, hashes, HumanDB frequency,
-row 11, Sanmill replay, P14, the P03-001/006 transposition, or objective
-strength. The next review should be a concrete shortlist to correct rather than
-another abstract questionnaire. That
+The Mill expert has closed the semantic selection gate. The
+[semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
+preserves the distinction between his unique-placement requirement and the
+project's D4 normalization policy. The
+[coverage decision](sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+freezes the 33-pattern expert catalogue and diagnostic membership, while the
+earlier
 [shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
-now records one endpoint-unique breadth representative per P01-P14 parent,
-proposed P03 extended families, unconfirmed sibling tie-breaks, and the Book
-quota conflict without freezing any member.
+remains the historical correction sheet he reviewed.
 
-Until that decision is recorded, status remains `needs_decision`; no final
-prefix list, final corpus image-review package, candidate-versus-baseline run,
-or launch authorization exists.
+Status remains `needs_decision` only for the balanced core composition and its
+internal Book subtype allocation. No final core prefix list, final core image
+review package, candidate-versus-baseline run, or launch authorization exists.

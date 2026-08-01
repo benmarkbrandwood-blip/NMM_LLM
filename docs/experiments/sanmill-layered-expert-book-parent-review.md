@@ -15,7 +15,9 @@ and the
 [reviewed-source follow-up](sanmill-layered-expert-book-review-follow-up.md)
 for current evidence and corrected images. The later
 [breadth-first shortlist](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
-turns the remaining abstract questions into concrete choices for correction.
+turned the remaining abstract questions into concrete choices. The expert's
+1 August clarification is applied by the superseding
+[unique-pattern coverage decision](sanmill-layered-expert-book-coverage-decision-2026-08-01.md).
 
 This guide asks for a narrow Mill-domain review of the expert-curated
 `Book Opening Plays.docx` delivery. The source has already been transcribed,

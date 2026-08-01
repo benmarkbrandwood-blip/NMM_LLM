@@ -1,11 +1,18 @@
 # Expert Book breadth-first shortlist proposal
 
-Status: `proposal_for_expert_correction_not_frozen`
+Status: `superseded_by_unique_pattern_coverage_decision`
 
 Date: 2026-07-31
 
 Machine-readable proposal:
 [`sanmill-layered-expert-book-shortlist-proposal-2026-07-31.json`](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.json)
+
+Disposition: the expert clarified on 1 August that every unique placement
+pattern should be kept, while different routes ending in the same placement
+do not require separate places, and delegated the arrangement. The resulting
+[coverage decision](sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+supersedes this correction sheet. The JSON remains the exact proposal that was
+reviewed; it is not rewritten as if it had already contained the response.
 
 This document turns the Mill expert's family descriptions into concrete
 choices that can be corrected quickly. It is not a record that the expert has
@@ -136,7 +143,11 @@ P03 row 8 because it has the strongest exact HumanDB support among the
 additional expert histories. If later cross-source selection creates an
 endpoint conflict, rows 18 and 23 are the next non-overlapping alternatives.
 
-## Minimal expert correction requested
+## Original minimal expert correction request
+
+This request is closed by the 1 August clarification. It remains below to show
+what the expert was answering; no further tier or primary-row response is
+required.
 
 The expert can review this proposal by answering only the lines that are
 wrong:
@@ -152,11 +163,11 @@ wrong:
 5. If P03 rows 15 or 16 remain eligible, should their latest open/outer wording
    replace the older inner/closed wording?
 
-Silence or general approval must not be converted into a formal corpus freeze.
-After expert correction, the product owner must still approve the overall
+The expert response is now recorded in the separate coverage decision. The
+product owner must still approve the overall
 `22 Book / 21 HumanDB / 21 Perfect DB` composition and the internal split of
-the 22 Book places. Only then may an immutable 64-prefix proposal and final
-review images be generated.
+the 22 Book places. Only then may an immutable 64-prefix core proposal and
+final review images be generated.
 
 No candidate model was loaded, no game was played, and no evaluation or
 training launch is authorised by this shortlist.

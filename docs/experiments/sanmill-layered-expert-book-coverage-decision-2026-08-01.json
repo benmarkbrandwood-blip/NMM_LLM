@@ -1,0 +1,325 @@
+{
+  "schema_version": "nmm.layered-expert-book-coverage-decision.v1",
+  "status": "expert_coverage_frozen_core_membership_not_frozen",
+  "date": "2026-08-01",
+  "source_audit_identity": "1f6f9ceb8df36150ea401145e16c88cc25550622c1ad85a1b54a067183b9978d",
+  "source_record_count": 36,
+  "candidate_loaded": false,
+  "games_played": 0,
+  "fallback": "none",
+  "expert_scope": {
+    "selection_unit": "unique_twelve_ply_final_placement_pattern",
+    "different_route_same_placement_requires_separate_slot": false,
+    "all_source_records_retained_as_provenance": true,
+    "technical_arrangement_delegated": true,
+    "evidence": "../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md"
+  },
+  "technical_policy": {
+    "pattern_key": "prefix_record.final.ring16_canonical_fen",
+    "symmetry_group": "D4",
+    "raw_record_count": 36,
+    "unique_exact_history_count": 35,
+    "unique_exact_final_fen_count": 34,
+    "unique_ring16_pattern_count": 33,
+    "representative_precedence": [
+      "explicit_expert_primary",
+      "exact_human_db_distinct_game_support_descending",
+      "typed_source_evidence_before_visual_interpretation",
+      "source_row_then_variation_id"
+    ],
+    "interpretation": "D4 normalization is a project policy for structural coverage, not a quotation or unstated judgment attributed to the expert."
+  },
+  "catalog_identity": "44519385ebfcb0e15207a23ec3914abb353c1638e5df6a52c4ffe3c53dba4617",
+  "coverage_catalog": [
+    {
+      "coverage_id": "expert-pattern-001",
+      "review_id": "P01",
+      "source_row": 1,
+      "variation_id": "expert-book-play-001-better-d1",
+      "ring16_canonical_fen": "......WWBW.WWBBB.....B.B|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-002",
+      "review_id": "P01",
+      "source_row": 1,
+      "variation_id": "expert-book-play-001-trap-c5",
+      "ring16_canonical_fen": ".......BBBWW.WBBW.....BW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-003",
+      "review_id": "P02",
+      "source_row": 2,
+      "variation_id": "expert-book-play-002",
+      "ring16_canonical_fen": ".......WBBWW.WBBW...B.B.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-004",
+      "review_id": "P03",
+      "source_row": 3,
+      "variation_id": "expert-book-play-003",
+      "ring16_canonical_fen": "........BBWBWWWW...WB.B.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-005",
+      "review_id": "P04",
+      "source_row": 4,
+      "variation_id": "expert-book-play-004",
+      "ring16_canonical_fen": ".......BBB.B.WWWW....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-006",
+      "review_id": "P04",
+      "source_row": 5,
+      "variation_id": "expert-book-play-005",
+      "ring16_canonical_fen": ".......B.B.BBWWWW....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-007",
+      "review_id": "P05",
+      "source_row": 6,
+      "variation_id": "expert-book-play-006",
+      "ring16_canonical_fen": ".......WBB.B.WWWB....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-008",
+      "review_id": "P05",
+      "source_row": 7,
+      "variation_id": "expert-book-play-007",
+      "ring16_canonical_fen": ".......W.B.BBWWWB....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-009",
+      "review_id": "P03",
+      "source_row": 8,
+      "variation_id": "expert-book-play-008",
+      "ring16_canonical_fen": ".......BBB.BWWWW.....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-010",
+      "review_id": "P03",
+      "source_row": 9,
+      "variation_id": "expert-book-play-009",
+      "ring16_canonical_fen": ".........BBWWWWB..BWWB..|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-011",
+      "review_id": "P03",
+      "source_row": 10,
+      "variation_id": "expert-book-play-010",
+      "ring16_canonical_fen": ".......BWB.BBWWW.....BWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-012",
+      "review_id": "P03",
+      "source_row": 11,
+      "variation_id": "expert-book-play-011-visual-c5",
+      "ring16_canonical_fen": ".........BBWWWWB...BWWB.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-013",
+      "review_id": "P06",
+      "source_row": 12,
+      "variation_id": "expert-book-play-012",
+      "ring16_canonical_fen": ".....BBB.W.WWBBB..W..W.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-014",
+      "review_id": "P07",
+      "source_row": 13,
+      "variation_id": "expert-book-play-013",
+      "ring16_canonical_fen": "........BBBBWWBWWBW.....|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-015",
+      "review_id": "P03",
+      "source_row": 15,
+      "variation_id": "expert-book-play-015",
+      "ring16_canonical_fen": ".......W.BBWWWWB....B.BW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-016",
+      "review_id": "P03",
+      "source_row": 17,
+      "variation_id": "expert-book-play-017",
+      "ring16_canonical_fen": "....B.B..BBWWWWB..W....W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-017",
+      "review_id": "P03",
+      "source_row": 18,
+      "variation_id": "expert-book-play-018",
+      "ring16_canonical_fen": "....W..WWWWWBB.B.B...B..|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-018",
+      "review_id": "P03",
+      "source_row": 19,
+      "variation_id": "expert-book-play-019",
+      "ring16_canonical_fen": ".......B.BWWWWBB.W.B..W.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-019",
+      "review_id": "P03",
+      "source_row": 21,
+      "variation_id": "expert-book-play-021",
+      "ring16_canonical_fen": ".........BBWWWWB..WB.B.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-020",
+      "review_id": "P03",
+      "source_row": 22,
+      "variation_id": "expert-book-play-022",
+      "ring16_canonical_fen": ".........BBWWWWB.WB..B.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-021",
+      "review_id": "P03",
+      "source_row": 23,
+      "variation_id": "expert-book-play-023",
+      "ring16_canonical_fen": ".....W.WBWWWWB.BB.....B.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-022",
+      "review_id": "P08",
+      "source_row": 24,
+      "variation_id": "expert-book-play-024",
+      "ring16_canonical_fen": ".......BBBB.WWW..W.W...B|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-023",
+      "review_id": "P08",
+      "source_row": 25,
+      "variation_id": "expert-book-play-025",
+      "ring16_canonical_fen": ".....B.BBBB.WWW..W.W....|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-024",
+      "review_id": "P09",
+      "source_row": 26,
+      "variation_id": "expert-book-play-026",
+      "ring16_canonical_fen": "...B.W.W.W.W.BBB.B.B.W.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-025",
+      "review_id": "P09",
+      "source_row": 27,
+      "variation_id": "expert-book-play-027",
+      "ring16_canonical_fen": "...B.W.WBB.W.W.B.W.B.B.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-026",
+      "review_id": "P03",
+      "source_row": 28,
+      "variation_id": "expert-book-play-028",
+      "ring16_canonical_fen": ".........BBWWWWB.W.B.B.W|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-027",
+      "review_id": "P10",
+      "source_row": 29,
+      "variation_id": "expert-book-play-029",
+      "ring16_canonical_fen": ".......B.WBWWBB..B..BWWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-028",
+      "review_id": "P11",
+      "source_row": 30,
+      "variation_id": "expert-book-play-030",
+      "ring16_canonical_fen": ".......B.W.BWBBWWB.W.WB.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-029",
+      "review_id": "P12",
+      "source_row": 31,
+      "variation_id": "expert-book-play-031",
+      "ring16_canonical_fen": "....BWW..B.B.WBW....WWB.|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-030",
+      "review_id": "P13-A",
+      "source_row": 32,
+      "variation_id": "expert-book-play-032",
+      "ring16_canonical_fen": ".....WBW.B.B.B.B....WWWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-031",
+      "review_id": "P13-A",
+      "source_row": 33,
+      "variation_id": "expert-book-play-033",
+      "ring16_canonical_fen": ".....WBW.B.B...BW...BWWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-032",
+      "review_id": "P14",
+      "source_row": 34,
+      "variation_id": "expert-book-play-034",
+      "ring16_canonical_fen": "....WBW..B...B.BW...BWWW|W|6|6"
+    },
+    {
+      "coverage_id": "expert-pattern-033",
+      "review_id": "P13-B",
+      "source_row": 35,
+      "variation_id": "expert-book-play-035",
+      "ring16_canonical_fen": ".....W.W.BBBBB......WWW.|W|6|6"
+    }
+  ],
+  "collapsed_pattern_groups": [
+    {
+      "ring16_canonical_fen": "........BBWBWWWW...WB.B.|W|6|6",
+      "representative_variation_id": "expert-book-play-003",
+      "representative_source_row": 3,
+      "basis": "The expert explicitly selected P03 child 001; all four records have the same D4-normalized twelve-ply endpoint.",
+      "alternate_records": [
+        {
+          "source_row": 14,
+          "variation_id": "expert-book-play-014",
+          "relationship": "different exact history and same exact final FEN as the representative"
+        },
+        {
+          "source_row": 16,
+          "variation_id": "expert-book-play-016",
+          "relationship": "different exact history and final FEN; D4-equivalent endpoint"
+        },
+        {
+          "source_row": 20,
+          "variation_id": "expert-book-play-020",
+          "relationship": "exact-history duplicate of row 14 and same exact final FEN as the representative"
+        }
+      ]
+    }
+  ],
+  "suite_architecture": {
+    "expert_coverage_catalog": {
+      "prefix_membership_frozen": true,
+      "prefix_count": 33,
+      "purpose": "Preserve one representative for every audited D4-unique expert placement pattern."
+    },
+    "expert_book_diagnostic_suite": {
+      "prefix_membership_frozen": true,
+      "prefix_count": 33,
+      "report_separately": true,
+      "execution_contract_frozen": false,
+      "purpose": "Test every nonredundant expert pattern without changing the balanced core source weights."
+    },
+    "balanced_core_64": {
+      "composition_proposal": {
+        "book": 22,
+        "human_db": 21,
+        "perfect_db": 21
+      },
+      "composition_frozen": false,
+      "membership_frozen": false,
+      "expert_pattern_membership_frozen": false,
+      "purpose": "Provide a source-balanced primary benchmark with every stratum reported separately."
+    }
+  },
+  "decision": {
+    "expert_coverage_membership_frozen": true,
+    "expert_diagnostic_execution_contract_frozen": false,
+    "balanced_core_composition_frozen": false,
+    "balanced_core_membership_frozen": false,
+    "final_64_frozen": false,
+    "evaluation_authorized": false,
+    "training_authorized": false
+  }
+}

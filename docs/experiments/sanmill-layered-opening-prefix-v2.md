@@ -269,25 +269,27 @@ overlap with the corrected Sanmill named lines, but nine unique final FENs
 and nine unique final orbits overlap. The fixed Perfect DB audit pool has no
 overlap.
 
-This evidence supports adding the expert material as a Book candidate subtype,
-not adding all rows or changing the Book quota automatically. Row 11's final
-`c5` is screenshot-derived but unambiguous at original resolution; its visual
-evidence basis remains recorded and is not an expert-confirmation blocker. The
-expert has now supplied a standalone P14 name, P03 child-level labels, the
-outer/inner Parallel Mill Rush distinction, and primary P03 child 001. The
+This evidence supports adding the expert material as a Book subtype without
+changing the balanced-core Book quota automatically. Row 11's final `c5` is
+screenshot-derived but unambiguous at original resolution; its visual evidence
+basis remains recorded and is not an expert-confirmation blocker. The expert
+has now supplied a standalone P14 name, P03 child-level labels, the outer/inner
+Parallel Mill Rush distinction, and primary P03 child 001. The
 [semantic disposition](../evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md)
-records the supplied family and child annotations without inferring missing
-answers. The
+records the supplied annotations and his later clarification: retain every
+unique placement pattern, do not spend another place on a different route to
+the same placement, and let the project arrange representatives. The
 [short follow-up](sanmill-layered-expert-book-review-follow-up.md)
-records that coverage priority and most primary/additional child choices remain
-unanswered. It also separates the objective child-001/006 endpoint
-transposition from the expert's semantic evidence. A concrete shortlist is the
-next review format; the expert is not asked to repeat the abstract tiers. The
+therefore closes the expert-selection gate. It also separates the objective
+child-001/006 endpoint transposition from the expert's semantic evidence. The
 [shortlist proposal](sanmill-layered-expert-book-shortlist-proposal-2026-07-31.md)
-covers all fourteen parents, proposes six P03 extended families, and keeps every
-unconfirmed primary visibly provisional. The
-provisional corpus decision must account for that review and the two distinct
-Book subtypes before any list is frozen.
+covers all fourteen parents and remains the historical correction sheet he
+reviewed. The later
+[coverage decision](sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
+uses the D4-normalized final `ring16` endpoint as project policy and freezes one
+representative for each of 33 unique expert patterns. All 36 raw histories
+remain provenance. The full 33-pattern diagnostic catalogue and the balanced
+core are separate products.
 
 ## Current delivery and corpus decision
 
@@ -302,7 +304,8 @@ The completed source comparison and provisional `22 Book / 21 HumanDB /
 [corpus decision brief](sanmill-layered-opening-prefix-v2-decision-brief.md).
 That composition is not frozen. Product confirmation is required before an
 immutable list or final corpus image-review material is generated. The
-source-only semantic guide above does not select corpus members.
+33-pattern expert diagnostic membership is frozen separately and does not
+select balanced-core members.
 
 ## Explicit exclusions
 

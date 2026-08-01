@@ -220,11 +220,12 @@ evidence. Neither file is the Sanmill Book asset or an active input. See the
 [original delivery record](evidence/maintainer-book-opening-plays-delivery-2026-07-26.md)
 and the
 [review delivery record](evidence/maintainer-book-opening-plays-review-delivery-2026-07-26.md).
-The correction's current replay and the partial family/child interpretation
-are recorded separately in the
-[reviewed-source audit](evidence/sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.md)
-and
-[semantic disposition](evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md).
+The correction's current replay, expert semantic disposition, and frozen
+33-pattern coverage catalogue are recorded separately in the
+[reviewed-source audit](evidence/sanmill-layered-expert-book-reviewed-source-audit-2026-07-26.md),
+[semantic disposition](evidence/maintainer-book-opening-plays-semantic-review-2026-07-26.md),
+and the
+[coverage decision](experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md).
 
 The original legacy SpecialistDB is isolated at:
 

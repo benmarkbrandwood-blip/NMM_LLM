@@ -116,7 +116,9 @@ The frozen reviewed-source audit already supplies the objective boundary:
 - 33 final `ring16` orbits remain after D4 normalization.
 
 No source history is deleted by selecting one representative per placement
-pattern.
+pattern. The project normalization and frozen representatives are recorded in
+the
+[unique-pattern coverage decision](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md).
 
 ## P03 extended-family evidence
 
