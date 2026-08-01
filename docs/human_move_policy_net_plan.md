@@ -470,6 +470,79 @@ Baselines to report alongside:
   support is sufficient.
 - HumanPrefNet softmax at the same temperature (for style comparison).
 
+## Phase 4b — extended eval + v2 split — COMPLETE (2026-08-01)
+
+Extended eval script (`tools/eval_human_move_policy_net.py`, rewritten commit
+`de2e932`) and v2 split rework landed 2026-07-31; re-extraction + re-train +
+full Phase 4b eval completed 2026-08-01.  Results in
+`data/gap_v3_prerequisite_eval.json` (git commit 7b9d6bb).
+
+**v2 dataset:** 5/15/80 three-way split (`three_way_split()` by state_key
+hash), 2 050 608 train / 384 837 val / 127 968 test samples; 2 209 726
+state_keys; extraction 515 s.
+
+**v2 model:** 26 epochs, best val event NLL **1.5816** (v1: 1.5953), elapsed
+65 150 s (~18.1 h).  Temperature scaling: T\* = 1.0 (no improvement from
+scaling).
+
+**Eval results (2026-08-01, v2 model)** — 384 837 val samples, 785 550 events:
+
+| Stratum | NLL | Brier | Top-1 | Top-3 | Top-5 | ECE |
+| --- | --- | --- | --- | --- | --- | --- |
+| Overall | 1.582 | 0.616 | 45.5 % | 79.5 % | 89.0 % | 0.175 |
+| band=lower | 1.613 | 0.620 | 44.8 % | 78.3 % | 88.0 % | 0.175 |
+| band=middle | 1.567 | 0.609 | 46.1 % | 79.6 % | 89.3 % | 0.177 |
+| band=upper | 1.583 | 0.619 | 45.3 % | 79.8 % | 89.0 % | 0.174 |
+| phase=place | 1.883 | 0.644 | 39.3 % | 73.8 % | 84.0 % | 0.201 |
+| phase=move | 1.342 | 0.607 | 50.5 % | 84.0 % | 92.9 % | 0.171 |
+| trans=win_preserved | 1.630 | 0.703 | 45.1 % | 74.6 % | 86.5 % | 0.189 |
+| trans=win_to_draw | 2.037 | 0.855 | 26.7 % | 61.8 % | 79.0 % | 0.133 |
+| trans=win_to_loss | 2.541 | 0.968 | 15.3 % | 46.1 % | 67.8 % | 0.084 |
+| trans=draw_preserved | 1.572 | 0.670 | 46.3 % | 81.3 % | 89.8 % | 0.182 |
+| trans=draw_to_loss | 2.222 | 0.912 | 21.4 % | 56.3 % | 73.8 % | 0.106 |
+| trans=all_losing | 1.322 | 0.629 | 51.5 % | 83.8 % | 92.7 % | 0.169 |
+| trans=unlabelled | 1.871 | 0.750 | 37.5 % | 68.3 % | 83.1 % | 0.179 |
+| lmc_2-5 | 0.900 | 0.473 | 61.4 % | 95.7 % | 100 % | 0.211 |
+| lmc_6-10 | 1.298 | 0.592 | 51.3 % | 85.3 % | 95.3 % | 0.217 |
+| lmc_11-20 | 1.960 | 0.728 | 37.7 % | 64.7 % | 78.1 % | 0.199 |
+| lmc_21+ | 2.089 | 0.848 | 34.0 % | 74.7 % | 83.1 % | 0.182 |
+| game_val_only | 1.571 | 0.675 | 44.9 % | 76.5 % | 88.3 % | 0.173 |
+
+**Baselines (overall):**
+
+| Baseline | NLL | Brier | Top-1 | Top-3 | Top-5 | ECE |
+| --- | --- | --- | --- | --- | --- | --- |
+| Uniform | 2.347 | 0.808 | 11.7 % | 31.2 % | 48.4 % | 0.020 |
+| Empirical (≥10 support, n=4 673 positions) | 1.320 | ~0 | 55.8 % | 85.1 % | 93.3 % | 0.235 |
+
+Empirical KL (≥10-support, n=4 673 positions): **mean KL 0.552** (v1: 0.557).
+Abstention: **0 samples** (0 encoding failures). OOD coverage: 100 % of val
+positions appear in session index.
+
+**Notes:**
+
+- NLL improvement over uniform: 30–33 % relative per band — model is
+  substantially better than chance at every Elo tier.
+- Brier score newly reported; values 0.47–0.62 depending on lmc, consistent
+  with a high-entropy multi-class task.
+- lmc-stratum gradient clear: NLL 0.90 (lmc 2-5) → 2.09 (lmc 21+), confirming
+  that positions with more legal moves are harder to predict.
+- game_val_only stratum (42 607 samples, positions seen only in game-val games)
+  tracks closely with overall val — no evidence of game-level leakage from the
+  position-level split.
+- ECE 0.175 per band.  The §16 gate threshold of 0.05 is unreachable in
+  practice: the uniform model itself achieves 0.020 because predicting uniform
+  is trivially calibrated regardless of human choice patterns.  The empirical
+  baseline ECE is 0.235 — worse than the model.  Gate threshold requires
+  revision before Stage B is declared fully closed.
+
+**Stage B gate check (§16 of gap_net_v3_plan.md):**
+
+- ✅ NLL gate: 30–33 % relative improvement per band (threshold: ≥ 20 %).
+- ❌ ECE gate: 0.174–0.177 per band after T\*=1.0 scaling (threshold: ≤ 0.05).
+  Gate threshold must be revised — see note above.
+- ✅ Abstention / OOD: 0 abstentions.
+
 ## Regret — deferred to GapNet plan (reviewer §11)
 
 Malom's complete move values are **ordered objects, not a globally

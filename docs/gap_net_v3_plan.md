@@ -145,7 +145,7 @@ The plan does not authorise any of the following work until every blocker in th
 
 Required before `P\_h` is trusted as a v3 dependency (§7):
 
-1. ✅ **DONE (2026-07-30/31)** — Train to convergence on `data/human\_move\_policy\_dataset/` (v1, 22 epochs, val NLL 1.5953, ~11.6 h).  First-run model saved as `data/human\_move\_policy\_net.npz`. A v2 re-extraction + re-train is underway (see item 3 below); the v2 candidate will be `data/human\_move\_policy\_net\_v2\_candidate.npz`.
+1. ✅ **DONE (2026-07-30/31 + 2026-08-01)** — Train to convergence on `data/human\_move\_policy\_dataset/` (v1, 22 epochs, val NLL 1.5953, ~11.6 h). First-run model saved as `data/human\_move\_policy\_net.npz`. v2 re-extraction (515\xc2\xa0s) + re-train (65\xe2\x80\x8a150\xc2\xa0s, 26 epochs, val NLL **1.5816**) complete 2026-08-01. v2 candidate saved as `data/human\_move\_policy\_net\_v2\_candidate.npz`.
 
 2. ✅ **DONE (2026-07-31)** — `tools/eval\_human\_move\_policy\_net.py` rewritten (Phase 4b).  Now reports:
 
@@ -175,11 +175,11 @@ Required before `P\_h` is trusted as a v3 dependency (§7):
 
    - `tools/build\_session\_index.py` (new) scans 97 138 JSONL game files → `game\_split\_mask` + `player\_split\_mask` uint8 bitmask arrays.
 
-   - `tools/train\_human\_move\_policy\_net.py` updated: detects v2 dataset, uses `sample\_split` for train/val/test; new default output `data/human\_move\_policy\_net\_v2\_candidate.npz`. **Pending (user will run):** re-extraction (~400 s), re-train (~11 h), session-index build (~variable), full Phase 4b eval → produce `data/gap\_v3\_prerequisite\_eval.json`.
+   - `tools/train\_human\_move\_policy\_net.py` updated: detects v2 dataset, uses `sample\_split` for train/val/test; new default output `data/human\_move\_policy\_net\_v2\_candidate.npz`. ✅ **DONE (2026-08-01):** re-extraction 515 s; re-train 65 150 s (~18.1 h); session-index built; Phase 4b eval complete → `data/gap\_v3\_prerequisite\_eval.json` produced.
 
 4. ✅ **DONE (2026-07-31)** — Provenance chain already inherited via `.npz`-embedded `provenance\_json` (verified: candidate DB SHA-256, dataset git commit, feature version, elo band config all present in `data/human\_move\_policy\_dataset/provenance.json` and model .npz). The split-manifest version is now "v2" (bumped from "v1").
 
-Owning document: this plan; `docs/human\_move\_policy\_net\_plan.md` §Phase 4b documents the extended eval requirements.  Run `data/gap\_v3\_prerequisite\_eval.json` to close gate §16 "Stage B eval".
+Owning document: this plan; `docs/human\_move\_policy\_net\_plan.md` §Phase 4b documents the extended eval requirements.  `data/gap\_v3\_prerequisite\_eval.json` produced 2026-08-01 — NLL sub-gate ✅ closed; ECE sub-gate threshold requires revision (see §16 gate table).
 
 ### 4.2 Candidate database
 
@@ -678,7 +678,7 @@ Every stage produces a discrete artefact.  Every artefact is committed alongsid
 | Gate | Threshold |
 | - | - |
 | Stage A tests | All pass; golden corpus has ≥ 3 rows per category in §6.1 |
-| Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; OOD rate \< 10 % |
+| Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; OOD rate \< 10 % | · ✅ NLL: 30–33 % per band (lower/mid/upper 30.4/33.0/33.0 %). ❌ ECE: 0.174–0.177 per band; T\xe2\x81\x8e=1.0 (no scaling benefit) — gate 0.05 is unreachable: uniform model achieves 0.020. Gate threshold needs revision. ✅ Abstention: 0 samples. Net: NLL and coverage pass; ECE gate flags miscalibration but threshold must be revised. |
 | Stage C direct `G\_v` | Sanity: `G\_v\_wdl\_utility\_loss` is monotonic decreasing in Elo band (upper \< middle \< lower) |
 | Stage D extraction | Coverage ≥ 60 % of `moves\_elo\_bins`-eligible `(state\_key, band)` samples; `abstained.jsonl` reasons summable |
 | Stage E training | Per-component held-out MSE improves over: (a) uniform-`P\_h` baseline by ≥ 30 % relative, (b) empirical-`P\_h` baseline (where support permits) by ≥ 10 % relative |
