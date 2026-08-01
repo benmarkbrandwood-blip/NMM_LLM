@@ -1,6 +1,6 @@
 # Twelve-ply layered opening-prefix corpus decision brief
 
-Status: `all_source_membership_and_execution_records_frozen_corpus_pending`
+Status: `executable_64_prefix_corpus_frozen_evaluation_not_authorized`
 
 Initial decision date: 2026-07-25
 
@@ -240,7 +240,7 @@ earlier
 remains the historical correction sheet he reviewed.
 
 Status is now
-`all_source_membership_and_execution_records_frozen_corpus_pending`. The
+`executable_64_prefix_corpus_frozen_evaluation_not_authorized`. The
 [Book core decision](sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
 freezes 15 expert-curated and seven Sanmill named-line members with 22 unique
 exact histories, final FENs, and `ring16` orbits. The
@@ -259,5 +259,6 @@ The subsequent
 [HumanDB execution overlay](sanmill-layered-opening-prefix-v2-human-execution-2026-08-01.md)
 freezes all 21 missing per-step records under two-process exact transcript
 equality. All 64 source-member records therefore exist; assembly and identity
-freeze of the combined executable corpus remain pending. No
-candidate-versus-baseline run or launch authorization exists.
+freeze are complete in the later
+[executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md).
+No candidate-versus-baseline run or launch authorization exists.

@@ -847,7 +847,7 @@ records the correction sheet he reviewed. The subsequent
 freezes 33 D4-unique representatives as the complete Expert Book catalogue and
 diagnostic membership while preserving all 36 raw records as provenance. Its
 execution contract is not frozen. Status is
-`all_source_membership_and_execution_records_frozen_corpus_pending` for the
+`executable_64_prefix_corpus_frozen_evaluation_not_authorized` for the
 balanced 64-prefix core, and
 the subsequent
 [Book core decision](../experiments/sanmill-layered-opening-prefix-v2-book-core-2026-08-01.md)
@@ -897,8 +897,16 @@ Mill-and-removal turns. The transcript identity is
 `e61bef7940fb1dd9a6fffb67b98640825d72a0ebcfb105627fdaa871173c13fd`;
 the frozen HumanDB execution identity is
 `1cf88ab8b3afb7c62112a0f2866eed9052587bbf2ef44dc57efa64c2749021d6`.
-All 64 source-member execution records now exist, but their combined
-executable-corpus manifest and identity remain pending.
+All 64 source-member execution records now exist. The subsequent
+[executable-corpus decision](../experiments/sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+assembles them under identity
+`417d74ebe01734c43e48531cab81ba742bc89e455f1c834ea7e31006b886f8b9`.
+It preserves the 43-record historical and 21-record exact-HEAD Sanmill binary
+identities separately. Evaluation and training remain unauthorised.
+The five focused corpus checks pass. The wider layered-prefix run reports 81
+passes after explicitly deselecting the known historical Perfect DB local
+regeneration check; running that check against the advanced moving checkout
+correctly fails closed on protected-path drift.
 
 ## Live Malom and Legacy-model Boundary
 
@@ -1050,8 +1058,9 @@ training merely because the managed run ended. Proceed in this order:
    expert Book, HumanDB, and Perfect DB audits. The HumanDB immutable snapshot
    was created without deleting active sidecars. Preserve the accepted
    `22 Book / 21 HumanDB / 21 Perfect DB` balanced-core split. Its 64 source
-   members, review manifest, and all source-member execution records are now
-   frozen; next assemble and identity-freeze the combined executable corpus.
+   members, review manifest, source-member execution records, and combined
+   executable corpus are now frozen. Preserve executable-corpus identity
+   `417d74ebe01734c43e48531cab81ba742bc89e455f1c834ea7e31006b886f8b9`.
    The expert gate is closed: preserve the frozen
    [33-pattern coverage catalogue](../experiments/sanmill-layered-expert-book-coverage-decision-2026-08-01.md)
    and keep the separately frozen balanced-core subset without changing that
@@ -1127,8 +1136,8 @@ The following choices are recorded for the next formal-evaluation design:
   decision; the later eight-ply 7/57 diversity proposal is also historical;
 - use twelve logical plies and separately report Book, genuine HumanDB, and
   StrictSteps Perfect DB strata for the current design; the 22/21/21
-  composition and 64 source-member identities are frozen, while HumanDB strict
-  replay and the executable corpus remain pending;
+  composition, 64 source-member identities, HumanDB strict replays, and
+  executable corpus are frozen, while evaluation remains unauthorised;
 - preserve all 33 D4-unique expert-curated Book placement patterns in a
   separately reported diagnostic catalogue while retaining all 36 source
   records as provenance; its execution protocol is not yet frozen;

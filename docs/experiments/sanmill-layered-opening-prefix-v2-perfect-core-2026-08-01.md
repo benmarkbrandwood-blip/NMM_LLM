@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix Perfect DB core
 
-Status: `all_source_membership_and_execution_records_frozen_corpus_pending`
+Status: `all_source_membership_execution_and_corpus_frozen`
 
 Decision date: 2026-08-01
 
@@ -61,9 +61,10 @@ All 64 source memberships are now frozen and structurally disjoint. A later
 freezes complete strict-Sanmill records for the remaining 21 histories. The
 combined source manifest is frozen in the
 [source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md).
-Assembly and identity freeze of the executable 64-prefix corpus remain
-pending. Neither source evidence nor review images constitute an evaluation
-launch.
+A subsequent
+[executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+assembles and identity-freezes all 64 records. Neither source evidence nor
+review images constitute an evaluation launch.
 
 No candidate was loaded and no game was played. Evaluation and training remain
 unauthorised.

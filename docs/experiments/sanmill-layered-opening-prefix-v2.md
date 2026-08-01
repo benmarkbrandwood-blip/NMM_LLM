@@ -1,6 +1,6 @@
 # Sanmill Layered Opening Prefix v2
 
-Status: `all_source_membership_and_execution_records_frozen_corpus_pending`
+Status: `executable_64_prefix_corpus_frozen_evaluation_not_authorized`
 
 Decision date: 2026-07-25
 
@@ -8,8 +8,9 @@ This document freezes the source-only preparation contract for twelve-logical-
 ply opening prefixes. The source ratio was subsequently frozen as
 `22 Book / 21 HumanDB / 21 Perfect DB`, and the later source-core decision
 freezes all 64 source memberships. Complete execution records now exist for
-all members, but this document still does not freeze their combined executable
-corpus, an evaluation baseline, or a match launch.
+all members, and the subsequent executable-corpus decision freezes their
+combined representation. This document still does not freeze an evaluation
+baseline or authorise a match launch.
 
 ## Expert and product decisions
 
@@ -214,7 +215,8 @@ Those audits are complete. The product owner accepted the recommended
 composition on 1 August 2026, closing the source-count gate. The later stratum
 and source-core decisions also close source membership. The later HumanDB
 execution overlay closes the strict replay gate; deterministic assembly and
-identity freeze of the combined executable corpus remain pending.
+identity freeze of the combined executable corpus are now complete in the
+subsequent executable-corpus decision.
 
 ## Current Book evidence
 
@@ -333,8 +335,10 @@ The later
 freezes audit routes 000 through 020. All 64 source memberships are now frozen
 and structurally disjoint in the
 [source core decision](sanmill-layered-opening-prefix-v2-source-core-2026-08-01.md);
-all source-member execution records now exist, while assembly and identity
-freeze of the combined executable corpus remain pending. The
+all source-member execution records now exist. Assembly and identity freeze
+of the combined executable corpus are complete in the
+[executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md).
+The
 [source-core review package](sanmill-layered-opening-prefix-v2-source-core-review-2026-08-01.md)
 provides 64 individual panels and six contact sheets for membership review;
 those images are not execution evidence.

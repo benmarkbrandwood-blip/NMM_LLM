@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix HumanDB execution records
 
-Status: `human_execution_frozen_executable_corpus_pending`
+Status: `human_execution_and_executable_corpus_frozen`
 
 Decision date: 2026-08-01
 
@@ -54,7 +54,9 @@ frozen HumanDB and source-core membership records.
 ## Evidence boundary
 
 This artifact freezes executable records for the HumanDB stratum only. The 22
-Book and 21 Perfect DB records already exist in their frozen source audits,
-but the combined executable 64-prefix corpus has not yet been assembled or
-given its own identity. This replay loaded no candidate model, played no game,
-and authorises neither evaluation nor training.
+Book and 21 Perfect DB records already exist in their frozen source audits. A
+subsequent
+[executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+assembles all 64 without changing this evidence. This replay loaded no
+candidate model, played no game, and authorises neither evaluation nor
+training.

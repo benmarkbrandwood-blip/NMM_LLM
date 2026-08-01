@@ -50,6 +50,11 @@ their displayed final FENs. The HumanDB panel footer
 `full_sanmill_replay_pending` records package-time state; this frozen image
 package is not regenerated or relabelled by the later evidence.
 
+The later
+[executable corpus](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+binds all 64 complete prefix records to this unchanged source membership. It
+does not convert the images themselves into execution evidence.
+
 This package does not load a candidate model, play games, measure strength,
 replace the separate movement/flying phase corpus, or authorise evaluation or
 training. Reviewer comments can identify a membership problem, but cannot

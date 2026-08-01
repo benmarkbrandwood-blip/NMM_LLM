@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix source core
 
-Status: `source_membership_and_human_execution_frozen_corpus_pending`
+Status: `source_membership_and_executable_corpus_frozen`
 
 Decision date: 2026-08-01
 
@@ -51,7 +51,9 @@ Therefore:
 
 - source membership is frozen;
 - all source-member execution records now exist;
-- the combined executable 64-prefix corpus is not yet assembled or frozen;
+- the subsequent
+  [executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+  assembles and identity-freezes all 64 records;
 - no replay failure may be repaired with random, search, Book, HumanDB, or
   Perfect DB fallback; and
 - no evaluation, training, publication, or promotion is authorised.

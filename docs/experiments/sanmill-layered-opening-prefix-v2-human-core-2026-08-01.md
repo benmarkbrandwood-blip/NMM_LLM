@@ -1,6 +1,6 @@
 # Twelve-ply layered-prefix HumanDB core
 
-Status: `human_membership_and_execution_frozen_corpus_pending`
+Status: `human_membership_execution_and_corpus_frozen`
 
 Decision date: 2026-08-01
 
@@ -75,5 +75,7 @@ this membership decision, and no random or alternate-source repair was used.
 No candidate was loaded and no game was played. The subsequent
 [Perfect DB core decision](sanmill-layered-opening-prefix-v2-perfect-core-2026-08-01.md)
 freezes the final 21 source members. The combined source manifest and review
-images are also frozen. Assembly of those records into one executable
-64-prefix corpus remains pending; evaluation and training remain unauthorised.
+images are also frozen. A subsequent
+[executable-corpus decision](sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.md)
+assembles and identity-freezes all 64 records; evaluation and training remain
+unauthorised.
