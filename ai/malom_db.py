@@ -78,6 +78,7 @@ Public surface
         .query_value(board) → OracleValue | None
         .move_value(parent, child) → OracleMoveValue
         .query(board)    → {"outcome": "W"|"L"|"D", "dtw": int} | None
+        .query_regret(parent_board, move) → RegretResult
         .close()
 
     parse_secval(path)       → (virt_win, virt_loss, {(W,B,WF,BF): int})
@@ -91,12 +92,17 @@ from __future__ import annotations
 
 import logging
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from math import comb
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# ── Regret-oracle versioning ───────────────────────────────────────────────────
+
+_REGRET_VERSION = "regret_v1"
+_MALOM_LABEL_VERSION = "sector-corrected-v1"
 
 # ── Board position mapping ─────────────────────────────────────────────────────
 #
@@ -761,6 +767,77 @@ def decode_entry(data: "bytes | memoryview",
     return "D"
 
 
+# ── Regret helpers ────────────────────────────────────────────────────────────
+
+_WDL_TRANSITIONS: dict[tuple[str, str], str] = {
+    # Both args are in mover-POV (parent mover's outcome before and after move).
+    # Derived via: _classify_from_mover_pov(pre, post)
+    #              = _classify_transition(pre, FLIP[post])
+    # where FLIP = {"W": "L", "L": "W", "D": "D"}.
+    ("W", "W"): "win_preserved",
+    ("W", "D"): "win_to_draw",
+    ("W", "L"): "win_to_loss",
+    ("D", "D"): "draw_preserved",
+    ("D", "L"): "draw_to_loss",
+    ("D", "W"): "label_inconsistency",
+    ("L", "L"): "all_losing",
+    ("L", "D"): "label_inconsistency",
+    ("L", "W"): "label_inconsistency",
+}
+
+_DOWNGRADE_TRANSITIONS = {"win_to_draw", "win_to_loss", "draw_to_loss"}
+_PRESERVE_TRANSITIONS  = {"win_preserved", "draw_preserved", "all_losing"}
+
+_U: dict[str, float] = {"W": 1.0, "D": 0.0, "L": -1.0}
+
+
+def _classify_from_mover_pov(pre: str, post: str) -> str:
+    """Classify a WDL transition where BOTH pre and post are in mover-POV.
+
+    pre  = parent mover outcome  (W/D/L)
+    post = child mover outcome   (W/D/L) — i.e. the mover's outcome AFTER the
+           move, from the same side's perspective (NOT the next player's POV).
+
+    This differs from audit_human_moves._classify_transition, which accepts
+    the *next-player* POV for the child.  Do NOT conflate the two.
+    """
+    if pre not in ("W", "D", "L") or post not in ("W", "D", "L"):
+        return "unlabelled"
+    return _WDL_TRANSITIONS.get((pre, post), "label_inconsistency")
+
+
+@dataclass(frozen=True)
+class RegretResult:
+    """Oracle regret for one (parent_board, move) pair.
+
+    available        : False when the regret cannot be computed (see
+                       unavailable_reason for the cause).
+    omv              : OracleMoveValue for the queried move.  None when
+                       available=False.
+    wdl_transition   : Transition category from the mover's perspective
+                       (e.g. "win_preserved", "win_to_loss").  None when
+                       available=False.
+    best_omv         : Best OracleMoveValue across all legal moves.  None when
+                       the best cannot be determined (any legal move's value is
+                       unavailable and the parent is non-terminal).
+    components       : Dict with keys class_downgrade_prob, wdl_utility_loss,
+                       ordinal_rank_loss, within_class_distance.  Values are
+                       float or None.
+    regret_version   : Version tag for the regret computation schema.
+    malom_label_version : Version tag for the Malom label pipeline.
+    unavailable_reason  : Short string when available=False, else None.
+    """
+
+    available: bool
+    omv: Optional[OracleMoveValue]
+    wdl_transition: Optional[str]
+    best_omv: Optional[OracleMoveValue]
+    components: dict
+    regret_version: str
+    malom_label_version: str
+    unavailable_reason: Optional[str] = None
+
+
 # ── MalomDB ────────────────────────────────────────────────────────────────────
 
 class MalomDB:
@@ -987,6 +1064,140 @@ class MalomDB:
             child_outcome,
             self._virt_win,
             self._virt_loss,
+        )
+
+    def query_regret(self, parent_board, move: dict) -> "RegretResult":
+        """Return the oracle regret for playing ``move`` from ``parent_board``.
+
+        The result is always available unless:
+          - the parent position is already terminal,
+          - the parent's Malom value is unavailable,
+          - the supplied move is not in the legal move list.
+
+        When available=True but any legal child's value is unknown (and that
+        child is non-terminal), best_omv is None and components B/C are None
+        (fail-closed: we will not claim rank or utility loss without a
+        complete oracle picture).
+
+        Component D (within_class_distance) is always None in v1.
+        """
+        from game.rules import get_all_legal_moves, is_terminal, terminal_wdl
+
+        def _unavail(reason: str) -> RegretResult:
+            return RegretResult(
+                available=False,
+                omv=None,
+                wdl_transition=None,
+                best_omv=None,
+                components={
+                    "class_downgrade_prob": None,
+                    "wdl_utility_loss": None,
+                    "ordinal_rank_loss": None,
+                    "within_class_distance": None,
+                },
+                regret_version=_REGRET_VERSION,
+                malom_label_version=_MALOM_LABEL_VERSION,
+                unavailable_reason=reason,
+            )
+
+        if is_terminal(parent_board)[0]:
+            return _unavail("parent_terminal")
+
+        parent_val = self.query_value(parent_board)
+        if parent_val is None:
+            return _unavail("parent_value_unavailable")
+
+        legal_moves = get_all_legal_moves(parent_board)
+
+        # Locate the target move; use dict comparison on (from, to, capture).
+        target_idx: Optional[int] = None
+        for i, lm in enumerate(legal_moves):
+            if lm == move:
+                target_idx = i
+                break
+        if target_idx is None:
+            return _unavail("move_not_legal")
+
+        # Single-pass: compute OracleMoveValue for every legal move.
+        all_omvs: list[Optional[OracleMoveValue]] = []
+        best_complete = True  # False if any non-terminal child is uncovered
+
+        for lm in legal_moves:
+            child_board = parent_board.apply_move(lm)
+            term_wdl = terminal_wdl(child_board)
+            if term_wdl is not None:
+                # terminal_move_value expects child_outcome from next player's POV
+                omv = self.terminal_move_value(parent_val, term_wdl)
+                all_omvs.append(omv)
+            else:
+                child_val = self.query_value(child_board)
+                if child_val is None:
+                    all_omvs.append(None)
+                    best_complete = False
+                else:
+                    omv = self.move_value(parent_val, child_val)
+                    all_omvs.append(omv)
+
+        this_omv = all_omvs[target_idx]
+        if this_omv is None:
+            return _unavail("move_value_unavailable")
+
+        # WDL transition: both pre and post are in mover-POV.
+        # parent_val.outcome = mover-POV; this_omv.outcome = mover-POV.
+        wdl_transition = _classify_from_mover_pov(
+            parent_val.outcome, this_omv.outcome
+        )
+
+        # Determine best_omv (fail-closed if any non-terminal child uncovered).
+        best_omv: Optional[OracleMoveValue]
+        if not best_complete:
+            best_omv = None
+        else:
+            best_omv = max(
+                (o for o in all_omvs if o is not None),
+                key=lambda o: o.ordering_key(),
+            )
+
+        # Component A — class_downgrade_prob
+        if wdl_transition in _DOWNGRADE_TRANSITIONS:
+            comp_a: Optional[float] = 1.0
+        elif wdl_transition in _PRESERVE_TRANSITIONS:
+            comp_a = 0.0
+        else:
+            comp_a = None
+
+        # Component B — wdl_utility_loss
+        if best_omv is not None:
+            comp_b: Optional[float] = _U[best_omv.outcome] - _U[this_omv.outcome]
+        else:
+            comp_b = None
+
+        # Component C — ordinal_rank_loss (fail-closed if best_omv unavailable)
+        if best_omv is not None:
+            this_key = this_omv.ordering_key()
+            n_legal = len(legal_moves)
+            n_strictly_better = sum(
+                1 for o in all_omvs if o is not None and o.ordering_key() > this_key
+            )
+            comp_c: Optional[float] = (
+                n_strictly_better / (n_legal - 1) if n_legal > 1 else 0.0
+            )
+        else:
+            comp_c = None
+
+        return RegretResult(
+            available=True,
+            omv=this_omv,
+            wdl_transition=wdl_transition,
+            best_omv=best_omv,
+            components={
+                "class_downgrade_prob": comp_a,
+                "wdl_utility_loss": comp_b,
+                "ordinal_rank_loss": comp_c,
+                "within_class_distance": None,
+            },
+            regret_version=_REGRET_VERSION,
+            malom_label_version=_MALOM_LABEL_VERSION,
         )
 
     def close(self) -> None:

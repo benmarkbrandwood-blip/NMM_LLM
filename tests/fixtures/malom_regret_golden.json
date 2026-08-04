@@ -1,0 +1,367 @@
+{
+  "meta": {
+    "regret_version": "regret_v1",
+    "malom_label_version": "sector-corrected-v1",
+    "generator": "scripts/generate_malom_regret_golden.py",
+    "note": "Human-inspected golden corpus for test_malom_regret_v1.py"
+  },
+  "cases": [
+    {
+      "label": "3v3-W:win_preserved",
+      "board": {
+        "positions": {
+          "a7": "W",
+          "g7": "B",
+          "f4": "B",
+          "d5": "W",
+          "e4": "W",
+          "c3": "B"
+        },
+        "turn": "W",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": "a7",
+        "to": "d7",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "win_preserved",
+        "omv_outcome": "W",
+        "best_omv_outcome": "W",
+        "components": {
+          "class_downgrade_prob": 0.0,
+          "wdl_utility_loss": 0.0,
+          "ordinal_rank_loss": 0.018867924528301886,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "3v3-W:win_to_loss",
+      "board": {
+        "positions": {
+          "a7": "W",
+          "g7": "B",
+          "f4": "B",
+          "d5": "W",
+          "e4": "W",
+          "c3": "B"
+        },
+        "turn": "W",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": "a7",
+        "to": "g4",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "win_to_loss",
+        "omv_outcome": "L",
+        "best_omv_outcome": "W",
+        "components": {
+          "class_downgrade_prob": 1.0,
+          "wdl_utility_loss": 2.0,
+          "ordinal_rank_loss": 0.3018867924528302,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "4v4-W:draw_preserved",
+      "board": {
+        "positions": {
+          "a7": "W",
+          "d7": "W",
+          "g7": "B",
+          "g4": "B",
+          "g1": "B",
+          "d1": "B",
+          "a1": "W",
+          "a4": "W"
+        },
+        "turn": "W",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 4,
+          "B": 4
+        }
+      },
+      "move": {
+        "from": "d7",
+        "to": "d6",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "draw_preserved",
+        "omv_outcome": "D",
+        "best_omv_outcome": "D",
+        "components": {
+          "class_downgrade_prob": 0.0,
+          "wdl_utility_loss": 0.0,
+          "ordinal_rank_loss": 0.0,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "scan:win_to_draw",
+      "board": {
+        "positions": {
+          "g7": "B",
+          "g4": "W",
+          "f4": "B",
+          "d5": "W",
+          "e4": "W",
+          "c3": "B"
+        },
+        "turn": "B",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": "c3",
+        "to": "e5",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "win_to_draw",
+        "omv_outcome": "D",
+        "best_omv_outcome": "W",
+        "components": {
+          "class_downgrade_prob": 1.0,
+          "wdl_utility_loss": 1.0,
+          "ordinal_rank_loss": 0.1320754716981132,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "scan:draw_to_loss",
+      "board": {
+        "positions": {
+          "g7": "B",
+          "g4": "W",
+          "f4": "B",
+          "d5": "W",
+          "e5": "B",
+          "e4": "W"
+        },
+        "turn": "W",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": "g4",
+        "to": "a7",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "draw_to_loss",
+        "omv_outcome": "L",
+        "best_omv_outcome": "D",
+        "components": {
+          "class_downgrade_prob": 1.0,
+          "wdl_utility_loss": 1.0,
+          "ordinal_rank_loss": 0.4528301886792453,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "scan:all_losing",
+      "board": {
+        "positions": {
+          "d7": "W",
+          "g7": "B",
+          "f4": "B",
+          "d5": "W",
+          "e4": "W",
+          "c3": "B"
+        },
+        "turn": "B",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": "g7",
+        "to": "a7",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "all_losing",
+        "omv_outcome": "L",
+        "best_omv_outcome": "L",
+        "components": {
+          "class_downgrade_prob": 0.0,
+          "wdl_utility_loss": 0.0,
+          "ordinal_rank_loss": 0.05660377358490566,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "new-game:any",
+      "board": {
+        "positions": {},
+        "turn": "W",
+        "phase": "place",
+        "pieces_placed": {
+          "W": 0,
+          "B": 0
+        },
+        "pieces_on_board": {
+          "W": 0,
+          "B": 0
+        }
+      },
+      "move": {
+        "from": null,
+        "to": "a7",
+        "capture": null
+      },
+      "expected": {
+        "available": true,
+        "wdl_transition": "draw_preserved",
+        "omv_outcome": "D",
+        "best_omv_outcome": "D",
+        "components": {
+          "class_downgrade_prob": 0.0,
+          "wdl_utility_loss": 0.0,
+          "ordinal_rank_loss": 0.0,
+          "within_class_distance": null
+        },
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "unavail:move_not_legal",
+      "board": {
+        "positions": {
+          "a7": "W",
+          "g7": "B",
+          "f4": "B",
+          "d5": "W",
+          "e4": "W",
+          "c3": "B"
+        },
+        "turn": "W",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 3,
+          "B": 3
+        }
+      },
+      "move": {
+        "from": null,
+        "to": "a1",
+        "capture": null
+      },
+      "expected": {
+        "available": false,
+        "unavailable_reason": "move_not_legal",
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    },
+    {
+      "label": "unavail:parent_terminal",
+      "board": {
+        "positions": {
+          "d7": "W",
+          "g7": "W",
+          "a1": "B",
+          "a4": "B",
+          "b4": "B",
+          "c3": "B"
+        },
+        "turn": "B",
+        "phase": "move",
+        "pieces_placed": {
+          "W": 9,
+          "B": 9
+        },
+        "pieces_on_board": {
+          "W": 2,
+          "B": 4
+        }
+      },
+      "move": {
+        "from": "a1",
+        "to": "d1",
+        "capture": null
+      },
+      "expected": {
+        "available": false,
+        "unavailable_reason": "parent_terminal",
+        "regret_version": "regret_v1",
+        "malom_label_version": "sector-corrected-v1"
+      }
+    }
+  ]
+}
