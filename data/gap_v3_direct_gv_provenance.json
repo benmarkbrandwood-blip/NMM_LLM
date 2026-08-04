@@ -1,0 +1,20 @@
+{
+  "stage": "C",
+  "script": "tools/compute_g_v_direct.py",
+  "script_sha256": "fc8eef6dd05a4bd1e41bf74c51b83c7180121773eb1626529bd8dfa4f5db97d5",
+  "human_db": "/home/benbrandwood/Documents/dev/NMM_ollama/data/human_db_candidate.sqlite",
+  "human_db_sha256": "df71395f51b9497b5d0916fbcc5a6a8456d082be79c280ecb354d5ba73f87d4f",
+  "malom_db_dir": "/mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted",
+  "regret_version": "regret_v1",
+  "malom_label_version": "sector-corrected-v1",
+  "min_support": 25,
+  "n_eligible_pairs": 8014,
+  "n_rows_emitted": 8013,
+  "n_abstained": 1,
+  "abstention_reasons": {
+    "n_legal_1_lt_2": 1
+  },
+  "elapsed_s": 93.96,
+  "output_parquet": "/home/benbrandwood/Documents/dev/NMM_ollama/data/gap_v3_direct_gv.parquet",
+  "output_abstained": "/home/benbrandwood/Documents/dev/NMM_ollama/data/gap_v3_direct_gv_abstained.jsonl"
+}
