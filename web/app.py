@@ -1344,10 +1344,10 @@ async def api_puzzle_random(
 
     # ── Resolve random params ─────────────────────────────────────────────────
     effective_side  = _rand.choice(["W", "B"]) if side == "random" else side
-    effective_depth = _rand.choice([3, 4, 5, 6, 7]) if depth == 0 else depth
-    if side not in ("W", "B", "random") or effective_depth not in (3, 4, 5, 6, 7):
+    effective_depth = _rand.choice([3, 4, 5, 6, 7, 8, 9, 10]) if depth == 0 else depth
+    if side not in ("W", "B", "random") or effective_depth not in (3, 4, 5, 6, 7, 8, 9, 10):
         from fastapi import HTTPException
-        raise HTTPException(400, "side must be W/B/random; depth must be 3–7 or 0")
+        raise HTTPException(400, "side must be W/B/random; depth must be 3–10 or 0")
 
     # ── Cache path (skipped when generate=True so we always produce something new) ──
     if not generate:
@@ -1617,9 +1617,9 @@ async def api_malom_puzzle_random(
     if side not in ("W", "B", "random"):
         from fastapi import HTTPException
         raise HTTPException(400, "side must be W/B/random")
-    if depth not in (0, 4, 5, 6, 7):
+    if depth not in (0, 4, 5, 6, 7, 8, 9, 10):
         from fastapi import HTTPException
-        raise HTTPException(400, "depth must be 0/4/5/6/7")
+        raise HTTPException(400, "depth must be 0/4/5/6/7/8/9/10")
 
     # ── Try cache first ──────────────────────────────────────────────────────
     all_cached: list[dict] = []
@@ -1743,14 +1743,17 @@ async def api_malom_puzzle_validate(
 
 @app.get("/api/puzzles/malom/best-response")
 async def api_malom_best_response(fen: str, winning_side: str):
-    """Return the hardest opponent response from the current FEN using Malom WDL.
+    """Return the opponent's best response from the current FEN using the heuristic AI.
 
-    Picks the legal move for the opponent (the side NOT winning_side) that
-    maximises the winning side's remaining dtw — i.e., the hardest defense.
-    Falls back to any legal move if _malom_puzzle_db is unavailable.
+    Uses the project's heuristic search engine (GameAI at difficulty=4) to choose
+    the opponent's move.  Only considers moves where the winning side is still
+    confirmed winning by Malom (outcome=="W" after the opponent's move) — this
+    prevents the AI from accidentally handing the win back.  Falls back to a
+    Malom-WDL-guided move, then to any legal move.
 
     Returns {"move": str|null, "child_fen": str, "game_over": bool}
     """
+    import asyncio as _asyncio
     from fastapi import HTTPException
     from game.board import BoardState
     from game.rules import get_all_legal_moves
@@ -1770,33 +1773,62 @@ async def api_malom_best_response(fen: str, winning_side: str):
     if not moves:
         return {"move": None, "child_fen": fen, "game_over": True}
 
-    best_mv = None
-    best_child = None
-    best_dtw = -1
-
+    # Build a set of Malom-safe opponent moves (those where ws remains winning)
+    safe_moves = []
     for mv in moves:
         child = board.apply_move(mv)
-        # After opponent moves, check winning side's WDL (they're now to move)
-        wdl = _malom_db.query(child)
-        # Prefer moves where the winning side is still winning (forced loss for opp)
-        # Use dtw from _malom_puzzle_db to pick the hardest defense
-        if wdl == "W":
-            dtw = 0
-            if _malom_puzzle_db is not None:
-                r = _malom_puzzle_db.query(child)
-                dtw = r.get("dtw", 0) if r else 0
+        r = _malom_db.query(child)
+        # outcome=="W" means current mover (winning_side) is winning — good for ws
+        if r is not None and r["outcome"] == "W":
+            safe_moves.append(mv)
+
+    # Use heuristic AI (difficulty=4, depth-4 negamax) to pick the opponent's move.
+    # The AI plays as `opp` and will naturally choose the move that best defends
+    # from its perspective — equivalent to the hardest defense for the winning side.
+    best_mv = None
+    best_child = None
+
+    try:
+        _game_ai_opp = _make_game_ai_for_personality(opp, "default", difficulty=4)
+        _game_ai_opp.max_search_depth = 4  # cap for responsiveness in puzzle context
+
+        def _run_ai_response():
+            try:
+                ai_mv = _game_ai_opp.choose_move(board)
+            except Exception:
+                return None
+            child = board.apply_move(ai_mv)
+            # Safety check: confirm the AI didn't accidentally pick a move that
+            # lets the winning side escape (prefer Malom-safe moves).
+            if safe_moves and ai_mv not in safe_moves:
+                return None  # fall through to Malom-WDL fallback
+            return (ai_mv, child)
+
+        result = await _asyncio.to_thread(_run_ai_response)
+        if result is not None:
+            best_mv, best_child = result
+
+    except Exception:
+        pass  # fall through to Malom-WDL fallback
+
+    # Fallback 1: Malom-WDL guided (highest dtw among safe moves)
+    if best_mv is None:
+        best_dtw = -1
+        for mv in (safe_moves if safe_moves else moves):
+            child = board.apply_move(mv)
+            r = _malom_db.query(child)
+            dtw = r.get("dtw", 0) if r else 0
             if best_mv is None or dtw > best_dtw:
                 best_dtw = dtw
                 best_mv = mv
                 best_child = child
 
+    # Fallback 2: any legal move
     if best_mv is None:
-        # All opponent moves lose immediately — pick first legal move
         best_mv = moves[0]
         best_child = board.apply_move(best_mv)
 
     # Check if winning side has already won after this move
-    ws_pieces = best_child.pieces_on_board.get(winning_side, 0)
     opp_pieces = best_child.pieces_on_board.get(opp, 0)
     game_over = opp_pieces < 3 or not get_all_legal_moves(best_child)
 
@@ -1827,9 +1859,9 @@ async def api_placement_puzzle_random(
     if side not in ("W", "B", "random"):
         from fastapi import HTTPException
         raise HTTPException(400, "side must be W/B/random")
-    if depth not in (0, 4, 5, 6, 7):
+    if depth not in (0, 4, 5, 6, 7, 8, 9, 10):
         from fastapi import HTTPException
-        raise HTTPException(400, "depth must be 0/4/5/6/7")
+        raise HTTPException(400, "depth must be 0/4/5/6/7/8/9/10")
 
     all_cached: list[dict] = []
     for jf in _PLACEMENT_PUZZLE_CACHE_DIR.glob("*.json"):

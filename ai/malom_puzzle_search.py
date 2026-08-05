@@ -1,25 +1,29 @@
 """ai/malom_puzzle_search.py — Malom-based puzzle generation for midgame positions.
 
-Generates Nine Men's Morris movement-phase puzzles using the Malom ultra-strong
-perfect database. Targets positions with a forced win in 4–7 moves for the
-current mover, covering mid-game configurations (4–9 pieces per side).
+Generates Nine Men's Morris movement-phase and placement-phase puzzles using the
+Malom ultra-strong perfect database.  Targets positions with a forced win in 4–10
+moves for the current mover, covering mid-game configurations.
 
 Design notes
 ------------
-Full minimax is too expensive in Python for midgame positions (branching ~15).
-Instead we use a GREEDY solution extraction guided by Malom WDL:
+Puzzle quality pipeline (per position):
 
-  • Winning side: always play the move that minimises the opponent's remaining dtw
-    (deepest threat first — good pedagogically and usually agrees with optimal).
-  • Opponent side: try ALL moves; if any escape to non-losing, reject the position
-    (only keep positions where every opponent reply keeps them losing).  Among
-    all losing-for-opponent replies, pick the one with the highest dtw (hardest
-    defense) as the representative response line shown to the solver.
+  1. Greedy pre-filter (fast): ``extract_solution_line`` uses Malom WDL + dtw to
+     quickly reject positions that clearly don't have a forced win.  This is cheap.
 
-The actual win depth is counted from the greedy line (not from dtw directly),
-since Malom's dtw field semantics differ across midgame sectors ("relative
-quality hint", per the DB documentation).  dtw is used only as a coarse
-pre-filter.
+  2. Minimax verifier (exact): ``find_malom_win_depth`` runs a full minimax search
+     over the game tree, using Malom WDL as the oracle at each node.  It returns
+     the exact number of winning-side moves to force a win, or None if > max_depth.
+     Memoised on (fen, budget) keys.
+
+  3. Depth pinning: both find_malom_win_depth(target) == target AND
+     find_malom_win_depth(target-1) is None are required.
+
+  4. Verified hardness scoring: ``score_hardness_verified`` uses the same memo
+     to count winning moves within the exact budget, giving accurate puzzle metadata.
+
+  5. Worst-case solution line: ``get_malom_solution_line`` builds the PV with the
+     opponent playing the hardest possible defence (maximises verified minimax depth).
 """
 from __future__ import annotations
 
@@ -34,14 +38,14 @@ from ai.malom_db import MalomDB, _get_hash_state
 
 
 # ── Hash cache pre-warming ────────────────────────────────────────────────────
-# HashState(W, B) init time scales with C(24, W): W=7 ≈ 0.77s, W=8 ≈ 1.74s.
-# Pre-warming all 25 pairs for W,B ∈ [3,7] costs ≈ 6 s total (one-time).
+# HashState(W, B) init time scales with C(24, W): W=7 ≈ 0.77s, W=8 ≈ 1.74s,
+# W=9 ≈ 3.5s.  Pre-warming all pairs for W,B ∈ [3,9] costs ≈ 30s total (once).
 # After warming, every db.query() for those piece counts is essentially free.
 
 _PREWARM_DONE = False
 
 
-def prewarm_hash_cache(max_pieces: int = 7) -> None:
+def prewarm_hash_cache(max_pieces: int = 9) -> None:
     """Pre-initialise Malom hash states for (W, B) in 3..max_pieces.
 
     Safe to call multiple times; only runs if max_pieces exceeds the previous
@@ -101,55 +105,161 @@ class MalomPuzzle:
         }
 
 
-# ── Win-depth search (used by validate endpoint) ─────────────────────────────
+# ── Minimax verifier ──────────────────────────────────────────────────────────
 
-def find_win_depth(
+def find_malom_win_depth(
     db: MalomDB,
     board: BoardState,
     winning_side: str,
     max_depth: int,
+    memo: Optional[dict] = None,
 ) -> Optional[int]:
     """Return minimum winning_side moves to force a win, or None if > max_depth.
 
-    Uses Malom WDL as oracle; does not recurse deeper than max_depth winning-side moves.
+    Uses Malom WDL as oracle; does not recurse deeper than max_depth
+    winning-side moves.  Memoised on (fen, budget) keys for efficiency.
+
+    Parameters
+    ----------
+    db:           MalomDB instance
+    board:        position to search from (board.turn is the current mover)
+    winning_side: "W" or "B"
+    max_depth:    maximum winning-side moves to consider
+    memo:         shared memoisation dict; pass the same dict across calls to
+                  benefit from shared work between depth-N and depth-(N-1) checks
+
+    Returns
+    -------
+    int : minimum winning_side moves to force a win (1 = can win immediately)
+    None: no forced win within max_depth moves, or a Malom sector is unavailable
     """
-    opp = "B" if winning_side == "W" else "W"
+    if memo is None:
+        memo = {}
+    return _malom_search(db, board, winning_side, max_depth, memo)
 
-    def _search(cur: BoardState, budget: int) -> Optional[int]:
-        moves = get_all_legal_moves(cur)
-        if cur.turn == winning_side:
-            if not moves or budget <= 0:
+
+def _malom_search(db: MalomDB, board: BoardState, ws: str, budget: int, memo: dict) -> Optional[int]:
+    fen = board.to_fen_string()
+    key = (fen, budget)
+    if key in memo:
+        return memo[key]
+    result = _malom_search_inner(db, board, ws, budget, memo)
+    memo[key] = result
+    return result
+
+
+def _malom_search_inner(db: MalomDB, board: BoardState, ws: str, budget: int, memo: dict) -> Optional[int]:
+    opp = "B" if ws == "W" else "W"
+    moves = get_all_legal_moves(board)
+
+    if board.turn == ws:
+        # Winning side's turn: find the move that wins in fewest ws-moves
+        if not moves or budget <= 0:
+            return None
+        best: Optional[int] = None
+        for mv in moves:
+            child = board.apply_move(mv)
+            # Immediate terminal: opponent eliminated or blocked
+            if child.pieces_on_board[opp] < 3 or not get_all_legal_moves(child):
+                best = 1
+                break  # can't do better than win-in-1
+            # Malom oracle: skip moves where opponent is not losing
+            r = db.query(child)
+            if r is None:
+                # Sector unavailable — reject conservatively (don't trust this path)
+                continue
+            if r["outcome"] != "L":
+                continue
+            d = _malom_search(db, child, ws, budget - 1, memo)
+            if d is not None:
+                total = 1 + d
+                if best is None or total < best:
+                    best = total
+        return best
+
+    else:
+        # Opponent's turn: worst-case (maximise depth for winning side)
+        if not moves:
+            return 0  # opponent blocked: winning side has already won
+        worst = 0
+        for mv in moves:
+            child = board.apply_move(mv)
+            if child.pieces_on_board[ws] < 3:
+                return None  # winning side eliminated — not a forced win
+            r = db.query(child)
+            if r is None:
+                return None  # sector unavailable — reject conservatively
+            if r["outcome"] != "W":
+                return None  # winning side not winning after this reply
+            d = _malom_search(db, child, ws, budget, memo)
+            if d is None:
                 return None
-            best = None
-            for mv in moves:
-                child = cur.apply_move(mv)
-                if child.pieces_on_board[opp] < 3 or not get_all_legal_moves(child):
-                    return 1
-                if _malom_wdl(db, child) != "L":
-                    continue
-                d = _search(child, budget - 1)
-                if d is not None:
-                    total = 1 + d
-                    if best is None or total < best:
-                        best = total
-            return best
-        else:
-            if not moves:
-                return 0
-            worst = 0
-            for mv in moves:
-                child = cur.apply_move(mv)
-                if child.pieces_on_board[winning_side] < 3:
-                    return None
-                if _malom_wdl(db, child) != "W":
-                    return None
-                d = _search(child, budget)
-                if d is None:
-                    return None
-                worst = max(worst, d)
-            return worst
+            worst = max(worst, d)
+        return worst
 
-    return _search(board, max_depth)
+
+# ── Principal variation (worst-case defense) ──────────────────────────────────
+
+def get_malom_solution_line(
+    db: MalomDB,
+    board: BoardState,
+    ws: str,
+    depth: int,
+    memo: dict,
+) -> list[str]:
+    """Return PV: winning moves interleaved with opponent's hardest defense.
+
+    Uses the same memo from find_malom_win_depth for near-zero extra cost.
+    The opponent always picks the move that maximises the verified minimax depth.
+    """
+    line: list[str] = []
+    _malom_pv(db, board, ws, depth, memo, line)
+    return line
+
+
+def _malom_pv(db: MalomDB, board: BoardState, ws: str, budget: int, memo: dict, line: list[str]) -> None:
+    opp = "B" if ws == "W" else "W"
+    moves = get_all_legal_moves(board)
+
+    if board.turn == ws:
+        if not moves or budget <= 0:
+            return
+        for mv in moves:
+            child = board.apply_move(mv)
+            note = _notation(mv)
+            # Immediate terminal
+            if child.pieces_on_board[opp] < 3 or not get_all_legal_moves(child):
+                line.append(note)
+                return
+            r = db.query(child)
+            if r is None or r["outcome"] != "L":
+                continue
+            d = _malom_search(db, child, ws, budget - 1, memo)
+            if d is not None:
+                line.append(note)
+                _malom_pv(db, child, ws, d, memo, line)
+                return
+
+    else:
+        # Opponent picks hardest defense (maximises verified minimax depth)
+        if not moves:
+            return
+        best_mv = None
+        best_child = None
+        best_d = -1
+        for mv in moves:
+            child = board.apply_move(mv)
+            if child.pieces_on_board[ws] < 3:
+                continue
+            r = db.query(child)
+            if r is None or r["outcome"] != "W":
+                continue
+            d = _malom_search(db, child, ws, budget, memo)
+            if d is not None and d > best_d:
+                best_d, best_mv, best_child = d, mv, child
+        if best_mv is not None:
+            line.append(_notation(best_mv))
+            _malom_pv(db, best_child, ws, best_d, memo, line)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -180,15 +290,18 @@ def _has_mill(board: BoardState, color: str) -> bool:
     return False
 
 
-# ── Greedy solution extraction ────────────────────────────────────────────────
+# ── Greedy solution extraction (pre-filter only) ──────────────────────────────
 
 def extract_solution_line(
     db: MalomDB,
     board: BoardState,
     ws: str,
-    max_depth: int = 9,
+    max_depth: int = 12,
 ) -> Optional[tuple[list[str], int]]:
     """Extract a solution line greedily using Malom WDL + dtw for move selection.
+
+    Used as a FAST PRE-FILTER ONLY.  The actual puzzle quality is determined by
+    the minimax verifier (find_malom_win_depth) called after this returns.
 
     Returns (line, win_depth) where win_depth is the number of winning-side moves
     in the line, or None if no forced-win path is found within max_depth.
@@ -258,7 +371,7 @@ def extract_solution_line(
     return None  # exhausted max_depth without terminal — end of extract_solution_line
 
 
-# ── Hardness scoring ──────────────────────────────────────────────────────────
+# ── Hardness scoring (greedy, WDL-based — for pre-filter pass) ───────────────
 
 def score_hardness(
     db: MalomDB,
@@ -267,10 +380,9 @@ def score_hardness(
 ) -> tuple[float, list[str], list[str], list[str]]:
     """Return (score, winning_moves, drawing_moves, losing_moves).
 
-    Classifies first-level moves by Malom WDL outcome:
-      winning  — opponent is losing (forced win maintained)
-      drawing  — draw (winning side gave up the advantage)
-      losing   — winning side is losing (blunder)
+    Classifies first-level moves by Malom WDL outcome (fast, no minimax).
+    Used during the greedy pre-filter phase.  For saved puzzle metadata, use
+    score_hardness_verified() which applies the exact budget constraint.
     """
     opp = "B" if winning_side == "W" else "W"
     winning, drawing, losing = [], [], []
@@ -289,6 +401,77 @@ def score_hardness(
         elif wdl == "D":
             drawing.append(note)
         else:  # "W" or None
+            losing.append(note)
+
+    n_winning = len(winning)
+    n_legal   = n_winning + len(drawing) + len(losing)
+    score = 0.0
+
+    if n_winning == 1:
+        score += 4.0
+    elif n_winning == 2:
+        score += 2.5
+
+    if len(losing) > 0:
+        score += 1.0
+    if n_winning < n_legal:
+        score += 2.0  # not all moves win
+    if n_legal >= 6:
+        score += 1.0
+
+    # Bonus for a quiet (non-capture) winning move
+    if n_winning <= 2:
+        quiet_wins = [
+            mv for mv in get_all_legal_moves(board)
+            if _notation(mv) in winning and not mv.get("capture")
+        ]
+        if quiet_wins:
+            score += 1.0
+
+    return score, winning, drawing, losing
+
+
+# ── Verified hardness scoring (minimax-based — for final puzzle metadata) ────
+
+def score_hardness_verified(
+    db: MalomDB,
+    board: BoardState,
+    winning_side: str,
+    target_win_in: int,
+    memo: dict,
+) -> tuple[float, list[str], list[str], list[str]]:
+    """Return (score, winning_moves, drawing_moves, losing_moves).
+
+    A move is 'winning' only if find_malom_win_depth(child, ws, target-1) is not
+    None (i.e. the win is achievable within the budget).  This gives accurate
+    metadata for the saved puzzle.
+    """
+    opp = "B" if winning_side == "W" else "W"
+    winning, drawing, losing = [], [], []
+
+    for mv in get_all_legal_moves(board):
+        child = board.apply_move(mv)
+        note = _notation(mv)
+
+        if child.pieces_on_board[opp] < 3 or not get_all_legal_moves(child):
+            winning.append(note)
+            continue
+
+        r = db.query(child)
+        if r is None:
+            losing.append(note)
+            continue
+
+        if r["outcome"] == "L":
+            # Check that this win is achievable within the depth budget
+            d = _malom_search(db, child, winning_side, target_win_in - 1, memo)
+            if d is not None:
+                winning.append(note)
+            else:
+                drawing.append(note)  # wins eventually, but past our depth budget
+        elif r["outcome"] == "D":
+            drawing.append(note)
+        else:  # "W" or unexpected
             losing.append(note)
 
     n_winning = len(winning)
@@ -349,11 +532,10 @@ def _random_movement_board(nW: int, nB: int, turn: str) -> BoardState:
 # ── Puzzle generation ─────────────────────────────────────────────────────────
 
 # dtw pre-filter: keep positions where outcome=="W" and dtw is in a range
-# that typically corresponds to win_in 4–7. Malom's midgame dtw semantics
-# are approximate ("relative quality hint"), so we use a wide range [5, 17]
-# and verify actual win depth from the greedy line.
-_DTW_PREFILTER_MIN = 5
-_DTW_PREFILTER_MAX = 17
+# that typically corresponds to win_in 4–10.  Malom's midgame dtw semantics
+# are approximate ("relative quality hint"), so we use a wide range.
+_DTW_PREFILTER_MIN = 3
+_DTW_PREFILTER_MAX = 40
 
 
 def generate_malom_puzzle(
@@ -368,7 +550,7 @@ def generate_malom_puzzle(
     """Sample random movement-phase positions and return the first valid puzzle.
 
     winning_side:          "W" | "B" | "random"
-    target_win_in:         4–7, or 0 = any in range
+    target_win_in:         4–10, or 0 = any in range
     max_attempts:          positions sampled per call (Malom pre-filter is fast)
     max_winning_moves:     reject positions with more than N first-level wins
     max_pieces_per_side:   default 7; set higher for CLI (accepts slower hash init)
@@ -376,7 +558,7 @@ def generate_malom_puzzle(
     if not db.is_available():
         return None
 
-    # One-time ~6 s pre-warm for (3..max_pieces)×(3..max_pieces) hash states.
+    # One-time pre-warm for (3..max_pieces)×(3..max_pieces) hash states.
     prewarm_hash_cache(max_pieces_per_side)
 
     for _ in range(max_attempts):
@@ -400,27 +582,51 @@ def generate_malom_puzzle(
         if not (_DTW_PREFILTER_MIN <= dtw <= _DTW_PREFILTER_MAX):
             continue
 
-        # Greedy solution extraction — determines actual win depth
-        sol = extract_solution_line(db, board, ws, max_depth=9)
+        # Greedy solution extraction — fast pre-filter to determine approximate depth
+        sol = extract_solution_line(db, board, ws, max_depth=12)
         if sol is None:
             continue
         line, actual_win_in = sol
 
-        if not (4 <= actual_win_in <= 7):
+        if not (4 <= actual_win_in <= 10):
             continue
         if target_win_in != 0 and actual_win_in != target_win_in:
             continue
 
-        h_score, winning_mvs, drawing_mvs, losing_mvs = score_hardness(db, board, ws)
+        # Quick WDL hardness check (before expensive minimax)
+        h_score_pre, winning_mvs_pre, _, _ = score_hardness(db, board, ws)
+
+        if len(winning_mvs_pre) > max_winning_moves:
+            continue
+
+        # ── Minimax verification ─────────────────────────────────────────────
+        # Use actual_win_in as the target depth from the greedy line.
+        # We verify the exact depth with true minimax.
+        target = actual_win_in
+        memo: dict = {}
+        verified_depth = find_malom_win_depth(db, board, ws, max_depth=target, memo=memo)
+        if verified_depth != target:
+            continue
+        # Belt-and-suspenders: confirm no shallower win exists
+        if target > 1 and find_malom_win_depth(db, board, ws, max_depth=target - 1, memo=memo) is not None:
+            continue
+
+        # Verified hardness scoring using the exact budget
+        h_score, winning_mvs, drawing_mvs, losing_mvs = score_hardness_verified(
+            db, board, ws, target, memo
+        )
 
         if len(winning_mvs) > max_winning_moves:
             continue
+
+        # Rebuild solution line with correct worst-case defender
+        line = get_malom_solution_line(db, board, ws, target, memo)
 
         fen = board.to_fen_string()
         pid = "mlm_" + hashlib.md5(fen.encode()).hexdigest()[:8]
         all_legal = [_notation(m) for m in get_all_legal_moves(board)]
 
-        tags = ["midgame", f"win-in-{actual_win_in}"]
+        tags = ["midgame", f"win-in-{target}"]
         if len(winning_mvs) == 1:
             tags += ["unique-move", "bottleneck"]
         elif len(winning_mvs) == 2:
@@ -437,7 +643,7 @@ def generate_malom_puzzle(
             board_fen=fen,
             side_to_move=ws,
             winning_side=ws,
-            target_win_in=actual_win_in,
+            target_win_in=target,
             best_move=winning_mvs[0] if winning_mvs else (line[0] if line else ""),
             solution_line=line,
             legal_moves=all_legal,
@@ -470,8 +676,8 @@ def _random_placement_board_state(
     return BoardState.from_fen_string(fen)
 
 
-_PLACEMENT_DTW_MIN = 3
-_PLACEMENT_DTW_MAX = 25
+_PLACEMENT_DTW_MIN = 2
+_PLACEMENT_DTW_MAX = 40
 
 
 def generate_malom_placement_puzzle(
@@ -484,7 +690,7 @@ def generate_malom_placement_puzzle(
     """Sample random placement-phase positions and return the first valid puzzle.
 
     winning_side:  "W" | "B" | "random"
-    target_win_in: 4–7, or 0 = any in range
+    target_win_in: 4–10, or 0 = any in range
 
     Piece counts are kept in [3, 7] per side (nX_unplaced ∈ [2, 6]) so the
     positions stay within the pre-warmed Malom hash cache range.  The sampling
@@ -494,7 +700,7 @@ def generate_malom_placement_puzzle(
     if not db.is_available():
         return None
 
-    prewarm_hash_cache(7)
+    prewarm_hash_cache(9)
 
     for _ in range(max_attempts):
         ws = random.choice(["W", "B"]) if winning_side == "random" else winning_side
@@ -531,26 +737,48 @@ def generate_malom_placement_puzzle(
         if not (_PLACEMENT_DTW_MIN <= dtw <= _PLACEMENT_DTW_MAX):
             continue
 
-        sol = extract_solution_line(db, board, ws, max_depth=9)
+        sol = extract_solution_line(db, board, ws, max_depth=12)
         if sol is None:
             continue
         line, actual_win_in = sol
 
-        if not (4 <= actual_win_in <= 7):
+        if not (4 <= actual_win_in <= 10):
             continue
         if target_win_in != 0 and actual_win_in != target_win_in:
             continue
 
-        h_score, winning_mvs, drawing_mvs, losing_mvs = score_hardness(db, board, ws)
+        # Quick WDL hardness check (before expensive minimax)
+        _, winning_mvs_pre, _, _ = score_hardness(db, board, ws)
+
+        if len(winning_mvs_pre) > max_winning_moves:
+            continue
+
+        # ── Minimax verification ─────────────────────────────────────────────
+        target = actual_win_in
+        memo: dict = {}
+        verified_depth = find_malom_win_depth(db, board, ws, max_depth=target, memo=memo)
+        if verified_depth != target:
+            continue
+        # Belt-and-suspenders: confirm no shallower win exists
+        if target > 1 and find_malom_win_depth(db, board, ws, max_depth=target - 1, memo=memo) is not None:
+            continue
+
+        # Verified hardness scoring using the exact budget
+        h_score, winning_mvs, drawing_mvs, losing_mvs = score_hardness_verified(
+            db, board, ws, target, memo
+        )
 
         if len(winning_mvs) > max_winning_moves:
             continue
+
+        # Rebuild solution line with correct worst-case defender
+        line = get_malom_solution_line(db, board, ws, target, memo)
 
         fen = board.to_fen_string()
         pid = "plc_" + hashlib.md5(fen.encode()).hexdigest()[:8]
         all_legal = [_notation(m) for m in get_all_legal_moves(board)]
 
-        tags = ["placement", f"win-in-{actual_win_in}"]
+        tags = ["placement", f"win-in-{target}"]
         if len(winning_mvs) == 1:
             tags += ["unique-move", "bottleneck"]
         elif len(winning_mvs) == 2:
@@ -563,7 +791,7 @@ def generate_malom_placement_puzzle(
             board_fen=fen,
             side_to_move=ws,
             winning_side=ws,
-            target_win_in=actual_win_in,
+            target_win_in=target,
             best_move=winning_mvs[0] if winning_mvs else (line[0] if line else ""),
             solution_line=line,
             legal_moves=all_legal,

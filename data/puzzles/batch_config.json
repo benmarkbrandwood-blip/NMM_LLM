@@ -1,0 +1,9 @@
+{
+  "cells": [
+    {"type": "midgame",   "side": "random", "depth": 0, "count": 100},
+    {"type": "placement", "side": "random", "depth": 0, "count": 50},
+    {"type": "endgame",   "side": "random", "depth": 0, "count": 50}
+  ],
+  "max_winning_moves": 1,
+  "min_hardness": 3.0
+}
