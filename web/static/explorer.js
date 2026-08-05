@@ -287,11 +287,129 @@ function _addBarMesh(barX, z, segH, yBot, colHex, opacity, rep, mvsForSq, needsC
   return mesh;
 }
 
+function _rebuildBarsAggregated(movesArray) {
+  // Movement/fly phase with no piece selected: show summed traj + best sentinel/heuristic per source piece.
+  const bySrc = new Map();
+  for (const mv of movesArray) {
+    if (!mv.from_sq || !POS_COORDS[mv.from_sq]) continue;
+    if (!bySrc.has(mv.from_sq)) bySrc.set(mv.from_sq, []);
+    bySrc.get(mv.from_sq).push(mv);
+  }
+  if (!bySrc.size) return;
+
+  const allHAbsMax  = Math.max(1, ...movesArray.map(m => Math.abs(m.heuristic_score || 0)));
+  const srcTotals   = new Map();
+  for (const [src, mvs] of bySrc)
+    srcTotals.set(src, mvs.reduce((s, m) => s + (m.total || 0), 0));
+  const maxSrcTotal = Math.max(1, ...srcTotals.values());
+
+  for (const [src, mvs] of bySrc) {
+    const [x,, z]   = POS_COORDS[src];
+    const baseY     = 0.07;
+    const barX      = x + BAR_OFFSET_X;
+    const segMeshes = [];
+
+    const bestSent    = Math.max(...mvs.map(m => m.sentinel_score    ?? -Infinity));
+    const bestHeurAbs = Math.max(...mvs.map(m => Math.abs(m.heuristic_score || 0)));
+    const dbMvs  = mvs.filter(m => m.has_db_data);
+    const wins   = dbMvs.reduce((s, m) => s + (m.wins   || 0), 0);
+    const draws  = dbMvs.reduce((s, m) => s + (m.draws  || 0), 0);
+    const losses = dbMvs.reduce((s, m) => s + (m.losses || 0), 0);
+    const total  = wins + draws + losses;
+    const trajSum = mvs.reduce((s, m) => s + (m.traj_freq        || 0), 0);
+    const predSum = mvs.reduce((s, m) => s + (m.pred_human_prob  || 0), 0);
+
+    const synth = {
+      notation:        src,
+      has_db_data:     total > 0,
+      wins, draws, losses, total,
+      win_pct:         total > 0 ? wins / total : 0,
+      heuristic_score: Math.max(...mvs.map(m => m.heuristic_score || 0)),
+      sentinel_score:  bestSent > -Infinity ? bestSent : null,
+      pred_human_prob: null,
+      malom_wdl_after: null,
+      malom_dtw_after: null,
+      avg_moves_to_end: dbMvs.length > 0
+        ? dbMvs.reduce((s, m) => s + (m.avg_moves_to_end || 0), 0) / dbMvs.length : 0,
+      _isAggregate: true,
+      _src:         src,
+      _bestSent:    bestSent > -Infinity ? bestSent : null,
+      _bestHeurAbs: bestHeurAbs,
+      _trajSum:     trajSum,
+      _predSum:     predSum,
+    };
+
+    // Traj/DB bar — summed W/D/L, height proportional to total games
+    if (total > 0) {
+      const barH  = Math.max(0.06, (total / maxSrcTotal) * MAX_BAR_HEIGHT);
+      const lossH = barH * (losses / (total || 1));
+      const drawH = barH * (draws  / (total || 1));
+      const winH  = barH * (wins   / (total || 1));
+      for (const seg of [
+        { h: lossH, col: 0xef4444, yBot: baseY },
+        { h: drawH, col: 0xa06040, yBot: baseY + lossH },
+        { h: winH,  col: 0x4ade80, yBot: baseY + lossH + drawH },
+      ]) {
+        if (seg.h < 0.005) continue;
+        segMeshes.push(_addBarMesh(barX, z, seg.h, seg.yBot, seg.col, 0.88, synth, mvs, false, src));
+      }
+    } else {
+      // No DB data: grey bar scaled by best heuristic
+      const barH = 0.06 + (bestHeurAbs / allHAbsMax) * (MAX_BAR_HEIGHT * 0.5);
+      segMeshes.push(_addBarMesh(barX, z, barH, baseY, 0x888888, 0.55, synth, mvs, false, src));
+    }
+
+    // Sentinel bar — best sentinel score for this piece
+    if (bestSent > 0.01 && bestSent !== -Infinity) {
+      const sentH = Math.max(0.04, bestSent * MAX_BAR_HEIGHT);
+      const sm = new THREE.Mesh(
+        new THREE.BoxGeometry(SENT_W, sentH, SENT_W),
+        new THREE.MeshLambertMaterial({ color: 0x5595d4, transparent: true, opacity: 0.85 }),
+      );
+      sm.position.set(x + SENT_OFFSET_X, baseY + sentH / 2, z);
+      sm.castShadow = true;
+      sm.userData.notation = src; sm.userData.moveData = synth;
+      sm.userData.allMoves = mvs; sm.userData.needsCapture = false;
+      sm.userData.toSq = src;
+      sm.userData.baseColor   = new THREE.Color(0x5595d4);
+      sm.userData.baseOpacity = 0.85;
+      barGroup.add(sm);
+      segMeshes.push(sm);
+    }
+
+    // Heuristic bar — best absolute heuristic score for this piece
+    if (bestHeurAbs > 0) {
+      const heurH = Math.max(0.04, (bestHeurAbs / allHAbsMax) * MAX_BAR_HEIGHT);
+      const hm = new THREE.Mesh(
+        new THREE.BoxGeometry(HEUR_W, heurH, HEUR_W),
+        new THREE.MeshLambertMaterial({ color: 0xa855f7, transparent: true, opacity: 0.85 }),
+      );
+      hm.position.set(x + HEUR_OFFSET_X, baseY + heurH / 2, z);
+      hm.castShadow = true;
+      hm.userData.notation = src; hm.userData.moveData = synth;
+      hm.userData.allMoves = mvs; hm.userData.needsCapture = false;
+      hm.userData.toSq = src;
+      hm.userData.baseColor   = new THREE.Color(0xa855f7);
+      hm.userData.baseOpacity = 0.85;
+      barGroup.add(hm);
+      segMeshes.push(hm);
+    }
+
+    barGroupMap.set(src, segMeshes);
+  }
+}
+
 function rebuildBars(movesArray) {
   barGroup.clear();
   barMeshMap.clear();
   barGroupMap.clear();
   if (!movesArray || movesArray.length === 0) return;
+
+  // In movement/fly phase with no piece selected: aggregate per source piece
+  if (currentPhase !== 'place' && selectionState === 'idle') {
+    _rebuildBarsAggregated(movesArray);
+    return;
+  }
 
   // Group by to_sq so mill-closing positions show one bar per destination
   const byToSq = new Map();
@@ -498,15 +616,30 @@ if (_explorerBandSel) {
   });
 }
 
-// ── Hint rings (HumanDB gold, Sentinel blue, capture red/gold) ────────────────
+// ── Hint rings (HumanDB gold, Pred Human blue-purple, Sentinel blue, Heuristic purple) ──
+// Each indicator uses a distinct ring radius so overlapping hints remain visible as
+// concentric rings rather than z-fighting on the same geometry.
 
-const hintRingGeo = new THREE.RingGeometry(0.34, 0.52, 24);
-hintRingGeo.rotateX(-Math.PI / 2);
+function _makeRingGeo(inner, outer) {
+  const g = new THREE.RingGeometry(inner, outer, 32);
+  g.rotateX(-Math.PI / 2);
+  return g;
+}
 
-function makeHintRing(sq, hexColor) {
+// Outermost → innermost: HumanDB, PredHuman, Sentinel, Heuristic
+const _hintGeos = {
+  human:   _makeRingGeo(0.44, 0.58),  // gold — largest
+  pred:    _makeRingGeo(0.32, 0.46),  // blue-purple
+  sent:    _makeRingGeo(0.20, 0.34),  // blue
+  heur:    _makeRingGeo(0.08, 0.22),  // purple — smallest
+  capture: _makeRingGeo(0.32, 0.46),  // red/gold capture rings
+};
+
+function makeHintRing(sq, hexColor, geoKey) {
   if (!POS_COORDS[sq]) return null;
-  const mat  = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-  const ring = new THREE.Mesh(hintRingGeo, mat);
+  const geo = _hintGeos[geoKey] || _hintGeos.human;
+  const mat = new THREE.MeshBasicMaterial({ color: hexColor, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(geo, mat);
   const [x,, z] = POS_COORDS[sq];
   ring.position.set(x, 0.12, z);
   return ring;
@@ -524,50 +657,47 @@ function rebuildHints(allMoves, hasTrajData) {
       .sort((a, b) => b.sentinel_score - a.sentinel_score)[0];
     const sentCapSq = bestSent?.capture_sq ?? null;
     for (const sq of capSqs) {
-      const ring = makeHintRing(sq, sq === sentCapSq ? 0xffd700 : 0xff3333);
+      const ring = makeHintRing(sq, sq === sentCapSq ? 0xffd700 : 0xff3333, 'capture');
       if (ring) hintGroup.add(ring);
     }
     return;
   }
 
-  // idle / piece_selected — HumanDB best (gold) or Pred Human (blue-purple) and Sentinel best (blue)
+  // idle / piece_selected — show ALL best-move indicators, always, as concentric rings
   const visibleMoves = (selectionState === 'piece_selected' && selectedPieceSq)
     ? allMoves.filter(m => m.from_sq === selectedPieceSq)
     : allMoves;
   if (visibleMoves.length === 0) return;
 
+  // HumanDB best (gold, outermost)
   const dbMoves = visibleMoves.filter(m => m.has_db_data && (m.total || 0) > 0);
-  let humanBestSq = null;
   if (hasTrajData !== false && dbMoves.length > 0) {
-    humanBestSq = [...dbMoves].sort((a, b) => wilsonLower(b.wins, b.total) - wilsonLower(a.wins, a.total))[0].to_sq;
-    const ring = makeHintRing(humanBestSq, 0xffd700);
+    const humanBestSq = [...dbMoves].sort((a, b) => wilsonLower(b.wins, b.total) - wilsonLower(a.wins, a.total))[0].to_sq;
+    const ring = makeHintRing(humanBestSq, 0xffd700, 'human');
     if (ring) hintGroup.add(ring);
-  } else if (hasTrajData === false) {
-    // Pred Human fallback: blue ring on the predicted best move
-    const predBest = visibleMoves.find(m => m.is_pred_human_best && m.to_sq);
-    if (predBest) {
-      humanBestSq = predBest.to_sq;
-      const ring = makeHintRing(humanBestSq, 0x5591c7);
-      if (ring) hintGroup.add(ring);
-    }
   }
 
+  // Pred Human best (blue-purple)
+  const predBest = visibleMoves.find(m => m.is_pred_human_best && m.to_sq);
+  if (predBest) {
+    const ring = makeHintRing(predBest.to_sq, 0x5591c7, 'pred');
+    if (ring) hintGroup.add(ring);
+  }
+
+  // Sentinel best (blue)
   const sentMoves = visibleMoves.filter(m => m.sentinel_score != null);
   if (sentMoves.length > 0) {
     const sentBestSq = [...sentMoves].sort((a, b) => b.sentinel_score - a.sentinel_score)[0].to_sq;
-    if (sentBestSq !== humanBestSq) {
-      const ring = makeHintRing(sentBestSq, 0x4488ff);
-      if (ring) hintGroup.add(ring);
-    }
+    const ring = makeHintRing(sentBestSq, 0x4488ff, 'sent');
+    if (ring) hintGroup.add(ring);
   }
 
+  // Heuristic best (purple, innermost)
   const heurMoves = visibleMoves.filter(m => m.heuristic_score != null);
   if (heurMoves.length > 0) {
     const heurBestSq = [...heurMoves].sort((a, b) => b.heuristic_score - a.heuristic_score)[0].to_sq;
-    if (heurBestSq !== humanBestSq && heurBestSq !== (sentMoves.length > 0 ? [...sentMoves].sort((a, b) => b.sentinel_score - a.sentinel_score)[0].to_sq : null)) {
-      const ring = makeHintRing(heurBestSq, 0xa855f7);
-      if (ring) hintGroup.add(ring);
-    }
+    const ring = makeHintRing(heurBestSq, 0xa855f7, 'heur');
+    if (ring) hintGroup.add(ring);
   }
 }
 
@@ -641,9 +771,12 @@ function updateStatusIndicator() {
 
 function _refreshAfterStateChange() {
   const filtered = filterMovesForState();
-  rebuildBars(filtered);
+  const allMoves = currentData?.moves || [];
+  // Idle movement phase: show aggregated per-piece bars but no arrows (keeps board clean)
+  const barsData = (currentPhase !== 'place' && selectionState === 'idle') ? allMoves : filtered;
+  rebuildBars(barsData);
   rebuildArrows(filtered);
-  rebuildHints(currentData?.moves || [], currentData?.has_traj_data);
+  rebuildHints(allMoves, currentData?.has_traj_data);
   updatePieceHighlights();
   updateStatusIndicator();
 }
@@ -713,6 +846,21 @@ function onMouseMove(e) {
     if (hoveredPiece) {
       hoveredPiece.material.color.setHex(0xffd700);
       hoveredPiece.material.opacity = 1.0;
+    }
+  }
+
+  // Show aggregate tooltip when hovering a moveable piece (no bar in the way)
+  if (!hoveredBar) {
+    if (hoveredPiece && selectionState === 'idle' && currentPhase !== 'place') {
+      const src = hoveredPiece.userData.pos;
+      const synthMv = barGroupMap.get(src)?.[0]?.userData?.moveData;
+      if (synthMv?._isAggregate) {
+        showTooltip(e.clientX, e.clientY, synthMv);
+      } else if (prevHoveredPiece && !hoveredPiece) {
+        tooltip.style.display = 'none';
+      }
+    } else if (!hoveredPiece && prevHoveredPiece) {
+      tooltip.style.display = 'none';
     }
   }
 
@@ -871,10 +1019,42 @@ window.addEventListener('keydown', e => {
 
 function showTooltip(cx, cy, mv) {
   if (!mv) return;
-  const sentText = mv.sentinel_score != null
-    ? `${(mv.sentinel_score * 100).toFixed(1)}%`
-    : '—';
   const allHAbsMax = Math.max(1, ...(currentData?.moves || []).map(m => Math.abs(m.heuristic_score || 0)));
+
+  // Aggregated per-piece tooltip (movement phase, no piece selected)
+  if (mv._isAggregate) {
+    const hasTrajData = currentData?.has_traj_data;
+    const winPct  = mv.total > 0 ? `${(mv.win_pct * 100).toFixed(1)}%` : '—';
+    const sentTxt = mv._bestSent != null ? `${(mv._bestSent * 100).toFixed(1)}%` : '—';
+    const heurPct = mv._bestHeurAbs > 0 ? `${(mv._bestHeurAbs / allHAbsMax * 100).toFixed(0)}%` : '—';
+    const trajPct = mv._trajSum > 0 ? Math.round(mv._trajSum * 100) : 0;
+    const predPct = mv._predSum > 0 ? Math.round(mv._predSum * 100) : 0;
+    const trajRow = hasTrajData !== false && trajPct > 0
+      ? `<div class="tt-row"><span class="tt-label">T (piece)</span><span>T:${trajPct}%</span></div>`
+      : hasTrajData === false && predPct > 0
+        ? `<div class="tt-row"><span class="tt-label">P (piece)</span><span style="color:#5591c7">P:${predPct}%</span></div>`
+        : '';
+    tooltip.innerHTML = `
+      <div class="tt-notation">${mv._src} — all moves</div>
+      ${mv.total > 0 ? `
+      <div class="tt-row"><span class="tt-label">Win%</span><span>${winPct}</span></div>
+      <div class="tt-row"><span class="tt-label">W/D/L</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
+      <div class="tt-row"><span class="tt-label">Total games</span><span>${mv.total}</span></div>
+      ` : ''}
+      ${trajRow}
+      <div class="tt-row"><span class="tt-label">Sentinel best</span><span>${sentTxt}</span></div>
+      <div class="tt-row"><span class="tt-label">Heuristic best</span><span>${heurPct}</span></div>
+    `;
+    const wr = wrap.getBoundingClientRect();
+    let tx = cx - wr.left + 14, ty = cy - wr.top - 10;
+    if (tx + 180 > wr.width)  tx = cx - wr.left - 180;
+    if (ty + 140 > wr.height) ty = cy - wr.top  - 140;
+    tooltip.style.left = tx + 'px'; tooltip.style.top = ty + 'px';
+    tooltip.style.display = 'block';
+    return;
+  }
+
+  const sentText = mv.sentinel_score != null ? `${(mv.sentinel_score * 100).toFixed(1)}%` : '—';
   const heurText = mv.heuristic_score != null
     ? `${(Math.abs(mv.heuristic_score) / allHAbsMax * 100).toFixed(0)}% (${mv.heuristic_score >= 0 ? '+' : ''}${mv.heuristic_score})`
     : '—';
@@ -892,11 +1072,11 @@ function showTooltip(cx, cy, mv) {
     dbRows = `
     <div class="tt-row"><span class="tt-label">Win%</span><span>${(mv.win_pct*100).toFixed(1)}%</span></div>
     <div class="tt-row"><span class="tt-label">W/D/L</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
-    <div class="tt-row"><span class="tt-label" style="color:#5a10c0">T choice</span><span style="color:#5a10c0">T:${tPct}% (n=${mv.total})</span></div>
+    <div class="tt-row"><span class="tt-label">T choice</span><span>T:${tPct}% (n=${mv.total})</span></div>
     <div class="tt-row"><span class="tt-label">Avg plies left</span><span>${mv.avg_moves_to_end.toFixed(0)}</span></div>
     <div class="tt-row"><span class="tt-label">Malom (after)</span><span>${wdlText}</span></div>`;
   } else if (hasTrajData) {
-    trajRow = `<div class="tt-row"><span class="tt-label" style="color:#5a10c0;opacity:0.55">T choice</span><span style="color:#5a10c0;opacity:0.55">T:— not observed</span></div>`;
+    trajRow = `<div class="tt-row"><span class="tt-label" style="opacity:0.55">T choice</span><span style="opacity:0.55">T:— not observed</span></div>`;
   }
 
   const predRow = mv.pred_human_prob != null
@@ -1048,7 +1228,9 @@ async function loadPosition(fen) {
     document.getElementById('fen-input').value = data.fen;
     rebuildPieces(data.board);
     const initialMoves = filterMovesForState();
-    rebuildBars(initialMoves);
+    const allMovesInit = data.moves || [];
+    const barsInit = (currentPhase !== 'place' && selectionState === 'idle') ? allMovesInit : initialMoves;
+    rebuildBars(barsInit);
     rebuildArrows(initialMoves);
     rebuildMalomOverlay(data.moves || []);
     rebuildHints(data.moves || [], data.has_traj_data);

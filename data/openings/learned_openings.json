@@ -12963,5 +12963,1325 @@
     "source_reference": "",
     "needs_llm_name": true,
     "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-f25588ad",
+    "name": "Black central column Var. d2-d6-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d2",
+      "d6",
+      "f4",
+      "b2",
+      "c4",
+      "c3",
+      "g1",
+      "b6",
+      "f6",
+      "b4",
+      "f6",
+      "e5",
+      "g4",
+      "e4",
+      "g7",
+      "d7",
+      "a4",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B.W.WB.........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........B.W.WB.......BW|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "....W...BB.W.WB.......BW|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "....W...BBWW.WBB......BW|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-c9c002cc",
+    "name": "Novel — a7-f4-d6 Var. a7-f4-d6 Var. a7-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "f4",
+      "d6",
+      "d7",
+      "d1",
+      "d2",
+      "b4",
+      "e3",
+      "a4",
+      "c4",
+      "g4",
+      "f2",
+      "d5",
+      "b2",
+      "a4",
+      "a1",
+      "d3",
+      "f6"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "WB.......W.B............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "WB...W...W.B.B..........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WB...W...W.B.B.W....B...|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WB...W.W.W.B.B.W....B..B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-385a30ee",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "a4",
+      "g4",
+      "g7",
+      "d5",
+      "d7",
+      "a7",
+      "c4",
+      "e3",
+      "c3",
+      "b6",
+      "c5",
+      "d3",
+      "g1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.W.BWB.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "..BW...B.W.BWB.W........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BBW...B.W.BWB.W.W......|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-9836e20d",
+    "name": "Novel — b4-f4-d6 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "b2",
+      "d2",
+      "e3",
+      "e4",
+      "d1",
+      "c4",
+      "a4",
+      "d5",
+      "d7",
+      "a1",
+      "f6",
+      "g4",
+      "g7",
+      "f2",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B..BW........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.B.WBW....B...|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".....B...W.B.WBW...WB...|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".....B.B.W.B.WBW...WB..W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-e8ef6d5c",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "a4",
+      "g4",
+      "g7",
+      "d5",
+      "d7",
+      "a7",
+      "c4",
+      "e3",
+      "c3",
+      "b6",
+      "c5",
+      "d3",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.W.BWB.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "..BW...B.W.BWB.W........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BBW...B.W.BWB.W.W......|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-3f6057b0",
+    "name": "Novel — b4-d6-d2 Var. b4-d6-d2 Var. b4-d6-d2",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "d6",
+      "d2",
+      "f4",
+      "e4",
+      "a4",
+      "g4",
+      "d3",
+      "f6",
+      "c3",
+      "e3",
+      "e5",
+      "c4",
+      "d7",
+      "d5",
+      "a7",
+      "a1",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........B.B.W.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.B.B.W.W...W....|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...W...B.B.B.W.W...W.B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...W...B.BWB.W.W...W.BB.|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-707b503e",
+    "name": "Novel — a7-b4-d6 Var. a7-b4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "b4",
+      "d6",
+      "d5",
+      "f6",
+      "b6",
+      "b2",
+      "d1",
+      "c3",
+      "c4",
+      "a4",
+      "a1",
+      "g1",
+      "g7",
+      "f4",
+      "f2",
+      "e4",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W........W.....B.B......|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W.......BWW....B.B......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W....B..BWW...WB.B......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W....B..BWW...WB.B....WB|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-a7862ee5",
+    "name": "Novel — a7-d6-f4 Var. a7-d6-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "d6",
+      "f4",
+      "b4",
+      "f2",
+      "f6",
+      "b6",
+      "c5",
+      "g7",
+      "d7",
+      "d5",
+      "c4",
+      "a4",
+      "c3",
+      "a4",
+      "a1",
+      "d3",
+      "d2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W........B.W...B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W........BBWW..B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W.......WBBWW..BB.......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WBW.....WBBWW..BB.......|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-d11206d9",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "a4",
+      "g4",
+      "d7",
+      "d1",
+      "c4",
+      "e4",
+      "d5",
+      "d3",
+      "a7",
+      "g7",
+      "g1",
+      "a1",
+      "e5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.W.BWB.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.W...B.W.BWB.W........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.W.W.B.W.BWB.W.......B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-d1125ac5",
+    "name": "Novel — a7-b4-d6 Var. a7-b4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "b4",
+      "d6",
+      "d7",
+      "f6",
+      "b6",
+      "b2",
+      "d3",
+      "f2",
+      "f4",
+      "d2",
+      "f4",
+      "e4",
+      "a1",
+      "e5",
+      "e3",
+      "c3",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "WB.......W.....B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "WB......BWW....B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WB......BWW...WB.....B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WB......BWWBW.WB.....B..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-236bf486",
+    "name": "Z Mill - c4/e3 - White dancer Var. d6-d2-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6",
+      "b2",
+      "d1",
+      "g4",
+      "e4",
+      "d7",
+      "g7",
+      "c4",
+      "a1",
+      "g1",
+      "d3",
+      "a4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBBBB........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...B.W..WWWWBBBB........|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-5c159113",
+    "name": "Novel — d2-d6-d7 Var. d2-d6-d7 Var. d2-d6-d7",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d2",
+      "d6",
+      "d7",
+      "f4",
+      "b6",
+      "c3",
+      "g4",
+      "a4",
+      "b4",
+      "c5",
+      "b2",
+      "f2",
+      "g7",
+      "g1",
+      "d1",
+      "d3",
+      "a7",
+      "e3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".W.......B.B.W..........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".W......WB.B.W........B.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".W.W...BWB.B.W........B.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W.W...BWB.B.W.WB.....B.|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-ba82762b",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "c4",
+      "d7",
+      "d5",
+      "a4",
+      "a1",
+      "e3",
+      "c5",
+      "d3",
+      "c3",
+      "e4",
+      "e5",
+      "e4",
+      "g1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.BWB.W.......B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".W.......W.BWB.W.B.....B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W....BW.W.BWB.W.B.....B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-13f19900",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "a4",
+      "g4",
+      "c4",
+      "e4",
+      "e5",
+      "c3",
+      "d1",
+      "b6",
+      "d3",
+      "b6",
+      "f6",
+      "b2",
+      "f4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.W.BWB.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...W...B.W.BWB.W.......B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...W...B.W.BWB.W..BW...B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-97f755b2",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "a4",
+      "g4",
+      "d5",
+      "e4",
+      "c5",
+      "e5",
+      "e3",
+      "c4",
+      "d3",
+      "d1",
+      "a1",
+      "a7",
+      "c3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......B.W.BWB.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...W...B.W.BWB.W.B......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...W...B.W.BWB.WBB.W....|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-cd736779",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "c4",
+      "a4",
+      "d7",
+      "d5",
+      "c3",
+      "c5",
+      "e5",
+      "g7",
+      "d3",
+      "d1",
+      "e3",
+      "e4",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.BWB.W.......B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.....W.W.BWB.W.......B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.....W.W.BWB.W.W....BB|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-46a1f7a4",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "c4",
+      "a4",
+      "d7",
+      "d5",
+      "g7",
+      "a7",
+      "a1",
+      "c3",
+      "d1",
+      "g1",
+      "d3",
+      "g1",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.BWB.W.......B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.....W.W.BWB.W.......B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BB....W.W.BWB.W.W.....B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-6999c085",
+    "name": "White column loss variant 2 Var. b4-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "d6",
+      "d2",
+      "f2",
+      "c4",
+      "b6",
+      "f6",
+      "g4",
+      "a1",
+      "d5",
+      "d7",
+      "b2",
+      "d2",
+      "d3",
+      "g1",
+      "c3",
+      "a4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........W.BWB.W.......B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWBBWB.W.......B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "...W..B.WWBBWB.W.......B|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-98d9d792",
+    "name": "Novel — b4-f4-a7 Var. b4-f4-a7 Var. b4-f4-a7",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "a7",
+      "a4",
+      "g4",
+      "d6",
+      "d2",
+      "d3",
+      "d5",
+      "g1",
+      "c4",
+      "f6",
+      "f2",
+      "b2",
+      "b6",
+      "c3",
+      "e3",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W......B...B...W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W..W...B.B.B...W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W..W...B.B.B.W.W.....B..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W..WB..B.B.B.W.W.W...B..|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-305786cc",
+    "name": "Novel — a7-f4-d6 Var. a7-f4-d6",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "f4",
+      "d6",
+      "d5",
+      "b2",
+      "c3",
+      "a4",
+      "a1",
+      "d2",
+      "f2",
+      "f6",
+      "b6",
+      "c4",
+      "b4",
+      "g7",
+      "d7",
+      "e4",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W........W.B.....B......|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W........W.B..W..B....B.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W.....BW.W.B..W..B....B.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W.....BW.W.BBWW..B....B.|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
   }
 ]

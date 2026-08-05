@@ -833,6 +833,9 @@ class Session:
         # Testing: Overseer drives every AI move instead of the engine
         self.use_overseer_player: bool = False
         self.use_generalist_player: bool = False
+        # Per-side generalist AI flag for AI-vs-AI games
+        self.use_generalist_white: bool = False
+        self.use_generalist_black: bool = False
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
@@ -2734,6 +2737,29 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
                 log.error("AI-vs-AI deliberation failed: %s", exc, exc_info=True)
                 await _send(ws, {"type": "error", "message": f"AI error: {exc}"})
                 return
+
+            # Generalist AI override for this side
+            _ava_gen = (
+                (color == "W" and getattr(session, "use_generalist_white", False)) or
+                (color == "B" and getattr(session, "use_generalist_black", False))
+            ) and _generalist_advisor is not None and _generalist_advisor.is_loaded()
+            if _ava_gen:
+                try:
+                    if game_ai is not None and hasattr(_generalist_advisor, "set_gameai"):
+                        try:
+                            _generalist_advisor.set_gameai(game_ai)
+                        except Exception:
+                            pass
+                    _ava_legal = get_all_legal_moves(board)
+                    if _ava_legal:
+                        _ava_cands = [{"from": m.get("from"), "to": m.get("to"), "capture": m.get("capture")} for m in _ava_legal]
+                        _ava_probs = await asyncio.to_thread(_generalist_advisor.score_moves, board, _ava_cands, board.turn)
+                        if _ava_probs:
+                            _ava_best = max(range(len(_ava_probs)), key=lambda i: _ava_probs[i])
+                            move = _ava_legal[_ava_best]
+                            log.info("AI-vs-AI Generalist override  color=%s move=%s", color, move)
+                except Exception as _ava_ge:
+                    log.warning("AI-vs-AI Generalist override failed: %s", _ava_ge, exc_info=True)
 
             elapsed = _time.time() - t0
             log.info("AI-vs-AI move  color=%s move=%s elapsed=%.2fs", color, move, elapsed)
@@ -4743,10 +4769,14 @@ async def ws_endpoint(websocket: WebSocket):
                 diff_w = max(1, min(10, int(msg.get("difficulty_white", 3))))
                 diff_b = max(1, min(10, int(msg.get("difficulty_black", 3))))
 
-                # Normalise personality names
-                if white_personality not in _PERSONALITY_WEIGHTS:
+                # Capture generalist flags before normalising personality names
+                use_gen_w = (white_personality == "generalist")
+                use_gen_b = (black_personality == "generalist")
+
+                # Normalise personality names (generalist falls back to balanced engine)
+                if use_gen_w or white_personality not in _PERSONALITY_WEIGHTS:
                     white_personality = "balanced"
-                if black_personality not in _PERSONALITY_WEIGHTS:
+                if use_gen_b or black_personality not in _PERSONALITY_WEIGHTS:
                     black_personality = "balanced"
 
                 # Cancel any running AI-vs-AI loop
@@ -4800,18 +4830,22 @@ async def ws_endpoint(websocket: WebSocket):
                 new_session.game_ai_black     = gai_b
                 new_session.coordinator_white = coord_w
                 new_session.coordinator_black = coord_b
-                new_session.white_personality = white_personality
-                new_session.black_personality = black_personality
+                new_session.white_personality    = "Generalist AI" if use_gen_w else white_personality
+                new_session.black_personality    = "Generalist AI" if use_gen_b else black_personality
+                new_session.use_generalist_white = use_gen_w and _generalist_advisor is not None
+                new_session.use_generalist_black = use_gen_b and _generalist_advisor is not None
                 session = new_session
 
+                _w_label = "Generalist AI" if use_gen_w else white_personality.capitalize()
+                _b_label = "Generalist AI" if use_gen_b else black_personality.capitalize()
                 log.info(
                     "AI-vs-AI started  white=%s(diff=%d) black=%s(diff=%d) save=%s llm=%s",
-                    white_personality, diff_w, black_personality, diff_b, save_flag, use_llm,
+                    _w_label, diff_w, _b_label, diff_b, save_flag, use_llm,
                 )
                 await _send(websocket, _state(session))
                 await _send(websocket, {
                     "type": "commentary", "speaker": "Game",
-                    "text": f"AI vs AI — {white_personality.capitalize()} (White) vs {black_personality.capitalize()} (Black)",
+                    "text": f"AI vs AI — {_w_label} (White) vs {_b_label} (Black)",
                     "section": "ai",
                 })
                 session._ava_task = asyncio.create_task(

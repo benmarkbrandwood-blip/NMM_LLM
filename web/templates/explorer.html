@@ -303,10 +303,10 @@
       <h3>To move</h3>
       <span id="turn-badge" class="white">White</span>
       <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;">
-        <div class="legend-row" style="margin:0;"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>&nbsp;HumanDB best</div>
-        <div class="legend-row" style="margin:0;"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #5591c7;flex-shrink:0;"></div>&nbsp;Pred Human best</div>
-        <div class="legend-row" style="margin:0;"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #4488ff;flex-shrink:0;"></div>&nbsp;Sentinel best</div>
-        <div class="legend-row" style="margin:0;"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #a855f7;flex-shrink:0;"></div>&nbsp;Heuristic best</div>
+        <div class="legend-row" style="margin:0;" title="Outermost ring"><div style="width:18px;height:18px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>&nbsp;HumanDB best</div>
+        <div class="legend-row" style="margin:0;" title="2nd ring"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #5591c7;flex-shrink:0;"></div>&nbsp;Pred Human best</div>
+        <div class="legend-row" style="margin:0;" title="3rd ring"><div style="width:10px;height:10px;border-radius:50%;border:2px solid #4488ff;flex-shrink:0;"></div>&nbsp;Sentinel best</div>
+        <div class="legend-row" style="margin:0;" title="Innermost ring"><div style="width:7px;height:7px;border-radius:50%;border:2px solid #a855f7;flex-shrink:0;"></div>&nbsp;Heuristic best</div>
         <div style="font-size:.65rem;color:#666;margin-top:0.3rem;line-height:1.5" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</div>
       </div>
     </div>
