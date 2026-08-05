@@ -26,10 +26,13 @@ Output files (data/gap_net_v3_dataset/):
                                    n_legal, ph_source, provenance JSON
   provenance.json               — full provenance record
   abstained.jsonl               — one JSON line per abstained (state_key, band)
+  checkpoint.json               — resume checkpoint (last_state_key, n_emitted, …)
+  metadata_checkpoint.npz       — accumulated metadata arrays for resume
 
 Usage::
     .venv/bin/python tools/extract_gap_v3_dataset.py [options]
     .venv/bin/python tools/extract_gap_v3_dataset.py --limit 500  # smoke test
+    .venv/bin/python tools/extract_gap_v3_dataset.py --resume      # continue interrupted run
 """
 from __future__ import annotations
 
@@ -37,7 +40,6 @@ import argparse
 import hashlib
 import json
 import sqlite3
-import struct
 import sys
 import time
 from collections import defaultdict
@@ -60,6 +62,7 @@ _BAND_TO_IDX = {"lower": 0, "middle": 1, "upper": 2}
 _SPLIT_SEED = b"gap_v3_split_v1"
 _FEATURE_VERSION = "value_net_v2_input_v1"
 _DATASET_VERSION = "1"
+_FLUSH_EVERY = 50_000  # Flush binary accumulators and write checkpoint every N emitted rows
 
 
 # ── Board helpers ─────────────────────────────────────────────────────────────
@@ -136,40 +139,67 @@ def _git_commit() -> str:
         return "unknown"
 
 
-# ── DB loading ────────────────────────────────────────────────────────────────
+# ── DB loading (streaming) ────────────────────────────────────────────────────
 
-def _load_band_counts(
-    db_path: Path,
-    min_support: int = 1,
-) -> dict[str, dict[str, dict[str, int]]]:
-    """Return {state_key: {band: {notation: total}}} for pairs with sum >= min_support."""
+def _count_distinct_state_keys(db_path: Path) -> int:
     conn = sqlite3.connect(str(db_path))
     try:
-        rows = conn.execute(
-            "SELECT state_key, notation, elo_bin, total FROM moves_elo_bins"
-        ).fetchall()
+        return conn.execute(
+            "SELECT COUNT(DISTINCT state_key) FROM moves_elo_bins"
+        ).fetchone()[0]
     finally:
         conn.close()
 
-    agg: dict[str, dict[str, dict[str, int]]] = defaultdict(
-        lambda: defaultdict(lambda: defaultdict(int))
+
+def _iter_state_key_groups(
+    db_path: Path,
+    min_support: int = 1,
+):
+    """Yield (state_key, {band: {notation: total}}) in state_key sorted order.
+
+    Streams rows from SQLite to avoid loading 3M+ rows into memory at once.
+    Only one state_key's data is held in memory at a time.
+    """
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("PRAGMA read_uncommitted = true")  # faster reads on pre-existing data
+    cur = conn.execute(
+        "SELECT state_key, notation, elo_bin, total "
+        "FROM moves_elo_bins ORDER BY state_key"
     )
-    for state_key, notation, elo_bin, total in rows:
+
+    current_sk: Optional[str] = None
+    current_bands: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+
+    for state_key, notation, elo_bin, total in cur:
         band = option_a_band_from_bin(elo_bin)
         if band == "unknown":
             continue
-        agg[state_key][band][notation] += total
 
-    # Filter by min_support per (state_key, band)
-    result: dict[str, dict[str, dict[str, int]]] = {}
-    for sk, band_dict in agg.items():
-        filtered: dict[str, dict[str, int]] = {}
-        for band, notation_counts in band_dict.items():
-            if sum(notation_counts.values()) >= min_support:
-                filtered[band] = dict(notation_counts)
+        if state_key != current_sk:
+            if current_sk is not None:
+                filtered = {
+                    b: dict(nc)
+                    for b, nc in current_bands.items()
+                    if sum(nc.values()) >= min_support
+                }
+                if filtered:
+                    yield current_sk, filtered
+            current_sk = state_key
+            current_bands = defaultdict(lambda: defaultdict(int))
+
+        current_bands[band][notation] += total
+
+    # Yield the final group
+    if current_sk is not None:
+        filtered = {
+            b: dict(nc)
+            for b, nc in current_bands.items()
+            if sum(nc.values()) >= min_support
+        }
         if filtered:
-            result[sk] = filtered
-    return result
+            yield current_sk, filtered
+
+    conn.close()
 
 
 # ── Fail-closed helpers ───────────────────────────────────────────────────────
@@ -249,6 +279,98 @@ def _compute_empirical_ph(
     return ph.astype(np.float32)
 
 
+# ── Checkpoint / resume helpers ───────────────────────────────────────────────
+
+def _verify_file_sizes(out_dir: Path, n_emitted: int) -> None:
+    """Raise if existing output files don't match n_emitted rows from checkpoint."""
+    for fname, row_bytes in [
+        ("parent_feats.f32.bin", 79 * 4),
+        ("targets.f32.bin", 4 * 4),
+        ("targets_empirical.f32.bin", 4 * 4),
+    ]:
+        p = out_dir / fname
+        if not p.exists():
+            raise RuntimeError(f"Resume: missing output file {fname}")
+        actual = p.stat().st_size
+        expected = n_emitted * row_bytes
+        if actual != expected:
+            raise RuntimeError(
+                f"Resume: {fname} has {actual} bytes but checkpoint says "
+                f"n_emitted={n_emitted} (expected {expected} bytes)"
+            )
+
+
+def _load_resume_state(out_dir: Path) -> Optional[dict]:
+    """Load checkpoint state for resume. Returns None if no checkpoint found."""
+    cp = out_dir / "checkpoint.json"
+    meta_cp = out_dir / "metadata_checkpoint.npz"
+    if not cp.exists() or not meta_cp.exists():
+        return None
+    state = json.loads(cp.read_text(encoding="utf-8"))
+    meta = np.load(str(meta_cp), allow_pickle=True)
+    state["meta_state_keys"] = list(meta["state_keys"])
+    state["meta_band_idx"] = [int(x) for x in meta["band_idx"]]
+    state["meta_split"] = [int(x) for x in meta["split"]]
+    state["meta_phase"] = [str(x) for x in meta["phase"]]
+    state["meta_mover_color"] = [str(x) for x in meta["mover_color"]]
+    state["meta_n_legal"] = [int(x) for x in meta["n_legal"]]
+    state["meta_ph_source"] = [str(x) for x in meta["ph_source"]]
+    return state
+
+
+def _flush_binary_batch(
+    out_dir: Path,
+    feats: list[np.ndarray],
+    tgts: list[np.ndarray],
+    tgts_emp: list[np.ndarray],
+) -> None:
+    """Append batch binary data to output files."""
+    if not feats:
+        return
+    with open(out_dir / "parent_feats.f32.bin", "ab") as f:
+        np.stack(feats).astype(np.float32).tofile(f)
+    with open(out_dir / "targets.f32.bin", "ab") as f:
+        np.stack(tgts).astype(np.float32).tofile(f)
+    with open(out_dir / "targets_empirical.f32.bin", "ab") as f:
+        np.stack(tgts_emp).astype(np.float32).tofile(f)
+
+
+def _flush_abstained_batch(out_dir: Path, lines: list[str]) -> None:
+    """Append abstained JSON lines."""
+    if not lines:
+        return
+    with open(out_dir / "abstained.jsonl", "a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _save_checkpoint(
+    out_dir: Path,
+    last_state_key: str,
+    n_emitted: int,
+    meta_state_keys: list,
+    meta_band_idx: list,
+    meta_split: list,
+    meta_phase: list,
+    meta_mover_color: list,
+    meta_n_legal: list,
+    meta_ph_source: list,
+    counters: dict,
+) -> None:
+    """Overwrite metadata checkpoint .npz, then write checkpoint.json (written last)."""
+    np.savez(
+        str(out_dir / "metadata_checkpoint.npz"),
+        state_keys=np.array(meta_state_keys, dtype=object),
+        band_idx=np.array(meta_band_idx, dtype=np.int8),
+        split=np.array(meta_split, dtype=np.int8),
+        phase=np.array(meta_phase, dtype=object),
+        mover_color=np.array(meta_mover_color, dtype=object),
+        n_legal=np.array(meta_n_legal, dtype=np.int16),
+        ph_source=np.array(meta_ph_source, dtype=object),
+    )
+    cp = {"last_state_key": last_state_key, "n_emitted": n_emitted, **counters}
+    (out_dir / "checkpoint.json").write_text(json.dumps(cp), encoding="utf-8")
+
+
 # ── Main extraction ───────────────────────────────────────────────────────────
 
 def run_extraction(
@@ -260,6 +382,7 @@ def run_extraction(
     min_empirical_support: int = 25,
     temperature: float = 0.7674,
     limit: Optional[int] = None,
+    resume: bool = False,
 ) -> dict:
     """Run the full extraction pipeline. Returns a coverage summary dict."""
     import datetime
@@ -272,62 +395,110 @@ def run_extraction(
     if not malom.is_available():
         raise RuntimeError(f"Malom DB not available at {malom_db_dir}")
 
-    print(f"Loading moves_elo_bins (min_support={min_support})...")
+    # Pre-count distinct state_keys for progress reporting (cheap query)
+    print(f"Counting state_keys (min_support={min_support})...")
     t0 = time.time()
-    band_counts = _load_band_counts(human_db, min_support=min_support)
-    n_total_state_keys = len(band_counts)
-    n_total_pairs = sum(len(bd) for bd in band_counts.values())
-    print(f"  {n_total_state_keys:,} state_keys, {n_total_pairs:,} (state_key, band) pairs "
-          f"({time.time()-t0:.1f}s)")
+    n_total_state_keys = _count_distinct_state_keys(human_db)
+    print(f"  {n_total_state_keys:,} distinct state_keys ({time.time()-t0:.1f}s)")
 
-    # Accumulators
-    features_rows: list[np.ndarray] = []      # (79,) per emitted row
-    targets_rows: list[np.ndarray] = []       # (4,) per emitted row [A,B,C,NaN]
-    targets_emp_rows: list[np.ndarray] = []   # (4,) per emitted row (NaN where absent)
-    meta_state_keys: list[str] = []
-    meta_band_idx: list[int] = []
-    meta_split: list[int] = []
-    meta_phase: list[str] = []
-    meta_mover_color: list[str] = []
-    meta_n_legal: list[int] = []
-    meta_ph_source: list[str] = []
+    # === Resume state ===
+    skip_until_after: Optional[str] = None  # Skip state_keys <= this value
 
-    abstained_lines: list[str] = []
+    if resume:
+        prior = _load_resume_state(out_dir)
+        if prior is None:
+            print("No checkpoint found — starting fresh.")
+            resume = False
+        else:
+            _verify_file_sizes(out_dir, prior["n_emitted"])
+            skip_until_after = prior["last_state_key"]
+            n_emitted              = prior["n_emitted"]
+            n_processed_state_keys = prior.get("n_processed_state_keys", 0)
+            n_processed_pairs      = prior.get("n_processed_pairs", 0)
+            n_bad_board            = prior.get("n_bad_board", 0)
+            n_terminal             = prior.get("n_terminal", 0)
+            n_n_legal_lt2          = prior.get("n_n_legal_lt2", 0)
+            n_parent_no_malom      = prior.get("n_parent_no_malom", 0)
+            n_not_malom_eligible   = prior.get("n_not_malom_eligible", 0)
+            n_malom_eligible       = prior.get("n_malom_eligible", 0)
+            n_not_emittable        = prior.get("n_not_emittable", 0)
+            meta_state_keys        = prior["meta_state_keys"]
+            meta_band_idx          = prior["meta_band_idx"]
+            meta_split             = prior["meta_split"]
+            meta_phase             = prior["meta_phase"]
+            meta_mover_color       = prior["meta_mover_color"]
+            meta_n_legal           = prior["meta_n_legal"]
+            meta_ph_source         = prior["meta_ph_source"]
+            print(
+                f"Resuming: n_emitted={n_emitted:,}, "
+                f"n_processed_state_keys={n_processed_state_keys:,}, "
+                f"last_state_key={skip_until_after!r}"
+            )
 
-    # Counters for coverage gate
-    n_processed_pairs = 0
-    n_bad_board = 0
-    n_terminal = 0
-    n_n_legal_lt2 = 0
-    n_parent_no_malom = 0
-    n_not_malom_eligible = 0
-    n_not_emittable = 0
-    n_malom_eligible = 0
-    n_emitted = 0
+    if not resume:
+        # Fresh start: zero counters and create empty output files
+        n_emitted = n_processed_state_keys = n_processed_pairs = 0
+        n_bad_board = n_terminal = n_n_legal_lt2 = 0
+        n_parent_no_malom = n_not_malom_eligible = n_malom_eligible = n_not_emittable = 0
+        meta_state_keys: list[str] = []
+        meta_band_idx:   list[int] = []
+        meta_split:      list[int] = []
+        meta_phase:      list[str] = []
+        meta_mover_color:list[str] = []
+        meta_n_legal:    list[int] = []
+        meta_ph_source:  list[str] = []
+        for fname in ["parent_feats.f32.bin", "targets.f32.bin", "targets_empirical.f32.bin"]:
+            (out_dir / fname).write_bytes(b"")
+        (out_dir / "abstained.jsonl").write_text("", encoding="utf-8")
+
+    print("Streaming moves_elo_bins (sorted by state_key — constant memory)...")
+
+    # Batch accumulators (cleared after each flush)
+    batch_feats:     list[np.ndarray] = []
+    batch_tgts:      list[np.ndarray] = []
+    batch_tgts_emp:  list[np.ndarray] = []
+    batch_abstained: list[str] = []
+    last_flush_emitted = n_emitted
+    last_state_key_seen = ""
 
     _NAN4 = np.array([np.nan, np.nan, np.nan, np.nan], dtype=np.float32)
 
-    state_keys_sorted = sorted(band_counts.keys())
-    if limit is not None:
-        state_keys_sorted = state_keys_sorted[:limit]
-
     t_start = time.time()
-    for sk_idx, state_key in enumerate(state_keys_sorted):
-        if sk_idx % 10_000 == 0 and sk_idx > 0:
-            elapsed = time.time() - t_start
-            rate = sk_idx / elapsed
-            eta = (len(state_keys_sorted) - sk_idx) / max(rate, 1e-6)
-            print(f"  {sk_idx:,}/{len(state_keys_sorted):,} state_keys "
-                  f"| emitted={n_emitted:,} | elapsed={elapsed:.0f}s | eta={eta:.0f}s")
+    sk_gen = _iter_state_key_groups(human_db, min_support=min_support)
+    if limit is not None:
+        from itertools import islice
+        sk_gen = islice(sk_gen, limit)
 
-        bands_for_sk = band_counts[state_key]
+    sk_idx_this_run = 0
+
+    for state_key, bands_for_sk in sk_gen:
+        # Skip already-processed state_keys on resume
+        if skip_until_after is not None:
+            if state_key <= skip_until_after:
+                continue
+            skip_until_after = None  # Done skipping
+
+        sk_idx_this_run += 1
+        last_state_key_seen = state_key
+        n_processed_state_keys += 1
+
+        if n_processed_state_keys % 10_000 == 0:
+            elapsed = time.time() - t_start
+            rate = max(sk_idx_this_run / elapsed, 1e-6)
+            eta = (n_total_state_keys - n_processed_state_keys) / rate
+            print(
+                f"  {n_processed_state_keys:,}/{n_total_state_keys:,} state_keys "
+                f"| emitted={n_emitted:,} | elapsed={elapsed:.0f}s | eta={eta:.0f}s",
+                flush=True,
+            )
+
         n_bands_here = len(bands_for_sk)
         n_processed_pairs += n_bands_here
 
         board = _board_from_state_key(state_key)
         if board is None:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": "malformed_state_key",
                 }))
@@ -337,7 +508,7 @@ def run_extraction(
         is_term, _ = is_terminal(board)
         if is_term:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": "parent_terminal",
                 }))
@@ -347,7 +518,7 @@ def run_extraction(
         legal_moves = get_all_legal_moves(board)
         if len(legal_moves) < 2:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": f"n_legal_{len(legal_moves)}_lt_2",
                 }))
@@ -357,7 +528,7 @@ def run_extraction(
         # Quick parent-coverage check before querying all moves
         if malom.query_value(board) is None:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": "parent_value_unavailable",
                 }))
@@ -373,7 +544,7 @@ def run_extraction(
         malom_ok, malom_reason = _check_malom_eligible(regrets, legal_moves)
         if not malom_ok:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": malom_reason,
                 }))
@@ -386,7 +557,7 @@ def run_extraction(
         emit_ok, emit_reason = _check_emittable(regrets, legal_moves)
         if not emit_ok:
             for band in bands_for_sk:
-                abstained_lines.append(json.dumps({
+                batch_abstained.append(json.dumps({
                     "state_key": state_key, "band": band,
                     "reason": emit_reason,
                 }))
@@ -413,9 +584,12 @@ def run_extraction(
                 tgt_emp = _NAN4.copy()
                 ph_source = "model"
 
-            features_rows.append(parent_feats)
-            targets_rows.append(np.array([g_v_A_m, g_v_B_m, g_v_C_m, np.nan], dtype=np.float32))
-            targets_emp_rows.append(tgt_emp)
+            # Batch accumulators (binary data — flushed and cleared periodically)
+            batch_feats.append(parent_feats)
+            batch_tgts.append(np.array([g_v_A_m, g_v_B_m, g_v_C_m, np.nan], dtype=np.float32))
+            batch_tgts_emp.append(tgt_emp)
+
+            # All-metadata accumulators (kept in memory for final npz write)
             meta_state_keys.append(state_key)
             meta_band_idx.append(_BAND_TO_IDX[band])
             meta_split.append(_split_idx(split))
@@ -425,29 +599,42 @@ def run_extraction(
             meta_ph_source.append(ph_source)
             n_emitted += 1
 
+        # Flush after completing a state_key if batch is large enough
+        if (n_emitted - last_flush_emitted) >= _FLUSH_EVERY:
+            _flush_binary_batch(out_dir, batch_feats, batch_tgts, batch_tgts_emp)
+            _flush_abstained_batch(out_dir, batch_abstained)
+            counters = dict(
+                n_processed_state_keys=n_processed_state_keys,
+                n_processed_pairs=n_processed_pairs,
+                n_bad_board=n_bad_board,
+                n_terminal=n_terminal,
+                n_n_legal_lt2=n_n_legal_lt2,
+                n_parent_no_malom=n_parent_no_malom,
+                n_not_malom_eligible=n_not_malom_eligible,
+                n_malom_eligible=n_malom_eligible,
+                n_not_emittable=n_not_emittable,
+            )
+            _save_checkpoint(
+                out_dir, state_key, n_emitted,
+                meta_state_keys, meta_band_idx, meta_split,
+                meta_phase, meta_mover_color, meta_n_legal, meta_ph_source,
+                counters,
+            )
+            batch_feats = batch_tgts = batch_tgts_emp = batch_abstained = []
+            last_flush_emitted = n_emitted
+            print(f"  [checkpoint] n_emitted={n_emitted:,} last_state_key={state_key!r}",
+                  flush=True)
+
     elapsed = time.time() - t_start
     print(f"\nExtraction complete: {n_emitted:,} rows emitted in {elapsed:.1f}s")
 
-    # Write binary files
-    n = n_emitted
+    # Final flush of remaining batch
+    _flush_binary_batch(out_dir, batch_feats, batch_tgts, batch_tgts_emp)
+    _flush_abstained_batch(out_dir, batch_abstained)
+
+    # Write final metadata.npz
     print(f"Writing output files to {out_dir} ...")
-
-    feats_path = out_dir / "parent_feats.f32.bin"
-    tgts_path = out_dir / "targets.f32.bin"
-    tgts_emp_path = out_dir / "targets_empirical.f32.bin"
-
-    if n > 0:
-        feat_arr = np.stack(features_rows)          # (N, 79)
-        tgt_arr = np.stack(targets_rows)            # (N, 4)
-        tgt_emp_arr = np.stack(targets_emp_rows)    # (N, 4)
-        feat_arr.tofile(str(feats_path))
-        tgt_arr.tofile(str(tgts_path))
-        tgt_emp_arr.tofile(str(tgts_emp_path))
-    else:
-        for p in (feats_path, tgts_path, tgts_emp_path):
-            p.write_bytes(b"")
-
-    # Write metadata.npz
+    n = n_emitted
     meta_path = out_dir / "metadata.npz"
     provenance_for_meta = {
         "dataset_version": _DATASET_VERSION,
@@ -469,11 +656,6 @@ def run_extraction(
         provenance=np.array([json.dumps(provenance_for_meta)], dtype=object),
     )
 
-    # Write abstained.jsonl
-    abstained_path = out_dir / "abstained.jsonl"
-    abstained_path.write_text("\n".join(abstained_lines) + ("\n" if abstained_lines else ""),
-                              encoding="utf-8")
-
     # Coverage summary
     if n_malom_eligible > 0:
         coverage_of_malom_eligible = n_emitted / n_malom_eligible
@@ -494,7 +676,8 @@ def run_extraction(
 
     summary = {
         "dataset_version": _DATASET_VERSION,
-        "n_total_pairs_enumerated": n_total_pairs,
+        "n_total_state_keys_in_db": n_total_state_keys,
+        "n_processed_state_keys": n_processed_state_keys,
         "n_processed_pairs": n_processed_pairs,
         "n_bad_board": n_bad_board,
         "n_terminal": n_terminal,
@@ -549,6 +732,25 @@ def run_extraction(
     prov_path = out_dir / "provenance.json"
     prov_path.write_text(json.dumps(prov, indent=2), encoding="utf-8")
 
+    # Final checkpoint (marks completion)
+    counters = dict(
+        n_processed_state_keys=n_processed_state_keys,
+        n_processed_pairs=n_processed_pairs,
+        n_bad_board=n_bad_board,
+        n_terminal=n_terminal,
+        n_n_legal_lt2=n_n_legal_lt2,
+        n_parent_no_malom=n_parent_no_malom,
+        n_not_malom_eligible=n_not_malom_eligible,
+        n_malom_eligible=n_malom_eligible,
+        n_not_emittable=n_not_emittable,
+    )
+    _save_checkpoint(
+        out_dir, last_state_key_seen or "", n_emitted,
+        meta_state_keys, meta_band_idx, meta_split,
+        meta_phase, meta_mover_color, meta_n_legal, meta_ph_source,
+        counters,
+    )
+
     return summary
 
 
@@ -599,6 +801,8 @@ def main() -> None:
                         help="Model temperature for P_h [default: 0.7674 = T* from eval]")
     parser.add_argument("--limit", type=int, default=None,
                         help="Process only the first N state_keys (smoke test)")
+    parser.add_argument("--resume", action="store_true",
+                        help="Resume from checkpoint.json in --out-dir")
     args = parser.parse_args()
 
     human_db = Path(args.human_db) if args.human_db else _ROOT / "data" / "human_db_candidate.sqlite"
@@ -615,6 +819,8 @@ def main() -> None:
     print(f"temperature:   {args.temperature}")
     if args.limit:
         print(f"*** SMOKE TEST MODE: limit={args.limit} state_keys ***")
+    if args.resume:
+        print("*** RESUME MODE ***")
 
     if not human_db.exists():
         print(f"ERROR: human_db not found at {human_db}", file=sys.stderr)
@@ -632,6 +838,7 @@ def main() -> None:
         min_empirical_support=args.min_empirical_support,
         temperature=args.temperature,
         limit=args.limit,
+        resume=args.resume,
     )
 
     _print_gate(summary)

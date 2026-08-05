@@ -913,6 +913,49 @@ First-run result (v1, 22 epochs, early stop): val NLL=1.5953, ~11.6 h.
 | `--seed N` | 42 | RNG seed |
 
 
+## GapNet v3 — Stage D Dataset Extraction
+
+Smoke test (500 state_keys, ~2 min):
+```
+.venv/bin/python tools/extract_gap_v3_dataset.py \
+  --limit 500 \
+  --out-dir /tmp/gap_v3_smoke
+```
+
+Full run (writes to `data/gap_net_v3_dataset/`, checkpoint every 50 k emitted rows):
+```
+PYTHONUNBUFFERED=1 nohup .venv/bin/python -u tools/extract_gap_v3_dataset.py \
+  --min-support 1 > data/logs/gap_v3_extract_full.log 2>&1 &
+```
+
+Resume an interrupted full run:
+```
+PYTHONUNBUFFERED=1 nohup .venv/bin/python -u tools/extract_gap_v3_dataset.py \
+  --min-support 1 --resume > data/logs/gap_v3_extract_full.log 2>&1 &
+```
+
+| Flag | Default | Description |
+| - | - | - |
+| `--human-db PATH` | `data/human_db_candidate.sqlite` | Human game DB |
+| `--malom-db-dir PATH` | from `data/settings.json` | Malom DB directory |
+| `--model PATH` | `data/human_move_policy_net_v2_candidate.npz` | P_h policy model |
+| `--out-dir PATH` | `data/gap_net_v3_dataset/` | Output directory |
+| `--min-support N` | 1 | Min total plays per (state_key, band) to include |
+| `--min-empirical-support N` | 25 | Min support for empirical P_h (below → model-only) |
+| `--temperature FLOAT` | 0.7674 | Model temperature (T* from Phase 4b eval) |
+| `--limit N` | off | Process first N state_keys only (smoke test) |
+| `--resume` | off | Continue from `checkpoint.json` in `--out-dir` |
+
+Output files in `data/gap_net_v3_dataset/`:
+- `parent_feats.f32.bin` — (N, 79) float32, row-major
+- `targets.f32.bin` — (N, 4) float32 `[g_v_A, g_v_B, g_v_C, NaN]`
+- `targets_empirical.f32.bin` — (N, 4) float32 (empirical G_v, NaN where absent)
+- `metadata.npz` — state_keys, band_idx, split, phase, mover_color, n_legal, ph_source
+- `provenance.json` — full provenance record
+- `abstained.jsonl` — one line per abstained (state_key, band) with reason
+- `checkpoint.json` + `metadata_checkpoint.npz` — resume state
+
+
 ## HumanMovePolicyNet — Phase 4b Evaluate (full)
 
 Standard val eval (temperature scaling, all strata, all baselines):
