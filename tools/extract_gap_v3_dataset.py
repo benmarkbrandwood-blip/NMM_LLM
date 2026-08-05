@@ -620,7 +620,10 @@ def run_extraction(
                 meta_phase, meta_mover_color, meta_n_legal, meta_ph_source,
                 counters,
             )
-            batch_feats = batch_tgts = batch_tgts_emp = batch_abstained = []
+            batch_feats = []
+            batch_tgts = []
+            batch_tgts_emp = []
+            batch_abstained = []
             last_flush_emitted = n_emitted
             print(f"  [checkpoint] n_emitted={n_emitted:,} last_state_key={state_key!r}",
                   flush=True)
