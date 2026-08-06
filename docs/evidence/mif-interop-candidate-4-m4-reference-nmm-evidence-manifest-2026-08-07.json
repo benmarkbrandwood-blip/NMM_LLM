@@ -1,0 +1,76 @@
+{
+  "protocol": "NMM_LLM-MIF-INTEROP-EVIDENCE/1",
+  "milestone": "M4-differential",
+  "status": "candidate-interoperability-evidence-only",
+  "suiteConformance": false,
+  "baseline": {
+    "mifM4Commit": "40718e80d36ec9c060fc17997568d637a74e6d9f",
+    "mifWireCommit": "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978",
+    "launch": {
+      "path": "interop/differential-candidate-4-v1.json",
+      "sha256": "sha256:560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e",
+      "resourceCount": 29
+    },
+    "referenceBaseline": {
+      "path": "interop/evidence/mif-1.0-candidate-4-m4-reference-baseline.json",
+      "sha256": "sha256:29d198dbcf8221fa0235af6a72db9d6a82646b45fc653c584071821a9a4bb61b"
+    },
+    "externalSanmillEvidence": {
+      "implementationCommit": "ae9a1d8a16261478631a3a7583cbf35c7b6e0df5",
+      "evidenceCommit": "9431b95f151502f415f096c7d96ca944e5d578de",
+      "referenceReportSha256": "sha256:0135ba7778a4623cecc0fe07173f50d76d3f06b6afd7830269b2c01e168604a7"
+    }
+  },
+  "adapters": [
+    {
+      "name": "mif-reference",
+      "project": "MIF",
+      "branch": "master",
+      "commit": "40718e80d36ec9c060fc17997568d637a74e6d9f",
+      "published": true
+    },
+    {
+      "name": "nmm-llm-python",
+      "project": "NMM_LLM",
+      "branch": "dev",
+      "commit": "6c1538082fc551203d827782d137a5799c810535",
+      "published": true
+    }
+  ],
+  "report": {
+    "path": "docs/evidence/mif-interop-candidate-4-m4-reference-nmm-report-2026-08-07.json",
+    "sha256": "sha256:2bc434699902a1c468b604797d4456ee0c968817b057ec4dc8254a623a1ba64c",
+    "protocol": "MIF-INTEROP-DIFFERENTIAL-REPORT/1",
+    "launchDigest": "sha256:560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e",
+    "configDigest": "sha256:c6eb5edc21773c017e7a2d5d9050b38cb08450658a286e64a395f1edc6b7074e",
+    "summary": {
+      "runsPassed": 10,
+      "runsFailed": 0,
+      "negativePassed": 5,
+      "negativeFailed": 0
+    }
+  },
+  "verification": {
+    "candidate4Deterministic": {
+      "casesPassed": 58,
+      "casesFailed": 0,
+      "adapterCount": 3,
+      "configDigest": "sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f"
+    },
+    "threeProjectPreflight": {
+      "runsPassed": 10,
+      "runsFailed": 0,
+      "negativePassed": 5,
+      "negativeFailed": 0,
+      "configDigest": "sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f"
+    },
+    "focusedTests": {
+      "passed": 62,
+      "failed": 0
+    },
+    "ruff": "passed",
+    "focusedMypy": "passed",
+    "compileall": "passed",
+    "referenceGameplayImportMatches": 0
+  }
+}

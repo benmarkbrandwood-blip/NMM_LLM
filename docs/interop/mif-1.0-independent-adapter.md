@@ -161,18 +161,73 @@ An independent rerun at MIF
 `11bebd14e0d538a41a4b43aebfe57ee74c2a2601` reproduced the same report
 hash.
 
-Three-project M3 is not formally closed yet. The standard comparator report
-contains adapter names and case/config digests but no repository commit SHAs;
-the config digest binds command arrays, not source revisions. Sanmill must
-publish the planned companion evidence manifest binding the three commits,
-the report hash, both report digests, and all seven candidate-4 input hashes
-listed above. This is an evidence-chain gap only; the current review found no
-remaining adapter gameplay discrepancy. None of these results is MIF Suite
+Sanmill closed that M3 evidence-chain gap at evidence commit
+`9431b95f151502f415f096c7d96ca944e5d578de`. Its companion manifest binds
+MIF `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`, Sanmill
+`e6d639d41f079b15ca697268d0c2c21dad5c2bc3`, NMM_LLM
+`11bebd14e0d538a41a4b43aebfe57ee74c2a2601`, all seven candidate-4 input
+hashes, and the exact 58/58 report identity above. M3 is therefore closed for
+those recorded candidate identities. None of these results is MIF Suite
 conformance. The historical
 [candidate-3 report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json)
 and
 [candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json)
 remain valid only for their recorded identities.
+
+## Candidate-4 M4 differential evidence
+
+M4 uses the unchanged candidate-4 wire commit
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978` through the separately published
+MIF launch commit `40718e80d36ec9c060fc17997568d637a74e6d9f`. The fixed launch has
+SHA-256
+`560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e`
+and transitively binds 29 resources. The reference baseline has SHA-256
+`29d198dbcf8221fa0235af6a72db9d6a82646b45fc653c584071821a9a4bb61b`.
+Neither file, its seeds, nor its mutations was regenerated or edited here.
+
+The pre-fix NMM_LLM commit
+`e2ab05d29885af9a16a9aa5d5f62b1517cf6d91b` reproduced the prescribed
+three-party preflight: 10/10 seeded runs, 3/5 negative mutations, and config
+digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+The two failures were diagnostic-shape differences rather than state or move
+differences. Tested implementation commit
+`6c1538082fc551203d827782d137a5799c810535` classifies an attempted removal
+without a pending obligation as `inconsistent`, retains code
+`remove-without-obligation` and its event sequence, and omits non-contract
+`expected` and `actual` members from checkpoint, repetition-history, and claim
+replay mismatches. It changes no transition, replay, legal-action, or other
+gameplay semantics.
+
+At that clean, pushed implementation commit, 62 focused MIF tests pass. Ruff,
+a focused mypy check for the new M4 regression module, and bytecode compilation
+also pass. The candidate-4 deterministic corpus remains 58/58 across the MIF
+reference, Sanmill, and NMM_LLM. A source scan found no runtime import of the
+MIF reference runner by the NMM_LLM adapter or entry point.
+
+The exact two-adapter output is preserved as the
+[M4 Reference/NMM_LLM report](../evidence/mif-interop-candidate-4-m4-reference-nmm-report-2026-08-07.json),
+SHA-256
+`2bc434699902a1c468b604797d4456ee0c968817b057ec4dc8254a623a1ba64c`.
+It records 10/10 seeded runs, 5/5 negative mutations, launch digest
+`sha256:560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e`
+and machine-local config digest
+`sha256:c6eb5edc21773c017e7a2d5d9050b38cb08450658a286e64a395f1edc6b7074e`.
+The adjacent
+[evidence manifest](../evidence/mif-interop-candidate-4-m4-reference-nmm-evidence-manifest-2026-08-07.json)
+binds the report to the exact MIF and NMM_LLM commits and records the external
+Sanmill implementation commit
+`ae9a1d8a16261478631a3a7583cbf35c7b6e0df5`, evidence commit
+`9431b95f151502f415f096c7d96ca944e5d578de`, and Reference/Sanmill report
+SHA-256
+`0135ba7778a4623cecc0fe07173f50d76d3f06b6afd7830269b2c01e168604a7`.
+
+The final three-party preflight at these published external identities and the
+tested NMM_LLM implementation also records 10/10 seeded runs and 5/5 negative
+mutations with config digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+This closes NMM_LLM's Candidate-4 M4 differential evidence only. It is not,
+and must not be cited as, MIF Suite 1.0 conformance.
 
 A full 1,138-test NMM_LLM run was attempted without skips at the previous
 baseline, but reached the 15-minute command limit at roughly 15% with no

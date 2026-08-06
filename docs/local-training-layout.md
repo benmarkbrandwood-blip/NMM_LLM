@@ -116,6 +116,13 @@ candidate-set principles in
   The command generator also rejects worktree changes and verifies the formal
   four frozen file hashes plus the protocol, smoke and deterministic execution
   pins recorded in the interoperability document.
+- Candidate-4 M4 harness input: commit
+  `40718e80d36ec9c060fc17997568d637a74e6d9f`, with launch SHA-256
+  `560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e`
+  and reference-baseline SHA-256
+  `29d198dbcf8221fa0235af6a72db9d6a82646b45fc653c584071821a9a4bb61b`.
+  This later checkout adds the black-box differential harness and does not
+  replace or silently alter the frozen adapter wire identity above.
 - NMM_LLM independently implements the wire semantics under
   `learned_ai/interop/mif_v1/`; the MIF Python reference runner may be launched
   only as a separate black-box comparison process. Its gameplay code is not a

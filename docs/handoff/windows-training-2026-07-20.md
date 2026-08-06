@@ -1074,14 +1074,40 @@ Sanmill `e6d639d41f079b15ca697268d0c2c21dad5c2bc3`, and NMM_LLM
 `11bebd14e0d538a41a4b43aebfe57ee74c2a2601` reproduced the same report
 hash.
 
-NMM_LLM's candidate-4 implementation and pin are closed, but three-project M3
-is not formally closed. The standard report omits repository commit SHAs, and
-its config digest binds command arrays rather than source revisions. Sanmill
-still needs to publish the planned companion evidence manifest that binds the
-three commits, report hash, case/config digests, and all candidate-4 input
-hashes. This is an evidence-only gap; no adapter gameplay change is pending.
-No result claims MIF Suite conformance. The earlier candidate-3 and candidate-2
-reports remain historical evidence for their recorded identities.
+Sanmill closed the M3 evidence-chain gap at evidence commit
+`9431b95f151502f415f096c7d96ca944e5d578de`. Its companion manifest binds the
+three published commits, all seven candidate-4 inputs, and the 58/58 report
+identity above. M3 is closed for those exact candidate identities.
+
+Candidate-4 M4 uses MIF launch commit
+`40718e80d36ec9c060fc17997568d637a74e6d9f` over the unchanged wire commit
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The fixed launch SHA-256 is
+`560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e`;
+the reference-baseline SHA-256 is
+`29d198dbcf8221fa0235af6a72db9d6a82646b45fc653c584071821a9a4bb61b`.
+The prescribed pre-fix run at NMM_LLM
+`e2ab05d29885af9a16a9aa5d5f62b1517cf6d91b` reproduced 10/10 seeded runs
+and 3/5 mutations at config digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+
+Tested NMM_LLM implementation commit
+`6c1538082fc551203d827782d137a5799c810535` aligns only the two failing
+diagnostic shapes; it does not change gameplay or replay semantics. The
+[two-party raw report](../evidence/mif-interop-candidate-4-m4-reference-nmm-report-2026-08-07.json)
+has SHA-256
+`2bc434699902a1c468b604797d4456ee0c968817b057ec4dc8254a623a1ba64c`,
+records 10/10 seeded runs and 5/5 mutations, and has config digest
+`sha256:c6eb5edc21773c017e7a2d5d9050b38cb08450658a286e64a395f1edc6b7074e`.
+The adjacent
+[companion manifest](../evidence/mif-interop-candidate-4-m4-reference-nmm-evidence-manifest-2026-08-07.json)
+binds the exact MIF and NMM_LLM commits plus Sanmill implementation
+`ae9a1d8a16261478631a3a7583cbf35c7b6e0df5`, evidence
+`9431b95f151502f415f096c7d96ca944e5d578de`, and its two-party report hash.
+The final three-party preflight records 10/10 and 5/5 with config digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+This closes NMM_LLM's Candidate-4 M4 differential evidence only. No result
+claims MIF Suite 1.0 conformance. Earlier candidate reports remain historical
+evidence for their recorded identities.
 
 An additional 1,138-test repository run was attempted without skips, but the
 15-minute command limit stopped it at roughly 15% with no failure reported.
