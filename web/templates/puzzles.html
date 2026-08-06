@@ -652,8 +652,15 @@ function showWrongMoveDialog(notation) {
 window._wrongMoveRetry = function() {
   document.getElementById('wrong-move-overlay').classList.remove('show');
   _wrongMoveNotation = null;
+  // Re-parse the pre-move FEN (currentFen was never updated — the server call
+  // is skipped when the solution-line check fires client-side).  This restores
+  // any piece that was moved locally for a mill-capture UI and clears the
+  // pending capture state.
+  posMap      = parseFen(currentFen);
+  pendingMove = null;
+  document.getElementById('capture-prompt').style.display = 'none';
   setupUserTurn(null);
-  setStatus('Try again or good luck!', 'info');
+  setStatus('Try again.', 'info');
 };
 
 window._wrongMoveContinue = async function() {
