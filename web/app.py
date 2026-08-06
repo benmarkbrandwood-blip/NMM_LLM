@@ -71,11 +71,11 @@ _AUTOSAVE_PATH = _ROOT / "data" / "autosave_game.json"
 def _write_autosave(session: "Session") -> None:
     """Write current game state to autosave_game.json after each move.
 
-    Skipped until at least 4 pieces are on the board so the very first
-    placement moves cannot overwrite a meaningful saved game.
+    Skipped until at least 2 moves have been played in the current session so
+    the previous saved game is not overwritten while the Resume banner is visible.
     """
     try:
-        if sum(session.engine.board.pieces_on_board.values()) < 4:
+        if len(session.engine.game_record.get("moves", [])) < 2:
             return
         from datetime import datetime as _dt
         ai_color = session.game_ai.color if session.game_ai else None
@@ -3534,7 +3534,6 @@ async def ws_endpoint(websocket: WebSocket):
 
             # ── new_game ──────────────────────────────────────────────────────
             if kind == "new_game":
-                _clear_autosave()
                 import random as _random
                 is_tournament = (
                     bool(msg.get("tournament_game", False))
