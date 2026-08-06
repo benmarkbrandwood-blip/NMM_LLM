@@ -407,6 +407,13 @@ class GameDiag:
     temp_scheduled:           float = 0.0
     temp_boost:               float = 0.0
     temp_effective:           float = 0.0
+    # v2c reward components (per-step means across the game's learner moves).
+    reward_malom_dir_mean:    float = 0.0
+    reward_revisit_mean:      float = 0.0
+    reward_novelty_mean:      float = 0.0
+    # Game-level metadata for per-type filtering in analysis.
+    game_difficulty:          int   = 0
+    is_advance_reference:     int   = 0
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -840,32 +847,6 @@ def _record_rollout_outcome(
         win_history_heuristic.append(hv)
     if is_advance_reference and advance_cooldown_batches <= 0:
         level_heuristic_history.append(hv)
-
-
-def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
-    """Advance when (wins + 0.5×draws)/total >= threshold.
-
-    Levels 1-3: threshold 0.40/0.43/0.46, draw cap 0.40, min 12 games.
-    Level 4+: threshold ramps 0.51→0.60, draw cap 0.22, min 20 games.
-    Early levels are easier to escape to generate diverse training data.
-    v2c: draw caps tightened from 0.55/0.33 to prevent draw-heavy policies advancing."""
-    recent = list(win_history_heuristic)[-rolling_win:]
-    early  = difficulty <= 3
-    if len(recent) < (12 if early else 20):
-        return False
-    wins      = sum(1 for x in recent if x == 1.0)
-    draws     = sum(1 for x in recent if x == 0.5)
-    n         = len(recent)
-    draw_rate = draws / n
-    # v2c: tightened draw cap — 0.55→0.40 (early levels) and 0.33→0.22 (L4+).
-    if draw_rate >= (0.40 if early else 0.22):
-        return False
-    score = (wins + 0.5 * draws) / n
-    if early:
-        threshold = 0.40 + (difficulty - 1) * 0.03   # 0.40 / 0.43 / 0.46
-    else:
-        threshold = 0.51 + (difficulty - 4) * (0.09 / 16.0)  # 0.51→0.60 at level 20
-    return score >= threshold
 
 
 # ── Blended-opponent weights factory ─────────────────────────────────────────
@@ -1422,6 +1403,8 @@ def _build_game_diag(
     advance_cooldown_batches: int = 0,
     temp_scheduled:        float = 0.0,
     temp_boost:            float = 0.0,
+    game_difficulty:       int = 0,
+    is_advance_reference:  bool = False,
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
@@ -1493,6 +1476,11 @@ def _build_game_diag(
         temp_scheduled            =round(float(temp_scheduled), 4),
         temp_boost                =round(float(temp_boost), 4),
         temp_effective            =round(float(temperature), 4),
+        reward_malom_dir_mean     =_safe_mean([d.reward.malom_dir for d in sd]),
+        reward_revisit_mean       =_safe_mean([d.reward.revisit   for d in sd]),
+        reward_novelty_mean       =_safe_mean([d.reward.novelty   for d in sd]),
+        game_difficulty           =int(game_difficulty),
+        is_advance_reference      =int(is_advance_reference),
     )
 
 
@@ -1987,6 +1975,11 @@ def run(args: argparse.Namespace) -> None:
                                 pass
                         model.to(device)
                         opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+                        if _ckpt_r.get("optimizer_state") is not None:
+                            try:
+                                opt.load_state_dict(_ckpt_r["optimizer_state"])
+                            except Exception as _oe:
+                                print(f"[s_gen_v2c] Resurrection: optimizer state restore failed ({_oe}) — fresh Adam")
                         frozen_opp.refresh(model)
                         win_history.clear()
                         win_history_heuristic.clear()
@@ -2151,6 +2144,8 @@ def run(args: argparse.Namespace) -> None:
                 advance_cooldown_batches=advance_cooldown_batches,
                 temp_scheduled=_scheduled_temp,
                 temp_boost=temp_boost,
+                game_difficulty=game_difficulty,
+                is_advance_reference=is_advance_reference,
             )
             diag_buffer.append(_diag)
 
@@ -2297,6 +2292,8 @@ def run(args: argparse.Namespace) -> None:
                         advance_cooldown_batches=advance_cooldown_batches,
                         temp_scheduled=_scheduled_temp,
                         temp_boost=temp_boost,
+                        game_difficulty=game_difficulty,
+                        is_advance_reference=False,
                     ))
 
                     if game_count % 10 == 0:
@@ -2397,6 +2394,11 @@ def run(args: argparse.Namespace) -> None:
                             if _loaded_recovery:
                                 model.to(device)
                                 opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+                                if ckpt_r.get("optimizer_state") is not None:
+                                    try:
+                                        opt.load_state_dict(ckpt_r["optimizer_state"])
+                                    except Exception as _oe:
+                                        print(f"[s_gen_v2c] Recovery Stage 2: optimizer state restore failed ({_oe}) — fresh Adam")
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
@@ -2570,7 +2572,21 @@ def run(args: argparse.Namespace) -> None:
                 _adv = _sanmill_check_advance(level_heuristic_history,
                                               difficulty=difficulty,
                                               games_at_level=games_at_level)
-                if game_count - _last_advance_print_game >= 50:
+                # v2c draw-cap gate applied on top of the Sanmill superiority check.
+                # Draw-heavy policies must not advance even if they score well.
+                if _adv.should_advance:
+                    _recent_adv = list(level_heuristic_history)[-max(20, args.rolling_win):]
+                    _adv_draw_cap = 0.40 if difficulty <= 3 else 0.22
+                    _adv_draw_rate = (
+                        sum(1 for x in _recent_adv if x == 0.5) / max(len(_recent_adv), 1)
+                    )
+                    if _adv_draw_rate >= _adv_draw_cap:
+                        _adv = None
+                        if game_count - _last_advance_print_game >= 50:
+                            _last_advance_print_game = game_count
+                            print(f"[s_gen_v2c] advance-check @ diff {difficulty}: "
+                                  f"draw cap blocked (draw_rate={_adv_draw_rate:.3f} >= {_adv_draw_cap})")
+                if _adv is not None and game_count - _last_advance_print_game >= 50:
                     _last_advance_print_game = game_count
                     print(f"[s_gen_v2c] advance-check @ diff {difficulty}: {_adv.reason}")
             if _adv is not None and _adv.should_advance:
