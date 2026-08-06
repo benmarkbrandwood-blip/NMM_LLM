@@ -9,6 +9,7 @@ from learned_ai.interop.mif_v1.common import (
     MIF_ADAPTER_PROTOCOL_SHA256,
     MIF_CHINESE_SPEC_SHA256,
     MIF_COMMIT,
+    MIF_DETERMINISTIC_CORPUS_SHA256,
     MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
     MIF_INDEX_SHA256,
@@ -34,7 +35,18 @@ def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
                 "ruleset",
                 "transform",
             ],
-        }
+        },
+        {
+            "digest": MIF_DETERMINISTIC_CORPUS_SHA256,
+            "classes": [
+                "identity",
+                "key",
+                "position",
+                "replay",
+                "ruleset",
+                "transform",
+            ],
+        },
     ]
     assert value["annotations"] == {
         "contractCommit": MIF_COMMIT,
@@ -44,7 +56,8 @@ def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
         "executableCorpus": MIF_EXECUTABLE_CORPUS_SHA256,
         "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
         "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
-        "scope": "pinned-candidate-corpus-rulesets; no MIFSUITE published",
+        "deterministicCorpus": MIF_DETERMINISTIC_CORPUS_SHA256,
+        "scope": "pinned-candidate-corpora-rulesets; no MIFSUITE published",
     }
 
 

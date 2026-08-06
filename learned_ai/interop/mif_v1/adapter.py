@@ -11,6 +11,7 @@ from .common import (
     MIF_ADAPTER_PROTOCOL_SHA256,
     MIF_CHINESE_SPEC_SHA256,
     MIF_COMMIT,
+    MIF_DETERMINISTIC_CORPUS_SHA256,
     MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
     MIF_INDEX_SHA256,
@@ -165,7 +166,18 @@ def capabilities() -> dict[str, Any]:
                     "ruleset",
                     "transform",
                 ],
-            }
+            },
+            {
+                "digest": MIF_DETERMINISTIC_CORPUS_SHA256,
+                "classes": [
+                    "identity",
+                    "key",
+                    "position",
+                    "replay",
+                    "ruleset",
+                    "transform",
+                ],
+            },
         ],
         "annotations": {
             "contractCommit": MIF_COMMIT,
@@ -175,7 +187,8 @@ def capabilities() -> dict[str, Any]:
             "executableCorpus": MIF_EXECUTABLE_CORPUS_SHA256,
             "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
             "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
-            "scope": "pinned-candidate-corpus-rulesets; no MIFSUITE published",
+            "deterministicCorpus": MIF_DETERMINISTIC_CORPUS_SHA256,
+            "scope": "pinned-candidate-corpora-rulesets; no MIFSUITE published",
         },
     }
 
