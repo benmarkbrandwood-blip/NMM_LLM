@@ -876,13 +876,8 @@ async def _startup_malom_deferred():
                 log.info("MalomDB puzzle instance ready")
         except Exception as _e:
             log.warning("MalomDB puzzle init failed (non-fatal): %s", _e)
-        try:
-            from ai.malom_puzzle_search import prewarm_hash_cache
-            log.info("Malom hash cache warming (3–7 pieces)…")
-            prewarm_hash_cache(7)
-            log.info("Malom hash cache warmed.")
-        except Exception as _pe:
-            log.warning("Malom hash prewarm failed (non-fatal): %s", _pe)
+        # Hash cache prewarm removed — puzzles are pre-generated and shipped;
+        # MalomDB validation queries warm lazily on first access per (W,B) pair.
     _threading.Thread(target=_init_and_prewarm, daemon=True).start()
 
 

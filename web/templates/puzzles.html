@@ -15,8 +15,6 @@
   button { background: #3a5a8e; border-color: #5a8abe; }
   button:hover { background: #4a6aae; }
   button:disabled { opacity: 0.5; cursor: default; }
-  .btn-gen    { background: #3a4a2e; border-color: #5a7a4e; }
-  .btn-gen:hover { background: #4a5a3e; }
   .btn-enter  { background: #4a3a6e; border-color: #7a5aae; }
   .btn-enter:hover { background: #5a4a7e; }
   .btn-active { background: #6a4a9e !important; border-color: #9a7ace !important; }
@@ -135,9 +133,7 @@
     <option value="9">Win in 9</option>
     <option value="10">Win in 10</option>
   </select>
-  <button id="btn-new" onclick="window._loadPuzzle(false)">New puzzle</button>
-  <button id="btn-gen" class="btn-gen" onclick="window._loadPuzzle(true)"
-          title="Generate a new puzzle from the tablebase (~10–90s)">Generate new</button>
+  <button id="btn-new" onclick="window._loadPuzzle()">New puzzle</button>
   <button id="btn-enter" class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
 </div>
 
@@ -884,22 +880,21 @@ window._resetPuzzle = function() {
 };
 
 // ── Puzzle loading ────────────────────────────────────────────────────────────
-window._loadPuzzle = async function(generate = false) {
+window._loadPuzzle = async function() {
   if (setupMode) exitSetupMode();
-  const btn    = document.getElementById('btn-new');
-  const btnGen = document.getElementById('btn-gen');
-  btn.disabled = btnGen.disabled = true;
+  const btn = document.getElementById('btn-new');
+  btn.disabled = true;
   btn.textContent = 'Loading…';
-  setStatus(generate ? 'Generating from tablebase… (may take up to 90s)' : 'Fetching from cache…', 'info');
+  setStatus('Fetching from cache…', 'info');
 
   const side  = document.getElementById('sel-side').value;
   const depth = document.getElementById('sel-depth').value;
-  const url   = `/api/puzzles/random?side=${side}&depth=${depth}&generate=${generate}`;
+  const url   = `/api/puzzles/random?side=${side}&depth=${depth}&generate=false`;
   try {
     const r    = await fetch(url);
     const data = await r.json();
     if (!r.ok) {
-      setStatus('⚠ ' + (data.error || 'No puzzles found. Click "Generate new" or run the CLI.'), 'fail');
+      setStatus('⚠ ' + (data.error || 'No puzzles found. Run the CLI generator to populate the cache.'), 'fail');
       return;
     }
     puzzle      = data;
@@ -941,7 +936,7 @@ window._loadPuzzle = async function(generate = false) {
   } catch (e) {
     setStatus('Error: ' + e.message, 'fail');
   } finally {
-    btn.disabled = btnGen.disabled = false;
+    btn.disabled = false;
     btn.textContent = 'New puzzle';
   }
 };
