@@ -28,6 +28,7 @@ Puzzle quality pipeline (per position):
 from __future__ import annotations
 
 import hashlib
+import os
 import random
 from dataclasses import dataclass, field
 from typing import Optional
@@ -561,7 +562,17 @@ def generate_malom_puzzle(
     # One-time pre-warm for (3..max_pieces)×(3..max_pieces) hash states.
     prewarm_hash_cache(max_pieces_per_side)
 
-    for _ in range(max_attempts):
+    _rej: dict[str, int] = {
+        "db_miss": 0, "not_win": 0, "dtw_range": 0, "no_sol": 0,
+        "depth_range": 0, "pre_mwm": 0, "verify": 0, "shallow": 0, "post_mwm": 0,
+    }
+    _pid = os.getpid()
+
+    for attempt in range(max_attempts):
+        if attempt > 0 and attempt % 500 == 0:
+            rej_str = "  ".join(f"{k}={v}" for k, v in _rej.items() if v > 0)
+            print(f"[pid={_pid} mid] try={attempt}/{max_attempts}  {rej_str or 'none_rejected_yet'}", flush=True)
+
         ws = random.choice(["W", "B"]) if winning_side == "random" else winning_side
         nW = random.randint(min_pieces_per_side, max_pieces_per_side)
         nB = random.randint(min_pieces_per_side, max_pieces_per_side)
@@ -573,30 +584,37 @@ def generate_malom_puzzle(
 
         result = db.query(board)
         if result is None:
+            _rej["db_miss"] += 1
             continue
 
         # Pre-filter: must be winning for current mover, dtw in rough range
         if result["outcome"] != "W":
+            _rej["not_win"] += 1
             continue
         dtw = result.get("dtw", 0)
         if not (_DTW_PREFILTER_MIN <= dtw <= _DTW_PREFILTER_MAX):
+            _rej["dtw_range"] += 1
             continue
 
         # Greedy solution extraction — fast pre-filter to determine approximate depth
         sol = extract_solution_line(db, board, ws, max_depth=12)
         if sol is None:
+            _rej["no_sol"] += 1
             continue
         line, actual_win_in = sol
 
         if not (4 <= actual_win_in <= 10):
+            _rej["depth_range"] += 1
             continue
         if target_win_in != 0 and actual_win_in != target_win_in:
+            _rej["depth_range"] += 1
             continue
 
         # Quick WDL hardness check (before expensive minimax)
         h_score_pre, winning_mvs_pre, _, _ = score_hardness(db, board, ws)
 
         if len(winning_mvs_pre) > max_winning_moves:
+            _rej["pre_mwm"] += 1
             continue
 
         # ── Minimax verification ─────────────────────────────────────────────
@@ -606,9 +624,11 @@ def generate_malom_puzzle(
         memo: dict = {}
         verified_depth = find_malom_win_depth(db, board, ws, max_depth=target, memo=memo)
         if verified_depth != target:
+            _rej["verify"] += 1
             continue
         # Belt-and-suspenders: confirm no shallower win exists
         if target > 1 and find_malom_win_depth(db, board, ws, max_depth=target - 1, memo=memo) is not None:
+            _rej["shallow"] += 1
             continue
 
         # Verified hardness scoring using the exact budget
@@ -617,6 +637,7 @@ def generate_malom_puzzle(
         )
 
         if len(winning_mvs) > max_winning_moves:
+            _rej["post_mwm"] += 1
             continue
 
         # Rebuild solution line with correct worst-case defender
@@ -654,6 +675,8 @@ def generate_malom_puzzle(
             tags=tags,
         )
 
+    rej_str = "  ".join(f"{k}={v}" for k, v in _rej.items() if v > 0)
+    print(f"[pid={_pid} mid] exhausted {max_attempts} attempts  {rej_str}", flush=True)
     return None
 
 
@@ -702,7 +725,17 @@ def generate_malom_placement_puzzle(
 
     prewarm_hash_cache(9)
 
-    for _ in range(max_attempts):
+    _rej: dict[str, int] = {
+        "db_miss": 0, "not_win": 0, "dtw_range": 0, "mill": 0, "no_sol": 0,
+        "depth_range": 0, "pre_mwm": 0, "verify": 0, "shallow": 0, "post_mwm": 0,
+    }
+    _pid = os.getpid()
+
+    for attempt in range(max_attempts):
+        if attempt > 0 and attempt % 500 == 0:
+            rej_str = "  ".join(f"{k}={v}" for k, v in _rej.items() if v > 0)
+            print(f"[pid={_pid} plc] try={attempt}/{max_attempts}  {rej_str or 'none_rejected_yet'}", flush=True)
+
         ws = random.choice(["W", "B"]) if winning_side == "random" else winning_side
 
         # nW_unplaced in [2, 6] → nW_on in [3, 7] (within prewarm range)
@@ -725,32 +758,40 @@ def generate_malom_placement_puzzle(
         # Reject positions with mills — any mill implies a capture happened,
         # contradicting our no-capture sampling (pieces_placed == pieces_on_board).
         if _has_mill(board, "W") or _has_mill(board, "B"):
+            _rej["mill"] += 1
             continue
 
         result = db.query(board)
         if result is None:
+            _rej["db_miss"] += 1
             continue
 
         if result["outcome"] != "W":
+            _rej["not_win"] += 1
             continue
         dtw = result.get("dtw", 0)
         if not (_PLACEMENT_DTW_MIN <= dtw <= _PLACEMENT_DTW_MAX):
+            _rej["dtw_range"] += 1
             continue
 
         sol = extract_solution_line(db, board, ws, max_depth=12)
         if sol is None:
+            _rej["no_sol"] += 1
             continue
         line, actual_win_in = sol
 
         if not (4 <= actual_win_in <= 10):
+            _rej["depth_range"] += 1
             continue
         if target_win_in != 0 and actual_win_in != target_win_in:
+            _rej["depth_range"] += 1
             continue
 
         # Quick WDL hardness check (before expensive minimax)
         _, winning_mvs_pre, _, _ = score_hardness(db, board, ws)
 
         if len(winning_mvs_pre) > max_winning_moves:
+            _rej["pre_mwm"] += 1
             continue
 
         # ── Minimax verification ─────────────────────────────────────────────
@@ -758,9 +799,11 @@ def generate_malom_placement_puzzle(
         memo: dict = {}
         verified_depth = find_malom_win_depth(db, board, ws, max_depth=target, memo=memo)
         if verified_depth != target:
+            _rej["verify"] += 1
             continue
         # Belt-and-suspenders: confirm no shallower win exists
         if target > 1 and find_malom_win_depth(db, board, ws, max_depth=target - 1, memo=memo) is not None:
+            _rej["shallow"] += 1
             continue
 
         # Verified hardness scoring using the exact budget
@@ -769,6 +812,7 @@ def generate_malom_placement_puzzle(
         )
 
         if len(winning_mvs) > max_winning_moves:
+            _rej["post_mwm"] += 1
             continue
 
         # Rebuild solution line with correct worst-case defender
@@ -803,4 +847,6 @@ def generate_malom_placement_puzzle(
             tags=tags,
         )
 
+    rej_str = "  ".join(f"{k}={v}" for k, v in _rej.items() if v > 0)
+    print(f"[pid={_pid} plc] exhausted {max_attempts} attempts  {rej_str}", flush=True)
     return None

@@ -29,6 +29,14 @@ import sys
 import time
 from pathlib import Path
 
+try:
+    import resource as _resource
+    def _rss_mb() -> int:
+        return _resource.getrusage(_resource.RUSAGE_SELF).ru_maxrss // 1024
+except ImportError:
+    def _rss_mb() -> int:  # type: ignore[misc]
+        return 0
+
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
@@ -70,14 +78,17 @@ def _worker_init(settings_path: str) -> None:
     except Exception:
         _worker_settings = {}
 
-    # Pre-warm Malom hash cache (slow once; free afterwards)
+    pid = os.getpid()
     try:
-        from ai.malom_puzzle_search import prewarm_hash_cache
-        print(f"[worker {os.getpid()}] pre-warming Malom hash states (max_pieces=9)…", flush=True)
-        prewarm_hash_cache(9)
-        print(f"[worker {os.getpid()}] hash cache ready.", flush=True)
+        from ai.malom_puzzle_search import prewarm_hash_cache, _PREWARM_DONE
+        if not _PREWARM_DONE:
+            # spawn start method (non-Linux): must prewarm here (~30s per worker)
+            print(f"[worker pid={pid}] pre-warming Malom hash cache (max_pieces=9)…", flush=True)
+            prewarm_hash_cache(9)
+        rss = _rss_mb()
+        print(f"[worker pid={pid}] ready  RSS={rss} MB", flush=True)
     except Exception as exc:
-        print(f"[worker {os.getpid()}] prewarm failed: {exc}", flush=True)
+        print(f"[worker pid={pid}] init warning: {exc}", flush=True)
 
 
 # ── Worker function ────────────────────────────────────────────────────────────
@@ -90,6 +101,11 @@ def _worker_generate(args: tuple) -> dict | None:
         settings = json.loads(Path(settings_path).read_text()) if Path(settings_path).exists() else {}
     except Exception:
         settings = {}
+
+    pid = os.getpid()
+    side_str = side if side != "random" else "W/B"
+    depth_str = str(depth) if depth else "any"
+    print(f"[pid={pid}] starting {puzzle_type} side={side_str} depth={depth_str}", flush=True)
 
     if puzzle_type == "endgame":
         return _gen_endgame(depth, side, max_winning_moves, min_hardness, attempts, settings)
@@ -283,14 +299,14 @@ def run_generation(
                 if not run_forever and generated >= count:
                     break
 
-                elapsed = time.time() - t0
                 out_file = _write_puzzle_json(out_dir, result)
                 generated += 1
                 total_time = time.time() - t_start
+                rss = _rss_mb()
                 print(
-                    f"{label} FOUND id={result['id']}  goal={result.get('goal', '?')}  "
-                    f"score={result.get('hardness_score', '?')}  time={elapsed:.1f}s | "
-                    f"total={generated} in {total_time/60:.1f} min"
+                    f"{label} FOUND #{generated}  id={result['id']}  "
+                    f"goal={result.get('goal', '?')}  score={result.get('hardness_score', '?')}  "
+                    f"elapsed={total_time/60:.1f} min  RSS={rss} MB"
                 )
                 print(f"  Saved → {out_file.relative_to(_ROOT)}")
                 t0 = time.time()
@@ -464,5 +480,21 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    multiprocessing.set_start_method("spawn", force=True)
+    if sys.platform.startswith("linux"):
+        # Pre-warm the Malom hash cache once in the parent process.
+        # Forked workers inherit the populated _HASH_CACHE via copy-on-write,
+        # so the ~30s prewarm and ~500MB of lookup tables only exist once
+        # in physical memory — not once per worker.
+        print("Pre-warming Malom hash cache in parent (max_pieces=9) — ~30s…", flush=True)
+        t_pw = time.time()
+        try:
+            from ai.malom_puzzle_search import prewarm_hash_cache
+            prewarm_hash_cache(9)
+            print(f"Hash cache ready in {time.time()-t_pw:.1f}s  parent RSS={_rss_mb()} MB", flush=True)
+        except Exception as exc:
+            print(f"Warning: prewarm failed ({exc}); workers will warm individually", flush=True)
+        multiprocessing.set_start_method("fork", force=True)
+    else:
+        # Windows/macOS: spawn is required; workers each prewarm independently
+        multiprocessing.set_start_method("spawn", force=True)
     main()
