@@ -1,0 +1,81 @@
+{
+  "id": "mlm_f181b633",
+  "source_db": "malom",
+  "board_fen": "...BBWWBWB.BW.B..W.WW..B|B|9|9",
+  "side_to_move": "B",
+  "winning_side": "B",
+  "goal": "Black to move and win in 9",
+  "target_win_in": 9,
+  "best_move": "b2-b4xe3",
+  "solution_line": [
+    "b2-b4xe3",
+    "f2-d2",
+    "g4-g7",
+    "d2-d3",
+    "a4-a7",
+    "d5-e5",
+    "a7-a4xe5",
+    "d1-d2",
+    "f4-g4xd2",
+    "a1-d1",
+    "g7-d7",
+    "d1-a1",
+    "a4-a7",
+    "a1-d1",
+    "d7-g7xd1",
+    "b6-d7",
+    "a7-a4xd7"
+  ],
+  "legal_moves": [
+    "g4-g7",
+    "a4-a7",
+    "a4-b4",
+    "d6-f6",
+    "d6-d7",
+    "f4-f6",
+    "b2-d2",
+    "b2-b4xd1",
+    "b2-b4xa1",
+    "b2-b4xb6",
+    "b2-b4xf2",
+    "b2-b4xd5",
+    "b2-b4xe4",
+    "b2-b4xe3",
+    "c4-c3",
+    "c4-c5",
+    "c4-b4"
+  ],
+  "winning_moves": [
+    "b2-b4xe3"
+  ],
+  "losing_moves": [
+    "a4-a7",
+    "a4-b4",
+    "d6-f6",
+    "f4-f6",
+    "b2-d2",
+    "c4-c3",
+    "c4-c5",
+    "c4-b4"
+  ],
+  "drawing_moves": [
+    "g4-g7",
+    "d6-d7",
+    "b2-b4xd1",
+    "b2-b4xa1",
+    "b2-b4xb6",
+    "b2-b4xf2",
+    "b2-b4xd5",
+    "b2-b4xe4"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "midgame",
+    "win-in-9",
+    "unique-move",
+    "bottleneck",
+    "high-branching",
+    "early-game"
+  ],
+  "created_at": "2026-08-06 09:41"
+}

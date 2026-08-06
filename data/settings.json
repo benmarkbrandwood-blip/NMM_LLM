@@ -57,7 +57,7 @@
     "sel-opponent": "ai",
     "sel-human-color": "B",
     "sel-game-personality": "balanced",
-    "sel-difficulty": "5",
+    "sel-difficulty": "6",
     "chk-llm": false,
     "chk-sentinel": false,
     "sel-sentinel-mode": "score_adjust",
@@ -70,7 +70,7 @@
     "rng-value-net-blend": "10",
     "chk-ext-qsearch": true,
     "sel-traj-n": "",
-    "sel-star-square": "inner_square",
+    "sel-star-square": "cardinal",
     "chk-ngram": true,
     "chk-perfect-db": false
   }

@@ -1,0 +1,69 @@
+{
+  "id": "mlm_901d5d4a",
+  "source_db": "malom",
+  "board_fen": "W..BBWW...B....B.WB.B.B.|B|9|9",
+  "side_to_move": "B",
+  "winning_side": "B",
+  "goal": "Black to move and win in 8",
+  "target_win_in": 8,
+  "best_move": "b4-a4",
+  "solution_line": [
+    "b4-a4",
+    "a7-d7",
+    "f6-f4",
+    "d7-a7",
+    "e3-d3",
+    "a7-d7",
+    "e5-e4xd7",
+    "d1-e3",
+    "f4-f2",
+    "a1-f4",
+    "g1-d1",
+    "d5-d2",
+    "a4-a1",
+    "f4-a7",
+    "g4-g1xa7"
+  ],
+  "legal_moves": [
+    "g4-g7",
+    "g4-f4",
+    "f6-d6",
+    "f6-f4",
+    "b4-b2",
+    "b4-b6",
+    "b4-a4",
+    "b4-c4",
+    "e5-e4",
+    "e3-e4",
+    "e3-d3",
+    "c3-d3",
+    "c3-c4"
+  ],
+  "winning_moves": [
+    "b4-a4"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "g4-g7",
+    "g4-f4",
+    "f6-d6",
+    "f6-f4",
+    "b4-b2",
+    "b4-b6",
+    "b4-c4",
+    "e5-e4",
+    "e3-e4",
+    "e3-d3",
+    "c3-d3",
+    "c3-c4"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "midgame",
+    "win-in-8",
+    "unique-move",
+    "bottleneck",
+    "high-branching"
+  ],
+  "created_at": "2026-08-06 10:27"
+}

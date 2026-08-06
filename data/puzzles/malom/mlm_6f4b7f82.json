@@ -1,0 +1,68 @@
+{
+  "id": "mlm_6f4b7f82",
+  "source_db": "malom",
+  "board_fen": "BBWB.W.WBW..W.BBB...W...|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 10",
+  "target_win_in": 10,
+  "best_move": "f2-d2",
+  "solution_line": [
+    "f2-d2",
+    "g4-g1",
+    "e3-d3xg1",
+    "b4-c4",
+    "a4-b4",
+    "a7-a4",
+    "d1-g1",
+    "d7-a7",
+    "g7-d7",
+    "a4-a1",
+    "g1-d1xc4",
+    "a1-a4",
+    "d1-g1",
+    "c5-d5",
+    "g1-d1xd5",
+    "a4-a1",
+    "d3-e3",
+    "a7-a4",
+    "d7-a7"
+  ],
+  "legal_moves": [
+    "d1-g1",
+    "d1-a1",
+    "d1-d2",
+    "a4-a1",
+    "d6-f6",
+    "d6-d5",
+    "f2-f4",
+    "f2-d2",
+    "e3-e4",
+    "e3-d3"
+  ],
+  "winning_moves": [
+    "f2-d2"
+  ],
+  "losing_moves": [
+    "d1-g1",
+    "d1-a1",
+    "a4-a1",
+    "d6-f6",
+    "d6-d5",
+    "f2-f4",
+    "e3-e4",
+    "e3-d3"
+  ],
+  "drawing_moves": [
+    "d1-d2"
+  ],
+  "hardness_score": 9.0,
+  "tags": [
+    "midgame",
+    "win-in-10",
+    "unique-move",
+    "bottleneck",
+    "high-branching"
+  ],
+  "created_at": "2026-08-06 09:58"
+}

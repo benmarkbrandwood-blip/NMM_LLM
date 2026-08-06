@@ -1,0 +1,48 @@
+{
+  "id": "mlm_fc5e5033",
+  "source_db": "malom",
+  "board_fen": "B..WW..B..WWW...B.WWB..B|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 6",
+  "target_win_in": 6,
+  "best_move": "g4-g7",
+  "solution_line": [
+    "g4-g7",
+    "a4-a1",
+    "f4-g4xa7",
+    "a1-d1",
+    "g7-d7",
+    "e3-d3",
+    "g4-f4xd1",
+    "c5-g4",
+    "f6-d6",
+    "g4-a7",
+    "g1-g4xa7"
+  ],
+  "legal_moves": [
+    "g4-g7",
+    "g1-d1",
+    "f6-d6",
+    "f2-d2",
+    "e5-d5"
+  ],
+  "winning_moves": [
+    "g4-g7"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "g1-d1",
+    "f6-d6",
+    "f2-d2",
+    "e5-d5"
+  ],
+  "hardness_score": 7.0,
+  "tags": [
+    "midgame",
+    "win-in-6",
+    "unique-move",
+    "bottleneck"
+  ],
+  "created_at": "2026-08-06 09:45"
+}

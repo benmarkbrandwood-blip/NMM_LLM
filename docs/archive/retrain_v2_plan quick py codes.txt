@@ -1,0 +1,109 @@
+DEVICE=cuda ./scripts/train_sentinel_v2_step0.sh 2>&1 | tee /tmp/sentinel_v2_run.log
+
+.venv/bin/python tools/train_value_net_v2.py
+
+.venv/bin/python tools/train_human_pref_net.py \
+  --db data/human_db.sqlite \
+  --output data/human_pref_net.npz \
+  --patience 10 --batch-size 4096
+
+Step 3 to be done
+
+# Step 4 — build the dataset (needs sentinel v2 + human_pref_net.npz from Steps 0 and 2)
+.venv/bin/python scripts/build_gap_dataset.py \
+  --sentinel-ckpt learned_ai/sentinel/checkpoints/v2/best.pt \
+  --human-pref-ckpt data/human_pref_net.npz \
+  --out data/gap_net_training_v2.npz \
+  --samples-per-category 20000
+
+# Step 5 — train
+.venv/bin/python tools/train_gap_net.py \
+  --data data/gap_net_training_v2.npz \
+  --out  data/gap_net_v2.npz \
+  --epochs 80 --hp-blend 0.3
+
+Step: 6a Sentinel DB correlation
+Status: ✅ new
+Script: .venv/bin/python scripts/eval_sentinel_db.py --checkpoint learned_ai/sentinel/checkpoints/v2/best.pt
+────────────────────────────────────────
+Step: 6b Sentinel game bench
+Status: ✅ existed
+Script: .venv/bin/python tools/bench_sentinel_v2.py
+────────────────────────────────────────
+Step: 6c ValueNet held-out MSE + sign
+Status: ✅ new
+Script: .venv/bin/python scripts/eval_value_net_v2.py
+────────────────────────────────────────
+Step: 6c ValueNet game bench
+Status: ✅ existed
+Script: .venv/bin/python tools/bench_trajectory_value_net.py
+────────────────────────────────────────
+Step: 6d HumanPrefNet top-K + Spearman
+Status: ✅ new
+Script: .venv/bin/python scripts/eval_human_pref_net.py
+────────────────────────────────────────
+Step: 6e GapNet vs human proxy
+Status: ⛔ blocked
+Script: needs Step 3 (HumanPrefAdvisor + humanlike_blend in GameAI)
+
+Human blunder:
+
+.venv/bin/python tools/build_human_db_sha.py --rebuild --games-dir data/human_games --candidate-out data/human_db_candidate.sqlite
+
+# 1. Extract dataset (~90 min against full 2.2M state_keys; adjust --limit-state-keys for smoke)
+.venv/bin/python tools/extract_human_blunder_dataset.py \
+    --db data/human_db_candidate.sqlite \
+    --output-dir data/human_blunder_dataset
+
+# 2. Train HumanBlunderNet
+.venv/bin/python tools/train_human_blunder_net.py \
+    --dataset-dir data/human_blunder_dataset \
+    --output data/human_blunder_net.npz \
+    --epochs 40 --patience 6
+
+# 3. Held-out eval
+.venv/bin/python tools/eval_human_blunder_net.py \
+    --dataset-dir data/human_blunder_dataset \
+    --model data/human_blunder_net.npz \
+    --candidate-db data/human_db_candidate.sqlite \
+    --output data/human_blunder_eval.json
+
+3. Re-train (~11 h, can run overnight):
+.venv/bin/python tools/train_human_move_policy_net.py \
+  --dataset-dir data/human_move_policy_dataset \
+  --output data/human_move_policy_net_v2_candidate.npz \
+  --epochs 200 \
+  --patience 10
+4. Eval (after training completes):
+.venv/bin/python tools/eval_human_move_policy_net.py \
+  --dataset-dir data/human_move_policy_dataset \
+  --model data/human_move_policy_net_v2_candidate.npz \
+  --candidate-db data/human_db_candidate.sqlite \
+  --session-index data/human_move_policy_session_index.npz \
+  --output data/gap_v3_prerequisite_eval.json
+
+-----------------------------------------------------------------------------
+
+1. Run the unit tests first (no DB, no GPU required, ~5 seconds):
+.venv/bin/python -m pytest tests/test_human_move_policy_eval.py::TestStratumECE tests/test_human_move_policy_eval.py::TestDegradeCal -v
+
+2. Run the full test suite including the integration test (~15–30 seconds):
+.venv/bin/python -m pytest tests/test_human_move_policy_eval.py -v
+
+3. Val-set evaluation on the existing v2 candidate model (~2 minutes):
+.venv/bin/python tools/eval_human_move_policy_net.py \
+  --dataset-dir data/human_move_policy_dataset \
+  --model data/human_move_policy_net_v2_candidate.npz \
+  --candidate-db data/human_db_candidate.sqlite \
+  --session-index data/human_move_policy_session_index.npz \
+  --output data/gap_v3_prerequisite_eval.json
+
+4. After reviewing the gates, run the untouched test partition once:
+.venv/bin/python tools/eval_human_move_policy_net.py \
+  --dataset-dir data/human_move_policy_dataset \
+  --model data/human_move_policy_net_v2_candidate.npz \
+  --candidate-db data/human_db_candidate.sqlite \
+  --session-index data/human_move_policy_session_index.npz \
+  --run-test-set \
+  --output data/gap_v3_prerequisite_eval_with_test.json
+

@@ -1,0 +1,62 @@
+{
+  "id": "mlm_ad719923",
+  "source_db": "malom",
+  "board_fen": "WB..W.W.WBB....W.B.B...W|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 5",
+  "target_win_in": 5,
+  "best_move": "a1-d1",
+  "solution_line": [
+    "a1-d1",
+    "d7-g7",
+    "a7-a4xg7",
+    "d6-d7",
+    "a4-a1xd7",
+    "f6-a4",
+    "d1-d2",
+    "a4-a7",
+    "a1-a4xa7"
+  ],
+  "legal_moves": [
+    "a7-a4xf6",
+    "a7-a4xe4",
+    "g1-g4",
+    "g1-d1",
+    "a1-d1",
+    "a1-a4xf6",
+    "a1-a4xe4",
+    "b4-b2",
+    "b4-a4xf6",
+    "b4-a4xe4",
+    "c4-c3",
+    "c4-c5"
+  ],
+  "winning_moves": [
+    "a1-d1"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "a7-a4xf6",
+    "a7-a4xe4",
+    "g1-g4",
+    "g1-d1",
+    "a1-a4xf6",
+    "a1-a4xe4",
+    "b4-b2",
+    "b4-a4xf6",
+    "b4-a4xe4",
+    "c4-c3",
+    "c4-c5"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "midgame",
+    "win-in-5",
+    "unique-move",
+    "bottleneck",
+    "high-branching"
+  ],
+  "created_at": "2026-08-06 09:45",
+  "play_count": 1
+}
