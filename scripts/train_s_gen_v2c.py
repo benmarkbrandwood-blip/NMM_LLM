@@ -4,15 +4,19 @@ Extends train_s_gen_v2b.py with five targeted changes to discourage the
 draw-by-repetition behaviour observed at inference:
 
   1. DRAW_REP_PENALTY (-0.6): repetition draws receive a harsher terminal
-     signal than passive long draws (-0.25), and count as losses in stats.
-  2. REVISIT_PENALTY (-0.05): per-move inline penalty when the learner enters
-     a board position it has already visited in the current game.
-  3. Directional Malom reward: replaced the static W-position reward with a
-     progress signal — reward D/L→W transitions, penalise W→D/L regressions.
-  5. Advancement draw cap tightened: 0.55→0.40 (early) and 0.33→0.22 (L4+),
+     signal than passive long draws (-0.25).  Stored as "D" in SpecialistDB
+     and counted as draws in win/draw statistics (not losses).
+  2. REVISIT_PENALTY (-0.05): per-move inline penalty when the learner moves
+     TO a board position already in the game's position history.  Credit is
+     assigned to the successor state, not the current state.
+  3. Directional Malom reward: compared WDL before and after the learner's
+     move (both as strings from the learner's perspective); penalises W→D/L
+     regressions.  Progress D/L→W cannot fire with an exact minimax table.
+  4. Advancement draw cap tightened: 0.55→0.40 (early) and 0.33→0.22 (L4+),
      preventing draw-heavy policies from cementing level-by-level.
-  6. NOVELTY_BONUS (+0.02): small bonus when the learner visits a position not
-     yet seen in the current game, rewarding forward progress over orbiting.
+  5. NOVELTY_BONUS (+0.02): fires only when escaping an established loop —
+     the learner has been at the current position before AND the chosen
+     successor is new, so the bonus is not awarded on every first-visit step.
 
 All else identical to v2b.
 
@@ -797,9 +801,9 @@ def _retroactive_rescore(trajectory: list[ScaffoldedStep], step_diags: list[Step
 def _outcome_to_history_float(outcome: float) -> float:
     if outcome == WIN_REWARD:
         return 1.0
-    if outcome in (DRAW_SHORT, DRAW_LONG):
-        return 0.5
-    return 0.0
+    if outcome == LOSS_REWARD:
+        return 0.0
+    return 0.5  # all draw variants (DRAW_SHORT, DRAW_LONG, DRAW_REP_PENALTY)
 
 
 _INFRA_REASON_VALUES = frozenset(r.value for r in INFRA_REASONS)
@@ -1033,6 +1037,7 @@ def _rollout(
     # from DRAW_MAX_PLY_TRUNCATED so the plot can separate genuine drawn play
     # from rollouts that simply ran out of the training-time ply budget.
     _pos_counts: dict[str, int] = {}
+    _learner_positions_seen: dict[str, int] = {}   # counts learner-to-move positions only
     _plies_since_capture: int = 0
     _REPETITION_LIMIT = 3       # threefold-repetition draw
     _NO_CAPTURE_LIMIT = 100     # 100 half-plies = 50 moves per side without a capture / mill
@@ -1058,14 +1063,16 @@ def _rollout(
         player = board.turn
 
         if player == learner_color:
-            # v2c: compute revisit/novelty signal from current learner position.
-            # _pos_counts[_current_key] was incremented last time we visited this
-            # position, so count >= 1 means we have been here before this game.
-            _current_key = (
+            # Track how many times the learner has been at this exact position.
+            # Uses a separate dict (not _pos_counts) so opponent-inserted positions
+            # don't corrupt the credit assignment.
+            _curr_key = (
                 f"{learner_color}|"
                 + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
+                + f"|{board.pieces_on_board.get('W', 0)}|{board.pieces_on_board.get('B', 0)}"
             )
-            _revisit_count = _pos_counts.get(_current_key, 0)
+            _curr_visit_count = _learner_positions_seen.get(_curr_key, 0)
+            _learner_positions_seen[_curr_key] = _curr_visit_count + 1
 
             # v4: full-legal-moves scoring via encode_position_with_lookahead.
             learner_boards.append(board)
@@ -1153,10 +1160,32 @@ def _rollout(
                                                           value_net=value_net,
                                                           lookahead_advisor=None)
 
+            # Successor-state key for revisit/novelty check (board_after.turn == opp_color).
+            # Check _pos_counts before the bottom-of-loop increment so first-time
+            # occurrences read 0.
+            _succ_key = (
+                f"{board_after.turn}|"
+                + "".join(board_after.positions.get(p, ".") or "." for p in POSITIONS)
+                + f"|{board_after.pieces_on_board.get('W', 0)}|{board_after.pieces_on_board.get('B', 0)}"
+            )
+            _succ_count = _pos_counts.get(_succ_key, 0)
+
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
-            # v2c: query both before and after WDL for directional Malom reward.
-            malom_before = malom_db.query(board)            if malom_db is not None else None
-            malom_q      = malom_db.query_move_quality(board, move) if malom_db is not None else None
+            # Directional Malom: compare WDL before and after from the learner's perspective.
+            # query(board) returns WDL for the side to move (learner); query(board_after)
+            # returns WDL for the opponent, so flip it to get learner's post-move WDL.
+            # query_move_quality() returns 0/-1/-2 (numeric downgrade) — wrong type for
+            # the string comparisons in _compute_per_move_reward, so we derive strings instead.
+            malom_before = malom_db.query(board)      if malom_db is not None else None
+            _malom_after_opp = malom_db.query(board_after) if malom_db is not None else None
+            _WDL_FLIP = {"W": "L", "L": "W", "D": "D"}
+            malom_q = _WDL_FLIP.get(_malom_after_opp) if _malom_after_opp is not None else None
+            # Numeric downgrade for diagnostics only (before_rank − after_rank).
+            _WDL_RANK = {"W": 1.0, "D": 0.0, "L": -1.0}
+            malom_q_numeric: Optional[float] = (
+                _WDL_RANK.get(malom_q, 0.0) - _WDL_RANK.get(malom_before, 0.0)
+                if (malom_before is not None and malom_q is not None) else None
+            )
             reward, rb = _compute_per_move_reward(
                 enc, chosen_idx, enc_after,
                 board_phase=board.phase,
@@ -1167,12 +1196,14 @@ def _rollout(
                 malom_before=malom_before,
             )
 
-            # v2c: inline revisit penalty and novelty bonus.
-            if _revisit_count >= 1:
+            # Revisit fires when the learner moves TO a state already in _pos_counts.
+            # Novelty bonus is restricted to escape-from-loop: learner has been at
+            # the current position before (_curr_visit_count >= 1) but moves somewhere new.
+            if _succ_count >= 1:
                 rb.revisit = REVISIT_PENALTY
                 reward    += REVISIT_PENALTY
                 rb.total  += REVISIT_PENALTY
-            elif _revisit_count == 0:
+            elif _curr_visit_count >= 1 and _succ_count == 0:
                 rb.novelty = NOVELTY_BONUS
                 reward    += NOVELTY_BONUS
                 rb.total  += NOVELTY_BONUS
@@ -1246,7 +1277,7 @@ def _rollout(
                 vn_after=vn_after,
                 vn_delta=vn_after - vn_before,
                 malom_chosen_wdl="n/a",
-                malom_chosen_dtm=malom_q,
+                malom_chosen_dtm=malom_q_numeric,
                 was_top1_policy=was_top1_policy,
                 was_top1_heuristic=heuristic_top1,
             ))
@@ -1293,7 +1324,11 @@ def _rollout(
         # A rules draw takes precedence over max_ply truncation because it
         # represents a genuine outcome the game engine would accept.
         try:
-            _pos_key = f"{board.turn}|" + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
+            _pos_key = (
+                f"{board.turn}|"
+                + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
+                + f"|{board.pieces_on_board.get('W', 0)}|{board.pieces_on_board.get('B', 0)}"
+            )
         except Exception:
             _pos_key = None
         if _pos_key is not None:
@@ -1326,7 +1361,7 @@ def _rollout(
     _is_infra_final = termination_reason.value in _INFRA_REASON_VALUES
     if specialist_db is not None and learner_boards and not _is_infra_final:
         try:
-            _res = "W" if outcome == WIN_REWARD else ("D" if outcome in (DRAW_SHORT, DRAW_LONG) else "L")
+            _res = "W" if outcome == WIN_REWARD else ("L" if outcome == LOSS_REWARD else "D")
             specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "gen", learner_color=learner_color)
         except Exception:
             pass
