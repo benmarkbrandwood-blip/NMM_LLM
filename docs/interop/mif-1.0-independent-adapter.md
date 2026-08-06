@@ -6,17 +6,17 @@ Status: implemented against the frozen candidate wire contract; no MIF Suite
 ## Frozen source identity
 
 The implementation is locked to MIF commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The formal frozen inputs and
+`f37ddfeb5fb8479991fa38eeb03c797bef8ae408`. The formal frozen inputs and
 additional comparison inputs at that commit have these raw SHA-256 identities:
 
 | Input | Role | SHA-256 |
 |---|---|---|
 | `mif-1.0.md` | formal English specification | `330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995` |
 | `docs/zh-CN/mif-1.0.md` | formal Chinese specification | `9cc06abb57425e2bc2e26432b6da53abe503e9b5415ea0b4f854f19f68722cc1` |
-| `artifacts/mif-1.0/index.json` | formal artifact index | `176db4d3701af8aa66c1691e87f99fddb71bf484f07ce9d9380e79e8fa62e10b` |
-| `artifacts/mif-1.0/corpus/executable/reference-cases.json` | formal executable corpus | `e3af2bd5e2d88774a8ce7a4344702c0878ddffba8b77fa0740f3d3104a1258dd` |
+| `artifacts/mif-1.0/index.json` | formal artifact index | `3849a70897829d6d994c790b64e63484469483a940887fe828a1a0d421d78e90` |
+| `artifacts/mif-1.0/corpus/executable/reference-cases.json` | formal executable corpus | `a48c50352caebce30deb1de11f8f73dbc4540ee538651c3a139d9bcb166ba983` |
 | `interop/adapter-protocol-v1.md` | additional process protocol | `a59e5e5af3e948f6c7cac6a39a490c6eae6338151741b6c7fcdde5c88d991e2d` |
-| `interop/cases/smoke-v1.json` | additional smoke comparison corpus | `6da3ba24ed009fb43a62b31718038930f99bc1b92f37d1248c758adbe7c7db10` |
+| `interop/cases/smoke-v1.json` | additional smoke comparison corpus | `a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53` |
 
 The adapter has no runtime dependency on the MIF repository. The checkout is
 needed only by the external comparison harness and its test cases.
@@ -115,13 +115,16 @@ every operation path governed by the published resource limits.
 Reference-derived constants were obtained through independent process calls,
 not by importing the reference runner.
 
-The official `smoke-v1.json` comparison passes all 16 cases across the MIF
-reference process at the frozen commit above, NMM_LLM commit
+The previous M2 evidence compared all 16 cases at MIF commit
+`83e4b758f624f3059c7ba289d4d4429eed0a710a`, NMM_LLM commit
 `7b4bde40e53bfef012277840ba6e9e43e7b73fe3`, and Sanmill commit
 `54623a6c5d66ffcbfb6e61ed295a20885ed7920d`. Both adapter commits are
-published on their respective remote branches. This is durable M2 comparison
-evidence, but it is not an M3 freeze or a three-project conformance decision:
-the external MIF reference/harness still has the known RFC 8785 UTF-16 key
-ordering defect. A full 1,138-test NMM_LLM run was also attempted without
-skips, but reached the 15-minute command limit at roughly 15% with no reported
-failure. It must not be described as a complete repository-suite pass.
+published on their respective remote branches.
+
+The current binding advances to the MIF commit and hashes recorded above,
+which include the corrected RFC 8785 reference implementation and a 17th
+smoke case. A clean-commit 17-case comparison must be recorded before this
+new binding is treated as durable cross-project evidence. A full 1,138-test
+NMM_LLM run was also attempted without skips, but reached the 15-minute
+command limit at roughly 15% with no reported failure. It must not be
+described as a complete repository-suite pass.

@@ -1026,7 +1026,7 @@ database growth.
 ## MIF 1.0 Independent Interoperability Adapter
 
 The NMM_LLM adapter is locked to MIF commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a` and implements all six
+`f37ddfeb5fb8479991fa38eeb03c797bef8ae408` and implements all six
 `MIF-INTEROP/1` operations: capabilities, MFEN/MPK canonicalization, finite
 rules execution, checkpoint-verifying replay, full-state transform, and
 complete logical-turn projection. It is intentionally independent of the MIF
@@ -1041,13 +1041,13 @@ mechanisms, semantic-state extensions, mill effects, or stalemate policies
 with the legacy NMM_LLM board engine. No MIF Suite has been published, so this
 is not a suite-conformance claim.
 
-The published M2 verification identities are NMM_LLM commit
+The previous published M2 verification identities are NMM_LLM commit
 `7b4bde40e53bfef012277840ba6e9e43e7b73fe3` on `origin/dev` and Sanmill
 commit `54623a6c5d66ffcbfb6e61ed295a20885ed7920d` on `origin/master`. The
 NMM_LLM focused run reports 45 tests passing, the Sanmill focused run reports
-14, and the official 16-case smoke corpus compares equal across both published
-adapters and the MIF reference process at frozen commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The exact pin, source hashes,
+14, and the historical 16-case smoke corpus compares equal across both
+published adapters and the MIF reference process at commit
+`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The exact current pin, hashes,
 scope and host-local command-array generator are in
 [`docs/interop/mif-1.0-independent-adapter.md`](../interop/mif-1.0-independent-adapter.md).
 The local command generator now requires the exact MIF commit, a clean
@@ -1056,9 +1056,11 @@ execution pins. Published request, event and repetition limits are enforced
 across every applicable operation and return structured resource diagnostics
 rather than truncation or a silent process exit.
 
-The NMM_LLM adapter meets the M2 independent-adapter acceptance boundary.
-The external MIF reference-runner JCS defect still prevents a three-project
-baseline or M3 freeze.
+The NMM_LLM adapter meets the M2 independent-adapter acceptance boundary. MIF
+commit `f37ddfeb5fb8479991fa38eeb03c797bef8ae408` closes the external JCS defect
+and adds a 17th smoke case. The current pin still requires a clean-commit
+17-case comparison record before it becomes durable evidence for the next
+cross-project freeze.
 
 An additional 1,138-test repository run was attempted without skips, but the
 15-minute command limit stopped it at roughly 15% with no failure reported.
