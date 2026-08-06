@@ -588,6 +588,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("btn-new-game").addEventListener("click", startNewGame);
 
+  // Paste-from-Explorer controls
+  $("btn-paste-toggle").addEventListener("click", () => {
+    $("paste-panel").hidden  = false;
+    $("setup-panel").hidden  = true;
+    $("paste-error").textContent = "";
+    $("paste-input").value   = "";
+  });
+  $("btn-paste-cancel").addEventListener("click", () => { $("paste-panel").hidden = true; });
+  $("btn-paste-load").addEventListener("click", loadFromPaste);
+
   // Setup position controls
   $("btn-setup-toggle").addEventListener("click", enterSetupMode);
   $("btn-setup-cancel").addEventListener("click", exitSetupMode);
@@ -994,6 +1004,51 @@ function startFromExplorerFen(fen) {
   ws.onclose   = () => { if (phase !== "game_over") setStatus("Disconnected."); };
 }
 
+async function loadFromPaste() {
+  const raw   = ($("paste-input").value || "").trim();
+  const errEl = $("paste-error");
+  errEl.textContent = "";
+
+  if (!raw) { errEl.textContent = "Paste a game first."; return; }
+
+  // Parse: first line "FEN: <fen>", rest are move lines "1. Wa4 Bd4" or "1. a4 d4"
+  const lines    = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const fenLine  = lines.find(l => l.startsWith("FEN:"));
+  const startFen = fenLine ? fenLine.replace(/^FEN:\s*/, "").trim() : "";
+
+  // Collect all move tokens (strip move numbers like "1." and leading W/B color labels)
+  const moveLines = lines.filter(l => /^\d+\./.test(l));
+  const moves = [];
+  for (const line of moveLines) {
+    const tokens = line.replace(/^\d+\.\s*/, "").split(/\s+/);
+    for (const t of tokens) {
+      if (!t || t === "—") continue;
+      moves.push(t);
+    }
+  }
+
+  if (!startFen && moves.length === 0) {
+    errEl.textContent = "Could not parse any FEN or moves from the pasted text.";
+    return;
+  }
+
+  $("btn-paste-load").disabled = true;
+  try {
+    const params = new URLSearchParams();
+    if (moves.length > 0) params.set("moves",     moves.join(","));
+    if (startFen)          params.set("start_fen", startFen);
+    const res  = await fetch("/api/explorer/fen_after_moves?" + params.toString());
+    const data = await res.json();
+    if (data.error) { errEl.textContent = "Error: " + data.error; return; }
+    $("paste-panel").hidden = true;
+    startFromExplorerFen(data.fen);
+  } catch (e) {
+    errEl.textContent = "Network error: " + e.message;
+  } finally {
+    $("btn-paste-load").disabled = false;
+  }
+}
+
 function renderIdle() {
   setStatus("Configure a game and click New Game.");
   setTurnBadge(null, null);
@@ -1238,6 +1293,7 @@ function enterSetupMode() {
     b.classList.toggle("setup-swatch-active", b.dataset.piece === ""));
 
   $("settings-panel").hidden = true;
+  $("paste-panel").hidden    = true;
   $("setup-panel").hidden    = false;
   $("toggle-settings").classList.remove("btn-active");
   $("toggle-setup").classList.add("btn-active");

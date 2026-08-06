@@ -2219,13 +2219,16 @@ async def explorer_move(fen: str, move: str):
 
 
 @app.get("/api/explorer/fen_after_moves")
-async def explorer_fen_after_moves(moves: str = ""):
-    """Apply a comma-separated sequence of moves from the starting position. Returns FEN."""
+async def explorer_fen_after_moves(moves: str = "", start_fen: str = ""):
+    """Apply a comma-separated sequence of moves, optionally from a custom starting FEN."""
     from fastapi.responses import JSONResponse
     from ai.human_db import _apply_notation
     from game.board import BoardState
     try:
-        board = BoardState.new_game()
+        if start_fen.strip():
+            board = BoardState.from_fen_string(start_fen.strip())
+        else:
+            board = BoardState.new_game()
         if moves.strip():
             for move_str in moves.split(","):
                 move_str = move_str.strip()

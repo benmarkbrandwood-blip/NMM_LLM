@@ -534,6 +534,7 @@
 
         <button id="btn-new-game">New Game</button>
         <button id="btn-setup-toggle" class="btn-small" style="margin-top:6px;width:100%">&#x270E; Setup Position…</button>
+        <button id="btn-paste-toggle" class="btn-small" style="margin-top:4px;width:100%">&#128203; Paste from Explorer…</button>
       </div>
 
       <!-- Position Setup panel (shown when setup mode is active) -->
@@ -585,6 +586,20 @@
         <button id="btn-setup-start" disabled>&#x25B6; Start from Here</button>
         <button id="btn-setup-clear" class="btn-small" style="margin-top:6px;width:100%">Clear Board</button>
         <button id="btn-setup-cancel" class="btn-small" style="margin-top:4px;width:100%">Cancel</button>
+      </div>
+
+      <!-- Paste-from-Explorer panel -->
+      <div class="panel-box" id="paste-panel" hidden>
+        <h3>&#128203; Paste from Explorer</h3>
+        <p style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px;line-height:1.4">
+          Copy a game in the Explorer and paste it here to replay from the final position.
+        </p>
+        <textarea id="paste-input" rows="6"
+          placeholder="FEN: ...&#10;1. a4 d4&#10;2. ..."
+          style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:0.4rem;border-radius:4px;font-size:.74rem;font-family:monospace;resize:vertical"></textarea>
+        <div id="paste-error" style="font-size:.76rem;color:var(--red);min-height:1.1em;margin:4px 0"></div>
+        <button id="btn-paste-load" style="margin-top:2px">&#x25B6; Load &amp; Play</button>
+        <button id="btn-paste-cancel" class="btn-small" style="margin-top:6px;width:100%">Cancel</button>
       </div>
 
       <!-- Tournament panel (toggled via header button) -->

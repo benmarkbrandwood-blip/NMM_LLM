@@ -1205,7 +1205,84 @@ function updatePanel(data) {
 // ── Navigation ────────────────────────────────────────────────────────────────
 
 const history = [];
-let   currentData = null;
+let   currentData  = null;
+let   _playedMoves = [];   // { notation, color } records for the history panel
+let   _startingFen = null; // FEN at the start of the current exploration session
+
+// ── Played-moves panel ────────────────────────────────────────────────────────
+
+const _pmPanel    = document.getElementById('pm-panel');
+const _pmBody     = document.getElementById('pm-body');
+const _pmCopyBtn  = document.getElementById('pm-copy-btn');
+const _pmEmpty    = document.getElementById('pm-empty');
+
+function _renderPlayedMoves() {
+  _pmBody.innerHTML = '';
+  if (_playedMoves.length === 0) {
+    _pmBody.appendChild(Object.assign(document.createElement('div'), { id: 'pm-empty', textContent: 'No moves yet.' }));
+    return;
+  }
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'pm-row pm-row-hdr';
+  hdr.innerHTML = '<span class="pm-num">#</span><span class="pm-w">⬜</span><span class="pm-b">⬛</span>';
+  _pmBody.appendChild(hdr);
+
+  // Pair into rows
+  const rows = [];
+  let i = 0;
+  while (i < _playedMoves.length) {
+    const mv = _playedMoves[i];
+    if (mv.color === 'W') {
+      const next = _playedMoves[i + 1];
+      rows.push([mv.notation, next?.color === 'B' ? next.notation : '']);
+      i += (next?.color === 'B') ? 2 : 1;
+    } else {
+      rows.push(['—', mv.notation]);
+      i += 1;
+    }
+  }
+
+  rows.forEach((pair, idx) => {
+    const row = document.createElement('div');
+    row.className = 'pm-row';
+    row.innerHTML =
+      `<span class="pm-num">${idx + 1}.</span>` +
+      `<span class="pm-w">${pair[0] || ''}</span>` +
+      `<span class="pm-b">${pair[1] || ''}</span>`;
+    _pmBody.appendChild(row);
+  });
+  _pmBody.scrollTop = _pmBody.scrollHeight;
+}
+
+function _copyPlayedMoves() {
+  if (_playedMoves.length === 0) return;
+  const startFen = _startingFen || '........................|W|0|0';
+  const rows = [];
+  let i = 0;
+  while (i < _playedMoves.length) {
+    const mv = _playedMoves[i];
+    if (mv.color === 'W') {
+      const next = _playedMoves[i + 1];
+      rows.push([mv.notation, next?.color === 'B' ? next.notation : '']);
+      i += (next?.color === 'B') ? 2 : 1;
+    } else {
+      rows.push(['—', mv.notation]);
+      i += 1;
+    }
+  }
+  const moveText = rows.map((pair, idx) => `${idx + 1}. ${pair[0]}${pair[1] ? ' ' + pair[1] : ''}`).join('\n');
+  const text = `FEN: ${startFen}\n${moveText}`;
+  navigator.clipboard.writeText(text).then(() => {
+    const prev = _pmCopyBtn.textContent;
+    _pmCopyBtn.textContent = 'Copied!';
+    setTimeout(() => { _pmCopyBtn.textContent = prev; }, 1500);
+  }).catch(() => {
+    prompt('Copy this game:', text);
+  });
+}
+
+if (_pmCopyBtn) _pmCopyBtn.addEventListener('click', _copyPlayedMoves);
 
 async function loadPosition(fen) {
   loading.style.display = 'flex';
@@ -1255,8 +1332,12 @@ async function applyMove(notation) {
     document.getElementById('btn-back').disabled = false;
     return;
   }
+  // Record starting FEN on first move
+  if (_playedMoves.length === 0) _startingFen = currentData.fen;
+  _playedMoves.push({ notation, color: currentTurn });
   history.push(currentData.fen);
   await loadPosition(await fenAfterMove(currentData.fen, notation));
+  _renderPlayedMoves();
 }
 
 async function fenAfterMove(fen, move) {
@@ -1273,11 +1354,17 @@ document.getElementById('btn-back').addEventListener('click', () => {
     return;
   }
   if (history.length === 0) return;
+  _playedMoves.pop();
+  if (_playedMoves.length === 0) _startingFen = null;
+  _renderPlayedMoves();
   loadPosition(history.pop());
 });
 
 document.getElementById('btn-reset').addEventListener('click', () => {
   history.length = 0;
+  _playedMoves = [];
+  _startingFen = null;
+  _renderPlayedMoves();
   if (_otToggle && _otToggle.checked) {
     _otPath = [];
     _otRender();
@@ -1531,13 +1618,17 @@ function _otApplyCameraPan(open) {
 
 _otToggle.addEventListener('change', () => {
   if (_otToggle.checked) {
+    // Opening tree ON — hide played-moves panel, clear history
+    if (_pmPanel) _pmPanel.style.display = 'none';
+    _playedMoves = [];
+    _startingFen = null;
     _otLeftPanel.style.display = 'flex';
     _otApplyCameraPan(true);
-    if (!_otLoaded) _otLoad(); // _otLoad uses syncBoard=false → keeps current board
-    // No sync here — current board position carries over into tree mode
+    if (!_otLoaded) _otLoad();
   } else {
     _otLeftPanel.style.display = 'none';
     _otApplyCameraPan(false);
+    if (_pmPanel) _pmPanel.style.display = 'flex';
   }
 });
 
