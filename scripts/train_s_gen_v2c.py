@@ -1017,11 +1017,22 @@ def _rollout(
     # §D — rules-based draw detection (repetition + N-ply no-capture).  Distinct
     # from DRAW_MAX_PLY_TRUNCATED so the plot can separate genuine drawn play
     # from rollouts that simply ran out of the training-time ply budget.
+    #
+    # NOTE — reconciling with game_engine.py's repetition check is out of scope.
+    # GameEngine uses an 8-half-move oscillation check on a move log (both players
+    # must oscillate simultaneously over exactly two reversals), and it only applies
+    # after all placements are complete.  Adopting that exact rule here would require
+    # either porting the oscillation logic and its edge-case semantics, or running a
+    # full GameEngine instance inside the rollout (a structural change that would
+    # couple the trainer to the UI engine's stateful object).  The position-count
+    # approach here is a reasonable approximation; the two methods agree on the vast
+    # majority of genuine two-cycle repetitions.
     _pos_counts: dict[str, int] = {}
     _learner_positions_seen: dict[str, int] = {}   # counts learner-to-move positions only
     _plies_since_capture: int = 0
     _REPETITION_LIMIT = 3       # threefold-repetition draw
     _NO_CAPTURE_LIMIT = 100     # 100 half-plies = 50 moves per side without a capture / mill
+    _WDL_FLIP_REP = {"W": "L", "L": "W", "D": "D"}  # flip opponent WDL to learner perspective
 
     while ply < max_ply:
         if ply == retry_ply:
@@ -1315,8 +1326,24 @@ def _rollout(
         if _pos_key is not None:
             _pos_counts[_pos_key] = _pos_counts.get(_pos_key, 0) + 1
             if _pos_counts[_pos_key] >= _REPETITION_LIMIT:
-                # v2c: deliberate repetition draws penalised harder than passive draws.
-                outcome = DRAW_REP_PENALTY
+                # Value-conditioned repetition penalty: repeating from a lost position
+                # can be the correct saving play, so use DRAW_SHORT there.  Only apply
+                # DRAW_REP_PENALTY when Malom confirms the learner had a won or drawn
+                # alternative.  If Malom is unavailable, fall back to DRAW_REP_PENALTY.
+                _rep_outcome = DRAW_REP_PENALTY
+                if malom_db is not None:
+                    try:
+                        _wdl_stm = malom_db.query(board)   # WDL for side to move
+                        if _wdl_stm is not None:
+                            _learner_wdl = (
+                                _wdl_stm if board.turn == learner_color
+                                else _WDL_FLIP_REP.get(_wdl_stm)
+                            )
+                            if _learner_wdl == "L":
+                                _rep_outcome = DRAW_SHORT   # saving draw — no harsh penalty
+                    except Exception:
+                        pass
+                outcome = _rep_outcome
                 termination_reason = TerminationReason.DRAW_REPETITION
                 done = True
                 ply += 1
