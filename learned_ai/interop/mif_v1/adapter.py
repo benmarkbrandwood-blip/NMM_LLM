@@ -205,6 +205,7 @@ class MifInteropAdapter:
                 "replay",
                 "transform",
                 "project-logical-turns",
+                "project-legal-actions",
             }:
                 fail("unsupported", "unsupported-operation", "unknown operation")
             if not isinstance(request["payload"], Mapping):
@@ -298,6 +299,10 @@ class MifInteropAdapter:
             from .transform import transform_payload
 
             return transform_payload(payload)
-        from .turns import project_logical_turns
+        if operation == "project-logical-turns":
+            from .turns import project_logical_turns
 
-        return project_logical_turns(payload)
+            return project_logical_turns(payload)
+        from .legal_actions import project_legal_actions
+
+        return project_legal_actions(payload)

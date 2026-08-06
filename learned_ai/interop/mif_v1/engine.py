@@ -523,7 +523,11 @@ class FiniteRulesExecutor:
             return False
         live = [POINTS[index] for index, piece in enumerate(self.state.board) if piece == piece_for(player)]
         flying = self.manifest.manifest["flying"]
-        if flying["enabled"] and len(live) <= flying["maximumLive"]:
+        if (
+            self.state.phase == "m"
+            and flying["enabled"]
+            and len(live) <= flying["maximumLive"]
+        ):
             return bool(live)
         return any(self._is_adjacent(source, destination) for source in live for destination in empty)
 
@@ -744,7 +748,11 @@ class FiniteRulesExecutor:
             fail("unreachable", "illegal-move", "source or destination is illegal", event_seq=event["seq"])
         live = self.state.live_count(actor)
         flying = self.manifest.manifest["flying"]
-        may_fly = flying["enabled"] and live <= flying["maximumLive"]
+        may_fly = (
+            self.state.phase == "m"
+            and flying["enabled"]
+            and live <= flying["maximumLive"]
+        )
         if not may_fly and not self._is_adjacent(source, destination):
             fail("unreachable", "illegal-move", "non-adjacent movement is not legal", event_seq=event["seq"])
         self._expire_claim_right()
