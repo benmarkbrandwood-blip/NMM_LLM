@@ -21,7 +21,7 @@ def _fake_repositories(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_generator_pins_formal_and_execution_source_identities() -> None:
-    assert commands.MIF_COMMIT == "0693353fe0821dcbbf547cc1eb9b679dcf2f90b8"
+    assert commands.MIF_COMMIT == "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978"
     assert commands.MIF_PINNED_FILES == {
         "mif-1.0.md": (
             "330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995"
@@ -30,10 +30,10 @@ def test_generator_pins_formal_and_execution_source_identities() -> None:
             "9cc06abb57425e2bc2e26432b6da53abe503e9b5415ea0b4f854f19f68722cc1"
         ),
         "artifacts/mif-1.0/index.json": (
-            "2bd247cd7e27ff4b0e142d8a0b2d6dececd619c882bb67f0be11bf763a794895"
+            "5acbb714bed77e24eaac72fa5f24d2e54d1e17aaf568a8b60718c840281a6541"
         ),
         "artifacts/mif-1.0/corpus/executable/reference-cases.json": (
-            "a48c50352caebce30deb1de11f8f73dbc4540ee538651c3a139d9bcb166ba983"
+            "350b7ff02772e820a57431e11c4e2f15a874d0779fb6e7afb01e9b16f6992741"
         ),
         "interop/adapter-protocol-v1.md": (
             "253c1d201ea1db625e0c534da445ca4ecaa0b07597dfc7dbf59fbd6adf89874f"
@@ -42,7 +42,7 @@ def test_generator_pins_formal_and_execution_source_identities() -> None:
             "a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53"
         ),
         "interop/cases/deterministic-v1.json": (
-            "c2d7017b2a8583914aff1eeea38bc02b078814ca11346c484e0a2b38b5e94f0c"
+            "d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82"
         ),
     }
 
