@@ -48,8 +48,12 @@
   #setup-error { color: #f44336; font-size: 0.82em; min-height: 1.1em; }
   #setup-counts { color: #aaa; font-size: 0.85em; }
   .setup-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-  .btn-save { background: #3a5a2e; border-color: #5a9a4e; }
-  .btn-save:hover { background: #4a6a3e; }
+  .btn-save   { background: #3a5a2e; border-color: #5a9a4e; }
+  .btn-save:hover   { background: #4a6a3e; }
+  .btn-play   { background: #1a5a4a; border-color: #2a9a7a; }
+  .btn-play:hover   { background: #2a6a5a; }
+  .btn-delete { background: #5a2a2a; border-color: #9a4a4a; }
+  .btn-delete:hover { background: #6a3a3a; }
 
   /* ── Play area ── */
   .goal { font-size: 1.3em; color: #ffe080; margin: 16px 0 8px; font-weight: bold; }
@@ -233,6 +237,8 @@
       <button class="reveal-btn" onclick="window._revealSolution()">🔍 Show solution</button>
       <button class="btn-small" onclick="window._resetPuzzle()">↺ Try again</button>
       <button class="btn-small" onclick="window._openExplorer()">🔭 Explorer</button>
+      <button class="btn-play btn-small" onclick="window._playPuzzle()">▶ Play</button>
+      <button class="btn-delete btn-small" onclick="window._deletePuzzle()">🗑 Delete</button>
     </div>
     <div id="tags" class="tags"></div>
     <p id="alt-note" class="alt-note" style="display:none">
@@ -849,6 +855,78 @@ window._showHint = function() {
 window._revealSolution = function() {
   if (!puzzle) return;
   setStatus('Solution: ' + formatSolutionLine(puzzle.solution_line, puzzle.winning_side), 'info');
+};
+
+// Apply a solution-line notation string to a posMap copy.
+// moverColor is the color of the side making this move ('W' or 'B').
+function applyNotationToMap(pm, notation, moverColor) {
+  const m = { ...pm };
+  let match;
+  // movement + capture: e4-f4xg4
+  match = notation.match(/^([a-g][1-7])-([a-g][1-7])x([a-g][1-7])$/);
+  if (match) { m[match[2]] = m[match[1]]; m[match[1]] = null; m[match[3]] = null; return m; }
+  // movement only: e4-f4
+  match = notation.match(/^([a-g][1-7])-([a-g][1-7])$/);
+  if (match) { m[match[2]] = m[match[1]]; m[match[1]] = null; return m; }
+  // placement + capture: e4xg4
+  match = notation.match(/^([a-g][1-7])x([a-g][1-7])$/);
+  if (match) { m[match[1]] = moverColor; m[match[2]] = null; return m; }
+  // placement only: e4
+  match = notation.match(/^([a-g][1-7])$/);
+  if (match) { m[match[1]] = moverColor; return m; }
+  return m;
+}
+
+window._playPuzzle = async function() {
+  if (!puzzle || !puzzle.solution_line || !puzzle.solution_line.length) return;
+  const playId = puzzle.id;  // used to abort if a new puzzle is loaded mid-play
+  const ws  = puzzle.winning_side;
+  const opp = ws === 'W' ? 'B' : 'W';
+
+  let pm = parseFen(puzzle.board_fen);
+  board.render({ board: pm, phase: 'move', is_human_turn: false,
+                 legal_sources: [], legal_dests: [] });
+  setStatus('▶ Playing solution…', 'info');
+  await new Promise(r => setTimeout(r, 800));
+
+  for (let i = 0; i < puzzle.solution_line.length; i++) {
+    if (!puzzle || puzzle.id !== playId) return;
+    const moverColor = (i % 2 === 0) ? ws : opp;
+    const notation   = puzzle.solution_line[i];
+    pm = applyNotationToMap(pm, notation, moverColor);
+    board.render({ board: pm, phase: 'move', is_human_turn: false,
+                   legal_sources: [], legal_dests: [] });
+    setStatus(`▶ ${moverColor}${notation}`, 'info');
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  if (!puzzle || puzzle.id !== playId) return;
+  board.flashMills(pm, ws);
+  setStatus('✓ Solution complete.', 'ok');
+};
+
+window._deletePuzzle = async function() {
+  if (!puzzle) return;
+  const pid = puzzle.id;
+  try {
+    const r = await fetch(`/api/puzzles/${encodeURIComponent(pid)}`, { method: 'DELETE' });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setStatus('Delete failed: ' + (d.detail || r.status), 'fail');
+      return;
+    }
+    puzzle     = null;
+    currentFen = null;
+    posMap     = {};
+    movesDone  = [];
+    document.getElementById('goal-label').style.display = 'none';
+    document.getElementById('btn-area').style.display   = 'none';
+    board.render({ board: posMap, phase: 'move', is_human_turn: false,
+                   legal_sources: [], legal_dests: [] });
+    setStatus(`Deleted ${pid}. Click "New puzzle" to load another.`, 'info');
+  } catch (e) {
+    setStatus('Delete error: ' + e.message, 'fail');
+  }
 };
 
 window._openExplorer = function() {

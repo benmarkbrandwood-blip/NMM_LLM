@@ -1443,6 +1443,29 @@ async def api_puzzle_random(
     return d
 
 
+@app.delete("/api/puzzles/{puzzle_id}")
+async def api_puzzle_delete(puzzle_id: str):
+    """Delete a cached puzzle JSON by ID (egdb_*, mlm_*, plc_*)."""
+    import re
+    from fastapi import HTTPException
+    if not re.fullmatch(r"[a-z]+_[0-9a-f]+", puzzle_id):
+        raise HTTPException(400, "Invalid puzzle ID")
+    _PREFIX_TO_DIR = {
+        "egdb": _ROOT / "data" / "puzzles" / "endgame",
+        "mlm":  _ROOT / "data" / "puzzles" / "malom",
+        "plc":  _ROOT / "data" / "puzzles" / "placement",
+    }
+    prefix = puzzle_id.split("_")[0]
+    puzzle_dir = _PREFIX_TO_DIR.get(prefix)
+    if puzzle_dir is None:
+        raise HTTPException(400, f"Unknown puzzle ID prefix: {prefix!r}")
+    puzzle_file = puzzle_dir / f"{puzzle_id}.json"
+    if not puzzle_file.exists():
+        raise HTTPException(404, f"Puzzle not found: {puzzle_id}")
+    puzzle_file.unlink()
+    return {"deleted": puzzle_id}
+
+
 @app.get("/api/puzzles/validate")
 async def api_puzzle_validate(fen: str, move: str, winning_side: str, target_win_in: int = 3):
     """Check if a move is on the forced-win line for the current puzzle position.
