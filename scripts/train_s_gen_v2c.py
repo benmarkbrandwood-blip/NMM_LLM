@@ -235,6 +235,7 @@ DRAW_LONG       = -0.25   # max-ply timeout draws penalised harder (passive play
 # suppression — the full -0.6 fires even during recovery grace.  Treated as a loss
 # (0.0) in win/draw statistics so draw-rate reporting stays clean.
 DRAW_REP_PENALTY = -0.6
+DRAW_REP_NEUTRAL  = 0.0   # rep draw from a Malom-D or Malom-unknown position: no penalty
 
 # ── Optimiser / schedule ──────────────────────────────────────────────────────
 
@@ -998,6 +999,8 @@ def _rollout(
     step_diags:              list[StepDiag]       = []
     branch_candidates:       list[tuple[int, BoardState, str]] = []
     _uniform_fallback_count: int = 0
+    _n_rep_avoidable:        int = 0   # Malom-W → rep draw (avoidable repetitions)
+    _n_rep_malom_unknown:    int = 0   # Malom unavailable at rep-draw decision
     done                    = False
     outcome                 = 0.0
     learner_move_count      = 0
@@ -1061,7 +1064,7 @@ def _rollout(
             _curr_key = (
                 f"{learner_color}|"
                 + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
-                + f"|{board.pieces_on_board.get('W', 0)}|{board.pieces_on_board.get('B', 0)}"
+                + f"|{board.pieces_placed.get('W', 0)}|{board.pieces_placed.get('B', 0)}"
             )
             _curr_visit_count = _learner_positions_seen.get(_curr_key, 0)
             _learner_positions_seen[_curr_key] = _curr_visit_count + 1
@@ -1158,7 +1161,7 @@ def _rollout(
             _succ_key = (
                 f"{board_after.turn}|"
                 + "".join(board_after.positions.get(p, ".") or "." for p in POSITIONS)
-                + f"|{board_after.pieces_on_board.get('W', 0)}|{board_after.pieces_on_board.get('B', 0)}"
+                + f"|{board_after.pieces_placed.get('W', 0)}|{board_after.pieces_placed.get('B', 0)}"
             )
             _succ_count = _pos_counts.get(_succ_key, 0)
 
@@ -1319,30 +1322,39 @@ def _rollout(
             _pos_key = (
                 f"{board.turn}|"
                 + "".join(board.positions.get(p, ".") or "." for p in POSITIONS)
-                + f"|{board.pieces_on_board.get('W', 0)}|{board.pieces_on_board.get('B', 0)}"
+                + f"|{board.pieces_placed.get('W', 0)}|{board.pieces_placed.get('B', 0)}"
             )
         except Exception:
             _pos_key = None
         if _pos_key is not None:
             _pos_counts[_pos_key] = _pos_counts.get(_pos_key, 0) + 1
             if _pos_counts[_pos_key] >= _REPETITION_LIMIT:
-                # Value-conditioned repetition penalty: repeating from a lost position
-                # can be the correct saving play, so use DRAW_SHORT there.  Only apply
-                # DRAW_REP_PENALTY when Malom confirms the learner had a won or drawn
-                # alternative.  If Malom is unavailable, fall back to DRAW_REP_PENALTY.
-                _rep_outcome = DRAW_REP_PENALTY
+                # W/D/L-conditioned repetition shaping:
+                #   Malom W → DRAW_REP_PENALTY  (learner had a winning alternative — avoidable)
+                #   Malom D → DRAW_REP_NEUTRAL  (no winning alternative; exact minimax says draw)
+                #   Malom L → DRAW_SHORT        (rep draw saves a loss — correct play)
+                #   unavailable → DRAW_REP_NEUTRAL + log (don't penalise the unknown)
+                _rep_malom_wdl = None
+                _rep_outcome = DRAW_REP_NEUTRAL   # default: no Malom available
+                _n_rep_malom_unknown += 1
                 if malom_db is not None:
                     try:
                         _wdl_stm = malom_db.query(board)   # WDL for side to move
                         if _wdl_stm is not None:
-                            _learner_wdl = (
+                            _rep_malom_wdl = (
                                 _wdl_stm if board.turn == learner_color
                                 else _WDL_FLIP_REP.get(_wdl_stm)
                             )
-                            if _learner_wdl == "L":
-                                _rep_outcome = DRAW_SHORT   # saving draw — no harsh penalty
+                            _n_rep_malom_unknown -= 1   # query succeeded
+                            if _rep_malom_wdl == "W":
+                                _rep_outcome = DRAW_REP_PENALTY   # avoidable
+                                _n_rep_avoidable += 1
+                            elif _rep_malom_wdl == "D":
+                                _rep_outcome = DRAW_REP_NEUTRAL   # no better alternative
+                            else:  # "L"
+                                _rep_outcome = DRAW_SHORT         # saving draw
                     except Exception:
-                        pass
+                        pass   # query failed — remain neutral
                 outcome = _rep_outcome
                 termination_reason = TerminationReason.DRAW_REPETITION
                 done = True
@@ -1628,7 +1640,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"[s_gen_v2c] LookaheadAdvisor: 12-ply width, {args.sim_ply_depth}-ply sim, 5 signals (h+learner_sent+opp_sent+vn+gap)")
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
-    specialist_db = SpecialistDB(_ROOT / "data" / "specialist_db.sqlite")
+    specialist_db = SpecialistDB(Path(args.specialist_db))
     print(f"[s_gen_v2c] SpecialistDB: {specialist_db.stats()}")
 
     # ── Load model ─────────────────────────────────────────────────────────────
@@ -2599,23 +2611,21 @@ def run(args: argparse.Namespace) -> None:
                 _adv = _sanmill_check_advance(level_heuristic_history,
                                               difficulty=difficulty,
                                               games_at_level=games_at_level)
-                # v2c draw-cap gate applied on top of the Sanmill superiority check.
-                # Draw-heavy policies must not advance even if they score well.
-                if _adv.should_advance:
-                    _recent_adv = list(level_heuristic_history)[-max(20, args.rolling_win):]
-                    _adv_draw_cap = 0.40 if difficulty <= 3 else 0.22
-                    _adv_draw_rate = (
-                        sum(1 for x in _recent_adv if x == 0.5) / max(len(_recent_adv), 1)
-                    )
-                    if _adv_draw_rate >= _adv_draw_cap:
-                        _adv = None
-                        if game_count - _last_advance_print_game >= 50:
-                            _last_advance_print_game = game_count
-                            print(f"[s_gen_v2c] advance-check @ diff {difficulty}: "
-                                  f"draw cap blocked (draw_rate={_adv_draw_rate:.3f} >= {_adv_draw_cap})")
                 if _adv is not None and game_count - _last_advance_print_game >= 50:
                     _last_advance_print_game = game_count
                     print(f"[s_gen_v2c] advance-check @ diff {difficulty}: {_adv.reason}")
+                # Shadow draw-cap: log when avoidable-rep fraction would have blocked,
+                # but never gate — the correct metric is avoidable reps, not all draws.
+                if _adv is not None and _adv.should_advance:
+                    _recent_adv = list(level_heuristic_history)[-max(20, args.rolling_win):]
+                    _shadow_draw_cap = 0.40 if difficulty <= 3 else 0.22
+                    _shadow_draw_rate = (
+                        sum(1 for x in _recent_adv if x == 0.5) / max(len(_recent_adv), 1)
+                    )
+                    if _shadow_draw_rate >= _shadow_draw_cap:
+                        print(f"[s_gen_v2c] advance-check @ diff {difficulty}: "
+                              f"[shadow] draw cap would have blocked "
+                              f"(draw_rate={_shadow_draw_rate:.3f} >= {_shadow_draw_cap})")
             if _adv is not None and _adv.should_advance:
                 if difficulty >= args.diff_max:
                     print(f"[s_gen_v2c] *** DONE at diff {difficulty}: {_adv.reason} ***")
@@ -2656,7 +2666,10 @@ def run(args: argparse.Namespace) -> None:
                 print(f"[s_gen_v2c] Continuing with in-memory model for diff {difficulty} (no checkpoint reload)")
 
                 best_win_rate_at_diff = 0.0
-                opt = torch.optim.Adam(model.parameters(), lr=args.lr)
+                # Adam momentum/variance intentionally preserved across advancement
+                # for continuous curriculum learning. Only LR is reset.
+                for _pg in opt.param_groups:
+                    _pg["lr"] = args.lr
                 frozen_opp.refresh(model)
                 # Decaying temperature + entropy boost to ease the transition to the new difficulty.
                 # games_at_level was reset above → scheduled temp is now temp_start.
@@ -2739,6 +2752,8 @@ def main() -> None:
     p.add_argument("--run-name",  default="", type=str,
                    help="Optional subfolder under --out-dir, e.g. 'exp1'. "
                         "Keeps each experiment's checkpoints and logs separate.")
+    p.add_argument("--specialist-db", default=str(_ROOT / "data" / "specialist_db.sqlite"),
+                   help="Path to SpecialistDB SQLite file")
     p.add_argument("--sentinel", default=str(_ROOT / "learned_ai" / "sentinel" / "checkpoints" / "best.pt"))
     p.add_argument("--malom",    default="", type=str)
     p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
