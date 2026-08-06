@@ -809,7 +809,7 @@ class FiniteRulesExecutor:
     def _apply_remove(self, event: Mapping[str, Any]) -> None:
         if not self.state.obligations:
             fail(
-                "unreachable",
+                "inconsistent",
                 "remove-without-obligation",
                 "remove event has no pending obligation",
                 event_seq=event["seq"],
@@ -1108,30 +1108,18 @@ def replay(mstate_value: Any, caller_manifest: Any | None) -> tuple[Execution, d
             "replay",
             "checkpoint-mismatch",
             "replayed current does not match MSTATE checkpoint",
-            expected=mstate["current"],
-            actual=actual_current,
-            include_expected=True,
-            include_actual=True,
         )
     if execution.repetition_history != mstate["repetitionHistory"]:
         fail(
             "replay",
             "repetition-history-mismatch",
             "replayed repetition window does not match MSTATE",
-            expected=mstate["repetitionHistory"],
-            actual=execution.repetition_history,
-            include_expected=True,
-            include_actual=True,
         )
     if execution.claims != mstate["claims"]:
         fail(
             "replay",
             "claims-mismatch",
             "replayed claim audit does not match MSTATE",
-            expected=mstate["claims"],
-            actual=execution.claims,
-            include_expected=True,
-            include_actual=True,
         )
     decision = execution.trace[-1]["decisionState"]
     decision_digest = execution.trace[-1]["decisionDigest"]
