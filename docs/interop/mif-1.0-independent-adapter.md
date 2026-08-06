@@ -116,15 +116,27 @@ Reference-derived constants were obtained through independent process calls,
 not by importing the reference runner.
 
 The previous M2 evidence compared all 16 cases at MIF commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a`, NMM_LLM commit
-`7b4bde40e53bfef012277840ba6e9e43e7b73fe3`, and Sanmill commit
-`54623a6c5d66ffcbfb6e61ed295a20885ed7920d`. Both adapter commits are
-published on their respective remote branches.
+`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The post-JCS baseline was then
+verified on 6 August 2026 at these exact implementation identities:
 
-The current binding advances to the MIF commit and hashes recorded above,
-which include the corrected RFC 8785 reference implementation and a 17th
-smoke case. A clean-commit 17-case comparison must be recorded before this
-new binding is treated as durable cross-project evidence. A full 1,138-test
-NMM_LLM run was also attempted without skips, but reached the 15-minute
-command limit at roughly 15% with no reported failure. It must not be
-described as a complete repository-suite pass.
+- MIF reference and corpus commit
+  `f37ddfeb5fb8479991fa38eeb03c797bef8ae408`;
+- NMM_LLM binding and adapter commit
+  `d631c54f56bcc736ebd5d59d896846d4d2fd485e`;
+- Sanmill adapter commit
+  `54623a6c5d66ffcbfb6e61ed295a20885ed7920d`.
+
+At the clean NMM_LLM commit, all 45 focused tests and Ruff passed. The command
+generator accepted the clean MIF checkout and all six hashes above, and the
+official `smoke-v1.json` comparison passed all 17 cases across the three
+independent adapter processes. The added JCS case required no NMM_LLM state
+machine or canonicalization change; the existing implementation already
+matched the corrected reference behaviour.
+
+This closes NMM_LLM's post-JCS pin and comparison evidence. The comparator
+labels the result candidate interoperability evidence, not suite conformance;
+a three-project M3 freeze still requires the corresponding Sanmill pin and
+evidence publication. A full 1,138-test NMM_LLM run was also attempted without
+skips at the previous baseline, but reached the 15-minute command limit at
+roughly 15% with no reported failure. It must not be described as a complete
+repository-suite pass.
