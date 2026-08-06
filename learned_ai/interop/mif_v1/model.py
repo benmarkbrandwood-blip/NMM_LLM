@@ -619,7 +619,15 @@ def canonicalize_mpk(value: Any, manifest_value: Any | None) -> str:
     if not isinstance(value, str) or not value.isascii():
         fail("syntax", "invalid-mpk", "MPK must be US-ASCII text")
     fields = value.split(" ")
-    if any(field == "" for field in fields) or len(fields) < 9:
+    if any(field == "" for field in fields):
+        fail("syntax", "invalid-mpk", "invalid MPK fields")
+    if (
+        len(fields) == 8
+        and fields[:2] == ["MPK/1.0", "mill24-state-v1"]
+        and fields[3] == "structural-d4-v1"
+    ):
+        fail("integrity", "mpk-semantic-digest-missing")
+    if len(fields) < 9:
         fail("syntax", "invalid-mpk", "invalid MPK fields")
     if fields[0] != "MPK/1.0" or fields[1] != "mill24-state-v1":
         fail("unsupported", "unsupported-profile", "unsupported MPK profile")
@@ -628,6 +636,13 @@ def canonicalize_mpk(value: Any, manifest_value: Any | None) -> str:
         fail("integrity", "manifest-conflict", "MPK ruleset reference mismatch")
     if not fields[3]:
         fail("integrity", "mpk-semantic-digest-missing")
+    if (
+        fields[3].startswith("sha256:")
+        and len(fields[3]) == 71
+        and all(character in "0123456789abcdefABCDEF" for character in fields[3][7:])
+        and any(character in "ABCDEF" for character in fields[3][7:])
+    ):
+        fail("canonical", "non-canonical-digest")
     require_digest(fields[3], context="MPK semantic digest")
     if fields[3] != manifest.semantic_digest:
         fail("integrity", "semantic-digest-mismatch")

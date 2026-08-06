@@ -939,7 +939,7 @@ class FiniteRulesExecutor:
     def _apply_claim(self, event: Mapping[str, Any]) -> None:
         if self.state.obligations:
             fail(
-                "unreachable",
+                "inconsistent",
                 "claim-during-obligation",
                 "claim-draw is forbidden during an obligation",
                 event_seq=event["seq"],
