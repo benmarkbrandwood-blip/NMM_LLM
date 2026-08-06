@@ -1800,4 +1800,78 @@ Uses Malom DB path from `data/settings.json`.
 | `--out PATH` | `data/puzzles/` | Output directory |
 | `--print` | off | Print each puzzle JSON to stdout |
 
+---
+
+### Unified Puzzle Generator (recommended — all types, minimax-verified)
+
+`tools/unified_puzzle_generator.py` replaces the three legacy scripts above.
+Puzzles are minimax-verified (exact depth, opponent plays hardest defense) and
+require a single forced-win path (`--max-winning-moves 1` default).
+Outputs to `data/puzzles/endgame/`, `data/puzzles/malom/`, `data/puzzles/placement/`.
+
+**Single type:**
+```
+# 200 midgame puzzles, any depth 4-10, 6 parallel workers
+.venv/bin/python tools/unified_puzzle_generator.py \
+  --type midgame --depth 0 --count 200 --workers 6
+
+# 200 endgame puzzles, any depth 3-10
+.venv/bin/python tools/unified_puzzle_generator.py \
+  --type endgame --depth 0 --count 200 --workers 6
+
+# 200 placement puzzles, any depth 4-10
+.venv/bin/python tools/unified_puzzle_generator.py \
+  --type placement --depth 0 --count 200 --workers 6
+
+# Specific depth / side
+.venv/bin/python tools/unified_puzzle_generator.py \
+  --type midgame --depth 5 --side W --count 50 --workers 4
+```
+
+**Batch mode** (edit `data/puzzles/batch_config.json` first, then run once):
+```
+.venv/bin/python tools/unified_puzzle_generator.py \
+  --batch data/puzzles/batch_config.json --workers 6
+```
+Batch mode is resume-aware: already-met quotas are skipped.
+
+**`data/puzzles/batch_config.json` format:**
+```json
+{
+  "cells": [
+    {"type": "midgame",   "side": "random", "depth": 0, "count": 200},
+    {"type": "placement", "side": "random", "depth": 0, "count": 200},
+    {"type": "endgame",   "side": "random", "depth": 0, "count": 200}
+  ],
+  "max_winning_moves": 1,
+  "min_hardness": 3.0
+}
+```
+
+| Flag | Default | Description |
+| - | - | - |
+| `--type endgame\|midgame\|placement` | — | Puzzle type (required unless `--batch`) |
+| `--depth 0\|3–10` | 0 | Target win depth; 0 = random within type range |
+| `--side W\|B\|random` | random | Which side has the winning move |
+| `--max-winning-moves N` | 1 | Max first moves that win within depth budget |
+| `--min-hardness F` | 3.0 | Minimum hardness score to accept a puzzle |
+| `--count N` | 0 | Puzzles to generate (0 = run forever) |
+| `--attempts N` | 5000/3000 | Positions sampled per attempt (endgame/malom) |
+| `--workers N` | cpu_count−1 | Parallel worker processes |
+| `--batch PATH` | — | Batch config JSON; overrides `--type/--depth/--side` |
+| `--out PATH` | type-specific | Override output directory |
+
+**Tags written to puzzle JSON:**
+
+| Tag | Meaning |
+| - | - |
+| `endgame` / `midgame` / `placement` | Game phase |
+| `win-in-N` | Exact verified forced-win depth (3–10) |
+| `unique-move` | Exactly one winning first move within budget |
+| `bottleneck` | Same as `unique-move` |
+| `two-solutions` | Two winning first moves within budget |
+| `high-branching` | ≥ 6 legal moves at the root |
+| `near-endgame` | Midgame with ≤ 8 total pieces |
+| `early-game` | Midgame with ≥ 14 total pieces |
+
 
