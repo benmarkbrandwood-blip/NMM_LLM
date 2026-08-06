@@ -1023,6 +1023,46 @@ database growth.
   pinned Sanmill checkout is a reference and possible differential-test input
   under the boundary recorded in the local-layout document.
 
+## MIF 1.0 Independent Interoperability Adapter
+
+The NMM_LLM adapter is locked to MIF commit
+`83e4b758f624f3059c7ba289d4d4429eed0a710a` and implements all six
+`MIF-INTEROP/1` operations: capabilities, MFEN/MPK canonicalization, finite
+rules execution, checkpoint-verifying replay, full-state transform, and
+complete logical-turn projection. It is intentionally independent of the MIF
+Python reference runner; the latter is used only as a separate black-box
+comparison process.
+
+The adapter's honest runtime claim is narrower than every possible
+`mif-finite-rules-v3` variant. It advertises the two frozen candidate corpus
+rulesets, accepts patches inside their implemented semantic subset, and fails
+closed outside that subset rather than approximating unsupported capture
+mechanisms, semantic-state extensions, mill effects, or stalemate policies
+with the legacy NMM_LLM board engine. No MIF Suite has been published, so this
+is not a suite-conformance claim.
+
+The M2 verification run reports 45 focused tests passing. The official
+16-case smoke corpus then compared equal between the MIF reference and
+NMM_LLM processes, and also across a live third Sanmill adapter process.
+That Sanmill adapter was still an uncommitted external-worktree change, so the
+three-party run is development evidence only until Sanmill supplies a durable
+commit identity and the comparison is rerun. The exact pin, source hashes,
+scope and host-local command-array generator are in
+[`docs/interop/mif-1.0-independent-adapter.md`](../interop/mif-1.0-independent-adapter.md).
+The local command generator now requires the exact MIF commit, a clean
+worktree, the formal four pinned source hashes, and the protocol and smoke
+execution pins. Published request, event and repetition limits are enforced
+across every applicable operation and return structured resource diagnostics
+rather than truncation or a silent process exit.
+
+The NMM_LLM adapter meets the M2 independent-adapter acceptance boundary.
+The external MIF reference-runner JCS defect still prevents a three-project
+baseline or M3 freeze.
+
+An additional 1,138-test repository run was attempted without skips, but the
+15-minute command limit stopped it at roughly 15% with no failure reported.
+It is not a full-suite pass and must not be presented as one.
+
 ## Recommended Next Actions
 
 The workspace/root check, graph inspection, earlier trainer fixes, focused

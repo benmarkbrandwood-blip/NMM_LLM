@@ -105,6 +105,25 @@ Fixed-node heuristic training follows the Sanmill-aligned quiescence and
 candidate-set principles in
 [`docs/fixed-node-heuristic-search.md`](fixed-node-heuristic-search.md).
 
+### Mill Interchange Format
+
+- Local lookup: read `mif_checkout` from the ignored
+  `data/training_paths.local.json`. It is used only by interoperability tools
+  and is not a trainer input or runtime dependency.
+- Frozen adapter input: commit
+  `83e4b758f624f3059c7ba289d4d4429eed0a710a`. Do not run comparison cases
+  against a floating MIF checkout and then attribute the result to this pin.
+  The command generator also rejects worktree changes and verifies the formal
+  four frozen file hashes plus the protocol and smoke execution pins recorded
+  in the interoperability document.
+- NMM_LLM independently implements the wire semantics under
+  `learned_ai/interop/mif_v1/`; the MIF Python reference runner may be launched
+  only as a separate black-box comparison process. Its gameplay code is not a
+  library dependency and must not be copied into this repository.
+- The durable contract, source hashes, scope limits and machine-local
+  three-party command generator are documented in
+  [`docs/interop/mif-1.0-independent-adapter.md`](interop/mif-1.0-independent-adapter.md).
+
 ## Repository-local Data Inventory
 
 The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
@@ -298,12 +317,14 @@ documents. The intended logical mapping is:
 | `specialist_db_path` | `data/specialist_db.sector_corrected.sqlite` |
 | `malom_db_path` | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted` |
 | `sanmill_checkout` | Cross-volume reference checkout; read the actual value from the ignored registry |
+| `mif_checkout` | Frozen MIF source and black-box interoperability-harness checkout; read the actual value from the ignored registry |
 
 The generalist trainer consumes the seven training keys above.
-`sanmill_checkout` is only a local reference-path index for documentation and
-differential-test tooling. The archived candidates deliberately have no
-configuration keys: find their relative paths in the inventory and relocation
-record, then create a separately reviewed experiment contract before use.
+`sanmill_checkout` and `mif_checkout` are only local reference-path indexes
+for documentation and differential-test tooling. The archived candidates
+deliberately have no configuration keys: find their relative paths in the
+inventory and relocation record, then create a separately reviewed experiment
+contract before use.
 
 The trainer resolves configuration in this order:
 

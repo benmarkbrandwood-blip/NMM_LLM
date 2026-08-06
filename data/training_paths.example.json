@@ -7,5 +7,6 @@
   "human_db_path": "data/human_db.sqlite",
   "specialist_db_path": "data/specialist_db.sqlite",
   "malom_db_path": "",
-  "sanmill_checkout": ""
+  "sanmill_checkout": "",
+  "mif_checkout": ""
 }
