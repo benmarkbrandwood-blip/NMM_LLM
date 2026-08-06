@@ -111,11 +111,11 @@ candidate-set principles in
   `data/training_paths.local.json`. It is used only by interoperability tools
   and is not a trainer input or runtime dependency.
 - Frozen adapter input: commit
-  `f37ddfeb5fb8479991fa38eeb03c797bef8ae408`. Do not run comparison cases
+  `0693353fe0821dcbbf547cc1eb9b679dcf2f90b8`. Do not run comparison cases
   against a floating MIF checkout and then attribute the result to this pin.
   The command generator also rejects worktree changes and verifies the formal
-  four frozen file hashes plus the protocol and smoke execution pins recorded
-  in the interoperability document.
+  four frozen file hashes plus the protocol, smoke and deterministic execution
+  pins recorded in the interoperability document.
 - NMM_LLM independently implements the wire semantics under
   `learned_ai/interop/mif_v1/`; the MIF Python reference runner may be launched
   only as a separate black-box comparison process. Its gameplay code is not a

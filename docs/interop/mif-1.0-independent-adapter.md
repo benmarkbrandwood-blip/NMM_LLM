@@ -6,24 +6,25 @@ Status: implemented against the frozen candidate wire contract; no MIF Suite
 ## Frozen source identity
 
 The implementation is locked to MIF commit
-`f37ddfeb5fb8479991fa38eeb03c797bef8ae408`. The formal frozen inputs and
+`0693353fe0821dcbbf547cc1eb9b679dcf2f90b8`. The formal frozen inputs and
 additional comparison inputs at that commit have these raw SHA-256 identities:
 
 | Input | Role | SHA-256 |
 |---|---|---|
 | `mif-1.0.md` | formal English specification | `330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995` |
 | `docs/zh-CN/mif-1.0.md` | formal Chinese specification | `9cc06abb57425e2bc2e26432b6da53abe503e9b5415ea0b4f854f19f68722cc1` |
-| `artifacts/mif-1.0/index.json` | formal artifact index | `3849a70897829d6d994c790b64e63484469483a940887fe828a1a0d421d78e90` |
+| `artifacts/mif-1.0/index.json` | formal artifact index | `2bd247cd7e27ff4b0e142d8a0b2d6dececd619c882bb67f0be11bf763a794895` |
 | `artifacts/mif-1.0/corpus/executable/reference-cases.json` | formal executable corpus | `a48c50352caebce30deb1de11f8f73dbc4540ee538651c3a139d9bcb166ba983` |
-| `interop/adapter-protocol-v1.md` | additional process protocol | `a59e5e5af3e948f6c7cac6a39a490c6eae6338151741b6c7fcdde5c88d991e2d` |
+| `interop/adapter-protocol-v1.md` | additional process protocol | `253c1d201ea1db625e0c534da445ca4ecaa0b07597dfc7dbf59fbd6adf89874f` |
 | `interop/cases/smoke-v1.json` | additional smoke comparison corpus | `a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53` |
+| `interop/cases/deterministic-v1.json` | candidate-3 deterministic comparison corpus | `c2d7017b2a8583914aff1eeea38bc02b078814ca11346c484e0a2b38b5e94f0c` |
 
 The adapter has no runtime dependency on the MIF repository. The checkout is
 needed only by the external comparison harness and its test cases.
 The command-array generator verifies the exact commit, rejects all worktree
 changes, and hashes the formal four inputs plus the two additional execution
-inputs before emitting a comparison configuration. A matching `HEAD` alone is
-not accepted as locked evidence.
+inputs and deterministic corpus before emitting a comparison configuration. A
+matching `HEAD` alone is not accepted as locked evidence.
 
 ## Independence boundary
 
@@ -45,8 +46,10 @@ UTF-8 NDJSON and implements:
 - `capabilities`;
 - `canonicalize` for MFEN/1.0 and structural-d4-v1 MPK/1.0;
 - `execute` and checkpoint-verifying `replay`;
-- `transform` for MSTATE, MIFPOS and materialized decision state; and
-- `project-logical-turns` for complete primary-plus-removal fragments.
+- `transform` for MSTATE, MIFPOS and materialized decision state;
+- `project-logical-turns` for complete primary-plus-removal fragments; and
+- `project-legal-actions` for the closed, canonically ordered
+  `legal-actions-v1` harness projection.
 
 The capability response advertises the two candidate corpus rulesets. The
 executor also accepts manifest patches that remain inside their implemented
@@ -56,11 +59,12 @@ non-standard mill effects and non-loss/draw stalemate actions are not claimed.
 This narrower, explicit claim is preferable to silently approximating a
 variant with NMM_LLM's legacy `BoardState` rules.
 
-The capability binds all six candidate-2 source and harness identities in its
-annotations. Its `testedCorpora` records the 17-case smoke digest and the five
-exercised classes: identity, position, replay, ruleset and transform. The
-separate `suites` array remains empty because this evidence is not a published
-MIF Suite.
+The capability binds all seven candidate-3 source and harness identities in its
+annotations. Its `testedCorpora` retains the 17-case smoke identity and adds the
+55-case deterministic identity after the NMM_LLM adapter matched the separate
+MIF reference process. The deterministic record covers identity, key,
+position, replay, ruleset and transform. The separate `suites` array remains
+empty because this evidence is not a published MIF Suite.
 
 The three published resource limits are executable contract, not descriptive
 metadata. Request framing is capped at 16,777,216 bytes, event arrays at
@@ -103,7 +107,7 @@ Then run the comparator from the locked MIF checkout:
 ```powershell
 python -B tools\compare_mif_1_0_adapters.py `
   --config <NMM_LLM_ROOT>\out\mif-interop-three-party.local.json `
-  --cases interop\cases\smoke-v1.json
+  --cases interop\cases\deterministic-v1.json
 ```
 
 For a prebuilt Sanmill binary, pass `--sanmill-binary <path>` to avoid a Cargo
@@ -112,48 +116,40 @@ startup build. The generated configuration remains machine-local under
 
 ## Current verification
 
-The focused adapter set contains 45 passing tests. In addition to the frozen
-candidate identities, it covers process framing, duplicate JSON names,
-checkpoint audit, pre-origin claim preservation, placement and flying mills,
-compulsory removal, material termination, full-state transforms and logical
-turn grouping. It now also covers dirty/hash-mismatched source checkouts and
-every operation path governed by the published resource limits.
-Reference-derived constants were obtained through independent process calls,
-not by importing the reference runner.
+The focused adapter set contains 55 passing tests. In addition to the earlier
+framing, identity, replay, resource, transform and logical-turn coverage, it
+now fixes the candidate-3 MPK diagnostics, classifies a claim made during a
+compulsory removal as inconsistent, and exercises every legal-action stratum.
+The legal-action tests also expose and prevent phase-p flying: placing movement
+may be enabled, but the frozen contract restricts flying to phase m. Ruff passes
+for the complete focused implementation and test set.
 
-The previous M2 evidence compared all 16 cases at MIF commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The final candidate-2 smoke run
-was verified on 6 August 2026 at these exact implementation identities:
-
-- MIF reference and corpus commit
-  `f37ddfeb5fb8479991fa38eeb03c797bef8ae408`;
-- NMM_LLM capability and adapter commit
-  `99f0fdb46513ccdd9c7d496af7ea69944b397057`;
-- Sanmill adapter commit
-  `14e7d9d0a439929316866fe9dcae213777a8a2b8`.
-
-At the clean NMM_LLM commit, all 45 focused tests and Ruff passed. The command
-generator accepted the clean MIF checkout and all six hashes above, and the
-official `smoke-v1.json` comparison passed all 17 cases across the three
-independent adapter processes. The raw comparator output is preserved as the
-[candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json),
+The candidate-3 implementation is the three-commit chain ending at NMM_LLM
+commit `121b663951fcc69e90e956d35c3d44d8118bb066`. At that clean commit, the
+command generator accepted clean MIF commit
+`0693353fe0821dcbbf547cc1eb9b679dcf2f90b8` and all seven hashes above. The
+official deterministic corpus then compared equal on all 55 cases between the
+separate MIF reference and NMM_LLM processes. The exact comparator output is
+preserved as the
+[candidate-3 NMM/reference report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json),
 SHA-256
-`9a39863360fa3c1d8b59ad849aefb3e30a111c5b3bb6e5019913fd5a45e13d05`.
+`552a3bddd731e51ce5323655c32f06782d1c73433131c86e71b49d335f77663c`.
 It records cases digest
-`sha256:a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53`
+`sha256:c2d7017b2a8583914aff1eeea38bc02b078814ca11346c484e0a2b38b5e94f0c`
 and machine-local config digest
-`sha256:a846470160848f1951df0d718df2aa528504d8448c7c68f2cde54652924332b6`.
-The generated config remains ignored because it contains host paths. The
-added JCS case required no NMM_LLM state-machine or canonicalization change;
-the existing implementation already matched the corrected reference
-behaviour.
+`sha256:1d04f6f2f775239110ff00a1f97bb129fe13f1d903dd284f6f3905810b1b7889`.
+The generated configuration remains ignored because it contains host paths.
 
-This closes NMM_LLM's candidate-2 pin, capability and persisted smoke evidence.
-The report includes the current Sanmill process but does not substitute for a
-Sanmill-owned evidence artifact. The comparator labels the result candidate
-interoperability evidence, not suite conformance. Under the three-project plan,
-M3 still requires the complete deterministic corpus rather than only this
-smoke set. A full 1,138-test NMM_LLM run was also attempted without skips at
-the previous baseline, but reached the 15-minute command limit at roughly 15%
-with no reported failure. It must not be described as a complete
-repository-suite pass.
+This closes the NMM_LLM side of the candidate-3 implementation and
+deterministic comparison. It does not complete three-project M3: the persisted
+report intentionally contains only the published MIF reference and the clean
+NMM_LLM commit. A new three-party 55-case report is required after Sanmill
+publishes its independent candidate-3 changes. Neither result is MIF Suite
+conformance. The historical
+[candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json)
+remains valid for its recorded 17-case identities.
+
+A full 1,138-test NMM_LLM run was attempted without skips at the previous
+baseline, but reached the 15-minute command limit at roughly 15% with no
+reported failure. It must not be described as a complete repository-suite
+pass.
