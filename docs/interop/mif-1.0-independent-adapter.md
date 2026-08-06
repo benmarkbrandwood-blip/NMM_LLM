@@ -145,12 +145,30 @@ and machine-local config digest
 The generated configuration remains ignored because it contains host paths.
 
 This closes the NMM_LLM side of the candidate-4 pin and deterministic
-comparison. It does not complete three-project M3: the persisted report
-intentionally contains only the published MIF reference and clean NMM_LLM
-commit. Sanmill is still published at its candidate-3 commit
-`6f56c8efcba753001d8e07398c8c262d2aa6c481`; a new three-party 58-case
-report must bind a later Sanmill candidate-4 pin and all three immutable
-commits. Neither result is MIF Suite conformance. The historical
+comparison. Sanmill subsequently published its candidate-4 adapter and
+evidence at commit `e6d639d41f079b15ca697268d0c2c21dad5c2bc3`. Its tracked
+`interop/evidence/mif-interop-candidate-4-three-project-report-2026-08-06.json`
+has SHA-256
+`895c04cd69fc00e50bdcd349b150293e52fcc4150c63321d8c9771015f70aaaf`
+and records 58/58 across the MIF reference, Sanmill, and NMM_LLM. It records
+cases digest
+`sha256:d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82`
+and config digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+An independent rerun at MIF
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`, Sanmill
+`e6d639d41f079b15ca697268d0c2c21dad5c2bc3`, and NMM_LLM
+`11bebd14e0d538a41a4b43aebfe57ee74c2a2601` reproduced the same report
+hash.
+
+Three-project M3 is not formally closed yet. The standard comparator report
+contains adapter names and case/config digests but no repository commit SHAs;
+the config digest binds command arrays, not source revisions. Sanmill must
+publish the planned companion evidence manifest binding the three commits,
+the report hash, both report digests, and all seven candidate-4 input hashes
+listed above. This is an evidence-chain gap only; the current review found no
+remaining adapter gameplay discrepancy. None of these results is MIF Suite
+conformance. The historical
 [candidate-3 report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json)
 and
 [candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json)

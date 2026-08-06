@@ -1058,13 +1058,30 @@ The raw
 has SHA-256
 `89dfcd97c914764aa95bcb5e6b6ecdb23686591037dbf8c5493fe8b3dfbc142f`
 and records 58/58 equality between the published MIF reference and NMM_LLM at
-clean commit `bbbde2ee4bf1ba0e45e259baa595a29cb85895b9`. It deliberately
-excludes Sanmill because that project's published HEAD remains its candidate-3
-commit `6f56c8efcba753001d8e07398c8c262d2aa6c481`. NMM_LLM's candidate-4
-side is closed, but three-project M3 and Suite conformance are not: a new
-three-party 58-case report must bind a later Sanmill candidate-4 commit. The
-earlier candidate-3 and candidate-2 reports remain historical evidence for
-their recorded identities.
+clean commit `bbbde2ee4bf1ba0e45e259baa595a29cb85895b9`.
+
+Sanmill subsequently published candidate-4 commit
+`e6d639d41f079b15ca697268d0c2c21dad5c2bc3` and the tracked three-party
+report `interop/evidence/mif-interop-candidate-4-three-project-report-2026-08-06.json`.
+That report has SHA-256
+`895c04cd69fc00e50bdcd349b150293e52fcc4150c63321d8c9771015f70aaaf`
+and records 58/58 with cases digest
+`sha256:d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82`
+and config digest
+`sha256:4184d56c696b2e5031d95cc18918757af9f91fa5634dded579ecfae2ef3cf70f`.
+An independent rerun using MIF `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`,
+Sanmill `e6d639d41f079b15ca697268d0c2c21dad5c2bc3`, and NMM_LLM
+`11bebd14e0d538a41a4b43aebfe57ee74c2a2601` reproduced the same report
+hash.
+
+NMM_LLM's candidate-4 implementation and pin are closed, but three-project M3
+is not formally closed. The standard report omits repository commit SHAs, and
+its config digest binds command arrays rather than source revisions. Sanmill
+still needs to publish the planned companion evidence manifest that binds the
+three commits, report hash, case/config digests, and all candidate-4 input
+hashes. This is an evidence-only gap; no adapter gameplay change is pending.
+No result claims MIF Suite conformance. The earlier candidate-3 and candidate-2
+reports remain historical evidence for their recorded identities.
 
 An additional 1,138-test repository run was attempted without skips, but the
 15-minute command limit stopped it at roughly 15% with no failure reported.
