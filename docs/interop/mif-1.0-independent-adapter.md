@@ -56,6 +56,12 @@ non-standard mill effects and non-loss/draw stalemate actions are not claimed.
 This narrower, explicit claim is preferable to silently approximating a
 variant with NMM_LLM's legacy `BoardState` rules.
 
+The capability binds all six candidate-2 source and harness identities in its
+annotations. Its `testedCorpora` records the 17-case smoke digest and the five
+exercised classes: identity, position, replay, ruleset and transform. The
+separate `suites` array remains empty because this evidence is not a published
+MIF Suite.
+
 The three published resource limits are executable contract, not descriptive
 metadata. Request framing is capped at 16,777,216 bytes, event arrays at
 100,000 entries and active/materialized repetition history at 100,000 entries.
@@ -116,27 +122,38 @@ Reference-derived constants were obtained through independent process calls,
 not by importing the reference runner.
 
 The previous M2 evidence compared all 16 cases at MIF commit
-`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The post-JCS baseline was then
-verified on 6 August 2026 at these exact implementation identities:
+`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The final candidate-2 smoke run
+was verified on 6 August 2026 at these exact implementation identities:
 
 - MIF reference and corpus commit
   `f37ddfeb5fb8479991fa38eeb03c797bef8ae408`;
-- NMM_LLM binding and adapter commit
-  `d631c54f56bcc736ebd5d59d896846d4d2fd485e`;
+- NMM_LLM capability and adapter commit
+  `99f0fdb46513ccdd9c7d496af7ea69944b397057`;
 - Sanmill adapter commit
-  `54623a6c5d66ffcbfb6e61ed295a20885ed7920d`.
+  `14e7d9d0a439929316866fe9dcae213777a8a2b8`.
 
 At the clean NMM_LLM commit, all 45 focused tests and Ruff passed. The command
 generator accepted the clean MIF checkout and all six hashes above, and the
 official `smoke-v1.json` comparison passed all 17 cases across the three
-independent adapter processes. The added JCS case required no NMM_LLM state
-machine or canonicalization change; the existing implementation already
-matched the corrected reference behaviour.
+independent adapter processes. The raw comparator output is preserved as the
+[candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json),
+SHA-256
+`9a39863360fa3c1d8b59ad849aefb3e30a111c5b3bb6e5019913fd5a45e13d05`.
+It records cases digest
+`sha256:a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53`
+and machine-local config digest
+`sha256:a846470160848f1951df0d718df2aa528504d8448c7c68f2cde54652924332b6`.
+The generated config remains ignored because it contains host paths. The
+added JCS case required no NMM_LLM state-machine or canonicalization change;
+the existing implementation already matched the corrected reference
+behaviour.
 
-This closes NMM_LLM's post-JCS pin and comparison evidence. The comparator
-labels the result candidate interoperability evidence, not suite conformance;
-a three-project M3 freeze still requires the corresponding Sanmill pin and
-evidence publication. A full 1,138-test NMM_LLM run was also attempted without
-skips at the previous baseline, but reached the 15-minute command limit at
-roughly 15% with no reported failure. It must not be described as a complete
+This closes NMM_LLM's candidate-2 pin, capability and persisted smoke evidence.
+The report includes the current Sanmill process but does not substitute for a
+Sanmill-owned evidence artifact. The comparator labels the result candidate
+interoperability evidence, not suite conformance. Under the three-project plan,
+M3 still requires the complete deterministic corpus rather than only this
+smoke set. A full 1,138-test NMM_LLM run was also attempted without skips at
+the previous baseline, but reached the 15-minute command limit at roughly 15%
+with no reported failure. It must not be described as a complete
 repository-suite pass.

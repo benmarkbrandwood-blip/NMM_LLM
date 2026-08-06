@@ -1,0 +1,135 @@
+{
+  "adapters": [
+    "mif-reference",
+    "nmm-llm",
+    "sanmill"
+  ],
+  "cases": [
+    {
+      "comparison": "schema-only",
+      "errors": [],
+      "id": "capabilities",
+      "operation": "capabilities",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "canonicalize-initial-black",
+      "operation": "canonicalize",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "execute-initial-black",
+      "operation": "execute",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "execute-white-loses-initial-black",
+      "operation": "execute",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "execute-placing-cycle",
+      "operation": "execute",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "replay-offer-r1",
+      "operation": "replay",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "replay-offer-r2",
+      "operation": "replay",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "replay-offer-r1-portable",
+      "operation": "replay",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "replay-origin-stabilization",
+      "operation": "replay",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "project-origin-stabilization",
+      "operation": "project-logical-turns",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-origin-r90ccw",
+      "operation": "transform",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-mifpos-r90ccw",
+      "operation": "transform",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-decision-materialized",
+      "operation": "transform",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-decision-missing-history",
+      "operation": "transform",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-without-invariance",
+      "operation": "transform",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "replay-reference-without-manifest",
+      "operation": "replay",
+      "status": "passed"
+    },
+    {
+      "comparison": "semantic-equality",
+      "errors": [],
+      "id": "transform-mifpos-portable-jcs-boundaries",
+      "operation": "transform",
+      "status": "passed"
+    }
+  ],
+  "casesDigest": "sha256:a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53",
+  "configDigest": "sha256:a846470160848f1951df0d718df2aa528504d8448c7c68f2cde54652924332b6",
+  "protocol": "MIF-INTEROP-REPORT/1",
+  "summary": {
+    "failed": 0,
+    "passed": 17
+  }
+}
