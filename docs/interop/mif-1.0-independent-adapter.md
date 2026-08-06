@@ -116,10 +116,12 @@ Reference-derived constants were obtained through independent process calls,
 not by importing the reference runner.
 
 The official `smoke-v1.json` comparison passes all 16 cases across the MIF
-reference process, NMM_LLM and a live Sanmill process. The Sanmill adapter is
-currently an uncommitted external-worktree change, so that result is
-development evidence rather than a durable three-party baseline or a
-three-project conformance decision. A full
-1,138-test NMM_LLM run was also attempted without skips, but reached the
-15-minute command limit at roughly 15% with no reported failure. It must not
-be described as a complete repository-suite pass.
+reference process at the frozen commit above, NMM_LLM commit
+`7b4bde40e53bfef012277840ba6e9e43e7b73fe3`, and Sanmill commit
+`54623a6c5d66ffcbfb6e61ed295a20885ed7920d`. Both adapter commits are
+published on their respective remote branches. This is durable M2 comparison
+evidence, but it is not an M3 freeze or a three-project conformance decision:
+the external MIF reference/harness still has the known RFC 8785 UTF-16 key
+ordering defect. A full 1,138-test NMM_LLM run was also attempted without
+skips, but reached the 15-minute command limit at roughly 15% with no reported
+failure. It must not be described as a complete repository-suite pass.

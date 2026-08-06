@@ -1041,12 +1041,13 @@ mechanisms, semantic-state extensions, mill effects, or stalemate policies
 with the legacy NMM_LLM board engine. No MIF Suite has been published, so this
 is not a suite-conformance claim.
 
-The M2 verification run reports 45 focused tests passing. The official
-16-case smoke corpus then compared equal between the MIF reference and
-NMM_LLM processes, and also across a live third Sanmill adapter process.
-That Sanmill adapter was still an uncommitted external-worktree change, so the
-three-party run is development evidence only until Sanmill supplies a durable
-commit identity and the comparison is rerun. The exact pin, source hashes,
+The published M2 verification identities are NMM_LLM commit
+`7b4bde40e53bfef012277840ba6e9e43e7b73fe3` on `origin/dev` and Sanmill
+commit `54623a6c5d66ffcbfb6e61ed295a20885ed7920d` on `origin/master`. The
+NMM_LLM focused run reports 45 tests passing, the Sanmill focused run reports
+14, and the official 16-case smoke corpus compares equal across both published
+adapters and the MIF reference process at frozen commit
+`83e4b758f624f3059c7ba289d4d4429eed0a710a`. The exact pin, source hashes,
 scope and host-local command-array generator are in
 [`docs/interop/mif-1.0-independent-adapter.md`](../interop/mif-1.0-independent-adapter.md).
 The local command generator now requires the exact MIF commit, a clean
