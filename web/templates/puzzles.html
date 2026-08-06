@@ -826,6 +826,20 @@ window._showHint = function() {
     return;
   }
   const note = puzzle.solution_line[idx];
+
+  // If the mill has already been formed and the user is choosing which piece
+  // to capture, highlight only the capture target from the solution notation.
+  if (board.capMode) {
+    const cap = note.match(/x([a-g][1-7])$/);
+    if (cap) {
+      board.showHint(null, cap[1]);
+      setStatus(`💡 Hint: capture the piece at ${cap[1]}`, 'warn');
+    } else {
+      setStatus(`💡 Hint: try ${note}`, 'warn');
+    }
+    return;
+  }
+
   const mv = note.match(/^([a-g][1-7])-([a-g][1-7])/);
   if (mv) {
     board.showHint(mv[1], mv[2]);  // movement: amber source + blue dest
