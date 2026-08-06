@@ -6,8 +6,13 @@ import pytest
 
 from learned_ai.interop.mif_v1.adapter import MifInteropAdapter, capabilities
 from learned_ai.interop.mif_v1.common import (
+    MIF_ADAPTER_PROTOCOL_SHA256,
+    MIF_CHINESE_SPEC_SHA256,
     MIF_COMMIT,
+    MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
+    MIF_INDEX_SHA256,
+    MIF_SMOKE_CORPUS_SHA256,
     MifError,
     parse_ijson,
     transform_coordinate,
@@ -19,9 +24,28 @@ def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
     value = capabilities()
     assert value["implementation"]["version"].endswith(MIF_COMMIT[:12])
     assert value["suites"] == []
-    assert value["testedCorpora"] == []
-    assert value["annotations"]["contractCommit"] == MIF_COMMIT
-    assert value["annotations"]["executableCorpus"] == MIF_EXECUTABLE_CORPUS_SHA256
+    assert value["testedCorpora"] == [
+        {
+            "digest": MIF_SMOKE_CORPUS_SHA256,
+            "classes": [
+                "identity",
+                "position",
+                "replay",
+                "ruleset",
+                "transform",
+            ],
+        }
+    ]
+    assert value["annotations"] == {
+        "contractCommit": MIF_COMMIT,
+        "englishSpec": MIF_ENGLISH_SPEC_SHA256,
+        "chineseSpec": MIF_CHINESE_SPEC_SHA256,
+        "artifactIndex": MIF_INDEX_SHA256,
+        "executableCorpus": MIF_EXECUTABLE_CORPUS_SHA256,
+        "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
+        "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
+        "scope": "pinned-candidate-corpus-rulesets; no MIFSUITE published",
+    }
 
 
 def test_duplicate_json_member_is_rejected_after_unescaping() -> None:

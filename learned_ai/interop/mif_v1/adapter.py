@@ -8,11 +8,13 @@ from .common import (
     MAX_EVENTS,
     MAX_INTEROP_REQUEST_BYTES,
     MAX_REPETITION_ENTRIES,
+    MIF_ADAPTER_PROTOCOL_SHA256,
     MIF_CHINESE_SPEC_SHA256,
     MIF_COMMIT,
     MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
     MIF_INDEX_SHA256,
+    MIF_SMOKE_CORPUS_SHA256,
     PROTOCOL,
     MifError,
     enforce_resource_limit,
@@ -153,13 +155,26 @@ def capabilities() -> dict[str, Any]:
             },
             {"name": "repetition-entries", "limit": MAX_REPETITION_ENTRIES},
         ],
-        "testedCorpora": [],
+        "testedCorpora": [
+            {
+                "digest": MIF_SMOKE_CORPUS_SHA256,
+                "classes": [
+                    "identity",
+                    "position",
+                    "replay",
+                    "ruleset",
+                    "transform",
+                ],
+            }
+        ],
         "annotations": {
             "contractCommit": MIF_COMMIT,
             "englishSpec": MIF_ENGLISH_SPEC_SHA256,
             "chineseSpec": MIF_CHINESE_SPEC_SHA256,
             "artifactIndex": MIF_INDEX_SHA256,
             "executableCorpus": MIF_EXECUTABLE_CORPUS_SHA256,
+            "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
+            "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
             "scope": "pinned-candidate-corpus-rulesets; no MIFSUITE published",
         },
     }
