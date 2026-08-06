@@ -1026,7 +1026,7 @@ database growth.
 ## MIF 1.0 Independent Interoperability Adapter
 
 The NMM_LLM adapter is locked to MIF commit
-`0693353fe0821dcbbf547cc1eb9b679dcf2f90b8` and implements all seven
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978` and implements all seven
 `MIF-INTEROP/1` operations: capabilities, MFEN/MPK canonicalization, finite
 rules execution, checkpoint-verifying replay, full-state transform, complete
 logical-turn projection, and the `legal-actions-v1` harness projection. It is
@@ -1041,26 +1041,30 @@ mechanisms, semantic-state extensions, mill effects, or stalemate policies
 with the legacy NMM_LLM board engine. No MIF Suite has been published, so this
 is not a suite-conformance claim.
 
-Candidate-3 is implemented by NMM_LLM commits `748dae2`, `feb4646`, and
-`121b663`. They correct the required MPK and claim diagnostics, add the closed
-legal-action projection, and enforce the frozen rule that flying applies only
-in phase m. At clean commit `121b663951fcc69e90e956d35c3d44d8118bb066`,
-55 focused tests and Ruff pass. The generator accepts the clean MIF checkout
-and all seven frozen hashes, while MIFCAP publishes both the smoke and
-deterministic corpus identities without claiming a Suite. The exact pin,
-hashes, scope, and host-local command-array generator are in
+Candidate-3 gameplay is implemented by NMM_LLM commits `748dae2`, `feb4646`,
+and `121b663`. Candidate-4 changes only the locked source and corpus identities
+in NMM_LLM commit `bbbde2ee4bf1ba0e45e259baa595a29cb85895b9`; it does not alter
+the independent state machine. The existing implementation matched all 58
+candidate-4 cases before the pin update, including the three new
+asymmetric-reserve origin cases. At the clean pin commit, 55 focused tests and
+Ruff pass. The generator accepts the clean MIF checkout and all seven frozen
+hashes, while MIFCAP publishes the 17-case smoke and 58-case deterministic
+corpus identities without claiming a Suite. The exact pin, hashes, scope, and
+host-local command-array generator are in
 [`docs/interop/mif-1.0-independent-adapter.md`](../interop/mif-1.0-independent-adapter.md).
+
 The raw
-[candidate-3 report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json)
+[candidate-4 report](../evidence/mif-interop-candidate-4-nmm-reference-report-2026-08-06.json)
 has SHA-256
-`552a3bddd731e51ce5323655c32f06782d1c73433131c86e71b49d335f77663c`
-and records 55/55 equality between the published MIF reference and NMM_LLM.
-It deliberately excludes Sanmill until that project publishes its independent
-candidate-3 changes. NMM_LLM's candidate-3 side is closed, but three-project
-M3 and Suite conformance are not: a new three-party 55-case report is still
-required. The earlier
-[candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json)
-remains the historical 17-case three-party evidence.
+`89dfcd97c914764aa95bcb5e6b6ecdb23686591037dbf8c5493fe8b3dfbc142f`
+and records 58/58 equality between the published MIF reference and NMM_LLM at
+clean commit `bbbde2ee4bf1ba0e45e259baa595a29cb85895b9`. It deliberately
+excludes Sanmill because that project's published HEAD remains its candidate-3
+commit `6f56c8efcba753001d8e07398c8c262d2aa6c481`. NMM_LLM's candidate-4
+side is closed, but three-project M3 and Suite conformance are not: a new
+three-party 58-case report must bind a later Sanmill candidate-4 commit. The
+earlier candidate-3 and candidate-2 reports remain historical evidence for
+their recorded identities.
 
 An additional 1,138-test repository run was attempted without skips, but the
 15-minute command limit stopped it at roughly 15% with no failure reported.

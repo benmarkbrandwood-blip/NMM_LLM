@@ -111,7 +111,7 @@ candidate-set principles in
   `data/training_paths.local.json`. It is used only by interoperability tools
   and is not a trainer input or runtime dependency.
 - Frozen adapter input: commit
-  `0693353fe0821dcbbf547cc1eb9b679dcf2f90b8`. Do not run comparison cases
+  `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. Do not run comparison cases
   against a floating MIF checkout and then attribute the result to this pin.
   The command generator also rejects worktree changes and verifies the formal
   four frozen file hashes plus the protocol, smoke and deterministic execution

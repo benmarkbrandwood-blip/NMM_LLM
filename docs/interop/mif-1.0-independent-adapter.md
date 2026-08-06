@@ -6,18 +6,18 @@ Status: implemented against the frozen candidate wire contract; no MIF Suite
 ## Frozen source identity
 
 The implementation is locked to MIF commit
-`0693353fe0821dcbbf547cc1eb9b679dcf2f90b8`. The formal frozen inputs and
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The formal frozen inputs and
 additional comparison inputs at that commit have these raw SHA-256 identities:
 
 | Input | Role | SHA-256 |
 |---|---|---|
 | `mif-1.0.md` | formal English specification | `330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995` |
 | `docs/zh-CN/mif-1.0.md` | formal Chinese specification | `9cc06abb57425e2bc2e26432b6da53abe503e9b5415ea0b4f854f19f68722cc1` |
-| `artifacts/mif-1.0/index.json` | formal artifact index | `2bd247cd7e27ff4b0e142d8a0b2d6dececd619c882bb67f0be11bf763a794895` |
-| `artifacts/mif-1.0/corpus/executable/reference-cases.json` | formal executable corpus | `a48c50352caebce30deb1de11f8f73dbc4540ee538651c3a139d9bcb166ba983` |
+| `artifacts/mif-1.0/index.json` | formal artifact index | `5acbb714bed77e24eaac72fa5f24d2e54d1e17aaf568a8b60718c840281a6541` |
+| `artifacts/mif-1.0/corpus/executable/reference-cases.json` | formal executable corpus | `350b7ff02772e820a57431e11c4e2f15a874d0779fb6e7afb01e9b16f6992741` |
 | `interop/adapter-protocol-v1.md` | additional process protocol | `253c1d201ea1db625e0c534da445ca4ecaa0b07597dfc7dbf59fbd6adf89874f` |
 | `interop/cases/smoke-v1.json` | additional smoke comparison corpus | `a6d292f4d19381172fbc19f89d3ee42145a6d5533d6d81fd719394e25342bb53` |
-| `interop/cases/deterministic-v1.json` | candidate-3 deterministic comparison corpus | `c2d7017b2a8583914aff1eeea38bc02b078814ca11346c484e0a2b38b5e94f0c` |
+| `interop/cases/deterministic-v1.json` | candidate-4 deterministic comparison corpus | `d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82` |
 
 The adapter has no runtime dependency on the MIF repository. The checkout is
 needed only by the external comparison harness and its test cases.
@@ -59,9 +59,9 @@ non-standard mill effects and non-loss/draw stalemate actions are not claimed.
 This narrower, explicit claim is preferable to silently approximating a
 variant with NMM_LLM's legacy `BoardState` rules.
 
-The capability binds all seven candidate-3 source and harness identities in its
+The capability binds all seven candidate-4 source and harness identities in its
 annotations. Its `testedCorpora` retains the 17-case smoke identity and adds the
-55-case deterministic identity after the NMM_LLM adapter matched the separate
+58-case deterministic identity after the NMM_LLM adapter matched the separate
 MIF reference process. The deterministic record covers identity, key,
 position, replay, ruleset and transform. The separate `suites` array remains
 empty because this evidence is not a published MIF Suite.
@@ -124,30 +124,37 @@ The legal-action tests also expose and prevent phase-p flying: placing movement
 may be enabled, but the frozen contract restricts flying to phase m. Ruff passes
 for the complete focused implementation and test set.
 
-The candidate-3 implementation is the three-commit chain ending at NMM_LLM
-commit `121b663951fcc69e90e956d35c3d44d8118bb066`. At that clean commit, the
-command generator accepted clean MIF commit
-`0693353fe0821dcbbf547cc1eb9b679dcf2f90b8` and all seven hashes above. The
-official deterministic corpus then compared equal on all 55 cases between the
-separate MIF reference and NMM_LLM processes. The exact comparator output is
-preserved as the
-[candidate-3 NMM/reference report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json),
+The candidate-3 gameplay implementation is the three-commit chain ending at
+NMM_LLM commit `121b663951fcc69e90e956d35c3d44d8118bb066`. Candidate-4 changes
+only the locked identities at clean NMM_LLM commit
+`bbbde2ee4bf1ba0e45e259baa595a29cb85895b9`; no gameplay code changed. Before
+the pin was updated, the same implementation already matched all 58
+candidate-4 cases, including the three asymmetric-reserve origin cases. At the
+clean pin commit, 55 focused tests and Ruff pass, and the command generator
+accepts clean MIF commit
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978` plus all seven hashes above.
+
+The exact two-adapter comparator output is preserved as the
+[candidate-4 NMM/reference report](../evidence/mif-interop-candidate-4-nmm-reference-report-2026-08-06.json),
 SHA-256
-`552a3bddd731e51ce5323655c32f06782d1c73433131c86e71b49d335f77663c`.
-It records cases digest
-`sha256:c2d7017b2a8583914aff1eeea38bc02b078814ca11346c484e0a2b38b5e94f0c`
+`89dfcd97c914764aa95bcb5e6b6ecdb23686591037dbf8c5493fe8b3dfbc142f`.
+It records 58/58 equality, cases digest
+`sha256:d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82`
 and machine-local config digest
 `sha256:1d04f6f2f775239110ff00a1f97bb129fe13f1d903dd284f6f3905810b1b7889`.
 The generated configuration remains ignored because it contains host paths.
 
-This closes the NMM_LLM side of the candidate-3 implementation and
-deterministic comparison. It does not complete three-project M3: the persisted
-report intentionally contains only the published MIF reference and the clean
-NMM_LLM commit. A new three-party 55-case report is required after Sanmill
-publishes its independent candidate-3 changes. Neither result is MIF Suite
-conformance. The historical
+This closes the NMM_LLM side of the candidate-4 pin and deterministic
+comparison. It does not complete three-project M3: the persisted report
+intentionally contains only the published MIF reference and clean NMM_LLM
+commit. Sanmill is still published at its candidate-3 commit
+`6f56c8efcba753001d8e07398c8c262d2aa6c481`; a new three-party 58-case
+report must bind a later Sanmill candidate-4 pin and all three immutable
+commits. Neither result is MIF Suite conformance. The historical
+[candidate-3 report](../evidence/mif-interop-candidate-3-nmm-reference-report-2026-08-06.json)
+and
 [candidate-2 report](../evidence/mif-interop-candidate-2-report-2026-08-06.json)
-remains valid for its recorded 17-case identities.
+remain valid only for their recorded identities.
 
 A full 1,138-test NMM_LLM run was attempted without skips at the previous
 baseline, but reached the 15-minute command limit at roughly 15% with no
