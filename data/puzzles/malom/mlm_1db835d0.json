@@ -1,0 +1,59 @@
+{
+  "id": "mlm_1db835d0",
+  "source_db": "malom",
+  "board_fen": ".W...B.W..B.WBBBB..WWWBW|B|9|9",
+  "side_to_move": "B",
+  "winning_side": "B",
+  "goal": "Black to move and win in 9",
+  "target_win_in": 9,
+  "best_move": "f6-d6",
+  "solution_line": [
+    "f6-d6",
+    "e4-e5",
+    "d6-b6xd3",
+    "e3-d3",
+    "b6-d6",
+    "e5-d5",
+    "d6-b6xc4",
+    "d7-d6",
+    "b4-c4xa4",
+    "d6-f6",
+    "c4-b4xd3",
+    "d5-f4xc3",
+    "d2-d3",
+    "f6-d2",
+    "b4-c4",
+    "f4-a7",
+    "d3-c3xa7"
+  ],
+  "legal_moves": [
+    "d1-g1",
+    "d1-a1",
+    "f6-d6",
+    "f6-f4",
+    "b4-b6",
+    "c5-d5"
+  ],
+  "winning_moves": [
+    "f6-d6"
+  ],
+  "losing_moves": [
+    "d1-g1",
+    "d1-a1"
+  ],
+  "drawing_moves": [
+    "f6-f4",
+    "b4-b6",
+    "c5-d5"
+  ],
+  "hardness_score": 9.0,
+  "tags": [
+    "midgame",
+    "win-in-9",
+    "unique-move",
+    "bottleneck",
+    "high-branching",
+    "early-game"
+  ],
+  "created_at": "2026-08-06 09:15"
+}

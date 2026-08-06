@@ -428,7 +428,7 @@ window._savePuzzle = async function() {
     movesDone    = [];
     solved       = false;
     failed       = false;
-    freePlayMode = false;
+    freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('goal-label').style.display = '';
     document.getElementById('goal-label').textContent   = puzzle.goal;
@@ -441,7 +441,8 @@ window._savePuzzle = async function() {
     } else { snumEl.textContent = ''; }
     document.getElementById('meta').innerHTML =
       `Source: <span>${puzzle.source_db}</span> &nbsp;|&nbsp; ` +
-      `<span>${puzzle.tags.includes('db-verified') ? '✓ DB-verified' : 'user-submitted'}</span>`;
+      `<span>${puzzle.tags.includes('db-verified') ? '✓ DB-verified' : 'user-submitted'}</span>` +
+      ` &nbsp;|&nbsp; Played: <span>${puzzle.play_count || 0}×</span>`;
     document.getElementById('tags').innerHTML =
       (puzzle.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
     document.getElementById('alt-note').style.display = '';
@@ -469,8 +470,9 @@ let solved      = false;
 let failed      = false;
 let pendingMove = null;
 let puzzleMode  = 'endgame';  // 'endgame' | 'midgame' | 'placement'
-let freePlayMode = false;      // true after user chooses "Continue vs AI" on a wrong move
-let _wrongMoveNotation = null; // the wrong move to apply if user picks "Continue vs AI"
+let freePlayMode = false;       // true after user chooses "Continue vs AI" on a wrong move
+let _wrongMoveNotation = null;  // the wrong move to apply if user picks "Continue vs AI"
+let _opponentThinking  = false; // true while waiting for opponent move (blocks user clicks)
 
 function isPlacementPhase(fen) {
   const parts = fen ? fen.split('|') : [];
@@ -564,7 +566,7 @@ function onNodeClick(pos) {
   }
 
   if (!puzzle || solved || failed) return;
-  if (movesDone.length % 2 !== 0) return;   // opponent auto-play turn
+  if (_opponentThinking) return;   // opponent auto-play in progress
 
   const ws  = puzzle.winning_side;
   const opp = ws === 'W' ? 'B' : 'W';
@@ -680,7 +682,7 @@ window._wrongMoveContinue = async function() {
     const r = await fetch(url);
     if (!r.ok) {
       setStatus('Could not apply that move — try again.', 'fail');
-      freePlayMode = false;
+      freePlayMode = false; _opponentThinking = false;
       setupUserTurn(null);
       return;
     }
@@ -690,11 +692,12 @@ window._wrongMoveContinue = async function() {
     posMap     = parseFen(currentFen);
     updateMoveLog();
     showBoard();
+    _opponentThinking = true;
     setStatus('Free play — opponent thinking…', 'info');
     setTimeout(autoPlayOpponent, 700);
   } catch (e) {
     setStatus('Network error: ' + e.message, 'fail');
-    freePlayMode = false;
+    freePlayMode = false; _opponentThinking = false;
   }
 };
 
@@ -702,7 +705,11 @@ window._wrongMoveContinue = async function() {
 async function submitMove(notation) {
   // In free-play mode skip solution-line checking entirely.
   if (!freePlayMode && puzzle.solution_line && movesDone.length < puzzle.solution_line.length) {
-    if (notation !== puzzle.solution_line[movesDone.length]) {
+    const opp2 = puzzle.winning_side === 'W' ? 'B' : 'W';
+    const oppLeft = Object.values(posMap).filter(v => v === opp2).length;
+    // When opponent has exactly 3 pieces, any capture wins — don't enforce the line.
+    const anyCapWins = notation.includes('x') && oppLeft === 3;
+    if (!anyCapWins && notation !== puzzle.solution_line[movesDone.length]) {
       showWrongMoveDialog(notation);
       return;
     }
@@ -740,6 +747,7 @@ async function submitMove(notation) {
       solved = true;
     } else {
       showBoard();
+      _opponentThinking = true;
       setStatus('✓ Correct! Opponent thinking…', 'ok');
       setTimeout(autoPlayOpponent, 700);
     }
@@ -752,41 +760,33 @@ async function autoPlayOpponent() {
   const soFar = movesDone.length;
 
   if (freePlayMode) {
-    // Free-play: ask Malom for the hardest opponent reply.
+    // Free-play: use difficulty-5 heuristic AI (no personality, no Malom needed).
     const opp = puzzle.winning_side === 'W' ? 'B' : 'W';
     try {
-      const r = await fetch(`/api/puzzles/malom/best-response?fen=${encodeURIComponent(currentFen)}&winning_side=${opp}`);
-      if (!r.ok) {
-        setupUserTurn(null);
-        setStatus('Free play — your turn.', 'info');
-        return;
-      }
+      const r    = await fetch(`/api/puzzles/heuristic-move?fen=${encodeURIComponent(currentFen)}&side=${opp}`);
       const data = await r.json();
-      if (!data.move) {
-        setStatus('🎉 You win — opponent has no moves!', 'ok');
-        solved = true;
+      if (!r.ok || !data.move) {
+        _opponentThinking = false;
+        setupUserTurn(null);
+        setStatus(data.game_over ? '🎉 You win — opponent has no moves!' : 'Free play — your turn.', 'info');
+        if (data.game_over) solved = true;
         return;
       }
-      const oppMove = data.move;
-      const valUrl  = `${_validateBaseUrl()}?fen=${encodeURIComponent(currentFen)}`
-                    + `&move=${encodeURIComponent(oppMove)}`
-                    + `&winning_side=${puzzle.winning_side}`
-                    + `&target_win_in=99`;
-      const vr = await fetch(valUrl);
-      if (vr.ok) {
-        const vd   = await vr.json();
-        movesDone.push(oppMove);
-        currentFen = vd.child_fen;
-        posMap     = parseFen(currentFen);
-        updateMoveLog();
-        showBoard();
-        setupUserTurn(null);
-        setStatus(`Free play — opponent played ${oppMove}. Your turn.`, 'info');
+      movesDone.push(data.move);
+      currentFen = data.child_fen;
+      posMap     = parseFen(currentFen);
+      updateMoveLog();
+      showBoard();
+      _opponentThinking = false;
+      if (data.game_over) {
+        setStatus(`Opponent played ${data.move}. Game over.`, 'info');
+        solved = true;
       } else {
         setupUserTurn(null);
-        setStatus('Free play — your turn.', 'info');
+        setStatus(`Free play — opponent played ${data.move}. Your turn.`, 'info');
       }
     } catch (_) {
+      _opponentThinking = false;
       setupUserTurn(null);
       setStatus('Free play — your turn.', 'info');
     }
@@ -814,10 +814,13 @@ async function autoPlayOpponent() {
       posMap      = parseFen(currentFen);
       updateMoveLog();
       const movesLeft = puzzle.target_win_in - Math.ceil(movesDone.length / 2);
+      _opponentThinking = false;
       setupUserTurn(null);
       setStatus(`Opponent played ${oppMove}. Find the win in ${movesLeft} more move${movesLeft === 1 ? '' : 's'}.`, 'info');
+    } else {
+      _opponentThinking = false;
     }
-  } catch (_) { /* silent */ }
+  } catch (_) { _opponentThinking = false; }
 }
 
 window._showHint = function() {
@@ -981,7 +984,7 @@ window._loadPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
-    freePlayMode = false;
+    freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
@@ -1001,7 +1004,8 @@ window._loadPuzzle = async function() {
     document.getElementById('meta').innerHTML =
       `Source: <span>${puzzle.source_db}</span> &nbsp;|&nbsp; ` +
       `Hardness: <span class="score">${puzzle.hardness_score}</span> &nbsp;|&nbsp; ` +
-      `Legal: <span>${puzzle.legal_moves.length} moves</span>`;
+      `Legal: <span>${puzzle.legal_moves.length} moves</span>` +
+      ` &nbsp;|&nbsp; Played: <span>${puzzle.play_count || 0}×</span>`;
     document.getElementById('tags').innerHTML =
       (puzzle.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
     document.getElementById('alt-note').style.display = '';
@@ -1049,8 +1053,8 @@ window._setMode = function(mode) {
   document.getElementById('tags').innerHTML            = '';
   const hints = {
     endgame:   'Click "New puzzle" to load an endgame puzzle.',
-    midgame:   'Click "New puzzle" to load a midgame puzzle from the Malom database.',
-    placement: 'Click "New puzzle" to load a placement-phase puzzle from the Malom database.',
+    midgame:   'Click "New puzzle" to load a midgame puzzle.',
+    placement: 'Click "New puzzle" to load a placement puzzle.',
   };
   setStatus(hints[mode], 'info');
   showBoard();
@@ -1080,7 +1084,7 @@ window._loadMalomPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
-    freePlayMode = false;
+    freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
@@ -1100,7 +1104,8 @@ window._loadMalomPuzzle = async function() {
     document.getElementById('meta').innerHTML =
       `Source: <span>${puzzle.source_db}</span> &nbsp;|&nbsp; ` +
       `Hardness: <span class="score">${puzzle.hardness_score}</span> &nbsp;|&nbsp; ` +
-      `Legal: <span>${puzzle.legal_moves.length} moves</span>`;
+      `Legal: <span>${puzzle.legal_moves.length} moves</span>` +
+      ` &nbsp;|&nbsp; Played: <span>${puzzle.play_count || 0}×</span>`;
     document.getElementById('tags').innerHTML =
       (puzzle.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
     document.getElementById('alt-note').style.display = '';
@@ -1124,7 +1129,7 @@ window._loadPlacementPuzzle = async function() {
   const btn = document.getElementById('btn-new-plc');
   btn.disabled = true;
   btn.textContent = 'Loading…';
-  setStatus('Fetching placement puzzle from Malom database…', 'info');
+  setStatus('Fetching placement puzzle…', 'info');
 
   const side  = document.getElementById('sel-side-plc').value;
   const depth = document.getElementById('sel-depth-plc').value;
@@ -1142,7 +1147,7 @@ window._loadPlacementPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
-    freePlayMode = false;
+    freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
     document.getElementById('goal-label').style.display = '';
@@ -1162,7 +1167,8 @@ window._loadPlacementPuzzle = async function() {
     document.getElementById('meta').innerHTML =
       `Source: <span>${puzzle.source_db}</span> &nbsp;|&nbsp; ` +
       `Hardness: <span class="score">${puzzle.hardness_score}</span> &nbsp;|&nbsp; ` +
-      `Legal: <span>${puzzle.legal_moves.length} moves</span>`;
+      `Legal: <span>${puzzle.legal_moves.length} moves</span>` +
+      ` &nbsp;|&nbsp; Played: <span>${puzzle.play_count || 0}×</span>`;
     document.getElementById('tags').innerHTML =
       (puzzle.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
     document.getElementById('alt-note').style.display = '';

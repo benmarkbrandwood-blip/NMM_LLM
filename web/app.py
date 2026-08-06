@@ -1317,6 +1317,29 @@ _PLACEMENT_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 from datetime import datetime as _puzzle_dt
 
 
+def _puzzle_pick_and_increment(candidates: list[dict], all_cached: list[dict],
+                                id_to_number: dict, path_map: dict) -> dict:
+    """Pick the lowest-play-count puzzle, increment its counter, return enriched copy."""
+    import json as _pjson, random as _prand
+    min_count = min(d.get("play_count", 0) for d in candidates)
+    fresh = [d for d in candidates if d.get("play_count", 0) == min_count]
+    chosen = _prand.choice(fresh)
+    # Increment play_count in the JSON file
+    jf = path_map.get(chosen["id"])
+    if jf and jf.exists():
+        try:
+            raw = _pjson.loads(jf.read_text())
+            raw["play_count"] = raw.get("play_count", 0) + 1
+            jf.write_text(_pjson.dumps(raw, indent=2))
+            chosen = dict(chosen)
+            chosen["play_count"] = raw["play_count"]
+        except Exception:
+            pass
+    chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
+    chosen["total_puzzles"] = len(all_cached)
+    return chosen
+
+
 @app.get("/api/puzzles/random")
 async def api_puzzle_random(
     side: str = "random",
@@ -1347,6 +1370,7 @@ async def api_puzzle_random(
     # ── Cache path (skipped when generate=True so we always produce something new) ──
     if not generate:
         all_cached: list[dict] = []
+        path_map: dict = {}
         for jf in _PUZZLE_CACHE_DIR.glob("*.json"):
             try:
                 data = json.loads(jf.read_text())
@@ -1355,6 +1379,7 @@ async def api_puzzle_random(
             if "created_at" not in data:
                 data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
             all_cached.append(data)
+            path_map[data["id"]] = jf
 
         # Sort by created_at so puzzle numbers are stable
         all_cached.sort(key=lambda d: d.get("created_at", ""))
@@ -1368,19 +1393,12 @@ async def api_puzzle_random(
         ]
 
         if candidates:
-            chosen = _rand.choice(candidates)
-            chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
-            chosen["total_puzzles"] = len(all_cached)
-            return chosen
+            return _puzzle_pick_and_increment(candidates, all_cached, id_to_number, path_map)
 
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={
-                "error": "No cached puzzles found. Click 'Generate new' to create one "
-                         "(takes ~30–90s), or pre-generate with the CLI.",
-                "hint": ".venv/bin/python tools/puzzle_generator.py --count 20",
-            },
+            content={"error": "No puzzles found. Run the CLI generator to populate the cache."},
         )
 
     # ── Live generation ────────────────────────────────────────────────────────
@@ -1641,6 +1659,7 @@ async def api_malom_puzzle_random(
 
     # ── Try cache first ──────────────────────────────────────────────────────
     all_cached: list[dict] = []
+    path_map: dict = {}
     for jf in _MALOM_PUZZLE_CACHE_DIR.glob("*.json"):
         try:
             data = json.loads(jf.read_text())
@@ -1649,6 +1668,7 @@ async def api_malom_puzzle_random(
         if "created_at" not in data:
             data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
         all_cached.append(data)
+        path_map[data["id"]] = jf
 
     all_cached.sort(key=lambda d: d.get("created_at", ""))
     id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
@@ -1660,10 +1680,7 @@ async def api_malom_puzzle_random(
         and (depth == 0 or d.get("target_win_in") == depth)
     ]
     if candidates:
-        chosen = _rand.choice(candidates)
-        chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
-        chosen["total_puzzles"] = len(all_cached)
-        return chosen
+        return _puzzle_pick_and_increment(candidates, all_cached, id_to_number, path_map)
 
     # ── Live generation ──────────────────────────────────────────────────────
     if _malom_db is None or not _malom_db.is_available():
@@ -1857,6 +1874,54 @@ async def api_malom_best_response(fen: str, winning_side: str):
     }
 
 
+@app.get("/api/puzzles/heuristic-move")
+async def api_puzzles_heuristic_move(fen: str, side: str):
+    """Pick a move for *side* using the heuristic AI at difficulty 5 (no personality).
+
+    Used by the puzzle 'Continue vs AI' free-play mode so the opponent is driven
+    by the engine rather than Malom (which requires a prewarmed hash cache).
+
+    Returns {"move": str | null, "child_fen": str, "game_over": bool}
+    """
+    import asyncio as _asyncio
+    from fastapi import HTTPException
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+    from ai.malom_puzzle_search import _notation as _mnot
+
+    if side not in ("W", "B"):
+        raise HTTPException(400, "side must be W or B")
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception:
+        raise HTTPException(400, f"Invalid FEN: {fen!r}")
+
+    moves = get_all_legal_moves(board)
+    if not moves:
+        return {"move": None, "child_fen": fen, "game_over": True}
+
+    def _run():
+        try:
+            gai = _make_game_ai_for_personality(side, "balanced", difficulty=5)
+            mv  = gai.choose_move(board)
+            return mv
+        except Exception:
+            return None
+
+    mv = await _asyncio.to_thread(_run)
+    if mv is None:
+        mv = moves[0]
+
+    child      = board.apply_move(mv)
+    opp        = "B" if side == "W" else "W"
+    game_over  = child.pieces_on_board.get(opp, 0) < 3 or not get_all_legal_moves(child)
+    return {
+        "move":      _mnot(mv),
+        "child_fen": child.to_fen_string(),
+        "game_over": game_over,
+    }
+
+
 @app.get("/api/puzzles/placement/random")
 async def api_placement_puzzle_random(
     side: str = "random",
@@ -1882,6 +1947,7 @@ async def api_placement_puzzle_random(
         raise HTTPException(400, "depth must be 0/4/5/6/7/8/9/10")
 
     all_cached: list[dict] = []
+    path_map: dict = {}
     for jf in _PLACEMENT_PUZZLE_CACHE_DIR.glob("*.json"):
         try:
             data = json.loads(jf.read_text())
@@ -1890,6 +1956,7 @@ async def api_placement_puzzle_random(
         if "created_at" not in data:
             data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
         all_cached.append(data)
+        path_map[data["id"]] = jf
 
     all_cached.sort(key=lambda d: d.get("created_at", ""))
     id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
@@ -1901,10 +1968,7 @@ async def api_placement_puzzle_random(
         and (depth == 0 or d.get("target_win_in") == depth)
     ]
     if candidates:
-        chosen = _rand.choice(candidates)
-        chosen["puzzle_number"] = id_to_number.get(chosen["id"], 0)
-        chosen["total_puzzles"] = len(all_cached)
-        return chosen
+        return _puzzle_pick_and_increment(candidates, all_cached, id_to_number, path_map)
 
     if _malom_db is None or not _malom_db.is_available():
         from fastapi.responses import JSONResponse
