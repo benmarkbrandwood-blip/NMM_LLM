@@ -12,6 +12,16 @@ available. The authorized corrected-v4 managed plan
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
 
+The separately authorized rules-corrected successor smoke
+`successor-rules-v2-smoke-001` completed on 7 August from clean, published
+`dev` commit `5cb44b1`. It used fresh weights, the isolated empty corrected DB,
+the final MIF and rules identities, and explicit disable controls. Two counted
+games produced one finite 14-step Adam update and a verified version-2
+`latest.pt`; the lifecycle chain and post-run database audit pass. This is
+infrastructure evidence only. The smoke authorization is consumed and no long
+run is authorized. See the
+[successor smoke result](../evidence/successor-training-smoke-result-2026-08-07.md).
+
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
 the 64-position corpus and synthetic
@@ -1167,8 +1177,17 @@ experiment-specific rather than MIF publication gates.
 
 ## Recommended Next Actions
 
+The rules-corrected successor smoke is complete and passed. Preserve its
+manifest, lifecycle ledger, logs, checkpoint, database, and recorded hashes as
+one disposable evidence bundle. Do not exact-resume it or use its populated DB
+as a fresh long-run input. Before proposing a long run, execute the current
+complete test suite, create a separate empty corrected DB and output root, and
+freeze a new immutable plan with an evidence-backed wall-time envelope. The
+two-game smoke is not a representative throughput benchmark, and no long-run
+authorization exists.
+
 The workspace/root check, graph inspection, earlier trainer fixes, focused
-tests, 102-test Malom/provenance rerun, first-experiment component decision,
+tests, mandatory Malom/provenance rerun, first-experiment component decision,
 bounded smoke, managed-plan hardening, and the 5,000-game managed run are
 complete. The owner-reviewed 106-position package is committed, its focused
 checks pass, and the complete Python baseline is also clean. Do not launch more

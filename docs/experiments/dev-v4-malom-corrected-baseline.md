@@ -179,7 +179,7 @@ Before either smoke or long training, record:
    into tracked files;
 4. output-directory existence and contents;
 5. SpecialistDB label version and row counts;
-6. the focused Generalist and 102-test Malom/provenance results.
+6. the focused Generalist and mandatory Malom/provenance results.
 
 The launch log must show all of the following:
 
@@ -303,8 +303,11 @@ semantic state. The full evidence is recorded in
 
 The original one-game run also did not create `update_log.jsonl`, so it did not
 exercise periodic update-log or best-checkpoint cadence. The reporting fix is
-covered by focused tests; a new post-fix smoke has not been launched without a
-separate readiness gate and launch authorisation.
+covered by focused tests. A separately authorized two-game rules-corrected
+successor smoke later performed a real final-flush update and produced a
+verified version-2 checkpoint. It is recorded in the
+[successor smoke result](../evidence/successor-training-smoke-result-2026-08-07.md)
+and does not extend or resume this completed experiment.
 
 ## Long-Run Launch Gate
 
@@ -331,7 +334,7 @@ does not provide a new plan or launch authorization.
 
 Immediately before launch, rerun the training-readiness workflow and re-check
 the corrected SpecialistDB identity, new output directory, resolved work
-budget, component manifest, native fixed-work probe, and quarantine rules. A
-new disposable smoke must reach at least one RL update and prove that imitation
-stayed disabled. Do not reuse the original smoke DB, smoke checkpoint, or any
-author-`main` checkpoint.
+budget, component manifest, native fixed-work probe, and quarantine rules. The
+successor smoke has now reached one real RL update and kept imitation disabled,
+but it does not authorize a long run. Do not reuse either smoke DB, either smoke
+checkpoint, or any author-`main` checkpoint for a fresh long experiment.
