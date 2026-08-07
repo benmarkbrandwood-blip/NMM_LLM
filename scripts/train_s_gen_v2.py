@@ -36,7 +36,8 @@ _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from game.board import BoardState, MILLS
-from game.rules import is_terminal
+from game.draw_rules import StandardDrawState, StandardDrawTracker
+from game.rules import is_terminal, terminal_result
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from learned_ai.agents.heuristic_agent import GameAI as _GA
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
@@ -379,6 +380,7 @@ class GameDiag:
     bucket_opening:          int
     bucket_midgame:          int
     bucket_endgame:          int
+    termination_reason:      str = "legacy-unknown"
     opponent_search_nodes:   int = 0
     opponent_search_calls:   int = 0
     opponent_node_budget:    Optional[int] = None
@@ -1210,8 +1212,10 @@ class RolloutResult:
     step_diags:        list[StepDiag]
     outcome:           float
     ply:               int
-    branch_candidates: list[tuple[int, BoardState, str]]
+    termination_reason: str
+    branch_candidates: list[tuple[int, BoardState, str, StandardDrawState]]
     retry_board:       Optional[BoardState] = None
+    retry_draw_state:  Optional[StandardDrawState] = None
     opponent_search_nodes: int = 0
     opponent_search_calls: int = 0
     opponent_node_budget: Optional[int] = None
@@ -1301,6 +1305,7 @@ def _rollout(
     malom_db=None,
     deep_game: bool = False,
     torch_generator: Optional[torch.Generator] = None,
+    draw_state: Optional[StandardDrawState] = None,
 ) -> RolloutResult:
     # For deep games (1-in-20): temporarily run full ply_depth simulation
     _saved_sim_ply = None
@@ -1313,12 +1318,15 @@ def _rollout(
     move_phase_start_ply:   Optional[int] = None
     game_trajectory:        list[ScaffoldedStep] = []
     step_diags:             list[StepDiag]       = []
-    branch_candidates:      list[tuple[int, BoardState, str]] = []
+    branch_candidates:      list[tuple[int, BoardState, str, StandardDrawState]] = []
     done                    = False
     outcome                 = 0.0
+    termination_reason      = "ongoing"
     learner_move_count      = 0
     learner_placement_count = 0
     retry_board: Optional[BoardState] = None
+    retry_draw_state: Optional[StandardDrawState] = None
+    draw_rules = StandardDrawTracker(board, state=draw_state)
     move_history: deque[dict] = deque(maxlen=N_HISTORY)
     learner_boards: list[BoardState] = []
     learner_result_boards: list[BoardState] = []
@@ -1330,10 +1338,11 @@ def _rollout(
     while ply < max_ply:
         if ply == retry_ply:
             retry_board = board
+            retry_draw_state = draw_rules.snapshot()
         if board.phase != "place" and move_phase_start_ply is None:
             move_phase_start_ply = ply
 
-        terminal, winner = is_terminal(board)
+        terminal, winner, terminal_reason = terminal_result(board)
         if terminal:
             if winner == learner_color:
                 outcome = WIN_REWARD
@@ -1341,6 +1350,7 @@ def _rollout(
                 outcome = LOSS_REWARD
             else:
                 outcome = DRAW_SHORT if ply < MAX_PLY else DRAW_LONG
+            termination_reason = terminal_reason or "terminal"
             done = True
             break
 
@@ -1360,6 +1370,7 @@ def _rollout(
             )
             if enc is None or not enc.legal_moves:
                 outcome = LOSS_REWARD
+                termination_reason = "learner-no-legal-move"
                 done    = True
                 break
 
@@ -1497,9 +1508,38 @@ def _rollout(
             learner_move_count += 1
             if record_branches and branch_every > 0 and (learner_move_count % branch_every == 0):
                 moves_into_movement = (ply - move_phase_start_ply) if move_phase_start_ply is not None else None
-                branch_candidates.append((ply, board, _phase_bucket(board, moves_into_movement)))
+                branch_candidates.append(
+                    (
+                        ply,
+                        board,
+                        _phase_bucket(board, moves_into_movement),
+                        draw_rules.snapshot(),
+                    )
+                )
 
             board = board_after
+
+            terminal_after, winner_after, reason_after = terminal_result(board)
+            draw_reason = None
+            if terminal_after:
+                outcome = (
+                    WIN_REWARD
+                    if winner_after == learner_color
+                    else LOSS_REWARD
+                )
+                termination_reason = reason_after or "terminal"
+                done = True
+            else:
+                draw_reason = draw_rules.observe(
+                    learner_boards[-1],
+                    move,
+                    board,
+                )
+            if draw_reason is not None:
+                outcome = DRAW_SHORT
+                termination_reason = draw_reason
+                done = True
+                game_trajectory[-1].done = True
 
         else:
             try:
@@ -1514,15 +1554,40 @@ def _rollout(
                 opponent_search_calls += 1
             if not opp_move:
                 outcome = WIN_REWARD
+                termination_reason = "opponent-no-move"
                 done    = True
                 break
             move_history.append(opp_move)
+            board_before = board
             board = board.apply_move(opp_move)
+            terminal_after, winner_after, reason_after = terminal_result(board)
+            draw_reason = None
+            if terminal_after:
+                outcome = (
+                    WIN_REWARD
+                    if winner_after == learner_color
+                    else LOSS_REWARD
+                )
+                termination_reason = reason_after or "terminal"
+                done = True
+                if game_trajectory:
+                    game_trajectory[-1].done = True
+            else:
+                draw_reason = draw_rules.observe(board_before, opp_move, board)
+            if draw_reason is not None:
+                outcome = DRAW_SHORT
+                termination_reason = draw_reason
+                done = True
+                if game_trajectory:
+                    game_trajectory[-1].done = True
 
         ply += 1
+        if done:
+            break
 
     if not done:
         outcome = DRAW_LONG
+        termination_reason = "max-ply-truncation"
 
     if _saved_sim_ply is not None and lookahead_advisor is not None:
         lookahead_advisor._sim_ply_depth = _saved_sim_ply
@@ -1542,8 +1607,10 @@ def _rollout(
         step_diags=step_diags,
         outcome=outcome,
         ply=ply,
+        termination_reason=termination_reason,
         branch_candidates=branch_candidates,
         retry_board=retry_board,
+        retry_draw_state=retry_draw_state,
         opponent_search_nodes=opponent_search_nodes,
         opponent_search_calls=opponent_search_calls,
         opponent_node_budget=opponent_node_budget,
@@ -1618,6 +1685,7 @@ def _build_game_diag(
         bucket_opening =bucket_counts.get("opening",  0),
         bucket_midgame =bucket_counts.get("midgame",  0),
         bucket_endgame =bucket_counts.get("endgame",  0),
+        termination_reason=result.termination_reason,
         opponent_search_nodes=result.opponent_search_nodes,
         opponent_search_calls=result.opponent_search_calls,
         opponent_node_budget=result.opponent_node_budget,
@@ -2110,6 +2178,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    draw_state=result.retry_draw_state,
                     torch_generator=_game_torch_generator(
                         _derive_game_identity(
                             args.seed, cfg.scheduled_index, "confirm"
@@ -2204,6 +2273,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    draw_state=result.retry_draw_state,
                     torch_generator=_game_torch_generator(
                         _derive_game_identity(
                             args.seed, cfg.scheduled_index, "retry"
@@ -2238,7 +2308,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             )
             branch_order_rng.shuffle(candidates)
             seen_buckets: set[str] = set()
-            ordered_candidates: list[tuple[int, BoardState, str]] = []
+            ordered_candidates: list[
+                tuple[int, BoardState, str, StandardDrawState]
+            ] = []
             for cand in candidates:
                 if cand[2] not in seen_buckets:
                     ordered_candidates.insert(0, cand)
@@ -2250,6 +2322,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 branch_ply,
                 branch_board,
                 bucket,
+                branch_draw_state,
             ) in enumerate(ordered_candidates):
                 if not _extra_rollout_fits_in_segment(game_count, segment_stop_game):
                     break
@@ -2278,6 +2351,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     human_db=human_db,
                     specialist_db=specialist_db,
                     malom_db=db,
+                    draw_state=branch_draw_state,
                     torch_generator=_game_torch_generator(
                         _derive_game_identity(
                             args.seed,

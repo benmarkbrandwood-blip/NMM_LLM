@@ -88,7 +88,7 @@ PATH_SPECS = {
     "ruleset_manifest": (
         "NMM_RULESET_MANIFEST",
         "ruleset_manifest_path",
-        "data/rulesets/nmm-training-core@1.json",
+        "data/rulesets/nmm-training-core@2.json",
     ),
 }
 

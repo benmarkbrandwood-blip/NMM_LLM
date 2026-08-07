@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from .board import BoardState, BOARD_REFERENCE
+from .draw_rules import StandardDrawTracker
 from .notation import encode_move, export_pgn_style
 from .rules import (
     does_form_mill,
@@ -48,8 +49,7 @@ class GameEngine:
         self.winner: Optional[str] = None
         self.draw_reason: Optional[str] = None
         self._turn_num: int = 1  # pair number (White + Black = 1 turn)
-        self._post_placement_moves: int = 0   # half-moves after placement ends
-        self._move_log: List[Tuple] = []       # (color, from, to) per half-move
+        self._draw_rules = StandardDrawTracker(self.board)
 
         self.game_record: Dict = {
             "session_id": str(uuid.uuid4()),
@@ -98,6 +98,7 @@ class GameEngine:
         }
 
         self.game_record["moves"].append(record_entry)
+        previous_board = self.board
         self.board = self.board.apply_move(move)
 
         # Advance pair counter after Black moves
@@ -113,60 +114,16 @@ class GameEngine:
 
         # Draw checks (only when game not already finished by terminal condition)
         if not self.finished:
-            placement_done = (
-                self.board.pieces_placed.get("W", 0) >= 9
-                and self.board.pieces_placed.get("B", 0) >= 9
+            draw_reason = self._draw_rules.observe(
+                previous_board,
+                move,
+                self.board,
             )
-            if placement_done:
-                self._post_placement_moves += 1
-
-            # Store (color, from, to, capture) so the repetition check can exclude
-            # moves that changed material — a capture can never be part of repetition.
-            self._move_log.append(
-                (color, move.get("from"), move.get("to"), move.get("capture"))
-            )
-
-            # Threefold repetition: the SAME BOARD POSITION occurred 3 times.
-            # Requires BOTH players to oscillate over 8 half-moves (4 per player):
-            #   A: A→B  B: C→D  A: B→A  B: D→C   (position repeats once)
-            #   A: A→B  B: C→D  A: B→A  B: D→C   (position repeats a 3rd time)
-            # 6-half-move check only catches 2-fold (1 oscillation cycle each).
-            log = self._move_log
-            if len(log) >= 8:
-                no_captures = all(log[i][3] is None for i in (-1,-2,-3,-4,-5,-6,-7,-8))
-                if no_captures:
-                    c1, f1, t1, _ = log[-1]
-                    c3, f3, t3, _ = log[-3]
-                    c5, f5, t5, _ = log[-5]
-                    c7, f7, t7, _ = log[-7]
-                    c2, f2, t2, _ = log[-2]
-                    c4, f4, t4, _ = log[-4]
-                    c6, f6, t6, _ = log[-6]
-                    c8, f8, t8, _ = log[-8]
-                    osc_a = (
-                        c1 == c3 == c5 == c7 and f1 is not None
-                        and f1 == t3 and t1 == f3
-                        and f1 == f5 and t1 == t5
-                        and f3 == f7 and t3 == t7
-                    )
-                    osc_b = (
-                        c2 == c4 == c6 == c8 and f2 is not None
-                        and f2 == t4 and t2 == f4
-                        and f2 == f6 and t2 == t6
-                        and f4 == f8 and t4 == t8
-                    )
-                    if osc_a and osc_b:
-                        self.finished = True
-                        self.winner = None
-                        self.draw_reason = "repetition"
-                        self.game_record["draw_reason"] = "repetition"
-
-            # 50-move rule (100 half-moves post-placement without capture)
-            if not self.finished and self._post_placement_moves >= self.AUTO_DRAW_THRESHOLD:
+            if draw_reason is not None:
                 self.finished = True
                 self.winner = None
-                self.draw_reason = "50-move rule"
-                self.game_record["draw_reason"] = "50-move rule"
+                self.draw_reason = draw_reason
+                self.game_record["draw_reason"] = draw_reason
 
     # ── Helpers used by the UI / AI ───────────────────────────────────────────
 
@@ -185,7 +142,6 @@ class GameEngine:
     def status_line(self) -> str:
         b = self.board
         phase = get_game_phase(b, b.turn)
-        placed = b.pieces_placed[b.turn]
         return (
             f"Turn: {'White' if b.turn == 'W' else 'Black'} | "
             f"Phase: {phase} | "
@@ -237,7 +193,7 @@ def _prompt_capture(engine: GameEngine) -> str:
     board = engine.board
     color = board.turn
     legal = board.legal_captures(color)
-    print(f"  Mill formed! Choose an opponent piece to capture.")
+    print("  Mill formed! Choose an opponent piece to capture.")
     print(f"  Legal captures: {sorted(legal)}")
     while True:
         raw = input("  Capture: ").strip().lower()

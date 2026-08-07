@@ -104,7 +104,7 @@ def _smoke_args(tmp_path: Path):
                 Path(trainer.__file__).resolve().parents[1]
                 / "data"
                 / "rulesets"
-                / "nmm-training-core@1.json"
+                / "nmm-training-core@2.json"
             ),
             "--no-sentinel",
             "--no-value-net",

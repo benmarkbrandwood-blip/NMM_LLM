@@ -21,7 +21,7 @@ from learned_ai.training.training_identity import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RULESET = ROOT / "data" / "rulesets" / "nmm-training-core@1.json"
+RULESET = ROOT / "data" / "rulesets" / "nmm-training-core@2.json"
 
 
 def test_final_mif_release_identity_is_frozen() -> None:
@@ -41,7 +41,7 @@ def test_tracked_ruleset_matches_implemented_training_semantics() -> None:
     identity = load_trainer_ruleset(RULESET)
 
     assert identity.ruleset_id == "nmm-training-core"
-    assert identity.version == 1
+    assert identity.version == 2
     assert identity.semantic_digest == TRAINER_RULESET_SEMANTIC_DIGEST
 
 

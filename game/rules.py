@@ -9,7 +9,7 @@ used by both the game engine and the minimax AI.
 from __future__ import annotations
 from typing import List, Optional, Tuple
 
-from .board import MILLS, SQUARE_MILLS, BoardState
+from .board import SQUARE_MILLS, BoardState
 
 
 # ── Phase helpers ─────────────────────────────────────────────────────────────
@@ -45,6 +45,27 @@ def is_blocked(board: BoardState, color: str) -> bool:
 
 # ── Terminal detection ────────────────────────────────────────────────────────
 
+def terminal_result(
+    board: BoardState,
+) -> Tuple[bool, Optional[str], Optional[str]]:
+    """Return terminal state, winner, and a stable reason code.
+
+    History-dependent draws are intentionally handled by ``draw_rules``;
+    this pure function covers only terminal facts derivable from one board.
+    """
+    for color in ("W", "B"):
+        if board.pieces_placed[color] == 9 and board.pieces_on_board[color] < 3:
+            winner = "B" if color == "W" else "W"
+            return True, winner, "fewer-than-three"
+
+    current = board.turn
+    if get_game_phase(board, current) == "move" and is_blocked(board, current):
+        winner = "B" if current == "W" else "W"
+        return True, winner, "no-legal-move"
+
+    return False, None, None
+
+
 def is_terminal(board: BoardState) -> Tuple[bool, Optional[str]]:
     """
     Return (terminal, winner).
@@ -54,17 +75,8 @@ def is_terminal(board: BoardState) -> Tuple[bool, Optional[str]]:
     1. They have placed all 9 pieces and fewer than 3 remain on the board.
     2. It is their turn, they are in move phase, and they have no legal moves.
     """
-    for color in ("W", "B"):
-        if board.pieces_placed[color] == 9 and board.pieces_on_board[color] < 3:
-            winner = "B" if color == "W" else "W"
-            return True, winner
-
-    current = board.turn
-    if get_game_phase(board, current) == "move" and is_blocked(board, current):
-        winner = "B" if current == "W" else "W"
-        return True, winner
-
-    return False, None
+    terminal, winner, _ = terminal_result(board)
+    return terminal, winner
 
 
 def terminal_wdl(
