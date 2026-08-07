@@ -65,3 +65,28 @@ def test_configuration_rejects_update_cadence_below_real_batch(tmp_path) -> None
 
     with pytest.raises(PreflightConfigurationError, match="update_every must be at least"):
         trainer.validate_generalist_configuration(args)
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [trainer.WIN_REWARD, trainer.LOSS_REWARD, trainer.DRAW_SHORT, trainer.DRAW_LONG],
+)
+def test_minimal_rollouts_keep_every_primary_outcome(outcome) -> None:
+    assert trainer._keep_primary_trajectory(
+        outcome,
+        minimal_rollouts=True,
+        confirmed=False,
+    )
+
+
+def test_nonminimal_loss_still_requires_confirmation() -> None:
+    assert not trainer._keep_primary_trajectory(
+        trainer.LOSS_REWARD,
+        minimal_rollouts=False,
+        confirmed=False,
+    )
+    assert trainer._keep_primary_trajectory(
+        trainer.LOSS_REWARD,
+        minimal_rollouts=False,
+        confirmed=True,
+    )

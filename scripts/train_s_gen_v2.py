@@ -1006,6 +1006,18 @@ def _record_curriculum_outcome(
     return False
 
 
+def _keep_primary_trajectory(
+    outcome: float,
+    *,
+    minimal_rollouts: bool,
+    confirmed: bool,
+) -> bool:
+    """Keep full primary experience when derived confirmation is disabled."""
+    if minimal_rollouts:
+        return True
+    return outcome == WIN_REWARD or confirmed
+
+
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
     """Advance when (wins + 0.5×draws)/total >= threshold.
 
@@ -1958,9 +1970,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             # the managed segment has only one remaining slot so game_count cannot
             # overshoot segment_stop_game (managed evidence requires an exact match).
             _room = _segment_slots_remaining(game_count, segment_stop_game)
-            if result.outcome == WIN_REWARD:
-                ep_steps.extend(result.trajectory)
-            elif (not args.minimal_rollouts
+            confirmed = False
+            confirm_training_steps: list[ScaffoldedStep] = []
+            if (not args.minimal_rollouts
                   and result.outcome in (LOSS_REWARD, DRAW_SHORT)
                   and result.retry_board is not None
                   and _confirm_fits_in_segment(_room)):
@@ -1996,10 +2008,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     (result.outcome == LOSS_REWARD and confirm_result.outcome == LOSS_REWARD) or
                     (result.outcome == DRAW_SHORT  and confirm_result.outcome == DRAW_SHORT)
                 )
-                if confirmed and result.trajectory:
-                    ep_steps.extend(result.trajectory)
                 if confirm_result.outcome in (WIN_REWARD, DRAW_SHORT):
-                    ep_steps.extend(confirm_result.trajectory)
+                    confirm_training_steps = confirm_result.trajectory
                 game_count += 1
                 games_since_target_update += 1
                 _record_curriculum_outcome(
@@ -2013,6 +2023,14 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
                     print(f"[s_gen_v2] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
+
+            if result.trajectory and _keep_primary_trajectory(
+                result.outcome,
+                minimal_rollouts=args.minimal_rollouts,
+                confirmed=confirmed,
+            ):
+                ep_steps.extend(result.trajectory)
+            ep_steps.extend(confirm_training_steps)
 
             advance_reference_added = _record_curriculum_outcome(
                 result.outcome,
