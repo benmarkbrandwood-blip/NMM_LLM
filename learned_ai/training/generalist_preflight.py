@@ -34,6 +34,7 @@ from learned_ai.training.checkpoint_envelope import (
     is_checkpoint_envelope,
     load_checkpoint,
 )
+from learned_ai.training.scaffolded_a2c import MIN_UPDATE_STEPS
 
 
 PREFLIGHT_SCHEMA = "nmm.generalist-preflight.v1"
@@ -240,6 +241,10 @@ def validate_generalist_configuration(args: Any) -> None:
         "sim_ply_depth",
     ):
         _positive_integer(getattr(args, field), field=field)
+    if args.update_every < MIN_UPDATE_STEPS:
+        raise PreflightConfigurationError(
+            f"update_every must be at least {MIN_UPDATE_STEPS} steps"
+        )
 
     for field in ("lr", "temp_start", "s1b_refresher_lr"):
         if _finite_number(getattr(args, field), field=field) <= 0:

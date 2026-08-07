@@ -38,6 +38,7 @@ from torch import nn
 ENTROPY_COEF = 0.01
 VALUE_COEF   = 0.5
 GRAD_CLIP    = 1.0
+MIN_UPDATE_STEPS = 8
 
 
 class NonFiniteTrainingError(RuntimeError):
@@ -92,7 +93,7 @@ def scaffolded_a2c_update(
     entropy_coef: float = ENTROPY_COEF,
     value_coef: float = VALUE_COEF,
     grad_clip: float = GRAD_CLIP,
-    min_batch: int = 8,
+    min_batch: int = MIN_UPDATE_STEPS,
 ) -> tuple[float, float, float]:
     """One A2C gradient update over a batch of ScaffoldedSteps.
 
@@ -194,7 +195,7 @@ def scaffolded_ppo_update(
     entropy_coef: float = ENTROPY_COEF,
     value_coef: float = VALUE_COEF,
     grad_clip: float = GRAD_CLIP,
-    min_batch: int = 8,
+    min_batch: int = MIN_UPDATE_STEPS,
 ) -> tuple[float, float, float]:
     """PPO clipped surrogate update over ScaffoldedSteps.
 

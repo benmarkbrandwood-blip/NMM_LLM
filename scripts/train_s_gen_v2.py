@@ -53,6 +53,7 @@ from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.training.scaffolded_a2c import (
+    MIN_UPDATE_STEPS,
     NonFiniteTrainingError,
     ScaffoldedStep,
     scaffolded_a2c_update,
@@ -576,6 +577,29 @@ def _configure_paths(args: argparse.Namespace) -> dict[str, str]:
 
 def _safe_mean(xs: list[float]) -> float:
     return float(sum(xs) / len(xs)) if xs else 0.0
+
+
+def _update_if_ready(
+    *,
+    update_fn: Any,
+    model: Any,
+    optimizer: Any,
+    steps: list[Any],
+    device: torch.device,
+    gamma: float,
+    entropy_coef: float,
+) -> Optional[tuple[float, float, float]]:
+    """Run a real policy update only when the optimizer can consume the batch."""
+    if len(steps) < MIN_UPDATE_STEPS:
+        return None
+    return update_fn(
+        model,
+        optimizer,
+        steps,
+        device,
+        gamma=gamma,
+        entropy_coef=entropy_coef,
+    )
 
 
 def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) -> str:
@@ -2168,9 +2192,18 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
-                last_update_pl, last_update_vl, last_update_ent = update_fn(
-                    model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=args.entropy_coef
+                update_result = _update_if_ready(
+                    update_fn=update_fn,
+                    model=model,
+                    optimizer=opt,
+                    steps=ep_steps,
+                    device=device,
+                    gamma=args.gamma_td,
+                    entropy_coef=args.entropy_coef,
                 )
+                if update_result is None:
+                    raise RuntimeError("update cadence produced an undersized batch")
+                last_update_pl, last_update_vl, last_update_ent = update_result
                 update_count += 1
                 upd_entry = {
                     "game":        game_count,
@@ -2179,6 +2212,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     "entropy":     None if last_update_ent is None else float(last_update_ent),
                     "lr":          float(opt.param_groups[0]["lr"]),
                     "batch_steps": len(ep_steps),
+                    "reason":      "periodic",
                 }
                 with open(update_log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(upd_entry) + "\n")
@@ -2336,16 +2370,40 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     # ── Final flush ────────────────────────────────────────────────────────────
     if ep_steps:
-        last_update_pl, last_update_vl, last_update_ent = update_fn(
-            model,
-            opt,
-            ep_steps,
-            device,
+        final_batch_steps = len(ep_steps)
+        update_result = _update_if_ready(
+            update_fn=update_fn,
+            model=model,
+            optimizer=opt,
+            steps=ep_steps,
+            device=device,
             gamma=args.gamma_td,
             entropy_coef=args.entropy_coef,
         )
-        update_count += 1
-        ep_steps.clear()
+        if update_result is not None:
+            last_update_pl, last_update_vl, last_update_ent = update_result
+            update_count += 1
+            with open(update_log_path, "a", encoding="utf-8") as f:
+                f.write(
+                    json.dumps(
+                        {
+                            "game": game_count,
+                            "policy_loss": float(last_update_pl),
+                            "value_loss": float(last_update_vl),
+                            "entropy": float(last_update_ent),
+                            "lr": float(opt.param_groups[0]["lr"]),
+                            "batch_steps": final_batch_steps,
+                            "reason": "final_flush",
+                        }
+                    )
+                    + "\n"
+                )
+            ep_steps.clear()
+        else:
+            print(
+                f"[s_gen_v2] Preserving {final_batch_steps} pending steps; "
+                f"minimum update batch is {MIN_UPDATE_STEPS}"
+            )
     if diag_buffer:
         with open(log_path, "a", encoding="utf-8") as f:
             for d in diag_buffer:
