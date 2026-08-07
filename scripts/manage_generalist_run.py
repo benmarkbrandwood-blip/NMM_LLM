@@ -96,9 +96,9 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--update-target-every",
         "50",
         "--max-ply",
-        "60",
+        str(args.max_ply),
         "--max-ply-branch",
-        "60",
+        str(args.max_ply),
         "--max-branches-per-game",
         "0",
         "--sim-ply-depth",
@@ -180,7 +180,8 @@ def _build_parser() -> argparse.ArgumentParser:
     prepare.add_argument("--plan-id")
     prepare.add_argument(
         "--objective",
-        default="corrected-v4-single-machine-single-GPU-baseline",
+        required=True,
+        help="Product-approved purpose of this successor experiment",
     )
     prepare.add_argument(
         "--paths-config",
@@ -188,7 +189,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     prepare.add_argument(
         "--experiment-id",
-        default="dev-v4-managed-baseline-v1",
+        required=True,
+        help="New experiment identity; do not reuse a completed run ID",
     )
     prepare.add_argument("--max-games", type=int, default=DEFAULT_MAX_GAMES)
     prepare.add_argument(
@@ -201,6 +203,15 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=DEFAULT_NODE_BUDGET,
         help="Technical fixed-work setting; normally selected by the Agent",
+    )
+    prepare.add_argument(
+        "--max-ply",
+        required=True,
+        type=int,
+        help=(
+            "Explicit experiment truncation ceiling in complete logical plies; "
+            "this is not a rules draw"
+        ),
     )
     prepare.add_argument(
         "--specialist-db",
