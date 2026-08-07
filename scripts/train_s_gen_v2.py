@@ -383,6 +383,7 @@ class GameDiag:
     termination_reason:      str = "legacy-unknown"
     opponent_search_nodes:   int = 0
     opponent_search_calls:   int = 0
+    opponent_search_depth_mean: float = 0.0
     opponent_node_budget:    Optional[int] = None
 
 
@@ -1218,6 +1219,7 @@ class RolloutResult:
     retry_draw_state:  Optional[StandardDrawState] = None
     opponent_search_nodes: int = 0
     opponent_search_calls: int = 0
+    opponent_search_depth_sum: int = 0
     opponent_node_budget: Optional[int] = None
 
 
@@ -1229,6 +1231,15 @@ def _move_notation(mv: dict) -> str:
     if cap:
         s += f"x{cap}"
     return s
+
+
+def _opponent_search_observation(opponent: Any) -> Optional[tuple[int, int]]:
+    """Return the public node/depth observation for one opponent search."""
+    nodes = getattr(opponent, "last_search_nodes", None)
+    depth = getattr(opponent, "last_search_depth", None)
+    if nodes is None and depth is None:
+        return None
+    return int(nodes or 0), int(depth or 0)
 
 
 def _derive_game_identity(
@@ -1333,6 +1344,7 @@ def _rollout(
     learner_moves_notation: list[str] = []
     opponent_search_nodes = 0
     opponent_search_calls = 0
+    opponent_search_depth_sum = 0
     opponent_node_budget = getattr(opponent, "node_budget", None)
 
     while ply < max_ply:
@@ -1548,9 +1560,11 @@ def _rollout(
                 if opponent_node_budget is not None:
                     raise
                 opp_move = None
-            last_search_nodes = getattr(opponent, "last_search_nodes", None)
-            if last_search_nodes is not None:
-                opponent_search_nodes += int(last_search_nodes)
+            search_observation = _opponent_search_observation(opponent)
+            if search_observation is not None:
+                search_nodes, search_depth = search_observation
+                opponent_search_nodes += search_nodes
+                opponent_search_depth_sum += search_depth
                 opponent_search_calls += 1
             if not opp_move:
                 outcome = WIN_REWARD
@@ -1613,6 +1627,7 @@ def _rollout(
         retry_draw_state=retry_draw_state,
         opponent_search_nodes=opponent_search_nodes,
         opponent_search_calls=opponent_search_calls,
+        opponent_search_depth_sum=opponent_search_depth_sum,
         opponent_node_budget=opponent_node_budget,
     )
 
@@ -1688,6 +1703,11 @@ def _build_game_diag(
         termination_reason=result.termination_reason,
         opponent_search_nodes=result.opponent_search_nodes,
         opponent_search_calls=result.opponent_search_calls,
+        opponent_search_depth_mean=round(
+            result.opponent_search_depth_sum
+            / max(1, result.opponent_search_calls),
+            3,
+        ),
         opponent_node_budget=result.opponent_node_budget,
     )
 

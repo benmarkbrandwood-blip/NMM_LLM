@@ -126,5 +126,10 @@ class HeuristicAgent:
         return int(self._inner._nodes)
 
     @property
+    def last_search_depth(self) -> int:
+        """Return the deepest fully completed search depth for the last move."""
+        return int(self._inner.last_depth_reached)
+
+    @property
     def node_budget(self) -> int | None:
         return self._inner._override_node_budget
