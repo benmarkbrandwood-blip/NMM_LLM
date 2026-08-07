@@ -512,6 +512,54 @@ def _restore_exact_resume_payload(
     }
 
 
+def _iter_state_tensors(value: Any):
+    if isinstance(value, torch.Tensor):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _iter_state_tensors(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _iter_state_tensors(item)
+
+
+def _restore_recovery_training_state(
+    *,
+    model: ScaffoldedPolicyNet,
+    optimizer: torch.optim.Optimizer,
+    model_state: dict[str, torch.Tensor],
+    optimizer_state: Optional[dict[str, Any]],
+) -> None:
+    """Atomically restore a compatible model/optimizer recovery pair."""
+    if optimizer_state is None:
+        raise RuntimeError("recovery checkpoint has no optimizer state")
+
+    current_state = model.state_dict()
+    if set(model_state) != set(current_state):
+        raise RuntimeError("incompatible recovery model state keys")
+    for name, expected in current_state.items():
+        candidate = model_state[name]
+        if candidate.shape != expected.shape or candidate.dtype != expected.dtype:
+            raise RuntimeError(
+                f"incompatible recovery model state for {name}"
+            )
+        if not torch.isfinite(candidate).all():
+            raise RuntimeError(f"non-finite recovery model state for {name}")
+    for tensor in _iter_state_tensors(optimizer_state):
+        if tensor.is_floating_point() and not torch.isfinite(tensor).all():
+            raise RuntimeError("non-finite recovery optimizer state")
+
+    model_before = copy.deepcopy(current_state)
+    optimizer_before = copy.deepcopy(optimizer.state_dict())
+    try:
+        model.load_state_dict(model_state)
+        optimizer.load_state_dict(optimizer_state)
+    except Exception as exc:
+        model.load_state_dict(model_before)
+        optimizer.load_state_dict(optimizer_before)
+        raise RuntimeError("incompatible recovery optimizer state") from exc
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _configure_paths(args: argparse.Namespace) -> dict[str, str]:
@@ -2166,35 +2214,25 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         best_ckpt = out_dir / f"best{difficulty}.pt"
                         if best_ckpt.exists():
                             checkpoint = load_checkpoint(best_ckpt, map_location=device)
-                            model_state = checkpoint.payload.model_state
-                            _loaded_recovery = False
-                            try:
-                                model.load_state_dict(model_state)
-                                _loaded_recovery = True
-                            except RuntimeError:
-                                pol_state = {
-                                    key: value
-                                    for key, value in model_state.items()
-                                    if key.startswith("policy_mlp")
-                                }
-                                try:
-                                    model.load_state_dict(pol_state, strict=False)
-                                    _loaded_recovery = True
-                                    print(f"[s_gen_v2] Recovery: value_mlp shape mismatch — policy weights loaded, value head kept")
-                                except RuntimeError:
-                                    print(f"[s_gen_v2] Recovery: checkpoint shape incompatible (old feat_dim) — keeping current weights")
-                            if _loaded_recovery:
-                                model.to(device)
-                                opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-                                frozen_opp.refresh(model)
-                                win_history.clear()
-                                win_history_heuristic.clear()
-                                level_heuristic_history.clear()
-                                games_at_level = 0
-                                # Recovery does not alter the global temperature schedule.
-                                recovery_grace = 100
-                                print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
-                                print(f"[s_gen_v2] Recovery grace: draw penalty suppressed for 100 games")
+                            _restore_recovery_training_state(
+                                model=model,
+                                optimizer=opt,
+                                model_state=checkpoint.payload.model_state,
+                                optimizer_state=checkpoint.payload.optimizer_state,
+                            )
+                            model.to(device)
+                            frozen_opp.refresh(model)
+                            games_since_target_update = 0
+                            ep_steps.clear()
+                            win_history.clear()
+                            win_history_heuristic.clear()
+                            level_heuristic_history.clear()
+                            games_at_level = 0
+                            source_checkpoint = str(best_ckpt)
+                            # Recovery does not alter the global temperature schedule.
+                            recovery_grace = 100
+                            print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
+                            print(f"[s_gen_v2] Recovery grace: draw penalty suppressed for 100 games")
 
                 main_diags   = [d for d in diag_buffer if not d.is_branch]
                 branch_diags = [d for d in diag_buffer if d.is_branch]
