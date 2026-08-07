@@ -236,7 +236,7 @@ pass.
 
 ## Suite 1.0 final adapter pin
 
-The independent adapter is now bound to the finalization baseline at MIF
+The independent adapter was tested against the finalization baseline at MIF
 commit `3ee7e57c7d4c7208be91f62914f344a587fb0f70`, while the implemented wire
 semantics remain pinned to commit
 `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The Suite raw-file SHA-256 is
@@ -287,8 +287,24 @@ repository-suite result.
 The evidence classification is `exact-for-tested-domain`. Its
 `suiteConformance=true` applies only to the six declared classes, two declared
 rulesets, and fixed Suite corpus. It is not `full` conformance and does not
-claim `conversion`. The finalization notice is still a candidate-Suite gate,
-not the immutable signed Suite release. Engineering smoke additionally needs
-an independent experiment digest; formal long-running archival training
-remains unauthorized until the signed tag and both Suite-bound adapters are
-accepted.
+claim `conversion`.
+
+## Immutable Suite release
+
+MIF subsequently published the immutable tag `mif-suite-1.0` at release commit
+`a0a0f21cff5d6fbde045cd1482e416b92e0dc45a`. The release retains Suite JCS
+SHA-256
+`81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`.
+Its final evidence SHA-256 is
+`2c23983281858386bc66e3adfce52f365c712d9e63a31c53f6a68bd6b2de08e1`
+and its release-manifest SHA-256 is
+`dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499`.
+
+The release wraps the already accepted adapter evidence; it does not broaden
+the tested classes, rulesets, or claim. NMM_LLM training manifests persist the
+tag, release commit, Suite digest, release-manifest digest, final-evidence
+digest, selected ruleset semantic digest, and an independent experiment
+digest. Protocol publication is therefore no longer a training blocker.
+Training still requires a clean tested implementation commit, an immutable
+experiment plan, isolated outputs and data lineage, a successful
+update-reaching smoke, and explicit launch authorization.

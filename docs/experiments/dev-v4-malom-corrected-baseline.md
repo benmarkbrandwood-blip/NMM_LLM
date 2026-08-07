@@ -37,6 +37,7 @@ labelled legacy comparison.
 | Malom | Enable the machine-local `malom_db_path` through `data/training_paths.local.json` and the corrected decoder |
 | SpecialistDB | Start with an empty DB carrying `malom_label_version=sector-corrected-v1` |
 | HumanDB | Human frequencies and outcomes may be used; historical unversioned Malom columns remain masked |
+| Rules | Bind `data/rulesets/nmm-training-core@2.json`; rule draws and experiment truncation remain distinct |
 | Sentinel | Disabled with `--no-sentinel` |
 | ValueNet | Disabled with `--no-value-net` |
 | GapNet | Disabled with `--no-gap-net` |
@@ -67,6 +68,13 @@ freezes these values, the exact Git commit, local path-config identity, and
 resource bounds in `plan.json`. Recording this default does not approve a
 smoke or long run. Launch authorization remains a separate product decision in
 `authorization.json`.
+
+The table is the immutable definition of the completed 5,000-game experiment,
+not a reusable command template. In particular, its `max_ply=60` value was an
+experiment truncation, not a rules draw. It is too short to observe the
+current 100-movement-ply no-progress rule after an ordinary placement phase.
+A successor experiment must freeze a new truncation ceiling and resource
+estimate rather than silently inheriting 60.
 
 | Choice | Recommended value |
 | --- | --- |
@@ -312,6 +320,14 @@ training semantics, local path-config hash, game and segment bounds, wall-time
 envelope, component exclusions, and fixed-node work. The product owner then
 approves only the objective and resource envelope through the separate
 authorization contract. Plan creation alone never authorizes launch.
+
+The MIF protocol prerequisite is now satisfied by immutable tag
+`mif-suite-1.0` at release commit
+`a0a0f21cff5d6fbde045cd1482e416b92e0dc45a`. New run manifests also bind
+ruleset `nmm-training-core@2`, semantic digest
+`52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a`,
+and an independent experiment digest. This closes protocol identity only; it
+does not provide a new plan or launch authorization.
 
 Immediately before launch, rerun the training-readiness workflow and re-check
 the corrected SpecialistDB identity, new output directory, resolved work

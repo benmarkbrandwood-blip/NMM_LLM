@@ -1,11 +1,13 @@
-# Windows Training Handover — 20 July 2026 (updated 6 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 7 August 2026)
 
 ## Executive Summary
 
-The repository is usable on the Windows 11 host, the downloaded databases and
-existing model artifacts are in their intended locations, and both the focused
-Malom/provenance suite and the complete Python suite are green. The authorized
-corrected-v4 managed plan
+The repository is usable on the Windows 11 host and the downloaded databases
+and existing model artifacts are in their intended locations. The focused
+Malom/provenance and current trainer-contract suites are green. The most recent
+full collection is not a clean all-pass claim: eight machine-local Sanmill
+bridge tests remain fail-closed because their historical pinned binary is not
+available. The authorized corrected-v4 managed plan
 `managed-v4-baseline-v1` completed 5,000 games in 20 verified segments on
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
@@ -54,8 +56,12 @@ game, and rule, action, history, aggregate-budget, and local performance probes
 passed. This was infrastructure evidence only: no candidate was loaded and
 formal candidate-versus-baseline evaluation remains stopped.
 
-The maintainer's latest `main` history and 21/22 July staged upload have now
-been integrated and audited without activating their databases or checkpoints.
+The maintainer's `main` history through `67af016` and the 21/22 July staged
+upload were integrated and audited without activating their databases or
+checkpoints. Later `main` history through fetched tip `bc46b51e` was reviewed
+commit by commit on 7 August but was not merged or cherry-picked. The active
+decision record is
+[`main-integration-audit-2026-08-07.md`](../evidence/main-integration-audit-2026-08-07.md).
 The rebuilt HumanDB has current label metadata and matched 30 deterministic
 Malom probes; the rebuilt SpecialistDB has current metadata and zero Malom
 labels but retains 2.1 million empirical positions. Seven updated checkpoints
@@ -1038,8 +1044,9 @@ The adapter's honest runtime claim is narrower than every possible
 rulesets, accepts patches inside their implemented semantic subset, and fails
 closed outside that subset rather than approximating unsupported capture
 mechanisms, semantic-state extensions, mill effects, or stalemate policies
-with the legacy NMM_LLM board engine. No MIF Suite has been published, so this
-is not a suite-conformance claim.
+with the legacy NMM_LLM board engine. The following candidate records are
+historical inputs to the later immutable Suite release; none is a `full` or
+conversion claim.
 
 Candidate-3 gameplay is implemented by NMM_LLM commits `748dae2`, `feb4646`,
 and `121b663`. Candidate-4 changes only the locked source and corpus identities
@@ -1142,9 +1149,21 @@ The 66 focused MIF tests and static checks pass. A four-shard run exercised all
 failure passed alone, and eight machine-local Sanmill tests remained
 fail-closed because the historical strict-v2 binary bytes are unavailable.
 This is not a clean full-repository pass and must not be represented as one.
-The Suite claim is only `exact-for-tested-domain`; formal long-running archival
-training remains gated on the immutable signed Suite tag and both accepted
-Suite-bound adapters.
+The Suite claim is only `exact-for-tested-domain`; it is not `full`
+conformance and makes no conversion claim.
+
+MIF Suite 1.0 is now immutably published as tag `mif-suite-1.0` at release
+commit `a0a0f21cff5d6fbde045cd1482e416b92e0dc45a`. Suite JCS SHA-256 remains
+`81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`;
+final evidence SHA-256 is
+`2c23983281858386bc66e3adfce52f365c712d9e63a31c53f6a68bd6b2de08e1`;
+release-manifest SHA-256 is
+`dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499`.
+Training manifests now bind those identities, ruleset
+`nmm-training-core@2`, semantic digest
+`52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a`,
+and an independent experiment digest. The remaining long-run gates are
+experiment-specific rather than MIF publication gates.
 
 ## Recommended Next Actions
 
@@ -1194,9 +1213,10 @@ training merely because the managed run ended. Proceed in this order:
    supplied a plausible move for each, marked several unlikely or poor states,
    described the overall spread as useful, and suggested adding positions
    where closing a Mill competes with blocking or enabling a chain Mill. This
-   is domain feedback, not an automatic corpus freeze. The product decision
-   must state whether to accept the draft unchanged, replace named outliers,
-   or add a separately identified tactical stratum before seeing results.
+   refers to the separate phase-coverage draft, not the already frozen
+   22/21/21 twelve-ply opening corpus. It is domain feedback, not an automatic
+   phase-corpus freeze. Any later tactical stratum must remain separately
+   identified.
 10. After the prefix-policy and corpus decisions close, freeze the formal
    fixed-node ceiling, history-bearing start representation, accepted starts,
    pair count, rules-compliant termination contract, and interval rule. Then
@@ -1275,7 +1295,11 @@ imitation warm-start or mixing, 50/50 frozen/heuristic opponents, 500,000
 native nodes per heuristic move, full depth-5 rollout, temperature `0.90` to
 `0.20`, 5,000 games, seed 42, single-game batching, and 250-game exact-resume
 segments. That plan and its authorization are complete historical contracts;
-they are not authority for another run.
+they are not authority for another run. Its `max_ply=60` cap was truncation,
+not a rules draw, and must not be copied into a successor plan without a new
+decision. The active ruleset has a 100-movement-logical-ply no-progress draw,
+so a full-game cap must exceed the placement phase plus that window if the
+rule is to be observable.
 
 The product owner should be asked only about the objective, total game or
 wall-time envelope, launch, later resource expansion, and publication or

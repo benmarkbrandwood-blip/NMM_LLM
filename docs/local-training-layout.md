@@ -110,15 +110,31 @@ candidate-set principles in
 - Local lookup: read `mif_checkout` from the ignored
   `data/training_paths.local.json`. It is used only by interoperability tools
   and is not a trainer input or runtime dependency.
+- Immutable release identity: tag `mif-suite-1.0`, release commit
+  `a0a0f21cff5d6fbde045cd1482e416b92e0dc45a`, Suite JCS SHA-256
+  `81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`,
+  final evidence SHA-256
+  `2c23983281858386bc66e3adfce52f365c712d9e63a31c53f6a68bd6b2de08e1`,
+  and release-manifest SHA-256
+  `dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499`.
+  Every new training run persists these values as evidence identity; MIF is
+  not imported as trainer gameplay code.
+- Active trainer rules identity: `data/rulesets/nmm-training-core@2.json`,
+  semantic digest
+  `52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a`
+  and document digest
+  `1dfdf5777f36866a53a942c1addd21857d3b72eede8ea2bf4fe1beedfbe878f2`.
+  The rollout cap remains experiment metadata and is not part of this MRS.
 - Frozen wire-semantics input: commit
   `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The current adapter-finalization
-  comparison baseline is the clean Suite-candidate commit
+  evidence was generated at the clean Suite-candidate commit
   `3ee7e57c7d4c7208be91f62914f344a587fb0f70`, Suite JCS SHA-256
   `81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`,
   and Suite raw SHA-256
   `088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4`.
-  Do not run comparison cases against a floating MIF checkout and then
-  attribute the result to either pin. The command generator rejects worktree
+  These are historical evidence inputs wrapped by the immutable release
+  above. Do not run comparison cases against a floating MIF checkout and then
+  attribute the result to any pin. The command generator rejects worktree
   changes and verifies the wire artefacts, Suite, differential launch, release
   manifest, and licence identities recorded in the interoperability document.
 - Candidate-4 M4 harness input: commit
