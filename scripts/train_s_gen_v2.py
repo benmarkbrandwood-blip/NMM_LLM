@@ -361,6 +361,7 @@ def _make_checkpoint_payload(
     temperature: float,
     win_history: deque,
     win_history_heuristic: deque,
+    level_heuristic_history: deque,
     diag_buffer: list[GameDiag],
     games_at_level: int,
     best_win_rate: float,
@@ -391,6 +392,7 @@ def _make_checkpoint_payload(
             "rolling_metrics": {
                 "win_history": list(win_history),
                 "win_history_heuristic": list(win_history_heuristic),
+                "level_heuristic_history": list(level_heuristic_history),
                 "diag_buffer": [asdict(item) for item in diag_buffer],
                 "best_win_rate": best_win_rate,
                 "best_win_rate_at_diff": best_win_rate_at_diff,
@@ -443,6 +445,7 @@ def _restore_exact_resume_payload(
             {
                 "win_history",
                 "win_history_heuristic",
+                "level_heuristic_history",
                 "diag_buffer",
                 "best_win_rate",
                 "best_win_rate_at_diff",
@@ -491,6 +494,9 @@ def _restore_exact_resume_payload(
         "win_history": deque(rolling["win_history"], maxlen=rolling_win),
         "win_history_heuristic": deque(
             rolling["win_history_heuristic"], maxlen=rolling_win
+        ),
+        "level_heuristic_history": deque(
+            rolling["level_heuristic_history"], maxlen=rolling_win
         ),
         "diag_buffer": diagnostics,
         "games_at_level": int(curriculum["games_at_level"]),
@@ -906,6 +912,26 @@ def _outcome_to_history_float(outcome: float) -> float:
     if outcome in (DRAW_SHORT, DRAW_LONG):
         return 0.5
     return 0.0
+
+
+def _record_curriculum_outcome(
+    outcome: float,
+    *,
+    win_history: deque,
+    win_history_heuristic: deque,
+    level_heuristic_history: deque,
+    is_full_diff: bool,
+    is_advance_reference: bool,
+) -> bool:
+    """Route one result without treating derived rollouts as fresh evidence."""
+    value = _outcome_to_history_float(outcome)
+    win_history.append(value)
+    if is_full_diff:
+        win_history_heuristic.append(value)
+    if is_advance_reference:
+        level_heuristic_history.append(value)
+        return True
+    return False
 
 
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
@@ -1560,6 +1586,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     )
     win_history:             deque[float] = deque(maxlen=args.rolling_win)
     win_history_heuristic:   deque[float] = deque(maxlen=args.rolling_win)
+    level_heuristic_history: deque[float] = deque(maxlen=args.rolling_win)
     ep_steps: list[ScaffoldedStep] = []
     last_update_pl  = None
     last_update_vl  = None
@@ -1620,6 +1647,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         temperature = restored["temperature"]
         win_history = restored["win_history"]
         win_history_heuristic = restored["win_history_heuristic"]
+        level_heuristic_history = restored["level_heuristic_history"]
         diag_buffer = restored["diag_buffer"]
         games_at_level = restored["games_at_level"]
         best_win_rate = restored["best_win_rate"]
@@ -1702,6 +1730,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             temperature=temperature,
             win_history=win_history,
             win_history_heuristic=win_history_heuristic,
+            level_heuristic_history=level_heuristic_history,
             diag_buffer=diag_buffer,
             games_at_level=games_at_level,
             best_win_rate=best_win_rate,
@@ -1834,6 +1863,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             is_full_diff           = cfg.is_full_diff
             game_forced_placements = cfg.game_forced_placements
             game_retry_ply         = cfg.retry_ply
+            advance_reference_added = False
 
             if result.trajectory:
                 _retroactive_rescore(result.trajectory, result.step_diags, result.outcome, _draw_scale)
@@ -1885,22 +1915,30 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 if confirm_result.outcome in (WIN_REWARD, DRAW_SHORT):
                     ep_steps.extend(confirm_result.trajectory)
                 game_count += 1
-                games_at_level += 1
                 games_since_target_update += 1
-                _hv = _outcome_to_history_float(confirm_result.outcome)
-                win_history.append(_hv)
-                if is_full_diff:
-                    win_history_heuristic.append(_hv)
+                _record_curriculum_outcome(
+                    confirm_result.outcome,
+                    win_history=win_history,
+                    win_history_heuristic=win_history_heuristic,
+                    level_heuristic_history=level_heuristic_history,
+                    is_full_diff=is_full_diff,
+                    is_advance_reference=False,
+                )
                 _coc = "W" if confirm_result.outcome == WIN_REWARD else ("L" if confirm_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
                     print(f"[s_gen_v2] {game_count:6d}  r{game_retry_ply:2d} {learner_color} |          | {_coc} ply={confirm_result.ply:3d} | (from ply {game_retry_ply}) {'[learn]' if confirmed else '[skip]'}")
 
-            _hv = _outcome_to_history_float(result.outcome)
-            win_history.append(_hv)
-            if is_full_diff:
-                win_history_heuristic.append(_hv)
+            advance_reference_added = _record_curriculum_outcome(
+                result.outcome,
+                win_history=win_history,
+                win_history_heuristic=win_history_heuristic,
+                level_heuristic_history=level_heuristic_history,
+                is_full_diff=is_full_diff,
+                is_advance_reference=is_full_diff,
+            )
             game_count += 1
-            games_at_level += 1
+            if advance_reference_added:
+                games_at_level += 1
             games_since_target_update += 1
 
             bucket_counts = Counter(branch_bucket_history)
@@ -1957,12 +1995,15 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
                     if retry_result.outcome in (WIN_REWARD, DRAW_SHORT):
                         ep_steps.extend(retry_result.trajectory)
-                _rv = _outcome_to_history_float(retry_result.outcome)
-                win_history.append(_rv)
-                if is_full_diff:
-                    win_history_heuristic.append(_rv)
+                _record_curriculum_outcome(
+                    retry_result.outcome,
+                    win_history=win_history,
+                    win_history_heuristic=win_history_heuristic,
+                    level_heuristic_history=level_heuristic_history,
+                    is_full_diff=is_full_diff,
+                    is_advance_reference=False,
+                )
                 game_count += 1
-                games_at_level += 1
                 games_since_target_update += 1
                 _roc = "W" if retry_result.outcome == WIN_REWARD else ("L" if retry_result.outcome == LOSS_REWARD else "D")
                 if game_count % 10 == 0:
@@ -2034,9 +2075,15 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     branch_bucket_history.append(bucket)
                     branches_spawned += 1
                     game_count += 1
-                    games_at_level += 1
                     games_since_target_update += 1
-                    win_history.append(_outcome_to_history_float(branch_result.outcome))
+                    _record_curriculum_outcome(
+                        branch_result.outcome,
+                        win_history=win_history,
+                        win_history_heuristic=win_history_heuristic,
+                        level_heuristic_history=level_heuristic_history,
+                        is_full_diff=False,
+                        is_advance_reference=False,
+                    )
 
                     bucket_counts = Counter(branch_bucket_history)
                     diag_buffer.append(_build_game_diag(
@@ -2080,10 +2127,15 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             # ── Periodic log + checkpoint ──────────────────────────────────────
             if game_count % args.log_every == 0 and diag_buffer:
                 recent_h     = list(win_history_heuristic)
+                recent_reference = list(level_heuristic_history)
                 win_rate     = sum(1 for x in recent_h if x == 1.0) / max(len(recent_h), 1)
                 draw_rate    = sum(1 for x in recent_h if x == 0.5) / max(len(recent_h), 1)
                 loss_rate    = sum(1 for x in recent_h if x == 0.0) / max(len(recent_h), 1)
                 win_rate_all = sum(1 for x in win_history  if x == 1.0) / max(len(win_history), 1)
+                reference_win_rate = (
+                    sum(1 for x in recent_reference if x == 1.0)
+                    / max(len(recent_reference), 1)
+                )
 
                 _adapt_lr(opt, win_rate, args.lr)
 
@@ -2123,6 +2175,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                                 frozen_opp.refresh(model)
                                 win_history.clear()
                                 win_history_heuristic.clear()
+                                level_heuristic_history.clear()
+                                games_at_level = 0
                                 # Recovery does not alter the global temperature schedule.
                                 recovery_grace = 100
                                 print(f"[s_gen_v2] Recovery: reloaded best{difficulty}.pt (W={win_rate:.2f} L={loss_rate:.2f})")
@@ -2159,13 +2213,13 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 )
 
                 if _should_save_best_checkpoint(
-                    win_rate,
+                    reference_win_rate,
                     best_win_rate_at_diff,
-                    len(win_history_heuristic),
+                    len(level_heuristic_history),
                 ):
-                    best_win_rate_at_diff = win_rate
-                    if win_rate > best_win_rate:
-                        best_win_rate = win_rate
+                    best_win_rate_at_diff = reference_win_rate
+                    if reference_win_rate > best_win_rate:
+                        best_win_rate = reference_win_rate
                     _save_runtime_checkpoint(
                         out_dir / f"best{difficulty}.pt",
                         role="best_train",
@@ -2182,8 +2236,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             # Throttle: evaluate the P-value only every 10 games at the current
             # level to limit false-positive advances from variance blips.
             _adv = None
-            if games_at_level >= 20 and games_at_level % 10 == 0:
-                _adv = _sanmill_check_advance(win_history_heuristic,
+            if (
+                advance_reference_added
+                and games_at_level >= 20
+                and games_at_level % 10 == 0
+            ):
+                _adv = _sanmill_check_advance(level_heuristic_history,
                                               difficulty=difficulty,
                                               games_at_level=games_at_level)
                 if game_count % 50 == 0:
@@ -2198,6 +2256,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     difficulty += 1
                     win_history.clear()
                     win_history_heuristic.clear()
+                    level_heuristic_history.clear()
                     games_at_level = 0
                     print(f"[s_gen_v2] *** Advanced to diff {difficulty} (was diff {prev_diff}: "
                           f"score={_adv.score_pct:.3f} P={_adv.p_super:.3f} target={_adv.target:.3f}) ***")

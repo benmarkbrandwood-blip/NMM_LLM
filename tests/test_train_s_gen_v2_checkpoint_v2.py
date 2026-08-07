@@ -40,6 +40,7 @@ def _payload(model: ScaffoldedPolicyNet, *, game_count: int = 7):
         temperature=0.7,
         win_history=deque([1.0, 0.5], maxlen=40),
         win_history_heuristic=deque([1.0], maxlen=40),
+        level_heuristic_history=deque([1.0], maxlen=40),
         diag_buffer=[],
         games_at_level=4,
         best_win_rate=0.6,
@@ -80,6 +81,9 @@ def test_generalist_payload_captures_mutable_training_state() -> None:
 
     assert payload.trainer_state["game_count"] == 7
     assert payload.trainer_state["rolling_metrics"]["best_win_rate"] == 0.6
+    assert payload.trainer_state["rolling_metrics"]["level_heuristic_history"] == [
+        1.0
+    ]
     assert payload.trainer_state["target_network"]["games_since_update"] == 3
     assert payload.trainer_state["model_config"] == model.get_config()
     assert payload.data_state["cursor"] == {"completed_games": 7}
@@ -158,6 +162,7 @@ def test_exact_resume_restores_complete_mutable_state() -> None:
     assert restored["update_count"] == 4
     assert restored["temperature"] == 0.42
     assert restored["games_at_level"] == 9
+    assert list(restored["level_heuristic_history"]) == [1.0]
     assert restored["games_since_target_update"] == 5
     assert restored["recovery_grace"] == 2
     assert restored["last_update_losses"] == (0.4, 0.5, 0.6)
@@ -176,6 +181,22 @@ def test_exact_resume_rejects_inconsistent_data_cursor() -> None:
     payload.data_state["cursor"]["completed_games"] = 6
 
     with pytest.raises(RuntimeError, match="cursor disagrees"):
+        trainer._restore_exact_resume_payload(
+            payload,
+            optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
+            game_rng=random.Random(99),
+            frozen_model=copy.deepcopy(model),
+            rolling_win=40,
+            bucket_window=300,
+        )
+
+
+def test_exact_resume_rejects_legacy_curriculum_statistics() -> None:
+    model = _model()
+    payload = _payload(model)
+    del payload.trainer_state["rolling_metrics"]["level_heuristic_history"]
+
+    with pytest.raises(RuntimeError, match="rolling_metrics state is incomplete"):
         trainer._restore_exact_resume_payload(
             payload,
             optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
