@@ -56,9 +56,9 @@ The local `data/training_paths.local.json` remains ignored and
 machine-specific. The plan records its file identity, while trainer preflight
 resolves and verifies the actual Malom, HumanDB, SpecialistDB, and output paths.
 
-## Managed v4 Technical Default
+## Completed Managed v4 Technical Default
 
-The supervisor currently prepares this conservative default:
+The completed 5,000-game plan used this conservative default:
 
 - A2C, with PPO disabled;
 - fresh random initialization;
@@ -74,8 +74,11 @@ The supervisor currently prepares this conservative default:
 - 5,000 games in 250-game process segments;
 - `latest.pt` and diagnostic publication every 50 games.
 
-These are technical defaults, not playing-strength evidence. The Agent may
-revise them before results are visible, but every actual run must freeze the
+These values are historical lineage, not playing-strength evidence or a
+reusable successor default. In particular, `max_ply=60` was experiment
+truncation rather than a rules draw. Current plan preparation requires an
+explicit objective, a new experiment ID, and an explicit logical-ply ceiling;
+it cannot silently copy those three boundaries. Every actual run freezes the
 complete selection in a new immutable plan. Changing a frozen plan requires a
 new plan and a new product authorization.
 
@@ -88,7 +91,10 @@ From a clean committed worktree, the Agent runs a command equivalent to:
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py prepare `
   --control-dir <new-ignored-control-directory> `
-  --max-wall-hours <product-resource-limit>
+  --max-wall-hours <product-resource-limit> `
+  --objective <product-approved-objective> `
+  --experiment-id <new-experiment-id> `
+  --max-ply <explicit-experiment-truncation>
 ```
 
 Preparation validates the technical configuration and records the current Git
@@ -212,3 +218,6 @@ the Agent must invoke the repository's training-readiness workflow, run a new
 disposable smoke that reaches at least one RL update, validate the intended
 empty corrected SpecialistDB and output isolation, and record the exact launch
 plan. A long run still requires an explicit product launch authorization.
+The readiness question must wait for an explicit product answer; no timeout or
+default selection may create the objective, resource envelope, truncation
+ceiling, or authorization.
