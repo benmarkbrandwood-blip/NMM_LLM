@@ -115,6 +115,7 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--no-s1a-warmstart",
         "--no-imitation-mix",
         "--no-s1b-refresher",
+        "--no-opening-forcing",
     ]
     specialist_db = getattr(args, "specialist_db", None)
     if specialist_db:

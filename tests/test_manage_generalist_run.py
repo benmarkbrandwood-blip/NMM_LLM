@@ -48,3 +48,19 @@ def test_common_args_record_explicit_truncation_ceiling(tmp_path) -> None:
     assert common[common.index("--experiment-id") + 1] == (
         "dev-v4-rules-corrected-v2"
     )
+
+
+def test_common_args_disable_unapproved_training_inputs(tmp_path) -> None:
+    args = manager._build_parser().parse_args(_required_prepare_args())
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert {
+        "--no-sentinel",
+        "--no-value-net",
+        "--no-gap-net",
+        "--no-s1a-warmstart",
+        "--no-imitation-mix",
+        "--no-s1b-refresher",
+        "--no-opening-forcing",
+    } <= set(common)
