@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import tools.mif_interop_adapter_commands as commands
+import tools.mif_suite_adapter_evidence as evidence_generator
 from learned_ai.interop.mif_v1.adapter import capabilities
 
 
@@ -26,6 +30,13 @@ TESTED_CLASSES = [
     "ruleset",
     "transform",
 ]
+ROOT = Path(__file__).resolve().parents[1]
+EVIDENCE_PATH = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "mif-suite-1.0-nmm-adapter-evidence-2026-08-07.json"
+)
 
 
 def test_capability_publishes_exact_suite_tested_domain() -> None:
@@ -69,4 +80,33 @@ def test_command_generator_locks_suite_candidate_and_release_inputs() -> None:
     ] == "560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e"
     assert commands.MIF_PINNED_FILES["LICENSE"] == (
         "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    )
+
+
+def test_suite_evidence_names_its_publication_commit() -> None:
+    evidence = json.loads(EVIDENCE_PATH.read_text(encoding="utf-8"))
+
+    assert evidence_generator.EVIDENCE_COMMIT == (
+        "ae7911e37fa2bf45ea6074850453bbad2479438e"
+    )
+    assert evidence["evidenceCommit"] == (
+        "ae7911e37fa2bf45ea6074850453bbad2479438e"
+    )
+
+
+def test_suite_evidence_is_stably_regenerated() -> None:
+    assert evidence_generator.render_evidence_manifest() == (
+        EVIDENCE_PATH.read_bytes()
+    )
+
+
+def test_suite_evidence_generator_locks_raw_artifacts() -> None:
+    assert evidence_generator.CAPABILITY_RAW_SHA256 == (
+        "sha256:cd661b1156bf7269f976e050446d01797c9959482f1e1843e21ae3ea7f70dcce"
+    )
+    assert evidence_generator.DETERMINISTIC_REPORT_RAW_SHA256 == (
+        "sha256:3463f438531fd52847df44fa4186dcba13ed22c7c570a0cc216d9a7eaa797665"
+    )
+    assert evidence_generator.DIFFERENTIAL_REPORT_RAW_SHA256 == (
+        "sha256:4c86725bfcd1759433374938c8d8eb2a1dacfa6ea3723592eff759162fce8da6"
     )
