@@ -1209,6 +1209,15 @@ freeze a new immutable plan with an evidence-backed wall-time envelope. The
 two-game smoke is not a representative throughput benchmark, and no long-run
 authorization exists.
 
+The complete-suite gate has now been executed and recorded. The current
+[successor decision brief](../experiments/dev-v4-rules-corrected-successor-v2-decision-brief.md)
+recommends a fresh 5,000-game objective, `max_ply=120`, 250-game segments, and
+a 12-active-hour limit. Historical segment timing and partial per-game logs
+support that conservative bound; the two-game smoke remains excluded as a
+throughput benchmark. The objective and resource envelope still require an
+explicit product decision, followed by exact plan publication and a separate
+launch authorization.
+
 The workspace/root check, graph inspection, earlier trainer fixes, focused
 tests, mandatory Malom/provenance rerun, first-experiment component decision,
 bounded smoke, managed-plan hardening, and the 5,000-game managed run are
