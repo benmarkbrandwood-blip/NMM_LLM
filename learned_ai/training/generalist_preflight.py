@@ -45,7 +45,7 @@ from learned_ai.training.training_identity import (
 
 PREFLIGHT_SCHEMA = "nmm.generalist-preflight.v1"
 
-TRAINING_PATH_KEYS = frozenset(
+TRAINER_PATH_KEYS = frozenset(
     {
         "generalist_output_dir",
         "sentinel_checkpoint",
@@ -59,6 +59,19 @@ TRAINING_PATH_KEYS = frozenset(
         "sanmill_checkout",
     }
 )
+
+REGISTRY_ONLY_PATH_KEYS = frozenset(
+    {
+        "human_db_prefix12_snapshot_path",
+        "human_db_prefix12_source_manifest_path",
+        "human_db_prefix12_history_ledger_path",
+        "human_games_imported_manifest_path",
+        "sanmill_prefix12_checkout",
+        "mif_checkout",
+    }
+)
+
+TRAINING_PATH_KEYS = TRAINER_PATH_KEYS | REGISTRY_ONLY_PATH_KEYS
 
 PATH_SPECS = {
     "out_dir": (

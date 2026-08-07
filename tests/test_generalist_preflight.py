@@ -139,6 +139,26 @@ def test_settings_loader_rejects_duplicate_and_unknown_local_keys(
         load_training_settings(tmp_path, str(local))
 
 
+def test_settings_loader_accepts_documented_lookup_only_keys(tmp_path: Path) -> None:
+    data = tmp_path / "data"
+    data.mkdir()
+    (data / "settings.json").write_text("{}", encoding="utf-8")
+    local = data / "paths.json"
+    registry_only = {
+        "human_db_prefix12_snapshot_path": "snapshot.sqlite",
+        "human_db_prefix12_source_manifest_path": "source.jsonl",
+        "human_db_prefix12_history_ledger_path": "history.jsonl",
+        "human_games_imported_manifest_path": "imported.json",
+        "sanmill_prefix12_checkout": "sanmill-prefix-runtime",
+        "mif_checkout": "mif-runtime",
+    }
+    local.write_text(json.dumps(registry_only), encoding="utf-8")
+
+    settings = load_training_settings(tmp_path, str(local))
+
+    assert {key: settings.values[key] for key in registry_only} == registry_only
+
+
 def test_path_resolution_records_cli_environment_config_and_disable_sources(
     tmp_path: Path,
 ) -> None:
