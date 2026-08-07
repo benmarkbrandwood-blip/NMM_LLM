@@ -13,7 +13,12 @@ from learned_ai.interop.mif_v1.common import (
     MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
     MIF_INDEX_SHA256,
+    MIF_LICENSE_SHA256,
+    MIF_RELEASE_MANIFEST_SHA256,
     MIF_SMOKE_CORPUS_SHA256,
+    MIF_SUITE_COMMIT,
+    MIF_SUITE_JCS_SHA256,
+    MIF_SUITE_RAW_SHA256,
     MifError,
     parse_ijson,
     transform_coordinate,
@@ -21,10 +26,10 @@ from learned_ai.interop.mif_v1.common import (
 from learned_ai.interop.mif_v1.engine import repetition_root
 
 
-def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
+def test_adapter_is_pinned_to_the_tested_suite_domain() -> None:
     value = capabilities()
-    assert value["implementation"]["version"].endswith(MIF_COMMIT[:12])
-    assert value["suites"] == []
+    assert value["implementation"]["version"].endswith(MIF_SUITE_COMMIT[:12])
+    assert value["suites"] == [MIF_SUITE_JCS_SHA256]
     assert value["testedCorpora"] == [
         {
             "digest": MIF_SMOKE_CORPUS_SHA256,
@@ -50,6 +55,10 @@ def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
     ]
     assert value["annotations"] == {
         "contractCommit": MIF_COMMIT,
+        "wireCommit": MIF_COMMIT,
+        "suiteCandidateCommit": MIF_SUITE_COMMIT,
+        "suiteJcsSha256": MIF_SUITE_JCS_SHA256,
+        "suiteRawSha256": MIF_SUITE_RAW_SHA256,
         "englishSpec": MIF_ENGLISH_SPEC_SHA256,
         "chineseSpec": MIF_CHINESE_SPEC_SHA256,
         "artifactIndex": MIF_INDEX_SHA256,
@@ -57,7 +66,12 @@ def test_adapter_is_pinned_without_claiming_a_published_suite() -> None:
         "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
         "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
         "deterministicCorpus": MIF_DETERMINISTIC_CORPUS_SHA256,
-        "scope": "pinned-candidate-corpora-rulesets; no MIFSUITE published",
+        "differentialLaunch": (
+            "sha256:560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e"
+        ),
+        "releaseManifest": MIF_RELEASE_MANIFEST_SHA256,
+        "license": MIF_LICENSE_SHA256,
+        "scope": "exact-for-tested-domain; no full or conversion claim",
     }
 
 

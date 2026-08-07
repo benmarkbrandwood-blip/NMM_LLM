@@ -6,7 +6,11 @@ from pathlib import Path
 import pytest
 
 from learned_ai.interop.mif_v1.adapter import MifInteropAdapter, capabilities
-from learned_ai.interop.mif_v1.common import MifError, sha256_digest
+from learned_ai.interop.mif_v1.common import (
+    MIF_SUITE_JCS_SHA256,
+    MifError,
+    sha256_digest,
+)
 from learned_ai.interop.mif_v1.engine import execute, replay, resumption_state
 from learned_ai.interop.mif_v1.model import (
     canonicalize_mfen,
@@ -43,10 +47,11 @@ def test_pinned_manifest_identities_and_source_independence() -> None:
         assert all("reference" not in name for name in imported)
 
 
-def test_capabilities_pin_contract_without_claiming_a_suite() -> None:
+def test_capabilities_pin_contract_and_tested_suite_domain() -> None:
     value = capabilities()
-    assert value["suites"] == []
+    assert value["suites"] == [MIF_SUITE_JCS_SHA256]
     assert value["annotations"]["contractCommit"] == MIF_COMMIT
+    assert all(record["level"] == "tested" for record in value["rulesets"])
     assert [record["id"] for record in value["rulesets"]] == [
         "example-morris",
         "x-origin-stabilization",

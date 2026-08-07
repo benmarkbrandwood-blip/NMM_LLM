@@ -16,7 +16,18 @@ import sys
 from pathlib import Path
 
 
-MIF_COMMIT = "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978"
+NMM_ROOT = Path(__file__).resolve().parents[1]
+if str(NMM_ROOT) not in sys.path:
+    sys.path.insert(0, str(NMM_ROOT))
+
+from learned_ai.interop.mif_v1.common import sha256_digest  # noqa: E402
+
+
+MIF_SUITE_COMMIT = "3ee7e57c7d4c7208be91f62914f344a587fb0f70"
+MIF_WIRE_COMMIT = "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978"
+MIF_SUITE_JCS_SHA256 = (
+    "sha256:81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f"
+)
 MIF_PINNED_FILES = {
     "mif-1.0.md": "330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995",
     "docs/zh-CN/mif-1.0.md": (
@@ -37,8 +48,17 @@ MIF_PINNED_FILES = {
     "interop/cases/deterministic-v1.json": (
         "d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82"
     ),
+    "interop/differential-candidate-4-v1.json": (
+        "560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e"
+    ),
+    "mif-suite-1.0.json": (
+        "088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4"
+    ),
+    "release/mif-1.0-release-manifest.json": (
+        "b721cb2bd22e404ef2cac1ff570c7ea4d0b4859c97cbaba94a8acce241a00057"
+    ),
+    "LICENSE": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
 }
-NMM_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _git_head(repository: Path) -> str:
@@ -102,6 +122,16 @@ def _verify_mif_sources(repository: Path) -> None:
             )
 
 
+def _verify_mif_suite(repository: Path) -> None:
+    suite = json.loads((repository / "mif-suite-1.0.json").read_text("utf-8"))
+    actual_suite_jcs = sha256_digest(suite)
+    if actual_suite_jcs != MIF_SUITE_JCS_SHA256:
+        raise ValueError(
+            "MIF suite JCS hash mismatch: expected "
+            f"{MIF_SUITE_JCS_SHA256}, got {actual_suite_jcs}"
+        )
+
+
 def command_config(
     *,
     mif_root: Path,
@@ -111,9 +141,9 @@ def command_config(
     mif_root = mif_root.resolve()
     sanmill_root = sanmill_root.resolve()
     mif_head = _git_head(mif_root)
-    if mif_head != MIF_COMMIT:
+    if mif_head != MIF_SUITE_COMMIT:
         raise ValueError(
-            f"MIF checkout must be exactly {MIF_COMMIT}; got {mif_head}"
+            f"MIF checkout must be exactly {MIF_SUITE_COMMIT}; got {mif_head}"
         )
     worktree_changes = _git_worktree_changes(mif_root)
     if worktree_changes:
@@ -122,6 +152,7 @@ def command_config(
             f"locked evidence: {worktree_changes}"
         )
     _verify_mif_sources(mif_root)
+    _verify_mif_suite(mif_root)
     reference_adapter = mif_root / "tools" / "mif_1_0_reference_adapter.py"
     nmm_adapter = NMM_ROOT / "tools" / "nmm_llm_mif_adapter.py"
     if not reference_adapter.is_file() or not nmm_adapter.is_file():
@@ -160,12 +191,12 @@ def command_config(
                 "workingDirectory": "{repo}",
             },
             {
-                "name": "nmm-llm",
+                "name": "nmm-llm-python",
                 "command": ["{python}", "-B", str(nmm_adapter)],
                 "workingDirectory": "{repo}",
             },
             {
-                "name": "sanmill",
+                "name": "sanmill-rust",
                 "command": sanmill_command,
                 "workingDirectory": "{repo}",
             },

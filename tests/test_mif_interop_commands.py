@@ -21,7 +21,12 @@ def _fake_repositories(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_generator_pins_formal_and_execution_source_identities() -> None:
-    assert commands.MIF_COMMIT == "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978"
+    assert commands.MIF_SUITE_COMMIT == (
+        "3ee7e57c7d4c7208be91f62914f344a587fb0f70"
+    )
+    assert commands.MIF_WIRE_COMMIT == (
+        "7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978"
+    )
     assert commands.MIF_PINNED_FILES == {
         "mif-1.0.md": (
             "330e65145ceb26fe582e58b89405d87bd73e8be200b476aef82c0ee27731d995"
@@ -44,6 +49,18 @@ def test_generator_pins_formal_and_execution_source_identities() -> None:
         "interop/cases/deterministic-v1.json": (
             "d11317a090300f8a47f77afed647bdbd236dcdb1996c0147a81c874fa39dfd82"
         ),
+        "interop/differential-candidate-4-v1.json": (
+            "560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e"
+        ),
+        "mif-suite-1.0.json": (
+            "088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4"
+        ),
+        "release/mif-1.0-release-manifest.json": (
+            "b721cb2bd22e404ef2cac1ff570c7ea4d0b4859c97cbaba94a8acce241a00057"
+        ),
+        "LICENSE": (
+            "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        ),
     }
 
 
@@ -51,25 +68,32 @@ def test_three_party_command_arrays_are_process_isolated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mif_root, sanmill_root = _fake_repositories(tmp_path)
-    monkeypatch.setattr(commands, "_git_head", lambda _: commands.MIF_COMMIT)
+    monkeypatch.setattr(
+        commands, "_git_head", lambda _: commands.MIF_SUITE_COMMIT
+    )
     monkeypatch.setattr(commands, "_git_worktree_changes", lambda _: "")
     monkeypatch.setattr(commands, "_verify_mif_sources", lambda _: None)
+    monkeypatch.setattr(commands, "_verify_mif_suite", lambda _: None)
     config = commands.command_config(
         mif_root=mif_root,
         sanmill_root=sanmill_root,
         sanmill_binary=None,
     )
     adapters = {item["name"]: item for item in config["adapters"]}
-    assert list(adapters) == ["mif-reference", "nmm-llm", "sanmill"]
+    assert list(adapters) == [
+        "mif-reference",
+        "nmm-llm-python",
+        "sanmill-rust",
+    ]
     assert adapters["mif-reference"]["command"] == [
         "{python}",
         "-B",
         "tools/mif_1_0_reference_adapter.py",
     ]
-    assert Path(adapters["nmm-llm"]["command"][-1]).name == (
+    assert Path(adapters["nmm-llm-python"]["command"][-1]).name == (
         "nmm_llm_mif_adapter.py"
     )
-    assert adapters["sanmill"]["command"][-2:] == ["mill", "mif-interop"]
+    assert adapters["sanmill-rust"]["command"][-2:] == ["mill", "mif-interop"]
     assert all(item["workingDirectory"] == "{repo}" for item in adapters.values())
 
 
@@ -105,11 +129,24 @@ def test_command_generator_rejects_modified_pinned_source(
         commands._verify_mif_sources(mif_root)
 
 
+def test_command_generator_rejects_wrong_suite_jcs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mif_root, _ = _fake_repositories(tmp_path)
+    (mif_root / "mif-suite-1.0.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(commands, "sha256_digest", lambda _: "sha256:" + "0" * 64)
+
+    with pytest.raises(ValueError, match="MIF suite JCS hash mismatch"):
+        commands._verify_mif_suite(mif_root)
+
+
 def test_command_generator_rejects_mif_worktree_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     mif_root, sanmill_root = _fake_repositories(tmp_path)
-    monkeypatch.setattr(commands, "_git_head", lambda _: commands.MIF_COMMIT)
+    monkeypatch.setattr(
+        commands, "_git_head", lambda _: commands.MIF_SUITE_COMMIT
+    )
     monkeypatch.setattr(
         commands,
         "_git_worktree_changes",

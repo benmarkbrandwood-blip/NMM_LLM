@@ -12,10 +12,16 @@ from .common import (
     MIF_CHINESE_SPEC_SHA256,
     MIF_COMMIT,
     MIF_DETERMINISTIC_CORPUS_SHA256,
+    MIF_DIFFERENTIAL_LAUNCH_SHA256,
     MIF_ENGLISH_SPEC_SHA256,
     MIF_EXECUTABLE_CORPUS_SHA256,
     MIF_INDEX_SHA256,
+    MIF_LICENSE_SHA256,
+    MIF_RELEASE_MANIFEST_SHA256,
     MIF_SMOKE_CORPUS_SHA256,
+    MIF_SUITE_COMMIT,
+    MIF_SUITE_JCS_SHA256,
+    MIF_SUITE_RAW_SHA256,
     PROTOCOL,
     MifError,
     enforce_resource_limit,
@@ -83,23 +89,23 @@ def _preflight_resource_limits(
 
 
 def capabilities() -> dict[str, Any]:
-    """Return an honest pre-suite capability claim for the pinned contract."""
+    """Return the tested-domain claim for the pinned Suite 1.0 candidate."""
 
     return {
         "format": "MIFCAP/1.0",
         "implementation": {
             "name": "nmm-llm-independent-mif-adapter",
-            "version": f"mif-1.0-{MIF_COMMIT[:12]}",
+            "version": f"mif-suite-1.0-{MIF_SUITE_COMMIT[:12]}",
         },
-        "suites": [],
+        "suites": [MIF_SUITE_JCS_SHA256],
         "classes": [
             {"id": "conversion", "level": "none"},
-            {"id": "identity", "level": "implemented"},
-            {"id": "key", "level": "implemented"},
-            {"id": "position", "level": "implemented"},
-            {"id": "replay", "level": "implemented"},
-            {"id": "ruleset", "level": "implemented"},
-            {"id": "transform", "level": "implemented"},
+            {"id": "identity", "level": "tested"},
+            {"id": "key", "level": "tested"},
+            {"id": "position", "level": "tested"},
+            {"id": "replay", "level": "tested"},
+            {"id": "ruleset", "level": "tested"},
+            {"id": "transform", "level": "tested"},
         ],
         "formats": [
             {"id": "MFEN/1.0", "read": "implemented", "write": "implemented"},
@@ -136,14 +142,14 @@ def capabilities() -> dict[str, Any]:
                 "version": 1,
                 "semanticDigest": EXAMPLE_SEMANTIC,
                 "documentDigest": EXAMPLE_DOCUMENT,
-                "level": "implemented",
+                "level": "tested",
             },
             {
                 "id": "x-origin-stabilization",
                 "version": 1,
                 "semanticDigest": ORIGIN_SEMANTIC,
                 "documentDigest": ORIGIN_DOCUMENT,
-                "level": "implemented",
+                "level": "tested",
             },
         ],
         "invarianceDeclarations": [],
@@ -181,6 +187,10 @@ def capabilities() -> dict[str, Any]:
         ],
         "annotations": {
             "contractCommit": MIF_COMMIT,
+            "wireCommit": MIF_COMMIT,
+            "suiteCandidateCommit": MIF_SUITE_COMMIT,
+            "suiteJcsSha256": MIF_SUITE_JCS_SHA256,
+            "suiteRawSha256": MIF_SUITE_RAW_SHA256,
             "englishSpec": MIF_ENGLISH_SPEC_SHA256,
             "chineseSpec": MIF_CHINESE_SPEC_SHA256,
             "artifactIndex": MIF_INDEX_SHA256,
@@ -188,7 +198,10 @@ def capabilities() -> dict[str, Any]:
             "adapterProtocol": MIF_ADAPTER_PROTOCOL_SHA256,
             "smokeCorpus": MIF_SMOKE_CORPUS_SHA256,
             "deterministicCorpus": MIF_DETERMINISTIC_CORPUS_SHA256,
-            "scope": "pinned-candidate-corpora-rulesets; no MIFSUITE published",
+            "differentialLaunch": MIF_DIFFERENTIAL_LAUNCH_SHA256,
+            "releaseManifest": MIF_RELEASE_MANIFEST_SHA256,
+            "license": MIF_LICENSE_SHA256,
+            "scope": "exact-for-tested-domain; no full or conversion claim",
         },
     }
 
