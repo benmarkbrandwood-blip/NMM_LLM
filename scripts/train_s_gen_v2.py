@@ -53,6 +53,7 @@ from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.training.scaffolded_a2c import (
+    NonFiniteTrainingError,
     ScaffoldedStep,
     scaffolded_a2c_update,
     scaffolded_ppo_update,
@@ -113,6 +114,30 @@ BOOK_GAME_PROB = 0.50
 def _sample_forced_placements(line_moves: list[str], learner_color: str) -> list[str]:
     start = 0 if learner_color == "W" else 1
     return [line_moves[i] for i in range(start, len(line_moves), 2)][:4]
+
+
+def _policy_distribution(
+    logits: torch.Tensor,
+    temperature: float,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build the behaviour policy and reject corrupt sampling state."""
+    if not math.isfinite(temperature) or temperature <= 0.0:
+        raise NonFiniteTrainingError(
+            f"rollout: invalid behaviour temperature {temperature!r}"
+        )
+    if not torch.isfinite(logits).all():
+        raise NonFiniteTrainingError("rollout: non-finite policy logits")
+    log_probs = F.log_softmax(logits / temperature, dim=-1)
+    probs = log_probs.exp()
+    if not torch.isfinite(log_probs).all() or not torch.isfinite(probs).all():
+        raise NonFiniteTrainingError("rollout: non-finite policy distribution")
+    mass = probs.sum()
+    if not bool(torch.isfinite(mass).item()) or float(mass.item()) <= 0.0:
+        raise NonFiniteTrainingError("rollout: invalid policy probability mass")
+    probs = probs / mass
+    if not torch.isfinite(probs).all():
+        raise NonFiniteTrainingError("rollout: non-finite normalized policy")
+    return log_probs, probs
 
 
 # Board position index lookup for history feature encoding
@@ -1121,12 +1146,7 @@ def _rollout(
             feat_t = torch.tensor(enc.feat_matrix, dtype=torch.float32).to(device)
             with torch.no_grad():
                 logits    = model.policy_logits(feat_t)
-                scaled    = logits / max(temperature, 1e-6)
-                log_probs = F.log_softmax(scaled, dim=-1)
-                probs     = log_probs.exp()
-                if not torch.isfinite(probs).all():
-                    probs = torch.where(torch.isfinite(probs), probs, torch.zeros_like(probs))
-                probs     = probs / probs.sum().clamp(min=1e-9)
+                log_probs, probs = _policy_distribution(logits, temperature)
                 entropy   = float((-(probs * log_probs).sum()).item())
 
                 forced_idx = None
@@ -1218,6 +1238,7 @@ def _rollout(
                 next_move_features=next_mf,
                 next_value_input=next_vi,
                 done=terminal_next,
+                behaviour_temperature=temperature,
             )
             game_trajectory.append(step)
 

@@ -5,12 +5,15 @@ from __future__ import annotations
 import argparse
 
 import pytest
+import torch
 
+from learned_ai.training.scaffolded_a2c import NonFiniteTrainingError
 from scripts.train_s_gen_v2 import (
     TEMP_END,
     TEMP_START,
     _compute_temperature,
     _finite_positive_float,
+    _policy_distribution,
 )
 
 
@@ -61,3 +64,23 @@ def test_temp_start_rejects_non_positive_or_non_finite_values(value):
         match="finite positive number",
     ):
         _finite_positive_float(value)
+
+
+def test_policy_distribution_uses_requested_temperature():
+    log_probs, probs = _policy_distribution(torch.tensor([0.0, 2.0]), 0.5)
+
+    expected = torch.log_softmax(torch.tensor([0.0, 4.0]), dim=-1)
+    assert torch.equal(log_probs, expected)
+    assert torch.equal(probs, expected.exp())
+
+
+@pytest.mark.parametrize(
+    "logits",
+    [
+        torch.tensor([0.0, float("nan")]),
+        torch.tensor([0.0, float("inf")]),
+    ],
+)
+def test_policy_distribution_fails_closed_on_non_finite_logits(logits):
+    with pytest.raises(NonFiniteTrainingError, match="non-finite policy logits"):
+        _policy_distribution(logits, 0.9)

@@ -26,6 +26,7 @@ ScaffoldedStep dataclass fields:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import List
 
@@ -37,6 +38,10 @@ from torch import nn
 ENTROPY_COEF = 0.01
 VALUE_COEF   = 0.5
 GRAD_CLIP    = 1.0
+
+
+class NonFiniteTrainingError(RuntimeError):
+    """Stop training when an update can no longer preserve finite state."""
 
 
 @dataclass
@@ -51,6 +56,31 @@ class ScaffoldedStep:
     next_move_features: np.ndarray   # (k', 62) — for optional bootstrapping
     next_value_input:   np.ndarray   # (23,)
     done:               bool
+    behaviour_temperature: float = 1.0
+
+
+def _behaviour_temperature(step: ScaffoldedStep) -> float:
+    """Return the recorded collection temperature or reject old pending data."""
+    if "behaviour_temperature" not in vars(step):
+        raise NonFiniteTrainingError(
+            "A2C: pending step predates behaviour-temperature tracking"
+        )
+    try:
+        value = float(step.behaviour_temperature)
+    except (TypeError, ValueError) as exc:
+        raise NonFiniteTrainingError(
+            "A2C: invalid behaviour_temperature value"
+        ) from exc
+    if not math.isfinite(value) or value <= 0.0:
+        raise NonFiniteTrainingError(
+            f"A2C: invalid behaviour_temperature={value!r}"
+        )
+    return value
+
+
+def _require_finite(tensor: torch.Tensor, *, label: str) -> None:
+    if not torch.isfinite(tensor).all():
+        raise NonFiniteTrainingError(f"A2C: non-finite {label}")
 
 
 def scaffolded_a2c_update(
@@ -112,7 +142,8 @@ def scaffolded_a2c_update(
     for i, step in enumerate(steps):
         feat   = torch.tensor(step.move_features, dtype=torch.float32).to(device)
         logits = model.policy_logits(feat)              # (k,)
-        log_probs = F.log_softmax(logits, dim=-1)       # (k,)
+        scaled = logits / _behaviour_temperature(step)
+        log_probs = F.log_softmax(scaled, dim=-1)       # (k,)
         policy_terms.append(-log_probs[step.chosen_idx] * advantages[i])
         probs = log_probs.exp()
         entropy_terms.append(-(probs * log_probs).sum())
@@ -126,11 +157,24 @@ def scaffolded_a2c_update(
         - entropy_coef * entropy_loss
         + value_coef * value_loss
     )
+    _require_finite(total_loss, label="total loss")
 
     optimizer.zero_grad()
     total_loss.backward()
-    nn.utils.clip_grad_norm_(model.parameters(), grad_clip)
+    for name, parameter in model.named_parameters():
+        if parameter.grad is not None:
+            _require_finite(parameter.grad, label=f"gradient in {name}")
+    try:
+        nn.utils.clip_grad_norm_(
+            model.parameters(),
+            grad_clip,
+            error_if_nonfinite=True,
+        )
+    except RuntimeError as exc:
+        raise NonFiniteTrainingError("A2C: non-finite gradient norm") from exc
     optimizer.step()
+    for name, parameter in model.named_parameters():
+        _require_finite(parameter, label=f"parameter {name} after optimizer step")
 
     return (
         float(policy_loss.item()),

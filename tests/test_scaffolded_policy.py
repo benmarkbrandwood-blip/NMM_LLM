@@ -25,7 +25,11 @@ from learned_ai.models.scaffolded_encoder import (
 )
 from learned_ai.models.lookahead_advisor import LOOKAHEAD_SIGNALS_PER_PLY
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
-from learned_ai.training.scaffolded_a2c import ScaffoldedStep, scaffolded_a2c_update
+from learned_ai.training.scaffolded_a2c import (
+    NonFiniteTrainingError,
+    ScaffoldedStep,
+    scaffolded_a2c_update,
+)
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────
@@ -279,3 +283,76 @@ class TestScaffoldedA2C:
         after  = [p.data.clone() for p in model.parameters()]
         changed = any(not torch.equal(b, a) for b, a in zip(before, after))
         assert changed, "No parameters changed after A2C update"
+
+    def test_policy_loss_uses_collection_temperature(self):
+        class FixedPolicyValue(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.policy = torch.nn.Parameter(torch.tensor([0.0, 2.0]))
+                self.value_bias = torch.nn.Parameter(torch.tensor(0.0))
+
+            def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
+                assert features.shape == (2, 1)
+                return self.policy
+
+            def value(self, features: torch.Tensor) -> torch.Tensor:
+                return self.value_bias.expand(features.shape[0])
+
+        temperature = 0.5
+        expected = float(
+            -F.log_softmax(torch.tensor([0.0, 2.0]) / temperature, dim=-1)[0]
+        )
+        steps = [
+            ScaffoldedStep(
+                move_features=np.zeros((2, 1), dtype=np.float32),
+                value_input=np.zeros(1, dtype=np.float32),
+                chosen_idx=0,
+                log_prob_old=expected,
+                reward=1.0,
+                next_move_features=np.zeros((2, 1), dtype=np.float32),
+                next_value_input=np.zeros(1, dtype=np.float32),
+                done=True,
+                behaviour_temperature=temperature,
+            )
+            for _ in range(8)
+        ]
+        model = FixedPolicyValue()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+
+        policy_loss, _, _ = scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            entropy_coef=0.0,
+            value_coef=0.0,
+        )
+
+        assert policy_loss == pytest.approx(expected)
+
+    def test_non_finite_loss_fails_before_updating_parameters(self):
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        steps = self._make_steps(8)
+        steps[0].move_features[0, 0] = np.nan
+        before = [parameter.detach().clone() for parameter in model.parameters()]
+
+        with pytest.raises(NonFiniteTrainingError, match="non-finite"):
+            scaffolded_a2c_update(model, optimizer, steps, torch.device("cpu"))
+
+        assert all(
+            torch.equal(old, parameter)
+            for old, parameter in zip(before, model.parameters())
+        )
+
+    def test_pending_step_without_recorded_temperature_fails_closed(self):
+        steps = self._make_steps(8)
+        del vars(steps[0])["behaviour_temperature"]
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+        with pytest.raises(
+            NonFiniteTrainingError,
+            match="predates behaviour-temperature tracking",
+        ):
+            scaffolded_a2c_update(model, optimizer, steps, torch.device("cpu"))
