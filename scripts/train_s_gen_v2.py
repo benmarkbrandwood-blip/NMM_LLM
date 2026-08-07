@@ -1912,6 +1912,21 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 "trainer": STAGE_TAG,
                 "framework": "pytorch",
                 "pytorch": str(torch.__version__),
+                "experiment_digest": run_manifest.checkpoint_policy[
+                    "experimentDigest"
+                ],
+                "mif_suite_tag": run_manifest.checkpoint_policy["mifSuite"][
+                    "tag"
+                ],
+                "mif_release_commit": run_manifest.checkpoint_policy[
+                    "mifSuite"
+                ]["releaseCommit"],
+                "mif_suite_jcs_sha256": run_manifest.checkpoint_policy[
+                    "mifSuite"
+                ]["suiteJcsSha256"],
+                "ruleset_semantic_digest": run_manifest.checkpoint_policy[
+                    "ruleset"
+                ]["semanticDigest"],
             },
         )
         payload = _make_checkpoint_payload(
@@ -2608,6 +2623,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
                    help="Disable GapNet even when a path is configured")
     p.add_argument("--human-db",      default=None, type=str)
     p.add_argument("--specialist-db", default=None, type=str)
+    p.add_argument(
+        "--ruleset-manifest",
+        default=None,
+        type=str,
+        help=(
+            "MIF MRS/1.0 manifest whose semanticDigest exactly matches the "
+            "trainer's implemented rules"
+        ),
+    )
     p.add_argument(
         "--no-opening-forcing",
         action="store_true",

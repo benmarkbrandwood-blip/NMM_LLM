@@ -35,6 +35,12 @@ from learned_ai.training.checkpoint_envelope import (
     load_checkpoint,
 )
 from learned_ai.training.scaffolded_a2c import MIN_UPDATE_STEPS
+from learned_ai.training.training_identity import (
+    TrainingIdentityError,
+    experiment_digest,
+    load_trainer_ruleset,
+    mif_release_identity,
+)
 
 
 PREFLIGHT_SCHEMA = "nmm.generalist-preflight.v1"
@@ -49,6 +55,7 @@ TRAINING_PATH_KEYS = frozenset(
         "gap_net_path",
         "human_db_path",
         "specialist_db_path",
+        "ruleset_manifest_path",
         "sanmill_checkout",
     }
 )
@@ -77,6 +84,11 @@ PATH_SPECS = {
         "NMM_SPECIALIST_DB",
         "specialist_db_path",
         "data/specialist_db.sqlite",
+    ),
+    "ruleset_manifest": (
+        "NMM_RULESET_MANIFEST",
+        "ruleset_manifest_path",
+        "data/rulesets/nmm-training-core@1.json",
     ),
 }
 
@@ -564,6 +576,49 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _probe_ruleset(path: Path) -> dict[str, Any]:
+    report: dict[str, Any] = {
+        "exists": path.is_file(),
+        "kind": "MRS/1.0",
+        "path": str(path),
+    }
+    if not path.is_file():
+        report["error"] = "ruleset manifest is not an existing file"
+        return report
+    try:
+        identity = load_trainer_ruleset(path)
+    except TrainingIdentityError as exc:
+        report["error"] = str(exc)
+        return report
+    report.update(identity.to_dict())
+    report["trust"] = "verified-against-trainer-semantics"
+    return report
+
+
+def _experiment_assets(
+    *,
+    start_mode: str,
+    malom: Mapping[str, Any],
+    human: Mapping[str, Any],
+    opening: Mapping[str, Any],
+    checkpoint: Mapping[str, Any] | None,
+) -> dict[str, str]:
+    """Return immutable inputs; mutable DB/checkpoint state is bound separately."""
+    identities = {
+        "malom_tablebase": str(malom.get("identity", "")),
+        "human_db": str(human.get("identity", "")),
+    }
+    if opening.get("enabled"):
+        identities["opening_forcing_sources"] = str(opening.get("identity", ""))
+    if start_mode == "weights-only" and checkpoint is not None:
+        identities["source_checkpoint"] = str(checkpoint.get("identity", ""))
+    if any(not value for value in identities.values()):
+        raise TrainingIdentityError(
+            "experiment identity requires all immutable asset identities"
+        )
+    return identities
+
+
 def _probe_opening_sources(args: Any, *, root: Path) -> dict[str, Any]:
     if args.no_opening_forcing:
         return {"enabled": False, "sources": []}
@@ -690,6 +745,8 @@ def _probe_source_checkpoint(
                     "feature_schema_version": descriptor.feature_schema_version,
                     "payload_size": envelope.payload_size,
                     "model_config": dict(config),
+                    "experiment_id": descriptor.experiment_id,
+                    "implementation": dict(descriptor.implementation),
                     "mutable_assets": dict(
                         envelope.payload.data_state["mutable_assets"]
                     ),
@@ -864,6 +921,7 @@ def run_generalist_preflight(
     specialist_report = _probe_specialist_db(Path(args.specialist_db))
     human_report = _probe_human_db(Path(args.human_db))
     opening_report = _probe_opening_sources(args, root=root)
+    ruleset_report = _probe_ruleset(Path(args.ruleset_manifest))
     checkpoint_report: dict[str, Any] | None = None
     expected_resume_config_sha256 = resume_config_sha256(args)
     if args.start_mode in {"weights-only", "exact-resume"}:
@@ -879,6 +937,7 @@ def run_generalist_preflight(
         ("specialist_db", specialist_report),
         ("human_db", human_report),
         ("opening_forcing", opening_report),
+        ("ruleset", ruleset_report),
     ):
         if report.get("error"):
             errors.append(f"{name}: {report['error']}")
@@ -898,6 +957,8 @@ def run_generalist_preflight(
             "content_sha256"
         ):
             errors.append("checkpoint: SpecialistDB content identity has changed")
+        if checkpoint_report.get("experiment_id") != args.experiment_id:
+            errors.append("checkpoint: experiment identity has changed")
     if args.start_mode in {"fresh", "weights-only"} and specialist_report.get(
         "exists"
     ):
@@ -918,6 +979,40 @@ def run_generalist_preflight(
     ):
         errors.append("specialist_db: parent directory does not exist")
 
+    experiment_digest_value: str | None = None
+    try:
+        if ruleset_report.get("error"):
+            raise TrainingIdentityError(str(ruleset_report["error"]))
+        ruleset_identity = load_trainer_ruleset(args.ruleset_manifest)
+        experiment_digest_value = experiment_digest(
+            experiment_id=args.experiment_id,
+            git_commit=state.commit,
+            resume_config_sha256=expected_resume_config_sha256,
+            immutable_assets=_experiment_assets(
+                start_mode=args.start_mode,
+                malom=malom_report,
+                human=human_report,
+                opening=opening_report,
+                checkpoint=checkpoint_report,
+            ),
+            ruleset=ruleset_identity,
+        )
+    except TrainingIdentityError as exc:
+        errors.append(f"experiment_identity: {exc}")
+    if args.start_mode == "exact-resume" and checkpoint_report is not None:
+        implementation = checkpoint_report.get("implementation", {})
+        if implementation.get("experiment_digest") != experiment_digest_value:
+            errors.append("checkpoint: experimentDigest is incompatible")
+        release = mif_release_identity()
+        for field, expected in (
+            ("mif_suite_tag", release["tag"]),
+            ("mif_release_commit", release["releaseCommit"]),
+            ("mif_suite_jcs_sha256", release["suiteJcsSha256"]),
+            ("ruleset_semantic_digest", ruleset_report.get("semanticDigest")),
+        ):
+            if implementation.get(field) != expected:
+                errors.append(f"checkpoint: {field} is incompatible")
+
     config = _resolved_config(args, mode)
     if errors:
         verdict = "fatal_stop"
@@ -937,6 +1032,12 @@ def run_generalist_preflight(
         "resolved_config": config,
         "config_sha256": canonical_sha256(config),
         "resume_config_sha256": expected_resume_config_sha256,
+        "experimentDigest": experiment_digest_value,
+        "mifSuite": mif_release_identity(),
+        "ruleset": {
+            key: ruleset_report.get(key)
+            for key in ("id", "version", "semanticDigest", "documentDigest")
+        },
         "path_sources": dict(path_sources),
         "checks": {
             "output": output_report,
@@ -944,6 +1045,7 @@ def run_generalist_preflight(
             "specialist_db": specialist_report,
             "human_db": human_report,
             "opening_forcing": opening_report,
+            "ruleset": ruleset_report,
             "checkpoint": checkpoint_report,
             "components": {
                 "sentinel": not args.no_sentinel,

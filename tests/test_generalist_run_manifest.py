@@ -51,6 +51,21 @@ def _report() -> dict:
         "git": {"commit": "a" * 40, "dirty": False, "diff_sha256": None},
         "resolved_config": config,
         "config_sha256": canonical_sha256(config),
+        "experimentDigest": "sha256:" + "e" * 64,
+        "mifSuite": {
+            "tag": "mif-suite-1.0",
+            "releaseCommit": "a" * 40,
+            "suiteJcsSha256": "sha256:" + "b" * 64,
+            "finalEvidenceSha256": "sha256:" + "c" * 64,
+            "releaseManifestSha256": "sha256:" + "d" * 64,
+            "claim": "exact-for-tested-domain",
+        },
+        "ruleset": {
+            "id": "nmm-training-core",
+            "version": 1,
+            "semanticDigest": "sha256:" + "f" * 64,
+            "documentDigest": "sha256:" + "0" * 64,
+        },
         "checks": {
             "malom": {"identity": "malom-identity"},
             "specialist_db": {
@@ -95,12 +110,17 @@ def test_manifest_binds_preflight_assets_components_and_outputs(tmp_path: Path) 
         "opening_forcing": False,
     }
     assert [asset.logical_name for asset in manifest.assets] == [
+        "mif_suite_1_0",
+        "training_ruleset",
         "malom_tablebase",
         "specialist_db",
         "human_db",
     ]
     assert manifest.outputs["run_directory"] == "run"
     assert manifest.checkpoint_policy["start_mode"] == "fresh"
+    assert manifest.checkpoint_policy["experimentDigest"] == (
+        "sha256:" + "e" * 64
+    )
 
 
 def test_manifest_rejects_nonpassing_or_inconsistent_preflight(tmp_path: Path) -> None:
@@ -200,6 +220,9 @@ def test_initial_contract_publication_is_atomic_and_no_overwrite(
     assert len(events) == 1
     assert events[0].status == "preflight_passed"
     assert events[0].details["manifest_sha256"] == manifest.manifest_sha256
+    assert events[0].details["experimentDigest"] == (
+        manifest.checkpoint_policy["experimentDigest"]
+    )
     assert not list(tmp_path.glob(".*.contract.*.tmp"))
     with pytest.raises(FileExistsError, match="already exists"):
         publish_initial_run_contract(output, manifest)

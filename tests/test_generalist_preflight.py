@@ -99,6 +99,13 @@ def _smoke_args(tmp_path: Path):
             str(tmp_path / "human.sqlite"),
             "--specialist-db",
             str(tmp_path / "specialist.sqlite"),
+            "--ruleset-manifest",
+            str(
+                Path(trainer.__file__).resolve().parents[1]
+                / "data"
+                / "rulesets"
+                / "nmm-training-core@1.json"
+            ),
             "--no-sentinel",
             "--no-value-net",
             "--no-gap-net",
@@ -426,6 +433,17 @@ def test_exact_resume_preflight_binds_semantics_and_specialist_db(
             },
         },
     )
+    fresh_report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        expected_move_feature_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        expected_value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+    assert fresh_report["verdict"] == "ready_for_smoke"
     descriptor = CheckpointDescriptor(
         checkpoint_id="source:checkpoint:00000001",
         run_id="source",
@@ -439,7 +457,15 @@ def test_exact_resume_preflight_binds_semantics_and_specialist_db(
         label_schema_version=trainer.LABEL_SCHEMA_VERSION,
         database_schema_versions={"specialist_db": trainer.LABEL_SCHEMA_VERSION},
         asset_identities={"specialist_db": specialist_sha256},
-        implementation={"trainer": trainer.STAGE_TAG, "framework": "pytorch"},
+        implementation={
+            "trainer": trainer.STAGE_TAG,
+            "framework": "pytorch",
+            "experiment_digest": fresh_report["experimentDigest"],
+            "mif_suite_tag": fresh_report["mifSuite"]["tag"],
+            "mif_release_commit": fresh_report["mifSuite"]["releaseCommit"],
+            "mif_suite_jcs_sha256": fresh_report["mifSuite"]["suiteJcsSha256"],
+            "ruleset_semantic_digest": fresh_report["ruleset"]["semanticDigest"],
+        },
     )
     source = tmp_path / "source.pt"
     save_checkpoint(source, descriptor, payload)

@@ -80,6 +80,22 @@ def _asset_refs(
             )
     assets = [
         AssetManifestRef(
+            logical_name="mif_suite_1_0",
+            role="protocol_release",
+            identity=report["mifSuite"]["releaseManifestSha256"],
+            schema_version="MIF-RELEASE-MANIFEST/1",
+            trust_level="mif-suite-1.0-final-release",
+            intended_use="training_evidence_identity_only",
+        ),
+        AssetManifestRef(
+            logical_name="training_ruleset",
+            role="ruleset",
+            identity=report["ruleset"]["semanticDigest"],
+            schema_version="MRS/1.0",
+            trust_level="verified-against-trainer-semantics",
+            intended_use="generalist_rollout_rules_identity",
+        ),
+        AssetManifestRef(
             logical_name="malom_tablebase",
             role="training_oracle",
             identity=malom["identity"],
@@ -169,6 +185,8 @@ def build_generalist_run_manifest(
     if config_sha256 != report["config_sha256"]:
         raise ContractValidationError("preflight configuration hash is inconsistent")
     git = report["git"]
+    if not report.get("experimentDigest"):
+        raise ContractValidationError("preflight did not provide experimentDigest")
     return RunManifest(
         run_id=run_id,
         experiment_id=experiment_id,
@@ -204,6 +222,9 @@ def build_generalist_run_manifest(
             "automatic_resume": False,
             "historical_checkpoints": "weights_only",
             "roles": ["latest", "best_train", "candidate", "accepted"],
+            "experimentDigest": report["experimentDigest"],
+            "mifSuite": report["mifSuite"],
+            "ruleset": report["ruleset"],
         },
         claim_boundaries=(
             "corrected v4 infrastructure evidence",
@@ -233,6 +254,9 @@ def publish_initial_run_contract(output_dir: str | Path, manifest: RunManifest) 
             details={
                 "manifest_sha256": manifest.manifest_sha256,
                 "config_sha256": manifest.config_sha256,
+                "experimentDigest": manifest.checkpoint_policy[
+                    "experimentDigest"
+                ],
             },
             previous_event_sha256=None,
         )
