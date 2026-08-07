@@ -4,10 +4,14 @@
 
 The repository is usable on the Windows 11 host and the downloaded databases
 and existing model artifacts are in their intended locations. The focused
-Malom/provenance and current trainer-contract suites are green. The most recent
-full collection is not a clean all-pass claim: eight machine-local Sanmill
-bridge tests remain fail-closed because their historical pinned binary is not
-available. The authorized corrected-v4 managed plan
+Malom/provenance and current trainer-contract suites are green. The 7 August
+complete run collected and executed 1,235 tests: 1,227 passed and eight
+machine-local Sanmill bridge tests failed closed because the moving checkout
+changed protected paths relative to their historical strict-v2 pin. The
+historical binary bytes also remain unavailable. This is not a clean all-pass
+claim; see the
+[current complete-test baseline](../evidence/current-complete-test-baseline-2026-08-07.md).
+The authorized corrected-v4 managed plan
 `managed-v4-baseline-v1` completed 5,000 games in 20 verified segments on
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
 playing-strength or promotion evidence. No further training run is authorized.
@@ -1171,6 +1175,15 @@ fail-closed because the historical strict-v2 binary bytes are unavailable.
 This is not a clean full-repository pass and must not be represented as one.
 The Suite claim is only `exact-for-tested-domain`; it is not `full`
 conformance and makes no conversion claim.
+
+A later clean single-process run at published `dev` commit `f06d457` collected
+and executed all 1,235 current tests without skips. It reported `1,227 passed`,
+`8 failed`, and `498 subtests passed` in 2,876.61 seconds. A focused rerun
+proved that all eight failures stop at the same protected-source-path check
+before any Sanmill query, search, replay, or gameplay assertion. No NMM_LLM
+trainer, MIF, Malom, checkpoint, exact-resume, or managed-run test failed. The
+full evidence and claim boundary are in the
+[7 August complete-test baseline](../evidence/current-complete-test-baseline-2026-08-07.md).
 
 MIF Suite 1.0 is now immutably published as tag `mif-suite-1.0` at release
 commit `a0a0f21cff5d6fbde045cd1482e416b92e0dc45a`. Suite JCS SHA-256 remains
