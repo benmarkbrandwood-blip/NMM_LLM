@@ -91,25 +91,59 @@ from learned_ai.training.run_contract import canonical_sha256
 
 # ── Opening book ──────────────────────────────────────────────────────────────
 
-def _load_opening_book() -> list[list[str]]:
+_OPENING_SOURCE_FILES = {
+    "book": "book_openings.json",
+    "learned": "learned_openings.json",
+}
+
+
+def _load_opening_source(path: Path) -> list[list[str]]:
     lines: list[list[str]] = []
-    for fname in ("book_openings.json", "learned_openings.json"):
-        fpath = _ROOT / "data" / "openings" / fname
-        if not fpath.exists():
-            continue
-        try:
-            with open(fpath, encoding="utf-8") as f:
-                entries = json.load(f)
-            for entry in entries:
-                moves = entry.get("line_moves", [])
-                if isinstance(moves, list) and len(moves) >= 2:
-                    lines.append(moves)
-        except Exception:
-            pass
+    try:
+        with path.open(encoding="utf-8") as handle:
+            entries = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot load opening source {path}: {exc}") from exc
+    if not isinstance(entries, list) or not entries:
+        raise RuntimeError(f"opening source must be a non-empty list: {path}")
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise RuntimeError(f"opening entry {index} must be an object: {path}")
+        moves = entry.get("line_moves")
+        if not isinstance(moves, list):
+            raise RuntimeError(
+                f"opening entry {index} line_moves must be a list: {path}"
+            )
+        if len(moves) < 2 or any(not isinstance(move, str) or not move for move in moves):
+            raise RuntimeError(
+                f"opening entry {index} has invalid line_moves: {path}"
+            )
+        lines.append(moves)
     return lines
 
-_OPENING_LINES: list[list[str]] = _load_opening_book()
-BOOK_GAME_PROB = 0.50
+
+def _resolve_opening_lines(
+    args: argparse.Namespace,
+    *,
+    root: Path = _ROOT,
+) -> list[list[str]]:
+    if args.no_opening_forcing:
+        return []
+    source_names = (
+        ("book", "learned")
+        if args.opening_source == "book-and-learned"
+        else (args.opening_source,)
+    )
+    lines: list[list[str]] = []
+    for source_name in source_names:
+        if source_name not in _OPENING_SOURCE_FILES:
+            raise RuntimeError("opening forcing requires an explicit source")
+        lines.extend(
+            _load_opening_source(
+                root / "data" / "openings" / _OPENING_SOURCE_FILES[source_name]
+            )
+        )
+    return lines
 
 
 def _sample_forced_placements(line_moves: list[str], learner_color: str) -> list[str]:
@@ -1544,6 +1578,15 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     if not paths_configured:
         _configure_paths(args)
     validate_generalist_configuration(args)
+    opening_lines = _resolve_opening_lines(args)
+    if args.no_opening_forcing:
+        print("[s_gen_v2] Opening forcing disabled by CLI")
+    else:
+        print(
+            f"[s_gen_v2] Opening forcing: source={args.opening_source}, "
+            f"probability={args.opening_force_probability:.3f}, "
+            f"lines={len(opening_lines)}"
+        )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
     rng = _initialize_training_rngs(args.seed)
@@ -1895,9 +1938,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     )
                 _opp, _gt = _h, "vs_heuristic"
             _fp: Optional[list[str]] = None
-            if _OPENING_LINES and config_rng.random() < BOOK_GAME_PROB:
-                _ln = _OPENING_LINES[
-                    config_rng.randint(0, len(_OPENING_LINES) - 1)
+            if (
+                opening_lines
+                and config_rng.random() < args.opening_force_probability
+            ):
+                _ln = opening_lines[
+                    config_rng.randint(0, len(opening_lines) - 1)
                 ]
                 _fp = _sample_forced_placements(_ln, _lc)
             batch_slots.append((
@@ -2508,6 +2554,23 @@ def _build_argument_parser() -> argparse.ArgumentParser:
                    help="Disable GapNet even when a path is configured")
     p.add_argument("--human-db",      default=None, type=str)
     p.add_argument("--specialist-db", default=None, type=str)
+    p.add_argument(
+        "--no-opening-forcing",
+        action="store_true",
+        help="Disable all trainer-side opening-prefix forcing",
+    )
+    p.add_argument(
+        "--opening-source",
+        choices=("book", "learned", "book-and-learned"),
+        default=None,
+        help="Explicit opening source when forcing is enabled",
+    )
+    p.add_argument(
+        "--opening-force-probability",
+        type=float,
+        default=None,
+        help="Per-game forcing probability in (0, 1] when enabled",
+    )
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument(

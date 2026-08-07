@@ -30,6 +30,7 @@ def _args(tmp_path: Path) -> SimpleNamespace:
         no_gap_net=True,
         no_s1a_warmstart=True,
         no_imitation_mix=True,
+        no_opening_forcing=True,
         ppo=False,
         start_mode="fresh",
         out_dir=str(tmp_path / "run"),
@@ -91,6 +92,7 @@ def test_manifest_binds_preflight_assets_components_and_outputs(tmp_path: Path) 
         "ppo": False,
         "imitation_warmstart": False,
         "imitation_mix": False,
+        "opening_forcing": False,
     }
     assert [asset.logical_name for asset in manifest.assets] == [
         "malom_tablebase",

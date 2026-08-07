@@ -104,6 +104,7 @@ def _smoke_args(tmp_path: Path):
             "--no-gap-net",
             "--no-s1a-warmstart",
             "--no-imitation-mix",
+            "--no-opening-forcing",
             "--max-games",
             "1",
             "--batch-games",

@@ -104,6 +104,22 @@ def _asset_refs(
             intended_use="human_frequencies_and_empirical_outcomes_only",
         ),
     ]
+    opening = checks.get("opening_forcing", {"enabled": False})
+    if opening.get("enabled"):
+        if not opening.get("identity"):
+            raise ContractValidationError(
+                "enabled opening forcing does not provide an asset identity"
+            )
+        assets.append(
+            AssetManifestRef(
+                logical_name="opening_forcing_sources",
+                role="training_prefix_source",
+                identity=opening["identity"],
+                schema_version="nmm.opening-forcing-sources.v1",
+                trust_level="source-labelled-not-human-frequency",
+                intended_use="trainer_side_placement_prefix_forcing",
+            )
+        )
     checkpoint = checks.get("checkpoint")
     if checkpoint is not None:
         exact_resume = start_mode == "exact-resume"
@@ -175,6 +191,7 @@ def build_generalist_run_manifest(
             "ppo": bool(args.ppo),
             "imitation_warmstart": not args.no_s1a_warmstart,
             "imitation_mix": not args.no_imitation_mix,
+            "opening_forcing": not args.no_opening_forcing,
         },
         outputs={
             "run_directory": _portable_path(args.out_dir, root),

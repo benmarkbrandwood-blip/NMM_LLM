@@ -260,6 +260,28 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             "self_play_ratio must be between zero and one"
         )
+    if args.no_opening_forcing:
+        if args.opening_source is not None or args.opening_force_probability is not None:
+            raise PreflightConfigurationError(
+                "disabled opening forcing must not specify a source or probability"
+            )
+    else:
+        if args.opening_source is None:
+            raise PreflightConfigurationError(
+                "opening_source is required when opening forcing is enabled"
+            )
+        if args.opening_force_probability is None:
+            raise PreflightConfigurationError(
+                "opening_force_probability is required when opening forcing is enabled"
+            )
+        opening_probability = _finite_number(
+            args.opening_force_probability,
+            field="opening_force_probability",
+        )
+        if not 0 < opening_probability <= 1:
+            raise PreflightConfigurationError(
+                "opening_force_probability must be greater than zero and at most one"
+            )
     time_budget = _finite_number(args.time_budget, field="time_budget")
     if time_budget != -1 and time_budget <= 0:
         raise PreflightConfigurationError(
@@ -542,6 +564,67 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _probe_opening_sources(args: Any, *, root: Path) -> dict[str, Any]:
+    if args.no_opening_forcing:
+        return {"enabled": False, "sources": []}
+    source_names = (
+        ("book", "learned")
+        if args.opening_source == "book-and-learned"
+        else (args.opening_source,)
+    )
+    filenames = {
+        "book": "book_openings.json",
+        "learned": "learned_openings.json",
+    }
+    source_reports: list[dict[str, Any]] = []
+    try:
+        for source_name in source_names:
+            filename = filenames[source_name]
+            path = root / "data" / "openings" / filename
+            if not path.is_file():
+                raise ValueError(f"opening source is not an existing file: {path}")
+            with path.open(encoding="utf-8") as handle:
+                entries = json.load(handle)
+            if not isinstance(entries, list) or not entries:
+                raise ValueError(f"opening source must be a non-empty list: {path}")
+            for index, entry in enumerate(entries):
+                if not isinstance(entry, dict):
+                    raise ValueError(f"opening entry {index} must be an object: {path}")
+                moves = entry.get("line_moves")
+                if not isinstance(moves, list):
+                    raise ValueError(
+                        f"opening entry {index} line_moves must be a list: {path}"
+                    )
+                if len(moves) < 2 or any(
+                    not isinstance(move, str) or not move for move in moves
+                ):
+                    raise ValueError(
+                        f"opening entry {index} has invalid line_moves: {path}"
+                    )
+            source_reports.append(
+                {
+                    "name": source_name,
+                    "path": path.relative_to(root).as_posix(),
+                    "sha256": _file_sha256(path),
+                    "line_count": len(entries),
+                }
+            )
+    except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
+        return {"enabled": True, "sources": source_reports, "error": str(exc)}
+    return {
+        "enabled": True,
+        "sources": source_reports,
+        "identity": canonical_sha256(
+            {
+                "schema": "nmm.opening-forcing-sources.v1",
+                "source": args.opening_source,
+                "probability": args.opening_force_probability,
+                "sources": source_reports,
+            }
+        ),
+    }
+
+
 _RESUME_CONFIG_EXCLUDED_FIELDS = {
     "auto_resume_best",
     "experiment_id",
@@ -707,6 +790,7 @@ def run_generalist_preflight(
         "no_gap_net",
         "no_s1a_warmstart",
         "no_imitation_mix",
+        "no_opening_forcing",
     ):
         if not getattr(args, flag):
             errors.append(f"corrected fresh baseline requires explicit --{flag.replace('_', '-')}")
@@ -779,6 +863,7 @@ def run_generalist_preflight(
     }
     specialist_report = _probe_specialist_db(Path(args.specialist_db))
     human_report = _probe_human_db(Path(args.human_db))
+    opening_report = _probe_opening_sources(args, root=root)
     checkpoint_report: dict[str, Any] | None = None
     expected_resume_config_sha256 = resume_config_sha256(args)
     if args.start_mode in {"weights-only", "exact-resume"}:
@@ -793,6 +878,7 @@ def run_generalist_preflight(
         ("malom", malom_report),
         ("specialist_db", specialist_report),
         ("human_db", human_report),
+        ("opening_forcing", opening_report),
     ):
         if report.get("error"):
             errors.append(f"{name}: {report['error']}")
@@ -857,6 +943,7 @@ def run_generalist_preflight(
             "malom": malom_report,
             "specialist_db": specialist_report,
             "human_db": human_report,
+            "opening_forcing": opening_report,
             "checkpoint": checkpoint_report,
             "components": {
                 "sentinel": not args.no_sentinel,
@@ -865,6 +952,7 @@ def run_generalist_preflight(
                 "ppo": bool(args.ppo),
                 "imitation_warmstart": not args.no_s1a_warmstart,
                 "imitation_mix": not args.no_imitation_mix,
+                "opening_forcing": not args.no_opening_forcing,
             },
         },
         "errors": errors,
