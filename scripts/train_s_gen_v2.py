@@ -613,6 +613,32 @@ def _safe_mean(xs: list[float]) -> float:
     return float(sum(xs) / len(xs)) if xs else 0.0
 
 
+def _load_runtime_component(
+    *,
+    label: str,
+    path: Path,
+    disabled: bool,
+    expected_kind: str,
+    loader: Any,
+    ready: Optional[Any] = None,
+) -> Any:
+    """Load a required runtime dependency or stop before training mutates state."""
+    if disabled:
+        return None
+    exists = path.is_file() if expected_kind == "file" else path.is_dir()
+    if not exists:
+        raise RuntimeError(
+            f"required {label} path is not an existing {expected_kind}: {path}"
+        )
+    try:
+        component = loader(path)
+    except Exception as exc:
+        raise RuntimeError(f"{label} load failed: {exc}") from exc
+    if component is None or (ready is not None and not ready(component)):
+        raise RuntimeError(f"{label} is not ready after loading: {path}")
+    return component
+
+
 def _update_if_ready(
     *,
     update_fn: Any,
@@ -1052,6 +1078,42 @@ def _keep_primary_trajectory(
     return outcome == WIN_REWARD or confirmed
 
 
+def _persist_rollout_evidence(
+    *,
+    specialist_db: Any,
+    malom_db: Any,
+    learner_boards: list[BoardState],
+    learner_result_boards: list[BoardState],
+    outcome: float,
+    learner_moves_notation: list[str],
+    learner_color: str,
+) -> None:
+    if specialist_db is None or not learner_boards:
+        return
+    result = (
+        "W"
+        if outcome == WIN_REWARD
+        else "D"
+        if outcome in (DRAW_SHORT, DRAW_LONG)
+        else "L"
+    )
+    specialist_db.record_game(
+        learner_boards + learner_result_boards,
+        result,
+        learner_moves_notation,
+        "gen",
+        learner_color=learner_color,
+    )
+    if malom_db is None:
+        return
+    scored = [(board, abs(_simple_evaluate(board, learner_color))) for board in learner_boards]
+    scored.sort(key=lambda item: -item[1])
+    for board, _ in scored[:10]:
+        label = malom_db.query(board)
+        if label in ("W", "D", "L"):
+            specialist_db.label_position_malom(board, label)
+
+
 def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: int) -> bool:
     """Advance when (wins + 0.5×draws)/total >= threshold.
 
@@ -1465,25 +1527,15 @@ def _rollout(
     if _saved_sim_ply is not None and lookahead_advisor is not None:
         lookahead_advisor._sim_ply_depth = _saved_sim_ply
 
-    if specialist_db is not None and learner_boards:
-        try:
-            _res = "W" if outcome == WIN_REWARD else ("D" if outcome in (DRAW_SHORT, DRAW_LONG) else "L")
-            specialist_db.record_game(learner_boards + learner_result_boards, _res, learner_moves_notation, "gen", learner_color=learner_color)
-        except Exception:
-            pass
-        if malom_db is not None:
-            try:
-                _scored = [(b, abs(_simple_evaluate(b, learner_color))) for b in learner_boards]
-                _scored.sort(key=lambda x: -x[1])
-                for _b, _ in _scored[:10]:
-                    try:
-                        _ml = malom_db.query(_b)
-                        if _ml in ("W", "D", "L"):
-                            specialist_db.label_position_malom(_b, _ml)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+    _persist_rollout_evidence(
+        specialist_db=specialist_db,
+        malom_db=malom_db,
+        learner_boards=learner_boards,
+        learner_result_boards=learner_result_boards,
+        outcome=outcome,
+        learner_moves_notation=learner_moves_notation,
+        learner_color=learner_color,
+    )
 
     return RolloutResult(
         trajectory=game_trajectory,
@@ -1592,75 +1644,77 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     rng = _initialize_training_rngs(args.seed)
 
     # ── Load components ────────────────────────────────────────────────────────
-    sentinel = None
-    sent_path = args.sentinel
     if getattr(args, "no_sentinel", False):
         print("[s_gen_v2] Sentinel disabled by CLI")
-    elif sent_path and Path(sent_path).exists():
-        sentinel = load_advisor(sent_path)
-        if sentinel and sentinel.is_loaded():
-            print(f"[s_gen_v2] Sentinel loaded: {sent_path}")
-        else:
-            sentinel = None
-    if sentinel is None and not getattr(args, "no_sentinel", False):
-        print("[s_gen_v2] Sentinel unavailable — sentinel reward = 0")
+    sentinel = _load_runtime_component(
+        label="Sentinel",
+        path=Path(args.sentinel),
+        disabled=getattr(args, "no_sentinel", False),
+        expected_kind="file",
+        loader=lambda path: load_advisor(str(path)),
+        ready=lambda component: component.is_loaded(),
+    )
+    if sentinel is not None:
+        print(f"[s_gen_v2] Sentinel loaded: {args.sentinel}")
 
-    db = None
-    malom_path = args.malom
-    if malom_path and Path(malom_path).exists():
-        try:
-            from learned_ai.sentinel.db_teacher import ExternalSolvedDB
-            db = ExternalSolvedDB(malom_path)
-            if db.is_available():
-                print(f"[s_gen_v2] Malom DB loaded (lookahead termination only): {malom_path}")
-            else:
-                db = None
-        except Exception as e:
-            print(f"[s_gen_v2] Malom DB failed ({e})")
-    if db is None:
-        print("[s_gen_v2] Malom DB unavailable — lookahead uses no endgame early-exit")
+    from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 
-    value_net = None
-    vn_path = args.value_net
+    db = _load_runtime_component(
+        label="Malom DB",
+        path=Path(args.malom),
+        disabled=False,
+        expected_kind="directory",
+        loader=lambda path: ExternalSolvedDB(str(path)),
+        ready=lambda component: component.is_available(),
+    )
+    print(f"[s_gen_v2] Malom DB loaded (lookahead termination only): {args.malom}")
+
     if getattr(args, "no_value_net", False):
         print("[s_gen_v2] Value net disabled by CLI")
-    elif vn_path and Path(vn_path).exists():
-        try:
-            from ai.value_net import ValueNet as _ValueNet
-            value_net = _ValueNet.load(vn_path)
-            print(f"[s_gen_v2] Value net loaded: {vn_path}")
-        except Exception as e:
-            print(f"[s_gen_v2] Value net load failed ({e}) — VN features will be 0")
-    else:
-        print("[s_gen_v2] No value net — VN features will be 0")
+    def _load_value_net(path: Path):
+        from ai.value_net import ValueNet as _ValueNet
 
-    gap_net = None
-    gap_path = args.gap_net
+        return _ValueNet.load(str(path))
+
+    value_net = _load_runtime_component(
+        label="ValueNet",
+        path=Path(args.value_net),
+        disabled=getattr(args, "no_value_net", False),
+        expected_kind="file",
+        loader=_load_value_net,
+    )
+    if value_net is not None:
+        print(f"[s_gen_v2] Value net loaded: {args.value_net}")
+
     if getattr(args, "no_gap_net", False):
         print("[s_gen_v2] Gap net disabled by CLI")
-    elif gap_path and Path(gap_path).exists():
-        try:
-            from ai.gap_net import GapNet as _GapNet
-            gap_net = _GapNet.load(gap_path)
-            print(f"[s_gen_v2] Gap net loaded: {gap_path}")
-        except Exception as e:
-            print(f"[s_gen_v2] Gap net load failed ({e}) — gap features will be 0.5")
-    else:
-        print("[s_gen_v2] No gap net — gap features will be 0.5")
+    def _load_gap_net(path: Path):
+        from ai.gap_net import GapNet as _GapNet
+
+        return _GapNet.load(str(path))
+
+    gap_net = _load_runtime_component(
+        label="GapNet",
+        path=Path(args.gap_net),
+        disabled=getattr(args, "no_gap_net", False),
+        expected_kind="file",
+        loader=_load_gap_net,
+    )
+    if gap_net is not None:
+        print(f"[s_gen_v2] Gap net loaded: {args.gap_net}")
 
     # v3: HumanDB — for per-candidate human-play-frequency feature
-    human_db = None
-    hdb_path = Path(args.human_db)
-    if hdb_path.exists():
-        try:
-            from ai.human_db import HumanDB
-            human_db = HumanDB(hdb_path)
-            print(f"[s_gen_v2] HumanDB loaded: {human_db.game_count} games "
-                  f"({human_db.entry_count} positions)")
-        except Exception as e:
-            print(f"[s_gen_v2] HumanDB load failed ({e}) — human_freq features will be 0")
-    else:
-        print("[s_gen_v2] No HumanDB — human_freq features will be 0")
+    from ai.human_db import HumanDB
+
+    human_db = _load_runtime_component(
+        label="HumanDB",
+        path=Path(args.human_db),
+        disabled=False,
+        expected_kind="file",
+        loader=lambda path: HumanDB(path),
+    )
+    print(f"[s_gen_v2] HumanDB loaded: {human_db.game_count} games "
+          f"({human_db.entry_count} positions)")
 
     # ── LookaheadAdvisor ─────────────────────────────────────────────────────
     lookahead_advisor = LookaheadAdvisor(
