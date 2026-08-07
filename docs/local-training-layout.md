@@ -110,12 +110,17 @@ candidate-set principles in
 - Local lookup: read `mif_checkout` from the ignored
   `data/training_paths.local.json`. It is used only by interoperability tools
   and is not a trainer input or runtime dependency.
-- Frozen adapter input: commit
-  `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. Do not run comparison cases
-  against a floating MIF checkout and then attribute the result to this pin.
-  The command generator also rejects worktree changes and verifies the formal
-  four frozen file hashes plus the protocol, smoke and deterministic execution
-  pins recorded in the interoperability document.
+- Frozen wire-semantics input: commit
+  `7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The current adapter-finalization
+  comparison baseline is the clean Suite-candidate commit
+  `3ee7e57c7d4c7208be91f62914f344a587fb0f70`, Suite JCS SHA-256
+  `81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`,
+  and Suite raw SHA-256
+  `088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4`.
+  Do not run comparison cases against a floating MIF checkout and then
+  attribute the result to either pin. The command generator rejects worktree
+  changes and verifies the wire artefacts, Suite, differential launch, release
+  manifest, and licence identities recorded in the interoperability document.
 - Candidate-4 M4 harness input: commit
   `40718e80d36ec9c060fc17997568d637a74e6d9f`, with launch SHA-256
   `560ef369fde248bd96d3468a4336442db1d970ede04f488821509e69925fd48e`

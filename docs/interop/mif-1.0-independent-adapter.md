@@ -233,3 +233,62 @@ A full 1,138-test NMM_LLM run was attempted without skips at the previous
 baseline, but reached the 15-minute command limit at roughly 15% with no
 reported failure. It must not be described as a complete repository-suite
 pass.
+
+## Suite 1.0 final adapter pin
+
+The independent adapter is now bound to the finalization baseline at MIF
+commit `3ee7e57c7d4c7208be91f62914f344a587fb0f70`, while the implemented wire
+semantics remain pinned to commit
+`7e45d5a3fa970a535ed6a8a8ff5981aba4b9c978`. The Suite raw-file SHA-256 is
+`088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4` and
+its RFC 8785 JCS SHA-256 is
+`81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`.
+The clean, pushed NMM_LLM implementation commit is
+`a7e7dbd5461cc2d8d8c0a09317d6091598202214`.
+
+The published `MIFCAP/1.0` document lists that Suite JCS identity, marks only
+`identity`, `key`, `position`, `replay`, `ruleset`, and `transform` as
+`tested`, and binds the two Suite ruleset semantic digests. It retains
+`conversion=none`, has no `full` class, and makes no conversion claim. Its
+[raw capability](../evidence/mif-suite-1.0-nmm-capability-2026-08-07.json)
+has SHA-256
+`cd661b1156bf7269f976e050446d01797c9959482f1e1843e21ae3ea7f70dcce`.
+
+The exact Reference/NMM_LLM finalization reports are preserved as follows:
+
+- the [58-case deterministic report](../evidence/mif-suite-1.0-nmm-deterministic-report-2026-08-07.json)
+  has SHA-256
+  `3463f438531fd52847df44fa4186dcba13ed22c7c570a0cc216d9a7eaa797665`;
+- the [differential report](../evidence/mif-suite-1.0-nmm-differential-report-2026-08-07.json)
+  has SHA-256
+  `4c86725bfcd1759433374938c8d8eb2a1dacfa6ea3723592eff759162fce8da6`
+  and records 10/10 seeded runs plus 5/5 mutation families; and
+- both reports use config digest
+  `sha256:c6eb5edc21773c017e7a2d5d9050b38cb08450658a286e64a395f1edc6b7074e`.
+
+All three raw artefacts were generated twice and were byte-identical. A final
+three-adapter preflight against the current published Sanmill Suite adapter
+also passed 58/58, 10/10, and 5/5 with config digest
+`sha256:133cc572ba786ebd544e9fe5fc89c67248432952a1a2fce451a3e1ec6bfda0f2`.
+The
+[Suite-bound evidence](../evidence/mif-suite-1.0-nmm-adapter-evidence-2026-08-07.json)
+records the exact commits, raw identities, tested domain, and zero unexplained
+differences under protocol `MIF-SUITE-ADAPTER-EVIDENCE/1`.
+
+The focused MIF set passes 66 tests; Ruff, focused mypy, and bytecode
+compilation also pass. The complete 1,179-test repository collection was
+exercised in four process-isolated shards. Of those tests, 1,170 passed on the
+first run, one Windows Chroma SQLite cleanup failure passed when rerun alone,
+and eight machine-local Sanmill tests remained intentionally fail-closed
+because the historical strict-v2 binary bytes are documented as unavailable.
+No failure reaches the changed MIF subsystem, but this is not a clean full
+repository-suite result.
+
+The evidence classification is `exact-for-tested-domain`. Its
+`suiteConformance=true` applies only to the six declared classes, two declared
+rulesets, and fixed Suite corpus. It is not `full` conformance and does not
+claim `conversion`. The finalization notice is still a candidate-Suite gate,
+not the immutable signed Suite release. Engineering smoke additionally needs
+an independent experiment digest; formal long-running archival training
+remains unauthorized until the signed tag and both Suite-bound adapters are
+accepted.

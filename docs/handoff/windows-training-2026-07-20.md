@@ -1113,6 +1113,39 @@ An additional 1,138-test repository run was attempted without skips, but the
 15-minute command limit stopped it at roughly 15% with no failure reported.
 It is not a full-suite pass and must not be presented as one.
 
+The later Suite-finalization gate supersedes the pre-Suite capability status
+without changing the wire implementation. MIF commit
+`3ee7e57c7d4c7208be91f62914f344a587fb0f70` fixes Suite raw SHA-256
+`088ca33234289b06d9276aa4c430758222aa85d61621dee7bef4bfc6dcc069a4` and
+JCS SHA-256
+`81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f`.
+NMM_LLM implementation commit
+`a7e7dbd5461cc2d8d8c0a09317d6091598202214` publishes the exact Suite pin
+and marks only the six required classes and two Suite rulesets as tested. It
+continues to declare no `full` class and `conversion=none`.
+
+The final Reference/NMM_LLM evidence records 58/58 deterministic cases, 10/10
+seeded differential runs, 5/5 mutation families, and zero unexplained
+differences. The capability, deterministic-report, and differential-report raw
+SHA-256 values are respectively
+`cd661b1156bf7269f976e050446d01797c9959482f1e1843e21ae3ea7f70dcce`,
+`3463f438531fd52847df44fa4186dcba13ed22c7c570a0cc216d9a7eaa797665`,
+and `4c86725bfcd1759433374938c8d8eb2a1dacfa6ea3723592eff759162fce8da6`.
+The
+[Suite evidence manifest](../evidence/mif-suite-1.0-nmm-adapter-evidence-2026-08-07.json)
+and [interop record](../interop/mif-1.0-independent-adapter.md) own the complete
+identity and scope details. A current three-adapter preflight also passed
+58/58, 10/10, and 5/5.
+
+The 66 focused MIF tests and static checks pass. A four-shard run exercised all
+1,179 repository tests: 1,170 passed initially, the sole Windows Chroma cleanup
+failure passed alone, and eight machine-local Sanmill tests remained
+fail-closed because the historical strict-v2 binary bytes are unavailable.
+This is not a clean full-repository pass and must not be represented as one.
+The Suite claim is only `exact-for-tested-domain`; formal long-running archival
+training remains gated on the immutable signed Suite tag and both accepted
+Suite-bound adapters.
+
 ## Recommended Next Actions
 
 The workspace/root check, graph inspection, earlier trainer fixes, focused
