@@ -990,6 +990,20 @@ class FrozenModelOpponent:
         return enc.legal_moves[idx]
 
 
+def _complete_curriculum_transition(
+    *,
+    model: ScaffoldedPolicyNet,
+    optimizer: torch.optim.Optimizer,
+    frozen_opponent: FrozenModelOpponent,
+    histories: tuple[deque, ...],
+) -> torch.optim.Optimizer:
+    """Start a new level without rolling back learned or optimizer state."""
+    for history in histories:
+        history.clear()
+    frozen_opponent.refresh(model)
+    return optimizer
+
+
 # ── Single-game rollout ────────────────────────────────────────────────────────
 
 RETRY_PLY_MIN =  5
@@ -2254,44 +2268,30 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 else:
                     prev_diff = difficulty
                     difficulty += 1
-                    win_history.clear()
-                    win_history_heuristic.clear()
-                    level_heuristic_history.clear()
                     games_at_level = 0
                     print(f"[s_gen_v2] *** Advanced to diff {difficulty} (was diff {prev_diff}: "
                           f"score={_adv.score_pct:.3f} P={_adv.p_super:.3f} target={_adv.target:.3f}) ***")
-                    wr = _adv.score_pct
-
-                prev_best = out_dir / f"best{prev_diff}.pt"
-                if not prev_best.exists():
+                    opt = _complete_curriculum_transition(
+                        model=model,
+                        optimizer=opt,
+                        frozen_opponent=frozen_opp,
+                        histories=(
+                            win_history,
+                            win_history_heuristic,
+                            level_heuristic_history,
+                        ),
+                    )
+                    games_since_target_update = 0
+                    best_win_rate_at_diff = 0.0
                     _save_runtime_checkpoint(
-                        prev_best,
-                        role="best_train",
+                        out_dir / "latest.pt",
+                        role="latest",
                         reason="difficulty_advanced",
                     )
-                    print(f"[s_gen_v2] Saved best{prev_diff}.pt at advancement (wr={wr:.3f})")
-                if prev_best.exists():
-                    checkpoint = load_checkpoint(prev_best, map_location=device)
-                    model_state = checkpoint.payload.model_state
-                    try:
-                        model.load_state_dict(model_state)
-                    except RuntimeError:
-                        pol_state = {
-                            key: value
-                            for key, value in model_state.items()
-                            if key.startswith("policy_mlp")
-                        }
-                        try:
-                            model.load_state_dict(pol_state, strict=False)
-                            print(f"[s_gen_v2] Advance-load: value_mlp shape mismatch — policy weights loaded, value head kept")
-                        except RuntimeError:
-                            print(f"[s_gen_v2] Advance-load: checkpoint shape incompatible (old feat_dim) — keeping current weights")
-                    model.to(device)
-                    print(f"[s_gen_v2] Loaded best{prev_diff}.pt as starting point for diff {difficulty}")
-
-                best_win_rate_at_diff = 0.0
-                opt = torch.optim.Adam(model.parameters(), lr=args.lr)
-                frozen_opp.refresh(model)
+                    print(
+                        f"[s_gen_v2] Preserved current model and optimizer at "
+                        f"diff {difficulty}; latest.pt records the transition"
+                    )
 
         if _advance_done:
             break
