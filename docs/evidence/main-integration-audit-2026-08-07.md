@@ -46,7 +46,7 @@ change and its surrounding contracts.
 | `d1df6de` GapNet v3 | Out of scope | GapNet is disabled and requires its own provenance, training, and promotion gates. |
 | Later puzzle, web, UI, and autosave changes | Out of scope | They do not affect the Generalist training route. |
 
-## Rules Observation Requiring External Follow-up
+## Rules Observation — Local Fix Verified, Publication Pending
 
 Current `dev` ruleset `nmm-training-core@2` uses MIF
 `stable-moving-v1`: an already stable moving origin is occurrence one for
@@ -61,10 +61,20 @@ would be observed again at actions 4 and 8 and the draw would occur at action
 8. This is a precise convention mismatch, not evidence that either engine's
 move legality is wrong.
 
-The mismatch does not block a self-contained NMM_LLM training smoke whose MRS
-identity is recorded. It does block claiming exact live-rule parity with
-Sanmill or using Sanmill as the formal referee until the convention is made
-explicit and tested.
+Sanmill local commit
+`a6623f88959f7453594df274fbe1f128af7ff55e` now makes the convention explicit
+through opt-in CLI profile `mif-stable-moving-v1`. A fresh black-box process
+confirmed occurrence counts 1/2/3 at logical plies 0/4/8, an action-8
+threefold result, and fail-closed rejection of an attempted ninth action. The
+default `sanmill-live-v1` profile remains unchanged. The exact source and
+runtime evidence are recorded in the
+[strict-referee parity audit](sanmill-strict-referee-parity-2026-08-07.md).
+
+The implementation closes the semantic discrepancy but was still one local
+commit ahead of `origin/master` when reviewed. It does not block self-contained
+NMM_LLM training. Formal Sanmill-referee use remains stopped until the commit
+is pushed, a clean release binary is pinned, and the NMM_LLM strict bridge is
+rerun with the profile selected explicitly.
 
 ## Verification
 

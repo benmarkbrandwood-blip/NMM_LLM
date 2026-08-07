@@ -727,6 +727,16 @@ and binary, rule identity, strict contract, and corrected opening-book asset.
 The complete repository suite was not rerun for this bridge-only update; the
 41-test focused result does not replace the prior full-suite baseline.
 
+On 7 August, Sanmill local commit
+`a6623f88959f7453594df274fbe1f128af7ff55e` added an opt-in
+`mif-stable-moving-v1` strict-referee profile. NMM_LLM-side source inspection
+and a fresh black-box process confirmed origin-counted occurrences at logical
+plies 0/4/8 and fail-closed rejection after the action-8 terminal draw. The
+default live profile is unchanged. The implementation was not yet pushed when
+reviewed, so formal referee adoption still requires remote publication, a
+clean pinned release build, and a repeated bridge audit. See the
+[strict-referee parity record](../evidence/sanmill-strict-referee-parity-2026-08-07.md).
+
 Current and historical bridge records are:
 
 - [v2 human-readable result](../evidence/sanmill-strict-uci-bridge-smoke-v2-2026-07-25.md)
