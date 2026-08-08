@@ -16,9 +16,12 @@ if str(_ROOT) not in sys.path:
 from learned_ai.validation.sanmill_route_probe import (  # noqa: E402
     DEFAULT_PATHS_RELATIVE,
     DEFAULT_PLAN_RELATIVE,
+    SanmillRouteProbeRunFailure,
     inspect_published_source,
     load_probe_plan,
     preflight_probe,
+    probe_failure_output,
+    publish_probe_failure,
     publish_probe_result,
     resolve_probe_inputs,
     run_probe,
@@ -75,6 +78,7 @@ def main() -> int:
     source = inspect_published_source(require_published=True)
     inputs = resolve_probe_inputs(args.paths_config)
     output = validate_probe_output(args.output)
+    failure_output = validate_probe_output(probe_failure_output(output))
     invocation = [
         str(Path(sys.executable).resolve()),
         "scripts/probe_sanmill_integrated_route.py",
@@ -89,13 +93,35 @@ def main() -> int:
         "--output",
         output.relative_to(_ROOT).as_posix(),
     ]
-    report = run_probe(
-        plan,
-        inputs,
-        source=source,
-        run_id=args.run_id,
-        invocation=invocation,
-    )
+    try:
+        report = run_probe(
+            plan,
+            inputs,
+            source=source,
+            run_id=args.run_id,
+            invocation=invocation,
+        )
+    except SanmillRouteProbeRunFailure as exc:
+        publish_probe_failure(failure_output, exc.report, plan)
+        failure = exc.report["failure"]
+        print(
+            json.dumps(
+                {
+                    "status": exc.report["status"],
+                    "run_id": exc.report["run_id"],
+                    "failure_output": failure_output.relative_to(_ROOT).as_posix(),
+                    "report_identity": exc.report["report_identity"],
+                    "completed_samples": failure["completed_sample_count"],
+                    "failed_scheduled_index": failure["failed_schedule"][
+                        "scheduled_index"
+                    ],
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+                indent=2,
+            )
+        )
+        return 1
     publish_probe_result(output, report, plan)
     print(
         json.dumps(

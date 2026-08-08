@@ -45,6 +45,7 @@ from learned_ai.training.sanmill_referee import (
     TRAINING_SANMILL_BINARY_SIZE,
     TRAINING_SANMILL_COMMIT,
     TRAINING_SANMILL_TREE,
+    SanmillBoardMirrorError,
     SanmillTrainingGame,
     SanmillTrainingOpponent,
     inspect_sanmill_training_installation,
@@ -57,6 +58,8 @@ from scripts import train_s_gen_v2 as trainer
 PLAN_SCHEMA = "nmm.sanmill-no-update-route-probe-plan.v1"
 PREFLIGHT_SCHEMA = "nmm.sanmill-no-update-route-probe-preflight.v1"
 RESULT_SCHEMA = "nmm.sanmill-no-update-route-probe-result.v1"
+FAILURE_SCHEMA = "nmm.sanmill-no-update-route-probe-failure.v1"
+SCHEDULE_FAILURE_SCHEMA = "nmm.sanmill-route-probe-schedule-failure.v1"
 DEFAULT_PLAN_RELATIVE = Path(
     "docs/experiments/sanmill-no-update-integrated-route-probe-v1.json"
 )
@@ -92,6 +95,22 @@ _RUN_ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789._-")
 
 class SanmillRouteProbeError(ValueError):
     """Raised when the probe contract or evidence fails closed."""
+
+
+class SanmillRouteProbeScheduleError(SanmillRouteProbeError):
+    """Raised with the exact completed prefix and failed schedule entry."""
+
+    def __init__(self, diagnostic: Mapping[str, Any]) -> None:
+        super().__init__("probe schedule failed closed")
+        self.diagnostic = dict(diagnostic)
+
+
+class SanmillRouteProbeRunFailure(SanmillRouteProbeError):
+    """Carries a complete quarantine report for atomic publication."""
+
+    def __init__(self, report: Mapping[str, Any]) -> None:
+        super().__init__("probe run failed closed")
+        self.report = dict(report)
 
 
 @dataclass(frozen=True)
@@ -152,6 +171,33 @@ class ProbeRuntime:
         self.human_db.close()
         self.specialist_db.close()
         self.malom_db.close()
+
+
+def _probe_game_record(game: ProbeGame) -> dict[str, Any]:
+    return {
+        "scheduled_index": game.scheduled_index,
+        "game_id": game.game_id,
+        "role": game.role,
+        "opponent_kind": game.opponent_kind,
+        "node_budget": game.node_budget,
+        "learner_color": game.learner_color,
+        "route_depth": game.route_depth,
+        "sim_ply_depth": game.sim_ply_depth,
+        "torch_seed": game.torch_seed,
+    }
+
+
+def _completed_sample_identities(
+    samples: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "scheduled_index": int(sample["scheduled_index"]),
+            "game_id": str(sample["game_id"]),
+            "sample_identity": canonical_sha256(sample),
+        }
+        for sample in samples
+    ]
 
 
 def _utc_now() -> str:
@@ -935,61 +981,83 @@ def execute_probe_schedule(
         wall_started = time.perf_counter()
         cpu_started = time.process_time()
         try:
-            with game_factory(
-                runtime.installation,
-                seed=plan.seed,
-                timing_observer=runtime.timing_sink.observe,
-            ) as game:
-                opponent = (
-                    opponent_factory(
-                        game,
-                        node_budget=scheduled.node_budget,
-                        depth=None,
-                    )
-                    if scheduled.opponent_kind == "sanmill"
-                    else runtime.frozen_opponent
-                )
-                result = rollout_fn(
-                    model=runtime.model,
-                    device=runtime.device,
-                    start_board=BoardState.new_game(),
-                    learner_color=scheduled.learner_color,
-                    opponent=opponent,
-                    opp_color=("B" if scheduled.learner_color == "W" else "W"),
-                    sentinel=None,
-                    value_net=None,
-                    temperature=plan.temperature,
-                    max_ply=plan.max_ply,
-                    record_branches=False,
-                    branch_every=0,
-                    retry_ply=0,
-                    forced_placements=None,
-                    lookahead_advisor=runtime.lookahead_advisor,
-                    game_difficulty=1,
-                    human_db=runtime.human_route,
-                    specialist_db=runtime.specialist_route,
-                    malom_db=runtime.malom_route,
-                    deep_game=(scheduled.route_depth == "deep"),
-                    torch_generator=trainer._game_torch_generator(scheduled.torch_seed),
-                    sanmill_game=game,
-                    persist_rollout_evidence=False,
+            try:
+                with game_factory(
+                    runtime.installation,
+                    seed=plan.seed,
                     timing_observer=runtime.timing_sink.observe,
-                )
-                state = game.state
-                state_record = {
-                    "fen": state.fen,
-                    "history_sha256": state.history_sha256,
-                    "logical_ply_count": state.logical_ply_count,
-                    "terminal": state.terminal,
-                    "winner": state.winner,
-                    "outcome_reason_code": state.outcome_reason_code,
+                ) as game:
+                    opponent = (
+                        opponent_factory(
+                            game,
+                            node_budget=scheduled.node_budget,
+                            depth=None,
+                        )
+                        if scheduled.opponent_kind == "sanmill"
+                        else runtime.frozen_opponent
+                    )
+                    result = rollout_fn(
+                        model=runtime.model,
+                        device=runtime.device,
+                        start_board=BoardState.new_game(),
+                        learner_color=scheduled.learner_color,
+                        opponent=opponent,
+                        opp_color=("B" if scheduled.learner_color == "W" else "W"),
+                        sentinel=None,
+                        value_net=None,
+                        temperature=plan.temperature,
+                        max_ply=plan.max_ply,
+                        record_branches=False,
+                        branch_every=0,
+                        retry_ply=0,
+                        forced_placements=None,
+                        lookahead_advisor=runtime.lookahead_advisor,
+                        game_difficulty=1,
+                        human_db=runtime.human_route,
+                        specialist_db=runtime.specialist_route,
+                        malom_db=runtime.malom_route,
+                        deep_game=(scheduled.route_depth == "deep"),
+                        torch_generator=trainer._game_torch_generator(
+                            scheduled.torch_seed
+                        ),
+                        sanmill_game=game,
+                        persist_rollout_evidence=False,
+                        timing_observer=runtime.timing_sink.observe,
+                    )
+                    state = game.state
+                    state_record = {
+                        "fen": state.fen,
+                        "history_sha256": state.history_sha256,
+                        "logical_ply_count": state.logical_ply_count,
+                        "terminal": state.terminal,
+                        "winner": state.winner,
+                        "outcome_reason_code": state.outcome_reason_code,
+                    }
+            finally:
+                if runtime.device.type == "cuda":
+                    torch.cuda.synchronize(runtime.device)
+                wall_seconds = time.perf_counter() - wall_started
+                cpu_seconds = time.process_time() - cpu_started
+                runtime.timing_sink.current = None
+        except Exception as exc:
+            exception_record: dict[str, Any] = {
+                "type": f"{type(exc).__module__}.{type(exc).__qualname__}",
+                "message": str(exc),
+            }
+            if isinstance(exc, SanmillBoardMirrorError):
+                exception_record["bridge_diagnostic"] = dict(exc.diagnostic)
+            raise SanmillRouteProbeScheduleError(
+                {
+                    "schema_version": SCHEDULE_FAILURE_SCHEMA,
+                    "failed_schedule": _probe_game_record(scheduled),
+                    "completed_sample_count": len(samples),
+                    "completed_samples": _completed_sample_identities(samples),
+                    "exception": exception_record,
+                    "wall_seconds": wall_seconds,
+                    "cpu_seconds": cpu_seconds,
+                    "timing_samples_seconds": collector.record(),
                 }
-        finally:
-            if runtime.device.type == "cuda":
-                torch.cuda.synchronize(runtime.device)
-            wall_seconds = time.perf_counter() - wall_started
-            cpu_seconds = time.process_time() - cpu_started
-            runtime.timing_sink.current = None
+            ) from exc
         if not math.isfinite(wall_seconds) or wall_seconds <= 0.0:
             raise SanmillRouteProbeError("probe game wall time is invalid")
         if not math.isfinite(cpu_seconds) or cpu_seconds < 0.0:
@@ -1253,19 +1321,82 @@ def run_probe(
     host_before = _host_record(runtime.device)
     started = _utc_now()
     wall_started = time.perf_counter()
+    schedule_failure: SanmillRouteProbeScheduleError | None = None
+    samples: list[dict[str, Any]] | None = None
     try:
-        samples = execute_probe_schedule(plan, runtime)
-        if model_state_sha256(runtime.model) != learner_before:
-            raise SanmillRouteProbeError("probe changed learner model state")
-        if model_state_sha256(runtime.frozen_opponent._model) != frozen_before:
-            raise SanmillRouteProbeError("probe changed frozen-target state")
+        try:
+            samples = execute_probe_schedule(plan, runtime)
+        except SanmillRouteProbeScheduleError as exc:
+            schedule_failure = exc
+        learner_after = model_state_sha256(runtime.model)
+        frozen_after = model_state_sha256(runtime.frozen_opponent._model)
+        host_after = _host_record(runtime.device)
     finally:
         runtime.close()
     wall_seconds = time.perf_counter() - wall_started
     data_after = verify_probe_inputs(plan, inputs)
+    source_after = inspect_published_source(require_published=True)
+    sanmill_record = training_installation_record(
+        runtime.installation,
+        seed=plan.seed,
+    )
+    if schedule_failure is not None:
+        failure_body = {
+            "schema_version": FAILURE_SCHEMA,
+            "status": "failed_closed",
+            "claim_boundary": plan.claim_boundary,
+            "run_id": run_id,
+            "started_at": started,
+            "failed_at": _utc_now(),
+            "wall_seconds": wall_seconds,
+            "invocation": list(invocation),
+            "plan": tracked_plan_record(plan),
+            "source_before": dict(source),
+            "source_after": source_after,
+            "source_unchanged": source_after == dict(source),
+            "sanmill": sanmill_record,
+            "data_before": data_before,
+            "data_after": data_after,
+            "data_unchanged": data_after == data_before,
+            "model": {
+                "learner_before_sha256": learner_before,
+                "learner_after_sha256": learner_after,
+                "learner_unchanged": learner_after == learner_before,
+                "frozen_before_sha256": frozen_before,
+                "frozen_after_sha256": frozen_after,
+                "frozen_unchanged": frozen_after == frozen_before,
+                "requires_grad": False,
+                "optimizer_constructed": False,
+                "backward_calls": 0,
+                "checkpoint_writes": 0,
+                "rollout_persistence": False,
+            },
+            "host_before": host_before,
+            "host_after": host_after,
+            "bounded_work": dict(plan.payload["bounded_work"]),
+            "failure": schedule_failure.diagnostic,
+            "interpretation": {
+                "completed_measurement": False,
+                "training_updates_measured": False,
+                "strength_measured": False,
+                "retry_authorized": False,
+                "training_launch_authorized": False,
+                "next_gate": "review failure evidence and authorize a minimal diagnostic",
+            },
+        }
+        failure_report = {
+            **failure_body,
+            "report_identity": canonical_sha256(failure_body),
+        }
+        raise SanmillRouteProbeRunFailure(failure_report) from schedule_failure
+    if samples is None:
+        raise SanmillRouteProbeError("probe returned no samples")
+    if learner_after != learner_before:
+        raise SanmillRouteProbeError("probe changed learner model state")
+    if frozen_after != frozen_before:
+        raise SanmillRouteProbeError("probe changed frozen-target state")
     if data_after != data_before:
         raise SanmillRouteProbeError("probe input data identity changed")
-    source_after = inspect_published_source(require_published=True)
     if source_after != dict(source):
         raise SanmillRouteProbeError("probe source identity changed during execution")
     body = {
@@ -1279,14 +1410,14 @@ def run_probe(
         "invocation": list(invocation),
         "plan": tracked_plan_record(plan),
         "source": dict(source),
-        "sanmill": training_installation_record(runtime.installation, seed=plan.seed),
+        "sanmill": sanmill_record,
         "data_before": data_before,
         "data_after": data_after,
         "model": {
             "learner_before_sha256": learner_before,
-            "learner_after_sha256": learner_before,
+            "learner_after_sha256": learner_after,
             "frozen_before_sha256": frozen_before,
-            "frozen_after_sha256": frozen_before,
+            "frozen_after_sha256": frozen_after,
             "requires_grad": False,
             "optimizer_constructed": False,
             "backward_calls": 0,
@@ -1294,7 +1425,7 @@ def run_probe(
             "rollout_persistence": False,
         },
         "host_before": host_before,
-        "host_after": _host_record(torch.device("cuda")),
+        "host_after": host_after,
         "bounded_work": dict(plan.payload["bounded_work"]),
         "samples": samples,
         "summary": summarize_probe(samples),
@@ -1325,6 +1456,11 @@ def validate_probe_output(path: str | Path) -> Path:
     return target
 
 
+def probe_failure_output(path: str | Path) -> Path:
+    completed = Path(path).resolve(strict=False)
+    return completed.with_name(f"{completed.stem}.failure.json")
+
+
 def _validate_completed_report(report: Mapping[str, Any], plan: ProbePlan) -> None:
     if report.get("schema_version") != RESULT_SCHEMA:
         raise SanmillRouteProbeError("probe result schema is invalid")
@@ -1342,18 +1478,74 @@ def _validate_completed_report(report: Mapping[str, Any], plan: ProbePlan) -> No
         raise SanmillRouteProbeError("probe result identity is invalid")
 
 
-def publish_probe_result(
-    path: str | Path,
-    report: Mapping[str, Any],
-    plan: ProbePlan,
-) -> None:
-    """Atomically publish a complete result without replacing evidence."""
-    _validate_completed_report(report, plan)
-    target = Path(path)
-    if target.exists():
-        raise FileExistsError(f"probe result already exists: {target}")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.{uuid4().hex}.tmp")
+def _validate_failure_report(report: Mapping[str, Any], plan: ProbePlan) -> None:
+    if report.get("schema_version") != FAILURE_SCHEMA:
+        raise SanmillRouteProbeError("probe failure schema is invalid")
+    if report.get("status") != "failed_closed":
+        raise SanmillRouteProbeError("probe failure status is invalid")
+    plan_record = report.get("plan")
+    if not isinstance(plan_record, Mapping) or plan_record.get("identity") != (
+        plan.identity
+    ):
+        raise SanmillRouteProbeError("probe failure plan identity is invalid")
+    failure = report.get("failure")
+    if (
+        not isinstance(failure, Mapping)
+        or failure.get("schema_version") != SCHEDULE_FAILURE_SCHEMA
+    ):
+        raise SanmillRouteProbeError("probe failure context is missing")
+    completed = failure.get("completed_samples")
+    completed_count = failure.get("completed_sample_count")
+    if (
+        not isinstance(completed, list)
+        or not isinstance(completed_count, int)
+        or isinstance(completed_count, bool)
+        or completed_count != len(completed)
+        or not 0 <= completed_count < len(plan.schedule)
+    ):
+        raise SanmillRouteProbeError("probe failure prefix is invalid")
+    expected_prefix = [
+        {
+            "scheduled_index": game.scheduled_index,
+            "game_id": game.game_id,
+        }
+        for game in plan.schedule[:completed_count]
+    ]
+    observed_prefix = [
+        {
+            "scheduled_index": item.get("scheduled_index"),
+            "game_id": item.get("game_id"),
+        }
+        for item in completed
+        if isinstance(item, Mapping)
+    ]
+    if observed_prefix != expected_prefix or any(
+        not isinstance(item, Mapping)
+        or not isinstance(item.get("sample_identity"), str)
+        or len(item["sample_identity"]) != 64
+        or any(
+            character not in "0123456789abcdef"
+            for character in item["sample_identity"]
+        )
+        for item in completed
+    ):
+        raise SanmillRouteProbeError("probe failure prefix identity is invalid")
+    if failure.get("failed_schedule") != _probe_game_record(
+        plan.schedule[completed_count]
+    ):
+        raise SanmillRouteProbeError("probe failed schedule entry is invalid")
+    identity = report.get("report_identity")
+    body = dict(report)
+    body.pop("report_identity", None)
+    if identity != canonical_sha256(body):
+        raise SanmillRouteProbeError("probe failure identity is invalid")
+
+
+def _atomic_publish_report(path: Path, report: Mapping[str, Any]) -> None:
+    if path.exists():
+        raise FileExistsError(f"probe evidence already exists: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
     payload = (
         json.dumps(
             report,
@@ -1369,9 +1561,30 @@ def publish_probe_result(
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        if target.exists():
-            raise FileExistsError(f"probe result already exists: {target}")
-        os.replace(temporary, target)
+        if path.exists():
+            raise FileExistsError(f"probe evidence already exists: {path}")
+        os.replace(temporary, path)
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def publish_probe_result(
+    path: str | Path,
+    report: Mapping[str, Any],
+    plan: ProbePlan,
+) -> None:
+    """Atomically publish a complete result without replacing evidence."""
+    _validate_completed_report(report, plan)
+    target = Path(path)
+    _atomic_publish_report(target, report)
+
+
+def publish_probe_failure(
+    path: str | Path,
+    report: Mapping[str, Any],
+    plan: ProbePlan,
+) -> None:
+    """Atomically quarantine a failed run without creating a result."""
+    _validate_failure_report(report, plan)
+    _atomic_publish_report(Path(path), report)
