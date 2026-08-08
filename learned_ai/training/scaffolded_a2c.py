@@ -22,6 +22,7 @@ ScaffoldedStep dataclass fields:
   next_move_features  (k', 62) np.ndarray
   next_value_input    (23,)  np.ndarray
   done            bool
+  bootstrap_perspective str  — whether next_value_input is same/opponent view
 """
 
 from __future__ import annotations
@@ -58,6 +59,7 @@ class ScaffoldedStep:
     next_value_input:   np.ndarray   # (23,)
     done:               bool
     behaviour_temperature: float = 1.0
+    bootstrap_perspective: str = "same"
 
 
 def _behaviour_temperature(step: ScaffoldedStep) -> float:
@@ -77,6 +79,22 @@ def _behaviour_temperature(step: ScaffoldedStep) -> float:
             f"A2C: invalid behaviour_temperature={value!r}"
         )
     return value
+
+
+def _bootstrap_sign(step: ScaffoldedStep) -> float:
+    """Map the recorded successor perspective onto the current mover."""
+    if "bootstrap_perspective" not in vars(step):
+        raise NonFiniteTrainingError(
+            "A2C: pending step predates bootstrap-perspective tracking"
+        )
+    perspective = step.bootstrap_perspective
+    if perspective == "same":
+        return 1.0
+    if perspective == "opponent":
+        return -1.0
+    raise NonFiniteTrainingError(
+        f"A2C: invalid bootstrap_perspective={perspective!r}"
+    )
 
 
 def _require_finite(tensor: torch.Tensor, *, label: str) -> None:
@@ -118,12 +136,17 @@ def scaffolded_a2c_update(
     dones   = torch.tensor(
         [float(s.done) for s in steps], dtype=torch.float32, device=device
     )                                                    # (B,)
+    bootstrap_signs = torch.tensor(
+        [_bootstrap_sign(s) for s in steps],
+        dtype=torch.float32,
+        device=device,
+    )                                                    # (B,)
 
     model.train()
 
     # ── Bootstrap: V(next_state) — no gradient ────────────────────────────────
     with torch.no_grad():
-        v_next = model.value(all_nvi)                   # (B,)
+        v_next = model.value(all_nvi) * bootstrap_signs # (B,)
         v_next = v_next * (1.0 - dones)
 
     td_targets = rewards + gamma * v_next               # (B,)
@@ -217,12 +240,17 @@ def scaffolded_ppo_update(
     dones   = torch.tensor(
         [float(s.done) for s in steps], dtype=torch.float32, device=device
     )
+    bootstrap_signs = torch.tensor(
+        [_bootstrap_sign(s) for s in steps],
+        dtype=torch.float32,
+        device=device,
+    )
     log_probs_old = torch.tensor(
         [s.log_prob_old for s in steps], dtype=torch.float32, device=device
     )
 
     with torch.no_grad():
-        v_next     = model.value(all_nvi) * (1.0 - dones)
+        v_next = model.value(all_nvi) * bootstrap_signs * (1.0 - dones)
         td_targets = (rewards + gamma * v_next).detach()
         with torch.no_grad():
             v0    = model.value(all_vi)

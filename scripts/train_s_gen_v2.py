@@ -1727,6 +1727,7 @@ def _rollout_impl(
                 next_value_input=next_vi,
                 done=terminal_next,
                 behaviour_temperature=temperature,
+                bootstrap_perspective="opponent",
             )
             game_trajectory.append(step)
 

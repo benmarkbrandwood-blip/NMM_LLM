@@ -330,6 +330,50 @@ class TestScaffoldedA2C:
 
         assert policy_loss == pytest.approx(expected)
 
+    def test_opponent_perspective_bootstrap_flips_value_sign(self):
+        class FeatureValueModel(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.policy = torch.nn.Parameter(torch.zeros(2))
+                self.value_scale = torch.nn.Parameter(torch.tensor(1.0))
+
+            def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
+                return self.policy
+
+            def value(self, features: torch.Tensor) -> torch.Tensor:
+                return features[:, 0] * self.value_scale
+
+        steps = [
+            ScaffoldedStep(
+                move_features=np.zeros((2, 1), dtype=np.float32),
+                value_input=np.array([0.25], dtype=np.float32),
+                chosen_idx=0,
+                log_prob_old=float(-np.log(2.0)),
+                reward=0.0,
+                next_move_features=np.zeros((2, 1), dtype=np.float32),
+                next_value_input=np.array([0.75], dtype=np.float32),
+                done=False,
+                behaviour_temperature=1.0,
+                bootstrap_perspective="opponent",
+            )
+            for _ in range(8)
+        ]
+        model = FeatureValueModel()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+
+        _, value_loss, _ = scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            gamma=1.0,
+            entropy_coef=0.0,
+        )
+
+        # Current V=+0.25.  The successor is from the opponent's perspective,
+        # so its +0.75 must bootstrap as -0.75: (-0.75 - 0.25)^2 == 1.
+        assert value_loss == pytest.approx(1.0)
+
     def test_non_finite_loss_fails_before_updating_parameters(self):
         model = ScaffoldedPolicyNet()
         optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)

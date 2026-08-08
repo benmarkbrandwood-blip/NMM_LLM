@@ -135,6 +135,19 @@ def test_timing_observer_does_not_change_rollout_semantics(monkeypatch) -> None:
     assert all(seconds >= 0.0 for _stage, seconds in timings)
 
 
+def test_rollout_marks_successor_value_as_opponent_perspective(monkeypatch) -> None:
+    move = {"from": None, "to": "a7", "capture": None}
+    monkeypatch.setattr(
+        trainer,
+        "encode_position_with_lookahead",
+        lambda *_args, **_kwargs: _encoded(move),
+    )
+
+    result = _one_ply_rollout(persist_rollout_evidence=False)
+
+    assert result.trajectory[0].bootstrap_perspective == "opponent"
+
+
 def test_deep_route_restores_simulation_depth_after_exception(monkeypatch) -> None:
     advisor = SimpleNamespace(_sim_ply_depth=5, _ply_depth=12)
 
