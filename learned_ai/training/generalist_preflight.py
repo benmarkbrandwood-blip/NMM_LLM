@@ -35,6 +35,7 @@ from learned_ai.training.checkpoint_envelope import (
     load_checkpoint,
 )
 from learned_ai.training.scaffolded_a2c import MIN_UPDATE_STEPS
+from learned_ai.training.sanmill_referee import probe_sanmill_training_runtime
 from learned_ai.training.training_identity import (
     TrainingIdentityError,
     experiment_digest,
@@ -57,6 +58,7 @@ TRAINER_PATH_KEYS = frozenset(
         "specialist_db_path",
         "ruleset_manifest_path",
         "sanmill_checkout",
+        "sanmill_training_checkout",
     }
 )
 
@@ -102,6 +104,11 @@ PATH_SPECS = {
         "NMM_RULESET_MANIFEST",
         "ruleset_manifest_path",
         "data/rulesets/nmm-training-core@2.json",
+    ),
+    "sanmill_runtime": (
+        "NMM_SANMILL_TRAINING_CHECKOUT",
+        "sanmill_training_checkout",
+        "",
     ),
 }
 
@@ -322,6 +329,65 @@ def validate_generalist_configuration(args: Any) -> None:
             raise PreflightConfigurationError(
                 "heuristic node and time budgets are mutually exclusive"
             )
+    referee_engine = getattr(args, "referee_engine", "local")
+    opponent_engine = getattr(args, "opponent_engine", "game-ai")
+    if (referee_engine, opponent_engine) not in {
+        ("local", "game-ai"),
+        ("sanmill", "sanmill"),
+    }:
+        raise PreflightConfigurationError(
+            "the initial integration requires paired local/game-ai or "
+            "sanmill/sanmill engines"
+        )
+    sanmill_ladder = getattr(args, "sanmill_node_ladder", None)
+    sanmill_depth = getattr(args, "sanmill_search_depth", None)
+    if referee_engine == "sanmill":
+        if not getattr(args, "sanmill_runtime", None):
+            raise PreflightConfigurationError(
+                "Sanmill-refereed training requires sanmill_runtime"
+            )
+        if not sanmill_ladder or any(
+            isinstance(value, bool) or not isinstance(value, int) or value <= 0
+            for value in sanmill_ladder
+        ):
+            raise PreflightConfigurationError(
+                "Sanmill-refereed training requires a positive node ladder"
+            )
+        if len(sanmill_ladder) != args.diff_max:
+            raise PreflightConfigurationError(
+                "sanmill_node_ladder must contain exactly diff_max budgets"
+            )
+        if args.curriculum_advance_policy != "disabled":
+            raise PreflightConfigurationError(
+                "the initial Sanmill lineage must disable the uncalibrated "
+                "legacy advancement gate"
+            )
+        if args.diff_max != 1:
+            raise PreflightConfigurationError(
+                "the initial Sanmill lineage supports one fixed-work level"
+            )
+        if sanmill_depth is not None:
+            _positive_integer(sanmill_depth, field="sanmill_search_depth")
+        if heuristic_node_budget is not None or time_budget != -1:
+            raise PreflightConfigurationError(
+                "Sanmill search cannot be combined with GameAI work budgets"
+            )
+        if not args.minimal_rollouts:
+            raise PreflightConfigurationError(
+                "the initial Sanmill lineage requires minimal_rollouts"
+            )
+        if not getattr(args, "no_recovery", False):
+            raise PreflightConfigurationError(
+                "the initial Sanmill lineage requires no_recovery"
+            )
+        if args.max_branches_per_game != 0:
+            raise PreflightConfigurationError(
+                "the initial Sanmill lineage does not support branch rollouts"
+            )
+    elif sanmill_ladder is not None or sanmill_depth is not None:
+        raise PreflightConfigurationError(
+            "Sanmill search settings require the Sanmill engine pair"
+        )
     if args.max_branches_per_game < 0:
         raise PreflightConfigurationError(
             "max_branches_per_game must not be negative"
@@ -615,6 +681,7 @@ def _experiment_assets(
     human: Mapping[str, Any],
     opening: Mapping[str, Any],
     checkpoint: Mapping[str, Any] | None,
+    sanmill: Mapping[str, Any],
 ) -> dict[str, str]:
     """Return immutable inputs; mutable DB/checkpoint state is bound separately."""
     identities = {
@@ -625,6 +692,10 @@ def _experiment_assets(
         identities["opening_forcing_sources"] = str(opening.get("identity", ""))
     if start_mode == "weights-only" and checkpoint is not None:
         identities["source_checkpoint"] = str(checkpoint.get("identity", ""))
+    if sanmill.get("enabled"):
+        identities["sanmill_training_runtime"] = str(
+            sanmill.get("identity", "")
+        )
     if any(not value for value in identities.values()):
         raise TrainingIdentityError(
             "experiment identity requires all immutable asset identities"
@@ -847,10 +918,10 @@ def run_generalist_preflight(
 
     if state.dirty:
         errors.append("Git worktree must be clean")
-    if (
-        args.start_mode != "fresh"
-        and args.experiment_id == "dev-v4-malom-corrected-fresh-v1"
-    ):
+    if args.start_mode != "fresh" and args.experiment_id in {
+        "dev-v4-malom-corrected-fresh-v1",
+        "dev-v4-sanmill-refereed-fresh-v1",
+    }:
         errors.append(
             "non-fresh imports require an explicit non-fresh experiment ID"
         )
@@ -866,6 +937,16 @@ def run_generalist_preflight(
             errors.append(f"corrected fresh baseline requires explicit --{flag.replace('_', '-')}")
     if args.ppo:
         errors.append("corrected fresh baseline must not enable PPO")
+    if args.experiment_id == "dev-v4-sanmill-refereed-fresh-v1":
+        if (args.referee_engine, args.opponent_engine) != (
+            "sanmill",
+            "sanmill",
+        ):
+            errors.append(
+                "Sanmill fresh lineage requires Sanmill referee and opponent"
+            )
+        if args.seed != 42:
+            errors.append("Sanmill fresh lineage requires seed 42")
     if mode == "smoke":
         bounded_games = getattr(args, "segment_games", None) or args.max_games
         if bounded_games not in {1, 2}:
@@ -875,7 +956,11 @@ def run_generalist_preflight(
     else:
         managed_plan = getattr(args, "managed_plan", None)
         managed_authorization = getattr(args, "managed_authorization", None)
-        if managed_plan and args.heuristic_node_budget is None:
+        if (
+            managed_plan
+            and args.opponent_engine == "game-ai"
+            and args.heuristic_node_budget is None
+        ):
             errors.append(
                 "managed long-run requires an explicit --heuristic-node-budget"
             )
@@ -935,6 +1020,20 @@ def run_generalist_preflight(
     human_report = _probe_human_db(Path(args.human_db))
     opening_report = _probe_opening_sources(args, root=root)
     ruleset_report = _probe_ruleset(Path(args.ruleset_manifest))
+    sanmill_report: dict[str, Any] = {"enabled": False}
+    if args.referee_engine == "sanmill":
+        try:
+            sanmill_report = {
+                "enabled": True,
+                **probe_sanmill_training_runtime(
+                    args.sanmill_runtime,
+                    node_budget=min(args.sanmill_node_ladder),
+                    depth=args.sanmill_search_depth,
+                    seed=args.seed,
+                ),
+            }
+        except (OSError, RuntimeError, ValueError) as exc:
+            sanmill_report = {"enabled": True, "error": str(exc)}
     checkpoint_report: dict[str, Any] | None = None
     expected_resume_config_sha256 = resume_config_sha256(args)
     if args.start_mode in {"weights-only", "exact-resume"}:
@@ -951,6 +1050,7 @@ def run_generalist_preflight(
         ("human_db", human_report),
         ("opening_forcing", opening_report),
         ("ruleset", ruleset_report),
+        ("sanmill_training", sanmill_report),
     ):
         if report.get("error"):
             errors.append(f"{name}: {report['error']}")
@@ -1007,6 +1107,7 @@ def run_generalist_preflight(
                 human=human_report,
                 opening=opening_report,
                 checkpoint=checkpoint_report,
+                sanmill=sanmill_report,
             ),
             ruleset=ruleset_identity,
         )
@@ -1025,6 +1126,10 @@ def run_generalist_preflight(
         ):
             if implementation.get(field) != expected:
                 errors.append(f"checkpoint: {field} is incompatible")
+        if args.referee_engine == "sanmill" and implementation.get(
+            "sanmill_runtime_identity"
+        ) != sanmill_report.get("identity"):
+            errors.append("checkpoint: Sanmill runtime identity is incompatible")
 
     config = _resolved_config(args, mode)
     if errors:
@@ -1059,6 +1164,7 @@ def run_generalist_preflight(
             "human_db": human_report,
             "opening_forcing": opening_report,
             "ruleset": ruleset_report,
+            "sanmill_training": sanmill_report,
             "checkpoint": checkpoint_report,
             "components": {
                 "sentinel": not args.no_sentinel,
@@ -1068,6 +1174,9 @@ def run_generalist_preflight(
                 "imitation_warmstart": not args.no_s1a_warmstart,
                 "imitation_mix": not args.no_imitation_mix,
                 "opening_forcing": not args.no_opening_forcing,
+                "referee_engine": args.referee_engine,
+                "opponent_engine": args.opponent_engine,
+                "recovery": not args.no_recovery,
             },
         },
         "errors": errors,

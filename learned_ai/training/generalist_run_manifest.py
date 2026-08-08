@@ -136,6 +136,22 @@ def _asset_refs(
                 intended_use="trainer_side_placement_prefix_forcing",
             )
         )
+    sanmill = checks.get("sanmill_training", {"enabled": False})
+    if sanmill.get("enabled"):
+        if not sanmill.get("identity"):
+            raise ContractValidationError(
+                "enabled Sanmill training does not provide an asset identity"
+            )
+        assets.append(
+            AssetManifestRef(
+                logical_name="sanmill_training_runtime",
+                role="authoritative_referee_and_search_opponent",
+                identity=sanmill["identity"],
+                schema_version="nmm.sanmill-training-runtime.v1",
+                trust_level="exact-source-and-binary-pin",
+                intended_use="complete_history_referee_and_fixed_node_search",
+            )
+        )
     checkpoint = checks.get("checkpoint")
     if checkpoint is not None:
         exact_resume = start_mode == "exact-resume"
@@ -210,6 +226,13 @@ def build_generalist_run_manifest(
             "imitation_warmstart": not args.no_s1a_warmstart,
             "imitation_mix": not args.no_imitation_mix,
             "opening_forcing": not args.no_opening_forcing,
+            "sanmill_referee": (
+                getattr(args, "referee_engine", "local") == "sanmill"
+            ),
+            "sanmill_opponent": (
+                getattr(args, "opponent_engine", "game-ai") == "sanmill"
+            ),
+            "recovery": not getattr(args, "no_recovery", False),
         },
         outputs={
             "run_directory": _portable_path(args.out_dir, root),

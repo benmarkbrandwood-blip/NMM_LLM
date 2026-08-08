@@ -59,6 +59,33 @@ def test_parser_exposes_fixed_heuristic_node_budget() -> None:
     assert args.heuristic_node_budget == 25_000
 
 
+def test_parser_exposes_explicit_sanmill_referee_contract() -> None:
+    args = trainer._build_argument_parser().parse_args(
+        [
+            "--referee-engine",
+            "sanmill",
+            "--opponent-engine",
+            "sanmill",
+            "--sanmill-runtime",
+            "runtime",
+            "--sanmill-node-ladder",
+            "1000,5000",
+            "--sanmill-search-depth",
+            "7",
+            "--curriculum-advance-policy",
+            "disabled",
+            "--no-recovery",
+        ]
+    )
+
+    assert args.referee_engine == "sanmill"
+    assert args.opponent_engine == "sanmill"
+    assert args.sanmill_node_ladder == (1_000, 5_000)
+    assert args.sanmill_search_depth == 7
+    assert args.curriculum_advance_policy == "disabled"
+    assert args.no_recovery is True
+
+
 def test_game_ai_rejects_mixed_time_and_node_budgets() -> None:
     with pytest.raises(ValueError, match="mutually exclusive"):
         trainer._GA(

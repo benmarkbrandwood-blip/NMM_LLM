@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 import torch
 
+from learned_ai.training import generalist_preflight as preflight_module
 from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
 from learned_ai.data.data_contract import publish_dataset_manifest
 from learned_ai.training.generalist_preflight import (
@@ -169,7 +170,13 @@ def test_path_resolution_records_cli_environment_config_and_disable_sources(
     )
     local = data / "paths.json"
     local.write_text(
-        json.dumps({"malom_db_path": "local-malom"}), encoding="utf-8"
+        json.dumps(
+            {
+                "malom_db_path": "local-malom",
+                "sanmill_training_checkout": "local-sanmill-runtime",
+            }
+        ),
+        encoding="utf-8",
     )
     args = _smoke_args(tmp_path)
     args.out_dir = "cli-output"
@@ -189,8 +196,14 @@ def test_path_resolution_records_cli_environment_config_and_disable_sources(
     assert sources["malom"] == "local_path_config:malom_db_path"
     assert sources["human_db"] == "shared_config:human_db_path"
     assert sources["specialist_db"] == "environment:NMM_SPECIALIST_DB"
+    assert sources["sanmill_runtime"] == (
+        "local_path_config:sanmill_training_checkout"
+    )
     assert sources["sentinel"] == "cli:no_sentinel"
     assert Path(args.malom) == (tmp_path / "local-malom").resolve()
+    assert Path(args.sanmill_runtime) == (
+        tmp_path / "local-sanmill-runtime"
+    ).resolve()
 
 
 @pytest.mark.parametrize(
@@ -233,6 +246,78 @@ def test_configuration_rejects_mixed_heuristic_work_budgets(
 
     with pytest.raises(PreflightConfigurationError, match="mutually exclusive"):
         validate_generalist_configuration(args)
+
+
+def _enable_sanmill_contract(args, runtime: Path) -> None:
+    args.referee_engine = "sanmill"
+    args.opponent_engine = "sanmill"
+    args.sanmill_runtime = str(runtime)
+    args.diff_max = 1
+    args.curriculum_advance_policy = "disabled"
+    args.sanmill_node_ladder = (1_000,)
+    args.sanmill_search_depth = None
+    args.minimal_rollouts = True
+    args.no_recovery = True
+
+
+def test_configuration_requires_paired_fail_closed_sanmill_controls(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.referee_engine = "sanmill"
+
+    with pytest.raises(PreflightConfigurationError, match="paired"):
+        validate_generalist_configuration(args)
+
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    args.minimal_rollouts = False
+    with pytest.raises(PreflightConfigurationError, match="minimal_rollouts"):
+        validate_generalist_configuration(args)
+
+    args.minimal_rollouts = True
+    args.no_recovery = False
+    with pytest.raises(PreflightConfigurationError, match="no_recovery"):
+        validate_generalist_configuration(args)
+
+
+def test_sanmill_smoke_preflight_binds_runtime_identity(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.experiment_id = "dev-v4-sanmill-refereed-fresh-v1"
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+    runtime_identity = "b" * 64
+
+    monkeypatch.setattr(
+        preflight_module,
+        "probe_sanmill_training_runtime",
+        lambda *_args, **_kwargs: {
+            "identity": runtime_identity,
+            "commit": "a" * 40,
+            "binary_sha256": "c" * 64,
+            "strict_referee": {
+                "semanticDigest": "sha256:" + "d" * 64,
+            },
+            "probe": {"deterministic": True},
+        },
+    )
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={"sanmill_runtime": "cli"},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_smoke"
+    assert report["checks"]["sanmill_training"]["identity"] == runtime_identity
+    assert report["checks"]["components"]["referee_engine"] == "sanmill"
+    assert report["experimentDigest"]
 
 
 def test_segment_boundary_does_not_change_resume_semantics(tmp_path: Path) -> None:

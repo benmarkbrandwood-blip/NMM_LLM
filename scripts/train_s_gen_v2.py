@@ -89,6 +89,12 @@ from learned_ai.training.checkpoint_envelope import (
     save_checkpoint,
 )
 from learned_ai.training.run_contract import canonical_sha256
+from learned_ai.training.sanmill_referee import (
+    SanmillTrainingGame,
+    SanmillTrainingOpponent,
+    inspect_sanmill_training_installation,
+    training_installation_record,
+)
 
 # ── Opening book ──────────────────────────────────────────────────────────────
 
@@ -1207,6 +1213,12 @@ class _GameConfig:
     temperature:            float
 
 
+@dataclass(frozen=True)
+class _SanmillOpponentSpec:
+    node_budget: int
+    depth: Optional[int]
+
+
 @dataclass
 class RolloutResult:
     trajectory:        list[ScaffoldedStep]
@@ -1293,6 +1305,23 @@ def _extra_rollout_fits_in_segment(game_count: int, segment_stop_game: int) -> b
     return _segment_slots_remaining(game_count, segment_stop_game) > 0
 
 
+def _sanmill_terminal_outcome(
+    game: SanmillTrainingGame,
+    learner_color: str,
+) -> Optional[tuple[float, str]]:
+    state = game.state
+    if not state.terminal:
+        return None
+    learner_name = "white" if learner_color == "W" else "black"
+    if state.winner == learner_name:
+        outcome = WIN_REWARD
+    elif state.winner is None:
+        outcome = DRAW_SHORT
+    else:
+        outcome = LOSS_REWARD
+    return outcome, state.outcome_reason_code
+
+
 def _rollout(
     model:          ScaffoldedPolicyNet,
     device:         torch.device,
@@ -1317,6 +1346,7 @@ def _rollout(
     deep_game: bool = False,
     torch_generator: Optional[torch.Generator] = None,
     draw_state: Optional[StandardDrawState] = None,
+    sanmill_game: Optional[SanmillTrainingGame] = None,
 ) -> RolloutResult:
     # For deep games (1-in-20): temporarily run full ply_depth simulation
     _saved_sim_ply = None
@@ -1337,7 +1367,13 @@ def _rollout(
     learner_placement_count = 0
     retry_board: Optional[BoardState] = None
     retry_draw_state: Optional[StandardDrawState] = None
-    draw_rules = StandardDrawTracker(board, state=draw_state)
+    if sanmill_game is not None and draw_state is not None:
+        raise RuntimeError("Sanmill-refereed rollouts cannot import local draw state")
+    draw_rules = (
+        None
+        if sanmill_game is not None
+        else StandardDrawTracker(board, state=draw_state)
+    )
     move_history: deque[dict] = deque(maxlen=N_HISTORY)
     learner_boards: list[BoardState] = []
     learner_result_boards: list[BoardState] = []
@@ -1347,22 +1383,38 @@ def _rollout(
     opponent_search_depth_sum = 0
     opponent_node_budget = getattr(opponent, "node_budget", None)
 
+    if sanmill_game is not None:
+        sanmill_game.assert_current_board(board)
+
     while ply < max_ply:
-        if ply == retry_ply:
+        if sanmill_game is None and ply == retry_ply:
+            assert draw_rules is not None
             retry_board = board
             retry_draw_state = draw_rules.snapshot()
         if board.phase != "place" and move_phase_start_ply is None:
             move_phase_start_ply = ply
 
-        terminal, winner, terminal_reason = terminal_result(board)
-        if terminal:
-            if winner == learner_color:
-                outcome = WIN_REWARD
-            elif winner is not None:
-                outcome = LOSS_REWARD
-            else:
-                outcome = DRAW_SHORT if ply < MAX_PLY else DRAW_LONG
-            termination_reason = terminal_reason or "terminal"
+        if sanmill_game is not None:
+            sanmill_game.assert_current_board(board)
+            authoritative_terminal = _sanmill_terminal_outcome(
+                sanmill_game, learner_color
+            )
+        else:
+            terminal, winner, terminal_reason = terminal_result(board)
+            authoritative_terminal = None
+            if terminal:
+                if winner == learner_color:
+                    local_outcome = WIN_REWARD
+                elif winner is not None:
+                    local_outcome = LOSS_REWARD
+                else:
+                    local_outcome = DRAW_SHORT if ply < MAX_PLY else DRAW_LONG
+                authoritative_terminal = (
+                    local_outcome,
+                    terminal_reason or "terminal",
+                )
+        if authoritative_terminal is not None:
+            outcome, termination_reason = authoritative_terminal
             done = True
             break
 
@@ -1425,12 +1477,22 @@ def _rollout(
             move_history.append(move)   # advance history for next-state context
             hist_feats_next = _build_history_features(move_history)
 
+            if sanmill_game is not None:
+                sanmill_game.apply_nmm_move(board, move)
             board_after = board.apply_move(move)
             learner_result_boards.append(board_after)
-            enc_after   = encode_position_with_lookahead(board_after, opp_color,
-                                                          sentinel_advisor=sentinel, db=None,
-                                                          value_net=value_net,
-                                                          lookahead_advisor=None)
+            enc_after = (
+                None
+                if sanmill_game is not None and sanmill_game.state.terminal
+                else encode_position_with_lookahead(
+                    board_after,
+                    opp_color,
+                    sentinel_advisor=sentinel,
+                    db=None,
+                    value_net=value_net,
+                    lookahead_advisor=None,
+                )
+            )
 
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
             malom_q = malom_db.query_move_quality(board, move) if malom_db is not None else None
@@ -1471,7 +1533,11 @@ def _rollout(
                 next_mf = np.zeros((1, MOVE_FEAT_DIM_WITH_LOOKAHEAD), dtype=np.float32)
                 next_vi = np.zeros(VALUE_INPUT_DIM_WITH_HISTORY, dtype=np.float32)
 
-            terminal_next, _ = is_terminal(board_after)
+            terminal_next = (
+                sanmill_game.state.terminal
+                if sanmill_game is not None
+                else is_terminal(board_after)[0]
+            )
             step = ScaffoldedStep(
                 move_features=enc.feat_matrix,
                 value_input=vi_now,
@@ -1519,6 +1585,7 @@ def _rollout(
 
             learner_move_count += 1
             if record_branches and branch_every > 0 and (learner_move_count % branch_every == 0):
+                assert draw_rules is not None
                 moves_into_movement = (ply - move_phase_start_ply) if move_phase_start_ply is not None else None
                 branch_candidates.append(
                     (
@@ -1531,27 +1598,36 @@ def _rollout(
 
             board = board_after
 
-            terminal_after, winner_after, reason_after = terminal_result(board)
-            draw_reason = None
-            if terminal_after:
-                outcome = (
-                    WIN_REWARD
-                    if winner_after == learner_color
-                    else LOSS_REWARD
+            if sanmill_game is not None:
+                authoritative_terminal = _sanmill_terminal_outcome(
+                    sanmill_game, learner_color
                 )
-                termination_reason = reason_after or "terminal"
-                done = True
+                if authoritative_terminal is not None:
+                    outcome, termination_reason = authoritative_terminal
+                    done = True
             else:
-                draw_reason = draw_rules.observe(
-                    learner_boards[-1],
-                    move,
-                    board,
-                )
-            if draw_reason is not None:
-                outcome = DRAW_SHORT
-                termination_reason = draw_reason
-                done = True
-                game_trajectory[-1].done = True
+                terminal_after, winner_after, reason_after = terminal_result(board)
+                draw_reason = None
+                if terminal_after:
+                    outcome = (
+                        WIN_REWARD
+                        if winner_after == learner_color
+                        else LOSS_REWARD
+                    )
+                    termination_reason = reason_after or "terminal"
+                    done = True
+                else:
+                    assert draw_rules is not None
+                    draw_reason = draw_rules.observe(
+                        learner_boards[-1],
+                        move,
+                        board,
+                    )
+                if draw_reason is not None:
+                    outcome = DRAW_SHORT
+                    termination_reason = draw_reason
+                    done = True
+                    game_trajectory[-1].done = True
 
         else:
             try:
@@ -1571,29 +1647,45 @@ def _rollout(
                 termination_reason = "opponent-no-move"
                 done    = True
                 break
+            if isinstance(opponent, SanmillTrainingOpponent):
+                opponent.consume_committed_turn(opp_move)
+            elif sanmill_game is not None:
+                sanmill_game.apply_nmm_move(board, opp_move)
             move_history.append(opp_move)
             board_before = board
             board = board.apply_move(opp_move)
-            terminal_after, winner_after, reason_after = terminal_result(board)
-            draw_reason = None
-            if terminal_after:
-                outcome = (
-                    WIN_REWARD
-                    if winner_after == learner_color
-                    else LOSS_REWARD
+            if sanmill_game is not None:
+                sanmill_game.assert_current_board(board)
+                authoritative_terminal = _sanmill_terminal_outcome(
+                    sanmill_game, learner_color
                 )
-                termination_reason = reason_after or "terminal"
-                done = True
-                if game_trajectory:
-                    game_trajectory[-1].done = True
+                if authoritative_terminal is not None:
+                    outcome, termination_reason = authoritative_terminal
+                    done = True
+                    if game_trajectory:
+                        game_trajectory[-1].done = True
             else:
-                draw_reason = draw_rules.observe(board_before, opp_move, board)
-            if draw_reason is not None:
-                outcome = DRAW_SHORT
-                termination_reason = draw_reason
-                done = True
-                if game_trajectory:
-                    game_trajectory[-1].done = True
+                terminal_after, winner_after, reason_after = terminal_result(board)
+                draw_reason = None
+                if terminal_after:
+                    outcome = (
+                        WIN_REWARD
+                        if winner_after == learner_color
+                        else LOSS_REWARD
+                    )
+                    termination_reason = reason_after or "terminal"
+                    done = True
+                    if game_trajectory:
+                        game_trajectory[-1].done = True
+                else:
+                    assert draw_rules is not None
+                    draw_reason = draw_rules.observe(board_before, opp_move, board)
+                if draw_reason is not None:
+                    outcome = DRAW_SHORT
+                    termination_reason = draw_reason
+                    done = True
+                    if game_trajectory:
+                        game_trajectory[-1].done = True
 
         ply += 1
         if done:
@@ -1730,6 +1822,22 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[s_gen_v2] Device: {device}")
     rng = _initialize_training_rngs(args.seed)
+    sanmill_installation = None
+    sanmill_runtime_record = None
+    if args.referee_engine == "sanmill":
+        sanmill_installation = inspect_sanmill_training_installation(
+            args.sanmill_runtime
+        )
+        sanmill_runtime_record = training_installation_record(
+            sanmill_installation,
+            seed=args.seed,
+        )
+        print(
+            "[s_gen_v2] Sanmill referee: "
+            f"commit={sanmill_runtime_record['commit'][:12]} "
+            f"binary={sanmill_runtime_record['binary_sha256'][:12]} "
+            "profile=mif-stable-moving-v1"
+        )
 
     # ── Load components ────────────────────────────────────────────────────────
     if getattr(args, "no_sentinel", False):
@@ -2015,6 +2123,13 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 "ruleset_semantic_digest": run_manifest.checkpoint_policy[
                     "ruleset"
                 ]["semanticDigest"],
+                "referee_engine": args.referee_engine,
+                "opponent_engine": args.opponent_engine,
+                "sanmill_runtime_identity": (
+                    sanmill_runtime_record["identity"]
+                    if sanmill_runtime_record is not None
+                    else None
+                ),
             },
         )
         payload = _make_checkpoint_payload(
@@ -2079,21 +2194,32 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 _gd = difficulty
                 if difficulty > 1 and config_rng.random() < 0.15:
                     _gd = config_rng.randint(1, difficulty - 1)
-                _h  = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
-                if args.heuristic_node_budget is not None:
-                    _h._inner = _GA(
-                        color=_oc,
-                        difficulty=_gd,
-                        override_node_budget=args.heuristic_node_budget,
+                if args.opponent_engine == "sanmill":
+                    _opp = _SanmillOpponentSpec(
+                        node_budget=args.sanmill_node_ladder[_gd - 1],
+                        depth=args.sanmill_search_depth,
                     )
+                    _gt = "vs_sanmill"
                 else:
-                    _tb = _heuristic_time_budget(_gd) if args.time_budget <= 0 else args.time_budget
-                    _h._inner = _GA(
-                        color=_oc,
-                        difficulty=_gd,
-                        override_time_budget=_tb,
-                    )
-                _opp, _gt = _h, "vs_heuristic"
+                    _h = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
+                    if args.heuristic_node_budget is not None:
+                        _h._inner = _GA(
+                            color=_oc,
+                            difficulty=_gd,
+                            override_node_budget=args.heuristic_node_budget,
+                        )
+                    else:
+                        _tb = (
+                            _heuristic_time_budget(_gd)
+                            if args.time_budget <= 0
+                            else args.time_budget
+                        )
+                        _h._inner = _GA(
+                            color=_oc,
+                            difficulty=_gd,
+                            override_time_budget=_tb,
+                        )
+                    _opp, _gt = _h, "vs_heuristic"
             _fp: Optional[list[str]] = None
             if (
                 opening_lines
@@ -2110,7 +2236,10 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     torch_seed=torch_seed,
                     learner_color=_lc, opp_color=_oc, game_type=_gt,
                     game_difficulty=_gd,
-                    is_full_diff=(_gt == "vs_heuristic" and _gd == difficulty),
+                    is_full_diff=(
+                        _gt in {"vs_heuristic", "vs_sanmill"}
+                        and _gd == difficulty
+                    ),
                     game_forced_placements=_fp,
                     retry_ply=config_rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
                     temperature=temperature,
@@ -2127,21 +2256,51 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
         # ── Run primary rollouts (parallel when batch_games > 1) ─────────────
         def _primary(cfg: _GameConfig, opp: Any) -> RolloutResult:
-            return _rollout(
-                model=model, device=device, start_board=BoardState.new_game(),
-                learner_color=cfg.learner_color, opponent=opp, opp_color=cfg.opp_color,
-                sentinel=sentinel, value_net=value_net, temperature=cfg.temperature,
-                max_ply=args.max_ply, record_branches=(args.max_branches_per_game > 0),
-                branch_every=args.branch_every, retry_ply=cfg.retry_ply,
-                forced_placements=cfg.game_forced_placements,
-                lookahead_advisor=lookahead_advisor,
-                game_difficulty=cfg.game_difficulty,
-                human_db=human_db,
-                specialist_db=specialist_db,
-                malom_db=db,
-                deep_game=(cfg.scheduled_index % 20 == 0),
-                torch_generator=_game_torch_generator(cfg.torch_seed),
-            )
+            def invoke(
+                actual_opponent: Any,
+                sanmill_game: Optional[SanmillTrainingGame],
+            ) -> RolloutResult:
+                return _rollout(
+                    model=model,
+                    device=device,
+                    start_board=BoardState.new_game(),
+                    learner_color=cfg.learner_color,
+                    opponent=actual_opponent,
+                    opp_color=cfg.opp_color,
+                    sentinel=sentinel,
+                    value_net=value_net,
+                    temperature=cfg.temperature,
+                    max_ply=args.max_ply,
+                    record_branches=(args.max_branches_per_game > 0),
+                    branch_every=args.branch_every,
+                    retry_ply=cfg.retry_ply,
+                    forced_placements=cfg.game_forced_placements,
+                    lookahead_advisor=lookahead_advisor,
+                    game_difficulty=cfg.game_difficulty,
+                    human_db=human_db,
+                    specialist_db=specialist_db,
+                    malom_db=db,
+                    deep_game=(cfg.scheduled_index % 20 == 0),
+                    torch_generator=_game_torch_generator(cfg.torch_seed),
+                    sanmill_game=sanmill_game,
+                )
+
+            if sanmill_installation is None:
+                return invoke(opp, None)
+            with SanmillTrainingGame(
+                sanmill_installation,
+                seed=args.seed,
+            ) as game:
+                actual_opponent = (
+                    SanmillTrainingOpponent(
+                        game,
+                        node_budget=opp.node_budget,
+                        depth=opp.depth,
+                    )
+                    if isinstance(opp, _SanmillOpponentSpec)
+                    else opp
+                )
+                return invoke(actual_opponent, game)
 
         if not batch_slots:
             break
@@ -2266,7 +2425,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 hdr = sum(1 for x in recent_h if x == 0.5) / max(len(recent_h), 1)
                 _awr = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
                 _oc  = "W" if result.outcome == WIN_REWARD else ("L" if result.outcome == LOSS_REWARD else "D")
-                _gt  = "heur" if game_type == "vs_heuristic" else "self"
+                _gt = {
+                    "vs_heuristic": "heur",
+                    "vs_sanmill": "sanmill",
+                    "vs_frozen": "self",
+                }.get(game_type, game_type)
                 _dif = f"d{game_difficulty}" if game_difficulty != difficulty else f"diff {difficulty}"
                 print(f"[s_gen_v2] {game_count:6d} {_gt:4s} {learner_color} | {_dif} | {_oc} ply={result.ply:3d} | hwr={hwr:.3f} hdr={hdr:.3f} awr={_awr:.3f} | temp={temperature:.2f} lr={opt.param_groups[0]['lr']:.5f}")
 
@@ -2462,7 +2625,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
                 _adapt_lr(opt, win_rate, args.lr)
 
-                if (len(win_history_heuristic) >= RECOVERY_MIN_GAMES
+                if (not args.no_recovery
+                        and len(win_history_heuristic) >= RECOVERY_MIN_GAMES
                         and loss_rate > win_rate):
                     _h_list = list(win_history_heuristic)
                     _mid    = len(_h_list) // 2
@@ -2550,7 +2714,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             # level to limit false-positive advances from variance blips.
             _adv = None
             if (
-                advance_reference_added
+                args.curriculum_advance_policy == "legacy-score"
+                and advance_reference_added
                 and games_at_level >= 20
                 and games_at_level % 10 == 0
             ):
@@ -2670,6 +2835,21 @@ def _policy_hidden_widths(value: str) -> tuple[int, ...]:
     return widths
 
 
+def _positive_integer_ladder(value: str) -> tuple[int, ...]:
+    """Parse a non-empty fixed-work curriculum ladder."""
+    try:
+        budgets = tuple(int(item.strip()) for item in value.split(","))
+    except (AttributeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be comma-separated positive integers"
+        ) from exc
+    if not budgets or any(budget <= 0 for budget in budgets):
+        raise argparse.ArgumentTypeError(
+            "must be comma-separated positive integers"
+        )
+    return budgets
+
+
 def _build_argument_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Generalist v2: full-game training from new_game()")
     mode = p.add_mutually_exclusive_group()
@@ -2770,6 +2950,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--diff-start",          type=int,   default=None)
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
     p.add_argument(
+        "--curriculum-advance-policy",
+        choices=("legacy-score", "disabled"),
+        default="legacy-score",
+        help=(
+            "Difficulty transition rule; fresh Sanmill integration disables "
+            "the uncalibrated legacy score gate"
+        ),
+    )
+    p.add_argument(
         "--temp-start",
         type=_finite_positive_float,
         default=TEMP_START,
@@ -2782,6 +2971,36 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-ply",             type=int,   default=MAX_PLY)
     p.add_argument("--max-ply-branch",      type=int,   default=MAX_PLY_BRANCH)
     p.add_argument("--time-budget",         type=float, default=-1.0)
+    p.add_argument(
+        "--referee-engine",
+        choices=("local", "sanmill"),
+        default="local",
+        help="Authoritative rules/history engine for complete game rollouts",
+    )
+    p.add_argument(
+        "--opponent-engine",
+        choices=("game-ai", "sanmill"),
+        default="game-ai",
+        help="Search implementation for the non-frozen opponent stratum",
+    )
+    p.add_argument(
+        "--sanmill-runtime",
+        default=None,
+        type=str,
+        help="Exact isolated Sanmill source/runtime checkout",
+    )
+    p.add_argument(
+        "--sanmill-node-ladder",
+        type=_positive_integer_ladder,
+        default=None,
+        help="Comma-separated fixed node budgets, one per curriculum level",
+    )
+    p.add_argument(
+        "--sanmill-search-depth",
+        type=int,
+        default=None,
+        help="Optional positive ceiling for Sanmill fixed-node search",
+    )
     p.add_argument(
         "--heuristic-node-budget",
         type=int,
@@ -2811,6 +3030,11 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--minimal-rollouts",    action="store_true",
                    help="Skip retry + confirm rollouts (branches are already off by default). "
                         "Trades sample efficiency for wall-clock speed — one primary rollout per game.")
+    p.add_argument(
+        "--no-recovery",
+        action="store_true",
+        help="Disable observation-based best-checkpoint resurrection",
+    )
     p.add_argument("--sim-ply-depth",       type=int,   default=5,
                    help="LookaheadAdvisor simulation depth during training (default 5). "
                         "Feature width stays at 15-ply * 4 = 60 floats via padding, so inference "

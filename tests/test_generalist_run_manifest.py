@@ -108,6 +108,9 @@ def test_manifest_binds_preflight_assets_components_and_outputs(tmp_path: Path) 
         "imitation_warmstart": False,
         "imitation_mix": False,
         "opening_forcing": False,
+        "sanmill_referee": False,
+        "sanmill_opponent": False,
+        "recovery": True,
     }
     assert [asset.logical_name for asset in manifest.assets] == [
         "mif_suite_1_0",
@@ -121,6 +124,41 @@ def test_manifest_binds_preflight_assets_components_and_outputs(tmp_path: Path) 
     assert manifest.checkpoint_policy["experimentDigest"] == (
         "sha256:" + "e" * 64
     )
+
+
+def test_manifest_records_sanmill_as_referee_and_opponent_asset(
+    tmp_path: Path,
+) -> None:
+    args = _args(tmp_path)
+    args.referee_engine = "sanmill"
+    args.opponent_engine = "sanmill"
+    args.no_recovery = True
+    report = _report()
+    report["checks"]["sanmill_training"] = {
+        "enabled": True,
+        "identity": "sanmill-runtime-identity",
+    }
+
+    manifest = build_generalist_run_manifest(
+        args,
+        report=report,
+        root=tmp_path,
+        command=("python", "trainer.py"),
+        run_id="sanmill-run",
+        experiment_id="dev-v4-sanmill-refereed-fresh-v1",
+        created_at_utc="2026-08-08T08:00:00Z",
+        environment={"python": "3.13.1"},
+    )
+
+    assert manifest.components["sanmill_referee"] is True
+    assert manifest.components["sanmill_opponent"] is True
+    assert manifest.components["recovery"] is False
+    runtime = next(
+        asset
+        for asset in manifest.assets
+        if asset.logical_name == "sanmill_training_runtime"
+    )
+    assert runtime.identity == "sanmill-runtime-identity"
 
 
 def test_manifest_rejects_nonpassing_or_inconsistent_preflight(tmp_path: Path) -> None:
