@@ -1,6 +1,6 @@
 ---
 name: verify-training-readiness
-description: Verify whether an NMM_LLM training smoke, long run, or resume is safe to launch by checking Git state, experiment decisions, resolved paths, data and checkpoint provenance, output isolation, focused tests, and the exact launch contract. Use when preparing, reviewing, resuming, diagnosing, smoke-testing, or starting a training run, or when asked whether training is ready.
+description: Verify and analyze an NMM_LLM training smoke, long run, resume, or completed result by checking Git state, experiment decisions, resolved paths, data and checkpoint provenance, output isolation, focused tests, the exact launch contract, learning curves, seeds, hyperparameters, baselines, ablations, and disaggregated metrics. Use when preparing, reviewing, resuming, diagnosing, smoke-testing, starting, monitoring, or interpreting a training run, or when asked whether training is ready, healthy, successful, or worth promoting.
 ---
 
 # Verify Training Readiness
@@ -75,6 +75,52 @@ long-run decisions it does not approve.
 4. Report known unrelated collection failures separately. Never describe the
    full suite as clean when it did not collect or run cleanly.
 5. Do not delete, skip, weaken, or rewrite assertions merely to obtain green.
+
+## Analyse Learning Evidence
+
+When diagnosing training behaviour or interpreting a result, do not infer a
+learning conclusion from one smoothed curve or one seed. Assemble the widest
+comparable evidence that is actually available:
+
+- inspect raw and smoothed train and validation curves together, with their
+  windows, sample counts, segment boundaries and axes stated;
+- compare multiple fixed seeds and report individual runs plus centre,
+  dispersion and outliers instead of silently pooling them;
+- bind exact hyperparameters and schedules, including optimiser, learning
+  rate, temperature, entropy, batch/update cadence, rollout horizon, opponent
+  mix, search budget and enabled components;
+- bind dataset, split, ruleset, label-schema and database versions and check
+  for leakage, identity drift or changed class balance;
+- compare against a frozen, compatible baseline under the same rules,
+  starting positions, colours, work budget and adjudication;
+- use controlled ablations to isolate claimed causes, changing one relevant
+  factor at a time unless an interaction experiment is explicitly designed;
+  and
+- report per-class metrics with support counts and, when applicable,
+  per-phase, per-opponent, per-colour and per-termination results. Include
+  macro and micro summaries when imbalance makes the distinction material.
+
+Treat missing evidence as an explicit gap. If ordinary supervised validation
+does not exist for an RL run, use a frozen held-out corpus or evaluation as a
+separately named validation-like measure; never invent or relabel a training
+metric as validation. Distinguish raw observations from rolling-window or
+plotting artefacts, and distinguish rules draws from max-ply truncations.
+
+Structure every substantive diagnosis under these separate labels:
+
+1. **Observed facts / 观察事实** — directly measured values with artefact,
+   version, seed and scope identities;
+2. **Hypotheses / 假设** — falsifiable explanations, ranked when several fit;
+3. **Supporting evidence / 支持证据** — evidence that raises each hypothesis;
+4. **Counterevidence / 反证** — conflicting results, alternative explanations
+   and confounders; and
+5. **Next validation experiments / 下一步验证实验** — the smallest decisive
+   experiment, including control, changed variable, seeds, data version,
+   metrics, acceptance rule and resource bound.
+
+Mark predictions explicitly. Do not present curve correlation, a training-tail
+improvement, a single-seed result, or an anti-collapse gate as causal evidence
+or playing-strength promotion.
 
 ## Issue the Verdict
 
