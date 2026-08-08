@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +37,7 @@ from learned_ai.training.run_contract import (
 
 MANAGED_PLAN_SCHEMA = "nmm.managed-generalist-plan.v1"
 MANAGED_AUTHORIZATION_SCHEMA = "nmm.managed-authorization.v1"
+POLICY_HEALTH_GATE_SCHEMA = "nmm.managed-policy-health-gate.v1"
 CONTROLLER_LEDGER_NAME = "controller-events.jsonl"
 CONTROLLER_LOCK_NAME = "controller.lock"
 
@@ -86,6 +87,22 @@ def _require_positive_number(value: Any, *, field: str) -> float:
     number = float(value)
     if not math.isfinite(number) or number <= 0:
         raise ManagedContractError(f"{field} must be finite and positive")
+    return number
+
+
+def _require_finite_number(value: Any, *, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ManagedContractError(f"{field} must be numeric")
+    number = float(value)
+    if not math.isfinite(number):
+        raise ManagedContractError(f"{field} must be finite")
+    return number
+
+
+def _require_probability(value: Any, *, field: str) -> float:
+    number = _require_finite_number(value, field=field)
+    if not 0.0 <= number <= 1.0:
+        raise ManagedContractError(f"{field} must be between zero and one")
     return number
 
 
@@ -154,6 +171,94 @@ def _publish_exclusive(path: Path, value: Mapping[str, Any]) -> None:
 
 
 @dataclass(frozen=True)
+class PolicyHealthGate:
+    """Immutable fixed-state acceptance gate for one managed plan."""
+
+    corpus_path: str
+    corpus_sha256: str
+    audit_script_path: str
+    audit_script_sha256: str
+    exact_critical_states: int
+    required_direct_preserving_rate: float
+    min_candidate_preserving_rate: float
+    min_candidate_logit_margin: float
+    device: str = "auto"
+
+    _FIELDS: ClassVar[set[str]] = {
+        "schema_version",
+        "corpus_path",
+        "corpus_sha256",
+        "audit_script_path",
+        "audit_script_sha256",
+        "exact_critical_states",
+        "required_direct_preserving_rate",
+        "min_candidate_preserving_rate",
+        "min_candidate_logit_margin",
+        "device",
+    }
+
+    def __post_init__(self) -> None:
+        for field in ("corpus_path", "audit_script_path"):
+            path = Path(_require_text(getattr(self, field), field=field))
+            if not path.is_absolute():
+                raise ManagedContractError(f"{field} must be an absolute path")
+        _require_sha256(self.corpus_sha256, field="corpus_sha256")
+        _require_sha256(self.audit_script_sha256, field="audit_script_sha256")
+        _require_positive_int(
+            self.exact_critical_states,
+            field="exact_critical_states",
+        )
+        _require_probability(
+            self.required_direct_preserving_rate,
+            field="required_direct_preserving_rate",
+        )
+        _require_probability(
+            self.min_candidate_preserving_rate,
+            field="min_candidate_preserving_rate",
+        )
+        _require_finite_number(
+            self.min_candidate_logit_margin,
+            field="min_candidate_logit_margin",
+        )
+        if self.device not in {"auto", "cpu", "cuda"}:
+            raise ManagedContractError("policy-health device is unsupported")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": POLICY_HEALTH_GATE_SCHEMA,
+            "corpus_path": self.corpus_path,
+            "corpus_sha256": self.corpus_sha256,
+            "audit_script_path": self.audit_script_path,
+            "audit_script_sha256": self.audit_script_sha256,
+            "exact_critical_states": self.exact_critical_states,
+            "required_direct_preserving_rate": (
+                self.required_direct_preserving_rate
+            ),
+            "min_candidate_preserving_rate": self.min_candidate_preserving_rate,
+            "min_candidate_logit_margin": self.min_candidate_logit_margin,
+            "device": self.device,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> PolicyHealthGate:
+        actual = set(value)
+        if actual != cls._FIELDS:
+            raise ManagedContractError(
+                "policy-health gate fields differ; "
+                f"unknown={sorted(actual - cls._FIELDS)}, "
+                f"missing={sorted(cls._FIELDS - actual)}"
+            )
+        if value["schema_version"] != POLICY_HEALTH_GATE_SCHEMA:
+            raise ManagedContractError("unsupported policy-health gate schema")
+        return cls(
+            **{
+                key: value[key]
+                for key in cls._FIELDS - {"schema_version"}
+            }
+        )
+
+
+@dataclass(frozen=True)
 class ManagedPlan:
     """Immutable technical and resource envelope for one local training goal."""
 
@@ -173,6 +278,7 @@ class ManagedPlan:
     allow_safe_exact_resume: bool
     publication_allowed: bool
     promotion_allowed: bool
+    policy_health: PolicyHealthGate | None = None
 
     _FIELDS: ClassVar[set[str]] = {
         "schema_version",
@@ -193,7 +299,10 @@ class ManagedPlan:
         "allow_safe_exact_resume",
         "publication_allowed",
         "promotion_allowed",
+        "policy_health",
     }
+
+    _OPTIONAL_FIELDS: ClassVar[set[str]] = {"policy_health"}
 
     def __post_init__(self) -> None:
         for field in ("plan_id", "objective", "experiment_id", "git_commit"):
@@ -231,9 +340,15 @@ class ManagedPlan:
             raise ManagedContractError(
                 "managed training plans cannot pre-authorize publication or promotion"
             )
+        if self.policy_health is not None and not isinstance(
+            self.policy_health, PolicyHealthGate
+        ):
+            raise ManagedContractError(
+                "policy_health must be a PolicyHealthGate or null"
+            )
 
     def _payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": MANAGED_PLAN_SCHEMA,
             "plan_id": self.plan_id,
             "created_at_utc": self.created_at_utc,
@@ -252,6 +367,9 @@ class ManagedPlan:
             "publication_allowed": self.publication_allowed,
             "promotion_allowed": self.promotion_allowed,
         }
+        if self.policy_health is not None:
+            payload["policy_health"] = self.policy_health.to_dict()
+        return payload
 
     @property
     def plan_sha256(self) -> str:
@@ -263,20 +381,27 @@ class ManagedPlan:
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> ManagedPlan:
         actual = set(value)
-        if actual != cls._FIELDS:
+        required = cls._FIELDS - cls._OPTIONAL_FIELDS
+        if not required <= actual or actual - cls._FIELDS:
             raise ManagedContractError(
                 "managed plan fields differ; "
                 f"unknown={sorted(actual - cls._FIELDS)}, "
-                f"missing={sorted(cls._FIELDS - actual)}"
+                f"missing={sorted(required - actual)}"
             )
         if value["schema_version"] != MANAGED_PLAN_SCHEMA:
             raise ManagedContractError("unsupported managed plan schema")
-        plan = cls(
-            **{
-                key: value[key]
-                for key in cls._FIELDS - {"schema_version", "plan_sha256"}
-            }
-        )
+        fields = {
+            key: value[key]
+            for key in required - {"schema_version", "plan_sha256"}
+        }
+        if "policy_health" in value:
+            raw_health = value["policy_health"]
+            if not isinstance(raw_health, Mapping):
+                raise ManagedContractError(
+                    "managed plan policy_health must be an object"
+                )
+            fields["policy_health"] = PolicyHealthGate.from_dict(raw_health)
+        plan = cls(**fields)
         if value["plan_sha256"] != plan.plan_sha256:
             raise ManagedContractError("managed plan hash does not match its content")
         return plan
@@ -1018,11 +1143,265 @@ def _inspect_completed_segment(
     return completed_games, checkpoint
 
 
+def _trainer_arg_value(plan: ManagedPlan, option: str) -> str:
+    matches = [
+        index
+        for index, value in enumerate(plan.common_trainer_args)
+        if value == option
+    ]
+    if len(matches) != 1:
+        raise ManagedContractError(
+            f"managed trainer arguments must contain exactly one {option}"
+        )
+    index = matches[0]
+    if index + 1 >= len(plan.common_trainer_args):
+        raise ManagedContractError(f"managed trainer option {option} has no value")
+    return plan.common_trainer_args[index + 1]
+
+
+def _report_path(value: Any, *, field: str) -> Path:
+    text = _require_text(value, field=field)
+    path = Path(text)
+    if not path.is_absolute():
+        path = _repository_root() / path
+    return path.resolve(strict=False)
+
+
+def _report_mapping(value: Any, *, field: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ManagedContractError(f"policy-health {field} must be an object")
+    return value
+
+
+def _validate_policy_health_report(
+    plan: ManagedPlan,
+    *,
+    segment_index: int,
+    report_path: Path,
+    checkpoint: Path,
+    specialist_db: Path,
+    completed_games: int,
+    runtime_commit: str,
+) -> dict[str, Any]:
+    """Validate identities and frozen thresholds in one audit report."""
+    gate = plan.policy_health
+    if gate is None:
+        raise ManagedContractError("policy-health gate is not enabled")
+    report = _strict_json(report_path)
+    if report.get("schema_version") != "nmm.generalist-policy-health.v1":
+        raise ManagedContractError("policy-health report schema differs")
+    evidence_id = _require_sha256(
+        report.get("evidence_id"), field="policy-health evidence_id"
+    )
+    report_core = dict(report)
+    del report_core["evidence_id"]
+    if canonical_sha256(report_core) != evidence_id:
+        raise ManagedContractError("policy-health evidence_id is invalid")
+
+    identities = _report_mapping(
+        report.get("identities"), field="identities"
+    )
+    expected_identity_values = {
+        "git_commit": runtime_commit,
+        "checkpoint_sha256": _file_sha256(checkpoint),
+        "run_id": _segment_run_id(plan, segment_index),
+        "experiment_id": plan.experiment_id,
+        "corpus_sha256": gate.corpus_sha256,
+        "paths_config_sha256": plan.paths_config_sha256,
+        "specialist_db_sha256": _file_sha256(specialist_db),
+    }
+    for key, expected in expected_identity_values.items():
+        if identities.get(key) != expected:
+            raise ManagedContractError(
+                f"policy-health report {key} identity differs"
+            )
+    expected_paths = {
+        "checkpoint": checkpoint.resolve(strict=False),
+        "corpus": Path(gate.corpus_path).resolve(strict=False),
+        "specialist_db": specialist_db.resolve(strict=False),
+    }
+    for key, expected in expected_paths.items():
+        if _report_path(identities.get(key), field=key) != expected:
+            raise ManagedContractError(
+                f"policy-health report {key} path differs"
+            )
+
+    checkpoint_state = _report_mapping(
+        report.get("checkpoint_state"), field="checkpoint_state"
+    )
+    if checkpoint_state.get("game_count") != completed_games:
+        raise ManagedContractError("policy-health report game count differs")
+    diagnostic = _report_mapping(
+        report.get("fixed_state_diagnostic"),
+        field="fixed_state_diagnostic",
+    )
+    direct = _report_mapping(
+        diagnostic.get("direct_lookahead_signal"),
+        field="direct_lookahead_signal",
+    )
+    candidate = _report_mapping(
+        diagnostic.get("candidate"), field="candidate"
+    )
+    metrics = _report_mapping(candidate.get("metrics"), field="candidate.metrics")
+    all_metrics = _report_mapping(metrics.get("all"), field="candidate.metrics.all")
+
+    direct_critical = direct.get("critical_states")
+    candidate_critical = all_metrics.get("critical_states")
+    if isinstance(direct_critical, bool) or not isinstance(direct_critical, int):
+        raise ManagedContractError("policy-health direct critical count is invalid")
+    if isinstance(candidate_critical, bool) or not isinstance(
+        candidate_critical, int
+    ):
+        raise ManagedContractError("policy-health candidate critical count is invalid")
+    direct_rate = _require_probability(
+        direct.get("argmax_value_preserving_rate"),
+        field="direct argmax preserving rate",
+    )
+    candidate_rate = _require_probability(
+        all_metrics.get("critical_argmax_value_preserving_rate"),
+        field="candidate argmax preserving rate",
+    )
+    candidate_margin = _require_finite_number(
+        all_metrics.get(
+            "critical_mean_preserving_minus_downgrading_logit"
+        ),
+        field="candidate preserving logit margin",
+    )
+
+    failures: list[str] = []
+    if direct_critical != gate.exact_critical_states:
+        failures.append("direct_critical_state_count")
+    if candidate_critical != gate.exact_critical_states:
+        failures.append("candidate_critical_state_count")
+    if direct_rate < gate.required_direct_preserving_rate:
+        failures.append("direct_value_preserving_rate")
+    if candidate_rate < gate.min_candidate_preserving_rate:
+        failures.append("candidate_value_preserving_rate")
+    if candidate_margin < gate.min_candidate_logit_margin:
+        failures.append("candidate_preserving_logit_margin")
+
+    return {
+        "passed": not failures,
+        "failures": failures,
+        "report": str(report_path.resolve(strict=False)),
+        "report_sha256": _file_sha256(report_path),
+        "evidence_id": evidence_id,
+        "metrics": {
+            "direct_critical_states": direct_critical,
+            "candidate_critical_states": candidate_critical,
+            "direct_value_preserving_rate": direct_rate,
+            "candidate_value_preserving_rate": candidate_rate,
+            "candidate_preserving_logit_margin": candidate_margin,
+        },
+        "thresholds": {
+            "exact_critical_states": gate.exact_critical_states,
+            "required_direct_preserving_rate": (
+                gate.required_direct_preserving_rate
+            ),
+            "min_candidate_preserving_rate": (
+                gate.min_candidate_preserving_rate
+            ),
+            "min_candidate_logit_margin": gate.min_candidate_logit_margin,
+        },
+    }
+
+
+def _run_policy_health_gate(
+    plan: ManagedPlan,
+    *,
+    segment_index: int,
+    checkpoint: Path,
+    completed_games: int,
+    runtime_commit: str,
+    python_executable: str,
+    timeout_seconds: float,
+    runner: Callable[..., subprocess.CompletedProcess],
+) -> dict[str, Any] | None:
+    gate = plan.policy_health
+    if gate is None:
+        return None
+    corpus = Path(gate.corpus_path)
+    audit_script = Path(gate.audit_script_path)
+    if not corpus.is_file() or _file_sha256(corpus) != gate.corpus_sha256:
+        raise ManagedContractError("policy-health corpus identity differs")
+    if (
+        not audit_script.is_file()
+        or _file_sha256(audit_script) != gate.audit_script_sha256
+    ):
+        raise ManagedContractError("policy-health audit script identity differs")
+    if timeout_seconds <= 0:
+        raise ManagedContractError("no wall time remains for policy-health audit")
+
+    report_path = (
+        _segment_output_dir(plan, segment_index) / "policy-health.json"
+    )
+    if report_path.exists():
+        raise ManagedContractError("policy-health report already exists")
+    specialist_db = _specialist_db_path_for_plan(plan)
+    command = [
+        python_executable,
+        str(audit_script),
+        "--checkpoint",
+        str(checkpoint),
+        "--specialist-db",
+        str(specialist_db),
+        "--output",
+        str(report_path),
+        "--corpus",
+        str(corpus),
+        "--expected-corpus-sha256",
+        gate.corpus_sha256,
+        "--paths-config",
+        plan.paths_config,
+        "--expected-experiment-id",
+        plan.experiment_id,
+        "--expected-game-count",
+        str(completed_games),
+        "--seed",
+        _trainer_arg_value(plan, "--seed"),
+        "--schedule-max-games",
+        str(plan.max_games),
+        "--temp-start",
+        _trainer_arg_value(plan, "--temp-start"),
+        "--device",
+        gate.device,
+    ]
+    try:
+        result = runner(
+            command,
+            cwd=_repository_root(),
+            check=False,
+            timeout=timeout_seconds,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ManagedContractError("policy-health audit timed out") from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ManagedContractError("policy-health audit could not run") from exc
+    if result.returncode != 0:
+        raise ManagedContractError(
+            f"policy-health audit exited with code {result.returncode}"
+        )
+    if not report_path.is_file():
+        raise ManagedContractError("policy-health audit did not publish a report")
+    return _validate_policy_health_report(
+        plan,
+        segment_index=segment_index,
+        report_path=report_path,
+        checkpoint=checkpoint,
+        specialist_db=specialist_db,
+        completed_games=completed_games,
+        runtime_commit=runtime_commit,
+    )
+
+
 def run_next_segment(
     plan_path: str | Path,
     authorization_path: str | Path,
     *,
     runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    health_runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     python_executable: str = sys.executable,
 ) -> dict[str, Any]:
     """Run exactly one authorized segment, then verify its durable evidence."""
@@ -1030,6 +1409,23 @@ def run_next_segment(
     authorization_path = Path(authorization_path).resolve(strict=False)
     plan = load_managed_plan(plan_path)
     _verify_authorization(plan, authorization_path)
+
+    ledger_events = load_run_events(
+        Path(plan.control_dir) / CONTROLLER_LEDGER_NAME
+    )
+    if ledger_events:
+        last_event = ledger_events[-1]
+        recovery_ready = (
+            last_event.event_type == "managed_segment_interrupted"
+            and last_event.reason_code == "host_reboot"
+            and bool(last_event.details.get("recovery_checkpoint"))
+        )
+        if last_event.status in {"failed", "quarantined", "interrupted"} and not (
+            recovery_ready
+        ):
+            raise ManagedContractError(
+                "managed plan is stopped and requires Agent review"
+            )
 
     completed_events = _completed_segment_events(plan)
     previous_completed_games = (
@@ -1059,7 +1455,10 @@ def run_next_segment(
         _pending_recovery_for_segment(plan, pending_index) is not None
         or _plan_used_host_reboot_recovery(plan)
     )
-    _assert_managed_git_state(plan, allow_recovery_descendant=allow_descendant)
+    runtime_commit = _assert_managed_git_state(
+        plan,
+        allow_recovery_descendant=allow_descendant,
+    )
     if _file_sha256(Path(plan.paths_config)) != plan.paths_config_sha256:
         raise ManagedContractError("managed paths configuration has changed")
 
@@ -1246,6 +1645,68 @@ def run_next_segment(
                 },
             )
             raise ManagedContractError("managed segment evidence is invalid") from exc
+        policy_health: dict[str, Any] | None = None
+        if plan.policy_health is not None:
+            try:
+                policy_health = _run_policy_health_gate(
+                    plan,
+                    segment_index=segment_index,
+                    checkpoint=checkpoint,
+                    completed_games=completed_games,
+                    runtime_commit=runtime_commit,
+                    python_executable=python_executable,
+                    timeout_seconds=remaining_seconds - elapsed,
+                    runner=health_runner,
+                )
+            except Exception as exc:
+                elapsed = time.monotonic() - started
+                report = (
+                    _segment_output_dir(plan, segment_index)
+                    / "policy-health.json"
+                )
+                details: dict[str, Any] = {
+                    "segment_index": segment_index,
+                    "completed_games": completed_games,
+                    "checkpoint": str(checkpoint.resolve(strict=False)),
+                    "elapsed_seconds": elapsed,
+                    "exception_type": type(exc).__name__,
+                }
+                if report.is_file():
+                    details["report"] = str(report.resolve(strict=False))
+                    details["report_sha256"] = _file_sha256(report)
+                _append_controller_event(
+                    plan,
+                    status="quarantined",
+                    event_type="managed_segment_policy_health_quarantined",
+                    reason_code="policy_health_audit_failed",
+                    details=details,
+                )
+                raise ManagedContractError(
+                    "managed segment policy-health evidence is invalid"
+                ) from exc
+            if policy_health is None:
+                raise ManagedContractError(
+                    "enabled policy-health gate returned no result"
+                )
+            if not policy_health["passed"]:
+                elapsed = time.monotonic() - started
+                _append_controller_event(
+                    plan,
+                    status="quarantined",
+                    event_type="managed_segment_policy_health_quarantined",
+                    reason_code="policy_health_threshold_failed",
+                    details={
+                        "segment_index": segment_index,
+                        "completed_games": completed_games,
+                        "checkpoint": str(checkpoint.resolve(strict=False)),
+                        "elapsed_seconds": elapsed,
+                        "policy_health": policy_health,
+                    },
+                )
+                raise ManagedContractError(
+                    "managed segment failed the policy-health thresholds"
+                )
+        elapsed = time.monotonic() - started
         _append_controller_event(
             plan,
             status="completed",
@@ -1256,6 +1717,7 @@ def run_next_segment(
                 "completed_games": completed_games,
                 "checkpoint": str(checkpoint.resolve(strict=False)),
                 "elapsed_seconds": elapsed,
+                "policy_health": policy_health,
             },
         )
         if completed_games >= plan.max_games:
@@ -1276,6 +1738,7 @@ def run_authorized_plan(
     authorization_path: str | Path,
     *,
     runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+    health_runner: Callable[..., subprocess.CompletedProcess] = subprocess.run,
     python_executable: str = sys.executable,
 ) -> dict[str, Any]:
     """Continue safe exact-resume segments until completion or a hard stop."""
@@ -1284,6 +1747,7 @@ def run_authorized_plan(
             plan_path,
             authorization_path,
             runner=runner,
+            health_runner=health_runner,
             python_executable=python_executable,
         )
         if status["state"] == "completed":

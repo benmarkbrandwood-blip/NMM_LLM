@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import hashlib
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from learned_ai.training import managed_generalist as managed
 from learned_ai.training.managed_generalist import (
     ManagedContractError,
     ManagedPlan,
+    PolicyHealthGate,
     authorize_plan,
     build_segment_command,
     load_managed_plan,
@@ -59,6 +61,95 @@ def _plan(tmp_path: Path) -> ManagedPlan:
     )
 
 
+def _policy_health_plan(tmp_path: Path) -> ManagedPlan:
+    plan = _plan(tmp_path)
+    corpus = tmp_path / "fixed-corpus.json"
+    corpus.write_text('{"entries": []}\n', encoding="utf-8")
+    audit_script = tmp_path / "audit.py"
+    audit_script.write_text("# test audit identity\n", encoding="utf-8")
+    specialist_db = tmp_path / "specialist.sqlite"
+    specialist_db.write_bytes(b"test-specialist-db")
+    gate = PolicyHealthGate(
+        corpus_path=str(corpus.resolve()),
+        corpus_sha256=hashlib.sha256(corpus.read_bytes()).hexdigest(),
+        audit_script_path=str(audit_script.resolve()),
+        audit_script_sha256=hashlib.sha256(audit_script.read_bytes()).hexdigest(),
+        exact_critical_states=29,
+        required_direct_preserving_rate=1.0,
+        min_candidate_preserving_rate=0.50,
+        min_candidate_logit_margin=-0.10,
+    )
+    return replace(
+        plan,
+        common_trainer_args=(
+            *plan.common_trainer_args,
+            "--seed",
+            "42",
+            "--temp-start",
+            "0.90",
+            "--specialist-db",
+            str(specialist_db.resolve()),
+        ),
+        policy_health=gate,
+    )
+
+
+def _publish_health_report(
+    command: list[str],
+    plan: ManagedPlan,
+    checkpoint: Path,
+    *,
+    candidate_rate: float = 0.75,
+    candidate_margin: float = 0.05,
+) -> Path:
+    assert plan.policy_health is not None
+    output = Path(command[command.index("--output") + 1])
+    specialist_db = Path(command[command.index("--specialist-db") + 1])
+    core = {
+        "schema_version": "nmm.generalist-policy-health.v1",
+        "identities": {
+            "git_commit": plan.git_commit,
+            "checkpoint": str(checkpoint.resolve()),
+            "checkpoint_sha256": hashlib.sha256(
+                checkpoint.read_bytes()
+            ).hexdigest(),
+            "run_id": "managed-v4-test-segment-0001",
+            "experiment_id": plan.experiment_id,
+            "corpus": plan.policy_health.corpus_path,
+            "corpus_sha256": plan.policy_health.corpus_sha256,
+            "paths_config_sha256": plan.paths_config_sha256,
+            "specialist_db": str(specialist_db.resolve()),
+            "specialist_db_sha256": hashlib.sha256(
+                specialist_db.read_bytes()
+            ).hexdigest(),
+        },
+        "checkpoint_state": {"game_count": 100},
+        "fixed_state_diagnostic": {
+            "direct_lookahead_signal": {
+                "critical_states": 29,
+                "argmax_value_preserving_rate": 1.0,
+            },
+            "candidate": {
+                "metrics": {
+                    "all": {
+                        "critical_states": 29,
+                        "critical_argmax_value_preserving_rate": candidate_rate,
+                        "critical_mean_preserving_minus_downgrading_logit": (
+                            candidate_margin
+                        ),
+                    }
+                }
+            },
+        },
+    }
+    report = {**core, "evidence_id": managed.canonical_sha256(core)}
+    output.write_text(
+        json.dumps(report, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return output
+
+
 def test_plan_is_exclusive_and_tamper_evident(tmp_path: Path) -> None:
     plan = _plan(tmp_path)
     plan_path = tmp_path / "control" / "plan.json"
@@ -74,6 +165,20 @@ def test_plan_is_exclusive_and_tamper_evident(tmp_path: Path) -> None:
     plan_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ManagedContractError, match="plan hash"):
         load_managed_plan(plan_path)
+
+
+def test_policy_health_plan_round_trip_preserves_legacy_plan_shape(
+    tmp_path: Path,
+) -> None:
+    legacy = _plan(tmp_path)
+    assert "policy_health" not in legacy.to_dict()
+    health = _policy_health_plan(tmp_path)
+
+    restored = ManagedPlan.from_dict(health.to_dict())
+
+    assert restored == health
+    assert restored.policy_health is not None
+    assert restored.policy_health.exact_critical_states == 29
 
 
 def test_authorization_is_separate_and_bound_to_exact_plan(tmp_path: Path) -> None:
@@ -261,6 +366,182 @@ def test_supervisor_runs_one_bounded_segment_and_publishes_progress(
     assert status["progress"]["completed_games"] == 100
 
 
+def test_supervisor_requires_passing_policy_health_before_completion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _policy_health_plan(tmp_path)
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (100, checkpoint),
+    )
+    trainer_calls: list[list[str]] = []
+    health_calls: list[list[str]] = []
+
+    def trainer_runner(command, **_kwargs):
+        trainer_calls.append(command)
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint.write_bytes(b"checkpoint")
+        return subprocess.CompletedProcess(command, 0)
+
+    def health_runner(command, **_kwargs):
+        health_calls.append(command)
+        _publish_health_report(command, plan, checkpoint)
+        return subprocess.CompletedProcess(command, 0)
+
+    status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=trainer_runner,
+        health_runner=health_runner,
+        python_executable="python",
+    )
+
+    assert len(trainer_calls) == 1
+    assert len(health_calls) == 1
+    assert status["progress"]["completed_games"] == 100
+    completed = managed._completed_segment_events(plan)[-1]
+    assert completed.details["policy_health"]["passed"] is True
+    assert (
+        completed.details["policy_health"]["metrics"]
+        ["candidate_value_preserving_rate"]
+        == 0.75
+    )
+
+
+def test_policy_health_threshold_failure_quarantines_and_blocks_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _policy_health_plan(tmp_path)
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (100, checkpoint),
+    )
+    trainer_calls = 0
+
+    def trainer_runner(command, **_kwargs):
+        nonlocal trainer_calls
+        trainer_calls += 1
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint.write_bytes(b"checkpoint")
+        return subprocess.CompletedProcess(command, 0)
+
+    def health_runner(command, **_kwargs):
+        _publish_health_report(
+            command,
+            plan,
+            checkpoint,
+            candidate_rate=0.49,
+        )
+        return subprocess.CompletedProcess(command, 0)
+
+    with pytest.raises(ManagedContractError, match="threshold"):
+        run_next_segment(
+            plan_path,
+            authorization_path,
+            runner=trainer_runner,
+            health_runner=health_runner,
+            python_executable="python",
+        )
+
+    events = managed.load_run_events(
+        Path(plan.control_dir) / managed.CONTROLLER_LEDGER_NAME
+    )
+    assert events[-1].status == "quarantined"
+    assert events[-1].reason_code == "policy_health_threshold_failed"
+    assert events[-1].details["policy_health"]["failures"] == (
+        "candidate_value_preserving_rate",
+    )
+    with pytest.raises(ManagedContractError, match="Agent review"):
+        run_next_segment(
+            plan_path,
+            authorization_path,
+            runner=trainer_runner,
+            health_runner=health_runner,
+            python_executable="python",
+        )
+    assert trainer_calls == 1
+
+
+@pytest.mark.parametrize("report_mode", ("missing", "malformed"))
+def test_invalid_policy_health_report_fails_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    report_mode: str,
+) -> None:
+    plan = _policy_health_plan(tmp_path)
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (100, checkpoint),
+    )
+
+    def trainer_runner(command, **_kwargs):
+        checkpoint.parent.mkdir(parents=True, exist_ok=True)
+        checkpoint.write_bytes(b"checkpoint")
+        return subprocess.CompletedProcess(command, 0)
+
+    def health_runner(command, **_kwargs):
+        if report_mode == "malformed":
+            output = Path(command[command.index("--output") + 1])
+            output.write_text("{not-json\n", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    with pytest.raises(ManagedContractError, match="evidence is invalid"):
+        run_next_segment(
+            plan_path,
+            authorization_path,
+            runner=trainer_runner,
+            health_runner=health_runner,
+            python_executable="python",
+        )
+
+    events = managed.load_run_events(
+        Path(plan.control_dir) / managed.CONTROLLER_LEDGER_NAME
+    )
+    assert events[-1].reason_code == "policy_health_audit_failed"
+    assert managed_status(plan_path, authorization_path)["state"] == (
+        "stopped_for_agent_review"
+    )
+
+
 def test_supervisor_never_removes_a_lock_it_does_not_own(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -360,4 +641,3 @@ def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
     )
     assert verified == plan
     assert managed._pending_recovery_for_segment(plan, 2) is not None
-

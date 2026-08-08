@@ -14,9 +14,10 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from learned_ai.training.managed_generalist import (
+from learned_ai.training.managed_generalist import (  # noqa: E402
     ManagedContractError,
     ManagedPlan,
+    PolicyHealthGate,
     authorize_plan,
     managed_status,
     publish_managed_plan,
@@ -24,12 +25,12 @@ from learned_ai.training.managed_generalist import (
     run_authorized_plan,
     run_next_segment,
 )
-from learned_ai.training.generalist_preflight import (
+from learned_ai.training.generalist_preflight import (  # noqa: E402
     resume_config_sha256,
     validate_generalist_configuration,
 )
-from learned_ai.training.generalist_run_manifest import utc_now_text
-from scripts import train_s_gen_v2 as trainer
+from learned_ai.training.generalist_run_manifest import utc_now_text  # noqa: E402
+from scripts import train_s_gen_v2 as trainer  # noqa: E402
 
 
 DEFAULT_NODE_BUDGET = 500_000
@@ -37,6 +38,13 @@ DEFAULT_MAX_GAMES = 5_000
 DEFAULT_SEGMENT_GAMES = 250
 DEFAULT_SANMILL_NODE_LADDER = "1000,5000,25000,100000,500000"
 DEFAULT_SANMILL_STAGE_GAMES = "500,500,500,1000,2500"
+DEFAULT_POLICY_HEALTH_CORPUS = (
+    _ROOT / "docs/experiments/dev-v4-phase-covered-corpus-v1.json"
+)
+DEFAULT_POLICY_HEALTH_CORPUS_SHA256 = (
+    "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e"
+)
+DEFAULT_POLICY_HEALTH_AUDIT = _ROOT / "tools/audit_generalist_policy_health.py"
 
 
 def _file_sha256(path: Path) -> str:
@@ -167,6 +175,26 @@ def _prepare(args: argparse.Namespace) -> dict:
     semantic_args = parser.parse_args(["--preflight", "long-run", *common_args])
     trainer._configure_paths(semantic_args)
     validate_generalist_configuration(semantic_args)
+    policy_health = None
+    if args.policy_health_gate:
+        corpus = Path(args.policy_health_corpus).resolve(strict=True)
+        audit_script = DEFAULT_POLICY_HEALTH_AUDIT.resolve(strict=True)
+        corpus_sha256 = _file_sha256(corpus)
+        if corpus_sha256 != DEFAULT_POLICY_HEALTH_CORPUS_SHA256:
+            raise ManagedContractError(
+                "the fixed policy-health corpus identity differs"
+            )
+        policy_health = PolicyHealthGate(
+            corpus_path=str(corpus),
+            corpus_sha256=corpus_sha256,
+            audit_script_path=str(audit_script),
+            audit_script_sha256=_file_sha256(audit_script),
+            exact_critical_states=29,
+            required_direct_preserving_rate=1.0,
+            min_candidate_preserving_rate=0.50,
+            min_candidate_logit_margin=-0.10,
+            device=args.policy_health_device,
+        )
     plan = ManagedPlan(
         plan_id=args.plan_id or _default_plan_id(commit),
         created_at_utc=utc_now_text(),
@@ -184,6 +212,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         allow_safe_exact_resume=True,
         publication_allowed=False,
         promotion_allowed=False,
+        policy_health=policy_health,
     )
     publish_managed_plan(plan_path, plan)
     return {
@@ -199,6 +228,9 @@ def _prepare(args: argparse.Namespace) -> dict:
             "segment_games": plan.segment_games,
             "max_wall_hours": plan.max_wall_hours,
         },
+        "policy_health_gate": (
+            None if policy_health is None else policy_health.to_dict()
+        ),
     }
 
 
@@ -274,6 +306,25 @@ def _build_parser() -> argparse.ArgumentParser:
             "Optional disposable SpecialistDB path. Required for smoke so the "
             "active sector-corrected baseline database is never reused."
         ),
+    )
+    prepare.add_argument(
+        "--policy-health-gate",
+        action="store_true",
+        help=(
+            "Require the frozen fixed-state policy-health audit after every "
+            "completed segment"
+        ),
+    )
+    prepare.add_argument(
+        "--policy-health-corpus",
+        default=str(DEFAULT_POLICY_HEALTH_CORPUS),
+        help="Fixed phase-covered corpus used by the policy-health gate",
+    )
+    prepare.add_argument(
+        "--policy-health-device",
+        choices=("auto", "cpu", "cuda"),
+        default="auto",
+        help="Device for the read-only segment-boundary policy audit",
     )
 
     authorize = commands.add_parser("authorize")
