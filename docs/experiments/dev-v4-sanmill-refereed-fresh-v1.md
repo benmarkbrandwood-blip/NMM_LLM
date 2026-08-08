@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `exact_resume_parity_passed_long_plan_required`
+Status: `resource_curriculum_frozen_implementation_required`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -318,3 +318,12 @@ at `b3d049b`: its
 proves exact model, optimiser, RNG, trainer/data-state, log, and SpecialistDB
 semantic equality after a real process-boundary resume. No retained training
 plan or long-run command is yet authorized by this experiment record.
+
+The subsequent
+[fixed-resource curriculum decision](sanmill-fixed-resource-curriculum-v1.md)
+freezes a deterministic five-level, game-indexed Sanmill node schedule and the
+remaining retained-run product envelope. Implementation, focused tests, and
+one isolated five-game schedule smoke are authorized under that decision.
+The schedule is resource exposure, not a score-based advancement or strength
+claim; no retained run may start until its implementation smoke, evidence,
+managed plan, and final preflight have passed.
