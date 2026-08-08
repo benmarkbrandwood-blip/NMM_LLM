@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `ready_for_one_launch`
+Status: `passed_authority_consumed`
 
 Parent experiment: `dev-v4-sanmill-refereed-fresh-v1`
 

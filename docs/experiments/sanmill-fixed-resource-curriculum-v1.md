@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `implementation_authorized`
+Status: `smoke_passed_managed_plan_required`
 
 Parent experiment: `dev-v4-sanmill-refereed-fresh-v1`
 

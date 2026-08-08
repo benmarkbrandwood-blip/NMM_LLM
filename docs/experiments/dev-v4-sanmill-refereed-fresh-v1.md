@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `resource_curriculum_frozen_implementation_required`
+Status: `resource_schedule_smoke_passed_managed_plan_required`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
