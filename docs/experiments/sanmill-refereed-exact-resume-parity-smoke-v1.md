@@ -13,11 +13,15 @@ continuation test, not a strength evaluation, node-ladder decision, retained
 training plan, or authority to reuse any resulting checkpoint.
 
 The delegated technical authority applies only after this document is
-published, both input databases are proven empty and isolated, all three
-exact-command preflights pass from one clean published source commit, and a
-readiness record is separately published. Each of the three training
-invocations may then be launched once. Any failure consumes the affected
-invocation and stops the comparison; there is no automatic retry.
+published, both input databases are proven empty and isolated, the continuous
+and first-segment exact-command preflights pass from one clean published source
+commit, and a staged readiness record is separately published. The continuous
+and first-segment invocations may then be launched once. The exact-resume
+preflight necessarily waits for the first segment to create its checkpoint;
+it must run from the same published source commit, without an intervening Git
+change, and must pass before the second segment may be launched once. Any
+failure consumes the affected invocation and stops the comparison; there is
+no automatic retry.
 
 ## Question under test
 
@@ -85,9 +89,12 @@ The comparison permits exactly:
 
 ## Frozen commands
 
-All commands run from the repository root. The readiness record must replace
-`--launch smoke` with `--preflight smoke` and omit `--run-id` only when
-performing a read-only preflight.
+All commands run from the repository root. A read-only preflight replaces
+`--launch smoke` with `--preflight smoke` and omits `--run-id`. The staged
+readiness record covers the two fresh commands directly and makes the
+exact-resume invocation conditional on its later exact-command preflight.
+There must be no source commit between the first and second segmented
+processes because the checkpoint's experiment identity binds the Git commit.
 
 ### Uninterrupted reference
 
@@ -197,4 +204,3 @@ Any protocol error, state mismatch, non-finite update, checkpoint failure,
 database identity change, unexpected final-flush update, or parity difference
 is `fatal_stop`. The resulting artefacts are quarantined evidence and cannot
 be retried or used as a long-run source without a new diagnosis and contract.
-
