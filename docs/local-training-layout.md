@@ -165,6 +165,7 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Archived maintainer Openings delivery | Exact ignored retention copy under `data/backups/maintainer_openings_20260725`; the two Book files duplicate tracked assets, while the 184-record learned file contains 15 unmerged `seed_source=learned` candidates; see the delivery evidence |
 | Archived maintainer Book Opening Plays deliveries | Exact ignored DOCX retention copies under `data/backups/maintainer_book_opening_plays_20260726`; the original is 3,432,474 bytes with SHA-256 `227584cde9d8c6278665a1b6decac6491d6b30b9b7add44a4b00200aec5e83c7`, while the 15-page expert-review supplement is 3,434,996 bytes with SHA-256 `9ef34e0a984d63167a5db526e87e3849ec2752b05cf7a3ed27adfa932fcf9ad8`; the original tracked transcription remains immutable and the confirmed row-19 correction is applied only through the separately identified reviewed-source audit |
 | Pinned Sanmill prefix-replay runtime | Isolated clean checkout resolved through `sanmill_prefix12_checkout`; commit `db65eb3e73189d934d615d0f47519d395193c646`, release binary SHA-256 `6502f7a2180769666c1ba6c801288a5ba079920e2bd6c1121f0e8b0c27e11e53`; source-only HumanDB replay runtime, not the moving reference checkout or historical smoke-v2 binary |
+| Pinned Sanmill training runtime | Ignored isolated clean checkout under `data/runtimes`, resolved through `sanmill_training_checkout`; commit `a6623f88959f7453594df274fbe1f128af7ff55e`, tree `17b9b0fd51ee8dac54c0454a6935978a47d19e0c`, release binary SHA-256 `5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619` and size 5,641,216 bytes; authoritative referee and fixed-node opponent only for the fresh Sanmill lineage |
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
@@ -345,10 +346,13 @@ documents. The intended logical mapping is:
 | `specialist_db_path` | `data/specialist_db.sector_corrected.sqlite` |
 | `malom_db_path` | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted` |
 | `sanmill_checkout` | Cross-volume reference checkout; read the actual value from the ignored registry |
+| `sanmill_training_checkout` | Ignored exact source/runtime pin for Sanmill-refereed training; normally under `data/runtimes` |
 | `mif_checkout` | Frozen MIF source and black-box interoperability-harness checkout; read the actual value from the ignored registry |
 
-The generalist trainer consumes the seven training keys above.
-`sanmill_checkout` and `mif_checkout` are only local reference-path indexes
+The generalist trainer consumes the ordinary model/data keys above and, only
+when `--referee-engine sanmill` is selected, the
+`sanmill_training_checkout` runtime key. `sanmill_checkout` and `mif_checkout`
+are only local reference-path indexes
 for documentation and differential-test tooling. The archived candidates
 deliberately have no configuration keys: find their relative paths in the
 inventory and relocation record, then create a separately reviewed experiment

@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 7 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 8 August 2026)
 
 ## Executive Summary
 
@@ -25,6 +25,33 @@ games produced one finite 14-step Adam update and a verified version-2
 infrastructure evidence only. The smoke authorization is consumed and no long
 run is authorized. See the
 [successor smoke result](../evidence/successor-training-smoke-result-2026-08-07.md).
+
+On 8 August the product owner selected a separate fresh
+`dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
+participate in training, not merely in later evaluation. The new route starts
+from random weights, keeps the completed local-GameAI run immutable, uses
+Sanmill as the authoritative complete-history referee for every primary
+rollout, and replaces local `GameAI` with fixed-node `go logical` search on
+the non-frozen opponent stratum. Its exact ignored runtime is pinned to
+Sanmill commit `a6623f88959f7453594df274fbe1f128af7ff55e`, tree
+`17b9b0fd51ee8dac54c0454a6935978a47d19e0c`, binary SHA-256
+`5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619`,
+and strict-referee semantic digest
+`sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94`.
+The initial contract disables retries, branches, observation-based recovery,
+and the uncalibrated local-GameAI advancement gate. Process-level tests cover
+cross-process search determinism, full logical turns with compulsory removal,
+illegal-action rejection, and an eight-ply learner/opponent rollout whose
+entire history is checked by Sanmill. This is implementation evidence only.
+No smoke or long run in the new lineage is authorized, and the node ladder,
+throughput envelope, and later advancement rule remain unfrozen. See the
+[fresh Sanmill experiment contract](../experiments/dev-v4-sanmill-refereed-fresh-v1.md).
+The current focused verification is 137 trainer/contract tests passed plus
+103 Malom and label-provenance tests with 498 parameterized subtests passed;
+Ruff and `git diff --check` also pass for the changed scope. A new full
+`tests/` run collected 1,246 tests and reached approximately 16% with no
+failure before the 15-minute command limit, so this work does not replace or
+upgrade the separately recorded 7 August complete-suite baseline.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
