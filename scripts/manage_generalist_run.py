@@ -21,6 +21,7 @@ from learned_ai.training.managed_generalist import (  # noqa: E402
     authorize_plan,
     managed_status,
     publish_managed_plan,
+    recover_failed_segment,
     recover_interrupted_segment,
     run_authorized_plan,
     run_next_segment,
@@ -348,6 +349,11 @@ def _build_parser() -> argparse.ArgumentParser:
     recover = commands.add_parser("recover-interrupted")
     recover.add_argument("--plan", required=True)
     recover.add_argument("--authorization", required=True)
+
+    recover_failed = commands.add_parser("recover-failed")
+    recover_failed.add_argument("--plan", required=True)
+    recover_failed.add_argument("--authorization", required=True)
+    recover_failed.add_argument("--technical-evidence", required=True)
     return parser
 
 
@@ -371,6 +377,12 @@ def main(argv: list[str] | None = None) -> int:
             result = run_next_segment(args.plan, args.authorization)
         elif args.command == "recover-interrupted":
             result = recover_interrupted_segment(args.plan, args.authorization)
+        elif args.command == "recover-failed":
+            result = recover_failed_segment(
+                args.plan,
+                args.authorization,
+                technical_evidence_path=args.technical_evidence,
+            )
         else:
             result = run_authorized_plan(args.plan, args.authorization)
     except (ManagedContractError, FileNotFoundError, subprocess.SubprocessError) as exc:

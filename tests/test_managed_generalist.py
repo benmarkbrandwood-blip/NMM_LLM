@@ -11,6 +11,13 @@ from pathlib import Path
 import pytest
 
 from learned_ai.training import managed_generalist as managed
+from learned_ai.training.checkpoint_envelope import (
+    CheckpointDescriptor,
+    CheckpointPayload,
+    capture_rng_state,
+    load_checkpoint,
+    save_checkpoint,
+)
 from learned_ai.training.managed_generalist import (
     ManagedContractError,
     ManagedPlan,
@@ -20,9 +27,41 @@ from learned_ai.training.managed_generalist import (
     load_managed_plan,
     managed_status,
     publish_managed_plan,
+    recover_failed_segment,
     run_next_segment,
     verify_managed_launch,
 )
+
+
+def _managed_checkpoint_payload(game_count: int) -> CheckpointPayload:
+    return CheckpointPayload(
+        model_state={},
+        optimizer_state=None,
+        scheduler_state=None,
+        scaler_state=None,
+        rng_state=capture_rng_state(),
+        trainer_state={
+            "game_count": game_count,
+            "batch_count": game_count,
+            "update_count": 0,
+            "difficulty": 1,
+            "temperature": 0.8,
+            "rolling_metrics": {},
+            "curriculum": {},
+            "target_network": {},
+            "recovery_state": {},
+            "model_config": {},
+        },
+        data_state={
+            "cursor": {"completed_games": game_count},
+            "consumed_snapshots": [],
+            "cache": {},
+            "buckets": {},
+            "mutable_assets": {
+                "specialist_db": {"sha256": "d" * 64}
+            },
+        },
+    )
 
 
 def _plan(tmp_path: Path) -> ManagedPlan:
@@ -584,7 +623,13 @@ def test_stale_lock_is_cleared_when_pid_is_dead(
     assert not lock.exists()
 
 
-def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "reason_code", ("host_reboot", "verified_implementation_repair")
+)
+def test_verify_accepts_pending_recovery_resume(
+    tmp_path: Path,
+    reason_code: str,
+) -> None:
     plan = _plan(tmp_path)
     plan_path = tmp_path / "control" / "plan.json"
     authorization_path = tmp_path / "control" / "authorization.json"
@@ -617,7 +662,7 @@ def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
         plan,
         status="interrupted",
         event_type="managed_segment_interrupted",
-        reason_code="host_reboot",
+        reason_code=reason_code,
         details={
             "segment_index": 2,
             "recovery_checkpoint": str(recovery.resolve()),
@@ -641,3 +686,245 @@ def test_verify_accepts_pending_reboot_recovery_resume(tmp_path: Path) -> None:
     )
     assert verified == plan
     assert managed._pending_recovery_for_segment(plan, 2) is not None
+
+
+def test_technical_recovery_evidence_is_commit_and_failure_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan(tmp_path)
+    managed._append_controller_event(
+        plan,
+        status="failed",
+        event_type="managed_segment_failed",
+        reason_code="trainer_exit_nonzero",
+        details={"segment_index": 1},
+    )
+    failed = managed.load_run_events(
+        Path(plan.control_dir) / managed.CONTROLLER_LEDGER_NAME
+    )[-1]
+    repair_commit = "b" * 40
+    runtime_commit = "c" * 40
+    evidence = tmp_path / "repair.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": managed.TECHNICAL_RECOVERY_EVIDENCE_SCHEMA,
+                "plan_sha256": plan.plan_sha256,
+                "failed_event_sha256": failed.event_sha256,
+                "failed_segment_index": 1,
+                "failure_code": "zero-expansion-search",
+                "source_commit": plan.git_commit,
+                "tested_repair_commit": repair_commit,
+                "reproduction": {"result": "reproduced-and-fixed"},
+                "verification": ["focused regression passed"],
+                "claim_boundary": "technical recovery only",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(managed, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(managed, "_git_is_ancestor", lambda *_args: True)
+    monkeypatch.setattr(
+        managed.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0),
+    )
+
+    result = managed._load_technical_recovery_evidence(
+        evidence,
+        plan=plan,
+        failed_event=failed,
+        runtime_commit=runtime_commit,
+    )
+
+    assert result["tested_repair_commit"] == repair_commit
+    assert result["failure_code"] == "zero-expansion-search"
+    assert result["sha256"] == hashlib.sha256(evidence.read_bytes()).hexdigest()
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    payload["failed_event_sha256"] = "d" * 64
+    evidence.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ManagedContractError, match="another failure"):
+        managed._load_technical_recovery_evidence(
+            evidence,
+            plan=plan,
+            failed_event=failed,
+            runtime_commit=runtime_commit,
+        )
+
+
+def test_recovery_checkpoint_rebinds_database_and_implementation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan(tmp_path)
+    source = tmp_path / "source.pt"
+    destination = tmp_path / "recovery.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="managed-v4-test-segment-0001:checkpoint:1",
+        run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+        parent_checkpoint_id=None,
+        role="latest",
+        save_reason="periodic",
+        created_at_utc="2026-07-20T12:10:00Z",
+        config_sha256=plan.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={
+            "malom_tablebase": "m" * 64,
+            "human_db": "h" * 64,
+            "specialist_db": "d" * 64,
+        },
+        implementation={"experiment_digest": "sha256:" + "a" * 64},
+    )
+    save_checkpoint(
+        source,
+        descriptor,
+        _managed_checkpoint_payload(50),
+        previous_copies=0,
+    )
+    rebound_digest = "sha256:" + "b" * 64
+    monkeypatch.setattr(
+        managed,
+        "_recovery_experiment_digest",
+        lambda *_args, **_kwargs: rebound_digest,
+    )
+    specialist_identity = {
+        "sha256": "1" * 64,
+        "size": 123,
+        "label_version": "sector-corrected-v1",
+        "malom_label_count": 27,
+    }
+
+    managed._write_recovery_checkpoint(
+        source,
+        destination,
+        specialist_identity=specialist_identity,
+        plan=plan,
+        runtime_commit="b" * 40,
+        recovery_reason="verified-implementation-repair",
+    )
+
+    recovered = load_checkpoint(destination, map_location="cpu")
+    assert recovered.descriptor.checkpoint_id.endswith(
+        ":verified-implementation-repair-recovery"
+    )
+    assert (
+        recovered.descriptor.save_reason
+        == "interrupted-verified-implementation-repair-recovery"
+    )
+    assert recovered.descriptor.asset_identities["specialist_db"] == "1" * 64
+    assert recovered.descriptor.implementation["experiment_digest"] == rebound_digest
+    assert (
+        recovered.payload.data_state["mutable_assets"]["specialist_db"]
+        == specialist_identity
+    )
+
+
+def test_failed_segment_recovery_quarantines_and_records_repair(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan(tmp_path)
+    plan_path = Path(plan.control_dir) / "plan.json"
+    authorization_path = Path(plan.control_dir) / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approved.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    segment = Path(plan.control_dir) / "segments" / "segment-0001"
+    checkpoint = segment / "latest.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="managed-v4-test-segment-0001:checkpoint:1",
+        run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+        parent_checkpoint_id=None,
+        role="latest",
+        save_reason="periodic",
+        created_at_utc="2026-07-20T12:10:00Z",
+        config_sha256=plan.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        checkpoint,
+        descriptor,
+        _managed_checkpoint_payload(50),
+        previous_copies=0,
+    )
+    specialist = tmp_path / "specialist.sqlite"
+    specialist.write_bytes(b"specialist evidence")
+    managed._append_controller_event(
+        plan,
+        status="failed",
+        event_type="managed_segment_failed",
+        reason_code="trainer_exit_nonzero",
+        details={"segment_index": 1},
+    )
+    runtime_commit = "b" * 40
+    repair = {
+        "path": str((tmp_path / "repair.json").resolve()),
+        "sha256": "e" * 64,
+        "failure_code": "zero-expansion-search",
+        "tested_repair_commit": "f" * 40,
+    }
+    monkeypatch.setattr(
+        managed,
+        "_assert_managed_git_state",
+        lambda *_args, **_kwargs: runtime_commit,
+    )
+    monkeypatch.setattr(
+        managed,
+        "_load_technical_recovery_evidence",
+        lambda *_args, **_kwargs: repair,
+    )
+    monkeypatch.setattr(
+        managed, "_specialist_db_path_for_plan", lambda _plan: specialist
+    )
+    monkeypatch.setattr(
+        managed,
+        "_live_specialist_identity",
+        lambda _path: {
+            "sha256": "1" * 64,
+            "size": specialist.stat().st_size,
+            "label_version": "sector-corrected-v1",
+            "malom_label_count": 0,
+            "wal_log_pages": 0,
+            "wal_checkpointed_pages": 0,
+        },
+    )
+
+    def write_recovery(source: Path, destination: Path, **_kwargs) -> Path:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source.read_bytes())
+        return destination.resolve()
+
+    monkeypatch.setattr(managed, "_write_recovery_checkpoint", write_recovery)
+
+    result = recover_failed_segment(
+        plan_path,
+        authorization_path,
+        technical_evidence_path=tmp_path / "repair.json",
+    )
+
+    recovery = Path(result["recovery"]["recovery_checkpoint"])
+    assert recovery.is_file()
+    assert not segment.exists()
+    assert result["recovery"]["resume_game_count"] == 50
+    assert result["recovery"]["runtime_commit"] == runtime_commit
+    assert result["recovery"]["technical_repair"] == repair
+    events = managed.load_run_events(
+        Path(plan.control_dir) / managed.CONTROLLER_LEDGER_NAME
+    )
+    assert events[-1].reason_code == "verified_implementation_repair"

@@ -1,0 +1,47 @@
+{
+  "schema_version": "nmm.managed-technical-recovery.v1",
+  "plan_sha256": "d498cd1b9a32d8e6ebb9cf6da4c38c884f0f4584a32538244779c67e143685e8",
+  "failed_event_sha256": "6e80cca071b7b216f7d26d63c403c33707eb21e1fba78d3b41264e4e6d7a5657",
+  "failed_segment_index": 13,
+  "failure_code": "sanmill-zero-expansion-search-rejected",
+  "source_commit": "ff7e360d3660c142768b1247d2d17ad79ceb435f",
+  "tested_repair_commit": "7049416b297f1a280510d81dfe38a05fb5ce1964",
+  "reproduction": {
+    "source_checkpoint_id": "managed-sanmill-corrected-retained-v2-segment-0013:checkpoint:00000004",
+    "source_game_count": 3200,
+    "isolated_stop_game": 3210,
+    "pre_repair_result": "SanmillBridgeError: successful logical turn did not search",
+    "post_repair_result": "ten games completed through game 3210",
+    "trigger_response_index": 261,
+    "trigger_response_utf8_sha256": "181c98bc8cc98e2db9ee9d81aac70a89e46ebe2888b6d18861a5553f367a07c4",
+    "trigger_response": {
+      "status": "ok",
+      "full_turn_actions": [
+        "d7-g7"
+      ],
+      "logical_ply_delta": 1,
+      "resulting_fen": "@@****@*/@*@O@O@*/*O****@O b m s 4 0 8 0 0 0 -1 -1 -1 -1 0 3 21 ids:nodes",
+      "effective_depth": 30,
+      "completed_depth": 30,
+      "score_kind": "mate",
+      "score": -9,
+      "node_budget": 500000,
+      "primary_nodes": 0,
+      "removal_nodes": 0,
+      "total_nodes": 0,
+      "search_calls": 30
+    },
+    "pre_repair_raw_capture_sha256": "1aa26492b921c75a9b894f53cf7e0819f7be830ad1e1fa3a9e95b10aebcc20f9",
+    "post_repair_raw_capture_sha256": "3aef2631710c0392c6db680bf3b399acb59fb56f29755d6790a491712ccdae22",
+    "pre_repair_run_events_sha256": "63fd506d703a8c647d6a492e72cfda1a5c53b80308cd39406166d94575ec376b",
+    "post_repair_run_events_sha256": "ad3feb60f63a10c77f5c3d23441ae3b96fe84a5b7f36a9c89a187d5493c51e29"
+  },
+  "verification": [
+    "41 non-local Sanmill UCI protocol tests passed",
+    "12 Sanmill training-referee and trainer-observability tests passed",
+    "Ruff passed for the parser and regression test",
+    "the repaired parser retained positive search_calls as mandatory",
+    "the repaired exact-resume reproduction accepted the same zero-node response and completed games 3201 through 3210"
+  ],
+  "claim_boundary": "This evidence authorizes technical exact-resume recovery only; it is not segment acceptance, strength evidence, promotion evidence, or permission to alter the frozen experiment semantics."
+}

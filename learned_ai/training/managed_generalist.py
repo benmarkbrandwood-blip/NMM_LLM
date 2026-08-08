@@ -33,13 +33,23 @@ from learned_ai.training.run_contract import (
     canonical_sha256,
     load_run_events,
 )
+from learned_ai.training.training_identity import (
+    TrainingIdentityError,
+    experiment_digest,
+    load_trainer_ruleset,
+)
 
 
 MANAGED_PLAN_SCHEMA = "nmm.managed-generalist-plan.v1"
 MANAGED_AUTHORIZATION_SCHEMA = "nmm.managed-authorization.v1"
 POLICY_HEALTH_GATE_SCHEMA = "nmm.managed-policy-health-gate.v1"
+TECHNICAL_RECOVERY_EVIDENCE_SCHEMA = "nmm.managed-technical-recovery.v1"
 CONTROLLER_LEDGER_NAME = "controller-events.jsonl"
 CONTROLLER_LOCK_NAME = "controller.lock"
+
+_RECOVERY_REASON_CODES = frozenset(
+    {"host_reboot", "verified_implementation_repair"}
+)
 
 _DYNAMIC_TRAINER_OPTIONS = frozenset(
     {
@@ -713,13 +723,61 @@ def _live_specialist_identity(path: Path) -> dict[str, Any]:
         db.close()
 
 
+def _recovery_experiment_digest(
+    plan: ManagedPlan,
+    *,
+    runtime_commit: str,
+    asset_identities: Mapping[str, str],
+) -> str:
+    """Rebind a repaired continuation to its exact clean source commit."""
+    immutable_assets = {
+        "malom_tablebase": str(asset_identities.get("malom_tablebase", "")),
+        "human_db": str(asset_identities.get("human_db", "")),
+    }
+    for name in ("opening_forcing_sources", "sanmill_training_runtime"):
+        if name in asset_identities:
+            immutable_assets[name] = str(asset_identities[name])
+    if any(not value for value in immutable_assets.values()):
+        raise ManagedContractError(
+            "recovery checkpoint lacks an immutable experiment asset"
+        )
+
+    args = plan.common_trainer_args
+    if "--ruleset-manifest" in args:
+        ruleset_path = Path(args[args.index("--ruleset-manifest") + 1])
+    else:
+        ruleset_path = (
+            _repository_root() / "data" / "rulesets" / "nmm-training-core@2.json"
+        )
+    try:
+        ruleset = load_trainer_ruleset(ruleset_path.resolve(strict=True))
+    except (OSError, TrainingIdentityError) as exc:
+        raise ManagedContractError(
+            "cannot verify the recovery ruleset identity"
+        ) from exc
+    return experiment_digest(
+        experiment_id=plan.experiment_id,
+        git_commit=runtime_commit,
+        resume_config_sha256=plan.resume_config_sha256,
+        immutable_assets=immutable_assets,
+        ruleset=ruleset,
+    )
+
+
 def _write_recovery_checkpoint(
     source: Path,
     destination: Path,
     *,
     specialist_identity: Mapping[str, Any],
+    plan: ManagedPlan | None = None,
+    runtime_commit: str | None = None,
+    recovery_reason: str = "host-reboot",
 ) -> Path:
     """Publish a recovery envelope whose SpecialistDB identity matches live state."""
+    if (plan is None) != (runtime_commit is None):
+        raise ManagedContractError(
+            "recovery plan and runtime commit must be supplied together"
+        )
     envelope = load_checkpoint(source, map_location="cpu")
     payload_dict = envelope.payload.to_dict()
     data_state = dict(payload_dict["data_state"])
@@ -729,12 +787,22 @@ def _write_recovery_checkpoint(
     payload_dict["data_state"] = data_state
     assets = dict(envelope.descriptor.asset_identities)
     assets["specialist_db"] = str(specialist_identity["sha256"])
+    implementation = dict(envelope.descriptor.implementation)
+    if plan is not None and runtime_commit is not None:
+        implementation["experiment_digest"] = _recovery_experiment_digest(
+            plan,
+            runtime_commit=runtime_commit,
+            asset_identities=assets,
+        )
     descriptor = replace(
         envelope.descriptor,
-        checkpoint_id=f"{envelope.descriptor.checkpoint_id}:reboot-recovery",
-        save_reason="interrupted-host-reboot-recovery",
+        checkpoint_id=(
+            f"{envelope.descriptor.checkpoint_id}:{recovery_reason}-recovery"
+        ),
+        save_reason=f"interrupted-{recovery_reason}-recovery",
         created_at_utc=utc_now_text(),
         asset_identities=assets,
+        implementation=implementation,
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists():
@@ -743,10 +811,117 @@ def _write_recovery_checkpoint(
     return destination.resolve(strict=True)
 
 
+def _load_technical_recovery_evidence(
+    path: str | Path,
+    *,
+    plan: ManagedPlan,
+    failed_event: RunEvent,
+    runtime_commit: str,
+) -> dict[str, str]:
+    """Verify a tracked diagnosis before reopening a failed segment."""
+    source = Path(path).resolve(strict=True)
+    root = _repository_root().resolve(strict=True)
+    try:
+        relative = source.relative_to(root)
+    except ValueError as exc:
+        raise ManagedContractError(
+            "technical recovery evidence must be inside the repository"
+        ) from exc
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", "--", relative.as_posix()],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if tracked.returncode != 0:
+        raise ManagedContractError(
+            "technical recovery evidence must be tracked at the current commit"
+        )
+
+    def reject_duplicates(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ManagedContractError(
+                    f"technical recovery evidence repeats key {key!r}"
+                )
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(
+            source.read_text(encoding="utf-8"),
+            object_pairs_hook=reject_duplicates,
+        )
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ManagedContractError(
+            "technical recovery evidence is not valid JSON"
+        ) from exc
+    expected = {
+        "schema_version",
+        "plan_sha256",
+        "failed_event_sha256",
+        "failed_segment_index",
+        "failure_code",
+        "source_commit",
+        "tested_repair_commit",
+        "reproduction",
+        "verification",
+        "claim_boundary",
+    }
+    if not isinstance(value, dict) or set(value) != expected:
+        actual = set(value) if isinstance(value, dict) else set()
+        raise ManagedContractError(
+            "technical recovery evidence fields differ; "
+            f"unknown={sorted(actual - expected)}, "
+            f"missing={sorted(expected - actual)}"
+        )
+    if value["schema_version"] != TECHNICAL_RECOVERY_EVIDENCE_SCHEMA:
+        raise ManagedContractError("unsupported technical recovery evidence schema")
+    if value["plan_sha256"] != plan.plan_sha256:
+        raise ManagedContractError("technical recovery evidence names another plan")
+    if value["failed_event_sha256"] != failed_event.event_sha256:
+        raise ManagedContractError("technical recovery evidence names another failure")
+    segment_index = value["failed_segment_index"]
+    if (
+        isinstance(segment_index, bool)
+        or not isinstance(segment_index, int)
+        or segment_index != int(failed_event.details["segment_index"])
+    ):
+        raise ManagedContractError("technical recovery segment identity differs")
+    if value["source_commit"] != plan.git_commit:
+        raise ManagedContractError("technical recovery source commit differs")
+    repair_commit = _require_text(
+        value["tested_repair_commit"], field="tested_repair_commit"
+    )
+    if not _git_is_ancestor(root, plan.git_commit, repair_commit):
+        raise ManagedContractError("tested repair does not descend from the plan")
+    if not _git_is_ancestor(root, repair_commit, runtime_commit):
+        raise ManagedContractError("runtime commit does not contain the tested repair")
+    failure_code = _require_text(value["failure_code"], field="failure_code")
+    if not isinstance(value["reproduction"], Mapping) or not value["reproduction"]:
+        raise ManagedContractError("technical recovery reproduction is empty")
+    verification = value["verification"]
+    if (
+        not isinstance(verification, list)
+        or not verification
+        or any(not isinstance(item, str) or not item for item in verification)
+    ):
+        raise ManagedContractError("technical recovery verification is empty")
+    _require_text(value["claim_boundary"], field="claim_boundary")
+    return {
+        "path": str(source),
+        "sha256": _file_sha256(source),
+        "failure_code": failure_code,
+        "tested_repair_commit": repair_commit,
+    }
+
+
 def _pending_recovery_for_segment(
     plan: ManagedPlan, segment_index: int
 ) -> dict[str, Any] | None:
-    """Return host-reboot recovery details still pending for one segment index."""
+    """Return verified recovery details still pending for one segment index."""
     ledger = Path(plan.control_dir) / CONTROLLER_LEDGER_NAME
     if not ledger.exists():
         return None
@@ -758,20 +933,20 @@ def _pending_recovery_for_segment(
             return None
         if (
             event.event_type == "managed_segment_interrupted"
-            and event.reason_code == "host_reboot"
+            and event.reason_code in _RECOVERY_REASON_CODES
             and details.get("recovery_checkpoint")
         ):
             return details
     return None
 
 
-def _plan_used_host_reboot_recovery(plan: ManagedPlan) -> bool:
+def _plan_used_recovery(plan: ManagedPlan) -> bool:
     ledger = Path(plan.control_dir) / CONTROLLER_LEDGER_NAME
     if not ledger.exists():
         return False
     return any(
         event.event_type == "managed_segment_interrupted"
-        and event.reason_code == "host_reboot"
+        and event.reason_code in _RECOVERY_REASON_CODES
         for event in load_run_events(ledger)
     )
 
@@ -779,18 +954,23 @@ def _plan_used_host_reboot_recovery(plan: ManagedPlan) -> bool:
 def recover_interrupted_segment(
     plan_path: str | Path,
     authorization_path: str | Path,
+    *,
+    technical_evidence_path: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Quarantine a reboot-interrupted segment and publish a recovery checkpoint.
+    """Quarantine an interrupted segment and publish a recovery checkpoint.
 
     Incomplete mid-segment work is not accepted as completed evidence. The next
     supervised segment exact-resumes from the interrupted latest.pt after the
     live SpecialistDB identity is rebound into a dedicated recovery envelope.
+    Trainer failures additionally require tracked, commit-bound repair evidence.
     """
     plan_path = Path(plan_path).resolve(strict=False)
     authorization_path = Path(authorization_path).resolve(strict=False)
     plan = load_managed_plan(plan_path)
     _verify_authorization(plan, authorization_path)
-    _assert_managed_git_state(plan, allow_recovery_descendant=True)
+    runtime_commit = _assert_managed_git_state(
+        plan, allow_recovery_descendant=True
+    )
     if _file_sha256(Path(plan.paths_config)) != plan.paths_config_sha256:
         raise ManagedContractError("managed paths configuration has changed")
 
@@ -811,9 +991,36 @@ def recover_interrupted_segment(
     if not ledger_events:
         raise ManagedContractError("managed controller ledger is empty")
     last = ledger_events[-1]
-    if last.event_type != "managed_segment_started" or last.status != "running":
+    technical_repair: dict[str, str] | None = None
+    if last.event_type == "managed_segment_started" and last.status == "running":
+        if technical_evidence_path is not None:
+            raise ManagedContractError(
+                "running-segment recovery does not accept repair evidence"
+            )
+        recovery_reason = "host_reboot"
+        quarantine_kind = "interrupted"
+        checkpoint_reason = "host-reboot"
+    elif (
+        last.event_type == "managed_segment_failed"
+        and last.status == "failed"
+        and last.reason_code == "trainer_exit_nonzero"
+    ):
+        if technical_evidence_path is None:
+            raise ManagedContractError(
+                "failed-segment recovery requires tracked repair evidence"
+            )
+        technical_repair = _load_technical_recovery_evidence(
+            technical_evidence_path,
+            plan=plan,
+            failed_event=last,
+            runtime_commit=runtime_commit,
+        )
+        recovery_reason = "verified_implementation_repair"
+        quarantine_kind = "failed"
+        checkpoint_reason = "verified-implementation-repair"
+    else:
         raise ManagedContractError(
-            "managed recovery requires a running segment interrupted by host loss"
+            "managed recovery requires host loss or a verified trainer repair"
         )
 
     segment_index = int(last.details["segment_index"])
@@ -829,11 +1036,15 @@ def recover_interrupted_segment(
     )
     incomplete = _segment_output_dir(plan, segment_index)
     if not incomplete.exists():
+        if technical_repair is not None:
+            raise ManagedContractError(
+                "failed segment output is missing; refusing technical recovery"
+            )
         _append_controller_event(
             plan,
             status="interrupted",
             event_type="managed_segment_interrupted",
-            reason_code="host_reboot",
+            reason_code=recovery_reason,
             details={
                 "segment_index": segment_index,
                 "incomplete_output": None,
@@ -858,7 +1069,7 @@ def recover_interrupted_segment(
     quarantine = (
         Path(plan.control_dir)
         / "quarantine"
-        / f"segment-{segment_index:04d}.interrupted-{stamp}"
+        / f"segment-{segment_index:04d}.{quarantine_kind}-{stamp}"
     )
     quarantine.parent.mkdir(parents=True, exist_ok=True)
     if quarantine.exists():
@@ -877,6 +1088,9 @@ def recover_interrupted_segment(
         quarantine / "latest.pt",
         Path(plan.control_dir) / "recovery" / f"segment-{segment_index:04d}.pt",
         specialist_identity=specialist_identity,
+        plan=plan,
+        runtime_commit=runtime_commit,
+        recovery_reason=checkpoint_reason,
     )
     details = {
         "segment_index": segment_index,
@@ -891,24 +1105,42 @@ def recover_interrupted_segment(
         ),
         "specialist_db_backup": str(backup_dir.resolve(strict=False)),
         "specialist_db_sha256": str(specialist_identity["sha256"]),
+        "runtime_commit": runtime_commit,
+        "checkpoint_recovery_reason": checkpoint_reason,
     }
+    if technical_repair is not None:
+        details["technical_repair"] = technical_repair
     _append_controller_event(
         plan,
         status="interrupted",
         event_type="managed_segment_interrupted",
-        reason_code="host_reboot",
+        reason_code=recovery_reason,
         details=details,
     )
     status = managed_status(plan_path, authorization_path)
     return {
         "state": status["state"],
         "summary": (
-            "Interrupted segment quarantined; recovery checkpoint is ready for "
-            "exact-resume continuation."
+            "Incomplete segment quarantined; a verified recovery checkpoint is "
+            "ready for exact-resume continuation."
         ),
         "recovery": details,
         "status": status,
     }
+
+
+def recover_failed_segment(
+    plan_path: str | Path,
+    authorization_path: str | Path,
+    *,
+    technical_evidence_path: str | Path,
+) -> dict[str, Any]:
+    """Prepare exact resume only after a tracked implementation repair."""
+    return recover_interrupted_segment(
+        plan_path,
+        authorization_path,
+        technical_evidence_path=technical_evidence_path,
+    )
 
 
 def build_segment_command(
@@ -1021,7 +1253,7 @@ def verify_managed_launch(
         )
     if git_commit != plan.git_commit:
         if not (
-            _plan_used_host_reboot_recovery(plan)
+            _plan_used_recovery(plan)
             or _pending_recovery_for_segment(plan, segment_index) is not None
         ):
             raise ManagedContractError("managed plan Git commit does not match")
@@ -1417,7 +1649,7 @@ def run_next_segment(
         last_event = ledger_events[-1]
         recovery_ready = (
             last_event.event_type == "managed_segment_interrupted"
-            and last_event.reason_code == "host_reboot"
+            and last_event.reason_code in _RECOVERY_REASON_CODES
             and bool(last_event.details.get("recovery_checkpoint"))
         )
         if last_event.status in {"failed", "quarantined", "interrupted"} and not (
@@ -1453,7 +1685,7 @@ def run_next_segment(
     pending_index = len(completed_preview) + 1
     allow_descendant = (
         _pending_recovery_for_segment(plan, pending_index) is not None
-        or _plan_used_host_reboot_recovery(plan)
+        or _plan_used_recovery(plan)
     )
     runtime_commit = _assert_managed_git_state(
         plan,
@@ -1502,6 +1734,9 @@ def run_next_segment(
                 previous_checkpoint,
                 refreshed,
                 specialist_identity=specialist_identity,
+                recovery_reason=str(
+                    recovery.get("checkpoint_recovery_reason", "host-reboot")
+                ),
             )
             os.replace(refreshed, previous_checkpoint)
     output_dir = _segment_output_dir(plan, segment_index)
