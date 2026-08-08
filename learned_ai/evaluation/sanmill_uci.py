@@ -1101,7 +1101,11 @@ def parse_logical_turn_line(
     )
     if score_perspective != "white":
         raise SanmillBridgeError("logical-turn score is not White-perspective")
-    if total_nodes <= 0 or search_calls <= 0:
+    # A successful iterative search can expand zero new nodes when every
+    # iteration is resolved from Sanmill's in-process transposition table.
+    # search_calls proves that search was attempted; total_nodes is consumed
+    # work under a ceiling, not a required minimum.
+    if search_calls <= 0:
         raise SanmillBridgeError("successful logical turn did not search")
     if terminal:
         if outcome_reason == "ongoing":

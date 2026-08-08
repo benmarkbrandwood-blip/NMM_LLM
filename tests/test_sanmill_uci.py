@@ -318,10 +318,41 @@ def test_logical_turn_parser_validates_complete_turn_and_budget() -> None:
     assert result.elapsed_seconds == 0.25
 
 
+def test_logical_turn_parser_accepts_zero_new_nodes_from_cached_search() -> None:
+    payload = _valid_logical_payload()
+    payload.update(
+        {
+            "full_turn_actions": ["d7-g7"],
+            "logical_move_id": "d7-g7",
+            "model_action": {"from": "d7", "to": "g7", "capture": None},
+            "resulting_fen": (
+                "@@****@*/@*@O@O@*/*O****@O b m s 4 0 8 0 0 0 "
+                "-1 -1 -1 -1 0 3 21 ids:nodes"
+            ),
+            "effective_depth": 30,
+            "completed_depth": 30,
+            "primary_nodes": 0,
+            "removal_nodes": 0,
+            "total_nodes": 0,
+            "search_calls": 30,
+        }
+    )
+
+    result = parse_logical_turn_line(
+        _machine_line("info string sanmill_logical_turn ", payload)
+    )
+
+    assert result.full_turn_actions == ("d7-g7",)
+    assert result.total_nodes == 0
+    assert result.search_calls == 30
+    assert result.completed_depth == 30
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
         ("total_nodes", 500_001),
+        ("search_calls", 0),
         ("logical_move_id", "d6-d5"),
         ("model_action", {"from": "d6", "to": "d5", "capture": None}),
         ("completed_depth", 9),
