@@ -143,7 +143,12 @@ separate content-addressed minimal diagnostic now selects only exact parent
 schedule index zero, with one game, at most 120 logical plies, 60 searches,
 and 60,000 requested node ceilings. Index zero is the smallest exact prefix,
 not an assertion about where the historical run failed. The diagnostic is
-prepared but unlaunched; publication, final preflight, and a new one-run
+implemented at local commit `bdd6ed1`, with plan identity
+`5554489e3278dca88cc4f816e97ced1bdf17e7a89b0e4c02991c808d7087e4b0`.
+Its local read-only preflight passed the model, data, runtime, plan, output,
+and two-ply zero-search route gates but correctly reports the source as
+unpublished. The readiness verdict is `needs_decision`. It remains unlaunched;
+publication, a final preflight from `dev == origin/dev`, and a new one-run
 authority are still required.
 
 The one-run calibration authority is consumed. No integrated route probe,

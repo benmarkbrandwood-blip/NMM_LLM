@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `prepared_unlaunched_needs_publication_and_final_preflight`
+Status: `local_preflight_passed_needs_publication_and_final_preflight`
 
 This contract prepares one diagnostic game. It does not authorize that game,
 another 36-game probe, a training smoke, or a long run. Silence, elapsed time,
