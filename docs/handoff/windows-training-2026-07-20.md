@@ -51,8 +51,11 @@ Commit `4e734e4a3105b1a590fbb11ab13c3197cb6a9fce` repairs that terminal-only
 projection boundary and adds the exact 43-logical-ply regression. The failed
 output and its subsequently diagnostic-written SpecialistDB are quarantined;
 the one-run authorization is consumed. A separate empty `smoke-002` database
-is prepared, but no retry or long run is authorized. The node ladder,
-throughput envelope, and later advancement rule remain unfrozen. See the
+is prepared, and its first clean read-only preflight returned
+`ready_for_smoke`; a final evidence-commit preflight and explicit new launch
+authorization are still required. No retry or long run is authorized. The
+node ladder, throughput envelope, and later advancement rule remain unfrozen.
+See the
 [fresh Sanmill experiment contract](../experiments/dev-v4-sanmill-refereed-fresh-v1.md).
 The terminal repair verification reports 182 trainer, launch, checkpoint,
 resume, bridge, and referee tests passed with six documented historical

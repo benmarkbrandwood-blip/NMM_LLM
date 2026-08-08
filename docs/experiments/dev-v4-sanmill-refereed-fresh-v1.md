@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `smoke_001_failed_retry_preflight_pending`
+Status: `smoke_001_failed_smoke_002_ready_for_final_preflight`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -250,8 +250,13 @@ The historical smoke-001 command returned `ready_for_smoke` immediately before
 its launch, but the launch then exposed the terminal-projection defect above.
 That historical verdict is superseded and cannot authorize a retry.
 
-The smoke-002 command has not yet been run from the final evidence commit.
-After the tracked tree is clean and published, it must return a fresh
-`ready_for_smoke` verdict with no errors or unresolved decisions. Even a
-passing result will not authorize replacing `--preflight smoke` with
-`--launch smoke`; the retry requires a new explicit one-run authorization.
+The smoke-002 command returned `ready_for_smoke` with no errors or unresolved
+decisions at clean commit `d7d6e4dbc22f95c79280ef05c93c8eb8e0a03167`. The
+[readiness record](../evidence/sanmill-refereed-fresh-v1-smoke-002-readiness-2026-08-08.md)
+owns its identities and claim boundary.
+
+Because that evidence record changes the Git identity, the command must be run
+once more from the final clean evidence commit before publication and any
+launch request. Even a passing result will not authorize replacing
+`--preflight smoke` with `--launch smoke`; the retry requires a new explicit
+one-run authorization.
