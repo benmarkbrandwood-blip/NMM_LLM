@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `ready_for_local_plan_and_final_preflight`
+Status: `completed_with_audited_recoveries`
 
 Experiment ID: `dev-v4-sanmill-corrected-retained-v2`
 
@@ -152,6 +152,38 @@ The separately published authorization must bind the exact plan SHA-256,
 name `product-owner` as authorizer, repeat the resource and isolation
 boundary, and record the owner's delegated technical launch authority.
 
+## Runtime completion
+
+The authorization was consumed. The immutable plan with semantic SHA-256
+`d498cd1b9a32d8e6ebb9cf6da4c38c884f0f4584a32538244779c67e143685e8`
+completed all 5,000 games and all 20 policy-gated process segments on
+9 August 2026 local time. The controller recorded 1.563432 active hours and
+ended with `managed_plan_completed`.
+
+Two fail-closed recoveries occurred without changing the frozen training
+configuration. Segment 13 resumed from its verified game-3,200 checkpoint
+after a parser repair for a searched Sanmill result whose transposition-table
+hits required zero new node expansion. Segment 18 restarted from the last
+accepted game-4,250 parent after an outer host command limit interrupted it
+before its first local checkpoint. Both partial directories and database
+snapshots remain quarantined, and both recoveries are bound in the controller
+ledger.
+
+The segment-13 recovery retained the trusted live same-lineage SpecialistDB,
+which had advanced beyond the database identity recorded in the game-3,200
+checkpoint. The result is therefore an auditable managed continuation, not
+bit-for-bit counterfactual parity with a hypothetical failure-free run.
+
+All 20 fixed-state gates passed. The final candidate preserved Malom value on
+28 of 29 critical argmax choices, with direct lookahead preservation 29 of 29
+and a +2.398080 mean preserving-minus-downgrading logit margin. The final
+checkpoint envelope and closed SpecialistDB verify and have matching database
+identity.
+
+The complete identities, recovery boundaries, aggregate diagnostics and
+verification record are in the
+[completion evidence](../evidence/sanmill-corrected-retained-v2-result-2026-08-09.md).
+
 ## Final launch gates
 
 Before starting `run-authorized`:
@@ -178,8 +210,7 @@ or fallback may substitute for a failed gate.
 
 ## Claim boundary
 
-Successful launch means only that a fresh, bounded, rules-corrected retained
-training lineage has started. Segment completion is learning-health and
-infrastructure evidence. Completion of all 5,000 games is still not a strength
-or promotion result. The retained candidate requires a later separately
-frozen held-out evaluation before any playing-strength claim.
+The completed 5,000-game lineage is learning-health and infrastructure
+evidence, not a strength or promotion result. The retained candidate requires
+a later separately frozen held-out evaluation before any playing-strength
+claim.

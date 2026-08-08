@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 8 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 9 August 2026)
 
 ## Executive Summary
 
@@ -62,8 +62,31 @@ real-checkpoint controller exercise are recorded at
 is frozen at `bbe2d32cc2c36153f3c359698aa3c74548eb8fbd`. It requires fresh
 seed-42 weights, a new empty corrected SpecialistDB, the same measured
 5,000-game fixed-node curriculum, and policy-health quarantine after every
-250 games. At this handover edit the ignored local plan and database have not
-yet been created and no replacement training process has started.
+250 games. The authorized plan later completed all 5,000 games and all 20
+policy-gated process segments on 9 August. Its final controller state is
+`completed`, all boundary audits passed, and the final checkpoint envelope
+and SpecialistDB identity verify.
+
+The run required two audited recoveries. Segment 13 stopped after game 3,200
+because NMM_LLM rejected a valid Sanmill search that made 30 search calls but
+expanded zero new nodes from its persistent transposition table. Published
+commit `7049416` corrected that interpretation and `6279139` added
+evidence-bound failed-segment recovery. A later outer command timeout
+interrupted segment 18 before its first checkpoint; commit `4973e32` made
+that host-only case resume from the last accepted game-4,250 boundary. The
+segment-13 database was a trusted same-lineage live database whose identity
+had advanced past the checkpoint, so the final lineage is auditable but not a
+bit-for-bit counterfactual replay of a failure-free run.
+
+The accepted log lineage contains exactly 5,000 unique consecutive game rows,
+including the game-3,001 through game-3,200 checkpoint prefix retained in the
+quarantined first segment-13 directory. The final policy gate preserved value
+on 28 of 29 candidate argmax choices, while direct lookahead preserved all 29;
+the mean candidate margin was +2.398080. These are anti-collapse and
+infrastructure results, not strength evidence. See the
+[completion evidence](../evidence/sanmill-corrected-retained-v2-result-2026-08-09.md)
+for exact hashes, recovery events, W/D/L accounting and the next evaluation
+gate.
 
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
@@ -1368,38 +1391,27 @@ release-manifest SHA-256 is
 Training manifests now bind those identities, ruleset
 `nmm-training-core@2`, semantic digest
 `52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a`,
-and an independent experiment digest. The remaining long-run gates are
-experiment-specific rather than MIF publication gates.
+and an independent experiment digest. The MIF publication gate is closed;
+the completed corrected retained run binds these identities in its final
+checkpoint.
 
 ## Recommended Next Actions
 
-The rules-corrected successor smoke is complete and passed. Preserve its
-manifest, lifecycle ledger, logs, checkpoint, database, and recorded hashes as
-one disposable evidence bundle. Do not exact-resume it or use its populated DB
-as a fresh long-run input. Before proposing a long run, execute the current
-complete test suite, create a separate empty corrected DB and output root, and
-freeze a new immutable plan with an evidence-backed wall-time envelope. The
-two-game smoke is not a representative throughput benchmark, and no long-run
-authorization exists.
+The corrected retained 5,000-game run is complete. Preserve its plan,
+authorization, controller ledger, split accepted logs, quarantined recovery
+inputs, final checkpoint, policy-health reports and SpecialistDB under the
+identities in the completion evidence. Do not exact-resume it, run another
+training job, promote it, or publish a strength claim merely because the
+controller completed.
 
-The complete-suite gate has now been executed and recorded. The current
-[successor decision brief](../experiments/dev-v4-rules-corrected-successor-v2-decision-brief.md)
-recommends a fresh 5,000-game objective, `max_ply=120`, 250-game segments, and
-a 12-active-hour limit. Historical segment timing and partial per-game logs
-support that conservative bound; the two-game smoke remains excluded as a
-throughput benchmark. The objective and resource envelope still require an
-explicit product decision, followed by exact plan publication and a separate
-launch authorization.
+The post-completion focused verification passed, but the repository still has
+the separately documented moving-checkout Sanmill failures; no new clean
+full-suite claim was made. The next experimental gate is a separately frozen
+held-out candidate evaluation. Proceed in this order:
 
-The workspace/root check, graph inspection, earlier trainer fixes, focused
-tests, mandatory Malom/provenance rerun, first-experiment component decision,
-bounded smoke, managed-plan hardening, and the 5,000-game managed run are
-complete. The owner-reviewed 106-position package is committed, its focused
-checks pass, and the complete Python baseline is also clean. Do not launch more
-training merely because the managed run ended. Proceed in this order:
-
-1. Preserve the completed plan, ledgers, segment checkpoints, candidate bundle,
-   and scratch-init bundle under their recorded identities.
+1. Preserve the corrected retained plan, authorization, ledgers, every
+   accepted segment checkpoint, both recovery bundles, the final candidate
+   checkpoint and the final SpecialistDB under their recorded identities.
 2. Keep both rebuilt database candidates archived and inactive, and keep every
    imported checkpoint out of the `dev` resume lineage. Ask for additional
    checkpoint lineage only if a future experiment proposes to adopt one; use
@@ -1441,11 +1453,12 @@ training merely because the managed run ended. Proceed in this order:
    22/21/21 twelve-ply opening corpus. It is domain feedback, not an automatic
    phase-corpus freeze. Any later tactical stratum must remain separately
    identified.
-10. After the prefix-policy and corpus decisions close, freeze the formal
-   fixed-node ceiling, history-bearing start representation, accepted starts,
-   pair count, rules-compliant termination contract, and interval rule. Then
-   implement and audit the formal runner and request launch separately. Do not
-   pool any result with Stage 0.
+10. The prefix-policy and corpus decisions are closed. Freeze the formal
+    baseline, fixed-node ceiling, history-bearing start representation,
+    accepted starts, pair count, rules-compliant termination contract and
+    interval rule. Then implement and audit the formal runner and request
+    launch separately. Do not pool any result with Stage 0 or the training
+    diagnostics in the completion record.
 
 The previously executed isolated smoke command was:
 
