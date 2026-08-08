@@ -51,6 +51,9 @@ data/training_paths.local.json
 # Managed training control directories (plan, authorization, segment ledgers)
 data/managed_runs/
 
+# Isolated engine runtimes built from pinned external source revisions
+data/runtimes/
+
 # ChromaDB data (generated at runtime)
 data/chroma/
 

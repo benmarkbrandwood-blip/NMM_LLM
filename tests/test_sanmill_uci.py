@@ -202,6 +202,46 @@ def test_state_parser_accepts_authoritative_protocol_v1_snapshot() -> None:
     assert state.logical_ply_count == 0
     assert state.logical_plies_by_side == (0, 0)
     assert len(state.legal_actions) == 24
+    assert "strict_referee_identity" not in state.portable_record()
+
+
+def test_state_parser_preserves_strict_referee_identity() -> None:
+    payload = _valid_state_payload()
+    payload["strict_referee_identity"] = {
+        "format": "SANMILL-STRICT-REFEREE-RULES/1",
+        "profile": "mif-stable-moving-v1",
+        "repetitionObservation": "stable-moving-v1",
+        "originCounted": True,
+        "semanticDigest": (
+            "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94"
+        ),
+    }
+
+    state = parse_state_json_line(
+        _machine_line("info string sanmill_state ", payload)
+    )
+
+    assert state.strict_referee_identity is not None
+    assert state.strict_referee_identity.portable_record() == payload[
+        "strict_referee_identity"
+    ]
+
+
+def test_state_parser_rejects_extended_strict_referee_identity() -> None:
+    payload = _valid_state_payload()
+    payload["strict_referee_identity"] = {
+        "format": "SANMILL-STRICT-REFEREE-RULES/1",
+        "profile": "mif-stable-moving-v1",
+        "repetitionObservation": "stable-moving-v1",
+        "originCounted": True,
+        "semanticDigest": "sha256:" + "1" * 64,
+        "unreviewedMeaning": True,
+    }
+
+    with pytest.raises(SanmillBridgeError, match="wrong shape"):
+        parse_state_json_line(
+            _machine_line("info string sanmill_state ", payload)
+        )
 
 
 def test_state_parser_allows_terminal_snapshot_to_retain_remove_action() -> None:

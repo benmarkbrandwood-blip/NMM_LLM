@@ -321,6 +321,24 @@ class UciStateOutcome:
 
 
 @dataclass(frozen=True)
+class UciStrictRefereeIdentity:
+    format: str
+    profile: str
+    repetition_observation: str
+    origin_counted: bool
+    semantic_digest: str
+
+    def portable_record(self) -> dict[str, Any]:
+        return {
+            "format": self.format,
+            "profile": self.profile,
+            "repetitionObservation": self.repetition_observation,
+            "originCounted": self.origin_counted,
+            "semanticDigest": self.semantic_digest,
+        }
+
+
+@dataclass(frozen=True)
 class UciPositionState:
     status: str
     ruleset_id: str
@@ -348,6 +366,7 @@ class UciPositionState:
     outcome_reason: str
     outcome_reason_code: str
     raw_line: str
+    strict_referee_identity: UciStrictRefereeIdentity | None = None
 
     @property
     def removal_pending(self) -> bool:
@@ -364,7 +383,7 @@ class UciPositionState:
         )
 
     def portable_record(self) -> dict[str, Any]:
-        return {
+        record = {
             "status": self.status,
             "ruleset_id": self.ruleset_id,
             "rules_identity_sha256": self.rules_identity_sha256,
@@ -388,6 +407,11 @@ class UciPositionState:
             "history_sha256": self.history_sha256,
             "outcome": self.outcome.portable_record(),
         }
+        if self.strict_referee_identity is not None:
+            record["strict_referee_identity"] = (
+                self.strict_referee_identity.portable_record()
+            )
+        return record
 
 
 @dataclass(frozen=True)
@@ -619,6 +643,64 @@ def parse_state_json_line(line: str) -> UciPositionState:
     rules_options = payload.get("rules_options")
     if not isinstance(rules_options, dict):
         raise SanmillBridgeError("sanmill_state.rules_options must be an object")
+    strict_referee_identity: UciStrictRefereeIdentity | None = None
+    raw_referee_identity = payload.get("strict_referee_identity")
+    if raw_referee_identity is not None:
+        if not isinstance(raw_referee_identity, dict):
+            raise SanmillBridgeError(
+                "sanmill_state.strict_referee_identity must be an object"
+            )
+        expected_referee_keys = {
+            "format",
+            "profile",
+            "repetitionObservation",
+            "originCounted",
+            "semanticDigest",
+        }
+        if set(raw_referee_identity) != expected_referee_keys:
+            raise SanmillBridgeError(
+                "sanmill_state.strict_referee_identity has the wrong shape"
+            )
+        referee_format = _required_string(
+            raw_referee_identity,
+            "format",
+            context="sanmill_state.strict_referee_identity",
+        )
+        referee_profile = _required_string(
+            raw_referee_identity,
+            "profile",
+            context="sanmill_state.strict_referee_identity",
+        )
+        repetition_observation = _required_string(
+            raw_referee_identity,
+            "repetitionObservation",
+            context="sanmill_state.strict_referee_identity",
+        )
+        origin_counted = _required_bool(
+            raw_referee_identity,
+            "originCounted",
+            context="sanmill_state.strict_referee_identity",
+        )
+        semantic_digest = _required_string(
+            raw_referee_identity,
+            "semanticDigest",
+            context="sanmill_state.strict_referee_identity",
+        )
+        if not semantic_digest.startswith("sha256:"):
+            raise SanmillBridgeError(
+                "strict-referee semanticDigest must use sha256"
+            )
+        _validate_sha256(
+            semantic_digest.removeprefix("sha256:"),
+            context="sanmill_state.strict_referee_identity.semanticDigest",
+        )
+        strict_referee_identity = UciStrictRefereeIdentity(
+            format=referee_format,
+            profile=referee_profile,
+            repetition_observation=repetition_observation,
+            origin_counted=origin_counted,
+            semantic_digest=semantic_digest,
+        )
     history_origin = _required_string(
         payload,
         "history_origin",
@@ -803,6 +885,7 @@ def parse_state_json_line(line: str) -> UciPositionState:
         outcome_reason=outcome_reason,
         outcome_reason_code=outcome_reason_code,
         raw_line=line,
+        strict_referee_identity=strict_referee_identity,
     )
 
 
@@ -1779,6 +1862,26 @@ class SanmillUciSession:
     def new_game(self) -> None:
         self._send("ucinewgame")
         self._send("setoption name Clear Hash")
+        self._sync()
+
+    def configure_strict_referee_profile(
+        self,
+        profile: str = "mif-stable-moving-v1",
+    ) -> None:
+        """Select the explicit history semantics used by a strict referee.
+
+        Historical bridge binaries do not advertise this option, so the
+        default session initialization remains byte-for-byte compatible with
+        their frozen contract. New training callers must opt in explicitly and
+        fail closed when the pinned runtime lacks the option.
+        """
+        if profile != "mif-stable-moving-v1":
+            raise SanmillBridgeError("unsupported strict referee profile")
+        if "StrictRefereeProfile" not in self.advertised_options:
+            raise SanmillBridgeError(
+                "Sanmill does not advertise StrictRefereeProfile"
+            )
+        self._send(f"setoption name StrictRefereeProfile value {profile}")
         self._sync()
 
     def position_startpos(self, actions: Sequence[str] = ()) -> None:
