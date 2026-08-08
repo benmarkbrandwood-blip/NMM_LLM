@@ -70,9 +70,18 @@ class PositionStats:
 class HumanDB:
     """Adapter for the pre-built human-game SQLite database."""
 
-    def __init__(self, db_path: Path | str, *, read_only: bool = False) -> None:
+    def __init__(
+        self,
+        db_path: Path | str,
+        *,
+        read_only: bool = False,
+        immutable: bool = False,
+    ) -> None:
         self._path = Path(db_path)
         self._read_only = bool(read_only)
+        self._immutable = bool(immutable)
+        if self._immutable and not self._read_only:
+            raise ValueError("immutable HumanDB access requires read_only=True")
         self._conn: Optional[sqlite3.Connection] = None
         self._available = False
         self._game_count: int = 0
@@ -86,7 +95,8 @@ class HumanDB:
 
         try:
             if self._read_only:
-                uri = f"file:{self._path.resolve().as_posix()}?mode=ro"
+                query = "mode=ro&immutable=1" if self._immutable else "mode=ro"
+                uri = f"file:{self._path.resolve().as_posix()}?{query}"
                 self._conn = sqlite3.connect(
                     uri,
                     uri=True,

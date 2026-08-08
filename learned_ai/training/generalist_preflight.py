@@ -65,9 +65,11 @@ TRAINER_PATH_KEYS = frozenset(
 REGISTRY_ONLY_PATH_KEYS = frozenset(
     {
         "human_db_prefix12_snapshot_path",
+        "human_db_route_probe_snapshot_path",
         "human_db_prefix12_source_manifest_path",
         "human_db_prefix12_history_ledger_path",
         "human_games_imported_manifest_path",
+        "specialist_db_route_probe_snapshot_path",
         "sanmill_prefix12_checkout",
         "mif_checkout",
     }

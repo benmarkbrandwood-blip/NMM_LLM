@@ -5,7 +5,9 @@
   "value_net_path": "data/value_net.npz",
   "gap_net_path": "data/gap_net.npz",
   "human_db_path": "data/human_db.sqlite",
+  "human_db_route_probe_snapshot_path": "",
   "specialist_db_path": "data/specialist_db.sqlite",
+  "specialist_db_route_probe_snapshot_path": "",
   "malom_db_path": "",
   "sanmill_checkout": "",
   "mif_checkout": ""

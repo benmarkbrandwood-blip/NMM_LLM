@@ -102,23 +102,25 @@ disabled advancement, so the five-level proposal cannot be launched as a
 training curriculum. Its acceptance and any later progression schedule remain
 owner decisions.
 
-The proposed
+The implemented but unlaunched
 [no-update integrated-route probe](../experiments/sanmill-no-update-integrated-route-probe-v1.md)
-would then measure the production rollout path without learning. Its bounded
+is designed to measure the production rollout path without learning. Its bounded
 matrix contains 30 Sanmill-opponent games and six Sanmill-refereed
 frozen-target controls, explicitly separating normal depth-5 from deliberately
 oversampled depth-12 routes and both learner colors. It requires a fresh
 random model, read-only HumanDB and empty corrected SpecialistDB snapshots,
 corrected Malom reads, no optimiser or checkpoint, identical before/after
 model and data identities, and at most 227,160,000 requested search nodes.
-The proposal is not implemented, preflighted, authorised, or launched.
+Its content-addressed plan, production-route controls, strict preflight,
+runner, atomic publisher, and focused tests are implemented. A passing
+preflight from a clean implementation commit already on `origin/dev` is still
+required before a readiness record may be published. The 36-game run is not
+authorised or launched.
 
-The focused calibration and current training-referee group reported 13 passed;
-Ruff and `git diff --check` pass. A broader historical bridge run reports 52
-passed and the same four known fail-closed moving-checkout pin failures from
-the 7 August baseline; those failures do not inspect or execute the isolated
-training runtime. The one-run calibration authority is consumed. No
-integrated route probe, additional smoke, or long run is authorised.
+The one-run calibration authority is consumed. No integrated route probe,
+additional smoke, or long run is authorised. Current probe implementation and
+verification results belong to its eventual implementation/evidence commits,
+not to the older calibration test totals recorded here.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected

@@ -1236,6 +1236,9 @@ class RolloutResult:
     opponent_node_budget: Optional[int] = None
     phase_ply_counts: dict[str, int] = field(default_factory=dict)
     compound_turn_count: int = 0
+    opponent_search_observations: list[dict[str, int]] = field(
+        default_factory=list
+    )
 
 
 def _move_notation(mv: dict) -> str:
@@ -1478,6 +1481,7 @@ def _rollout_impl(
     opponent_search_nodes = 0
     opponent_search_calls = 0
     opponent_search_depth_sum = 0
+    opponent_search_observations: list[dict[str, int]] = []
     opponent_node_budget = getattr(opponent, "node_budget", None)
     phase_ply_counts: Counter[str] = Counter()
     compound_turn_count = 0
@@ -1764,6 +1768,9 @@ def _rollout_impl(
                 opponent_search_nodes += search_nodes
                 opponent_search_depth_sum += search_depth
                 opponent_search_calls += 1
+                opponent_search_observations.append(
+                    {"nodes": search_nodes, "depth": search_depth}
+                )
             if not opp_move:
                 outcome = WIN_REWARD
                 termination_reason = "opponent-no-move"
@@ -1852,6 +1859,7 @@ def _rollout_impl(
         opponent_node_budget=opponent_node_budget,
         phase_ply_counts=dict(sorted(phase_ply_counts.items())),
         compound_turn_count=compound_turn_count,
+        opponent_search_observations=opponent_search_observations,
     )
 
 

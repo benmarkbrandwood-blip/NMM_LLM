@@ -340,10 +340,12 @@ documents. The intended logical mapping is:
 | `gap_net_path` | Disabled pending provenance review |
 | `human_db_path` | `data/human_db.sqlite` |
 | `human_db_prefix12_snapshot_path` | Ignored online-backup snapshot for the twelve-ply source audit |
+| `human_db_route_probe_snapshot_path` | Ignored, closed HumanDB snapshot for the no-update Sanmill route probe |
 | `human_db_prefix12_source_manifest_path` | Ignored content manifest for the recursive PlayOK JSONL sample |
 | `human_db_prefix12_history_ledger_path` | Ignored complete 83,002-history frequency and overlap ledger |
 | `human_games_imported_manifest_path` | `data/human_games/imported.json` |
 | `specialist_db_path` | `data/specialist_db.sector_corrected.sqlite` |
+| `specialist_db_route_probe_snapshot_path` | Ignored, empty `sector-corrected-v1` SpecialistDB snapshot for the no-update route probe |
 | `malom_db_path` | `../NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted` |
 | `sanmill_checkout` | Cross-volume reference checkout; read the actual value from the ignored registry |
 | `sanmill_training_checkout` | Ignored exact source/runtime pin for Sanmill-refereed training; normally under `data/runtimes` |

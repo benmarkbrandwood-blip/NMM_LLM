@@ -2,17 +2,20 @@
 
 ## Status and authority
 
-Status: `proposed_unimplemented_unlaunched`
+Status: `implemented_unlaunched_needs_published_preflight`
 
-This document proposes a bounded measurement for the fresh Sanmill-refereed
-lineage. It is not a machine-readable plan, readiness record, launch command,
-training run, strength evaluation, or authority to execute anything.
+This document defines a bounded measurement for the fresh Sanmill-refereed
+lineage. The content-addressed
+[machine-readable plan](sanmill-no-update-integrated-route-probe-v1.json),
+production-route controls, strict preflight, runner, and atomic publisher are
+implemented. This document is not a readiness record, training run, strength
+evaluation, or authority to execute the probe.
 
-The probe is contingent on owner acceptance of the five ceilings in the
-[node-ladder decision brief](sanmill-node-ladder-v1-decision-brief.md). Even
-after that decision, implementation, a clean published commit, a passing
-readiness audit, and explicit one-run authority are separate gates. No timeout
-or lack of response may choose a default.
+The owner accepted the five probe-only ceilings in the
+[node-ladder decision brief](sanmill-node-ladder-v1-decision-brief.md) by
+requesting implementation. A clean published implementation commit, a passing
+readiness audit, and explicit one-run authority remain separate gates. No
+timeout or lack of response may choose a default.
 
 ## Question being measured
 
@@ -36,9 +39,9 @@ explain game length and termination; they are not a candidate evaluation.
 
 ## Production route that must be preserved
 
-The implementation must invoke the production `_rollout` route and the
+The implementation invokes the production `_rollout` route and the
 production `SanmillTrainingGame` and `SanmillTrainingOpponent` classes. It
-must not copy gameplay, projection, replay, search, feature, reward, or rule
+does not copy gameplay, projection, replay, search, feature, reward, or rule
 logic into a second probe implementation.
 
 The runtime contract remains the one already verified for this lineage:
@@ -87,6 +90,16 @@ The probe must exercise data reads without permitting training side effects:
 - all source identities, schemas, row counts, `quick_check` results, main-file
   hashes, and any sidecar inventory are frozen before launch and compared
   again afterward.
+
+The implemented plan reuses the already closed, sidecar-free online-backup
+HumanDB snapshot indexed by `human_db_route_probe_snapshot_path`; its SHA-256
+is `97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c`.
+It binds a new probe-only empty SpecialistDB indexed by
+`specialist_db_route_probe_snapshot_path`, with SHA-256
+`b4d522d23720ab86013bbadd6b3414fba1e205ab988f3949c6ed417dca486b7f`.
+The HumanDB adapter uses SQLite `immutable=1` for this closed snapshot so even
+a read does not create WAL or SHM sidecars. Neither registry key redirects the
+active training databases.
 
 The production rollout currently persists completed evidence whenever a
 SpecialistDB object is present. Implementation therefore requires an explicit
@@ -191,13 +204,26 @@ relabeled as a completed result.
 
 ## Implementation and verification gates
 
-Implementation should be split into independently reviewable commits:
+Implementation is split into independently reviewable commits:
 
-1. add the default-on rollout-persistence control and semantic-parity tests;
-2. add the dedicated no-update runner, immutable plan schema, publisher, and
-   focused tests; and
-3. publish a readiness record only after the exact command passes from a clean
-   commit already present on `origin/dev`.
+1. the default-on rollout-persistence control, timing hooks, and
+   semantic-parity tests; and
+2. the dedicated no-update runner, immutable plan schema, publisher, and
+   focused tests.
+
+A third evidence commit may publish a readiness record only after the exact
+command passes from a clean implementation commit already present on
+`origin/dev`. The implemented read-only command is:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\probe_sanmill_integrated_route.py `
+  --preflight `
+  --plan docs\experiments\sanmill-no-update-integrated-route-probe-v1.json `
+  --paths-config data\training_paths.local.json
+```
+
+It includes one unscheduled two-ply frozen-target route check and consumes none
+of the 36 planned games.
 
 Focused tests must at least prove:
 
@@ -240,4 +266,6 @@ After the evidence is reviewed, a separate decision must freeze or reject:
 - game, wall-time, segment, checkpoint, and max-ply limits; and
 - whether a new update-enabled training smoke is required before a long run.
 
-The current readiness verdict remains `needs_decision`.
+The current readiness verdict is `not_ready`: implementation exists, but its
+commit is not yet the clean published source of a passing preflight. Probe and
+training launch authority are both absent.

@@ -1,0 +1,511 @@
+{
+  "bounded_work": {
+    "complete_games": 36,
+    "frozen_target_games": 6,
+    "maximum_logical_plies": 4320,
+    "maximum_requested_search_node_ceilings": 227160000,
+    "maximum_search_calls": 1800,
+    "search_opponent_games": 30
+  },
+  "claim_boundary": "Bounded no-update production-route throughput evidence only; not training, strength evaluation, ladder selection, or launch authority.",
+  "data_inputs": {
+    "human_db": {
+      "counts": {
+        "meta": 5,
+        "moves": 2516356,
+        "positions": 2152889,
+        "processed_files": 94983
+      },
+      "metadata": {
+        "build_date": "2026-07-19T15:31:33",
+        "schema_version": "2",
+        "source_sha256_files": "94983",
+        "total_files": "94983",
+        "total_games": "94429"
+      },
+      "quick_check": "ok",
+      "sha256": "97be7152573815180df6950b6150c667b1e5c2c8b1b21748b3ed9cf020b6f93c",
+      "sidecars": [],
+      "size": 738091008
+    },
+    "malom": {
+      "anchor_relative_path": "std.secval",
+      "anchor_sha256": "5078bf84505fe2845a4af7c36907efa2d66b2eb76f149ce12faa248117405b68",
+      "component_count": 512,
+      "manifest_sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+      "trust_level": "sector-corrected-v1"
+    },
+    "ruleset": {
+      "documentDigest": "sha256:1dfdf5777f36866a53a942c1addd21857d3b72eede8ea2bf4fe1beedfbe878f2",
+      "file_sha256": "79f69a60ba9a1171df113f208396c17a31c85407388857e00fd7010f3a01293a",
+      "id": "nmm-training-core",
+      "semanticDigest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+      "version": 2
+    },
+    "specialist_db": {
+      "counts": {
+        "meta": 1,
+        "positions": 0,
+        "preferred_plays": 0,
+        "winning_lines": 0
+      },
+      "metadata": {
+        "malom_label_version": "sector-corrected-v1"
+      },
+      "quick_check": "ok",
+      "sha256": "b4d522d23720ab86013bbadd6b3414fba1e205ab988f3949c6ed417dca486b7f",
+      "sidecars": [],
+      "size": 45056
+    }
+  },
+  "decision_rules": {
+    "auto_select_node_ladder": false,
+    "publish_only_complete_schedule": true,
+    "refuse_output_overwrite": true,
+    "strength_claim": false,
+    "training_launch": false
+  },
+  "experiment_id": "sanmill-no-update-integrated-route-probe-v1",
+  "model_route": {
+    "batch_games": 1,
+    "checkpoint": null,
+    "cuda_required": true,
+    "disabled_components": [
+      "sentinel",
+      "value_net",
+      "gap_net",
+      "s1a_warmstart",
+      "s1b_refresher",
+      "imitation_mix",
+      "opening_forcing",
+      "recovery",
+      "retry_rollouts",
+      "branch_rollouts"
+    ],
+    "max_ply": 120,
+    "optimizer": null,
+    "policy_hidden": [
+      512,
+      256,
+      128
+    ],
+    "rollout_persistence": false,
+    "seed": 42,
+    "sim_ply_depth_deep": 12,
+    "sim_ply_depth_normal": 5,
+    "start_mode": "fresh",
+    "temperature": 0.9
+  },
+  "plan_identity": "7aa079dcf59556d35f3fbd58072b6baa8c9f798e087cc336e29c8309552e3cfb",
+  "sanmill_runtime": {
+    "binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "binary_size": 5641216,
+    "commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "fallback": "none",
+    "search_threads": 1,
+    "shuffling": false,
+    "strict_referee_profile": "mif-stable-moving-v1",
+    "strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schedule": [
+    {
+      "game_id": "game:cfaf6392cb40a776a61370d4fc0608b5501c612b93fb531efe3d21a1940c33bf",
+      "learner_color": "W",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 0,
+      "sim_ply_depth": 5,
+      "torch_seed": 5741917532047058806
+    },
+    {
+      "game_id": "game:a4679c60cd80c02ea260887a978df8534fa4eba9a60a0dc5ade3072228d77430",
+      "learner_color": "B",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 1,
+      "sim_ply_depth": 5,
+      "torch_seed": 2623237247545163822
+    },
+    {
+      "game_id": "game:7bfae064c9b1a2c787410bb94ebd25a95977a2c79cb5d2d4a446cb06fdf06481",
+      "learner_color": "W",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 2,
+      "sim_ply_depth": 5,
+      "torch_seed": 8933699534328013511
+    },
+    {
+      "game_id": "game:6fb7d3b49480668e2dcc47798a69af6289a61222c5edb3cfcf1e8da91190f0fa",
+      "learner_color": "B",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 3,
+      "sim_ply_depth": 5,
+      "torch_seed": 8050135631487067790
+    },
+    {
+      "game_id": "game:23617ce9e274d505ef0577f8b9447638d4244556a4f409a67ae20dcfcb66eafc",
+      "learner_color": "W",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 4,
+      "sim_ply_depth": 12,
+      "torch_seed": 2549456208036943109
+    },
+    {
+      "game_id": "game:1a3984c50f3aded3fa23fa54429fd0c13ae20a13c1c3c7019edaeb6be9ab8086",
+      "learner_color": "B",
+      "node_budget": 1000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-1000-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 5,
+      "sim_ply_depth": 12,
+      "torch_seed": 1889687500557573843
+    },
+    {
+      "game_id": "game:09bc4a02b37137f35dc6acebb5bce260b8135a1ea14509035d57b2aeae75362c",
+      "learner_color": "W",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 6,
+      "sim_ply_depth": 5,
+      "torch_seed": 701517017423886323
+    },
+    {
+      "game_id": "game:967788df2d0125a02c84cd1fe3289197fed10210b0d059dc2b901967120bfd16",
+      "learner_color": "B",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 7,
+      "sim_ply_depth": 5,
+      "torch_seed": 1618913083177117088
+    },
+    {
+      "game_id": "game:02f98b40ad4923e8a8c94216d34116e846b7b7f03c5e63332b5edb7c9b4b04ed",
+      "learner_color": "W",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 8,
+      "sim_ply_depth": 5,
+      "torch_seed": 214355567178228712
+    },
+    {
+      "game_id": "game:757dd8d9d6d8cf6b2097106e227aac2ecfd0193a60d91948ef978d182556c600",
+      "learner_color": "B",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 9,
+      "sim_ply_depth": 5,
+      "torch_seed": 8466161304650436459
+    },
+    {
+      "game_id": "game:4fb908ac71f09cbb4d63abe2dfe9367ee838e9abb2472614ec283f0855d76d91",
+      "learner_color": "W",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 10,
+      "sim_ply_depth": 12,
+      "torch_seed": 5744632336426769595
+    },
+    {
+      "game_id": "game:4a4099cbb2084098ae30aa68814c694ab4fc5008d6f4d8e944f62a05502a5d34",
+      "learner_color": "B",
+      "node_budget": 5000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-5000-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 11,
+      "sim_ply_depth": 12,
+      "torch_seed": 5350445457460445336
+    },
+    {
+      "game_id": "game:660bf163776767bd0c55611b87d41965a70718a70db3f97db3c761d4608adee9",
+      "learner_color": "W",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 12,
+      "sim_ply_depth": 5,
+      "torch_seed": 7353236226119788477
+    },
+    {
+      "game_id": "game:1eb6b9314831f7ae578d54f0d35096c6980cead9df1a82c8ca090cdb4a9bf2b3",
+      "learner_color": "B",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 13,
+      "sim_ply_depth": 5,
+      "torch_seed": 2213159888214947758
+    },
+    {
+      "game_id": "game:380bffb4874a078207093ca1a9bf69a27ab4de2bac1b7e27e9e0c401fd0c9809",
+      "learner_color": "W",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 14,
+      "sim_ply_depth": 5,
+      "torch_seed": 4038602641696753538
+    },
+    {
+      "game_id": "game:95d222cdab220908e65efe38eb8ae3ce2b08dcaa4961dd1ba31d3ced80e84fa6",
+      "learner_color": "B",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 15,
+      "sim_ply_depth": 5,
+      "torch_seed": 1572357486640498952
+    },
+    {
+      "game_id": "game:f017510068bc95dbe521fbe0fecf85ea4349ad9a92c500847c8ccbc40e0328fd",
+      "learner_color": "W",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 16,
+      "sim_ply_depth": 12,
+      "torch_seed": 8077013518911313371
+    },
+    {
+      "game_id": "game:60a0ca06a76f33476536eb5ffd561b9eb919de7ac8a1d5cfc408c722bd242d59",
+      "learner_color": "B",
+      "node_budget": 25000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-25000-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 17,
+      "sim_ply_depth": 12,
+      "torch_seed": 6962787153842484039
+    },
+    {
+      "game_id": "game:f25631e2fb7c9087b899be82b242084c8f1ede0066e9838b5bb846d96b2df2d4",
+      "learner_color": "W",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 18,
+      "sim_ply_depth": 5,
+      "torch_seed": 8238827419272515719
+    },
+    {
+      "game_id": "game:24e53e45362c071fa5f96c4d1341d2173f63a8f131abc06cb81bb103db23e630",
+      "learner_color": "B",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 19,
+      "sim_ply_depth": 5,
+      "torch_seed": 2658599622014666527
+    },
+    {
+      "game_id": "game:2fe2a4862b099dd30796905810056385b1b6aee06c529178264531b9f4e25ad4",
+      "learner_color": "W",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 20,
+      "sim_ply_depth": 5,
+      "torch_seed": 3450501160673844691
+    },
+    {
+      "game_id": "game:2ead27adfc63f42f812715f44d4ec93e27a1da204641582434932e5c43b4fafa",
+      "learner_color": "B",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 21,
+      "sim_ply_depth": 5,
+      "torch_seed": 3363388124932863023
+    },
+    {
+      "game_id": "game:41a84aee313551707df851d75f93ee0507b91dd73b7fd742e85c10463ed03c23",
+      "learner_color": "W",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 22,
+      "sim_ply_depth": 12,
+      "torch_seed": 4731113795440955760
+    },
+    {
+      "game_id": "game:28b1fe598c26df35aea2d8ccadd20d1ce4e856a2283b96516d5d03c20e2ab773",
+      "learner_color": "B",
+      "node_budget": 100000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-100000-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 23,
+      "sim_ply_depth": 12,
+      "torch_seed": 2932404492951805749
+    },
+    {
+      "game_id": "game:ebfa309fa9e9d10eb165148f1c5c7b72a059f6e5dfbdd8cc761ebdab7f91db99",
+      "learner_color": "W",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 24,
+      "sim_ply_depth": 5,
+      "torch_seed": 7780584768544559374
+    },
+    {
+      "game_id": "game:38c337e2155420f7df09928d4a8ae24a57a0c9161c6e9255fef303b451dc9269",
+      "learner_color": "B",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 25,
+      "sim_ply_depth": 5,
+      "torch_seed": 4090174330742513911
+    },
+    {
+      "game_id": "game:530140c8bdc23453926befda2205af25b470da262aed01f437f4a43a01ffa587",
+      "learner_color": "W",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 26,
+      "sim_ply_depth": 5,
+      "torch_seed": 5981133011045987411
+    },
+    {
+      "game_id": "game:10da465f973909b4b2abc058f987cdcbf50b73843e17745dc79668ed806897d4",
+      "learner_color": "B",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 27,
+      "sim_ply_depth": 5,
+      "torch_seed": 1214360425902705076
+    },
+    {
+      "game_id": "game:77a592754443b8d8c5b83c7ac2a5c60e04c661f8d50b087d68336e248d783fc4",
+      "learner_color": "W",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 28,
+      "sim_ply_depth": 12,
+      "torch_seed": 8621458094024800472
+    },
+    {
+      "game_id": "game:be9916e41e43119ce1735466e1c01f66db1f837538480b21d28e57cced9939d1",
+      "learner_color": "B",
+      "node_budget": 500000,
+      "opponent_kind": "sanmill",
+      "role": "sanmill-500000-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 29,
+      "sim_ply_depth": 12,
+      "torch_seed": 4510661670804328860
+    },
+    {
+      "game_id": "game:28004fd76d512882555f61c2c622915ba702e077f98f4c4d91bb9f4a923bee91",
+      "learner_color": "W",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-normal-0-W",
+      "route_depth": "normal",
+      "scheduled_index": 30,
+      "sim_ply_depth": 5,
+      "torch_seed": 2882391548187715714
+    },
+    {
+      "game_id": "game:d00eb10c5cc84f7c34e761aed22194642ba38c6f9d4758293f01ec2a5651abd3",
+      "learner_color": "B",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-normal-0-B",
+      "route_depth": "normal",
+      "scheduled_index": 31,
+      "sim_ply_depth": 5,
+      "torch_seed": 5768742839362539388
+    },
+    {
+      "game_id": "game:3e6c3561044231fa444056b850bf5b1bbc474717904077f0378982c5b0b91433",
+      "learner_color": "W",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-normal-1-W",
+      "route_depth": "normal",
+      "scheduled_index": 32,
+      "sim_ply_depth": 5,
+      "torch_seed": 4498028818635829754
+    },
+    {
+      "game_id": "game:61b2787c312a11187ce2d8dd630c38e62af4f7a899f684b6a8177fba95716eb0",
+      "learner_color": "B",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-normal-1-B",
+      "route_depth": "normal",
+      "scheduled_index": 33,
+      "sim_ply_depth": 5,
+      "torch_seed": 7039821642329624856
+    },
+    {
+      "game_id": "game:c6c298646652c969aa150e0dd0c7d9917f412cf13c5b62a63fa6ff7255304bc8",
+      "learner_color": "W",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-deep-0-W",
+      "route_depth": "deep",
+      "scheduled_index": 34,
+      "sim_ply_depth": 12,
+      "torch_seed": 5098805285117675881
+    },
+    {
+      "game_id": "game:1f748238d75f573c6ec70e42e5c188ec863bdd98c87bf3449d511a837e7ce749",
+      "learner_color": "B",
+      "node_budget": null,
+      "opponent_kind": "frozen_target",
+      "role": "frozen-target-deep-0-B",
+      "route_depth": "deep",
+      "scheduled_index": 35,
+      "sim_ply_depth": 12,
+      "torch_seed": 2266579693117331260
+    }
+  ],
+  "schema_version": "nmm.sanmill-no-update-route-probe-plan.v1",
+  "status": "implemented_unlaunched"
+}
