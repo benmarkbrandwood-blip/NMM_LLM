@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `node_ladder_and_integrated_probe_proposed_needs_decision`
+Status: `exact_resume_parity_smoke_prepared_unlaunched`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -289,8 +289,20 @@ authorize execution.
 
 The separate
 [no-update integrated-route probe proposal](sanmill-no-update-integrated-route-probe-v1.md)
-defines a bounded 36-game measurement over those five ceilings, the normal
-depth-5 route, the occasional depth-12 route, both learner colors, and a
-Sanmill-refereed frozen-target control. It requires read-only data inputs,
-unchanged model digests, no optimiser, no checkpoint, no rollout persistence,
-and atomic ignored output. It remains unimplemented and unlaunched.
+was subsequently implemented and completed over all 36 immutable scheduled
+indices. The route covered all five node ceilings, normal depth-5 and
+occasional depth-12 learner routes, both learner colors, and Sanmill-refereed
+frozen-target controls. Index 31 exposed a terminal-turn projection mismatch;
+the red-first repair and exact reproduction passed before the remaining
+controls were run. The final
+[closure record](../evidence/sanmill-no-update-frozen-target-controls-continuation-v1-result-2026-08-08.md)
+binds the four last controls and the complete evidence chain. This remains
+no-update integration evidence, not training or strength evidence.
+
+The next bounded gate is the
+[Sanmill exact-resume parity smoke](sanmill-refereed-exact-resume-parity-smoke-v1.md).
+It compares an uninterrupted two-game route with the same schedule split over
+a fresh and exact-resume process, including finite periodic A2C updates and an
+exact semantic comparison of checkpoint, logs, and SpecialistDB rows. It is
+prepared but unlaunched. No retained training plan or long-run command is yet
+authorized by this experiment record.
