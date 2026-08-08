@@ -920,12 +920,12 @@ def run_generalist_preflight(
 
     if state.dirty:
         errors.append("Git worktree must be clean")
-    if args.start_mode != "fresh" and args.experiment_id in {
+    if args.start_mode == "weights-only" and args.experiment_id in {
         "dev-v4-malom-corrected-fresh-v1",
         "dev-v4-sanmill-refereed-fresh-v1",
     }:
         errors.append(
-            "non-fresh imports require an explicit non-fresh experiment ID"
+            "weights-only imports require an explicit non-fresh experiment ID"
         )
     for flag in (
         "no_sentinel",

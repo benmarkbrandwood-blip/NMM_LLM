@@ -493,12 +493,30 @@ def test_weights_only_preflight_accepts_compatible_legacy_weights(
     assert checkpoint["format"] == "legacy-pytorch-weights"
     assert checkpoint["checkpoint_id"].startswith("legacy-sha256:")
 
+    args.experiment_id = "dev-v4-malom-corrected-fresh-v1"
+    blocked = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={},
+        feature_schema_version=trainer.FEATURE_SCHEMA_VERSION,
+        expected_move_feature_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,
+        expected_value_input_dim=trainer.VALUE_INPUT_DIM_WITH_HISTORY,
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert blocked["verdict"] == "fatal_stop"
+    assert (
+        "weights-only imports require an explicit non-fresh experiment ID"
+        in blocked["errors"]
+    )
+
 
 def test_exact_resume_preflight_binds_semantics_and_specialist_db(
     tmp_path: Path,
 ) -> None:
     args = _smoke_args(tmp_path)
-    args.experiment_id = "exact-resume-test"
+    args.experiment_id = "dev-v4-malom-corrected-fresh-v1"
     _write_malom(Path(args.malom))
     _write_human_db(Path(args.human_db))
     specialist_path = Path(args.specialist_db)
