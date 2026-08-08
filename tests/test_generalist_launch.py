@@ -76,3 +76,36 @@ def test_launch_records_failed_before_propagating_training_error(
         trainer.main(_launch_arguments())
 
     assert statuses == ["running", "failed"]
+
+
+def test_long_run_preflight_accepts_ready_for_long_run(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setattr(trainer, "_configure_paths", lambda _args: {})
+    monkeypatch.setattr(
+        trainer,
+        "run_generalist_preflight",
+        lambda *_args, **_kwargs: {
+            "mode": "long-run",
+            "verdict": "ready_for_long_run",
+            "checks": {"checkpoint": None},
+        },
+    )
+
+    exit_code = trainer.main(
+        [
+            "--preflight",
+            "long-run",
+            "--no-sentinel",
+            "--no-value-net",
+            "--no-gap-net",
+            "--max-games",
+            "1",
+            "--batch-games",
+            "1",
+        ]
+    )
+
+    assert exit_code == 0
+    assert '"verdict": "ready_for_long_run"' in capsys.readouterr().out

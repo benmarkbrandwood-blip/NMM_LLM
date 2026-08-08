@@ -3311,7 +3311,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         p.error(str(exc))
     print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
     if args.preflight is not None:
-        return 0 if report["verdict"] == "ready_for_smoke" else 2
+        expected_preflight_verdict = (
+            "ready_for_smoke"
+            if args.preflight == "smoke"
+            else "ready_for_long_run"
+        )
+        return 0 if report["verdict"] == expected_preflight_verdict else 2
 
     expected_verdict = (
         "ready_for_smoke" if args.launch == "smoke" else "ready_for_long_run"
