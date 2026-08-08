@@ -553,10 +553,24 @@ def load_probe_diagnostic_plan(path: str | Path) -> ProbeDiagnosticPlan:
         _GAME_KEYS,
         context="probe diagnostic selected schedule entry",
     )
-    selected = parent.schedule[0]
+    scheduled_index = selected_record["scheduled_index"]
+    if (
+        isinstance(scheduled_index, bool)
+        or not isinstance(scheduled_index, int)
+        or scheduled_index < 0
+        or scheduled_index >= len(parent.schedule)
+    ):
+        raise SanmillRouteProbeError(
+            "probe diagnostic selected schedule index is invalid"
+        )
+    selected = parent.schedule[scheduled_index]
     if dict(selected_record) != _probe_game_record(selected):
         raise SanmillRouteProbeError(
-            "probe diagnostic must preserve parent schedule index zero exactly"
+            "probe diagnostic must preserve the selected parent schedule entry exactly"
+        )
+    if selected.opponent_kind != "sanmill":
+        raise SanmillRouteProbeError(
+            "probe diagnostic must select a Sanmill parent schedule entry"
         )
 
     bounded = {

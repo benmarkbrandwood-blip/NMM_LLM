@@ -48,7 +48,7 @@ def test_tracked_diagnostic_selects_only_parent_index_zero() -> None:
     }
 
 
-def test_diagnostic_rejects_a_different_parent_schedule_entry(
+def test_diagnostic_accepts_an_explicit_parent_schedule_entry(
     tmp_path: Path,
 ) -> None:
     path = _ROOT / probe.DEFAULT_DIAGNOSTIC_PLAN_RELATIVE
@@ -59,9 +59,50 @@ def test_diagnostic_rejects_a_different_parent_schedule_entry(
     changed = tmp_path / "changed.json"
     _write_reidentified(payload, changed)
 
+    diagnostic = probe.load_probe_diagnostic_plan(changed)
+
+    assert diagnostic.selected == diagnostic.parent.schedule[1]
+    assert probe.diagnostic_probe_plan(diagnostic).schedule == (
+        diagnostic.parent.schedule[1],
+    )
+
+
+def test_diagnostic_rejects_a_mismatched_parent_schedule_identity(
+    tmp_path: Path,
+) -> None:
+    path = _ROOT / probe.DEFAULT_DIAGNOSTIC_PLAN_RELATIVE
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["selected_schedule_entry"]["scheduled_index"] = 1
+    changed = tmp_path / "changed.json"
+    _write_reidentified(payload, changed)
+
     with pytest.raises(
         probe.SanmillRouteProbeError,
-        match="preserve parent schedule index zero exactly",
+        match="preserve the selected parent schedule entry exactly",
+    ):
+        probe.load_probe_diagnostic_plan(changed)
+
+
+def test_diagnostic_rejects_a_non_sanmill_parent_entry(tmp_path: Path) -> None:
+    path = _ROOT / probe.DEFAULT_DIAGNOSTIC_PLAN_RELATIVE
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["selected_schedule_entry"] = json.loads(
+        (_ROOT / probe.DEFAULT_PLAN_RELATIVE).read_text(encoding="utf-8")
+    )["schedule"][30]
+    payload["bounded_work"] = {
+        "complete_games": 1,
+        "search_opponent_games": 0,
+        "frozen_target_games": 1,
+        "maximum_logical_plies": 120,
+        "maximum_search_calls": 0,
+        "maximum_requested_search_node_ceilings": 0,
+    }
+    changed = tmp_path / "changed.json"
+    _write_reidentified(payload, changed)
+
+    with pytest.raises(
+        probe.SanmillRouteProbeError,
+        match="must select a Sanmill parent schedule entry",
     ):
         probe.load_probe_diagnostic_plan(changed)
 
