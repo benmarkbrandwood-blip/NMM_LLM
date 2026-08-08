@@ -2,14 +2,15 @@
 
 ## Status and authority
 
-Status: `resource_schedule_smoke_passed_managed_plan_required`
+Status: `long_launch_authorized_pending_managed_plan_and_preflight`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
 The product owner selected a new fresh training lineage on 8 August 2026.
 This document records that lineage and the required architecture. It is not a
-managed plan, a smoke authorization, a long-run authorization, or strength
-evidence.
+managed plan or strength evidence. The separate
+[managed long-run contract](sanmill-refereed-managed-long-v1.md) records the
+subsequent bounded launch authorization and its remaining local gates.
 
 ## Lineage decision
 
@@ -120,10 +121,9 @@ is a phase-aware search policy, not an opening-book activation. Opening Book,
 HumanDB, and Perfect DB prefix corpora remain separate frozen evaluation/data
 assets and are not silently injected into this fresh baseline.
 
-## Unfrozen calibration items
+## Historical calibration items
 
-The following values require implementation evidence before an immutable
-managed plan can be generated:
+The following values were initially left open pending implementation evidence:
 
 - the Sanmill node/depth curriculum and its number of levels;
 - advancement and cooling behaviour under that curriculum;
@@ -136,6 +136,10 @@ managed plan can be generated:
 The prior local `GameAI` difficulty ladder and its 55% advancement gate are
 not inherited by implication. Sanmill work levels must be calibrated and
 logged in Sanmill-native node/depth terms.
+
+The fixed-resource curriculum decision and its passing schedule smoke now
+freeze these items for the first retained run. This section remains as the
+historical reason that the values were not copied from the local-GameAI run.
 
 ## Required evidence before any smoke
 
@@ -155,9 +159,10 @@ reviewed:
 7. exact-resume equivalence across a process boundary; and
 8. bounded throughput and resource measurements on the intended Windows host.
 
-No further training command is currently authorized. A later smoke must use a
-new disposable output directory and SpecialistDB, and its one-run authorization
-must be recorded separately.
+At the initial publication of this architecture, no further training command
+was authorized and every later smoke required a new disposable output and
+SpecialistDB. The completed evidence chain and subsequent bounded long-run
+authorization are recorded below and in the managed long-run contract.
 
 The implementation-focused baseline currently records:
 
@@ -317,13 +322,15 @@ at `b3d049b`: its
 [result record](../evidence/sanmill-refereed-exact-resume-parity-smoke-v2-result-2026-08-08.md)
 proves exact model, optimiser, RNG, trainer/data-state, log, and SpecialistDB
 semantic equality after a real process-boundary resume. No retained training
-plan or long-run command is yet authorized by this experiment record.
+plan or long-run command was authorized by that parity result alone.
 
 The subsequent
 [fixed-resource curriculum decision](sanmill-fixed-resource-curriculum-v1.md)
 freezes a deterministic five-level, game-indexed Sanmill node schedule and the
 remaining retained-run product envelope. Implementation, focused tests, and
-one isolated five-game schedule smoke are authorized under that decision.
+one isolated five-game schedule smoke passed under that decision.
 The schedule is resource exposure, not a score-based advancement or strength
-claim; no retained run may start until its implementation smoke, evidence,
-managed plan, and final preflight have passed.
+claim. The subsequent
+[managed long-run contract](sanmill-refereed-managed-long-v1.md) authorizes
+creation of the immutable local plan and authorization, final preflight, and
+background launch only after every recorded gate passes.

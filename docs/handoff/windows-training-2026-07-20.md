@@ -14,7 +14,8 @@ claim; see the
 The authorized corrected-v4 managed plan
 `managed-v4-baseline-v1` completed 5,000 games in 20 verified segments on
 21 July 2026 (UTC). Its completion is lineage and infrastructure evidence, not
-playing-strength or promotion evidence. No further training run is authorized.
+playing-strength or promotion evidence. It does not authorize reuse of that
+lineage.
 
 The separately authorized rules-corrected successor smoke
 `successor-rules-v2-smoke-001` completed on 7 August from clean, published
@@ -25,6 +26,18 @@ games produced one finite 14-step Adam update and a verified version-2
 infrastructure evidence only. The smoke authorization is consumed and no long
 run is authorized. See the
 [successor smoke result](../evidence/successor-training-smoke-result-2026-08-07.md).
+
+Later work on 8 August closed the fresh Sanmill-refereed lineage's terminal
+projection, strict-referee, exact-resume, node-throughput, integrated-route,
+and deterministic resource-schedule gates. The isolated five-game schedule
+smoke exercised all five fixed-node levels and completed five finite A2C
+updates. The product owner then authorized the bounded
+[`managed-sanmill-v4-fresh-v1` long-run contract](../experiments/sanmill-refereed-managed-long-v1.md):
+at most 5,000 games or 12 active hours, 120 logical plies per game, and
+250-game exact-resume process segments. That authority permits creation of
+the ignored immutable local plan and authorization, final read-only preflight,
+and launch only if every fail-closed gate passes. It does not authorize
+publication or promotion.
 
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
@@ -57,8 +70,9 @@ one finite 47-step A2C update, a verified version-2 `latest.pt`, and a valid
 completed lifecycle chain. Its isolated corrected database now contains 94
 positions and one winning line and is retained as completed smoke evidence,
 not a fresh input. The second one-run authorization is consumed. No retry or
-long run is authorized. The node ladder, representative throughput envelope,
-and later advancement rule remain unfrozen.
+long run was authorized by that smoke. At that point the node ladder,
+representative throughput envelope, and later advancement rule remained
+unfrozen.
 See the
 [fresh Sanmill experiment contract](../experiments/dev-v4-sanmill-refereed-fresh-v1.md).
 The terminal repair verification reports 182 trainer, launch, checkpoint,
@@ -151,11 +165,13 @@ unpublished. The readiness verdict is `needs_decision`. It remains unlaunched;
 publication, a final preflight from `dev == origin/dev`, and a new one-run
 authority are still required.
 
-The one-run calibration authority is consumed. No integrated route probe,
-additional smoke, or long run is authorised. Current probe verification is
-62 focused tests plus the mandatory 103 Malom/provenance tests and 498
-parameterized subtests; these results belong to the probe readiness record,
-not to the older calibration test totals recorded here.
+At that historical checkpoint the one-run calibration authority was consumed,
+and no integrated route probe, additional smoke, or long run was authorised.
+Probe verification then comprised 62 focused tests plus the mandatory 103
+Malom/provenance tests and 498 parameterized subtests; those results belong to
+the probe readiness record, not to the older calibration test totals recorded
+here. The later authorization is the bounded contract linked near the start
+of this handover.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
