@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `smoke_002_completed_calibration_designed_unlaunched`
+Status: `smoke_002_and_engine_calibration_completed_probe_unfrozen`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -267,11 +267,14 @@ owns all raw identities and the claim boundary.
 The smoke passes only the integration gate. Its single Sanmill-opponent game
 and 1,000-node ceiling are not representative throughput evidence. No further
 smoke, exact resume, long run, node ladder, or advancement rule is authorised.
-A separate non-training fixed-position node-throughput calibration is the next
-safe preparation step. Its bounded engine-only contract is now defined in the
+
+The later separately authorised
 [Sanmill node-throughput calibration v1](sanmill-node-throughput-calibration-v1.md)
-document and content-addressed JSON plan. The design covers eight replayed
-placement, movement, flying, and compound-capable roots; five node ceilings;
-nine repetitions; and separate cold-process and warm-sequence modes. It does
-not load a model or trainer, and it cannot select a node ladder automatically.
-The calibration has not been launched and has no launch authorization.
+completed all 720 engine-only searches over eight replayed placement,
+movement, flying, and compound-capable roots, five node ceilings, nine
+repetitions, and cold-process and warm-sequence modes. The
+[result record](../evidence/sanmill-node-throughput-calibration-v1-result-2026-08-08.md)
+binds its ignored raw output. That calibration did not load a model or
+trainer and did not select a node ladder automatically. Its authority is
+consumed. A node-ladder decision and any no-update integrated-route probe
+remain separate, unauthorised gates.

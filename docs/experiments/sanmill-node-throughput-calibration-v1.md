@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `designed_unlaunched`
+Status: `completed_evidence_recorded`
 
 Plan identity:
 `2dff4e6d37f36af90d9e90943dad8f4bcccbec802615f7eedc1103af32a51290`.
@@ -12,8 +12,14 @@ Raw plan SHA-256:
 This document and its
 [machine-readable plan](sanmill-node-throughput-calibration-v1.json) define a
 bounded, engine-only calibration for the fresh Sanmill-refereed training
-lineage. They do not authorise the calibration, another training smoke, or a
-long run. No result exists yet.
+lineage. The immutable JSON retains its historical `designed_unlaunched`
+status because it is the exact launch input; it must not be edited after the
+run. The separately authorised calibration completed on 8 August 2026. Its
+[result record](../evidence/sanmill-node-throughput-calibration-v1-result-2026-08-08.md)
+owns the runtime identities, measurements, and claim boundary.
+
+The consumed calibration authority does not authorise another calibration,
+training smoke, integrated route probe, or long run.
 
 The calibration is intentionally separate from the completed
 [smoke-002 result](../evidence/sanmill-refereed-fresh-v1-smoke-002-result-2026-08-08.md).
@@ -154,7 +160,7 @@ probe. There is no timeout or automatic default decision.
 
 ## Commands
 
-After this design is committed and published, the read-only preflight is:
+The read-only preflight used before the completed launch was:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\calibrate_sanmill_nodes.py `
@@ -167,10 +173,12 @@ Preflight validates the clean published source, runtime, and all eight replay
 fixtures. It performs no timed search and reports
 `launch_authorized=false`.
 
-Only after a separate authorization may `--launch calibration`, a new run ID,
-and an absent ignored output path replace `--preflight`. The output should be
-placed under `out/diagnostics/`; it must not be committed until its claim
-boundary, hashes, and result interpretation have been reviewed.
+The owner separately authorised one replacement of `--preflight` with
+`--launch calibration`, run ID
+`sanmill-node-throughput-calibration-v1-20260808-001`, and a new ignored output
+under `out/diagnostics/`. That launch completed and the one-run authority is
+consumed. The portable result record binds the ignored raw report by both its
+report identity and file SHA-256.
 
 ## Design verification
 

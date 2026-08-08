@@ -75,19 +75,28 @@ The
 [smoke-002 result](../evidence/sanmill-refereed-fresh-v1-smoke-002-result-2026-08-08.md)
 owns the successful launch identities and explicitly excludes its two games
 from node-ladder, strength, and retained-run throughput claims.
-The next engine-only measurement is now designed but unlaunched. The
+The separately authorised
 [Sanmill node-throughput calibration v1](../experiments/sanmill-node-throughput-calibration-v1.md)
-uses eight complete-history roots, five fixed-node ceilings, nine repetitions,
-and separate cold-process and warm-sequence modes. Its maximum requested work
-is 90,864,000 node ceilings over 720 timed searches and no more than 405
-process launches. It loads no model, trainer, checkpoint, or database, and it
-does not auto-select a training ladder. No calibration launch, integrated
-route probe, additional smoke, or long run is authorized.
+completed on 8 August. It produced all 720 timed searches over eight
+complete-history roots, five fixed-node ceilings, nine repetitions, and
+separate cold-process and warm-sequence modes. All 80 cells were semantically
+stable, and all 40 matching cold/warm cells selected the same complete logical
+turn. The run used 79,510,680 actual nodes under 90,864,000 requested ceilings
+and completed in 37.846903 seconds. At 500,000 nodes, the warm cross-root
+median was 52.85 ms and P90 was 60.77 ms; the empty-board root remained
+phase-depth limited at 52 nodes. Fresh process startup had median cost about
+59.7 ms, so the persistent training process must be represented in the next
+measurement. The
+[result record](../evidence/sanmill-node-throughput-calibration-v1-result-2026-08-08.md)
+binds the ignored raw report and its claim boundary. It loads no model,
+trainer, checkpoint, or database and does not select a node ladder.
+
 The focused calibration and current training-referee group reported 13 passed;
 Ruff and `git diff --check` pass. A broader historical bridge run reports 52
 passed and the same four known fail-closed moving-checkout pin failures from
 the 7 August baseline; those failures do not inspect or execute the isolated
-training runtime.
+training runtime. The one-run calibration authority is consumed. No
+integrated route probe, additional smoke, or long run is authorised.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
