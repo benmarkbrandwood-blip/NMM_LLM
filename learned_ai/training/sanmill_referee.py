@@ -342,7 +342,10 @@ class SanmillTrainingGame:
     def assert_current_board(self, board: BoardState) -> None:
         state = self.state
         self._require_training_state(state)
-        projected = project_stable_sanmill_fen(state.fen)
+        projected = project_stable_sanmill_fen(
+            state.fen,
+            terminal=state.terminal,
+        )
         if projected.to_fen_string() != board.to_fen_string():
             raise SanmillBridgeError("Sanmill and NMM board mirrors diverged")
 

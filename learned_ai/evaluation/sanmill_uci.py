@@ -1593,8 +1593,37 @@ def atomic_move_for_actions(
     return matches[0]
 
 
-def project_stable_sanmill_fen(tgf_fen: str) -> BoardState:
-    projected = project_tgf_fen(tgf_fen)
+def project_stable_sanmill_fen(
+    tgf_fen: str,
+    *,
+    terminal: bool = False,
+) -> BoardState:
+    projection_fen = tgf_fen
+    if terminal:
+        # Sanmill's terminal FEN keeps the settled board and counters but uses
+        # phase ``o`` and may retain the prior action or emit ``?``.  Rewrite
+        # only a local copy so the placement/movement projector can recover
+        # the mirror board; the structured state remains the outcome authority.
+        fields = tgf_fen.split()
+        if len(fields) < 8 or fields[2] != "o":
+            raise SanmillBridgeError(
+                "terminal Sanmill FEN does not use the game-over phase"
+            )
+        if fields[3] not in {"p", "s", "r", "?"}:
+            raise SanmillBridgeError(
+                "terminal Sanmill FEN has an unknown atomic action"
+            )
+        try:
+            has_reserve = int(fields[5]) > 0 or int(fields[7]) > 0
+        except ValueError as exc:
+            raise SanmillBridgeError(
+                "terminal Sanmill FEN has invalid reserve counters"
+            ) from exc
+        fields[2] = "p" if has_reserve else "m"
+        fields[3] = "p" if has_reserve else "s"
+        projection_fen = " ".join(fields)
+
+    projected = project_tgf_fen(projection_fen)
     if projected is None:
         raise SanmillBridgeError("Sanmill FEN is pending a removal")
     return BoardState.from_fen_string(projected.fen)

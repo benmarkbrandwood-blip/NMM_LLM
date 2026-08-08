@@ -10,12 +10,17 @@ import torch
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves
-from learned_ai.evaluation.sanmill_uci import SanmillBridgeError
+from learned_ai.evaluation.phase_corpus import PhaseCorpusError
+from learned_ai.evaluation.sanmill_uci import (
+    SanmillBridgeError,
+    project_stable_sanmill_fen,
+)
 from learned_ai.training.sanmill_referee import (
     TRAINING_REFEREE_SEMANTIC_DIGEST,
     TRAINING_SANMILL_COMMIT,
     SanmillTrainingGame,
     inspect_sanmill_training_installation,
+    nmm_move_actions,
     probe_sanmill_training_runtime,
 )
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
@@ -49,6 +54,23 @@ def _placement(board: BoardState, to: str, capture: str | None = None) -> dict:
     ]
     assert len(candidates) == 1
     return candidates[0]
+
+
+def test_training_referee_projects_a_game_over_fen_as_a_stable_board() -> None:
+    terminal_fen = (
+        "**O**O**/**@**@**/******** w o ? 2 0 2 0 0 0 "
+        "-1 -1 -1 -1 0 0 1 ids:nodes"
+    )
+
+    with pytest.raises(PhaseCorpusError, match="unsupported stable TGF action"):
+        project_stable_sanmill_fen(terminal_fen)
+
+    projected = project_stable_sanmill_fen(terminal_fen, terminal=True)
+
+    assert projected.turn == "W"
+    assert projected.phase == "move"
+    assert projected.pieces_placed == {"W": 9, "B": 9}
+    assert projected.pieces_on_board == {"W": 2, "B": 2}
 
 
 def test_training_runtime_identity_and_cross_process_search_are_fixed() -> None:
@@ -100,6 +122,47 @@ def test_training_referee_replays_complete_logical_turn_with_capture() -> None:
         assert turn.state.strict_referee_identity.semantic_digest == (
             TRAINING_REFEREE_SEMANTIC_DIGEST
         )
+
+
+def test_training_referee_accepts_the_smoke_rule_terminal_history() -> None:
+    installation = inspect_sanmill_training_installation(_training_checkout())
+    action_history = (
+        "d6", "f4", "d2", "c4", "b4", "f2", "f6", "d7", "b6", "xc4",
+        "d1", "b2", "xd1", "g4", "e4", "c5", "a4", "e5", "c4", "xc5",
+        "d3", "c4-c3", "d3-e3", "d6-d5", "e3-d3", "c3-c4", "xd7",
+        "g4-g1", "b6-d6", "f4-g4", "d2-d1", "d3-d2", "d6-d7",
+        "g4-g7", "f6-f4", "g1-g4", "b4-b6", "d2-d3", "e4-e3",
+        "g4-g1", "b2-d2", "g7-g4", "e3-e4", "d3-c3", "d7-g7",
+        "c3-d3", "b6-b4", "xd3",
+    )
+    board = BoardState.new_game()
+    action_index = 0
+
+    with SanmillTrainingGame(installation, seed=42) as game:
+        while action_index < len(action_history):
+            logical_actions = [action_history[action_index]]
+            action_index += 1
+            if (
+                action_index < len(action_history)
+                and action_history[action_index].startswith("x")
+            ):
+                logical_actions.append(action_history[action_index])
+                action_index += 1
+            matching = [
+                move
+                for move in get_all_legal_moves(board)
+                if nmm_move_actions(move) == tuple(logical_actions)
+            ]
+            assert len(matching) == 1
+            game.apply_nmm_move(board, matching[0])
+            board = board.apply_move(matching[0])
+
+        assert game.state.terminal
+        assert game.state.outcome_reason == "loseNoLegalMoves"
+        assert game.state.winner == "white"
+        assert game.state.logical_ply_count == 43
+        assert game.state.action_token_count == 48
+        assert game.state.fen.split()[2:4] == ["o", "?"]
 
 
 def test_training_referee_rejects_illegal_local_move_without_fallback() -> None:
