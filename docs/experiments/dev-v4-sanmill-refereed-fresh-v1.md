@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `implementation_ready_for_clean-commit_preflight`
+Status: `ready_for_explicitly_authorized_smoke`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -224,3 +224,17 @@ cover one Sanmill-search opponent game and one frozen-target game, while
 Sanmill referees both. Replacing `--preflight smoke` with `--launch smoke`
 and adding a run ID remains prohibited until the owner explicitly authorizes
 that exact one-run smoke.
+
+## Readiness result
+
+The exact command above returned `ready_for_smoke` from a clean worktree at
+implementation/documentation commit `0e38e0ece88b2cca676363a9147e312d302048d0`.
+Every reported error and unresolved-decision list was empty. The preflight
+verified the exact runtime, two-process deterministic probe, corrected Malom,
+masked HumanDB policy, empty trusted SpecialistDB, MIF/rules identities, fresh
+checkpoint mode, disabled components, and absent output directory.
+
+This readiness result does not authorize replacing `--preflight smoke` with
+`--launch smoke`. Because this evidence paragraph itself changes the Git
+identity, the same read-only command must be rerun once more on the final
+evidence commit immediately before any separately authorized launch.
