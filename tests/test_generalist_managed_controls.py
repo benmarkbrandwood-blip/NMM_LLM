@@ -59,7 +59,7 @@ def test_parser_exposes_fixed_heuristic_node_budget() -> None:
     assert args.heuristic_node_budget == 25_000
 
 
-def test_parser_exposes_explicit_sanmill_referee_contract() -> None:
+def test_parser_exposes_explicit_sanmill_resource_schedule() -> None:
     args = trainer._build_argument_parser().parse_args(
         [
             "--referee-engine",
@@ -70,10 +70,12 @@ def test_parser_exposes_explicit_sanmill_referee_contract() -> None:
             "runtime",
             "--sanmill-node-ladder",
             "1000,5000",
+            "--sanmill-stage-games",
+            "10,20",
             "--sanmill-search-depth",
             "7",
             "--curriculum-advance-policy",
-            "disabled",
+            "fixed-resource",
             "--no-recovery",
         ]
     )
@@ -81,9 +83,80 @@ def test_parser_exposes_explicit_sanmill_referee_contract() -> None:
     assert args.referee_engine == "sanmill"
     assert args.opponent_engine == "sanmill"
     assert args.sanmill_node_ladder == (1_000, 5_000)
+    assert args.sanmill_stage_games == (10, 20)
     assert args.sanmill_search_depth == 7
-    assert args.curriculum_advance_policy == "disabled"
+    assert args.curriculum_advance_policy == "fixed-resource"
     assert args.no_recovery is True
+
+
+@pytest.mark.parametrize(
+    ("game_count", "expected_level"),
+    [
+        (0, 1),
+        (499, 1),
+        (500, 2),
+        (999, 2),
+        (1_000, 3),
+        (1_499, 3),
+        (1_500, 4),
+        (2_499, 4),
+        (2_500, 5),
+        (4_999, 5),
+    ],
+)
+def test_fixed_resource_schedule_uses_global_game_count(
+    game_count: int,
+    expected_level: int,
+) -> None:
+    stage_games = (500, 500, 500, 1_000, 2_500)
+
+    assert trainer._fixed_resource_level(game_count, stage_games) == expected_level
+
+
+def test_fixed_resource_schedule_selects_exact_resume_boundary() -> None:
+    """A checkpoint cursor at 500 must select level two after process restart."""
+    checkpoint_completed_games = 500
+
+    assert trainer._fixed_resource_transition_level(
+        1,
+        checkpoint_completed_games,
+        (500, 500, 500, 1_000, 2_500),
+    ) == 2
+
+
+def test_fixed_resource_schedule_rejects_corrupt_resumed_level() -> None:
+    with pytest.raises(RuntimeError, match="persisted curriculum level"):
+        trainer._fixed_resource_transition_level(
+            5,
+            500,
+            (500, 500, 500, 1_000, 2_500),
+        )
+
+
+def test_fixed_resource_schedule_never_samples_a_lower_level() -> None:
+    class NoSamplingExpected:
+        def random(self) -> float:
+            raise AssertionError("fixed-resource policy attempted random blending")
+
+        def randint(self, _start: int, _stop: int) -> int:
+            raise AssertionError("fixed-resource policy attempted a lower level")
+
+    assert trainer._opponent_resource_level(
+        5,
+        "fixed-resource",
+        NoSamplingExpected(),
+    ) == 5
+
+
+@pytest.mark.parametrize("game_count", [-1, 5_000])
+def test_fixed_resource_schedule_rejects_out_of_range_game_count(
+    game_count: int,
+) -> None:
+    with pytest.raises(ValueError, match="outside the resource schedule"):
+        trainer._fixed_resource_level(
+            game_count,
+            (500, 500, 500, 1_000, 2_500),
+        )
 
 
 def test_game_ai_rejects_mixed_time_and_node_budgets() -> None:

@@ -342,6 +342,7 @@ def validate_generalist_configuration(args: Any) -> None:
             "sanmill/sanmill engines"
         )
     sanmill_ladder = getattr(args, "sanmill_node_ladder", None)
+    sanmill_stage_games = getattr(args, "sanmill_stage_games", None)
     sanmill_depth = getattr(args, "sanmill_search_depth", None)
     if referee_engine == "sanmill":
         if not getattr(args, "sanmill_runtime", None):
@@ -359,15 +360,54 @@ def validate_generalist_configuration(args: Any) -> None:
             raise PreflightConfigurationError(
                 "sanmill_node_ladder must contain exactly diff_max budgets"
             )
-        if args.curriculum_advance_policy != "disabled":
+        if args.curriculum_advance_policy not in {"disabled", "fixed-resource"}:
             raise PreflightConfigurationError(
                 "the initial Sanmill lineage must disable the uncalibrated "
                 "legacy advancement gate"
             )
-        if args.diff_max != 1:
-            raise PreflightConfigurationError(
-                "the initial Sanmill lineage supports one fixed-work level"
-            )
+        if args.curriculum_advance_policy == "disabled":
+            if sanmill_stage_games is not None:
+                raise PreflightConfigurationError(
+                    "disabled Sanmill curriculum must not specify "
+                    "sanmill_stage_games"
+                )
+            if args.diff_max != 1:
+                raise PreflightConfigurationError(
+                    "disabled Sanmill curriculum supports one fixed-work level"
+                )
+        else:
+            if not sanmill_stage_games:
+                raise PreflightConfigurationError(
+                    "fixed-resource curriculum requires sanmill_stage_games"
+                )
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value <= 0
+                for value in sanmill_stage_games
+            ):
+                raise PreflightConfigurationError(
+                    "sanmill_stage_games must contain positive integers"
+                )
+            if len(sanmill_stage_games) != args.diff_max:
+                raise PreflightConfigurationError(
+                    "sanmill_stage_games must contain exactly diff_max durations"
+                )
+            if sum(sanmill_stage_games) != args.max_games:
+                raise PreflightConfigurationError(
+                    "sanmill_stage_games must sum to max_games"
+                )
+            if any(
+                right <= left
+                for left, right in zip(sanmill_ladder, sanmill_ladder[1:])
+            ):
+                raise PreflightConfigurationError(
+                    "fixed-resource Sanmill node ceilings must be strictly increasing"
+                )
+            if args.diff_start not in {None, 1}:
+                raise PreflightConfigurationError(
+                    "fixed-resource curriculum must start at level one"
+                )
         if sanmill_depth is not None:
             _positive_integer(sanmill_depth, field="sanmill_search_depth")
         if heuristic_node_budget is not None or time_budget != -1:
@@ -386,7 +426,12 @@ def validate_generalist_configuration(args: Any) -> None:
             raise PreflightConfigurationError(
                 "the initial Sanmill lineage does not support branch rollouts"
             )
-    elif sanmill_ladder is not None or sanmill_depth is not None:
+    elif (
+        sanmill_ladder is not None
+        or sanmill_stage_games is not None
+        or sanmill_depth is not None
+        or args.curriculum_advance_policy == "fixed-resource"
+    ):
         raise PreflightConfigurationError(
             "Sanmill search settings require the Sanmill engine pair"
         )
@@ -949,9 +994,43 @@ def run_generalist_preflight(
             )
         if args.seed != 42:
             errors.append("Sanmill fresh lineage requires seed 42")
+        if args.curriculum_advance_policy == "fixed-resource":
+            expected_ladder = (1_000, 5_000, 25_000, 100_000, 500_000)
+            if tuple(args.sanmill_node_ladder) != expected_ladder:
+                errors.append(
+                    "Sanmill fresh lineage fixed-resource node ladder differs "
+                    "from the frozen curriculum"
+                )
+            if mode == "smoke":
+                expected_stages = (1, 1, 1, 1, 1)
+                if tuple(args.sanmill_stage_games) != expected_stages:
+                    errors.append(
+                        "Sanmill resource-schedule smoke requires one game per level"
+                    )
+                if args.max_games != 5 or args.self_play_ratio != 0:
+                    errors.append(
+                        "Sanmill resource-schedule smoke requires max_games=5 "
+                        "and self_play_ratio=0"
+                    )
+            else:
+                expected_stages = (500, 500, 500, 1_000, 2_500)
+                if tuple(args.sanmill_stage_games) != expected_stages:
+                    errors.append(
+                        "Sanmill long run differs from the frozen resource durations"
+                    )
+                if args.max_games != 5_000:
+                    errors.append(
+                        "Sanmill long run requires the frozen 5000-game schedule"
+                    )
     if mode == "smoke":
         bounded_games = getattr(args, "segment_games", None) or args.max_games
-        if bounded_games not in {1, 2}:
+        resource_schedule_smoke = (
+            args.curriculum_advance_policy == "fixed-resource"
+            and bounded_games == 5
+            and args.max_games == 5
+            and tuple(args.sanmill_stage_games or ()) == (1, 1, 1, 1, 1)
+        )
+        if bounded_games not in {1, 2} and not resource_schedule_smoke:
             errors.append("smoke preflight requires a one- or two-game segment")
         if args.batch_games != 1:
             errors.append("smoke preflight requires batch_games=1")

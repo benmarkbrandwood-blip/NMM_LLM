@@ -255,9 +255,60 @@ def _enable_sanmill_contract(args, runtime: Path) -> None:
     args.diff_max = 1
     args.curriculum_advance_policy = "disabled"
     args.sanmill_node_ladder = (1_000,)
+    args.sanmill_stage_games = None
     args.sanmill_search_depth = None
     args.minimal_rollouts = True
     args.no_recovery = True
+
+
+def test_configuration_accepts_fixed_sanmill_resource_schedule(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    args.max_games = 5_000
+    args.diff_max = 5
+    args.curriculum_advance_policy = "fixed-resource"
+    args.sanmill_node_ladder = (1_000, 5_000, 25_000, 100_000, 500_000)
+    args.sanmill_stage_games = (500, 500, 500, 1_000, 2_500)
+
+    validate_generalist_configuration(args)
+
+
+@pytest.mark.parametrize(
+    ("stage_games", "message"),
+    [
+        (None, "requires sanmill_stage_games"),
+        ((500, 500), "exactly diff_max"),
+        ((500, 500, 500, 1_000, 2_499), "must sum to max_games"),
+    ],
+)
+def test_configuration_rejects_invalid_sanmill_resource_schedule(
+    tmp_path: Path,
+    stage_games,
+    message: str,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    args.max_games = 5_000
+    args.diff_max = 5
+    args.curriculum_advance_policy = "fixed-resource"
+    args.sanmill_node_ladder = (1_000, 5_000, 25_000, 100_000, 500_000)
+    args.sanmill_stage_games = stage_games
+
+    with pytest.raises(PreflightConfigurationError, match=message):
+        validate_generalist_configuration(args)
+
+
+def test_configuration_rejects_resource_schedule_on_local_route(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.curriculum_advance_policy = "fixed-resource"
+    args.sanmill_stage_games = (1,)
+
+    with pytest.raises(PreflightConfigurationError, match="Sanmill engine pair"):
+        validate_generalist_configuration(args)
 
 
 def test_configuration_requires_paired_fail_closed_sanmill_controls(
@@ -318,6 +369,49 @@ def test_sanmill_smoke_preflight_binds_runtime_identity(
     assert report["checks"]["sanmill_training"]["identity"] == runtime_identity
     assert report["checks"]["components"]["referee_engine"] == "sanmill"
     assert report["experimentDigest"]
+
+
+def test_sanmill_resource_schedule_smoke_is_bounded_and_ready(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.experiment_id = "dev-v4-sanmill-refereed-fresh-v1"
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    args.max_games = 5
+    args.segment_games = 5
+    args.self_play_ratio = 0.0
+    args.diff_max = 5
+    args.curriculum_advance_policy = "fixed-resource"
+    args.sanmill_node_ladder = (1_000, 5_000, 25_000, 100_000, 500_000)
+    args.sanmill_stage_games = (1, 1, 1, 1, 1)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+
+    monkeypatch.setattr(
+        preflight_module,
+        "probe_sanmill_training_runtime",
+        lambda *_args, **_kwargs: {
+            "identity": "b" * 64,
+            "commit": "a" * 40,
+            "binary_sha256": "c" * 64,
+            "strict_referee": {"semanticDigest": "sha256:" + "d" * 64},
+            "probe": {"deterministic": True},
+        },
+    )
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={"sanmill_runtime": "cli"},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_smoke"
+    assert report["errors"] == []
+    assert report["resolved_config"]["sanmill_stage_games"] == [1, 1, 1, 1, 1]
 
 
 def test_segment_boundary_does_not_change_resume_semantics(tmp_path: Path) -> None:

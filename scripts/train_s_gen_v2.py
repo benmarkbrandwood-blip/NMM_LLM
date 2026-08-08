@@ -224,6 +224,62 @@ def _specialist_time_budget(level: int) -> float:
     return 0.5 * (40.0 ** ((level - 1) / 19.0))
 
 
+def _fixed_resource_level(
+    game_count: int,
+    stage_games: tuple[int, ...],
+) -> int:
+    """Return the one-based resource level for a global scheduled game."""
+    if isinstance(game_count, bool) or not isinstance(game_count, int):
+        raise ValueError("game_count must be an integer")
+    boundary = 0
+    for level, duration in enumerate(stage_games, start=1):
+        if (
+            isinstance(duration, bool)
+            or not isinstance(duration, int)
+            or duration <= 0
+        ):
+            raise ValueError("resource stage durations must be positive integers")
+        boundary += duration
+        if 0 <= game_count < boundary:
+            return level
+    raise ValueError(
+        f"game_count {game_count} is outside the resource schedule"
+    )
+
+
+def _opponent_resource_level(
+    difficulty: int,
+    policy: str,
+    rng: random.Random,
+) -> int:
+    """Select opponent work without blending a fixed resource schedule."""
+    if policy == "legacy-score" and difficulty > 1 and rng.random() < 0.15:
+        return rng.randint(1, difficulty - 1)
+    return difficulty
+
+
+def _fixed_resource_transition_level(
+    current_level: int,
+    game_count: int,
+    stage_games: tuple[int, ...],
+) -> int:
+    """Validate persisted level state and return the scheduled next level."""
+    scheduled_level = _fixed_resource_level(game_count, stage_games)
+    allowed_levels = {scheduled_level}
+    stage_start = sum(stage_games[: scheduled_level - 1])
+    if scheduled_level > 1 and game_count == stage_start:
+        # A segment-final checkpoint is saved after the last game of the old
+        # level and transitions on the next loop, just like uninterrupted work.
+        allowed_levels.add(scheduled_level - 1)
+    if current_level not in allowed_levels:
+        raise RuntimeError(
+            "persisted curriculum level disagrees with the fixed resource "
+            f"schedule at game {game_count}: current={current_level}, "
+            f"allowed={sorted(allowed_levels)}"
+        )
+    return scheduled_level
+
+
 def _build_history_features(history: deque, n: int = 3) -> np.ndarray:
     """Encode the last n moves as normalised position indices (-1 if absent)."""
     feats = np.full(n * HIST_FLOATS_PER_MOVE, -1.0, dtype=np.float32)
@@ -2307,6 +2363,23 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             game_count, args.max_games, args.temp_start
         )
 
+        if args.curriculum_advance_policy == "fixed-resource":
+            scheduled_difficulty = _fixed_resource_transition_level(
+                difficulty,
+                game_count,
+                args.sanmill_stage_games,
+            )
+            if scheduled_difficulty != difficulty:
+                previous_difficulty = difficulty
+                difficulty = scheduled_difficulty
+                games_at_level = 0
+                print(
+                    f"[s_gen_v2] Resource schedule transition at game "
+                    f"{game_count}: level {previous_difficulty} -> "
+                    f"{difficulty}, nodes="
+                    f"{args.sanmill_node_ladder[difficulty - 1]}"
+                )
+
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
             games_since_target_update = 0
@@ -2330,9 +2403,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             if config_rng.random() < args.self_play_ratio:
                 _opp, _gt, _gd = frozen_opp, "vs_frozen", difficulty
             else:
-                _gd = difficulty
-                if difficulty > 1 and config_rng.random() < 0.15:
-                    _gd = config_rng.randint(1, difficulty - 1)
+                _gd = _opponent_resource_level(
+                    difficulty,
+                    args.curriculum_advance_policy,
+                    config_rng,
+                )
                 if args.opponent_engine == "sanmill":
                     _opp = _SanmillOpponentSpec(
                         node_budget=args.sanmill_node_ladder[_gd - 1],
@@ -3090,11 +3165,12 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)
     p.add_argument(
         "--curriculum-advance-policy",
-        choices=("legacy-score", "disabled"),
+        choices=("legacy-score", "fixed-resource", "disabled"),
         default="legacy-score",
         help=(
             "Difficulty transition rule; fresh Sanmill integration disables "
-            "the uncalibrated legacy score gate"
+            "the uncalibrated legacy score gate and may use a deterministic "
+            "global-game resource schedule"
         ),
     )
     p.add_argument(
@@ -3133,6 +3209,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         type=_positive_integer_ladder,
         default=None,
         help="Comma-separated fixed node budgets, one per curriculum level",
+    )
+    p.add_argument(
+        "--sanmill-stage-games",
+        type=_positive_integer_ladder,
+        default=None,
+        help=(
+            "Comma-separated game counts for --curriculum-advance-policy "
+            "fixed-resource; one positive duration per node level"
+        ),
     )
     p.add_argument(
         "--sanmill-search-depth",
