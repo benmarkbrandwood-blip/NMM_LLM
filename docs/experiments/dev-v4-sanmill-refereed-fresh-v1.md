@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `smoke_002_and_engine_calibration_completed_probe_unfrozen`
+Status: `node_ladder_proposed_integrated_probe_pending`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -278,3 +278,11 @@ binds its ignored raw output. That calibration did not load a model or
 trainer and did not select a node ladder automatically. Its authority is
 consumed. A node-ladder decision and any no-update integrated-route probe
 remain separate, unauthorised gates.
+
+The subsequent
+[node-ladder decision brief](sanmill-node-ladder-v1-decision-brief.md)
+recommends retaining the five measured ceilings
+`1,000 -> 5,000 -> 25,000 -> 100,000 -> 500,000` as a probe-only resource
+matrix. It does not identify five proven strength levels, select an
+advancement rule, change the trainer's current one-level preflight, or
+authorize execution.

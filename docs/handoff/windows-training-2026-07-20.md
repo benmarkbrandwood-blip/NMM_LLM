@@ -91,6 +91,17 @@ measurement. The
 binds the ignored raw report and its claim boundary. It loads no model,
 trainer, checkpoint, or database and does not select a node ladder.
 
+The resulting
+[node-ladder decision brief](../experiments/sanmill-node-ladder-v1-decision-brief.md)
+now recommends the five measured ceilings
+`1,000 -> 5,000 -> 25,000 -> 100,000 -> 500,000` as a probe-only resource
+matrix. Across the seven non-empty roots their warm completed-depth medians
+were 4, 7, 9, 11, and 13. This is not strength evidence. The current trainer
+still fails closed unless the Sanmill lineage uses one fixed work level and
+disabled advancement, so the five-level proposal cannot be launched as a
+training curriculum. Its acceptance and any later progression schedule remain
+owner decisions.
+
 The focused calibration and current training-referee group reported 13 passed;
 Ruff and `git diff --check` pass. A broader historical bridge run reports 52
 passed and the same four known fail-closed moving-checkout pin failures from
