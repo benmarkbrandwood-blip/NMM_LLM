@@ -1,0 +1,220 @@
+{
+  "checkpoint_state": {
+    "game_count": 5000,
+    "model_config": {
+      "dropout": 0.0,
+      "move_feat_dim": 134,
+      "policy_hidden": [
+        256,
+        128
+      ],
+      "value_hidden": [
+        256,
+        128,
+        64
+      ],
+      "value_input_dim": 80
+    },
+    "target_games_since_update": 50,
+    "temperature": 0.20000000000000007,
+    "update_count": 1134
+  },
+  "evidence_id": "1b8cf2b6d85dfa21c05fb7d098fe4249358a21518439c08a3e8602a517f184dc",
+  "fixed_state_diagnostic": {
+    "candidate": {
+      "argmax_malom_quality_counts": {
+        "-1": 20,
+        "-2": 7,
+        "0": 37
+      },
+      "metrics": {
+        "all": {
+          "critical_argmax_value_preserving_rate": 0.06896551724137931,
+          "critical_expected_malom_quality_scheduled": -1.0801637403292,
+          "critical_expected_malom_quality_temp1": -0.7998498865973416,
+          "critical_mean_preserving_minus_downgrading_logit": -0.7303871841266237,
+          "critical_states": 29,
+          "critical_value_preserving_probability_mass_scheduled": 0.11384220436581206,
+          "critical_value_preserving_probability_mass_temp1": 0.28708731029824963,
+          "heuristic_top1_agreement": 0.4375,
+          "known_argmax_states": 64,
+          "mean_argmax_malom_quality": -0.53125,
+          "mean_entropy_scheduled": 2.0867552417330444,
+          "mean_entropy_temp1": 2.858105830848217,
+          "mean_scheduled_known_malom_probability_mass": 0.9999999841675162,
+          "states": 64
+        },
+        "flying": {
+          "critical_argmax_value_preserving_rate": 0.0,
+          "critical_expected_malom_quality_scheduled": -1.158275657219799,
+          "critical_expected_malom_quality_temp1": -0.8700695390340561,
+          "critical_mean_preserving_minus_downgrading_logit": -1.0137505332628887,
+          "critical_states": 6,
+          "critical_value_preserving_probability_mass_scheduled": 0.008104006309319326,
+          "critical_value_preserving_probability_mass_temp1": 0.19571936130523682,
+          "heuristic_top1_agreement": 0.5238095238095238,
+          "known_argmax_states": 21,
+          "mean_argmax_malom_quality": -0.3333333333333333,
+          "mean_entropy_scheduled": 2.6742606333323886,
+          "mean_entropy_temp1": 3.671220858891805,
+          "mean_scheduled_known_malom_probability_mass": 0.9999999829701015,
+          "states": 21
+        },
+        "movement": {
+          "critical_argmax_value_preserving_rate": 0.125,
+          "critical_expected_malom_quality_scheduled": -0.9716623349836346,
+          "critical_expected_malom_quality_temp1": -0.6352828991080175,
+          "critical_mean_preserving_minus_downgrading_logit": -0.4182337149977684,
+          "critical_states": 8,
+          "critical_value_preserving_probability_mass_scheduled": 0.22379301103501348,
+          "critical_value_preserving_probability_mass_temp1": 0.44634357700124383,
+          "heuristic_top1_agreement": 0.47619047619047616,
+          "known_argmax_states": 21,
+          "mean_argmax_malom_quality": -0.42857142857142855,
+          "mean_entropy_scheduled": 1.6321511013167245,
+          "mean_entropy_temp1": 2.1962567397526334,
+          "mean_scheduled_known_malom_probability_mass": 1.0,
+          "states": 21
+        },
+        "placement": {
+          "critical_argmax_value_preserving_rate": 0.06666666666666667,
+          "critical_expected_malom_quality_scheduled": -1.1067863897572616,
+          "critical_expected_malom_quality_temp1": -0.8595310856169618,
+          "critical_mean_preserving_minus_downgrading_logit": -0.783523694674174,
+          "critical_states": 15,
+          "critical_value_preserving_probability_mass_scheduled": 0.09749705336483507,
+          "critical_value_preserving_probability_mass_temp1": 0.23869781432052453,
+          "heuristic_top1_agreement": 0.3181818181818182,
+          "known_argmax_states": 22,
+          "mean_argmax_malom_quality": -0.8181818181818182,
+          "mean_entropy_scheduled": 1.9598949565128847,
+          "mean_entropy_temp1": 2.7137156183069404,
+          "mean_scheduled_known_malom_probability_mass": 0.9999999701976776,
+          "states": 22
+        }
+      }
+    },
+    "design": "candidate and reconstructed scratch weights on the same 64 fixed positions, final target, production feature route, and read-only data identities",
+    "direct_lookahead_signal": {
+      "argmax_value_preserving_rate": 1.0,
+      "candidate_rows": 1583,
+      "critical_states": 29,
+      "mean_preserving_minus_downgrading_signal": 0.5
+    },
+    "malom_move_quality_counts": {
+      "-1": 384,
+      "-2": 31,
+      "0": 1168
+    },
+    "scratch": {
+      "argmax_malom_quality_counts": {
+        "-1": 8,
+        "-2": 1,
+        "0": 55
+      },
+      "metrics": {
+        "all": {
+          "critical_argmax_value_preserving_rate": 0.6896551724137931,
+          "critical_expected_malom_quality_scheduled": -0.6908374731258542,
+          "critical_expected_malom_quality_temp1": -0.6908375058447352,
+          "critical_mean_preserving_minus_downgrading_logit": 5.4067172195298804e-08,
+          "critical_states": 29,
+          "critical_value_preserving_probability_mass_scheduled": 0.36758316545907793,
+          "critical_value_preserving_probability_mass_temp1": 0.36758314182275326,
+          "heuristic_top1_agreement": 0.03125,
+          "known_argmax_states": 64,
+          "mean_argmax_malom_quality": -0.15625,
+          "mean_entropy_scheduled": 2.9755030386149883,
+          "mean_entropy_temp1": 2.9755030497908592,
+          "mean_scheduled_known_malom_probability_mass": 0.9999999860301614,
+          "states": 64
+        },
+        "flying": {
+          "critical_argmax_value_preserving_rate": 0.6666666666666666,
+          "critical_expected_malom_quality_scheduled": -0.6726371773722565,
+          "critical_expected_malom_quality_temp1": -0.6726371864960701,
+          "critical_mean_preserving_minus_downgrading_logit": 4.557999962647349e-08,
+          "critical_states": 6,
+          "critical_value_preserving_probability_mass_scheduled": 0.3366220938041806,
+          "critical_value_preserving_probability_mass_temp1": 0.3366220894580086,
+          "heuristic_top1_agreement": 0.047619047619047616,
+          "known_argmax_states": 21,
+          "mean_argmax_malom_quality": -0.09523809523809523,
+          "mean_entropy_scheduled": 3.8285214673905146,
+          "mean_entropy_temp1": 3.828521410624186,
+          "mean_scheduled_known_malom_probability_mass": 0.9999999772934687,
+          "states": 21
+        },
+        "movement": {
+          "critical_argmax_value_preserving_rate": 0.875,
+          "critical_expected_malom_quality_scheduled": -0.5323866179714447,
+          "critical_expected_malom_quality_temp1": -0.5323866733321203,
+          "critical_mean_preserving_minus_downgrading_logit": 7.560798032102412e-08,
+          "critical_states": 8,
+          "critical_value_preserving_probability_mass_scheduled": 0.5206902986392379,
+          "critical_value_preserving_probability_mass_temp1": 0.5206902651116252,
+          "heuristic_top1_agreement": 0.047619047619047616,
+          "known_argmax_states": 21,
+          "mean_argmax_malom_quality": -0.047619047619047616,
+          "mean_entropy_scheduled": 2.279078563054403,
+          "mean_entropy_temp1": 2.279078642527262,
+          "mean_scheduled_known_malom_probability_mass": 0.999999980131785,
+          "states": 21
+        },
+        "placement": {
+          "critical_argmax_value_preserving_rate": 0.6,
+          "critical_expected_malom_quality_scheduled": -0.7826247141763115,
+          "critical_expected_malom_quality_temp1": -0.7826247442575958,
+          "critical_mean_preserving_minus_downgrading_logit": 4.59736102224421e-08,
+          "critical_states": 15,
+          "critical_value_preserving_probability_mass_scheduled": 0.2983104564249516,
+          "critical_value_preserving_probability_mass_temp1": 0.2983104303479195,
+          "heuristic_top1_agreement": 0.0,
+          "known_argmax_states": 22,
+          "mean_argmax_malom_quality": -0.3181818181818182,
+          "mean_entropy_scheduled": 2.8260269923643633,
+          "mean_entropy_temp1": 2.8260270032015713,
+          "mean_scheduled_known_malom_probability_mass": 1.0,
+          "states": 22
+        }
+      }
+    }
+  },
+  "identities": {
+    "checkpoint": "learned_ai/checkpoints/scaffolded/s_gen_v2_sanmill_refereed/managed-sanmill-v4-fresh-v1/segments/segment-0020/latest.pt",
+    "checkpoint_asset_identities": {
+      "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+      "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+      "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+      "sanmill_training_runtime": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+      "source_checkpoint": "d9722311284f92d50e44f632ebb73c24948166da52a122a41a02aa4aaee50776",
+      "specialist_db": "167f56afab2249e206738f1811a8da200f89340a0a2fd44622c174f0c45ddd8c",
+      "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+    },
+    "checkpoint_id": "managed-sanmill-v4-fresh-v1-segment-0020:checkpoint:00000006",
+    "checkpoint_sha256": "82971abe6393b64316752d58b38ca2b5be8a765704b7261c3e0d956027416ea7",
+    "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+    "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+    "experiment_id": "dev-v4-sanmill-refereed-fresh-v1",
+    "git_commit": "3a4fdd1b10a559287f6901baf63d5772cf231a22",
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_sha256": "d8e22da38273f7c26eb76803ae91fc3fae711f508383ffbe3096c2946912b440",
+    "malom_manifest": "data/manifests/malom-sector-corrected-v1.json",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "malom_manifest_sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "malom_std_secval_sha256": "5078bf84505fe2845a4af7c36907efa2d66b2eb76f149ce12faa248117405b68",
+    "paths_config_sha256": "8ef14b31a37a2844d7d2318acd8d5b48a470131597a4858339329d932abad0a4",
+    "run_id": "managed-sanmill-v4-fresh-v1-segment-0020",
+    "specialist_db": "data/specialist_db.sanmill_refereed_fresh_v1.long.sqlite",
+    "specialist_db_sha256": "167f56afab2249e206738f1811a8da200f89340a0a2fd44622c174f0c45ddd8c"
+  },
+  "schema_version": "nmm.generalist-policy-health.v1",
+  "scope": {
+    "diagnostic_only": true,
+    "draft_phase_corpus_is_not_formal_evaluation": true,
+    "no_checkpoint_writes": true,
+    "no_database_writes": true,
+    "no_model_updates": true,
+    "no_strength_or_promotion_claim": true
+  }
+}
