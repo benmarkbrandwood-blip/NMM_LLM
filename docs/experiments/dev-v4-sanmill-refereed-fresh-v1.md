@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `smoke_001_failed_smoke_002_ready_for_final_preflight`
+Status: `smoke_002_completed_calibration_pending`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -191,15 +191,15 @@ Repair commit `4e734e4a3105b1a590fbb11ab13c3197cb6a9fce` makes terminal
 projection explicit while retaining Sanmill's structured state as outcome
 authority. It does not change gameplay, search, or training objectives.
 
-## Proposed smoke-002 preflight
+## Smoke-002 launch contract
 
 The ignored retry SpecialistDB
 `data/specialist_db.sanmill_refereed_fresh_v1.smoke-002.sqlite` is empty,
 passes `quick_check`, carries `sector-corrected-v1`, and has no lineage
 binding. Its initial SHA-256 is
 `5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`.
-The proposed retry output does not exist. After the repair and evidence are
-committed, the read-only command to review is:
+The proposed retry output did not exist. After the repair and readiness
+evidence were committed, the read-only command reviewed was:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
@@ -240,9 +240,9 @@ The 1,000-node level is only an integration-smoke workload. It is not a
 strength baseline or a proposed retained-run curriculum. With seed 42 and a
 0.60 frozen-target ratio, the two scheduled primary games deterministically
 cover one Sanmill-search opponent game and one frozen-target game, while
-Sanmill referees both. Replacing `--preflight smoke` with `--launch smoke`
-and adding run ID `sanmill-refereed-fresh-v1-smoke-002` remains prohibited
-until the owner explicitly authorizes that exact one-run retry.
+Sanmill referees both. The owner later authorised exactly one replacement of
+`--preflight smoke` with `--launch smoke` plus run ID
+`sanmill-refereed-fresh-v1-smoke-002`. That one-run authority is now consumed.
 
 ## Readiness result
 
@@ -255,8 +255,17 @@ decisions at clean commit `d7d6e4dbc22f95c79280ef05c93c8eb8e0a03167`. The
 [readiness record](../evidence/sanmill-refereed-fresh-v1-smoke-002-readiness-2026-08-08.md)
 owns its identities and claim boundary.
 
-Because that evidence record changes the Git identity, the command must be run
-once more from the final clean evidence commit before publication and any
-launch request. Even a passing result will not authorize replacing
-`--preflight smoke` with `--launch smoke`; the retry requires a new explicit
-one-run authorization.
+Because that evidence record changed the Git identity, the command was run
+once more from clean published commit
+`894360d11fc309e5aa58e3289d1c6817831a553c`. It again returned
+`ready_for_smoke` with no errors or unresolved decisions. The separately
+authorised launch then completed both games, one finite optimiser update, a
+verified final checkpoint, and a completed lifecycle chain. The
+[smoke-002 result](../evidence/sanmill-refereed-fresh-v1-smoke-002-result-2026-08-08.md)
+owns all raw identities and the claim boundary.
+
+The smoke passes only the integration gate. Its single Sanmill-opponent game
+and 1,000-node ceiling are not representative throughput evidence. No further
+smoke, exact resume, long run, node ladder, or advancement rule is authorised.
+A separate non-training fixed-position node-throughput calibration is the next
+safe preparation step.

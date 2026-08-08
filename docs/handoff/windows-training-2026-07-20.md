@@ -50,11 +50,15 @@ counted game, optimiser update, checkpoint, or training log was produced.
 Commit `4e734e4a3105b1a590fbb11ab13c3197cb6a9fce` repairs that terminal-only
 projection boundary and adds the exact 43-logical-ply regression. The failed
 output and its subsequently diagnostic-written SpecialistDB are quarantined;
-the one-run authorization is consumed. A separate empty `smoke-002` database
-is prepared, and its first clean read-only preflight returned
-`ready_for_smoke`; a final evidence-commit preflight and explicit new launch
-authorization are still required. No retry or long run is authorized. The
-node ladder, throughput envelope, and later advancement rule remain unfrozen.
+the first one-run authorization is consumed. The separately authorized
+`smoke-002` then ran from clean published commit `894360d`, after its final
+preflight again returned `ready_for_smoke`. It completed both scheduled games,
+one finite 47-step A2C update, a verified version-2 `latest.pt`, and a valid
+completed lifecycle chain. Its isolated corrected database now contains 94
+positions and one winning line and is retained as completed smoke evidence,
+not a fresh input. The second one-run authorization is consumed. No retry or
+long run is authorized. The node ladder, representative throughput envelope,
+and later advancement rule remain unfrozen.
 See the
 [fresh Sanmill experiment contract](../experiments/dev-v4-sanmill-refereed-fresh-v1.md).
 The terminal repair verification reports 182 trainer, launch, checkpoint,
@@ -67,6 +71,10 @@ owns the raw identities and diagnostic-side-effect boundary. A new full
 `tests/` run collected 1,246 tests and reached approximately 16% with no
 failure before the 15-minute command limit, so this work does not replace or
 upgrade the separately recorded 7 August complete-suite baseline.
+The
+[smoke-002 result](../evidence/sanmill-refereed-fresh-v1-smoke-002-result-2026-08-08.md)
+owns the successful launch identities and explicitly excludes its two games
+from node-ladder, strength, and retained-run throughput claims.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
 23 July 2026 with protocol decision **`accepted`**. Expert review had rejected
