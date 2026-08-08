@@ -13,6 +13,10 @@ from learned_ai.validation import sanmill_route_probe as probe
 
 
 _ROOT = Path(__file__).resolve().parents[1]
+_TRACKED_PLAN = (
+    _ROOT
+    / "docs/experiments/sanmill-no-update-integrated-route-continuation-v1.json"
+)
 
 
 def _payload() -> dict:
@@ -56,6 +60,22 @@ def _payload() -> dict:
 
 def _write(payload: dict, path: Path) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_tracked_continuation_plan_binds_remaining_parent_schedule() -> None:
+    loaded = continuation.load_probe_continuation_plan(_TRACKED_PLAN)
+    effective = continuation.continuation_probe_plan(loaded)
+
+    assert loaded.identity == (
+        "807fcae96ee03634d5abb61b9982fcfaf364b07ab1c139142ad8cc1cffdadb08"
+    )
+    assert loaded.raw_sha256 == (
+        "b10ba116f43468567f053ef965d72371cc570ea999bbd00234c5aa284ad6ad75"
+    )
+    assert [game.scheduled_index for game in effective.schedule] == list(
+        range(7, 36)
+    )
+    assert effective.payload["bounded_work"] == _payload()["bounded_work"]
 
 
 def test_continuation_preserves_parent_indices_and_bounds(tmp_path: Path) -> None:
