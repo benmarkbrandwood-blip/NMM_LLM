@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `ready_for_explicitly_authorized_smoke`
+Status: `smoke_001_failed_retry_preflight_pending`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -155,8 +155,8 @@ reviewed:
 7. exact-resume equivalence across a process boundary; and
 8. bounded throughput and resource measurements on the intended Windows host.
 
-No training command is currently authorized. A later smoke must use a new
-disposable output directory and SpecialistDB, and its one-run authorization
+No further training command is currently authorized. A later smoke must use a
+new disposable output directory and SpecialistDB, and its one-run authorization
 must be recorded separately.
 
 The implementation-focused baseline currently records:
@@ -174,13 +174,32 @@ The 1,246-test full suite did not complete within a 15-minute command bound;
 it reached approximately 16% without a failure. Therefore only the focused
 results above are claimed for this implementation change.
 
-## Provisional clean-commit preflight
+## Smoke-001 failure
 
-The ignored disposable SpecialistDB
-`data/specialist_db.sanmill_refereed_fresh_v1.smoke.sqlite` has been created
-empty with `sector-corrected-v1` metadata and no lineage binding. The output
-path below does not yet exist. After the implementation is committed on
-`dev`, the reviewed read-only command is:
+The owner-authorised `sanmill-refereed-fresh-v1-smoke-001` launch failed
+closed during its first primary game at clean published commit `aeac29c`. A
+valid Sanmill `game_over` FEN used raw action `?`, while NMM_LLM incorrectly
+routed it through a projector limited to placing and moving actions. The run
+produced no completed game, optimiser update, checkpoint, training log, or
+update log. Its output and SpecialistDB are quarantined, and the one-run
+authorisation is consumed.
+
+The complete identities, database audit, diagnostic side effect, repair, and
+claim boundary are recorded in the
+[smoke-001 failure evidence](../evidence/sanmill-refereed-fresh-v1-smoke-001-failure-2026-08-08.md).
+Repair commit `4e734e4a3105b1a590fbb11ab13c3197cb6a9fce` makes terminal
+projection explicit while retaining Sanmill's structured state as outcome
+authority. It does not change gameplay, search, or training objectives.
+
+## Proposed smoke-002 preflight
+
+The ignored retry SpecialistDB
+`data/specialist_db.sanmill_refereed_fresh_v1.smoke-002.sqlite` is empty,
+passes `quick_check`, carries `sector-corrected-v1`, and has no lineage
+binding. Its initial SHA-256 is
+`5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`.
+The proposed retry output does not exist. After the repair and evidence are
+committed, the read-only command to review is:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\train_s_gen_v2.py `
@@ -188,8 +207,8 @@ path below does not yet exist. After the implementation is committed on
   --paths-config data\training_paths.local.json `
   --experiment-id dev-v4-sanmill-refereed-fresh-v1 `
   --start-mode fresh `
-  --out-dir out\sanmill-refereed-fresh-v1-smoke-001 `
-  --specialist-db data\specialist_db.sanmill_refereed_fresh_v1.smoke.sqlite `
+  --out-dir out\sanmill-refereed-fresh-v1-smoke-002 `
+  --specialist-db data\specialist_db.sanmill_refereed_fresh_v1.smoke-002.sqlite `
   --referee-engine sanmill `
   --opponent-engine sanmill `
   --sanmill-node-ladder 1000 `
@@ -222,19 +241,17 @@ strength baseline or a proposed retained-run curriculum. With seed 42 and a
 0.60 frozen-target ratio, the two scheduled primary games deterministically
 cover one Sanmill-search opponent game and one frozen-target game, while
 Sanmill referees both. Replacing `--preflight smoke` with `--launch smoke`
-and adding a run ID remains prohibited until the owner explicitly authorizes
-that exact one-run smoke.
+and adding run ID `sanmill-refereed-fresh-v1-smoke-002` remains prohibited
+until the owner explicitly authorizes that exact one-run retry.
 
 ## Readiness result
 
-The exact command above returned `ready_for_smoke` from a clean worktree at
-implementation/documentation commit `0e38e0ece88b2cca676363a9147e312d302048d0`.
-Every reported error and unresolved-decision list was empty. The preflight
-verified the exact runtime, two-process deterministic probe, corrected Malom,
-masked HumanDB policy, empty trusted SpecialistDB, MIF/rules identities, fresh
-checkpoint mode, disabled components, and absent output directory.
+The historical smoke-001 command returned `ready_for_smoke` immediately before
+its launch, but the launch then exposed the terminal-projection defect above.
+That historical verdict is superseded and cannot authorize a retry.
 
-This readiness result does not authorize replacing `--preflight smoke` with
-`--launch smoke`. Because this evidence paragraph itself changes the Git
-identity, the same read-only command must be rerun once more on the final
-evidence commit immediately before any separately authorized launch.
+The smoke-002 command has not yet been run from the final evidence commit.
+After the tracked tree is clean and published, it must return a fresh
+`ready_for_smoke` verdict with no errors or unresolved decisions. Even a
+passing result will not authorize replacing `--preflight smoke` with
+`--launch smoke`; the retry requires a new explicit one-run authorization.

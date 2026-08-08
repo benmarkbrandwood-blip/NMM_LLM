@@ -43,12 +43,24 @@ and the uncalibrated local-GameAI advancement gate. Process-level tests cover
 cross-process search determinism, full logical turns with compulsory removal,
 illegal-action rejection, and an eight-ply learner/opponent rollout whose
 entire history is checked by Sanmill. This is implementation evidence only.
-No smoke or long run in the new lineage is authorized, and the node ladder,
+The separately authorized `smoke-001` then failed closed during its first
+game: Sanmill correctly emitted a game-over FEN with raw action `?`, but the
+NMM_LLM mirror called a projector limited to placing and moving states. No
+counted game, optimiser update, checkpoint, or training log was produced.
+Commit `4e734e4a3105b1a590fbb11ab13c3197cb6a9fce` repairs that terminal-only
+projection boundary and adds the exact 43-logical-ply regression. The failed
+output and its subsequently diagnostic-written SpecialistDB are quarantined;
+the one-run authorization is consumed. A separate empty `smoke-002` database
+is prepared, but no retry or long run is authorized. The node ladder,
 throughput envelope, and later advancement rule remain unfrozen. See the
 [fresh Sanmill experiment contract](../experiments/dev-v4-sanmill-refereed-fresh-v1.md).
-The current focused verification is 137 trainer/contract tests passed plus
-103 Malom and label-provenance tests with 498 parameterized subtests passed;
-Ruff and `git diff --check` also pass for the changed scope. A new full
+The terminal repair verification reports 182 trainer, launch, checkpoint,
+resume, bridge, and referee tests passed with six documented historical
+moving-checkout tests deselected, plus 103 Malom and label-provenance tests
+with 498 parameterized subtests passed. Ruff and `git diff --check` also pass
+for the changed scope. The
+[failure record](../evidence/sanmill-refereed-fresh-v1-smoke-001-failure-2026-08-08.md)
+owns the raw identities and diagnostic-side-effect boundary. A new full
 `tests/` run collected 1,246 tests and reached approximately 16% with no
 failure before the 15-minute command limit, so this work does not replace or
 upgrade the separately recorded 7 August complete-suite baseline.
