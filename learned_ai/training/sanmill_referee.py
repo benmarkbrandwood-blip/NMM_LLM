@@ -49,6 +49,15 @@ TRAINING_REPETITION_OBSERVATION = "stable-moving-v1"
 TRAINING_REFEREE_SEMANTIC_DIGEST = (
     "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94"
 )
+BOARD_MIRROR_DIAGNOSTIC_SCHEMA = "nmm.sanmill-board-mirror-diagnostic.v1"
+
+
+class SanmillBoardMirrorError(SanmillBridgeError):
+    """Fail-closed mirror mismatch with portable diagnostic context."""
+
+    def __init__(self, diagnostic: Mapping[str, Any]) -> None:
+        super().__init__("Sanmill and NMM board mirrors diverged")
+        self.diagnostic = dict(diagnostic)
 
 
 @contextmanager
@@ -370,7 +379,12 @@ class SanmillTrainingGame:
                 "training may observe only complete logical-turn boundaries"
             )
 
-    def assert_current_board(self, board: BoardState) -> None:
+    def assert_current_board(
+        self,
+        board: BoardState,
+        *,
+        transition: Mapping[str, Any] | None = None,
+    ) -> None:
         state = self.state
         self._require_training_state(state)
         projected = project_stable_sanmill_fen(
@@ -378,7 +392,22 @@ class SanmillTrainingGame:
             terminal=state.terminal,
         )
         if projected.to_fen_string() != board.to_fen_string():
-            raise SanmillBridgeError("Sanmill and NMM board mirrors diverged")
+            local_terminal, local_winner, local_reason = terminal_result(board)
+            raise SanmillBoardMirrorError(
+                {
+                    "schema_version": BOARD_MIRROR_DIAGNOSTIC_SCHEMA,
+                    "local_board_fen": board.to_fen_string(),
+                    "projected_board_fen": projected.to_fen_string(),
+                    "sanmill_state": state.portable_record(),
+                    "history_actions": list(self._history),
+                    "local_terminal": {
+                        "terminal": local_terminal,
+                        "winner": _winner_name(local_winner),
+                        "reason": local_reason,
+                    },
+                    "transition": dict(transition) if transition is not None else None,
+                }
+            )
 
         local_terminal, local_winner, _ = terminal_result(board)
         if local_terminal:
@@ -452,7 +481,18 @@ class SanmillTrainingGame:
                 raise SanmillBridgeError("Sanmill search/replay reason mismatch")
 
         self._state = state
-        self.assert_current_board(board.apply_move(normalised))
+        self.assert_current_board(
+            board.apply_move(normalised),
+            transition={
+                "move": dict(normalised),
+                "actions": list(actions),
+                "search": (
+                    search_result.semantic_record()
+                    if search_result is not None
+                    else None
+                ),
+            },
+        )
         return SanmillAppliedTurn(
             move=normalised,
             actions=actions,
