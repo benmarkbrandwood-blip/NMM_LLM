@@ -1,0 +1,68 @@
+{
+  "authorization_basis": "The product owner requested that the independent held-out evaluation plan and its authorization be frozen on 2026-08-09.",
+  "authorization_identity": "6426ffd109d28145a4148855d70a181d50fd4277068fe01b501934d212378fb1",
+  "authorized_by": "product-owner",
+  "authorized_on": "2026-08-09",
+  "claim_boundary": {
+    "full_mif_conformance": false,
+    "model_promotion": false,
+    "model_publication": false,
+    "multi_seed_stability": false,
+    "new_training": false,
+    "strength_claim_without_candidate_ahead": false
+  },
+  "consumption": {
+    "grant_count": 1,
+    "grant_status_at_freeze": "unconsumed_pending_runner_and_final_preflight",
+    "runtime_record_required": true,
+    "runtime_record_rule": "The grant is consumed when the first corpus game is opened for play or the candidate is asked for its first corpus move. A failed read-only preflight or synthetic canary does not consume it.",
+    "safe_resume_is_same_run": true
+  },
+  "decision_note": "Authorize exactly one 64-pair, 128-game retained-v2 held-out evaluation after the frozen runner and final preflight gates pass. Safe exact resume may complete only the missing suffix of that same run.",
+  "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+  "execution_scope": {
+    "active_evaluator_hours_ceiling": 6.0,
+    "candidate_games_ceiling": 128,
+    "launch_without_further_product_confirmation_after_all_gates_pass": true,
+    "pair_units": 64,
+    "permitted_before_consumption": [
+      "implement and test the exact frozen evaluator",
+      "generate readiness evidence without opening a corpus game",
+      "run synthetic and non-corpus canaries"
+    ],
+    "permitted_execution": [
+      "one complete evaluation under the exact frozen plan",
+      "safe exact resume of only the missing suffix after host interruption"
+    ],
+    "prohibited": [
+      "candidate or checkpoint substitution",
+      "corpus, pair count, role order or result-dependent subset changes",
+      "baseline, node ceiling, rules, referee or adjudication changes",
+      "threshold, interval or report-class changes",
+      "result-based early stopping",
+      "rerunning completed games or starting a second evaluation",
+      "new training, checkpoint promotion or model publication",
+      "resource expansion beyond the frozen ceiling"
+    ],
+    "unique_starts": 64
+  },
+  "plan": {
+    "commit": "106d015b23debee7d5c8d691195ff958da66f1fc",
+    "file_sha256": "06f168d1687557a9146455fae0a8174c7714b7dd864cfd5a1e2c383c26009b21",
+    "identity": "212076e9423b671b83783efef411db3b4a56c8c67ae36a463d381d6939d4d982",
+    "plan_id": "sanmill-corrected-retained-v2-heldout-eval-v1",
+    "tracked_file": "docs/experiments/sanmill-corrected-retained-v2-heldout-eval-v1.json"
+  },
+  "preconditions": [
+    "the evaluator implements every requirement in the frozen plan",
+    "focused runner, route, replay, statistics and ledger tests pass",
+    "mandatory Malom and label-provenance tests pass",
+    "a read-only preflight reports ready without consuming a corpus game",
+    "dev is clean, published and equal to origin/dev",
+    "all candidate, database, corpus, MIF, rules and Sanmill pins verify",
+    "the candidate bundle verifies on deterministic CPU float32 inference",
+    "the evaluation output targets are absent or are a valid same-run partial ledger",
+    "no trainer or competing evaluator owns the bound resources"
+  ],
+  "schema_version": "nmm.heldout-evaluation-authorization.v1"
+}

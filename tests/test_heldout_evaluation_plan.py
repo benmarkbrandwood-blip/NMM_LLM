@@ -19,6 +19,12 @@ AUDIT = (
     / "evidence"
     / "sanmill-corrected-retained-v2-heldout-exposure-2026-08-09.json"
 )
+AUTHORIZATION = (
+    ROOT
+    / "docs"
+    / "experiments"
+    / "sanmill-corrected-retained-v2-heldout-eval-v1-authorization.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -47,3 +53,31 @@ def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
         "book": 13,
         "perfect_db": 21,
     }
+
+
+def test_authorization_binds_one_exact_plan_and_no_promotion() -> None:
+    authorization = json.loads(AUTHORIZATION.read_text(encoding="utf-8"))
+    authorization_identity = authorization.pop("authorization_identity")
+    assert canonical_sha256(authorization) == authorization_identity
+    assert authorization["plan"] == {
+        "commit": "106d015b23debee7d5c8d691195ff958da66f1fc",
+        "file_sha256": (
+            "06f168d1687557a9146455fae0a8174c7714b7dd864cfd5a1e2c383c26009b21"
+        ),
+        "identity": (
+            "212076e9423b671b83783efef411db3b4a56c8c67ae36a463d381d6939d4d982"
+        ),
+        "plan_id": "sanmill-corrected-retained-v2-heldout-eval-v1",
+        "tracked_file": (
+            "docs/experiments/"
+            "sanmill-corrected-retained-v2-heldout-eval-v1.json"
+        ),
+    }
+    assert authorization["consumption"]["grant_count"] == 1
+    assert authorization["execution_scope"]["candidate_games_ceiling"] == 128
+    assert authorization["execution_scope"][
+        "launch_without_further_product_confirmation_after_all_gates_pass"
+    ] is True
+    assert authorization["claim_boundary"]["new_training"] is False
+    assert authorization["claim_boundary"]["model_promotion"] is False
+    assert authorization["claim_boundary"]["model_publication"] is False

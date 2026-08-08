@@ -88,6 +88,21 @@ infrastructure results, not strength evidence. See the
 for exact hashes, recovery events, W/D/L accounting and the next evaluation
 gate.
 
+On 9 August the first post-training held-out protocol was frozen at plan
+commit `106d015b23debee7d5c8d691195ff958da66f1fc`, with plan identity
+`212076e9423b671b83783efef411db3b4a56c8c67ae36a463d381d6939d4d982`.
+It uses 64 preregistered twelve-ply starts as 128 colour-swapped games against
+the exact 500,000-node Sanmill curriculum endpoint. A source-only audit found
+that the complete operational corpus is not wholly data-disjoint: 30 starts
+match HumanDB under D4 and one matches the final SpecialistDB. The same frozen
+ledger therefore reports a separate 34-start zero-database-match sensitivity
+subset. The product owner granted one bounded execution after a tested runner
+and final read-only preflight pass. No evaluation game has started and the
+grant remains unconsumed. See the
+[evaluation plan](../experiments/sanmill-corrected-retained-v2-heldout-eval-v1.md),
+[authorization](../experiments/sanmill-corrected-retained-v2-heldout-eval-v1-authorization.md)
+and [exposure audit](../evidence/sanmill-corrected-retained-v2-heldout-exposure-2026-08-09.md).
+
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
 participate in training, not merely in later evaluation. The new route starts
@@ -1406,8 +1421,9 @@ controller completed.
 
 The post-completion focused verification passed, but the repository still has
 the separately documented moving-checkout Sanmill failures; no new clean
-full-suite claim was made. The next experimental gate is a separately frozen
-held-out candidate evaluation. Proceed in this order:
+full-suite claim was made. The held-out protocol and one-run authorization are
+now frozen, but the grant remains unconsumed because its evaluator and final
+preflight do not yet exist. Proceed in this order:
 
 1. Preserve the corrected retained plan, authorization, ledgers, every
    accepted segment checkpoint, both recovery bundles, the final candidate
@@ -1453,12 +1469,11 @@ held-out candidate evaluation. Proceed in this order:
    22/21/21 twelve-ply opening corpus. It is domain feedback, not an automatic
    phase-corpus freeze. Any later tactical stratum must remain separately
    identified.
-10. The prefix-policy and corpus decisions are closed. Freeze the formal
-    baseline, fixed-node ceiling, history-bearing start representation,
-    accepted starts, pair count, rules-compliant termination contract and
-    interval rule. Then implement and audit the formal runner and request
-    launch separately. Do not pool any result with Stage 0 or the training
-    diagnostics in the completion record.
+10. Preserve the frozen retained-v2 held-out plan, exposure audit and one-run
+    authorization. Implement and audit the exact formal runner, then perform
+    its final read-only preflight. If every frozen gate passes, the grant
+    permits one 64-pair execution without another product-choice prompt. Do
+    not pool its result with Stage 0 or the training diagnostics.
 
 The previously executed isolated smoke command was:
 
@@ -1517,7 +1532,8 @@ The following choices are recorded for the next formal-evaluation design:
 - use twelve logical plies and separately report Book, genuine HumanDB, and
   StrictSteps Perfect DB strata for the current design; the 22/21/21
   composition, 64 source-member identities, HumanDB strict replays, and
-  executable corpus are frozen, while evaluation remains unauthorised;
+  executable corpus are frozen; the retained-v2 protocol and its one-run
+  authorization are now separately frozen and no game has started;
 - preserve all 33 D4-unique expert-curated Book placement patterns in a
   separately reported diagnostic catalogue while retaining all 36 source
   records as provenance; its execution protocol is not yet frozen;
@@ -1544,12 +1560,12 @@ promotion. Technical failures remain Agent diagnosis. The local
 endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
-The managed plan and its Stage-0 evaluation are complete. The evaluation's
-one-run authorization is consumed. Safe work now includes inspection,
-documentation, preservation, and implementation after the product choices in
-the next-evaluation decision brief. It does not include an additional
-evaluation, smoke or long training job, promotion/publication, or history
-rewrite without the applicable separate authorization.
+The managed plan and its Stage-0 evaluation are complete, and that older
+evaluation's authorization is consumed. The retained-v2 held-out grant is a
+different, unconsumed authorization. Safe work now includes its exact runner,
+tests and read-only readiness evidence. Only after all frozen gates pass may
+that one evaluation begin. No additional evaluation, smoke or training job,
+promotion/publication, protocol change or history rewrite is authorized.
 
 ## Reference Material
 
