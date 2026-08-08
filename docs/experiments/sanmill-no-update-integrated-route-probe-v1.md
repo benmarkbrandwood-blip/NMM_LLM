@@ -2,20 +2,25 @@
 
 ## Status and authority
 
-Status: `implemented_unlaunched_needs_published_preflight`
+Status: `published_preflight_passed_needs_evidence_publication_and_authority`
 
 This document defines a bounded measurement for the fresh Sanmill-refereed
 lineage. The content-addressed
 [machine-readable plan](sanmill-no-update-integrated-route-probe-v1.json),
 production-route controls, strict preflight, runner, and atomic publisher are
-implemented. This document is not a readiness record, training run, strength
-evaluation, or authority to execute the probe.
+implemented. The published implementation at commit `70fcd3c` passed the
+read-only preflight; the separate
+[readiness record](../evidence/sanmill-no-update-integrated-route-probe-v1-readiness-2026-08-08.md)
+owns that evidence. This document is not a training run, strength evaluation,
+or authority to execute the probe.
 
 The owner accepted the five probe-only ceilings in the
 [node-ladder decision brief](sanmill-node-ladder-v1-decision-brief.md) by
-requesting implementation. A clean published implementation commit, a passing
-readiness audit, and explicit one-run authority remain separate gates. No
-timeout or lack of response may choose a default.
+requesting implementation. The clean published implementation and first
+readiness audit gates are complete. Publication of the documentation-only
+evidence commit, a final preflight at that published tip, and explicit one-run
+authority remain separate gates. No timeout or lack of response may choose a
+default.
 
 ## Question being measured
 
@@ -211,8 +216,8 @@ Implementation is split into independently reviewable commits:
 2. the dedicated no-update runner, immutable plan schema, publisher, and
    focused tests.
 
-A third evidence commit may publish a readiness record only after the exact
-command passes from a clean implementation commit already present on
+The third, documentation-only evidence commit records the passing result from
+clean implementation commit `70fcd3c`, which was already present on
 `origin/dev`. The implemented read-only command is:
 
 ```powershell
@@ -266,6 +271,8 @@ After the evidence is reviewed, a separate decision must freeze or reject:
 - game, wall-time, segment, checkpoint, and max-ply limits; and
 - whether a new update-enabled training smoke is required before a long run.
 
-The current readiness verdict is `not_ready`: implementation exists, but its
-commit is not yet the clean published source of a passing preflight. Probe and
-training launch authority are both absent.
+The bounded-probe readiness verdict is `ready_for_smoke`, with machine status
+`ready_for_authorized_probe`, for implementation commit `70fcd3c`. The
+documentation-only evidence commit must still be published and the same
+preflight must pass at that final clean tip. Probe and training launch
+authority are both absent.

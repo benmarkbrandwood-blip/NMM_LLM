@@ -112,14 +112,21 @@ random model, read-only HumanDB and empty corrected SpecialistDB snapshots,
 corrected Malom reads, no optimiser or checkpoint, identical before/after
 model and data identities, and at most 227,160,000 requested search nodes.
 Its content-addressed plan, production-route controls, strict preflight,
-runner, atomic publisher, and focused tests are implemented. A passing
-preflight from a clean implementation commit already on `origin/dev` is still
-required before a readiness record may be published. The 36-game run is not
-authorised or launched.
+runner, atomic publisher, and focused tests are implemented and published in
+commits `913abc7` and `70fcd3c`. The prescribed command passed from clean
+`dev == origin/dev == 70fcd3c` and returned
+`ready_for_authorized_probe`, while explicitly returning
+`launch_authorized=false`. The
+[readiness record](../evidence/sanmill-no-update-integrated-route-probe-v1-readiness-2026-08-08.md)
+binds the source, plan, runtime, model, data, rule, host, and no-search route
+identities. The documentation-only evidence commit must be published and the
+preflight repeated from that final clean tip before a launch may be requested.
+The 36-game run is not authorised or launched.
 
 The one-run calibration authority is consumed. No integrated route probe,
-additional smoke, or long run is authorised. Current probe implementation and
-verification results belong to its eventual implementation/evidence commits,
+additional smoke, or long run is authorised. Current probe verification is
+62 focused tests plus the mandatory 103 Malom/provenance tests and 498
+parameterized subtests; these results belong to the probe readiness record,
 not to the older calibration test totals recorded here.
 
 The scoped Stage-0 evaluation `dev-v4-formal-paired-eval-v1` completed on
