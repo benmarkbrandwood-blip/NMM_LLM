@@ -131,6 +131,79 @@ def test_training_referee_mirror_error_preserves_portable_context(
     assert str(_ROOT) not in json.dumps(raised.value.diagnostic)
 
 
+def test_training_referee_accepts_terminal_mirror_with_undefined_turn(
+    monkeypatch,
+) -> None:
+    local = BoardState.from_fen_string(
+        "...........WWWW...B.B...|B|9|9"
+    )
+    projected = BoardState.from_fen_string(
+        "...........WWWW...B.B...|W|9|9"
+    )
+    state = SimpleNamespace(
+        fen="terminal-sanmill-fen",
+        terminal=True,
+        winner="white",
+        legal_actions=(),
+        portable_record=lambda: {
+            "fen": "terminal-sanmill-fen",
+            "side_to_move": None,
+            "terminal": True,
+            "winner": "white",
+        },
+    )
+    game = object.__new__(SanmillTrainingGame)
+    game._state = state
+    game._history = []
+    game._require_training_state = lambda _state: None
+    monkeypatch.setattr(
+        sanmill_referee,
+        "project_stable_sanmill_fen",
+        lambda _fen, *, terminal: projected,
+    )
+
+    game.assert_current_board(local)
+
+
+def test_training_referee_rejects_terminal_board_position_mismatch(
+    monkeypatch,
+) -> None:
+    local = BoardState.from_fen_string(
+        "...........WWWW...B.B...|B|9|9"
+    )
+    projected_positions = dict(local.positions)
+    projected_positions["a7"] = "W"
+    projected = BoardState.from_setup(
+        projected_positions,
+        turn="W",
+        phase="move",
+    )
+    state = SimpleNamespace(
+        fen="terminal-sanmill-fen",
+        terminal=True,
+        winner="white",
+        legal_actions=(),
+        portable_record=lambda: {
+            "fen": "terminal-sanmill-fen",
+            "side_to_move": None,
+            "terminal": True,
+            "winner": "white",
+        },
+    )
+    game = object.__new__(SanmillTrainingGame)
+    game._state = state
+    game._history = []
+    game._require_training_state = lambda _state: None
+    monkeypatch.setattr(
+        sanmill_referee,
+        "project_stable_sanmill_fen",
+        lambda _fen, *, terminal: projected,
+    )
+
+    with pytest.raises(SanmillBoardMirrorError):
+        game.assert_current_board(local)
+
+
 def test_training_runtime_identity_and_cross_process_search_are_fixed() -> None:
     report = probe_sanmill_training_runtime(
         _training_checkout(),

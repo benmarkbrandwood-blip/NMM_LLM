@@ -391,7 +391,12 @@ class SanmillTrainingGame:
             state.fen,
             terminal=state.terminal,
         )
-        if projected.to_fen_string() != board.to_fen_string():
+        mirror_matches = (
+            projected.positions == board.positions
+            and projected.pieces_placed == board.pieces_placed
+            and (state.terminal or projected.turn == board.turn)
+        )
+        if not mirror_matches:
             local_terminal, local_winner, local_reason = terminal_result(board)
             raise SanmillBoardMirrorError(
                 {
