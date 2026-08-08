@@ -56,12 +56,19 @@ from scripts import train_s_gen_v2 as trainer
 
 
 PLAN_SCHEMA = "nmm.sanmill-no-update-route-probe-plan.v1"
+DIAGNOSTIC_PLAN_SCHEMA = "nmm.sanmill-no-update-route-diagnostic-plan.v1"
 PREFLIGHT_SCHEMA = "nmm.sanmill-no-update-route-probe-preflight.v1"
+DIAGNOSTIC_PREFLIGHT_SCHEMA = (
+    "nmm.sanmill-no-update-route-diagnostic-preflight.v1"
+)
 RESULT_SCHEMA = "nmm.sanmill-no-update-route-probe-result.v1"
 FAILURE_SCHEMA = "nmm.sanmill-no-update-route-probe-failure.v1"
 SCHEDULE_FAILURE_SCHEMA = "nmm.sanmill-route-probe-schedule-failure.v1"
 DEFAULT_PLAN_RELATIVE = Path(
     "docs/experiments/sanmill-no-update-integrated-route-probe-v1.json"
+)
+DEFAULT_DIAGNOSTIC_PLAN_RELATIVE = Path(
+    "docs/experiments/sanmill-no-update-integrated-route-diagnostic-v1.json"
 )
 DEFAULT_PATHS_RELATIVE = Path("data/training_paths.local.json")
 
@@ -90,6 +97,18 @@ _GAME_KEYS = {
     "sim_ply_depth",
     "torch_seed",
 }
+_DIAGNOSTIC_PLAN_KEYS = {
+    "schema_version",
+    "status",
+    "experiment_id",
+    "claim_boundary",
+    "parent_plan",
+    "selected_schedule_entry",
+    "bounded_work",
+    "decision_rules",
+    "plan_identity",
+}
+_DIAGNOSTIC_PARENT_KEYS = {"path", "raw_sha256", "plan_identity"}
 _RUN_ID_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789._-")
 
 
@@ -139,6 +158,18 @@ class ProbePlan:
     policy_hidden: tuple[int, ...]
     node_budgets: tuple[int, ...]
     schedule: tuple[ProbeGame, ...]
+    payload: Mapping[str, Any]
+
+
+@dataclass(frozen=True)
+class ProbeDiagnosticPlan:
+    path: Path
+    raw_sha256: str
+    identity: str
+    experiment_id: str
+    claim_boundary: str
+    parent: ProbePlan
+    selected: ProbeGame
     payload: Mapping[str, Any]
 
 
@@ -470,6 +501,127 @@ def load_probe_plan(path: str | Path) -> ProbePlan:
         policy_hidden=policy_hidden,
         node_budgets=budgets,
         schedule=tuple(schedule),
+        payload=payload,
+    )
+
+
+def load_probe_diagnostic_plan(path: str | Path) -> ProbeDiagnosticPlan:
+    """Load the one-entry diagnostic without altering its parent plan."""
+    plan_path = Path(path)
+    raw = plan_path.read_bytes()
+    payload = _strict_json(plan_path)
+    _require_exact_keys(
+        payload,
+        _DIAGNOSTIC_PLAN_KEYS,
+        context="probe diagnostic plan",
+    )
+    if payload["schema_version"] != DIAGNOSTIC_PLAN_SCHEMA:
+        raise SanmillRouteProbeError("unsupported probe diagnostic plan schema")
+    if payload["status"] != "prepared_unlaunched":
+        raise SanmillRouteProbeError("probe diagnostic is not prepared/unlaunched")
+    identity = payload["plan_identity"]
+    if not isinstance(identity, str) or len(identity) != 64:
+        raise SanmillRouteProbeError("probe diagnostic identity is invalid")
+    identity_body = dict(payload)
+    identity_body.pop("plan_identity")
+    if canonical_sha256(identity_body) != identity:
+        raise SanmillRouteProbeError("probe diagnostic identity mismatch")
+
+    parent_record = payload["parent_plan"]
+    if not isinstance(parent_record, Mapping):
+        raise SanmillRouteProbeError("probe diagnostic parent must be an object")
+    _require_exact_keys(
+        parent_record,
+        _DIAGNOSTIC_PARENT_KEYS,
+        context="probe diagnostic parent",
+    )
+    if parent_record["path"] != DEFAULT_PLAN_RELATIVE.as_posix():
+        raise SanmillRouteProbeError("probe diagnostic parent path drifted")
+    parent = load_probe_plan(_ROOT / DEFAULT_PLAN_RELATIVE)
+    if parent_record["raw_sha256"] != parent.raw_sha256:
+        raise SanmillRouteProbeError("probe diagnostic parent bytes drifted")
+    if parent_record["plan_identity"] != parent.identity:
+        raise SanmillRouteProbeError("probe diagnostic parent identity drifted")
+
+    selected_record = payload["selected_schedule_entry"]
+    if not isinstance(selected_record, Mapping):
+        raise SanmillRouteProbeError(
+            "probe diagnostic selected schedule entry must be an object"
+        )
+    _require_exact_keys(
+        selected_record,
+        _GAME_KEYS,
+        context="probe diagnostic selected schedule entry",
+    )
+    selected = parent.schedule[0]
+    if dict(selected_record) != _probe_game_record(selected):
+        raise SanmillRouteProbeError(
+            "probe diagnostic must preserve parent schedule index zero exactly"
+        )
+
+    bounded = {
+        "complete_games": 1,
+        "search_opponent_games": 1,
+        "frozen_target_games": 0,
+        "maximum_logical_plies": parent.max_ply,
+        "maximum_search_calls": parent.max_ply // 2,
+        "maximum_requested_search_node_ceilings": (
+            int(selected.node_budget or 0) * (parent.max_ply // 2)
+        ),
+    }
+    if dict(payload["bounded_work"]) != bounded:
+        raise SanmillRouteProbeError("probe diagnostic bounded work drifted")
+    if dict(payload["decision_rules"]) != {
+        "diagnosis_only": True,
+        "execution_requires_explicit_authority": True,
+        "no_automatic_escalation": True,
+        "no_retry": True,
+        "preserve_parent_schedule_identity": True,
+        "publish_success_or_failure_atomically": True,
+        "refuse_output_overwrite": True,
+        "training_launch": False,
+    }:
+        raise SanmillRouteProbeError("probe diagnostic decision boundary drifted")
+
+    return ProbeDiagnosticPlan(
+        path=plan_path,
+        raw_sha256=hashlib.sha256(raw).hexdigest(),
+        identity=identity,
+        experiment_id=str(payload["experiment_id"]),
+        claim_boundary=str(payload["claim_boundary"]),
+        parent=parent,
+        selected=selected,
+        payload=payload,
+    )
+
+
+def diagnostic_probe_plan(plan: ProbeDiagnosticPlan) -> ProbePlan:
+    """Derive the one-entry execution view consumed by the existing route."""
+    payload = dict(plan.parent.payload)
+    payload.update(
+        {
+            "schema_version": DIAGNOSTIC_PLAN_SCHEMA,
+            "status": "prepared_unlaunched",
+            "experiment_id": plan.experiment_id,
+            "claim_boundary": plan.claim_boundary,
+            "schedule": [_probe_game_record(plan.selected)],
+            "bounded_work": dict(plan.payload["bounded_work"]),
+            "decision_rules": dict(plan.payload["decision_rules"]),
+            "plan_identity": plan.identity,
+        }
+    )
+    return ProbePlan(
+        path=plan.path,
+        raw_sha256=plan.raw_sha256,
+        identity=plan.identity,
+        experiment_id=plan.experiment_id,
+        claim_boundary=plan.claim_boundary,
+        seed=plan.parent.seed,
+        temperature=plan.parent.temperature,
+        max_ply=plan.parent.max_ply,
+        policy_hidden=plan.parent.policy_hidden,
+        node_budgets=(int(plan.selected.node_budget or 0),),
+        schedule=(plan.selected,),
         payload=payload,
     )
 
@@ -1300,6 +1452,37 @@ def preflight_probe(
     }
 
 
+def preflight_probe_diagnostic(
+    plan_path: str | Path,
+    paths_config: str | Path,
+    *,
+    require_published: bool = True,
+    verify_malom_components: bool = True,
+    perform_route_check: bool = True,
+) -> dict[str, Any]:
+    """Audit the one-entry diagnostic without consuming its selected game."""
+    diagnostic = load_probe_diagnostic_plan(plan_path)
+    parent_report = preflight_probe(
+        diagnostic.parent.path,
+        paths_config,
+        require_published=require_published,
+        verify_malom_components=verify_malom_components,
+        perform_route_check=perform_route_check,
+    )
+    effective = diagnostic_probe_plan(diagnostic)
+    return {
+        **parent_report,
+        "schema_version": DIAGNOSTIC_PREFLIGHT_SCHEMA,
+        "status": "ready_for_authorized_minimal_diagnostic",
+        "launch_authorized": False,
+        "plan": tracked_plan_record(effective),
+        "parent_probe_plan": parent_report["plan"],
+        "selected_schedule_entry": _probe_game_record(diagnostic.selected),
+        "bounded_work": dict(diagnostic.payload["bounded_work"]),
+        "next_gate": "explicit one-run minimal-diagnostic authority",
+    }
+
+
 def run_probe(
     plan: ProbePlan,
     inputs: ProbeInputs,
@@ -1438,6 +1621,74 @@ def run_probe(
         },
     }
     return {**body, "report_identity": canonical_sha256(body)}
+
+
+def _diagnostic_report(
+    report: Mapping[str, Any],
+    diagnostic: ProbeDiagnosticPlan,
+    *,
+    outcome: str,
+) -> dict[str, Any]:
+    body = dict(report)
+    body.pop("report_identity", None)
+    body["diagnostic"] = {
+        "schema_version": "nmm.sanmill-route-diagnostic-binding.v1",
+        "outcome": outcome,
+        "parent_probe_plan": tracked_plan_record(diagnostic.parent),
+        "selected_schedule_entry": _probe_game_record(diagnostic.selected),
+        "historical_failure_index_known": False,
+    }
+    interpretation = dict(body.get("interpretation", {}))
+    interpretation.update(
+        {
+            "completed_measurement": False,
+            "training_updates_measured": False,
+            "strength_measured": False,
+            "node_ladder_auto_selected": False,
+            "retry_authorized": False,
+            "training_launch_authorized": False,
+            "next_gate": (
+                "review the captured mirror diagnostic"
+                if outcome == "failed_closed_with_diagnostic"
+                else "record that parent schedule index zero did not reproduce"
+            ),
+        }
+    )
+    body["interpretation"] = interpretation
+    return {**body, "report_identity": canonical_sha256(body)}
+
+
+def run_probe_diagnostic(
+    diagnostic: ProbeDiagnosticPlan,
+    inputs: ProbeInputs,
+    *,
+    source: Mapping[str, Any],
+    run_id: str,
+    invocation: Sequence[str],
+) -> dict[str, Any]:
+    """Run exactly parent schedule index zero through the existing route."""
+    effective = diagnostic_probe_plan(diagnostic)
+    try:
+        report = run_probe(
+            effective,
+            inputs,
+            source=source,
+            run_id=run_id,
+            invocation=invocation,
+        )
+    except SanmillRouteProbeRunFailure as exc:
+        raise SanmillRouteProbeRunFailure(
+            _diagnostic_report(
+                exc.report,
+                diagnostic,
+                outcome="failed_closed_with_diagnostic",
+            )
+        ) from exc
+    return _diagnostic_report(
+        report,
+        diagnostic,
+        outcome="selected_entry_completed_without_mirror_mismatch",
+    )
 
 
 def validate_probe_output(path: str | Path) -> Path:

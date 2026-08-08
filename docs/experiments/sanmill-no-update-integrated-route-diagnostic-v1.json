@@ -1,0 +1,41 @@
+{
+  "bounded_work": {
+    "complete_games": 1,
+    "frozen_target_games": 0,
+    "maximum_logical_plies": 120,
+    "maximum_requested_search_node_ceilings": 60000,
+    "maximum_search_calls": 60,
+    "search_opponent_games": 1
+  },
+  "claim_boundary": "Single-entry reproduction evidence for original schedule index 0 only; not proof that it was the historical failing entry, not throughput, training, strength, or launch authority.",
+  "decision_rules": {
+    "diagnosis_only": true,
+    "execution_requires_explicit_authority": true,
+    "no_automatic_escalation": true,
+    "no_retry": true,
+    "preserve_parent_schedule_identity": true,
+    "publish_success_or_failure_atomically": true,
+    "refuse_output_overwrite": true,
+    "training_launch": false
+  },
+  "experiment_id": "sanmill-no-update-integrated-route-diagnostic-v1",
+  "parent_plan": {
+    "path": "docs/experiments/sanmill-no-update-integrated-route-probe-v1.json",
+    "plan_identity": "7aa079dcf59556d35f3fbd58072b6baa8c9f798e087cc336e29c8309552e3cfb",
+    "raw_sha256": "b422ea44fad5fa4181294a4bc3d6e77a48692b43672ccc2ed6976d87f1aabe36"
+  },
+  "plan_identity": "5554489e3278dca88cc4f816e97ced1bdf17e7a89b0e4c02991c808d7087e4b0",
+  "schema_version": "nmm.sanmill-no-update-route-diagnostic-plan.v1",
+  "selected_schedule_entry": {
+    "game_id": "game:cfaf6392cb40a776a61370d4fc0608b5501c612b93fb531efe3d21a1940c33bf",
+    "learner_color": "W",
+    "node_budget": 1000,
+    "opponent_kind": "sanmill",
+    "role": "sanmill-1000-normal-0-W",
+    "route_depth": "normal",
+    "scheduled_index": 0,
+    "sim_ply_depth": 5,
+    "torch_seed": 5741917532047058806
+  },
+  "status": "prepared_unlaunched"
+}

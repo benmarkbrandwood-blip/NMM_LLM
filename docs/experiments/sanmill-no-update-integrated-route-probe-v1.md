@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `failed_closed_diagnostics_implemented_needs_publication_and_authority`
+Status: `failed_closed_diagnostics_published_minimal_diagnostic_prepared_unlaunched`
 
 This document defines a bounded measurement for the fresh Sanmill-refereed
 lineage. The content-addressed
@@ -23,10 +23,14 @@ The owner accepted the five probe-only ceilings in the
 requesting implementation. The clean published implementation, readiness
 evidence, final preflight, and one-run launch gates were completed. The run
 authority is consumed by the fail-closed attempt. Structured failure context,
-atomic failure quarantine, and their regressions are now implemented in
-commits `6fdd662` and `5efae25`. Publication of the failure evidence and both
-diagnostic commits, a minimal diagnostic design, and new explicit authority
-are now separate gates. No timeout or lack of response may choose a default.
+atomic failure quarantine, and their regressions were published in commits
+`6fdd662` and `5efae25`; the complete failure and documentation chain is
+published through `b1a56b6`. The separate
+[one-entry diagnostic](sanmill-no-update-integrated-route-diagnostic-v1.md)
+now freezes parent schedule index zero as the smallest exact reproduction
+attempt. It remains unlaunched and does not identify the historical failing
+index. Publication, final preflight, and new explicit one-run authority remain
+separate gates. No timeout or lack of response may choose a default.
 
 ## Question being measured
 

@@ -132,13 +132,19 @@ actions, and schedule identity, so neither the failing game index nor the
 underlying state-field difference may be inferred. The
 [failure record](../evidence/sanmill-no-update-integrated-route-probe-v1-failure-2026-08-08.md)
 owns the exact boundary. The one-run probe authorization is consumed; no retry
-or training run is authorized. Local follow-up commits `6fdd662` and
-`5efae25` add structured, host-path-free mirror context and an atomic
+or training run is authorized. Follow-up commits `6fdd662` and `5efae25` add
+structured, host-path-free mirror context and an atomic
 no-overwrite failure quarantine containing the completed-sample prefix and
 failed schedule entry. The relevant 67-test group and the mandatory 103
 Malom/provenance tests with 498 parameterized subtests pass. These changes do
-not diagnose the root cause, select a failing game, or authorize replay; they
-must be published before a separately frozen minimal diagnostic is considered.
+not diagnose the root cause or retroactively select a failing game. The
+failure and diagnostic-hardening chain is published through `b1a56b6`. A
+separate content-addressed minimal diagnostic now selects only exact parent
+schedule index zero, with one game, at most 120 logical plies, 60 searches,
+and 60,000 requested node ceilings. Index zero is the smallest exact prefix,
+not an assertion about where the historical run failed. The diagnostic is
+prepared but unlaunched; publication, final preflight, and a new one-run
+authority are still required.
 
 The one-run calibration authority is consumed. No integrated route probe,
 additional smoke, or long run is authorised. Current probe verification is
