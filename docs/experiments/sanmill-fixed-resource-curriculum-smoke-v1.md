@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `prepared_unlaunched`
+Status: `ready_for_one_launch`
 
 Parent experiment: `dev-v4-sanmill-refereed-fresh-v1`
 
