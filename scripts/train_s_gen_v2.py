@@ -24,9 +24,10 @@ import sys
 import time
 from collections import deque, Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass, asdict
+from contextlib import contextmanager
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import numpy as np
 import torch
@@ -1233,6 +1234,8 @@ class RolloutResult:
     opponent_search_calls: int = 0
     opponent_search_depth_sum: int = 0
     opponent_node_budget: Optional[int] = None
+    phase_ply_counts: dict[str, int] = field(default_factory=dict)
+    compound_turn_count: int = 0
 
 
 def _move_notation(mv: dict) -> str:
@@ -1322,6 +1325,43 @@ def _sanmill_terminal_outcome(
     return outcome, state.outcome_reason_code
 
 
+@contextmanager
+def _timed_rollout_stage(
+    observer: Optional[Callable[[str, float], None]],
+    stage: str,
+) -> Iterator[None]:
+    """Report additive wall timing without changing rollout decisions."""
+    if observer is None:
+        yield
+        return
+    started = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - started
+        if not math.isfinite(elapsed) or elapsed < 0.0:
+            raise RuntimeError(f"non-finite rollout timing for {stage}")
+        observer(stage, elapsed)
+
+
+@contextmanager
+def _temporary_rollout_sim_depth(
+    lookahead_advisor: Any,
+    *,
+    deep_game: bool,
+) -> Iterator[None]:
+    """Temporarily select the deep route and restore it on every exit."""
+    if not deep_game or lookahead_advisor is None:
+        yield
+        return
+    saved = lookahead_advisor._sim_ply_depth
+    lookahead_advisor._sim_ply_depth = lookahead_advisor._ply_depth
+    try:
+        yield
+    finally:
+        lookahead_advisor._sim_ply_depth = saved
+
+
 def _rollout(
     model:          ScaffoldedPolicyNet,
     device:         torch.device,
@@ -1347,13 +1387,70 @@ def _rollout(
     torch_generator: Optional[torch.Generator] = None,
     draw_state: Optional[StandardDrawState] = None,
     sanmill_game: Optional[SanmillTrainingGame] = None,
+    persist_rollout_evidence: bool = True,
+    timing_observer: Optional[Callable[[str, float], None]] = None,
 ) -> RolloutResult:
-    # For deep games (1-in-20): temporarily run full ply_depth simulation
-    _saved_sim_ply = None
-    if deep_game and lookahead_advisor is not None:
-        _saved_sim_ply = lookahead_advisor._sim_ply_depth
-        lookahead_advisor._sim_ply_depth = lookahead_advisor._ply_depth
+    """Run one production rollout with optional additive probe controls."""
+    with _temporary_rollout_sim_depth(
+        lookahead_advisor,
+        deep_game=deep_game,
+    ):
+        return _rollout_impl(
+            model=model,
+            device=device,
+            start_board=start_board,
+            learner_color=learner_color,
+            opponent=opponent,
+            opp_color=opp_color,
+            sentinel=sentinel,
+            value_net=value_net,
+            temperature=temperature,
+            max_ply=max_ply,
+            record_branches=record_branches,
+            branch_every=branch_every,
+            retry_ply=retry_ply,
+            forced_placements=forced_placements,
+            lookahead_advisor=lookahead_advisor,
+            game_difficulty=game_difficulty,
+            human_db=human_db,
+            trajectory_db=trajectory_db,
+            specialist_db=specialist_db,
+            malom_db=malom_db,
+            torch_generator=torch_generator,
+            draw_state=draw_state,
+            sanmill_game=sanmill_game,
+            persist_rollout_evidence=persist_rollout_evidence,
+            timing_observer=timing_observer,
+        )
 
+
+def _rollout_impl(
+    model:          ScaffoldedPolicyNet,
+    device:         torch.device,
+    start_board:    BoardState,
+    learner_color:  str,
+    opponent,
+    opp_color:      str,
+    sentinel,
+    value_net,
+    temperature:    float,
+    max_ply:        int,
+    record_branches: bool,
+    branch_every:   int,
+    retry_ply:      int,
+    forced_placements: Optional[list[str]] = None,
+    lookahead_advisor=None,
+    game_difficulty: int = 1,
+    human_db=None,
+    trajectory_db=None,
+    specialist_db=None,
+    malom_db=None,
+    torch_generator: Optional[torch.Generator] = None,
+    draw_state: Optional[StandardDrawState] = None,
+    sanmill_game: Optional[SanmillTrainingGame] = None,
+    persist_rollout_evidence: bool = True,
+    timing_observer: Optional[Callable[[str, float], None]] = None,
+) -> RolloutResult:
     board                   = start_board
     ply                     = 0
     move_phase_start_ply:   Optional[int] = None
@@ -1382,6 +1479,8 @@ def _rollout(
     opponent_search_calls = 0
     opponent_search_depth_sum = 0
     opponent_node_budget = getattr(opponent, "node_budget", None)
+    phase_ply_counts: Counter[str] = Counter()
+    compound_turn_count = 0
 
     if sanmill_game is not None:
         sanmill_game.assert_current_board(board)
@@ -1419,58 +1518,69 @@ def _rollout(
             break
 
         player = board.turn
+        phase_ply_counts[board.phase] += 1
 
         if player == learner_color:
             # v4: full-legal-moves scoring via encode_position_with_lookahead.
             learner_boards.append(board)
-            enc = encode_position_with_lookahead(
-                board, player,
-                sentinel_advisor=sentinel,
-                db=None,
-                value_net=value_net,
-                lookahead_advisor=lookahead_advisor,
-                specialist_db=specialist_db,
-                sdb_min_samples=3,
-            )
+            with _timed_rollout_stage(timing_observer, "learner_encode"):
+                enc = encode_position_with_lookahead(
+                    board, player,
+                    sentinel_advisor=sentinel,
+                    db=None,
+                    value_net=value_net,
+                    lookahead_advisor=lookahead_advisor,
+                    specialist_db=specialist_db,
+                    sdb_min_samples=3,
+                )
             if enc is None or not enc.legal_moves:
                 outcome = LOSS_REWARD
                 termination_reason = "learner-no-legal-move"
                 done    = True
                 break
 
-            feat_t = torch.tensor(enc.feat_matrix, dtype=torch.float32).to(device)
-            with torch.no_grad():
-                logits    = model.policy_logits(feat_t)
-                log_probs, probs = _policy_distribution(logits, temperature)
-                entropy   = float((-(probs * log_probs).sum()).item())
+            with _timed_rollout_stage(timing_observer, "learner_policy"):
+                feat_t = torch.tensor(
+                    enc.feat_matrix, dtype=torch.float32
+                ).to(device)
+                with torch.no_grad():
+                    logits = model.policy_logits(feat_t)
+                    log_probs, probs = _policy_distribution(logits, temperature)
+                    entropy = float((-(probs * log_probs).sum()).item())
 
-                forced_idx = None
-                if (forced_placements
+                    forced_idx = None
+                    if (
+                        forced_placements
                         and board.phase == "place"
-                        and learner_placement_count < len(forced_placements)):
-                    book_pos = forced_placements[learner_placement_count]
-                    for _fi, _m in enumerate(enc.legal_moves):
-                        if _m.get("to") == book_pos:
-                            forced_idx = _fi
-                            break
+                        and learner_placement_count < len(forced_placements)
+                    ):
+                        book_pos = forced_placements[learner_placement_count]
+                        for _fi, _m in enumerate(enc.legal_moves):
+                            if _m.get("to") == book_pos:
+                                forced_idx = _fi
+                                break
 
-                if forced_idx is not None:
-                    chosen_idx = forced_idx
-                else:
-                    chosen_idx = int(
-                        torch.multinomial(
-                            probs.cpu(), 1, generator=torch_generator
-                        ).item()
+                    if forced_idx is not None:
+                        chosen_idx = forced_idx
+                    else:
+                        chosen_idx = int(
+                            torch.multinomial(
+                                probs.cpu(), 1, generator=torch_generator
+                            ).item()
+                        )
+                    chosen_prob = float(probs[chosen_idx].item())
+                    top1_prob = float(probs.max().item())
+                    was_top1_policy = int(
+                        chosen_idx == int(torch.argmax(probs).item())
                     )
-                chosen_prob     = float(probs[chosen_idx].item())
-                top1_prob       = float(probs.max().item())
-                was_top1_policy = int(chosen_idx == int(torch.argmax(probs).item()))
-                log_prob_old    = float(log_probs[chosen_idx].item())
+                    log_prob_old = float(log_probs[chosen_idx].item())
 
             # History features: snapshot BEFORE appending current move
             hist_feats_now = _build_history_features(move_history)
 
             move = enc.legal_moves[chosen_idx]
+            if move.get("capture") is not None:
+                compound_turn_count += 1
             learner_moves_notation.append(_move_notation(move))
             if board.phase == "place":
                 learner_placement_count += 1
@@ -1478,24 +1588,33 @@ def _rollout(
             hist_feats_next = _build_history_features(move_history)
 
             if sanmill_game is not None:
-                sanmill_game.apply_nmm_move(board, move)
+                with _timed_rollout_stage(
+                    timing_observer, "learner_referee_apply"
+                ):
+                    sanmill_game.apply_nmm_move(board, move)
             board_after = board.apply_move(move)
             learner_result_boards.append(board_after)
-            enc_after = (
-                None
-                if sanmill_game is not None and sanmill_game.state.terminal
-                else encode_position_with_lookahead(
-                    board_after,
-                    opp_color,
-                    sentinel_advisor=sentinel,
-                    db=None,
-                    value_net=value_net,
-                    lookahead_advisor=None,
+            with _timed_rollout_stage(timing_observer, "successor_encode"):
+                enc_after = (
+                    None
+                    if sanmill_game is not None and sanmill_game.state.terminal
+                    else encode_position_with_lookahead(
+                        board_after,
+                        opp_color,
+                        sentinel_advisor=sentinel,
+                        db=None,
+                        value_net=value_net,
+                        lookahead_advisor=None,
+                    )
                 )
-            )
 
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
-            malom_q = malom_db.query_move_quality(board, move) if malom_db is not None else None
+            with _timed_rollout_stage(timing_observer, "malom_move_quality"):
+                malom_q = (
+                    malom_db.query_move_quality(board, move)
+                    if malom_db is not None
+                    else None
+                )
             reward, rb = _compute_per_move_reward(
                 enc, chosen_idx, enc_after,
                 board_phase=board.phase,
@@ -1631,7 +1750,10 @@ def _rollout(
 
         else:
             try:
-                opp_move = opponent.choose_move(board)
+                with _timed_rollout_stage(
+                    timing_observer, "opponent_choose_move"
+                ):
+                    opp_move = opponent.choose_move(board)
             except Exception:
                 if opponent_node_budget is not None:
                     raise
@@ -1647,10 +1769,18 @@ def _rollout(
                 termination_reason = "opponent-no-move"
                 done    = True
                 break
+            if opp_move.get("capture") is not None:
+                compound_turn_count += 1
             if isinstance(opponent, SanmillTrainingOpponent):
-                opponent.consume_committed_turn(opp_move)
+                with _timed_rollout_stage(
+                    timing_observer, "opponent_referee_commit"
+                ):
+                    opponent.consume_committed_turn(opp_move)
             elif sanmill_game is not None:
-                sanmill_game.apply_nmm_move(board, opp_move)
+                with _timed_rollout_stage(
+                    timing_observer, "opponent_referee_apply"
+                ):
+                    sanmill_game.apply_nmm_move(board, opp_move)
             move_history.append(opp_move)
             board_before = board
             board = board.apply_move(opp_move)
@@ -1695,18 +1825,17 @@ def _rollout(
         outcome = DRAW_LONG
         termination_reason = "max-ply-truncation"
 
-    if _saved_sim_ply is not None and lookahead_advisor is not None:
-        lookahead_advisor._sim_ply_depth = _saved_sim_ply
-
-    _persist_rollout_evidence(
-        specialist_db=specialist_db,
-        malom_db=malom_db,
-        learner_boards=learner_boards,
-        learner_result_boards=learner_result_boards,
-        outcome=outcome,
-        learner_moves_notation=learner_moves_notation,
-        learner_color=learner_color,
-    )
+    if persist_rollout_evidence:
+        with _timed_rollout_stage(timing_observer, "rollout_persistence"):
+            _persist_rollout_evidence(
+                specialist_db=specialist_db,
+                malom_db=malom_db,
+                learner_boards=learner_boards,
+                learner_result_boards=learner_result_boards,
+                outcome=outcome,
+                learner_moves_notation=learner_moves_notation,
+                learner_color=learner_color,
+            )
 
     return RolloutResult(
         trajectory=game_trajectory,
@@ -1721,6 +1850,8 @@ def _rollout(
         opponent_search_calls=opponent_search_calls,
         opponent_search_depth_sum=opponent_search_depth_sum,
         opponent_node_budget=opponent_node_budget,
+        phase_ply_counts=dict(sorted(phase_ply_counts.items())),
+        compound_turn_count=compound_turn_count,
     )
 
 

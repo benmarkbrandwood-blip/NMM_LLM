@@ -9,10 +9,13 @@ training game.
 from __future__ import annotations
 
 import hashlib
+import math
 import subprocess
+import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterator, Mapping
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves, terminal_result
@@ -46,6 +49,25 @@ TRAINING_REPETITION_OBSERVATION = "stable-moving-v1"
 TRAINING_REFEREE_SEMANTIC_DIGEST = (
     "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94"
 )
+
+
+@contextmanager
+def _timed_referee_stage(
+    observer: Callable[[str, float], None] | None,
+    stage: str,
+) -> Iterator[None]:
+    """Emit additive timing while leaving the protocol path unchanged."""
+    if observer is None:
+        yield
+        return
+    started = time.perf_counter()
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - started
+        if not math.isfinite(elapsed) or elapsed < 0.0:
+            raise SanmillBridgeError(f"non-finite referee timing for {stage}")
+        observer(stage, elapsed)
 
 
 def _sha256_file(path: Path) -> str:
@@ -257,12 +279,14 @@ class SanmillTrainingGame:
         session_factory: Callable[..., SanmillUciSession] = SanmillUciSession,
         protocol_timeout: float = 10.0,
         search_timeout: float = 120.0,
+        timing_observer: Callable[[str, float], None] | None = None,
     ) -> None:
         self.installation = installation
         self.seed = seed
         self._session_factory = session_factory
         self._protocol_timeout = protocol_timeout
         self._search_timeout = search_timeout
+        self._timing_observer = timing_observer
         self._session: SanmillUciSession | None = None
         self._history: list[str] = []
         self._state: UciPositionState | None = None
@@ -270,28 +294,35 @@ class SanmillTrainingGame:
     def __enter__(self) -> "SanmillTrainingGame":
         if self._session is not None:
             raise SanmillBridgeError("Sanmill training game is already open")
-        self._session = self._session_factory(
-            self.installation,
-            seed=self.seed,
-            protocol_timeout=self._protocol_timeout,
-            search_timeout=self._search_timeout,
-        )
-        try:
-            self._session.configure_strict_referee_profile(
-                TRAINING_REFEREE_PROFILE
+        with _timed_referee_stage(
+            self._timing_observer, "sanmill_process_startup"
+        ):
+            self._session = self._session_factory(
+                self.installation,
+                seed=self.seed,
+                protocol_timeout=self._protocol_timeout,
+                search_timeout=self._search_timeout,
             )
-            self._session.new_game()
-            self._session.position_startpos()
-            self._state = self._session.state_json()
-            self._require_training_state(self._state)
-            if self._state.action_token_count != 0:
-                raise SanmillBridgeError("fresh Sanmill game has action history")
-            if self._state.logical_ply_count != 0:
-                raise SanmillBridgeError("fresh Sanmill game has logical history")
-            self.assert_current_board(BoardState.new_game())
-        except BaseException:
-            self.close()
-            raise
+            try:
+                self._session.configure_strict_referee_profile(
+                    TRAINING_REFEREE_PROFILE
+                )
+                self._session.new_game()
+                self._session.position_startpos()
+                self._state = self._session.state_json()
+                self._require_training_state(self._state)
+                if self._state.action_token_count != 0:
+                    raise SanmillBridgeError(
+                        "fresh Sanmill game has action history"
+                    )
+                if self._state.logical_ply_count != 0:
+                    raise SanmillBridgeError(
+                        "fresh Sanmill game has logical history"
+                    )
+                self.assert_current_board(BoardState.new_game())
+            except BaseException:
+                self.close()
+                raise
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -393,8 +424,11 @@ class SanmillTrainingGame:
 
         previous = self.state
         self._history.extend(actions)
-        self.session.position_startpos(self._history)
-        state = self.session.state_json()
+        with _timed_referee_stage(
+            self._timing_observer, "sanmill_referee_replay"
+        ):
+            self.session.position_startpos(self._history)
+            state = self.session.state_json()
         self._require_training_state(state)
         if state.action_token_count != len(self._history):
             raise SanmillBridgeError("Sanmill action-token count drifted")
@@ -436,7 +470,10 @@ class SanmillTrainingGame:
         self.assert_current_board(board)
         if self.state.terminal:
             raise SanmillBridgeError("cannot search after Sanmill termination")
-        result = self.session.search_logical_turn(node_budget, depth=depth)
+        with _timed_referee_stage(
+            self._timing_observer, "sanmill_opponent_search"
+        ):
+            result = self.session.search_logical_turn(node_budget, depth=depth)
         if result.status != "ok" or result.model_action is None:
             raise SanmillBridgeError("ongoing Sanmill root produced no move")
         return self.apply_nmm_move(
