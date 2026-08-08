@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `node_ladder_proposed_integrated_probe_pending`
+Status: `node_ladder_and_integrated_probe_proposed_needs_decision`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -286,3 +286,11 @@ recommends retaining the five measured ceilings
 matrix. It does not identify five proven strength levels, select an
 advancement rule, change the trainer's current one-level preflight, or
 authorize execution.
+
+The separate
+[no-update integrated-route probe proposal](sanmill-no-update-integrated-route-probe-v1.md)
+defines a bounded 36-game measurement over those five ceilings, the normal
+depth-5 route, the occasional depth-12 route, both learner colors, and a
+Sanmill-refereed frozen-target control. It requires read-only data inputs,
+unchanged model digests, no optimiser, no checkpoint, no rollout persistence,
+and atomic ignored output. It remains unimplemented and unlaunched.

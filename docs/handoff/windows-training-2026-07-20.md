@@ -102,6 +102,17 @@ disabled advancement, so the five-level proposal cannot be launched as a
 training curriculum. Its acceptance and any later progression schedule remain
 owner decisions.
 
+The proposed
+[no-update integrated-route probe](../experiments/sanmill-no-update-integrated-route-probe-v1.md)
+would then measure the production rollout path without learning. Its bounded
+matrix contains 30 Sanmill-opponent games and six Sanmill-refereed
+frozen-target controls, explicitly separating normal depth-5 from deliberately
+oversampled depth-12 routes and both learner colors. It requires a fresh
+random model, read-only HumanDB and empty corrected SpecialistDB snapshots,
+corrected Malom reads, no optimiser or checkpoint, identical before/after
+model and data identities, and at most 227,160,000 requested search nodes.
+The proposal is not implemented, preflighted, authorised, or launched.
+
 The focused calibration and current training-referee group reported 13 passed;
 Ruff and `git diff --check` pass. A broader historical bridge run reports 52
 passed and the same four known fail-closed moving-checkout pin failures from
