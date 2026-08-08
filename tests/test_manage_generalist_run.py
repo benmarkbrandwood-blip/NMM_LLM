@@ -64,3 +64,46 @@ def test_common_args_disable_unapproved_training_inputs(tmp_path) -> None:
         "--no-s1b-refresher",
         "--no-opening-forcing",
     } <= set(common)
+
+
+def test_common_args_build_sanmill_fixed_resource_profile(tmp_path) -> None:
+    argv = _required_prepare_args() + [
+        "--engine-profile",
+        "sanmill-fixed-resource",
+        "--self-play-ratio",
+        "0.60",
+        "--sanmill-node-ladder",
+        "1000,5000,25000,100000,500000",
+        "--sanmill-stage-games",
+        "500,500,500,1000,2500",
+    ]
+    args = manager._build_parser().parse_args(argv)
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert common[common.index("--referee-engine") + 1] == "sanmill"
+    assert common[common.index("--opponent-engine") + 1] == "sanmill"
+    assert common[common.index("--curriculum-advance-policy") + 1] == (
+        "fixed-resource"
+    )
+    assert common[common.index("--sanmill-node-ladder") + 1] == (
+        "1000,5000,25000,100000,500000"
+    )
+    assert common[common.index("--sanmill-stage-games") + 1] == (
+        "500,500,500,1000,2500"
+    )
+    assert common[common.index("--self-play-ratio") + 1] == "0.6"
+    assert common[common.index("--diff-start") + 1] == "1"
+    assert common[common.index("--diff-max") + 1] == "5"
+    assert "--minimal-rollouts" in common
+    assert "--no-recovery" in common
+    assert "--heuristic-node-budget" not in common
+
+
+def test_local_profile_keeps_explicit_game_ai_budget(tmp_path) -> None:
+    args = manager._build_parser().parse_args(_required_prepare_args())
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert common[common.index("--heuristic-node-budget") + 1] == "500000"
+    assert "--sanmill-node-ladder" not in common

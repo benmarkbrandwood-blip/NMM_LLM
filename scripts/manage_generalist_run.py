@@ -35,6 +35,8 @@ from scripts import train_s_gen_v2 as trainer
 DEFAULT_NODE_BUDGET = 500_000
 DEFAULT_MAX_GAMES = 5_000
 DEFAULT_SEGMENT_GAMES = 250
+DEFAULT_SANMILL_NODE_LADDER = "1000,5000,25000,100000,500000"
+DEFAULT_SANMILL_STAGE_GAMES = "500,500,500,1000,2500"
 
 
 def _file_sha256(path: Path) -> str:
@@ -80,6 +82,11 @@ def _default_plan_id(commit: str) -> str:
 
 
 def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[str]:
+    self_play_ratio = args.self_play_ratio
+    if self_play_ratio is None:
+        self_play_ratio = (
+            0.60 if args.engine_profile == "sanmill-fixed-resource" else 0.50
+        )
     common_args = [
         "--experiment-id",
         args.experiment_id,
@@ -92,7 +99,7 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--temp-start",
         "0.90",
         "--self-play-ratio",
-        "0.50",
+        str(self_play_ratio),
         "--update-target-every",
         "50",
         "--max-ply",
@@ -107,8 +114,6 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "1",
         "--log-every",
         "50",
-        "--heuristic-node-budget",
-        str(args.heuristic_node_budget),
         "--no-sentinel",
         "--no-value-net",
         "--no-gap-net",
@@ -117,6 +122,32 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--no-s1b-refresher",
         "--no-opening-forcing",
     ]
+    if args.engine_profile == "sanmill-fixed-resource":
+        level_count = len(args.sanmill_node_ladder.split(","))
+        common_args.extend(
+            (
+                "--referee-engine",
+                "sanmill",
+                "--opponent-engine",
+                "sanmill",
+                "--sanmill-node-ladder",
+                args.sanmill_node_ladder,
+                "--sanmill-stage-games",
+                args.sanmill_stage_games,
+                "--curriculum-advance-policy",
+                "fixed-resource",
+                "--diff-start",
+                "1",
+                "--diff-max",
+                str(level_count),
+                "--minimal-rollouts",
+                "--no-recovery",
+            )
+        )
+    else:
+        common_args.extend(
+            ("--heuristic-node-budget", str(args.heuristic_node_budget))
+        )
     specialist_db = getattr(args, "specialist_db", None)
     if specialist_db:
         common_args.extend(("--specialist-db", str(Path(specialist_db).resolve())))
@@ -200,10 +231,32 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SEGMENT_GAMES,
     )
     prepare.add_argument(
+        "--engine-profile",
+        choices=("local-game-ai", "sanmill-fixed-resource"),
+        default="local-game-ai",
+        help="Explicit opponent/referee and resource-curriculum profile",
+    )
+    prepare.add_argument(
+        "--self-play-ratio",
+        type=float,
+        default=None,
+        help="Frozen-target share; defaults to 0.50 local or 0.60 Sanmill",
+    )
+    prepare.add_argument(
         "--heuristic-node-budget",
         type=int,
         default=DEFAULT_NODE_BUDGET,
         help="Technical fixed-work setting; normally selected by the Agent",
+    )
+    prepare.add_argument(
+        "--sanmill-node-ladder",
+        default=DEFAULT_SANMILL_NODE_LADDER,
+        help="Comma-separated fixed-node ceilings for the Sanmill profile",
+    )
+    prepare.add_argument(
+        "--sanmill-stage-games",
+        default=DEFAULT_SANMILL_STAGE_GAMES,
+        help="Comma-separated global game durations for the Sanmill profile",
     )
     prepare.add_argument(
         "--max-ply",
