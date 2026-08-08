@@ -1,0 +1,34 @@
+{
+  "bounded_work": {
+    "complete_games": 4,
+    "frozen_target_games": 4,
+    "maximum_logical_plies": 480,
+    "maximum_requested_search_node_ceilings": 0,
+    "maximum_search_calls": 0,
+    "search_opponent_games": 0
+  },
+  "claim_boundary": "Bounded no-update completion evidence for immutable parent schedule indices 32 through 35 only; not training, strength evaluation, node-ladder selection, or launch authority.",
+  "decision_rules": {
+    "diagnosis_only": true,
+    "execution_requires_explicit_authority": true,
+    "no_automatic_escalation": true,
+    "no_retry": true,
+    "preserve_parent_schedule_identity": true,
+    "publish_success_or_failure_atomically": true,
+    "refuse_output_overwrite": true,
+    "training_launch": false
+  },
+  "experiment_id": "sanmill-no-update-frozen-target-controls-continuation-v1",
+  "parent_plan": {
+    "path": "docs/experiments/sanmill-no-update-integrated-route-probe-v1.json",
+    "plan_identity": "7aa079dcf59556d35f3fbd58072b6baa8c9f798e087cc336e29c8309552e3cfb",
+    "raw_sha256": "b422ea44fad5fa4181294a4bc3d6e77a48692b43672ccc2ed6976d87f1aabe36"
+  },
+  "plan_identity": "1a554be7d9c23c9b4f4ed5f932fc6318185c7b9cd274b655196449cc27598de6",
+  "schedule_range": {
+    "end_scheduled_index_exclusive": 36,
+    "start_scheduled_index": 32
+  },
+  "schema_version": "nmm.sanmill-no-update-route-continuation-plan.v1",
+  "status": "prepared_unlaunched"
+}
