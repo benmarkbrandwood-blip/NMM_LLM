@@ -1,0 +1,370 @@
+{
+  "schema_version": "nmm.sanmill-node-throughput-calibration-plan.v1",
+  "status": "designed_unlaunched",
+  "experiment_id": "dev-v4-sanmill-refereed-fresh-v1",
+  "claim_boundary": "engine-only fixed-position throughput evidence; no candidate, trainer, optimizer, database, strength evaluation, node-ladder selection, smoke, or long training run",
+  "sanmill_runtime": {
+    "commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c",
+    "binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "binary_size": 5641216,
+    "strict_referee_profile": "mif-stable-moving-v1",
+    "strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "rules_identity_sha256": "3e62cb93a1e0afe4534ce4824d233344816050b547bb8761dd7fe985d8ad399f"
+  },
+  "scope": {
+    "candidate_model": false,
+    "trainer": false,
+    "optimizer": false,
+    "checkpoint": false,
+    "human_db": false,
+    "specialist_db": false,
+    "malom_db": false,
+    "perfect_db": false,
+    "opening_book": false,
+    "patches_or_random_fallback": false
+  },
+  "measurement": {
+    "modes": [
+      "cold_process",
+      "warm_sequence"
+    ],
+    "node_budgets": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "repetitions_per_cell": 9,
+    "seed": 42,
+    "depth_limit": null,
+    "protocol_timeout_seconds": 10.0,
+    "search_timeout_seconds": 300.0,
+    "ordering": "chronological-roots-rotated-budgets-v1",
+    "percentile_method": "nearest-rank",
+    "requested_node_ceiling_total": 90864000,
+    "process_launch_ceiling": 405
+  },
+  "source_game": {
+    "evidence_relative_path": "docs/evidence/sanmill-strict-uci-bridge-smoke-v2-2026-07-25.json",
+    "evidence_sha256": "7ec31fdce3086adced94fe07ac13fadcf3f4040a78d12010b320bf4533002d7a",
+    "semantic_identity": "ae51a16b726e7227f499f054310fed5fbd4b158d8f1b998a4d8cb65d1f7c27bc",
+    "actions": [
+      "d6",
+      "f4",
+      "d2",
+      "b4",
+      "g4",
+      "d7",
+      "a4",
+      "d1",
+      "e4",
+      "d5",
+      "d3",
+      "f6",
+      "f2",
+      "b2",
+      "c3",
+      "e3",
+      "b6",
+      "c4",
+      "e4-e5",
+      "d7-g7",
+      "e5-e4",
+      "d5-e5",
+      "a4-a1",
+      "b4-a4",
+      "b6-b4",
+      "g7-d7",
+      "g4-g7",
+      "e5-d5",
+      "e4-e5",
+      "a4-a7",
+      "a1-a4",
+      "d1-a1",
+      "d2-d1",
+      "b2-d2",
+      "g7-g4",
+      "d7-g7",
+      "b4-b2",
+      "a7-d7",
+      "e5-e4",
+      "d7-a7",
+      "a4-b4",
+      "g7-d7",
+      "d6-b6",
+      "xd2",
+      "f6-d6",
+      "xd1",
+      "d3-d2",
+      "xf4",
+      "a7-a4",
+      "f2-f4",
+      "xa4",
+      "d6-f6",
+      "f4-f2",
+      "xf6",
+      "d5-d6",
+      "b4-a4",
+      "a1-d1",
+      "f2-f4",
+      "xc4",
+      "e3-d3",
+      "f4-f2",
+      "xd7",
+      "d3-f4",
+      "a4-b4",
+      "xf4"
+    ],
+    "actions_sha256": "830e0a6fcec325589683fd532f3f992ad3afadf72470949df5d4262e92f1f1e7"
+  },
+  "positions": [
+    {
+      "id": "placement-empty",
+      "stratum": "placement",
+      "purpose": "measure the empty-board opening-depth path and its low actual-node utilization",
+      "history_token_count": 0,
+      "expected_state": {
+        "fen": "********/********/******** w p p 0 9 0 9 0 0 -1 -1 -1 -1 0 0 1 ids:nodes",
+        "side_to_move": "white",
+        "phase": "placing",
+        "action": "place",
+        "action_token_count": 0,
+        "logical_ply_count": 0,
+        "logical_plies_by_side": [
+          0,
+          0
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "history_sha256": "3399f97a1de994f4513ae6a7dabb0377392ddea95def7bceb242456d81444e09",
+        "legal_action_count": 24,
+        "legal_actions_sha256": "fff579be0736ea675ff82bb56b07869176fd08ef464436c840e58fd71fd2a33d",
+        "state_identity": "4a2cf4f8b041edf6e598b1e261039aaae5e6049aa1c7915a156b2e4e8b73f3be"
+      },
+      "source": {
+        "historical_turn": 1,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "placement-mid",
+      "stratum": "placement",
+      "purpose": "measure a mid-placement root with thirteen legal placements",
+      "history_token_count": 11,
+      "expected_state": {
+        "fen": "@*O*O***/O*@*O*@*/@*O*@*O* b p p 6 3 5 4 0 0 -1 -1 -1 -1 0 0 6 ids:nodes",
+        "side_to_move": "black",
+        "phase": "placing",
+        "action": "place",
+        "action_token_count": 11,
+        "logical_ply_count": 11,
+        "logical_plies_by_side": [
+          6,
+          5
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "history_sha256": "8db2b76df1f6345b7a931fdf79d371ce86ea08b1d5f7ad4922c7fd25aee1e80f",
+        "legal_action_count": 13,
+        "legal_actions_sha256": "ac775178a37bb2fcc88158997a10a30a35aab781ebab1b417ec23fc69e454306",
+        "state_identity": "bf84603bf67aab8d53bf0c2a10704032d79d8771910d2c7095370fa0df9b72b4"
+      },
+      "source": {
+        "historical_turn": 12,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "placement-last",
+      "stratum": "placement",
+      "purpose": "measure the final placement boundary before movement begins",
+      "history_token_count": 17,
+      "expected_state": {
+        "fen": "@*O@OO**/O@@OO@@O/@*O*@*O* b p p 9 0 8 1 0 0 -1 -1 -1 -1 0 0 9 ids:nodes",
+        "side_to_move": "black",
+        "phase": "placing",
+        "action": "place",
+        "action_token_count": 17,
+        "logical_ply_count": 17,
+        "logical_plies_by_side": [
+          9,
+          8
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 0,
+        "repetition_history_length": 0,
+        "history_sha256": "35695d4e4808f7557d4d407fb315299eae645efbc29a87961e74fbb1c1bf923a",
+        "legal_action_count": 7,
+        "legal_actions_sha256": "ca6bfed5fc489a4be03930b85e3e9fef071b0cfd611485d949e75bcd049d9dcf",
+        "state_identity": "364dc4aa6698ecc584bbeb1cb803708213e7ad7905f531fde0ebd04c121f1353"
+      },
+      "source": {
+        "historical_turn": 18,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "moving-initial",
+      "stratum": "movement",
+      "purpose": "measure the first stable movement root under origin-counted repetition",
+      "history_token_count": 18,
+      "expected_state": {
+        "fen": "@*O@OO@*/O@@OO@@O/@*O*@*O* w m s 9 0 9 0 0 0 -1 -1 -1 -1 0 0 10 ids:nodes",
+        "side_to_move": "white",
+        "phase": "moving",
+        "action": "select",
+        "action_token_count": 18,
+        "logical_ply_count": 18,
+        "logical_plies_by_side": [
+          9,
+          9
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 1,
+        "repetition_history_length": 1,
+        "history_sha256": "f000196da9cf3085483d85e64412ba00bb907e152287181092f38a2cbe027987",
+        "legal_action_count": 5,
+        "legal_actions_sha256": "58da17045f6a7108534b61f9a28fc0747e85f99928c3332621b9a436242f5652",
+        "state_identity": "f4bf6a62f313f89e94cd14e4d7f4c3841d6287f93bfab64528a4c1b8ae3ae86d"
+      },
+      "source": {
+        "historical_turn": 19,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "moving-mid",
+      "stratum": "movement",
+      "purpose": "measure a full-material movement root after eleven no-capture plies",
+      "history_token_count": 29,
+      "expected_state": {
+        "fen": "@O*@OO@*/O@@OO@O*/@O**@O@* b m s 9 0 9 0 0 0 -1 -1 -1 -1 0 11 15 ids:nodes",
+        "side_to_move": "black",
+        "phase": "moving",
+        "action": "select",
+        "action_token_count": 29,
+        "logical_ply_count": 29,
+        "logical_plies_by_side": [
+          15,
+          14
+        ],
+        "no_capture_count": 11,
+        "repetition_current_count": 1,
+        "repetition_history_length": 12,
+        "history_sha256": "40124d6f81a10f2392e1193be554c90dc3d8dd3c9527dd6fdb1c248297f5abb0",
+        "legal_action_count": 8,
+        "legal_actions_sha256": "a34c72f7399a250744839485ef852ce41b523d7b53b240b4c76e47ee58a19c12",
+        "state_identity": "4d7d9d8aa56a2534c29bb07eec64673c4613f4b2df0eaa1c674e3e9ea6c0b678"
+      },
+      "source": {
+        "historical_turn": 30,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "moving-reduced",
+      "stratum": "movement",
+      "purpose": "measure movement after captures reset the no-progress and repetition windows",
+      "history_token_count": 46,
+      "expected_state": {
+        "fen": "@*O@OO@*/@*@O*OOO/@*O**@*@ w m s 8 0 8 0 0 0 -1 -1 -1 -1 0 0 23 ids:nodes",
+        "side_to_move": "white",
+        "phase": "moving",
+        "action": "select",
+        "action_token_count": 46,
+        "logical_ply_count": 44,
+        "logical_plies_by_side": [
+          22,
+          22
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 1,
+        "repetition_history_length": 1,
+        "history_sha256": "f6b1d6d6bee54dc0274b00f71e636919d4bcf40b7f9d5cb878769ca66762cb4a",
+        "legal_action_count": 7,
+        "legal_actions_sha256": "572d79b675d7fe487b3744ee265b089285aacb0c2f74a30d449659f0a0294a18",
+        "state_identity": "198280e452f7a518a931741ed8970d8f75356bc072560e0c93bf5f3f87451ddb"
+      },
+      "source": {
+        "historical_turn": 45,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "flying-black",
+      "stratum": "flying",
+      "purpose": "measure the high-branching flying path for the three-piece side",
+      "history_token_count": 62,
+      "expected_state": {
+        "fen": "**O*@O**/@**OOO*O/**O*@*O* b m s 8 0 3 0 0 0 -1 -1 -1 -1 0 0 28 ids:nodes",
+        "side_to_move": "black",
+        "phase": "moving",
+        "action": "select",
+        "action_token_count": 62,
+        "logical_ply_count": 55,
+        "logical_plies_by_side": [
+          28,
+          27
+        ],
+        "no_capture_count": 0,
+        "repetition_current_count": 1,
+        "repetition_history_length": 1,
+        "history_sha256": "4c6d0f6ea460322733c2c87467fe93a473c1b50242fb959fc4ba602469e69c7d",
+        "legal_action_count": 39,
+        "legal_actions_sha256": "d0b7b7894d34157873474d579762f6191f6d0920beaa47fa2345c7ee0be411a1",
+        "state_identity": "785bf35af3dab29322412a30067b002042bda5f4606c97003373a6f0f2cefd8d"
+      },
+      "source": {
+        "historical_turn": 56,
+        "boundary": "before_search"
+      }
+    },
+    {
+      "id": "compound-capable",
+      "stratum": "movement-removal",
+      "purpose": "record whether each node ceiling selects the historically observed mill-plus-compulsory-removal turn",
+      "history_token_count": 63,
+      "expected_state": {
+        "fen": "**O**O**/@*@OOO*O/**O*@*O* w m s 8 0 3 0 0 0 -1 -1 -1 -1 0 1 29 ids:nodes",
+        "side_to_move": "white",
+        "phase": "moving",
+        "action": "select",
+        "action_token_count": 63,
+        "logical_ply_count": 56,
+        "logical_plies_by_side": [
+          28,
+          28
+        ],
+        "no_capture_count": 1,
+        "repetition_current_count": 1,
+        "repetition_history_length": 2,
+        "history_sha256": "4c8f1c48cfc0d8b1d6fb866f7357a1418968fca6b54f835b2b0d55e983e75c34",
+        "legal_action_count": 12,
+        "legal_actions_sha256": "98be929fa36a4c1960cf05d7c6ede2b0b1e967ae4dbec253bf6d327f06ac1787",
+        "state_identity": "8bb79e24004226f3458e296cfe19a1fd2daa959e35c2a8c10b243859c4fabd82"
+      },
+      "source": {
+        "historical_turn": 57,
+        "boundary": "before_search"
+      }
+    }
+  ],
+  "decision_rules": {
+    "auto_select_training_ladder": false,
+    "required_review": [
+      "actual-node utilization by phase and ceiling",
+      "median, p90, and median absolute deviation of search latency",
+      "cold-process versus warm-sequence cache effects",
+      "completed depth, search-call, and compulsory-removal behavior",
+      "semantic determinism within every mode/root/budget cell",
+      "separate integrated no-update route cost before games-per-hour estimates"
+    ],
+    "forbidden_inference": "results do not measure playing strength, advancement thresholds, candidate quality, training updates, or end-to-end games per hour",
+    "next_decision": "after evidence review, the product owner must explicitly approve any proposed node ladder and any integrated route probe"
+  },
+  "plan_identity": "2dff4e6d37f36af90d9e90943dad8f4bcccbec802615f7eedc1103af32a51290"
+}

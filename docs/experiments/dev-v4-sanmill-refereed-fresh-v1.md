@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `smoke_002_completed_calibration_pending`
+Status: `smoke_002_completed_calibration_designed_unlaunched`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -268,4 +268,10 @@ The smoke passes only the integration gate. Its single Sanmill-opponent game
 and 1,000-node ceiling are not representative throughput evidence. No further
 smoke, exact resume, long run, node ladder, or advancement rule is authorised.
 A separate non-training fixed-position node-throughput calibration is the next
-safe preparation step.
+safe preparation step. Its bounded engine-only contract is now defined in the
+[Sanmill node-throughput calibration v1](sanmill-node-throughput-calibration-v1.md)
+document and content-addressed JSON plan. The design covers eight replayed
+placement, movement, flying, and compound-capable roots; five node ceilings;
+nine repetitions; and separate cold-process and warm-sequence modes. It does
+not load a model or trainer, and it cannot select a node ladder automatically.
+The calibration has not been launched and has no launch authorization.
