@@ -1,0 +1,185 @@
+{
+  "analysis": {
+    "confidence": {
+      "interpretation": "fixed-corpus engineering interval, not a population confidence interval",
+      "method": "normal-interval-on-pair-score-difference",
+      "z": 1.96
+    },
+    "decision_rule": {
+      "candidate_ahead": "lower_bound > 0",
+      "candidate_behind": "upper_bound < 0",
+      "inconclusive": "otherwise",
+      "integrity_failure": "invalid"
+    },
+    "pair_score_difference": "candidate_score_as_white + candidate_score_as_black - 1",
+    "per_class_reports": [
+      "source_stratum",
+      "candidate_color",
+      "termination_reason",
+      "strict_independence_membership"
+    ],
+    "primary_unit": "one unique start with two color-role-swapped games",
+    "result_based_early_stop": false,
+    "strict_independence_is_sensitivity_analysis": true
+  },
+  "baseline": {
+    "draw_on_human_experience": true,
+    "explicit_depth": null,
+    "fixed_node_ceiling_per_logical_turn": 500000,
+    "identity": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+    "kind": "sanmill-fixed-node-search",
+    "random_failure_fallback": false,
+    "role": "final-training-curriculum-endpoint-reference",
+    "search_data_sources": {
+      "human_db": false,
+      "opening_book": false,
+      "patches_or_traps": false,
+      "perfect_db": false
+    },
+    "strict_options": {
+      "Algorithm": "2",
+      "IDSEnabled": "true",
+      "MoveTimeMs": "0",
+      "SearchShuffleSeed": "42",
+      "Shuffling": "false",
+      "StrictFailurePolicy": "true",
+      "StrictRefereeProfile": "mif-stable-moving-v1",
+      "Threads": "1"
+    }
+  },
+  "candidate": {
+    "bundle": {
+      "identity": "c2652119b64a2808ebcd5e7dc661873f3f897065b7d529bd9e261328f0981f23",
+      "manifest_sha256": "95000bf90961bcc8b1386f5bc507fe0ab16f9822d02efcd783e2133dd01e6188",
+      "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/candidate-route-bundle",
+      "policy_weights_sha256": "9f31d1ab085f8f38921a486236d0089bb9de929f85a0239ad575b5992d218ae3",
+      "target_weights_sha256": "219734b8cae1364d823e3225c4040f9b36870cee35e63d7a85a90d9c201e3459"
+    },
+    "checkpoint": {
+      "file_sha256": "df00861a5ced53b6c9b16ed89f2762d41a82f1d74fce970b5d0bdf6adba4ac4d",
+      "id": "managed-sanmill-corrected-retained-v2-segment-0020:checkpoint:00000006",
+      "path": "learned_ai/checkpoints/scaffolded/s_gen_v2_sanmill_refereed/managed-sanmill-corrected-retained-v2/segments/segment-0020/latest.pt",
+      "payload_sha256": "8b4017ce856012fa3c4d578c56c5f32a6d5ebae97b9f17c6cbd2c5228146de19"
+    },
+    "components": {
+      "gap_net": false,
+      "human_db": true,
+      "malom_tablebase": true,
+      "sentinel": false,
+      "specialist_db": true,
+      "value_net": false
+    },
+    "device": "cpu",
+    "move_selection": "deterministic-policy-argmax",
+    "precision": "float32",
+    "route": "s-gen-v2-training-aligned-v1",
+    "route_feature_width": 134,
+    "sim_ply_depth": 5,
+    "training_seed": 42
+  },
+  "claim_boundary": {
+    "full_corpus_is_data_disjoint": false,
+    "multiple_training_seeds_available": false,
+    "publication_allowed": false,
+    "promotion_allowed": false,
+    "strength_claim": "only the frozen fixed-corpus relation to the named baseline",
+    "training_allowed": false
+  },
+  "corpus": {
+    "executable_corpus_identity": "417d74ebe01734c43e48531cab81ba742bc89e455f1c834ea7e31006b886f8b9",
+    "file_sha256": "3bcf9db2d003d10769b88767763eb7dfb950eecbff578b7c7ff7d1c208e19771",
+    "operational_schedule": {
+      "book": 22,
+      "human_db": 21,
+      "perfect_db": 21,
+      "records": 64
+    },
+    "ordered_records_identity": "e8a1828cb1d7e0e86c686d934e87934c6c12e6a8cf7610974ed8035937ab8cff",
+    "path": "docs/experiments/sanmill-layered-opening-prefix-v2-executable-corpus-2026-08-01.json",
+    "prefix_logical_plies": 12,
+    "runtime_fallback": "none",
+    "strict_independence_audit": {
+      "audit_file_sha256": "6ca9d040e55ed2fdabf1b6bf079c2f2164615fd15e818c99888390dee4de1678",
+      "audit_identity": "df5b04128e4cf21f5325e0601596f0fe74b8f54fb6708c6dfd2c6b79fffdc21e",
+      "count": 34,
+      "path": "docs/evidence/sanmill-corrected-retained-v2-heldout-exposure-2026-08-09.json",
+      "strata": {
+        "book": 13,
+        "perfect_db": 21
+      },
+      "subset_identity": "a01be0c72b395f2a624c2f5ae7538d9d08eaccde0a392dba566bebe2221806f8"
+    }
+  },
+  "data_identities": {
+    "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_malom_policy": "masked-unversioned",
+    "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db": "ea2df42d6df837588e1a2d87e37bd025c2b612f87695aa9ae16da064aebf62a8",
+    "specialist_db_label_version": "sector-corrected-v1"
+  },
+  "decision_date": "2026-08-09",
+  "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+  "evidence_gaps": {
+    "ablation_in_primary_run": false,
+    "cross_seed_training_variance": "unknown; only retained seed 42 exists",
+    "ordinary_supervised_validation_curve": "not applicable to this RL run",
+    "phase_isolation": "not claimed; games begin from placement prefixes and continue through rules termination"
+  },
+  "gates": [
+    "clean published dev implementation commit",
+    "plan and authorization hashes match",
+    "candidate bundle and checkpoint identities verify",
+    "HumanDB, SpecialistDB and Malom identities verify read-only",
+    "executable corpus and exposure audit identities verify",
+    "Sanmill runtime, strict referee and search identities verify",
+    "focused runner, route, replay, statistics and ledger tests pass",
+    "mandatory Malom and label-provenance tests pass",
+    "no trainer or competing evaluator owns the resources",
+    "specification and result targets are absent"
+  ],
+  "objective": "Measure the retained candidate against the frozen final Sanmill curriculum teacher on a preregistered color-swapped corpus, with a zero-database-match sensitivity subset and no automatic promotion claim.",
+  "outputs": {
+    "authorization": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/authorization.json",
+    "ledger": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/games.jsonl",
+    "plan": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/plan.json",
+    "report": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/report.json",
+    "specification": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/spec.json"
+  },
+  "plan_id": "sanmill-corrected-retained-v2-heldout-eval-v1",
+  "plan_identity": "212076e9423b671b83783efef411db3b4a56c8c67ae36a463d381d6939d4d982",
+  "protocol": {
+    "candidate_failure_policy": "fail-closed; never convert an adapter error or illegal move into a loss",
+    "candidate_history_features": "not available in the trained architecture; Sanmill still owns adjudication history",
+    "color_role_swap": true,
+    "game_score": {
+      "draw": 0.5,
+      "loss": 0.0,
+      "win": 1.0
+    },
+    "max_post_prefix_logical_plies": 1536,
+    "max_ply_disposition": "incomplete-invalid-not-draw",
+    "prefix_replay": "exact full action history in both games of each pair",
+    "referee": "Sanmill strict complete-history state",
+    "runtime_seed": 42,
+    "sanmill_failure_policy": "fail-closed with no database, shallow-search, patch or random fallback"
+  },
+  "rules": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "sha256:81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "ruleset_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.sanmill-heldout-evaluation-plan.v1",
+  "status": "frozen_awaiting_runner_and_final_preflight",
+  "workload": {
+    "games": 128,
+    "max_active_hours": 6.0,
+    "pairs": 64,
+    "safe_exact_resume_same_spec": true,
+    "unique_starts": 64
+  }
+}
