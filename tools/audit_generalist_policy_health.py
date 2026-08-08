@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sqlite3
 import subprocess
 import sys
 from collections import Counter
@@ -65,6 +66,38 @@ def _resolve(value: str) -> Path:
 
 def _relative(path: Path) -> str:
     return path.resolve().relative_to(ROOT.resolve()).as_posix()
+
+
+def _sqlite_asset_identity(path: Path) -> str:
+    """Reproduce the immutable SQLite identity used by training preflight."""
+    uri = f"{path.resolve().as_uri()}?mode=ro"
+    connection = sqlite3.connect(uri, uri=True)
+    try:
+        connection.execute("PRAGMA query_only=ON")
+        quick_check = connection.execute("PRAGMA quick_check").fetchone()
+        if quick_check is None or quick_check[0] != "ok":
+            raise RuntimeError("SQLite quick_check did not return ok")
+        stat = path.stat()
+        return canonical_sha256(
+            {
+                "size": stat.st_size,
+                "modified_ns": stat.st_mtime_ns,
+                "page_count": connection.execute(
+                    "PRAGMA page_count"
+                ).fetchone()[0],
+                "page_size": connection.execute(
+                    "PRAGMA page_size"
+                ).fetchone()[0],
+                "schema_version": connection.execute(
+                    "PRAGMA schema_version"
+                ).fetchone()[0],
+                "user_version": connection.execute(
+                    "PRAGMA user_version"
+                ).fetchone()[0],
+            }
+        )
+    finally:
+        connection.close()
 
 
 def _git_commit() -> str:
@@ -201,8 +234,9 @@ def main(argv: list[str] | None = None) -> int:
         expected_specialist = assets.get("specialist_db")
         if specialist_sha256 != expected_specialist:
             raise RuntimeError("SpecialistDB identity differs from the checkpoint")
+        human_identity = _sqlite_asset_identity(human_path)
         human_sha256 = _sha256(human_path)
-        if human_sha256 != assets.get("human_db"):
+        if human_identity != assets.get("human_db"):
             raise RuntimeError("HumanDB identity differs from the checkpoint")
         malom_manifest = load_dataset_manifest(malom_manifest_path)
         if malom_manifest.manifest_sha256 != assets.get("malom_tablebase"):
@@ -301,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 "malom_std_secval_sha256": anchor.sha256,
                 "specialist_db": _relative(specialist_path),
                 "specialist_db_sha256": specialist_sha256,
+                "human_db_identity": human_identity,
                 "human_db_sha256": human_sha256,
                 "checkpoint_asset_identities": assets,
             },
