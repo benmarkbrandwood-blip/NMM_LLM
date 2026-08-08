@@ -1054,15 +1054,36 @@ def recover_interrupted_segment(
         return managed_status(plan_path, authorization_path)
 
     latest = incomplete / "latest.pt"
-    if not latest.is_file():
-        raise ManagedContractError("interrupted segment has no latest.pt to recover")
-    envelope = load_checkpoint(latest, map_location="cpu")
+    checkpoint_origin = "interrupted_latest"
+    if latest.is_file():
+        source_checkpoint = latest
+        expected_checkpoint_run = _segment_run_id(plan, segment_index)
+    else:
+        if technical_repair is not None:
+            raise ManagedContractError(
+                "failed segment has no latest.pt; refusing technical recovery"
+            )
+        if not completed_events:
+            raise ManagedContractError(
+                "first-segment interruption has no checkpoint to recover"
+            )
+        source_checkpoint = Path(
+            str(completed_events[-1].details["checkpoint"])
+        ).resolve(strict=True)
+        expected_checkpoint_run = str(completed_events[-1].details["run_id"])
+        checkpoint_origin = "previous_completed_boundary"
+    envelope = load_checkpoint(source_checkpoint, map_location="cpu")
     game_count = int(envelope.payload.trainer_state["game_count"])
-    if envelope.descriptor.run_id != _segment_run_id(plan, segment_index):
+    if envelope.descriptor.run_id != expected_checkpoint_run:
         raise ManagedContractError("interrupted checkpoint run identity differs")
-    if not previous_completed_games < game_count < expected_games:
+    if checkpoint_origin == "interrupted_latest":
+        if not previous_completed_games < game_count < expected_games:
+            raise ManagedContractError(
+                "interrupted checkpoint game_count is outside the recoverable window"
+            )
+    elif game_count != previous_completed_games:
         raise ManagedContractError(
-            "interrupted checkpoint game_count is outside the recoverable window"
+            "completed parent checkpoint does not match its segment boundary"
         )
 
     stamp = datetime.now().strftime("%Y%m%dT%H%M%SZ")
@@ -1084,8 +1105,10 @@ def recover_interrupted_segment(
         if src.exists():
             shutil.copy2(src, backup_dir / src.name)
     specialist_identity = _live_specialist_identity(specialist_path)
+    if checkpoint_origin == "interrupted_latest":
+        source_checkpoint = quarantine / "latest.pt"
     recovery_checkpoint = _write_recovery_checkpoint(
-        quarantine / "latest.pt",
+        source_checkpoint,
         Path(plan.control_dir) / "recovery" / f"segment-{segment_index:04d}.pt",
         specialist_identity=specialist_identity,
         plan=plan,
@@ -1107,6 +1130,7 @@ def recover_interrupted_segment(
         "specialist_db_sha256": str(specialist_identity["sha256"]),
         "runtime_commit": runtime_commit,
         "checkpoint_recovery_reason": checkpoint_reason,
+        "checkpoint_origin": checkpoint_origin,
     }
     if technical_repair is not None:
         details["technical_repair"] = technical_repair
