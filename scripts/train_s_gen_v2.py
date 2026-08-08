@@ -1207,12 +1207,23 @@ def _check_advance(win_history_heuristic: deque, rolling_win: int, difficulty: i
 # ── Frozen-model opponent ─────────────────────────────────────────────────────
 
 class FrozenModelOpponent:
-    def __init__(self, model: ScaffoldedPolicyNet, device: torch.device, sentinel=None, value_net=None):
+    def __init__(
+        self,
+        model: ScaffoldedPolicyNet,
+        device: torch.device,
+        sentinel=None,
+        value_net=None,
+        *,
+        lookahead_advisor=None,
+        specialist_db=None,
+    ):
         self._model     = copy.deepcopy(model).to(device)
         self._model.eval()
         self._device    = device
         self._sentinel  = sentinel
         self._value_net = value_net
+        self._lookahead_advisor = lookahead_advisor
+        self._specialist_db = specialist_db
         self.last_was_blunder = False
         self.last_thinking    = "frozen"
 
@@ -1226,7 +1237,9 @@ class FrozenModelOpponent:
                                              sentinel_advisor=self._sentinel,
                                              db=None,
                                              value_net=self._value_net,
-                                             lookahead_advisor=None)
+                                             lookahead_advisor=self._lookahead_advisor,
+                                             specialist_db=self._specialist_db,
+                                             sdb_min_samples=3)
         if enc is None or not enc.legal_moves:
             return {}
         feat_t = torch.tensor(enc.feat_matrix, dtype=torch.float32).to(self._device)
@@ -2155,7 +2168,14 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         print(f"[s_gen_v2] Resuming from ({source_tag}): {resume_path}")
     print(f"[s_gen_v2] feat_dim={MOVE_FEAT_DIM_WITH_LOOKAHEAD}, starting game={start_game}, diff={difficulty}")
 
-    frozen_opp = FrozenModelOpponent(model, device, sentinel=sentinel, value_net=value_net)
+    frozen_opp = FrozenModelOpponent(
+        model,
+        device,
+        sentinel=sentinel,
+        value_net=value_net,
+        lookahead_advisor=lookahead_advisor,
+        specialist_db=specialist_db,
+    )
     # Option C: lookahead uses same frozen snapshot for learner-side simulated moves.
     lookahead_advisor.set_frozen_model(frozen_opp._model, device=device)
     print("[s_gen_v2] LookaheadAdvisor: frozen-model driven learner-side (Option C)")
