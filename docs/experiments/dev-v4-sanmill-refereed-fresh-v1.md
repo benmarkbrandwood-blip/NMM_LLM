@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `exact_resume_parity_smoke_v2_prepared_unlaunched`
+Status: `exact_resume_parity_passed_long_plan_required`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -312,6 +312,9 @@ quarantines both completed v1 outputs. Repair `6e820c1` retains the prohibition
 on weights-only imports while permitting checkpoint-verified continuation
 inside the same lineage. A fully isolated
 [v2 parity smoke](sanmill-refereed-exact-resume-parity-smoke-v2.md) is now
-prepared with new run IDs, outputs, and databases; it remains unlaunched. No
-retained training plan or long-run command is yet authorized by this
-experiment record.
+isolated with new run IDs, outputs, and databases. It completed successfully
+at `b3d049b`: its
+[result record](../evidence/sanmill-refereed-exact-resume-parity-smoke-v2-result-2026-08-08.md)
+proves exact model, optimiser, RNG, trainer/data-state, log, and SpecialistDB
+semantic equality after a real process-boundary resume. No retained training
+plan or long-run command is yet authorized by this experiment record.
