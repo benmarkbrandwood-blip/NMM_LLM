@@ -1,0 +1,720 @@
+{
+  "audit_identity": "df5b04128e4cf21f5325e0601596f0fe74b8f54fb6708c6dfd2c6b79fffdc21e",
+  "candidate_loaded": false,
+  "games_played": 0,
+  "records": [
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-001",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-002",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 75,
+      "source_core_id": "source-core-003",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 131,
+      "source_core_id": "source-core-004",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 13,
+      "source_core_id": "source-core-005",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-006",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 18,
+      "source_core_id": "source-core-007",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-008",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-009",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-010",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 6,
+      "source_core_id": "source-core-011",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-012",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-013",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 1,
+      "source_core_id": "source-core-014",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 68,
+      "source_core_id": "source-core-015",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-016",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 95,
+      "source_core_id": "source-core-017",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-018",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 90,
+      "source_core_id": "source-core-019",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-020",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-021",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-022",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "book",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 124,
+      "source_core_id": "source-core-023",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 94,
+      "source_core_id": "source-core-024",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 179,
+      "source_core_id": "source-core-025",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 76,
+      "source_core_id": "source-core-026",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 114,
+      "source_core_id": "source-core-027",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 54,
+      "source_core_id": "source-core-028",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 150,
+      "source_core_id": "source-core-029",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 31,
+      "source_core_id": "source-core-030",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 63,
+      "source_core_id": "source-core-031",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 147,
+      "source_core_id": "source-core-032",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 77,
+      "source_core_id": "source-core-033",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 119,
+      "source_core_id": "source-core-034",
+      "specialist_db_d4_exposed": true,
+      "specialist_db_empirical_samples": 4,
+      "specialist_db_has_theoretical_label": true,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 67,
+      "source_core_id": "source-core-035",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 103,
+      "source_core_id": "source-core-036",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 33,
+      "source_core_id": "source-core-037",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 111,
+      "source_core_id": "source-core-038",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 41,
+      "source_core_id": "source-core-039",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 149,
+      "source_core_id": "source-core-040",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 107,
+      "source_core_id": "source-core-041",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 25,
+      "source_core_id": "source-core-042",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": true,
+      "human_db_games": 163,
+      "source_core_id": "source-core-043",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "human_db",
+      "strict_independence_subset": false
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-044",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-045",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-046",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-047",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-048",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-049",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-050",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-051",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-052",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-053",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-054",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-055",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-056",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-057",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-058",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-059",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-060",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-061",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-062",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-063",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    },
+    {
+      "human_db_d4_exposed": false,
+      "human_db_games": 0,
+      "source_core_id": "source-core-064",
+      "specialist_db_d4_exposed": false,
+      "specialist_db_empirical_samples": 0,
+      "specialist_db_has_theoretical_label": false,
+      "stratum": "perfect_db",
+      "strict_independence_subset": true
+    }
+  ],
+  "records_identity": "337f0f296feddd30f2115f5a8f2918511dd34ca85021997222adf6838477bcd1",
+  "schema_version": "nmm.heldout-corpus-exposure-audit.v1",
+  "source_identities": {
+    "executable_corpus": "417d74ebe01734c43e48531cab81ba742bc89e455f1c834ea7e31006b886f8b9",
+    "executable_records": "e8a1828cb1d7e0e86c686d934e87934c6c12e6a8cf7610974ed8035937ab8cff",
+    "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "specialist_db": "ea2df42d6df837588e1a2d87e37bd025c2b612f87695aa9ae16da064aebf62a8"
+  },
+  "status": "source_only_no_candidate_loaded_no_games_played",
+  "strict_independence_identity": "a01be0c72b395f2a624c2f5ae7538d9d08eaccde0a392dba566bebe2221806f8",
+  "strict_independence_source_core_ids": [
+    "source-core-001",
+    "source-core-002",
+    "source-core-006",
+    "source-core-008",
+    "source-core-009",
+    "source-core-010",
+    "source-core-012",
+    "source-core-013",
+    "source-core-016",
+    "source-core-018",
+    "source-core-020",
+    "source-core-021",
+    "source-core-022",
+    "source-core-044",
+    "source-core-045",
+    "source-core-046",
+    "source-core-047",
+    "source-core-048",
+    "source-core-049",
+    "source-core-050",
+    "source-core-051",
+    "source-core-052",
+    "source-core-053",
+    "source-core-054",
+    "source-core-055",
+    "source-core-056",
+    "source-core-057",
+    "source-core-058",
+    "source-core-059",
+    "source-core-060",
+    "source-core-061",
+    "source-core-062",
+    "source-core-063",
+    "source-core-064"
+  ],
+  "summary": {
+    "human_db_d4_exposed_count": 30,
+    "per_stratum": {
+      "book": {
+        "human_db_d4_exposed": 9,
+        "records": 22,
+        "specialist_db_d4_exposed": 0
+      },
+      "human_db": {
+        "human_db_d4_exposed": 21,
+        "records": 21,
+        "specialist_db_d4_exposed": 1
+      },
+      "perfect_db": {
+        "human_db_d4_exposed": 0,
+        "records": 21,
+        "specialist_db_d4_exposed": 0
+      }
+    },
+    "record_count": 64,
+    "specialist_db_d4_exposed_count": 1,
+    "strict_independence_count": 34,
+    "strict_independence_stratum_counts": {
+      "book": 13,
+      "perfect_db": 21
+    }
+  }
+}
