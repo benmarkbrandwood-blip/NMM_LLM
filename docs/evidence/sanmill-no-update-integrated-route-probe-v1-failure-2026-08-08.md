@@ -115,6 +115,21 @@ Before requesting any replay, the implementation should:
 3. add focused regressions proving that diagnostics do not weaken comparison,
    change gameplay, or expose a random fallback.
 
+Those implementation prerequisites are now satisfied by commits
+`6fdd66292cec93600df43704b8161ea4e88d4650` and
+`5efae251388bfcda39df66a78082e118108cc112`. The first preserves the
+existing exception and comparison while attaching portable board, state,
+history, terminal, search, move, and action context. The second records the
+completed-sample prefix and failed schedule entry, captures source, model,
+data, host, plan, and runtime before/after identities, and atomically writes a
+distinct no-overwrite `.failure.json` while leaving the completed result
+absent.
+
+The resulting focused group reports 67 passed. The mandatory Malom,
+DB-teacher, and provenance group reports 103 passed and 498 parameterized
+subtests. Ruff and `git diff --check` pass for the changed scope. These are
+diagnostic-integrity results, not a root-cause finding or replay authority.
+
 Only after those changes are independently reviewed and published may a new,
 separately authorized minimal diagnostic reproduction be proposed. A second
 36-game probe must not be the first diagnostic step.

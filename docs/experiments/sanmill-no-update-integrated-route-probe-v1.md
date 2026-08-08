@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `failed_closed_needs_diagnostic_evidence_and_new_authority`
+Status: `failed_closed_diagnostics_implemented_needs_publication_and_authority`
 
 This document defines a bounded measurement for the fresh Sanmill-refereed
 lineage. The content-addressed
@@ -23,9 +23,10 @@ The owner accepted the five probe-only ceilings in the
 requesting implementation. The clean published implementation, readiness
 evidence, final preflight, and one-run launch gates were completed. The run
 authority is consumed by the fail-closed attempt. Structured failure context,
-a minimal diagnostic design, publication of any resulting fix, and new
-explicit authority are now separate gates. No timeout or lack of response may
-choose a default.
+atomic failure quarantine, and their regressions are now implemented in
+commits `6fdd662` and `5efae25`. Publication of the failure evidence and both
+diagnostic commits, a minimal diagnostic design, and new explicit authority
+are now separate gates. No timeout or lack of response may choose a default.
 
 ## Question being measured
 
