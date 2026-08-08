@@ -27,17 +27,43 @@ infrastructure evidence only. The smoke authorization is consumed and no long
 run is authorized. See the
 [successor smoke result](../evidence/successor-training-smoke-result-2026-08-07.md).
 
-Later work on 8 August closed the fresh Sanmill-refereed lineage's terminal
-projection, strict-referee, exact-resume, node-throughput, integrated-route,
-and deterministic resource-schedule gates. The isolated five-game schedule
-smoke exercised all five fixed-node levels and completed five finite A2C
-updates. The product owner then authorized the bounded
+Later work on 8 August closed the first fresh Sanmill-refereed lineage's
+terminal projection, strict-referee, exact-resume, node-throughput,
+integrated-route and deterministic resource-schedule gates. The isolated
+five-game schedule smoke exercised all five fixed-node levels and completed
+five finite A2C updates. The product owner then authorized the bounded
 [`managed-sanmill-v4-fresh-v1` long-run contract](../experiments/sanmill-refereed-managed-long-v1.md):
 at most 5,000 games or 12 active hours, 120 logical plies per game, and
-250-game exact-resume process segments. That authority permits creation of
-the ignored immutable local plan and authorization, final read-only preflight,
-and launch only if every fail-closed gate passes. It does not authorize
-publication or promotion.
+250-game exact-resume process segments. That run later completed all 5,000
+games and 20 segments without an infrastructure failure, but it is now
+learning-invalid and must not be resumed or promoted. A fixed-state audit
+found that its final policy selected a value-downgrading Malom move on 27 of
+29 critical positions and had a mean preserving-minus-downgrading logit
+margin of about -0.730.
+
+The root-cause reproduction found two independent training defects. Commit
+`4b0420755428d73581108f6e93cd95407b1b72dc` negates value bootstrap when a
+successor belongs to the opponent-to-move perspective. Commit
+`0fbc9510400c88a493b6e2efdcf7c9e92ae8b150` makes frozen-target opponents use
+the same lookahead and SpecialistDB feature route as the learner. A separate
+fresh 500-game smoke then completed 110 finite A2C updates and passed the
+prespecified policy-direction limits: 28 of 29 critical argmax choices
+preserved value and the mean logit margin was +0.0044. Its checkpoint and
+database remain smoke evidence only and cannot seed retained training.
+
+Current-source continuous-versus-segmented exact-resume parity passed and is
+recorded at `fa2656f8683f8464b14923d84e3c77a8500fd239`. Commit
+`c070739a9c94938528e76083cf3ef69f997c7a5a` then added an optional,
+hash-bound policy-health audit before each managed segment can become an
+exact-resume parent. Its focused and mandatory regression evidence plus a
+real-checkpoint controller exercise are recorded at
+`9409b4bcdc2b4c559fb75495965dde4f46dde87f`. The replacement
+[`managed-sanmill-corrected-retained-v2` contract](../experiments/sanmill-corrected-retained-long-v2.md)
+is frozen at `bbe2d32cc2c36153f3c359698aa3c74548eb8fbd`. It requires fresh
+seed-42 weights, a new empty corrected SpecialistDB, the same measured
+5,000-game fixed-node curriculum, and policy-health quarantine after every
+250 games. At this handover edit the ignored local plan and database have not
+yet been created and no replacement training process has started.
 
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
