@@ -14,6 +14,10 @@ from scripts import diagnose_sanmill_integrated_route as diagnostic_runner
 
 
 _ROOT = Path(__file__).resolve().parents[1]
+_INDEX_ONE_PLAN = (
+    _ROOT
+    / "docs/experiments/sanmill-no-update-integrated-route-diagnostic-index-1-v1.json"
+)
 
 
 def _write_reidentified(payload: dict, target: Path) -> None:
@@ -37,6 +41,26 @@ def test_tracked_diagnostic_selects_only_parent_index_zero() -> None:
     )
     assert diagnostic.selected == diagnostic.parent.schedule[0]
     assert effective.schedule == (diagnostic.parent.schedule[0],)
+    assert effective.node_budgets == (1_000,)
+    assert effective.payload["bounded_work"] == {
+        "complete_games": 1,
+        "search_opponent_games": 1,
+        "frozen_target_games": 0,
+        "maximum_logical_plies": 120,
+        "maximum_search_calls": 60,
+        "maximum_requested_search_node_ceilings": 60_000,
+    }
+
+
+def test_tracked_index_one_diagnostic_preserves_parent_entry() -> None:
+    diagnostic = probe.load_probe_diagnostic_plan(_INDEX_ONE_PLAN)
+    effective = probe.diagnostic_probe_plan(diagnostic)
+
+    assert diagnostic.identity == (
+        "298700a21e11fcff1f8789c2d6fb166af03c461f31cdc94e3adb2ed1675ffc2f"
+    )
+    assert diagnostic.selected == diagnostic.parent.schedule[1]
+    assert effective.schedule == (diagnostic.parent.schedule[1],)
     assert effective.node_budgets == (1_000,)
     assert effective.payload["bounded_work"] == {
         "complete_games": 1,
