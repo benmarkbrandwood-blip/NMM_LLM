@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `exact_resume_parity_smoke_prepared_unlaunched`
+Status: `exact_resume_parity_smoke_v2_prepared_unlaunched`
 
 Experiment ID: `dev-v4-sanmill-refereed-fresh-v1`
 
@@ -299,10 +299,19 @@ controls were run. The final
 binds the four last controls and the complete evidence chain. This remains
 no-update integration evidence, not training or strength evidence.
 
-The next bounded gate is the
-[Sanmill exact-resume parity smoke](sanmill-refereed-exact-resume-parity-smoke-v1.md).
-It compares an uninterrupted two-game route with the same schedule split over
-a fresh and exact-resume process, including finite periodic A2C updates and an
-exact semantic comparison of checkpoint, logs, and SpecialistDB rows. It is
-prepared but unlaunched. No retained training plan or long-run command is yet
-authorized by this experiment record.
+The first
+[Sanmill exact-resume parity smoke](sanmill-refereed-exact-resume-parity-smoke-v1.md)
+compared an uninterrupted two-game route with the same schedule split over a
+fresh and exact-resume process, including finite periodic A2C updates and an
+exact semantic comparison of checkpoint, logs, and SpecialistDB rows. It
+stopped before its second segment because an over-broad
+preflight policy rejected exact resume within an experiment whose identity
+described a fresh lineage. Its
+[failure record](../evidence/sanmill-refereed-exact-resume-parity-smoke-v1-failure-2026-08-08.md)
+quarantines both completed v1 outputs. Repair `6e820c1` retains the prohibition
+on weights-only imports while permitting checkpoint-verified continuation
+inside the same lineage. A fully isolated
+[v2 parity smoke](sanmill-refereed-exact-resume-parity-smoke-v2.md) is now
+prepared with new run IDs, outputs, and databases; it remains unlaunched. No
+retained training plan or long-run command is yet authorized by this
+experiment record.
