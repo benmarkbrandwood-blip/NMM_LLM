@@ -121,7 +121,18 @@ commits `913abc7` and `70fcd3c`. The prescribed command passed from clean
 binds the source, plan, runtime, model, data, rule, host, and no-search route
 identities. The documentation-only evidence commit must be published and the
 preflight repeated from that final clean tip before a launch may be requested.
-The 36-game run is not authorised or launched.
+That commit was published as `98dcf23`, and the repeated preflight passed. The
+owner then authorized the frozen command once. The attempt failed closed with
+`SanmillBridgeError: Sanmill and NMM board mirrors diverged` while committing
+a searched opponent turn. It published no completed report, left no Sanmill
+process, and did not change either read-only database or create sidecars. A
+post-failure preflight again passed. The current publisher retains no partial
+schedule ledger, and the exception lacks the two board projections, history,
+actions, and schedule identity, so neither the failing game index nor the
+underlying state-field difference may be inferred. The
+[failure record](../evidence/sanmill-no-update-integrated-route-probe-v1-failure-2026-08-08.md)
+owns the exact boundary. The one-run probe authorization is consumed; no retry
+or training run is authorized.
 
 The one-run calibration authority is consumed. No integrated route probe,
 additional smoke, or long run is authorised. Current probe verification is

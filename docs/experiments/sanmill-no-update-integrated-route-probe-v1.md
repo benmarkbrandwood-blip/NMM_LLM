@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `published_preflight_passed_needs_evidence_publication_and_authority`
+Status: `failed_closed_needs_diagnostic_evidence_and_new_authority`
 
 This document defines a bounded measurement for the fresh Sanmill-refereed
 lineage. The content-addressed
@@ -11,16 +11,21 @@ production-route controls, strict preflight, runner, and atomic publisher are
 implemented. The published implementation at commit `70fcd3c` passed the
 read-only preflight; the separate
 [readiness record](../evidence/sanmill-no-update-integrated-route-probe-v1-readiness-2026-08-08.md)
-owns that evidence. This document is not a training run, strength evaluation,
-or authority to execute the probe.
+owns that evidence. The later final preflight at published evidence commit
+`98dcf23` also passed, but the authorized run then stopped on an authoritative
+Sanmill/NMM board-mirror mismatch. The
+[failure record](../evidence/sanmill-no-update-integrated-route-probe-v1-failure-2026-08-08.md)
+owns that boundary. This document is not a training run, strength evaluation,
+or authority to execute the probe again.
 
 The owner accepted the five probe-only ceilings in the
 [node-ladder decision brief](sanmill-node-ladder-v1-decision-brief.md) by
-requesting implementation. The clean published implementation and first
-readiness audit gates are complete. Publication of the documentation-only
-evidence commit, a final preflight at that published tip, and explicit one-run
-authority remain separate gates. No timeout or lack of response may choose a
-default.
+requesting implementation. The clean published implementation, readiness
+evidence, final preflight, and one-run launch gates were completed. The run
+authority is consumed by the fail-closed attempt. Structured failure context,
+a minimal diagnostic design, publication of any resulting fix, and new
+explicit authority are now separate gates. No timeout or lack of response may
+choose a default.
 
 ## Question being measured
 
@@ -271,8 +276,8 @@ After the evidence is reviewed, a separate decision must freeze or reject:
 - game, wall-time, segment, checkpoint, and max-ply limits; and
 - whether a new update-enabled training smoke is required before a long run.
 
-The bounded-probe readiness verdict is `ready_for_smoke`, with machine status
-`ready_for_authorized_probe`, for implementation commit `70fcd3c`. The
-documentation-only evidence commit must still be published and the same
-preflight must pass at that final clean tip. Probe and training launch
-authority are both absent.
+The pre-launch bounded-probe verdict was `ready_for_smoke`, and the final
+machine status was `ready_for_authorized_probe`, at published commit
+`98dcf23`. The authorized attempt is now `fatal_stop`: it produced no
+completed report after a Sanmill/NMM board-mirror mismatch. Probe retry and
+training launch authority are both absent.
