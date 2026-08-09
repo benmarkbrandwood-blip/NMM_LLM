@@ -1602,6 +1602,68 @@ and an independent experiment digest. The MIF publication gate is closed;
 the completed corrected retained run binds these identities in its final
 checkpoint.
 
+## 10 August Normalized Auxiliary Preparation
+
+The three-seed no-update batch capture is complete. Its tracked interpretation
+was committed and ordinarily pushed as
+`bcceab547cc7de9177a24964bd021816d656bd7c`. The ignored raw result has
+identity `b0dfd3415c55196c59e71cf67e45b00ab5844e9f62fbc9f3bdc31b09a694bd86`
+and SHA-256
+`2e310ecccf869f16b314093c6f50395e91019839b603d805ad3e0cab9d651fee`.
+Across 60 games and 19 captured update batches it observed 1,473 labelled
+steps and 453 informative steps. A target policy-head ratio of 0.25 implied
+effective coefficients from about 0.0481 to 0.2154, with median about 0.1044.
+This is a no-update scale observation, not an optimizer, strength or
+coefficient-selection result.
+
+Local commit `702c669a624f3ead7099126c6707e6513ed821c3` implements the
+policy-head-normalized mode. It computes detached ordinary policy-head and raw
+auxiliary gradient norms per informative batch, targets ratio 0.25, caps the
+coefficient at 0.25, fails closed on an invalid auxiliary denominator, applies
+zero auxiliary weight when the ordinary gradient is below the floor, and logs
+the applied ratio and gradient cosine. Fixed coefficient zero remains the
+control and compatibility default.
+
+Local commit `bfd59106100d28a1cb046728bfc87b5be6708120` freezes the
+[three-seed paired calibration](../experiments/sanmill-malom-policy-auxiliary-normalized-calibration-v1.md),
+whose plan identity is
+`14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104`.
+Seeds 55, 56 and 57 each compare auxiliary-off control with normalized target
+0.25. Each arm is bounded to 100 games and one third active hour, so the whole
+sequence is capped at 600 games and two active hours. Only the first,
+previously observed 1,000-node Sanmill level is reached. The fixed rule uses
+paired scratch-normalized policy changes, at least two positive seed pairs,
+median preserving-mass gain of at least 0.001, and explicit entropy,
+repetition, identity, label, checkpoint and resource gates. Passing can only
+justify designing a later effectiveness experiment.
+
+The source-only readiness report is ignored at
+`out/malom-policy-auxiliary-normalized-calibration-v1/source-readiness.json`.
+Its readiness identity is
+`a81209e884564fea1814ce15874a6fc157ba9ce95eef8bb7673c0581fab5061e`
+and its file SHA-256 is
+`7c7dbf410fc6a5dfc4aff3a4ff4350fdd7de5065a5353566c4d4a3ccafad7daa`.
+It verifies the no-update evidence, empty `sector-corrected-v1` template,
+Sanmill binary and checkout, MIF release and active ruleset. Its state is
+`implementation_complete_needs_publication` because local `dev` is two commits
+ahead of `origin/dev`. No arm plan, database copy, authorization, segment,
+checkpoint or trainer process was created.
+
+The final local gate passes 162 normalized-auxiliary, trainer, managed-run,
+contract and readiness tests. The mandatory Malom, DB-teacher and label-
+provenance gate separately passes 103 tests plus 498 parameterized subtests.
+Ruff passes every changed non-legacy Python module, and the changed legacy
+trainer passes the fatal-error rule set; `git diff --check` passes. This is a
+focused preparation result, not a new clean full-repository test claim.
+
+Observed facts support testing normalization as a scale-control mechanism.
+They do not establish that its gradient direction cooperates with A2C or that
+100 games can show a repeatable effect. Gradient cosine, raw and complete
+training curves, all three seeds, the frozen hyperparameters and data versions,
+scratch/control baselines, paired ablation changes and phase/opponent/colour/
+termination metrics must be considered together. The 29-state diagnostic is
+development evidence, not held-out validation.
+
 ## Recommended Next Actions
 
 The corrected retained 5,000-game run is complete. Preserve its plan,
@@ -1678,15 +1740,17 @@ the current successor in this order:
     that the applied auxiliary-to-policy gradient ratio varied from about
     `0.69` to `26.7` across the two recoverable production batches. This is a
     scale-diagnosis result, not authority to choose a normalization target.
-14. Use the immutable three-seed, 60-game no-update batch-capture plan to
-    measure the missing production-batch distribution. Its implementation and
-    schema-aware readiness publisher are on published `dev`; the preliminary
-    preflight passed from commit `ba74a35a59af1f4d52d67982c6916f139dfe7f51`.
-15. Publish the batch-capture readiness evidence and this handover update, then
-    run one final preflight from the resulting clean `dev == origin/dev`.
-    Only an explicit one-run authorization naming that final readiness
-    identity may consume the 60-game diagnostic. No optimizer, training,
-    retry, extension, continuation, promotion or publication is authorized.
+14. Preserve the completed three-seed, 60-game no-update batch-capture raw
+    result and tracked interpretation under their recorded identities. Its
+    one-run authorization is consumed. Do not rerun it or treat its implied
+    coefficient distribution as a selected training setting.
+15. Keep commits `702c669` and `bfd5910` local until ordinary publication is
+    explicitly authorized. After clean `dev == origin/dev`, run the
+    fail-closed normalized-calibration preparer once. It may create only six
+    ignored managed plans, six preflight records and six isolated database
+    copies. Review their new readiness identity before requesting a separate
+    launch authorization. No training, retry, extension, resume, promotion or
+    publication is currently authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1775,13 +1839,13 @@ promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
-six-arm downgrade-penalty grant and the four-arm policy-auxiliary calibration
-grant are also consumed. Safe work now is limited to publishing the
-batch-capture readiness record, repeating its fail-closed preflight from the
-final published tip, and requesting identity-bound authority for that one
-no-update diagnostic. No additional calibration, long training job,
-promotion/publication, protocol change or history rewrite is authorized by
-this handover.
+six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
+grant, and the no-update batch-capture grant are also consumed. Safe work now
+is limited to publishing the two normalized-calibration preparation commits
+when explicitly authorized, generating its six unlaunched plans from the final
+clean published tip, and reviewing that new readiness evidence. No normalized
+arm, additional calibration, long training job, promotion/publication,
+protocol change or history rewrite is authorized by this handover.
 
 ## Reference Material
 
