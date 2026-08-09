@@ -424,19 +424,67 @@ optimization effects may also contribute. The current 64-start evaluation was
 used to find this mechanism and cannot later be relabelled as an independent
 strength gate for the selected successor.
 
-Next verification experiment: the unlaunched
-[`sanmill-mill-bonus-ablation-smoke-v1`](../experiments/sanmill-mill-bonus-ablation-smoke-v1.md)
-contains matched fresh seeds 42, 43 and 44, each comparing
-`legacy-unconditional` with `malom-preserving-only`. Every arm is limited to
-one 500-game segment at the 1,000-node level; the full envelope is at most
-3,000 games, six active wall hours and 73,200,000 requested Sanmill nodes.
-Raw and 50-game curves, support counts, seed-level results, opponent, colour,
-phase, node and termination classes remain separate. The source contract
-explicitly authorizes zero segments. After the exact local source is published,
-the preparation tool must prove `dev == origin/dev`, unchanged reviewed
-`origin/main`, exact runtime/data identities, six passing read-only preflights
-and same-seed one-factor equivalence before a single product-level launch
-decision is requested.
+The six-arm experiment above was subsequently frozen with fresh seeds 45, 46
+and 47, explicitly authorized once, and completed at clean published source
+`fb9b7036e4a08e92331491ed67d3bfdcdfc7bf2f`. Its immutable result identity is
+`1118b9ace643f2cdaa14c88bf48676d2460c589d184299cf23d564e0311a915d`;
+the result file SHA-256 is
+`c26d4ebe890fdc06e88be639b63979b10b964fd1322d03e8ee80c14e2ba49020`.
+The preregistered verdict is `inconclusive`: two of three tail comparisons
+favoured the downgrade penalty, but the median reduction was only 0.6142
+percentage points against the frozen two-point gate. Repetition draws rose in
+all three treatment pairs, and the Sanmill-facing reduction was small. The
+one-run authorization is consumed. Do not extend, rerun, promote, or lower the
+gate after seeing this result. The full observation, hypothesis, support,
+counterevidence, per-class metrics and decision boundary are in
+[`sanmill-malom-downgrade-penalty-ablation-result-2026-08-09.md`](../evidence/sanmill-malom-downgrade-penalty-ablation-result-2026-08-09.md).
+
+The current successor uses a direct policy auxiliary rather than increasing
+the scalar reward penalty. It labels every complete legal turn by exact Malom
+WDL and minimizes the negative log of the total policy probability assigned to
+all WDL-preserving actions. It does not choose a preferred action among tied
+preserving turns, and all-safe states contribute no preference gradient.
+Commits `52fc97f`, `5997d00` and `fcdce2a` implement the loss, exact action-label
+contract and trainer integration. Commits `9da12fb`, `b2ccecf`, `5c043cf` and
+`a36aff4` add and record the no-update gradient probe and bind the coefficient
+through managed plans.
+
+Observed probe facts: each of seeds 48, 49 and 50 labels 1,583 actions on the
+same 64 inspected development states, with 1,168 preserving and 415
+downgrading actions. Twenty-nine states are informative and 35 are all-safe.
+All gradients are finite and their descent direction analytically increases
+preserving mass. The direct float32 step at learning rate `1e-4` nevertheless
+rounds below observable probability resolution. This supports correct wiring
+and direction only; it is counterevidence against claiming an effective Adam
+coefficient, learned improvement, generalization or strength. The tracked
+probe manifest SHA-256 is
+`1d7784dfabf8aa59d70adc310d0279b03a08863e69e2a5a009339d9f13394092`;
+the ignored raw report SHA-256 is
+`ad1e6e3ee7596a872d3129e623d377e083c439f6bcbee23705a10bf8ced1b003`.
+
+The next bounded experiment is the unlaunched
+[`sanmill-malom-policy-auxiliary-calibration-smoke-v1`](../experiments/sanmill-malom-policy-auxiliary-calibration-smoke-v1.md).
+Its plan identity is
+`bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba`.
+It compares coefficients `0.00`, `0.03`, `0.10` and `0.30` at fresh seed 51,
+one sequential 100-game segment per arm, 1,000-node Sanmill search, and one
+isolated empty SpecialistDB per arm. The complete ceiling is 400 games, two
+active hours and 11,520,000 requested Sanmill nodes. Its decision uses
+scratch-normalized within-arm checkpoint change followed by a
+difference-in-differences comparison with control, because each arm's
+SpecialistDB evolves independently. It does not select by training W/D/L.
+
+Commits `81f511e`, `553be79`, `2969bf7`, `31e9764` and `c062ed2` freeze the
+contract, fail-closed preparation, numeric engineering gates,
+SpecialistDB-confound correction and immutable result analyzer. These commits
+are local and unpublished at this handover update. The technical gate therefore
+correctly stops because `dev != origin/dev`; no arm database, managed plan,
+authorization, segment, checkpoint or training process has been created. After
+ordinary publication, run the preparer once to create and audit the four
+ignored plans and database copies. A passing report may reach only
+`ready_for_product_authorization` with `launch_authorized=false`. Starting the
+four-arm sequence still requires a separate explicit product authorization;
+there is no automatic extension, continuation, promotion or publication.
 
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
@@ -1566,7 +1614,8 @@ controller completed.
 The post-completion focused verification passed, but the repository still has
 the separately documented moving-checkout Sanmill failures; no new clean
 full-suite claim was made. The held-out protocol has also completed, and its
-one-run authorization is consumed. Proceed in this order:
+one-run authorization is consumed. Preserve the historical work and advance
+the current successor in this order:
 
 1. Preserve the corrected retained plan, authorization, ledgers, every
    accepted segment checkpoint, both recovery bundles, the final candidate
@@ -1615,8 +1664,23 @@ one-run authorization is consumed. Proceed in this order:
 10. Preserve the frozen retained-v2 held-out plan, exposure audit, consumed
     authorization, runner, host-interruption archive, 128-record ledger and
     final result evidence. Do not rerun it, pool it with Stage 0 or training
-    diagnostics, or promote the candidate. The next safe task is the specified
-    read-only first-losing-turn audit over the existing ledger.
+    diagnostics, or promote the candidate. Preserve the later read-only
+    transition diagnosis as development evidence; do not re-query or relabel
+    the held-out corpus as a new strength gate.
+11. Preserve the completed six-arm downgrade-penalty experiment and its
+    `inconclusive` verdict. Its authorization is consumed, and reward-only
+    escalation is closed.
+12. Publish the current atomic `dev` successor chain by an ordinary push only
+    after explicit authorization. Do not amend, rebase or force-push it.
+13. At the resulting clean `dev == origin/dev`, run the auxiliary-calibration
+    preparer once with `--prepare`. Inspect its four technical preflights,
+    one-factor audit, identities, isolated databases and output paths. A valid
+    result stops at `ready_for_product_authorization`; it is not launch
+    authority.
+14. Only after that readiness report passes may the product owner authorize
+    exactly one four-arm, 400-game, two-active-hour calibration envelope. No
+    training, extension, continuation, promotion or publication is currently
+    authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1704,12 +1768,12 @@ endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
-evaluation's authorization is consumed. The retained-v2 held-out grant is
-also consumed after one completed 128-game evaluation. Safe work now consists
-of preserving and publishing the result evidence and I/O-hardening commits,
-then performing the read-only first-losing-turn audit without re-querying the
-candidate on corpus positions. No additional evaluation, smoke or training
-job, promotion/publication, protocol change or history rewrite is authorized.
+evaluation's authorization is consumed. The retained-v2 held-out grant and
+the later six-arm downgrade-penalty grant are also consumed. Safe work now is
+to publish the atomic policy-auxiliary implementation and evidence chain, then
+generate its fail-closed readiness report. No auxiliary-calibration arm,
+additional evaluation, long training job, promotion/publication, protocol
+change or history rewrite is authorized by this handover.
 
 ## Reference Material
 
