@@ -290,7 +290,12 @@ def test_manifest_must_match_readiness_protocol_and_assets() -> None:
     }
     preflight = {
         "schema_version": "nmm.generalist-preflight.v1",
-        "verdict": "ready_for_long_run",
+        "verdict": "needs_decision",
+        "errors": [],
+        "unresolved_decisions": [
+            "long-run launch requires a frozen managed plan and separate "
+            "product authorization"
+        ],
         "resume_config_sha256": "5" * 64,
         "mifSuite": mif,
         "ruleset": ruleset,
@@ -310,6 +315,20 @@ def test_manifest_must_match_readiness_protocol_and_assets() -> None:
         contract=contract,
         preflight=preflight,
     )
+
+    preflight["unresolved_decisions"].append("another decision")
+    with pytest.raises(
+        MillBonusAblationResultError,
+        match="readiness preflight content differs",
+    ):
+        _validate_manifest(
+            manifest,
+            plan=plan,
+            arm=arm,
+            contract=contract,
+            preflight=preflight,
+        )
+    preflight["unresolved_decisions"].pop()
 
     manifest["assets"][-1]["identity"] = "6" * 64
     with pytest.raises(

@@ -27,6 +27,7 @@ from learned_ai.validation.mill_bonus_ablation_readiness import (
     DEFAULT_CONTRACT,
     DEFAULT_PATHS_CONFIG,
     DEFAULT_REPORT as DEFAULT_READINESS_REPORT,
+    PRODUCT_AUTHORIZATION_DECISION,
     READINESS_SCHEMA,
     _assert_plan_semantics,
     _ordered_arms,
@@ -786,7 +787,10 @@ def _validate_manifest(
         raise MillBonusAblationResultError("run ruleset identity differs")
     if (
         preflight.get("schema_version") != "nmm.generalist-preflight.v1"
-        or preflight.get("verdict") != "ready_for_long_run"
+        or preflight.get("verdict") != "needs_decision"
+        or preflight.get("errors") != []
+        or preflight.get("unresolved_decisions")
+        != [PRODUCT_AUTHORIZATION_DECISION]
         or preflight.get("resume_config_sha256") != plan.resume_config_sha256
     ):
         raise MillBonusAblationResultError("readiness preflight content differs")

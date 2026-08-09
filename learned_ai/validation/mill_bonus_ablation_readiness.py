@@ -41,6 +41,10 @@ DEFAULT_CONTRACT = Path(
 )
 DEFAULT_PATHS_CONFIG = Path("data/training_paths.local.json")
 DEFAULT_REPORT = Path("out/mill-bonus-ablation-smoke-v1/readiness.json")
+PRODUCT_AUTHORIZATION_DECISION = (
+    "long-run launch requires a frozen managed plan and separate "
+    "product authorization"
+)
 
 
 class MillBonusAblationReadinessError(RuntimeError):
@@ -660,6 +664,7 @@ def _run_checked(
     *,
     root: Path,
     runner: Callable[..., subprocess.CompletedProcess[str]],
+    accepted_return_codes: Sequence[int] = (0,),
 ) -> subprocess.CompletedProcess[str]:
     try:
         result = runner(
@@ -673,7 +678,7 @@ def _run_checked(
         raise MillBonusAblationReadinessError(
             f"command could not run: {command[1]}"
         ) from exc
-    if result.returncode != 0:
+    if result.returncode not in accepted_return_codes:
         details = []
         stdout = (result.stdout or "").strip()
         stderr = (result.stderr or "").strip()
@@ -686,6 +691,83 @@ def _run_checked(
             + ("; ".join(details) if details else "<no output>")
         )
     return result
+
+
+def _validate_unlaunched_preflight(
+    preflight: Mapping[str, Any],
+    *,
+    plan: ManagedPlan,
+    source_commit: str,
+    arm_id: str,
+) -> None:
+    """Require a clean technical preflight with only the product gate open."""
+    if preflight.get("schema_version") != "nmm.generalist-preflight.v1":
+        raise MillBonusAblationReadinessError(
+            f"preflight schema differs: {arm_id}"
+        )
+    if preflight.get("mode") != "long-run":
+        raise MillBonusAblationReadinessError(
+            f"preflight mode differs: {arm_id}"
+        )
+    if preflight.get("verdict") != "needs_decision":
+        raise MillBonusAblationReadinessError(
+            f"unlaunched preflight verdict differs: {arm_id}"
+        )
+    if preflight.get("errors") != []:
+        raise MillBonusAblationReadinessError(
+            f"unlaunched preflight has errors: {arm_id}"
+        )
+    if preflight.get("unresolved_decisions") != [
+        PRODUCT_AUTHORIZATION_DECISION
+    ]:
+        raise MillBonusAblationReadinessError(
+            f"unlaunched preflight decisions differ: {arm_id}"
+        )
+    if preflight.get("resume_config_sha256") != plan.resume_config_sha256:
+        raise MillBonusAblationReadinessError(
+            f"preflight did not bind the managed plan: {arm_id}"
+        )
+    git = preflight.get("git")
+    if (
+        not isinstance(git, Mapping)
+        or git.get("commit") != source_commit
+        or git.get("dirty") is not False
+    ):
+        raise MillBonusAblationReadinessError(
+            f"preflight source identity differs: {arm_id}"
+        )
+    config = preflight.get("resolved_config")
+    expected_config = {
+        "experiment_id": plan.experiment_id,
+        "run_id": f"{plan.plan_id}-segment-0001",
+        "segment_games": plan.segment_games,
+        "segment_stop_game": min(plan.segment_games, plan.game_bound),
+        "start_mode": "fresh",
+    }
+    if not isinstance(config, Mapping) or any(
+        config.get(key) != value for key, value in expected_config.items()
+    ):
+        raise MillBonusAblationReadinessError(
+            f"preflight segment contract differs: {arm_id}"
+        )
+    expected_output = (
+        Path(plan.control_dir) / "segments" / "segment-0001"
+    ).resolve(strict=False)
+    observed_output = Path(str(config.get("out_dir", ""))).resolve(strict=False)
+    if observed_output != expected_output:
+        raise MillBonusAblationReadinessError(
+            f"preflight output path differs: {arm_id}"
+        )
+    checks = preflight.get("checks")
+    output = checks.get("output") if isinstance(checks, Mapping) else None
+    if not isinstance(output, Mapping) or output != {
+        "exists": False,
+        "isolated": True,
+        "kind": "run_directory",
+    }:
+        raise MillBonusAblationReadinessError(
+            f"preflight output isolation differs: {arm_id}"
+        )
 
 
 def _build_fresh_preflight_command(
@@ -778,7 +860,10 @@ def prepare_ablation(
             python_executable=python_executable,
         )
         preflight_result = _run_checked(
-            preflight_command, root=root, runner=runner
+            preflight_command,
+            root=root,
+            runner=runner,
+            accepted_return_codes=(2,),
         )
         try:
             preflight = json.loads(preflight_result.stdout)
@@ -786,14 +871,12 @@ def prepare_ablation(
             raise MillBonusAblationReadinessError(
                 f"preflight output is not JSON: {arm['arm_id']}"
             ) from exc
-        if (
-            preflight.get("verdict") != "ready_for_long_run"
-            or preflight.get("resume_config_sha256")
-            != plan.resume_config_sha256
-        ):
-            raise MillBonusAblationReadinessError(
-                f"preflight did not bind the managed plan: {arm['arm_id']}"
-            )
+        _validate_unlaunched_preflight(
+            preflight,
+            plan=plan,
+            source_commit=source["head"],
+            arm_id=arm["arm_id"],
+        )
         preflight_path = plan_path.parent / "preflight.json"
         try:
             with preflight_path.open("xb") as handle:
@@ -806,6 +889,7 @@ def prepare_ablation(
             "path": str(preflight_path),
             "sha256": _sha256_file(preflight_path),
             "verdict": preflight["verdict"],
+            "unresolved_decisions": preflight["unresolved_decisions"],
             "resume_config_sha256": preflight["resume_config_sha256"],
         }
     audited = audit_prepared_plans(

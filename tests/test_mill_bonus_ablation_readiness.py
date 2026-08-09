@@ -175,6 +175,27 @@ def test_failed_command_preserves_stdout_diagnostic(tmp_path: Path) -> None:
         )
 
 
+def test_expected_decision_exit_can_be_inspected(tmp_path: Path) -> None:
+    diagnostic = '{"verdict":"needs_decision"}'
+
+    def decision_runner(*_args, **_kwargs):
+        return subprocess.CompletedProcess(
+            args=["python", "trainer.py"],
+            returncode=2,
+            stdout=diagnostic,
+            stderr="",
+        )
+
+    result = readiness_module._run_checked(
+        ["python", "trainer.py"],
+        root=tmp_path,
+        runner=decision_runner,
+        accepted_return_codes=(2,),
+    )
+
+    assert result.stdout == diagnostic
+
+
 def test_fresh_preflight_targets_first_managed_segment(tmp_path: Path) -> None:
     plan = SimpleNamespace(
         common_trainer_args=["--max-games", "5000"],
@@ -202,6 +223,70 @@ def test_fresh_preflight_targets_first_managed_segment(tmp_path: Path) -> None:
     assert parsed.out_dir == str(tmp_path / "control/segments/segment-0001")
     assert parsed.segment_games == 500
     assert parsed.segment_stop_game == 500
+    assert parsed.managed_plan is None
+    assert parsed.managed_authorization is None
+
+
+def test_unlaunched_preflight_has_only_the_product_gate_open(
+    tmp_path: Path,
+) -> None:
+    plan = SimpleNamespace(
+        control_dir=str(tmp_path / "control"),
+        experiment_id="experiment",
+        game_bound=500,
+        plan_id="six-arm-seed-42-legacy",
+        resume_config_sha256="5" * 64,
+        segment_games=500,
+    )
+    source_commit = "a" * 40
+    preflight = {
+        "schema_version": "nmm.generalist-preflight.v1",
+        "mode": "long-run",
+        "verdict": "needs_decision",
+        "errors": [],
+        "unresolved_decisions": [
+            readiness_module.PRODUCT_AUTHORIZATION_DECISION
+        ],
+        "resume_config_sha256": plan.resume_config_sha256,
+        "git": {
+            "commit": source_commit,
+            "dirty": False,
+        },
+        "resolved_config": {
+            "experiment_id": plan.experiment_id,
+            "run_id": f"{plan.plan_id}-segment-0001",
+            "out_dir": str(tmp_path / "control/segments/segment-0001"),
+            "segment_games": 500,
+            "segment_stop_game": 500,
+            "start_mode": "fresh",
+        },
+        "checks": {
+            "output": {
+                "exists": False,
+                "isolated": True,
+                "kind": "run_directory",
+            }
+        },
+    }
+
+    readiness_module._validate_unlaunched_preflight(
+        preflight,
+        plan=plan,
+        source_commit=source_commit,
+        arm_id="s42-legacy",
+    )
+
+    preflight["unresolved_decisions"].append("another decision")
+    with pytest.raises(
+        MillBonusAblationReadinessError,
+        match="decisions differ",
+    ):
+        readiness_module._validate_unlaunched_preflight(
+            preflight,
+            plan=plan,
+            source_commit=source_commit,
+            arm_id="s42-legacy",
+        )
 
 
 def test_real_preparation_outputs_are_all_git_ignored() -> None:
