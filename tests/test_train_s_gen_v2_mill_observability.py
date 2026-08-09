@@ -120,6 +120,9 @@ def test_game_diag_separates_formed_mills_rewards_and_malom_downgrades() -> None
     assert diag.formed_mill_malom_downgrade_count == 1
     assert diag.formed_mill_malom_downgrade_rate == pytest.approx(0.5)
     assert diag.formed_mill_malom_unknown_count == 0
+    assert diag.formed_mill_malom_known_place == 1
+    assert diag.formed_mill_malom_known_move == 1
+    assert diag.formed_mill_malom_known_fly == 0
     assert diag.formed_mill_malom_downgrade_place == 1
     assert diag.formed_mill_malom_downgrade_move == 0
     assert diag.formed_mill_malom_downgrade_fly == 0
@@ -170,5 +173,8 @@ def test_game_diag_reports_unknown_malom_on_a_mill_separately() -> None:
     )
 
     assert diag.formed_mill_malom_unknown_count == 1
+    assert diag.formed_mill_malom_known_place == 0
+    assert diag.formed_mill_malom_known_move == 0
+    assert diag.formed_mill_malom_known_fly == 0
     assert diag.formed_mill_malom_downgrade_count == 0
     assert diag.formed_mill_malom_downgrade_rate == 0.0

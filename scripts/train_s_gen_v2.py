@@ -467,6 +467,9 @@ class GameDiag:
     formed_mill_malom_downgrade_count: int = 0
     formed_mill_malom_downgrade_rate: float = 0.0
     formed_mill_malom_unknown_count: int = 0
+    formed_mill_malom_known_place: int = 0
+    formed_mill_malom_known_move: int = 0
+    formed_mill_malom_known_fly: int = 0
     formed_mill_malom_downgrade_place: int = 0
     formed_mill_malom_downgrade_move: int = 0
     formed_mill_malom_downgrade_fly: int = 0
@@ -2149,6 +2152,21 @@ def _build_game_diag(
         ),
         formed_mill_malom_unknown_count=sum(
             1 for _, quality in mill_steps if quality is None
+        ),
+        formed_mill_malom_known_place=sum(
+            1
+            for step, _ in known_mill_steps
+            if step.board_phase == "place"
+        ),
+        formed_mill_malom_known_move=sum(
+            1
+            for step, _ in known_mill_steps
+            if step.board_phase == "move"
+        ),
+        formed_mill_malom_known_fly=sum(
+            1
+            for step, _ in known_mill_steps
+            if step.board_phase == "fly"
         ),
         formed_mill_malom_downgrade_place=sum(
             1
