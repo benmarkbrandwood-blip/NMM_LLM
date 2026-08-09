@@ -14,6 +14,7 @@ from learned_ai.training.scaffolded_a2c import (
 from learned_ai.validation.malom_policy_auxiliary_gradient_interaction import (
     MalomPolicyAuxiliaryGradientInteractionError,
     audit_malom_policy_auxiliary_gradient_interaction,
+    audit_malom_policy_auxiliary_normalized_target_response,
     measure_malom_policy_auxiliary_batch_gradients,
 )
 
@@ -105,6 +106,14 @@ def test_audit_measures_components_without_mutating_sources() -> None:
     )
     assert report["gradients"]["ordinary_policy_head_gradient_l2"] > 0.0
     assert report["adam_step"]["treatment_minus_baseline_preserving_mass"] >= 0.0
+    assert report["adam_step"]["baseline_to_treatment_policy_kl"]["mean"] >= 0.0
+    assert (
+        report["adam_step"]["informative_batch_policy_after_treatment"][
+            "informative_steps"
+        ]
+        == 8
+    )
+    assert report["adam_step"]["treatment_minus_baseline_entropy"] <= 0.0
     assert report["adam_step"]["persisted_treatment_replay_difference"] == {
         "raw": {"l2": 0.0, "max_abs": 0.0},
         "functionally_relevant": {"l2": 0.0, "max_abs": 0.0},
@@ -292,4 +301,131 @@ def test_batch_measurement_rejects_invalid_target_ratios(
             _steps(),
             device=torch.device("cpu"),
             target_policy_head_ratios=ratios,
+        )
+
+
+def test_normalized_target_response_replays_production_and_preserves_sources() -> None:
+    model = _FixedPolicyValue()
+    optimizer = _adam(model)
+    steps = _steps()
+    model_before = copy.deepcopy(model.state_dict())
+    optimizer_before = copy.deepcopy(optimizer.state_dict())
+
+    measurement = measure_malom_policy_auxiliary_batch_gradients(
+        model,
+        steps,
+        device=torch.device("cpu"),
+        target_policy_head_ratios=(0.25,),
+    )
+    expected_coefficient = measurement["candidate_scales"][0]["effective_coefficient"]
+    expected = copy.deepcopy(model)
+    expected_optimizer = _adam(expected)
+    expected_optimizer.load_state_dict(copy.deepcopy(optimizer.state_dict()))
+    scaffolded_a2c_update(
+        expected,
+        expected_optimizer,
+        steps,
+        torch.device("cpu"),
+        malom_policy_aux_mode="policy-head-normalized",
+        malom_policy_aux_target_ratio=0.25,
+        malom_policy_aux_coef_cap=10.0,
+    )
+
+    report = audit_malom_policy_auxiliary_normalized_target_response(
+        model,
+        optimizer,
+        steps,
+        target_policy_head_ratios=(0.25, 0.5, 1.0),
+        coefficient_cap=10.0,
+        denominator_floor=1e-12,
+        device=torch.device("cpu"),
+        expected_treatment_model=expected,
+        expected_treatment_target_ratio=0.25,
+    )
+
+    assert report["original_model_unchanged"] is True
+    assert report["original_optimizer_unchanged"] is True
+    assert [item["target_policy_head_ratio"] for item in report["responses"]] == [
+        0.25,
+        0.5,
+        1.0,
+    ]
+    assert report["responses"][0]["effective_coefficient"] == pytest.approx(
+        expected_coefficient
+    )
+    assert report["responses"][0]["realized_policy_head_ratio"] == pytest.approx(0.25)
+    assert report["responses"][1]["realized_policy_head_ratio"] == pytest.approx(0.5)
+    assert report["responses"][2]["realized_policy_head_ratio"] == pytest.approx(1.0)
+    replay = report["responses"][0]["audit"]["adam_step"][
+        "persisted_treatment_replay_difference"
+    ]
+    assert replay["functionally_relevant"] == {"l2": 0.0, "max_abs": 0.0}
+    assert all(
+        torch.equal(model_before[name], value)
+        for name, value in model.state_dict().items()
+    )
+    assert optimizer.state_dict() == optimizer_before
+
+
+def test_normalized_target_response_reports_coefficient_cap() -> None:
+    model = _FixedPolicyValue()
+    report = audit_malom_policy_auxiliary_normalized_target_response(
+        model,
+        _adam(model),
+        _steps(),
+        target_policy_head_ratios=(0.25, 0.5, 1.0),
+        coefficient_cap=1e-6,
+        denominator_floor=1e-12,
+        device=torch.device("cpu"),
+    )
+
+    assert all(item["coefficient_capped"] for item in report["responses"])
+    assert all(
+        item["effective_coefficient"] == pytest.approx(1e-6)
+        for item in report["responses"]
+    )
+    assert (
+        len({item["realized_policy_head_ratio"] for item in report["responses"]}) == 1
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        ({"coefficient_cap": 0.0}, "coefficient cap must be positive"),
+        ({"denominator_floor": 0.0}, "denominator floor must be positive"),
+        (
+            {"expected_treatment_model": _FixedPolicyValue()},
+            "must be provided together",
+        ),
+        (
+            {
+                "expected_treatment_model": _FixedPolicyValue(),
+                "expected_treatment_target_ratio": 0.75,
+            },
+            "is not in the candidate set",
+        ),
+    ],
+)
+def test_normalized_target_response_rejects_invalid_contract(
+    kwargs: dict[str, object],
+    message: str,
+) -> None:
+    model = _FixedPolicyValue()
+    defaults: dict[str, object] = {
+        "target_policy_head_ratios": (0.25, 0.5, 1.0),
+        "coefficient_cap": 0.25,
+        "denominator_floor": 1e-12,
+        "device": torch.device("cpu"),
+    }
+    defaults.update(kwargs)
+    with pytest.raises(
+        MalomPolicyAuxiliaryGradientInteractionError,
+        match=message,
+    ):
+        audit_malom_policy_auxiliary_normalized_target_response(
+            model,
+            _adam(model),
+            _steps(),
+            **defaults,
         )

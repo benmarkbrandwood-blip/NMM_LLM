@@ -550,13 +550,14 @@ def _parameter_distance(
     return {"l2": math.sqrt(squared), "max_abs": maximum}
 
 
-def _batch_preserving_mass(
+def _batch_policy_statistics(
     model: nn.Module,
     steps: Sequence[ScaffoldedStep],
     *,
     device: torch.device,
-) -> float:
+) -> dict[str, float | int]:
     masses: list[float] = []
+    entropies: list[float] = []
     was_training = model.training
     model.eval()
     try:
@@ -571,18 +572,84 @@ def _batch_preserving_mass(
                     device=device,
                 )
                 preserving = torch.as_tensor(mask, dtype=torch.bool, device=device)
-                probabilities = torch.softmax(
+                log_probabilities = F.log_softmax(
                     model.policy_logits(features) / _behaviour_temperature(step),
                     dim=-1,
                 )
+                probabilities = log_probabilities.exp()
                 masses.append(float(probabilities[preserving].sum().item()))
+                entropies.append(
+                    float((-(probabilities * log_probabilities).sum()).item())
+                )
     finally:
         model.train(was_training)
     if not masses:
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "batch has no informative preserving probability"
         )
-    return sum(masses) / len(masses)
+    return {
+        "informative_steps": len(masses),
+        "mean_preserving_mass": sum(masses) / len(masses),
+        "mean_entropy": sum(entropies) / len(entropies),
+    }
+
+
+def _batch_policy_kl(
+    reference: nn.Module,
+    candidate: nn.Module,
+    steps: Sequence[ScaffoldedStep],
+    *,
+    device: torch.device,
+) -> dict[str, float | int]:
+    values: list[float] = []
+    reference_was_training = reference.training
+    candidate_was_training = candidate.training
+    reference.eval()
+    candidate.eval()
+    try:
+        with torch.no_grad():
+            for step in steps:
+                mask = np.asarray(step.malom_preserving_mask)
+                if mask.dtype != np.bool_ or mask.ndim != 1 or mask.all():
+                    continue
+                features = torch.as_tensor(
+                    step.move_features,
+                    dtype=torch.float32,
+                    device=device,
+                )
+                temperature = _behaviour_temperature(step)
+                reference_log = F.log_softmax(
+                    reference.policy_logits(features) / temperature,
+                    dim=-1,
+                )
+                candidate_log = F.log_softmax(
+                    candidate.policy_logits(features) / temperature,
+                    dim=-1,
+                )
+                if reference_log.shape != candidate_log.shape:
+                    raise MalomPolicyAuxiliaryGradientInteractionError(
+                        "policy distributions have different shapes"
+                    )
+                value = float(
+                    (reference_log.exp() * (reference_log - candidate_log)).sum().item()
+                )
+                if not math.isfinite(value):
+                    raise MalomPolicyAuxiliaryGradientInteractionError(
+                        "policy divergence is non-finite"
+                    )
+                values.append(max(0.0, value))
+    finally:
+        reference.train(reference_was_training)
+        candidate.train(candidate_was_training)
+    if not values:
+        raise MalomPolicyAuxiliaryGradientInteractionError(
+            "batch has no informative policy distribution"
+        )
+    return {
+        "informative_steps": len(values),
+        "mean": sum(values) / len(values),
+        "max": max(values),
+    }
 
 
 def audit_malom_policy_auxiliary_gradient_interaction(
@@ -684,7 +751,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
 
     baseline_model, baseline_optimizer = _clone_adam(model, optimizer)
     treatment_model, treatment_optimizer = _clone_adam(model, optimizer)
-    before_mass = _batch_preserving_mass(model, steps, device=device)
+    before_policy = _batch_policy_statistics(model, steps, device=device)
     baseline_losses = scaffolded_a2c_update(
         baseline_model,
         baseline_optimizer,
@@ -709,12 +776,18 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         malom_policy_aux_coef=coefficient,
         diagnostics=treatment_diagnostics,
     )
-    baseline_mass = _batch_preserving_mass(
+    baseline_policy = _batch_policy_statistics(
         baseline_model,
         steps,
         device=device,
     )
-    treatment_mass = _batch_preserving_mass(
+    treatment_policy = _batch_policy_statistics(
+        treatment_model,
+        steps,
+        device=device,
+    )
+    baseline_to_treatment_kl = _batch_policy_kl(
+        baseline_model,
         treatment_model,
         steps,
         device=device,
@@ -732,10 +805,27 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         "treatment_minus_baseline_parameter_delta": _parameter_distance(
             treatment_model, baseline_model
         ),
-        "informative_batch_preserving_mass_before": before_mass,
-        "informative_batch_preserving_mass_after_baseline": baseline_mass,
-        "informative_batch_preserving_mass_after_treatment": treatment_mass,
-        "treatment_minus_baseline_preserving_mass": (treatment_mass - baseline_mass),
+        "informative_batch_preserving_mass_before": before_policy[
+            "mean_preserving_mass"
+        ],
+        "informative_batch_preserving_mass_after_baseline": baseline_policy[
+            "mean_preserving_mass"
+        ],
+        "informative_batch_preserving_mass_after_treatment": treatment_policy[
+            "mean_preserving_mass"
+        ],
+        "treatment_minus_baseline_preserving_mass": (
+            float(treatment_policy["mean_preserving_mass"])
+            - float(baseline_policy["mean_preserving_mass"])
+        ),
+        "informative_batch_policy_before": before_policy,
+        "informative_batch_policy_after_baseline": baseline_policy,
+        "informative_batch_policy_after_treatment": treatment_policy,
+        "treatment_minus_baseline_entropy": (
+            float(treatment_policy["mean_entropy"])
+            - float(baseline_policy["mean_entropy"])
+        ),
+        "baseline_to_treatment_policy_kl": baseline_to_treatment_kl,
     }
     if expected_treatment_model is not None:
         invariant_names = _softmax_invariant_policy_bias_names(treatment_model)
@@ -786,5 +876,133 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         "interpretation": (
             "read-only audit of one persisted pre-update batch; not a training "
             "run, validation curve, strength result, or normalization decision"
+        ),
+    }
+
+
+def audit_malom_policy_auxiliary_normalized_target_response(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    steps: Sequence[ScaffoldedStep],
+    *,
+    target_policy_head_ratios: Sequence[float],
+    coefficient_cap: float,
+    denominator_floor: float,
+    device: torch.device,
+    gamma: float = 0.99,
+    entropy_coef: float = 0.01,
+    value_coef: float = VALUE_COEF,
+    grad_clip: float = GRAD_CLIP,
+    expected_treatment_model: nn.Module | None = None,
+    expected_treatment_target_ratio: float | None = None,
+) -> dict[str, Any]:
+    """Compare disposable normalized targets on one persisted A2C batch.
+
+    Each candidate uses the same source model, Adam state and batch.  The
+    normalized coefficient is measured once and then passed as a detached
+    scalar to the production fixed-coefficient update, which is equivalent to
+    the production normalized update for that batch.  Source state is never
+    stepped or saved.
+    """
+    targets = _require_target_ratios(target_policy_head_ratios)
+    coefficient_cap = _require_finite(
+        coefficient_cap,
+        label="coefficient cap",
+    )
+    denominator_floor = _require_finite(
+        denominator_floor,
+        label="denominator floor",
+    )
+    if coefficient_cap <= 0.0:
+        raise MalomPolicyAuxiliaryGradientInteractionError(
+            "coefficient cap must be positive"
+        )
+    if denominator_floor <= 0.0:
+        raise MalomPolicyAuxiliaryGradientInteractionError(
+            "denominator floor must be positive"
+        )
+    if (expected_treatment_model is None) != (expected_treatment_target_ratio is None):
+        raise MalomPolicyAuxiliaryGradientInteractionError(
+            "expected treatment model and target ratio must be provided together"
+        )
+    if expected_treatment_target_ratio is not None:
+        expected_treatment_target_ratio = _require_finite(
+            expected_treatment_target_ratio,
+            label="expected treatment target ratio",
+        )
+        if expected_treatment_target_ratio not in targets:
+            raise MalomPolicyAuxiliaryGradientInteractionError(
+                "expected treatment target ratio is not in the candidate set"
+            )
+
+    model_before = _model_digest(model)
+    optimizer_before = _optimizer_digest(optimizer)
+    measurement = measure_malom_policy_auxiliary_batch_gradients(
+        model,
+        steps,
+        device=device,
+        target_policy_head_ratios=targets,
+        gamma=gamma,
+        entropy_coef=entropy_coef,
+        value_coef=value_coef,
+        denominator_floor=denominator_floor,
+    )
+    ordinary_norm = float(measurement["ordinary_policy_head_gradient_l2"])
+    raw_auxiliary_norm = float(measurement["raw_auxiliary_gradient_l2"])
+    responses: list[dict[str, Any]] = []
+    for candidate in measurement["candidate_scales"]:
+        target = float(candidate["target_policy_head_ratio"])
+        if candidate["status"] != "measured":
+            raise MalomPolicyAuxiliaryGradientInteractionError(
+                f"target {target} cannot be measured: {candidate['status']}"
+            )
+        uncapped = float(candidate["effective_coefficient"])
+        effective = min(uncapped, coefficient_cap)
+        applied_norm = effective * raw_auxiliary_norm
+        expected = (
+            expected_treatment_model
+            if target == expected_treatment_target_ratio
+            else None
+        )
+        audit = audit_malom_policy_auxiliary_gradient_interaction(
+            model,
+            optimizer,
+            steps,
+            coefficient=effective,
+            device=device,
+            gamma=gamma,
+            entropy_coef=entropy_coef,
+            value_coef=value_coef,
+            grad_clip=grad_clip,
+            expected_treatment_model=expected,
+        )
+        responses.append(
+            {
+                "target_policy_head_ratio": target,
+                "uncapped_effective_coefficient": uncapped,
+                "effective_coefficient": effective,
+                "coefficient_cap": coefficient_cap,
+                "coefficient_capped": effective < uncapped,
+                "applied_auxiliary_gradient_l2": applied_norm,
+                "realized_policy_head_ratio": (
+                    applied_norm / ordinary_norm if ordinary_norm > 0.0 else 0.0
+                ),
+                "audit": audit,
+            }
+        )
+
+    return {
+        "target_policy_head_ratios": list(targets),
+        "coefficient_cap": coefficient_cap,
+        "denominator_floor": denominator_floor,
+        "measurement": measurement,
+        "responses": responses,
+        "original_model_unchanged": _model_digest(model) == model_before,
+        "original_optimizer_unchanged": (
+            _optimizer_digest(optimizer) == optimizer_before
+        ),
+        "interpretation": (
+            "disposable one-update target response on a persisted batch; not "
+            "a learning curve, target selection, strength result, or training run"
         ),
     }
