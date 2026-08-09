@@ -31,6 +31,12 @@ READINESS_EVIDENCE = (
     / "evidence"
     / "sanmill-corrected-retained-v2-heldout-runner-readiness-2026-08-09.json"
 )
+RESULT_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-corrected-retained-v2-heldout-result-2026-08-09.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -105,3 +111,30 @@ def test_prepublish_readiness_evidence_preserves_the_unconsumed_gate() -> None:
     assert evidence["authorization_state"]["grant_consumed"] is False
     assert evidence["authorization_state"]["corpus_games_played"] == 0
     assert evidence["claim_boundary"]["evaluation_result"] is False
+
+
+def test_completed_heldout_evidence_binds_result_and_claim_boundary() -> None:
+    evidence = json.loads(RESULT_EVIDENCE.read_text(encoding="utf-8"))
+    evidence_identity = evidence.pop("evidence_identity")
+
+    assert canonical_sha256(evidence) == evidence_identity
+    assert evidence["status"] == "completed_candidate_behind"
+    assert evidence["execution"]["completed_games"] == 128
+    assert evidence["result"]["primary"] == {
+        "decision": "candidate_behind",
+        "draws": 102,
+        "games": 128,
+        "interval": [-0.23146381558966117, -0.08103618441033884],
+        "losses": 23,
+        "mean_pair_score_difference": -0.15625,
+        "score_rate": 0.421875,
+        "support_pairs": 64,
+        "wins": 3,
+    }
+    assert evidence["authorization"]["grant_consumed"] is True
+    assert evidence["authorization"]["no_second_run"] is True
+    assert evidence["host_interruption"]["completed_games_before_interruption"] == 4
+    assert evidence["host_interruption"]["interrupted_game_committed"] is False
+    assert evidence["verification"]["recompute_equal_to_persisted_report"] is True
+    assert evidence["claim_boundary"]["automatic_promotion"] is False
+    assert evidence["claim_boundary"]["new_training_authorized"] is False

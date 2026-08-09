@@ -1,0 +1,258 @@
+{
+  "analysis": {
+    "counterevidence": [
+      "The HumanDB stratum is inconclusive at a 0.488095 score rate, so the observed deficit is not uniform across all sources.",
+      "Candidate White scored 0.500000 on the Book stratum even though candidate Black scored 0.318182 there.",
+      "The training lineage passed every fixed policy-health gate and ended with a 0.965517 preserving rate and a positive 2.398080 logit margin; this rejects a simple policy-direction-collapse explanation.",
+      "This is one checkpoint from one training seed, against one fixed baseline profile, on a corpus that is not fully data-disjoint."
+    ],
+    "hypotheses": [
+      {
+        "hypothesis": "The retained policy generalises least reliably from theory-controlled starts and when playing Black from Book starts.",
+        "support": "Perfect DB scored 0.369048 with no candidate wins; Book/Black scored 0.318182; the strict zero-DB-match subset scored 0.375000.",
+        "test": "Audit the first value-downgrading candidate turn in every decisive loss and matched drawn controls, stratified by source, colour, phase and termination reason."
+      },
+      {
+        "hypothesis": "The mixed training tail diagnostic overstates performance against a fixed 500,000-node opponent because it mixes frozen targets, curriculum levels and non-held-out starts.",
+        "support": "The final 200 training games scored 0.475000 while this frozen evaluation scored 0.421875 against only the fixed baseline.",
+        "test": "Do not compare the two rates as a controlled effect. Use the next preregistered ablation to change only one training factor and retain this evaluator unchanged."
+      },
+      {
+        "hypothesis": "The decisive weakness is tactical conversion or defence rather than draw-rule handling.",
+        "support": "All 23 losses ended by fewer than three pieces or no legal moves; all 102 draws ended by the fifty-move or threefold rule.",
+        "test": "Locate the first losing transition with corrected tablebase or strict-search evidence before choosing a replay or curriculum intervention."
+      }
+    ],
+    "next_validation": [
+      "Preserve this checkpoint as a research baseline and do not promote or publish it.",
+      "Perform a read-only first-losing-turn audit over the existing ledger without asking the candidate to replay corpus moves.",
+      "Compare the 23 losses with colour- and stratum-matched draws, including phase, material, mobility and value-transition evidence.",
+      "Only after that audit, freeze one successor-training change and an ablation; do not combine curriculum, reward and architecture changes.",
+      "A later strength claim requires additional training seeds or independently trained candidates and another separately authorised evaluation."
+    ],
+    "observed_facts": [
+      "The frozen 128-game schedule completed and recomputed exactly from its hash-chained ledger.",
+      "The primary paired interval is strictly below zero, so the frozen decision is candidate_behind.",
+      "The deficit is concentrated in Book and Perfect DB strata; HumanDB is inconclusive.",
+      "Candidate Black underperformed candidate White overall and especially in the Book stratum.",
+      "The three candidate wins occurred on one Book and two HumanDB starts; none occurred on Perfect DB starts."
+    ]
+  },
+  "artifacts": {
+    "host_interruption_archive": {
+      "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/host-interruption-0001.failure.json",
+      "sha256": "63615c1460fe0fc6c567c234bf1b2e368355b6c5fc2f758aa5ae870d38eab6af"
+    },
+    "launch": {
+      "identity": "9be0f2c7f4c859d70a5575bcff08cdb9bf7fba06e04f11a1b18209b2593d4a66",
+      "sha256": "0bd13d93f5a867fabe9dad430dae6540163f03eb9fb3652dce4525536a1580f6"
+    },
+    "ledger": {
+      "sha256": "100863efa58381fc736096440bf8ff4a178cd34215ac7b43e3d6f6767fae7892",
+      "tail_record_sha256": "fb57fd8eeb96c0b84db68ff05fbd9ddc81486fd2471269915e1194a7672f03d0"
+    },
+    "progress": {
+      "identity": "b6f978ee2f4e2aa31dfbe4ec89d98c8a8de278d53cc67fba1561636a586923da",
+      "sha256": "62c256177212881dbf044553309dbd3bd84f8c30aa1104a1077d0c6cf7183cd1"
+    },
+    "readiness": {
+      "identity": "c75bae6351ab41e9827338eface645a6a3c5b4edbc51a411c1405c3230745967",
+      "sha256": "fa2c10821af8044f7ff441b80d7f4a99fcfd6112cfb99577396e0fc4bdf552af"
+    },
+    "report": {
+      "result_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",
+      "sha256": "463579526a7f42ca136fcca9cf03a9668db18c21055261086e45ed800b395c91"
+    },
+    "root": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1",
+    "specification": {
+      "identity": "ceb6f2230c448abd23b3e2cdffe479bb697b953a76d0072852bf99b131282332",
+      "sha256": "6295a829848437e793b056f328f3cdde0f1ae3e9e0921cbf2c065d50cb9d9b3f"
+    }
+  },
+  "authorization": {
+    "grant_consumed": true,
+    "identity": "6426ffd109d28145a4148855d70a181d50fd4277068fe01b501934d212378fb1",
+    "no_second_run": true,
+    "same_run_safe_resume_used": true
+  },
+  "baseline": {
+    "fixed_node_ceiling": 500000,
+    "mean_completed_depth": 12.640730593607305,
+    "mean_observed_nodes": 493286.31762557075,
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_runtime_identity": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+    "search_turns": 5475,
+    "total_observed_nodes": 2700742589
+  },
+  "candidate": {
+    "bundle_identity": "c2652119b64a2808ebcd5e7dc661873f3f897065b7d529bd9e261328f0981f23",
+    "checkpoint_file_sha256": "df00861a5ced53b6c9b16ed89f2762d41a82f1d74fce970b5d0bdf6adba4ac4d",
+    "checkpoint_id": "managed-sanmill-corrected-retained-v2-segment-0020:checkpoint:00000006",
+    "checkpoint_payload_sha256": "8b4017ce856012fa3c4d578c56c5f32a6d5ebae97b9f17c6cbd2c5228146de19",
+    "device": "cpu",
+    "precision": "float32",
+    "route": "s-gen-v2-training-aligned-v1",
+    "training_seed": 42
+  },
+  "claim_boundary": {
+    "automatic_promotion": false,
+    "automatic_publication": false,
+    "fixed_corpus_relation_only": true,
+    "full_corpus_data_disjoint": false,
+    "full_mif_conformance": false,
+    "multiple_training_seeds": false,
+    "new_training_authorized": false,
+    "overall_playing_strength_claim": false
+  },
+  "evidence_date": "2026-08-09",
+  "evidence_identity": "aaad33699bd7e6f15ea203e52fca6f275fcea711bd72e5f36dca1884eb79cab6",
+  "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+  "execution": {
+    "active_seconds": 483.720479,
+    "completed_games": 128,
+    "implementation_commit": "23dd90008b1d260a054e0c3cb471b8aad71e99a6",
+    "implementation_tree": "025ac96781832dd71d9b7b605c6ecd41fe064a32",
+    "pairs": 64,
+    "status": "completed"
+  },
+  "host_interruption": {
+    "archived_without_byte_change": true,
+    "candidate_loss_manufactured": false,
+    "completed_games_before_interruption": 4,
+    "error_type": "PermissionError",
+    "failure_identity": "d2511ab9e3f0c560718ec60b5d77ec3d4dbcd3f44164e0cd8a5ffeb48b4b7a8d",
+    "game_result_manufactured": false,
+    "interrupted_game_committed": false,
+    "ledger_tail_before_resume": "8a07bf807485b2027bed49c17c6fe8a99ba6b1cbc4e8b0a716156a03d1515637",
+    "missing_suffix_games": 124,
+    "resume_preflight_identity": "84c32095f3faa0330d60c008a506233e31347e84232bf714411f20242f3792af",
+    "resume_scope": "same specification and only the missing suffix"
+  },
+  "pair_distribution": {
+    "candidate_ahead_half_point": 3,
+    "candidate_behind_half_point": 19,
+    "candidate_behind_one_point": 2,
+    "equal": 40
+  },
+  "resources": {
+    "corpus_identity": "417d74ebe01734c43e48531cab81ba742bc89e455f1c834ea7e31006b886f8b9",
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "malom_tablebase_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_identity": "ea2df42d6df837588e1a2d87e37bd025c2b612f87695aa9ae16da064aebf62a8",
+    "strict_independence_subset_identity": "a01be0c72b395f2a624c2f5ae7538d9d08eaccde0a392dba566bebe2221806f8"
+  },
+  "result": {
+    "by_candidate_color": {
+      "black": {
+        "draws": 46,
+        "games": 64,
+        "losses": 16,
+        "score_rate": 0.390625,
+        "wins": 2
+      },
+      "white": {
+        "draws": 56,
+        "games": 64,
+        "losses": 7,
+        "score_rate": 0.453125,
+        "wins": 1
+      }
+    },
+    "by_stratum": {
+      "book": {
+        "decision": "candidate_behind",
+        "draws": 34,
+        "games": 44,
+        "interval": [
+          -0.30322862563488395,
+          -0.060407738001479666
+        ],
+        "losses": 9,
+        "score_rate": 0.4090909090909091,
+        "wins": 1
+      },
+      "human_db": {
+        "decision": "inconclusive",
+        "draws": 37,
+        "games": 42,
+        "interval": [
+          -0.1302258968187767,
+          0.08260684919972908
+        ],
+        "losses": 3,
+        "score_rate": 0.4880952380952381,
+        "wins": 2
+      },
+      "perfect_db": {
+        "decision": "candidate_behind",
+        "draws": 31,
+        "games": 42,
+        "interval": [
+          -0.40724726926047133,
+          -0.1165622545490525
+        ],
+        "losses": 11,
+        "score_rate": 0.36904761904761907,
+        "wins": 0
+      }
+    },
+    "game_lengths": {
+      "max_post_prefix_logical_plies": 230,
+      "mean_post_prefix_logical_plies": 85.328125,
+      "min_post_prefix_logical_plies": 13
+    },
+    "primary": {
+      "decision": "candidate_behind",
+      "draws": 102,
+      "games": 128,
+      "interval": [
+        -0.23146381558966117,
+        -0.08103618441033884
+      ],
+      "losses": 23,
+      "mean_pair_score_difference": -0.15625,
+      "score_rate": 0.421875,
+      "support_pairs": 64,
+      "wins": 3
+    },
+    "strict_independence_sensitivity": {
+      "decision": "candidate_behind",
+      "draws": 49,
+      "games": 68,
+      "interval": [
+        -0.36140729981811304,
+        -0.138592700181887
+      ],
+      "losses": 18,
+      "score_rate": 0.375,
+      "support_pairs": 34,
+      "wins": 1
+    },
+    "termination_reasons": {
+      "draw_fifty_move": 57,
+      "draw_threefold_repetition": 45,
+      "lose_fewer_than_three": 16,
+      "lose_no_legal_moves": 10
+    }
+  },
+  "schema_version": "nmm.sanmill-heldout-result-evidence.v1",
+  "status": "completed_candidate_behind",
+  "training_context": {
+    "conventional_train_validation_curves_available": false,
+    "final_200_training_score_rate": 0.475,
+    "heldout_score_rate": 0.421875,
+    "last_policy_health_logit_margin": 2.39808,
+    "last_policy_health_preserving_rate": 0.965517,
+    "multi_seed_evidence_available": false,
+    "rates_are_directly_comparable": false,
+    "training_games": 5000
+  },
+  "verification": {
+    "final_preflight": "all gates passed",
+    "focused_tests": "79 passed",
+    "mandatory_malom_and_provenance": "103 passed, 498 subtests passed",
+    "recompute_equal_to_persisted_report": true,
+    "ruff": "passed"
+  }
+}
