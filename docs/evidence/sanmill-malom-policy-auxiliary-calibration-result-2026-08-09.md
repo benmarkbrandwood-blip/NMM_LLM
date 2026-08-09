@@ -32,10 +32,13 @@ extension, promotion or publication was run.
 
 ## Observed facts
 
-All arms used fresh seed 51, A2C, learning rate `1e-4`, update batches of 64
-steps, `max_ply=120`, the same deterministic 100-game schedule and isolated
-empty `sector-corrected-v1` SpecialistDB copies.  The sole intended arm
-difference was the preserving-set auxiliary coefficient.
+All arms used fresh seed 51, A2C, base learning rate `1e-4`, update batches of
+64 steps, `max_ply=120`, the same deterministic 100-game schedule and isolated
+empty `sector-corrected-v1` SpecialistDB copies.  Each arm made 15 updates at
+the base rate, then 11 at the inherited `0.5` adaptive floor (`5e-5`) after
+the first 50-game boundary because the recent heuristic-opponent win rate was
+zero.  This schedule was identical across arms; the sole intended arm
+difference remained the preserving-set auxiliary coefficient.
 
 | Arm | Coefficient | Fixed-state mass gain over control change | Scaled auxiliary / absolute policy loss | Repetition draw rate | Gate result |
 | --- | ---: | ---: | ---: | ---: | --- |
