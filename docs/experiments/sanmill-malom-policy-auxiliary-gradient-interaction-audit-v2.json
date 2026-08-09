@@ -53,7 +53,7 @@
     "strength_or_promotion_claim": false,
     "training_updates": 0
   },
-  "experiment_id": "sanmill-malom-policy-auxiliary-gradient-interaction-audit-v1",
+  "experiment_id": "sanmill-malom-policy-auxiliary-gradient-interaction-audit-v2",
   "method": {
     "adam_replay": "production scaffolded_a2c_update on disposable model and optimizer copies",
     "batch_source": "persisted pending steps immediately before each arm's final flush",
@@ -64,9 +64,11 @@
       "value",
       "malom-preserving-set auxiliary"
     ],
-    "production_replay_tolerance": 1e-06
+    "logged_scalar_tolerance": 1e-05,
+    "production_replay_parameter_tolerance": 1e-06,
+    "softmax_invariant_parameter_policy": "report the final shared scalar policy bias separately and exclude it only from functional replay acceptance"
   },
-  "schema_version": "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v1",
+  "schema_version": "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v2",
   "source_calibration": {
     "plan_identity": "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba",
     "readiness_identity": "62a17abe2ecbb05aac07e7b1fa7f42d7be70cf9cca707d8a598bd98564b15bc0",

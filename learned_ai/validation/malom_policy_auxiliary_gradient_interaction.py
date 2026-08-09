@@ -475,10 +475,18 @@ def audit_malom_policy_auxiliary_gradient_interaction(
     ordinary = _sum_gradients(
         [applied["policy"], applied["entropy"], applied["value"]]
     )
+    ordinary_policy = _sum_gradients(
+        [applied["policy"], applied["entropy"]]
+    )
+    joint_policy = _sum_gradients(
+        [ordinary_policy, applied["auxiliary"]]
+    )
     joint = _sum_gradients([ordinary, applied["auxiliary"]])
     joint_norm = _norm(joint)
     ordinary_norm = _norm(ordinary)
     auxiliary_norm = _norm(applied["auxiliary"])
+    ordinary_policy_norm = _norm(ordinary_policy)
+    joint_policy_norm = _norm(joint_policy)
     clip_scale = min(1.0, grad_clip / (joint_norm + 1e-6))
     denominator = joint_norm * joint_norm
 
@@ -493,6 +501,12 @@ def audit_malom_policy_auxiliary_gradient_interaction(
                 _dot(applied[name], joint) / denominator
                 if denominator > 0.0
                 else 0.0
+            ),
+            "projection_fraction_of_policy_joint": (
+                _dot(applied[name], joint_policy)
+                / (joint_policy_norm * joint_policy_norm)
+                if name != "value" and joint_policy_norm > 0.0
+                else None
             ),
         }
 
@@ -587,6 +601,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         "gradients": {
             "pairwise_applied_cosine": pairwise,
             "ordinary_gradient_l2": ordinary_norm,
+            "ordinary_policy_head_gradient_l2": ordinary_policy_norm,
             "auxiliary_applied_gradient_l2": auxiliary_norm,
             "auxiliary_to_ordinary_gradient_l2_ratio": (
                 auxiliary_norm / ordinary_norm if ordinary_norm > 0.0 else None
@@ -594,6 +609,15 @@ def audit_malom_policy_auxiliary_gradient_interaction(
             "auxiliary_to_ordinary_cosine": _cosine(
                 applied["auxiliary"], ordinary
             ),
+            "auxiliary_to_ordinary_policy_head_gradient_l2_ratio": (
+                auxiliary_norm / ordinary_policy_norm
+                if ordinary_policy_norm > 0.0
+                else None
+            ),
+            "auxiliary_to_ordinary_policy_head_cosine": _cosine(
+                applied["auxiliary"], ordinary_policy
+            ),
+            "joint_policy_head_pre_clip_l2": joint_policy_norm,
             "joint_pre_clip_l2": joint_norm,
             "clip_threshold": grad_clip,
             "clip_scale": clip_scale,

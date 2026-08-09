@@ -103,6 +103,13 @@ def test_audit_measures_components_without_mutating_sources() -> None:
         > 0.0
     )
     assert (
+        report["gradients"][
+            "auxiliary_to_ordinary_policy_head_gradient_l2_ratio"
+        ]
+        > 0.0
+    )
+    assert report["gradients"]["ordinary_policy_head_gradient_l2"] > 0.0
+    assert (
         report["adam_step"]["treatment_minus_baseline_preserving_mass"]
         >= 0.0
     )

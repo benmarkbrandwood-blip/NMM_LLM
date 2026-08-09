@@ -27,11 +27,11 @@ from learned_ai.validation.malom_policy_auxiliary_gradient_interaction import ( 
 
 
 SCHEMA_VERSION = (
-    "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-result.v1"
+    "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-result.v2"
 )
 DEFAULT_PLAN = ROOT / (
     "docs/experiments/"
-    "sanmill-malom-policy-auxiliary-gradient-interaction-audit-v1.json"
+    "sanmill-malom-policy-auxiliary-gradient-interaction-audit-v2.json"
 )
 
 
@@ -329,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("gradient interaction output already exists")
     plan = _strict_json(plan_path)
     if plan.get("schema_version") != (
-        "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v1"
+        "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v2"
     ):
         raise RuntimeError("gradient interaction plan schema differs")
     if plan.get("claim_boundary") != {
