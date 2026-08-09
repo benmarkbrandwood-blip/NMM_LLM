@@ -1811,6 +1811,13 @@ the current successor in this order:
     further learning run, perform only the separately frozen no-game target
     response audit described above. No retry, extension, resume, promotion,
     model publication, or long training is currently authorized.
+16. The normalized target-response audit is now frozen as a no-game,
+    no-persistent-update comparison of targets `0.25`, `0.50`, and `1.00` on
+    the three treatment final-flush batches. Its machine-readable plan pins
+    every checkpoint, update log, result byte, implementation file, target,
+    cap, replay tolerance, and decision boundary. Run it once only from its
+    clean committed source; its result may authorize preparation of another
+    bounded calibration, never retained training by itself.
 
 The previously executed isolated smoke command was:
 

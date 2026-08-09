@@ -1,0 +1,126 @@
+{
+  "arms": [
+    {
+      "arm_id": "seed55-normalized-r025",
+      "final_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed55-normalized-r025/segments/segment-0001/latest.pt",
+        "sha256": "16d2a678cfe089775f13c765ecc2e95b445ea43e0ffdf7b621e913f32be80204",
+        "size_bytes": 2120131
+      },
+      "pre_update_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed55-normalized-r025/segments/segment-0001/latest.prev0.pt",
+        "sha256": "7181f83e8a581b0af0ebc523f637d88b3d7e63978282bf80d0c8c0d43fce4743",
+        "size_bytes": 2374598
+      },
+      "seed": 55,
+      "update_log": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed55-normalized-r025/segments/segment-0001/update_log.jsonl",
+        "sha256": "e48428190a04a8b839dd761b33dfb125459e3a11a7bdcd7e152ba43992d3b9ee",
+        "size_bytes": 36941
+      }
+    },
+    {
+      "arm_id": "seed56-normalized-r025",
+      "final_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed56-normalized-r025/segments/segment-0001/latest.pt",
+        "sha256": "7217b0574d6af49edd739b2abfc87de8175b44e5ff69b53488c383bb6b973e0e",
+        "size_bytes": 2120195
+      },
+      "pre_update_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed56-normalized-r025/segments/segment-0001/latest.prev0.pt",
+        "sha256": "13d8727f41089f5d094c87f8a1311936634acd888a0e8f43ff141e63659e2ccf",
+        "size_bytes": 2364102
+      },
+      "seed": 56,
+      "update_log": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed56-normalized-r025/segments/segment-0001/update_log.jsonl",
+        "sha256": "5747a0c26352924b1131f0c9f11464aa136c70767142636d9abb65fd26698317",
+        "size_bytes": 37091
+      }
+    },
+    {
+      "arm_id": "seed57-normalized-r025",
+      "final_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed57-normalized-r025/segments/segment-0001/latest.pt",
+        "sha256": "d72b46b397407e57c6fa0b052e141475c254c7f61a40bf0028ef7f8dd99537dd",
+        "size_bytes": 2120195
+      },
+      "pre_update_checkpoint": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed57-normalized-r025/segments/segment-0001/latest.prev0.pt",
+        "sha256": "b5565bf136ce29578d8a693d80ce1cb10b15d4c634fd001537eafb10165f3117",
+        "size_bytes": 2993862
+      },
+      "seed": 57,
+      "update_log": {
+        "path": "out/malom-policy-auxiliary-normalized-calibration-v1/seed57-normalized-r025/segments/segment-0001/update_log.jsonl",
+        "sha256": "9362181e649c7cefe068e8fc74906d115f37ffde0f2d65419a719d46715a2a9a",
+        "size_bytes": 30910
+      }
+    }
+  ],
+  "calibration_result": {
+    "path": "out/malom-policy-auxiliary-normalized-calibration-v1/result.json",
+    "result_identity": "669124f2803609fe87fabc15c38a798711e78541ed1a39614cf44837a51a58ac",
+    "sha256": "0d59bc587d66006255020e5ab3b7faab2f8b9c693a1c139686a475d0e93828bb",
+    "size_bytes": 1004023,
+    "verdict": "inconclusive_stop_and_redesign"
+  },
+  "claim_boundary": {
+    "candidate_model_loaded": true,
+    "new_games": 0,
+    "optimizer_or_model_mutation": false,
+    "strength_or_promotion_claim": false,
+    "training_updates": 0
+  },
+  "decision_rule": {
+    "bounded_response": "all values finite; mean baseline-to-treatment KL at most 0.0001; absolute treatment-minus-baseline informative entropy change at most 0.01",
+    "escalation_candidate": "only if preserving-mass response is non-decreasing from 0.25 to 0.50 to 1.00 in all three seeds, the median response at 1.00 exceeds the median at 0.25, target 0.50 is uncapped in every seed, and all replay, bounded-response, and mutation checks pass",
+    "interpretation": "passing permits preparation of a new independent-seed learning calibration only; it does not select a target for retained training",
+    "monotonic_tolerance": 1e-9,
+    "otherwise": "stop gradient-ratio escalation and compare auxiliary-off A2C with a separately designed KL-constrained teacher or safe-action sampling mechanism",
+    "target_1_cap_policy": "a cap at target 1.00 is reported as the response ceiling and is not itself a failure"
+  },
+  "experiment_id": "sanmill-malom-policy-auxiliary-normalized-target-response-audit-v1",
+  "implementation": {
+    "commit": "fb779091789581ce3d5264f202e96ce555917a9b",
+    "module": {
+      "path": "learned_ai/validation/malom_policy_auxiliary_gradient_interaction.py",
+      "sha256": "8e48f08c40c60e64e7fdaa97decd3bfe744a69652f910919294d3ffc1cbec590",
+      "size_bytes": 37743
+    },
+    "tool": {
+      "path": "tools/audit_malom_policy_auxiliary_normalized_target_response.py",
+      "sha256": "7d501b9e64387417a488674e6fc9d661dfd26f35d573356c7ec76e981616a214",
+      "size_bytes": 18376
+    }
+  },
+  "method": {
+    "coefficient_cap": 0.25,
+    "comparison": "same persisted pre-update model, Adam state, and final-flush batch for target ratios 0.25, 0.50, and 1.00",
+    "denominator_floor": 1e-12,
+    "entropy_coefficient": 0.01,
+    "gamma": 0.99,
+    "gradient_clip": 1.0,
+    "logged_scalar_tolerance": 1e-5,
+    "optimizer": "production Adam update on disposable deep copies",
+    "persisted_replay_target_ratio": 0.25,
+    "production_replay_parameter_tolerance": 1e-6,
+    "target_policy_head_ratios": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "value_coefficient": 0.5
+  },
+  "output": {
+    "path": "out/malom-policy-auxiliary-normalized-target-response-audit-v1/result.json",
+    "write_policy": "exclusive create once under ignored out; never overwrite"
+  },
+  "schema_version": "nmm.sanmill-malom-policy-auxiliary-normalized-target-response-plan.v1",
+  "source_calibration": {
+    "plan_identity": "1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab",
+    "readiness_identity": "a5fb75eda17b4609902294f424300cb45f964440852ecfe4a008f1ea70733637",
+    "training_source_commit": "83c5cf658bf6edfc75ece6785a87587685eee7a1"
+  },
+  "status": "frozen_unrun"
+}
