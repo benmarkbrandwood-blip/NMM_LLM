@@ -379,16 +379,31 @@ the quarantined main database still has template SHA-256
 `5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`.
 All formal control and arm-database targets are absent again.
 
+A third preparation attempt at published `02bb1a3` also stopped before
+authorization or training. The first arm's trainer preflight correctly returned
+`needs_decision`, with zero technical errors and the absent product
+authorization as its only unresolved decision. The preparer incorrectly
+required `ready_for_long_run`, so it stopped after creating only the first
+unlaunched plan and its byte-identical empty database. Those files are retained
+under ignored quarantine
+`out/quarantine/mill-bonus-ablation-preparation-failed-02bb1a3-20260809T073257Z`.
+Local commit `947a3fe` now accepts exit code 2 only for this exact technical
+preflight state, binds the clean Git source, resume configuration, first-segment
+identity and isolated output path, and fails closed on any error or additional
+decision. Result validation preserves the same authorization-gated meaning.
+
 Local commits `f305ad0`, `1a47d52`, `7aa4e80` and `3bafbf3` respectively make
 SpecialistDB preflight immutable and sidecar-closed, reserve trainer preflight
 stdout for JSON, bind preflight to the actual first managed segment, and
 preserve both subprocess output streams on failure. The current source-only
 plan identity is
-`717d76af61e4c62dd0c32ffa1a5d8879a9cb576503ef1140e43809d048234890`.
+`5202ab904c6761f645fc2efdbc2d6788979999814a25049883f8a652beecf9e3`.
 The post-fix local gate passes `239` focused Generalist, reward, observability,
 trainer, manager, checkpoint, exact-resume, policy-health and Sanmill-referee
 tests plus `41` route-contract tests. The separate mandatory Malom, DB-teacher
 and label-provenance gate passes `103` tests plus `498` parameterized subtests.
+The authorization-gated preparation and result paths additionally pass `56`
+focused readiness, result, contract and Generalist-preflight tests.
 Ruff passes the changed modules; the trainer retains its separately known
 legacy lint baseline, and the changed trainer lines pass with those pre-existing
 codes excluded. `git diff --check` also passes.
