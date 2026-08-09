@@ -307,8 +307,10 @@ MILL_BONUS = 0.25   # larger mill bonus — midgame mills more decisive
 MILL_BONUS_MODES = (
     "legacy-unconditional",
     "malom-preserving-only",
+    "malom-preserving-plus-downgrade-penalty",
     "disabled",
 )
+MALOM_DOWNGRADE_PENALTY = 0.25
 LAMBDA     = 0.70   # Batch 1: 0.5 → 0.7 (outcome matters more)
 DECAY      = 0.99   # Batch 1: 0.98 → 0.99 (outcome reaches further back)
 EXPLORE_COEF = 0.08 # bonus for winning with non-heuristic-top1 moves (Option A)
@@ -458,12 +460,22 @@ class GameDiag:
     opponent_search_depth_mean: float = 0.0
     opponent_node_budget:    Optional[int] = None
     reward_mill_bonus_mean:   float = 0.0
+    reward_malom_mean:        float = 0.0
     formed_mill_count:        int = 0
     formed_mill_move_count:   int = 0
     mill_bonus_awarded_total: float = 0.0
     malom_known_move_rate:    float = 0.0
     malom_preserving_move_rate: float = 0.0
     malom_downgrade_move_rate: float = 0.0
+    malom_downgrade_count: int = 0
+    malom_downgrade_rank_total: int = 0
+    malom_reward_total: float = 0.0
+    malom_known_place: int = 0
+    malom_known_move: int = 0
+    malom_known_fly: int = 0
+    malom_downgrade_place: int = 0
+    malom_downgrade_move: int = 0
+    malom_downgrade_fly: int = 0
     formed_mill_malom_downgrade_count: int = 0
     formed_mill_malom_downgrade_rate: float = 0.0
     formed_mill_malom_unknown_count: int = 0
@@ -1126,6 +1138,35 @@ def _mill_formation_reward(
     return float(MILL_BONUS * mills_formed)
 
 
+def _malom_downgrade_reward(
+    *,
+    malom_quality: Optional[float],
+    mode: str,
+) -> float:
+    """Penalise exact WDL rank loss only in the explicit successor mode.
+
+    The legacy and first corrected modes retain byte-for-byte reward semantics.
+    The new mode is asymmetric: preserving WDL earns no generic Malom reward,
+    while a one- or two-rank downgrade earns a fixed negative reward.  This
+    avoids reviving the historical positive signal that could favour safe draws.
+    """
+    if mode not in MILL_BONUS_MODES:
+        raise RuntimeError(f"unsupported mill bonus mode: {mode!r}")
+    if mode != "malom-preserving-plus-downgrade-penalty":
+        return 0.0
+    if isinstance(malom_quality, bool) or malom_quality is None:
+        raise RuntimeError(
+            "Malom move quality is required for downgrade-penalty shaping"
+        )
+    try:
+        quality = float(malom_quality)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Malom move quality must be numeric") from exc
+    if not math.isfinite(quality) or quality not in (0.0, -1.0, -2.0):
+        raise RuntimeError("Malom move quality must be one of 0, -1, or -2")
+    return float(MALOM_DOWNGRADE_PENALTY * quality)
+
+
 def _compute_per_move_reward(
     enc,
     chosen_idx: int,
@@ -1135,6 +1176,7 @@ def _compute_per_move_reward(
     move_phase_start_ply: Optional[int] = None,
     current_ply: int = 0,
     malom_q: Optional[float] = None,
+    mill_bonus_mode: str = "legacy-unconditional",
 ) -> tuple[float, RewardBreakdown]:
     rb = RewardBreakdown()
 
@@ -1151,10 +1193,10 @@ def _compute_per_move_reward(
             h_after  = float(enc.h_scores_abs[chosen_idx]) if getattr(enc, "h_scores_abs", None) else h_before
             rb.heuristic = BETA * math.tanh(h_after - h_before)
 
-    if malom_q == "W":
-        rb.malom = MALOM_REWARD
-    elif malom_q == "L":
-        rb.malom = -MALOM_REWARD
+    rb.malom = _malom_downgrade_reward(
+        malom_quality=malom_q,
+        mode=mill_bonus_mode,
+    )
 
     rb.total = rb.sentinel + rb.heuristic + rb.malom
     return float(rb.total), rb
@@ -1770,6 +1812,7 @@ def _rollout_impl(
                 move_phase_start_ply=move_phase_start_ply,
                 current_ply=ply,
                 malom_q=malom_q,
+                mill_bonus_mode=mill_bonus_mode,
             )
 
             # Mill formation bonus under the explicit experiment contract.
@@ -2136,6 +2179,7 @@ def _build_game_diag(
         reward_mill_bonus_mean=_safe_mean(
             [step.mill_bonus_awarded for step in sd]
         ),
+        reward_malom_mean=_safe_mean([step.reward.malom for step in sd]),
         formed_mill_count=sum(step.mills_formed for step in sd),
         formed_mill_move_count=len(mill_steps),
         mill_bonus_awarded_total=sum(
@@ -2150,6 +2194,39 @@ def _build_game_diag(
                 1.0 if float(quality) < 0.0 else 0.0
                 for _, quality in known_quality_steps
             ]
+        ),
+        malom_downgrade_count=sum(
+            1 for _, quality in known_quality_steps if float(quality) < 0.0
+        ),
+        malom_downgrade_rank_total=sum(
+            int(-float(quality))
+            for _, quality in known_quality_steps
+            if float(quality) < 0.0
+        ),
+        malom_reward_total=sum(step.reward.malom for step in sd),
+        malom_known_place=sum(
+            1 for step, _ in known_quality_steps if step.board_phase == "place"
+        ),
+        malom_known_move=sum(
+            1 for step, _ in known_quality_steps if step.board_phase == "move"
+        ),
+        malom_known_fly=sum(
+            1 for step, _ in known_quality_steps if step.board_phase == "fly"
+        ),
+        malom_downgrade_place=sum(
+            1
+            for step, quality in known_quality_steps
+            if step.board_phase == "place" and float(quality) < 0.0
+        ),
+        malom_downgrade_move=sum(
+            1
+            for step, quality in known_quality_steps
+            if step.board_phase == "move" and float(quality) < 0.0
+        ),
+        malom_downgrade_fly=sum(
+            1
+            for step, quality in known_quality_steps
+            if step.board_phase == "fly" and float(quality) < 0.0
         ),
         formed_mill_malom_downgrade_count=len(downgrade_mill_steps),
         formed_mill_malom_downgrade_rate=(
@@ -3348,8 +3425,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         choices=MILL_BONUS_MODES,
         default="legacy-unconditional",
         help=(
-            "Mill-formation shaping contract. The corrected successor uses "
-            "malom-preserving-only; the default preserves historical runs."
+            "Mill-formation and optional exact-WDL downgrade shaping contract. "
+            "The default preserves historical runs."
         ),
     )
     p.add_argument("--max-games",           type=int,   default=5000)

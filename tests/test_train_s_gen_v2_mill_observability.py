@@ -15,11 +15,13 @@ def _step(
     phase: str,
     mills_formed: int,
     mill_bonus: float,
+    malom_reward: float = 0.0,
     malom_quality: float | None,
 ) -> trainer.StepDiag:
     reward = trainer.RewardBreakdown(
-        total=mill_bonus,
+        total=mill_bonus + malom_reward,
         mill_formed=mill_bonus,
+        malom=malom_reward,
     )
     return trainer.StepDiag(
         reward=reward,
@@ -55,6 +57,7 @@ def test_game_diag_separates_formed_mills_rewards_and_malom_downgrades() -> None
             phase="place",
             mills_formed=1,
             mill_bonus=0.0,
+            malom_reward=-trainer.MALOM_DOWNGRADE_PENALTY,
             malom_quality=-1.0,
         ),
         _step(
@@ -67,6 +70,7 @@ def test_game_diag_separates_formed_mills_rewards_and_malom_downgrades() -> None
             phase="fly",
             mills_formed=0,
             mill_bonus=0.0,
+            malom_reward=-2 * trainer.MALOM_DOWNGRADE_PENALTY,
             malom_quality=-2.0,
         ),
         _step(
@@ -117,6 +121,20 @@ def test_game_diag_separates_formed_mills_rewards_and_malom_downgrades() -> None
     assert diag.malom_known_move_rate == pytest.approx(0.75)
     assert diag.malom_preserving_move_rate == pytest.approx(1 / 3)
     assert diag.malom_downgrade_move_rate == pytest.approx(2 / 3)
+    assert diag.reward_malom_mean == pytest.approx(
+        -3 * trainer.MALOM_DOWNGRADE_PENALTY / 4
+    )
+    assert diag.malom_reward_total == pytest.approx(
+        -3 * trainer.MALOM_DOWNGRADE_PENALTY
+    )
+    assert diag.malom_downgrade_count == 2
+    assert diag.malom_downgrade_rank_total == 3
+    assert diag.malom_known_place == 1
+    assert diag.malom_known_move == 1
+    assert diag.malom_known_fly == 1
+    assert diag.malom_downgrade_place == 1
+    assert diag.malom_downgrade_move == 0
+    assert diag.malom_downgrade_fly == 1
     assert diag.formed_mill_malom_downgrade_count == 1
     assert diag.formed_mill_malom_downgrade_rate == pytest.approx(0.5)
     assert diag.formed_mill_malom_unknown_count == 0

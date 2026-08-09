@@ -19,6 +19,16 @@ from scripts import train_s_gen_v2 as trainer
         ("malom-preserving-only", 0.0, trainer.MILL_BONUS),
         ("malom-preserving-only", -1.0, 0.0),
         ("malom-preserving-only", -2.0, 0.0),
+        (
+            "malom-preserving-plus-downgrade-penalty",
+            0.0,
+            trainer.MILL_BONUS,
+        ),
+        (
+            "malom-preserving-plus-downgrade-penalty",
+            -1.0,
+            0.0,
+        ),
         ("disabled", None, 0.0),
     ],
 )
@@ -62,6 +72,47 @@ def test_non_mill_needs_no_malom_query_for_bonus() -> None:
     ) == 0.0
 
 
+@pytest.mark.parametrize(
+    ("quality", "expected"),
+    [
+        (0.0, 0.0),
+        (-1.0, -trainer.MALOM_DOWNGRADE_PENALTY),
+        (-2.0, -2 * trainer.MALOM_DOWNGRADE_PENALTY),
+    ],
+)
+def test_downgrade_penalty_is_asymmetric_and_rank_weighted(
+    quality: float,
+    expected: float,
+) -> None:
+    assert trainer._malom_downgrade_reward(
+        malom_quality=quality,
+        mode="malom-preserving-plus-downgrade-penalty",
+    ) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("quality", [None, True, float("nan"), 1.0, -3.0])
+def test_downgrade_penalty_fails_closed_without_exact_quality(
+    quality: float | bool | None,
+) -> None:
+    with pytest.raises(RuntimeError, match="Malom move quality"):
+        trainer._malom_downgrade_reward(
+            malom_quality=quality,
+            mode="malom-preserving-plus-downgrade-penalty",
+        )
+
+
+def test_existing_modes_retain_zero_per_move_malom_reward() -> None:
+    for mode in (
+        "legacy-unconditional",
+        "malom-preserving-only",
+        "disabled",
+    ):
+        assert trainer._malom_downgrade_reward(
+            malom_quality=None,
+            mode=mode,
+        ) == 0.0
+
+
 def test_parser_preserves_legacy_default_and_accepts_successor_mode() -> None:
     parser = trainer._build_argument_parser()
 
@@ -74,9 +125,21 @@ def test_parser_preserves_legacy_default_and_accepts_successor_mode() -> None:
             "malom-preserving-only",
         ]
     )
+    penalty = parser.parse_args(
+        [
+            "--preflight",
+            "smoke",
+            "--mill-bonus-mode",
+            "malom-preserving-plus-downgrade-penalty",
+        ]
+    )
 
     assert legacy.mill_bonus_mode == "legacy-unconditional"
     assert successor.mill_bonus_mode == "malom-preserving-only"
+    assert (
+        penalty.mill_bonus_mode
+        == "malom-preserving-plus-downgrade-penalty"
+    )
 
 
 class _OneMoveModel:
@@ -150,10 +213,37 @@ def test_rollout_suppresses_only_the_contradictory_mill_bonus(monkeypatch) -> No
         **common,
         mill_bonus_mode="malom-preserving-only",
     )
+    penalty = trainer._rollout(
+        **common,
+        mill_bonus_mode="malom-preserving-plus-downgrade-penalty",
+    )
 
     assert legacy.trajectory[0].reward == pytest.approx(trainer.MILL_BONUS)
     assert corrected.trajectory[0].reward == 0.0
+    assert penalty.trajectory[0].reward == pytest.approx(
+        -trainer.MALOM_DOWNGRADE_PENALTY
+    )
     assert corrected.step_diags[0].mills_formed == 1
     assert corrected.step_diags[0].malom_quality == -1.0
     assert corrected.step_diags[0].mill_bonus_awarded == 0.0
     assert corrected.step_diags[0].board_phase == "place"
+    assert penalty.step_diags[0].reward.malom == pytest.approx(
+        -trainer.MALOM_DOWNGRADE_PENALTY
+    )
+
+
+def test_non_mill_downgrade_receives_the_new_penalty() -> None:
+    enc = _encoded({"from": None, "to": "a7", "capture": None})
+
+    reward, breakdown = trainer._compute_per_move_reward(
+        enc,
+        0,
+        None,
+        board_phase="place",
+        malom_q=-2.0,
+        mill_bonus_mode="malom-preserving-plus-downgrade-penalty",
+    )
+
+    assert reward == pytest.approx(-2 * trainer.MALOM_DOWNGRADE_PENALTY)
+    assert breakdown.malom == reward
+    assert breakdown.mill_formed == 0.0
