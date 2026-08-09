@@ -289,6 +289,7 @@ class ManagedPlan:
     publication_allowed: bool
     promotion_allowed: bool
     policy_health: PolicyHealthGate | None = None
+    completion_game_bound: int | None = None
 
     _FIELDS: ClassVar[set[str]] = {
         "schema_version",
@@ -310,9 +311,13 @@ class ManagedPlan:
         "publication_allowed",
         "promotion_allowed",
         "policy_health",
+        "completion_game_bound",
     }
 
-    _OPTIONAL_FIELDS: ClassVar[set[str]] = {"policy_health"}
+    _OPTIONAL_FIELDS: ClassVar[set[str]] = {
+        "policy_health",
+        "completion_game_bound",
+    }
 
     def __post_init__(self) -> None:
         for field in ("plan_id", "objective", "experiment_id", "git_commit"):
@@ -326,8 +331,19 @@ class ManagedPlan:
         _require_sha256(self.resume_config_sha256, field="resume_config_sha256")
         _require_positive_int(self.max_games, field="max_games")
         _require_positive_int(self.segment_games, field="segment_games")
-        if self.segment_games > self.max_games:
-            raise ManagedContractError("segment_games must not exceed max_games")
+        if self.completion_game_bound is not None:
+            _require_positive_int(
+                self.completion_game_bound,
+                field="completion_game_bound",
+            )
+            if self.completion_game_bound > self.max_games:
+                raise ManagedContractError(
+                    "completion_game_bound must not exceed max_games"
+                )
+        if self.segment_games > self.game_bound:
+            raise ManagedContractError(
+                "segment_games must not exceed the completion game bound"
+            )
         _require_positive_number(self.max_wall_hours, field="max_wall_hours")
         args = tuple(self.common_trainer_args)
         if not args or any(not isinstance(item, str) or not item for item in args):
@@ -357,6 +373,11 @@ class ManagedPlan:
                 "policy_health must be a PolicyHealthGate or null"
             )
 
+    @property
+    def game_bound(self) -> int:
+        """Return the authorized completion ceiling, separate from scheduling."""
+        return self.completion_game_bound or self.max_games
+
     def _payload(self) -> dict[str, Any]:
         payload = {
             "schema_version": MANAGED_PLAN_SCHEMA,
@@ -379,6 +400,8 @@ class ManagedPlan:
         }
         if self.policy_health is not None:
             payload["policy_health"] = self.policy_health.to_dict()
+        if self.completion_game_bound is not None:
+            payload["completion_game_bound"] = self.completion_game_bound
         return payload
 
     @property
@@ -411,6 +434,8 @@ class ManagedPlan:
                     "managed plan policy_health must be an object"
                 )
             fields["policy_health"] = PolicyHealthGate.from_dict(raw_health)
+        if "completion_game_bound" in value:
+            fields["completion_game_bound"] = value["completion_game_bound"]
         plan = cls(**fields)
         if value["plan_sha256"] != plan.plan_sha256:
             raise ManagedContractError("managed plan hash does not match its content")
@@ -603,7 +628,7 @@ def managed_status(
     last = ledger_events[-1]
     needs_product_decision = False
     decision = None
-    if completed_games >= plan.max_games or last.event_type == "managed_plan_completed":
+    if completed_games >= plan.game_bound or last.event_type == "managed_plan_completed":
         state = "completed"
         summary = "The authorized training plan reached its game bound."
     elif last.reason_code == "wall_time_limit":
@@ -634,7 +659,8 @@ def managed_status(
         "product_decision": decision,
         "progress": {
             "completed_games": completed_games,
-            "max_games": plan.max_games,
+            "max_games": plan.game_bound,
+            "schedule_max_games": plan.max_games,
             "completed_segments": len(completed),
             "elapsed_hours": round(elapsed_seconds / 3600.0, 4),
             "max_wall_hours": plan.max_wall_hours,
@@ -1032,7 +1058,7 @@ def recover_interrupted_segment(
     )
     expected_games = min(
         previous_completed_games + plan.segment_games,
-        plan.max_games,
+        plan.game_bound,
     )
     incomplete = _segment_output_dir(plan, segment_index)
     if not incomplete.exists():
@@ -1184,7 +1210,7 @@ def build_segment_command(
         raise ManagedContractError("previous_completed_games must be non-negative")
     expected_stop = min(
         previous_completed_games + plan.segment_games,
-        plan.max_games,
+        plan.game_bound,
     )
     if expected_stop <= previous_completed_games:
         raise ManagedContractError("segment schedule has no remaining games")
@@ -1269,7 +1295,7 @@ def verify_managed_launch(
     )
     expected_stop = min(
         previous_completed_games + plan.segment_games,
-        plan.max_games,
+        plan.game_bound,
     )
     if segment_stop_game != expected_stop:
         raise ManagedContractError(
@@ -1390,7 +1416,7 @@ def _inspect_completed_segment(
     completed_games = int(envelope.payload.trainer_state["game_count"])
     expected_games = min(
         previous_completed_games + plan.segment_games,
-        plan.max_games,
+        plan.game_bound,
     )
     if completed_games != expected_games:
         raise ManagedContractError(
@@ -1689,7 +1715,7 @@ def run_next_segment(
         if completed_events
         else 0
     )
-    if previous_completed_games >= plan.max_games:
+    if previous_completed_games >= plan.game_bound:
         return managed_status(plan_path, authorization_path)
     elapsed_seconds = sum(
         float(event.details.get("elapsed_seconds", 0.0))
@@ -1979,7 +2005,7 @@ def run_next_segment(
                 "policy_health": policy_health,
             },
         )
-        if completed_games >= plan.max_games:
+        if completed_games >= plan.game_bound:
             _append_controller_event(
                 plan,
                 status="completed",

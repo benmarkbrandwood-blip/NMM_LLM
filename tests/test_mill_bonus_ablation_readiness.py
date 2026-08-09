@@ -61,6 +61,7 @@ def test_prepare_commands_encode_all_six_unlaunched_arms() -> None:
         assert args.seed == arm["seed"]
         assert args.mill_bonus_mode == arm["mill_bonus_mode"]
         assert args.max_games == 5000
+        assert args.completion_game_bound == 500
         assert args.segment_games == 500
         assert args.max_wall_hours == 1.0
         assert args.max_ply == 120

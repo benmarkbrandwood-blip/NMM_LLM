@@ -216,6 +216,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         publication_allowed=False,
         promotion_allowed=False,
         policy_health=policy_health,
+        completion_game_bound=args.completion_game_bound,
     )
     publish_managed_plan(plan_path, plan)
     return {
@@ -227,7 +228,8 @@ def _prepare(args: argparse.Namespace) -> dict:
         "authorization_path": str(control_dir / "authorization.json"),
         "plan_sha256": plan.plan_sha256,
         "resource_envelope": {
-            "max_games": plan.max_games,
+            "max_games": plan.game_bound,
+            "schedule_max_games": plan.max_games,
             "segment_games": plan.segment_games,
             "max_wall_hours": plan.max_wall_hours,
         },
@@ -266,6 +268,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Explicit trainer seed recorded in the immutable run plan",
     )
     prepare.add_argument("--max-games", type=int, default=DEFAULT_MAX_GAMES)
+    prepare.add_argument(
+        "--completion-game-bound",
+        type=int,
+        default=None,
+        help=(
+            "Optional controller completion ceiling. The trainer still uses "
+            "--max-games as its global schedule horizon."
+        ),
+    )
     prepare.add_argument(
         "--segment-games",
         type=int,

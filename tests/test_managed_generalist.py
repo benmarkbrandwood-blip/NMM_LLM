@@ -212,6 +212,7 @@ def test_policy_health_plan_round_trip_preserves_legacy_plan_shape(
 ) -> None:
     legacy = _plan(tmp_path)
     assert "policy_health" not in legacy.to_dict()
+    assert "completion_game_bound" not in legacy.to_dict()
     health = _policy_health_plan(tmp_path)
 
     restored = ManagedPlan.from_dict(health.to_dict())
@@ -219,6 +220,47 @@ def test_policy_health_plan_round_trip_preserves_legacy_plan_shape(
     assert restored == health
     assert restored.policy_health is not None
     assert restored.policy_health.exact_critical_states == 29
+
+
+def test_completion_bound_round_trip_keeps_larger_schedule_horizon(
+    tmp_path: Path,
+) -> None:
+    plan = replace(
+        _plan(tmp_path),
+        max_games=5000,
+        completion_game_bound=100,
+        common_trainer_args=(
+            "--experiment-id",
+            "dev-v4-managed-baseline-v1",
+            "--max-games",
+            "5000",
+            "--heuristic-node-budget",
+            "500000",
+            "--no-sentinel",
+            "--no-value-net",
+            "--no-gap-net",
+            "--no-s1a-warmstart",
+            "--no-imitation-mix",
+        ),
+    )
+
+    restored = ManagedPlan.from_dict(plan.to_dict())
+    command = build_segment_command(
+        restored,
+        plan_path=tmp_path / "control" / "plan.json",
+        authorization_path=tmp_path / "control" / "authorization.json",
+        segment_index=1,
+        previous_checkpoint=None,
+        previous_run_id=None,
+        previous_completed_games=0,
+        python_executable="python",
+    )
+
+    assert restored.game_bound == 100
+    assert restored.max_games == 5000
+    assert restored.to_dict()["completion_game_bound"] == 100
+    assert command[command.index("--segment-stop-game") + 1] == "100"
+    assert command[command.index("--max-games") + 1] == "5000"
 
 
 def test_authorization_is_separate_and_bound_to_exact_plan(tmp_path: Path) -> None:
@@ -404,6 +446,78 @@ def test_supervisor_runs_one_bounded_segment_and_publishes_progress(
     assert options["timeout"] <= plan.max_wall_hours * 3600
     assert status["state"] == "ready_to_run"
     assert status["progress"]["completed_games"] == 100
+
+
+def test_supervisor_stops_at_completion_bound_not_schedule_horizon(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = replace(
+        _plan(tmp_path),
+        max_games=5000,
+        completion_game_bound=100,
+        common_trainer_args=(
+            "--experiment-id",
+            "dev-v4-managed-baseline-v1",
+            "--max-games",
+            "5000",
+            "--heuristic-node-budget",
+            "500000",
+            "--no-sentinel",
+            "--no-value-net",
+            "--no-gap-net",
+            "--no-s1a-warmstart",
+            "--no-imitation-mix",
+        ),
+    )
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approve one bounded comparison segment.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (100, checkpoint),
+    )
+    calls: list[list[str]] = []
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+    second_status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+
+    assert len(calls) == 1
+    assert calls[0][calls[0].index("--segment-stop-game") + 1] == "100"
+    assert calls[0][calls[0].index("--max-games") + 1] == "5000"
+    assert status["state"] == "completed"
+    assert status["progress"] == {
+        "completed_games": 100,
+        "max_games": 100,
+        "schedule_max_games": 5000,
+        "completed_segments": 1,
+        "elapsed_hours": 0.0,
+        "max_wall_hours": 12.0,
+    }
+    assert second_status["state"] == "completed"
 
 
 def test_supervisor_requires_passing_policy_health_before_completion(

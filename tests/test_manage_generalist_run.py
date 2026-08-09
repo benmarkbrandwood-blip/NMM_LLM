@@ -64,6 +64,25 @@ def test_common_args_record_explicit_truncation_ceiling(tmp_path) -> None:
     )
 
 
+def test_completion_bound_does_not_shorten_trainer_schedule(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        _required_prepare_args()
+        + [
+            "--max-games",
+            "5000",
+            "--completion-game-bound",
+            "500",
+            "--segment-games",
+            "500",
+        ]
+    )
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert args.completion_game_bound == 500
+    assert common[common.index("--max-games") + 1] == "5000"
+
+
 def test_common_args_disable_unapproved_training_inputs(tmp_path) -> None:
     args = manager._build_parser().parse_args(_required_prepare_args())
 

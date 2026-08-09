@@ -361,6 +361,8 @@ def build_prepare_command(
         str(arm["seed"]),
         "--max-games",
         str(common["max_games_schedule"]),
+        "--completion-game-bound",
+        str(resources["completed_games_per_arm"]),
         "--segment-games",
         str(common["one_segment_games"]),
         "--engine-profile",
@@ -481,6 +483,9 @@ def _assert_plan_semantics(
         ),
         "paths_config": str(paths_config),
         "max_games": common["max_games_schedule"],
+        "completion_game_bound": contract["resources"][
+            "completed_games_per_arm"
+        ],
         "segment_games": common["one_segment_games"],
         "max_wall_hours": contract["resources"]["active_wall_hours_per_arm"],
         "publication_allowed": False,
@@ -491,6 +496,10 @@ def _assert_plan_semantics(
             raise MillBonusAblationReadinessError(
                 f"managed plan field differs for {arm['arm_id']}: {field}"
             )
+    if plan.game_bound != contract["resources"]["completed_games_per_arm"]:
+        raise MillBonusAblationReadinessError(
+            f"managed plan completion bound differs for {arm['arm_id']}"
+        )
     if plan.paths_config_sha256 != _sha256_file(paths_config):
         raise MillBonusAblationReadinessError("managed path registry hash differs")
     args = _trainer_args(plan)
