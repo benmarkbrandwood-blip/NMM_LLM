@@ -93,7 +93,7 @@
     "plan_identity": "7aa079dcf59556d35f3fbd58072b6baa8c9f798e087cc336e29c8309552e3cfb",
     "raw_sha256": "b422ea44fad5fa4181294a4bc3d6e77a48692b43672ccc2ed6976d87f1aabe36"
   },
-  "plan_identity": "f6c79590425d6ed23ecf11eb9bb7b6f6833da7abbd790b510d4c4f80fb4d5b30",
+  "plan_identity": "a5c85ed13baecf3efed6780effdf590e97560a12e9ab197c5fc7bb4bf7341fab",
   "schedule_contract": {
     "deep_local_index_by_seed": {
       "52": 0,
@@ -222,9 +222,11 @@
   "schema_version": "nmm.sanmill-malom-policy-auxiliary-no-update-batch-capture-plan.v1",
   "source_evidence": {
     "calibration_plan_identity": "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba",
+    "calibration_result_path": "out/malom-policy-auxiliary-calibration-smoke-v1/result.json",
     "calibration_result_identity": "d11384f661192db84662a6e43e85cdd6eb299672724178a83a02858b0b12113f",
     "calibration_result_sha256": "bdfbfbb4b68dca011277d76604e385a2a5918dd818dca963c50600528fb64761",
     "gradient_interaction_audit_identity": "9d338f3b0e3c2a8d4a94a480a814ebc1137c5d3ffe60f1141865ceedd1b715e0",
+    "gradient_interaction_report_path": "out/diagnostics/malom-policy-auxiliary-gradient-interaction-v2.json",
     "gradient_interaction_report_sha256": "2576a9323170a5f590e2751ec58f1ef391fc0658cc8be3fbc77bbef748ff98be"
   },
   "status": "prepared_unlaunched"
