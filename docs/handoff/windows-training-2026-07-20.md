@@ -1656,6 +1656,14 @@ complete-window curves, all artifact identities and the paired decision. The
 control records selected-action Malom diagnostics but does not enumerate the
 all-action auxiliary labels.
 
+Local commit `2a263f0d3afd02a9bb5e5fd5b1137424a5b16d2a` makes the
+source-only audit report superseded preparation targets instead of implying
+that publication alone is sufficient. At that commit, source readiness
+identity `960061fd5e134f9240cf281b089de7016ab33e65cbf45ade48db2f9699c95828`
+reports 13 existing preliminary targets: six plan directories, six empty
+database files and the old readiness report. It authorizes nothing and lists
+both publication and quarantine as unresolved gates.
+
 Seeds 55, 56 and 57 each compare auxiliary-off control with normalized target
 0.25. Each arm is bounded to 100 games and one third active hour, so the whole
 sequence is capped at 600 games and two active hours. Only the first,
@@ -1665,7 +1673,7 @@ median preserving-mass gain of at least 0.001, and explicit entropy,
 repetition, identity, label, checkpoint and resource gates. Passing can only
 justify designing a later effectiveness experiment.
 
-The final local gate passes 173 normalized-auxiliary, result, trainer,
+The final local gate passes 174 normalized-auxiliary, result, trainer,
 managed-run, contract and readiness tests. The mandatory Malom, DB-teacher and
 label-provenance gate separately passes 103 tests plus 498 parameterized
 subtests. Ruff passes every changed Python module and `git diff --check`
@@ -1760,8 +1768,9 @@ the current successor in this order:
     result and tracked interpretation under their recorded identities. Its
     one-run authorization is consumed. Do not rerun it or treat its implied
     coefficient distribution as a selected training setting.
-15. Keep result-analyzer commit `a6de71a` and this handover update local until
-    ordinary publication is explicitly authorized. The preliminary
+15. Keep result-analyzer commit `a6de71a`, target-audit commit `2a263f0` and
+    this handover update local until ordinary publication is explicitly
+    authorized. The preliminary
     `30246f6` plans and empty databases bind the superseded contract and must be
     quarantined before preparation is repeated. After clean final
     `dev == origin/dev`, run the fail-closed preparer once to create six new
