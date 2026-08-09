@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 9 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 10 August 2026)
 
 ## Executive Summary
 
@@ -1738,6 +1738,18 @@ KL-constrained or safe-action mechanism is a separate experiment, not a
 long-run prerequisite. Preserve the detailed
 [audit evidence](../evidence/sanmill-malom-policy-auxiliary-normalized-target-response-2026-08-10.md).
 
+The successor decision is now frozen in
+[`sanmill-preserving-retained-long-v3.md`](../experiments/sanmill-preserving-retained-long-v3.md).
+It uses fresh, previously unobserved seed 58, `malom-preserving-only`, and no
+generic downgrade penalty or policy auxiliary. All other retained-v2
+curriculum, referee, optimizer, component-disable, segmentation, resource and
+policy-health choices remain fixed. This is a new research baseline, not a
+claim that the inconclusive short ablation proved strength improvement.
+Preparation still requires a clean published tip, a fresh isolated database,
+an immutable managed plan, complete focused verification, and a final
+readiness identity. Training remains unlaunched and needs explicit product
+authorization against that identity.
+
 ## Recommended Next Actions
 
 The corrected retained 5,000-game run is complete. Preserve its plan,
@@ -1833,6 +1845,12 @@ the current successor in this order:
     off in the next baseline. Any KL-constrained teacher or safe-action
     sampler requires a separate contract and is not a prerequisite for that
     baseline.
+17. Prepare the frozen seed-58 Sanmill-preserving retained-v3 baseline. Keep
+    `malom-preserving-only`, policy auxiliary off, downgrade penalty off, and
+    every other v2 training choice unchanged. Do not reuse or resume any
+    completed arm. The prior 64-start held-out corpus and 29-state development
+    corpus are exposed; neither may decide v3 promotion. Launch only after the
+    exact managed-plan readiness identity receives product authorization.
 
 The previously executed isolated smoke command was:
 
@@ -1924,8 +1942,8 @@ evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, and the no-update batch-capture grant are also consumed. Safe work now
 is limited to preserving the completed normalized calibration and
-target-response evidence, selecting only already justified semantics for a
-successor baseline, and preparing a new immutable plan and readiness audit.
+target-response evidence and preparing the frozen seed-58 successor's new
+isolated database, immutable managed plan, tests, and readiness audit.
 The superseded preliminary plans are already preserved in recoverable
 quarantine. No normalized arm, additional calibration, long training job,
 promotion/publication, protocol change or history rewrite is authorized by
