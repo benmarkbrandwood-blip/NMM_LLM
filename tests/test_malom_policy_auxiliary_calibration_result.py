@@ -209,6 +209,43 @@ def test_update_summary_quantifies_scaled_auxiliary_pressure() -> None:
     ] == pytest.approx(0.75)
 
 
+def test_update_summary_normalizes_absent_zero_coefficient_diagnostics() -> None:
+    row = _update_row(coefficient=0.0)
+    for field in (
+        "malom_policy_aux_loss",
+        "malom_policy_aux_informative_steps",
+        "malom_policy_aux_labelled_steps",
+        "malom_policy_aux_mean_preserving_mass",
+    ):
+        row.pop(field)
+
+    summary = summarize_update_rows(
+        [row],
+        coefficient=0.0,
+        expected_games=100,
+    )
+
+    assert summary["raw"][0]["malom_policy_aux_loss"] == 0.0
+    assert summary["raw"][0]["malom_policy_aux_labelled_steps"] == 0
+    assert summary["summary"]["label_coverage"] == 0.0
+    assert summary["summary"]["median_scaled_auxiliary_loss"] == 0.0
+
+
+def test_update_summary_rejects_partial_zero_coefficient_diagnostics() -> None:
+    row = _update_row(coefficient=0.0)
+    row.pop("malom_policy_aux_loss")
+
+    with pytest.raises(
+        MalomPolicyAuxiliaryCalibrationResultError,
+        match="lacks auxiliary fields",
+    ):
+        summarize_update_rows(
+            [row],
+            coefficient=0.0,
+            expected_games=100,
+        )
+
+
 def test_update_summary_rejects_incomplete_exact_labels() -> None:
     with pytest.raises(
         MalomPolicyAuxiliaryCalibrationResultError,

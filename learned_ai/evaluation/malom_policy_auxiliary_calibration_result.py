@@ -382,9 +382,18 @@ def summarize_update_rows(
     for index, row in enumerate(rows, start=1):
         missing = _AUXILIARY_UPDATE_FIELDS - set(row)
         if missing:
-            raise MalomPolicyAuxiliaryCalibrationResultError(
-                f"update {index} lacks auxiliary fields: {sorted(missing)}"
-            )
+            if coefficient != 0.0 or missing != _AUXILIARY_UPDATE_FIELDS:
+                raise MalomPolicyAuxiliaryCalibrationResultError(
+                    f"update {index} lacks auxiliary fields: {sorted(missing)}"
+                )
+            auxiliary_values: Mapping[str, Any] = {
+                "malom_policy_aux_loss": 0.0,
+                "malom_policy_aux_informative_steps": 0,
+                "malom_policy_aux_labelled_steps": 0,
+                "malom_policy_aux_mean_preserving_mass": 0.0,
+            }
+        else:
+            auxiliary_values = row
         _validate_finite_tree(row, field=f"update[{index}]")
         game = _require_int(row.get("game"), field="update.game", minimum=1)
         if game < previous_game or game > expected_games:
@@ -408,18 +417,19 @@ def summarize_update_rows(
                 "update reason is invalid"
             )
         auxiliary_loss = _require_finite(
-            row["malom_policy_aux_loss"], field="malom_policy_aux_loss"
+            auxiliary_values["malom_policy_aux_loss"],
+            field="malom_policy_aux_loss",
         )
         informative_steps = _require_int(
-            row["malom_policy_aux_informative_steps"],
+            auxiliary_values["malom_policy_aux_informative_steps"],
             field="malom_policy_aux_informative_steps",
         )
         labelled_steps = _require_int(
-            row["malom_policy_aux_labelled_steps"],
+            auxiliary_values["malom_policy_aux_labelled_steps"],
             field="malom_policy_aux_labelled_steps",
         )
         preserving_mass = _require_finite(
-            row["malom_policy_aux_mean_preserving_mass"],
+            auxiliary_values["malom_policy_aux_mean_preserving_mass"],
             field="malom_policy_aux_mean_preserving_mass",
         )
         if (
