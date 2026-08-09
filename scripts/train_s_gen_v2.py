@@ -1,8 +1,8 @@
 """scripts/train_s_gen_v2.py — Generalist v2: full-game (opening → midgame → endgame).
 
-Plays complete games from BoardState.new_game(); rewards fire during movement
-phase (sentinel delta + heuristic delta + mill bonus).  No phase restriction.
-Malom reward = 0.  Gap net included in lookahead (12-ply × 6 signals).
+Plays complete games from BoardState.new_game(); rewards include movement-phase
+Sentinel/heuristic deltas and an explicit mill-bonus policy.  Malom reward = 0.
+Gap net included in lookahead (12-ply × 6 signals).
 
 The CLI requires either a read-only preflight or a contract-backed launch.
 Fresh, weights-only, and fail-closed exact-resume launches are supported.
@@ -304,6 +304,11 @@ OUT_DIR   = "learned_ai/checkpoints/scaffolded/s_gen_v2"
 ALPHA      = 0.20   # sentinel quality delta
 BETA       = 0.15   # heuristic delta
 MILL_BONUS = 0.25   # larger mill bonus — midgame mills more decisive
+MILL_BONUS_MODES = (
+    "legacy-unconditional",
+    "malom-preserving-only",
+    "disabled",
+)
 LAMBDA     = 0.70   # Batch 1: 0.5 → 0.7 (outcome matters more)
 DECAY      = 0.99   # Batch 1: 0.98 → 0.99 (outcome reaches further back)
 EXPLORE_COEF = 0.08 # bonus for winning with non-heuristic-top1 moves (Option A)
@@ -1054,6 +1059,46 @@ def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> No
         g["lr"] = new_lr
 
 
+def _mill_formation_reward(
+    *,
+    mills_formed: int,
+    malom_quality: Optional[float],
+    mode: str,
+) -> float:
+    """Return the explicit mill-shaping reward for one complete turn.
+
+    The legacy mode preserves the historical unconditional reward.  The
+    corrected successor mode requires an exact complete-turn Malom quality and
+    awards the same reward only when the action preserves the mover's WDL.
+    """
+    if mode not in MILL_BONUS_MODES:
+        raise RuntimeError(f"unsupported mill bonus mode: {mode!r}")
+    if isinstance(mills_formed, bool) or not isinstance(mills_formed, int):
+        raise RuntimeError("mills_formed must be a non-negative integer")
+    if mills_formed < 0:
+        raise RuntimeError("mills_formed must be a non-negative integer")
+    if mills_formed == 0 or mode == "disabled":
+        return 0.0
+    if mode == "legacy-unconditional":
+        return float(MILL_BONUS * mills_formed)
+
+    if isinstance(malom_quality, bool) or malom_quality is None:
+        raise RuntimeError(
+            "Malom move quality is required for a mill-forming action"
+        )
+    try:
+        quality = float(malom_quality)
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("Malom move quality must be numeric") from exc
+    if not math.isfinite(quality) or quality not in (0.0, -1.0, -2.0):
+        raise RuntimeError(
+            "Malom move quality must be one of 0, -1, or -2"
+        )
+    if quality < 0.0:
+        return 0.0
+    return float(MILL_BONUS * mills_formed)
+
+
 def _compute_per_move_reward(
     enc,
     chosen_idx: int,
@@ -1062,7 +1107,7 @@ def _compute_per_move_reward(
     total_pieces: int = 18,
     move_phase_start_ply: Optional[int] = None,
     current_ply: int = 0,
-    malom_q: Optional[str] = None,
+    malom_q: Optional[float] = None,
 ) -> tuple[float, RewardBreakdown]:
     rb = RewardBreakdown()
 
@@ -1461,6 +1506,7 @@ def _rollout(
     sanmill_game: Optional[SanmillTrainingGame] = None,
     persist_rollout_evidence: bool = True,
     timing_observer: Optional[Callable[[str, float], None]] = None,
+    mill_bonus_mode: str = "legacy-unconditional",
 ) -> RolloutResult:
     """Run one production rollout with optional additive probe controls."""
     with _temporary_rollout_sim_depth(
@@ -1493,6 +1539,7 @@ def _rollout(
             sanmill_game=sanmill_game,
             persist_rollout_evidence=persist_rollout_evidence,
             timing_observer=timing_observer,
+            mill_bonus_mode=mill_bonus_mode,
         )
 
 
@@ -1522,6 +1569,7 @@ def _rollout_impl(
     sanmill_game: Optional[SanmillTrainingGame] = None,
     persist_rollout_evidence: bool = True,
     timing_observer: Optional[Callable[[str, float], None]] = None,
+    mill_bonus_mode: str = "legacy-unconditional",
 ) -> RolloutResult:
     board                   = start_board
     ply                     = 0
@@ -1697,11 +1745,16 @@ def _rollout_impl(
                 malom_q=malom_q,
             )
 
-            # Mill formation bonus (un-gated)
+            # Mill formation bonus under the explicit experiment contract.
             mills_before = sum(1 for m in MILLS if all(board.positions.get(p) == learner_color for p in m))
             mills_after  = sum(1 for m in MILLS if all(board_after.positions.get(p) == learner_color for p in m))
-            if mills_after > mills_before:
-                mill_bonus = MILL_BONUS * (mills_after - mills_before)
+            mills_formed = max(0, mills_after - mills_before)
+            mill_bonus = _mill_formation_reward(
+                mills_formed=mills_formed,
+                malom_quality=malom_q,
+                mode=mill_bonus_mode,
+            )
+            if mill_bonus:
                 reward    += mill_bonus
                 rb.mill_formed += mill_bonus
                 rb.total  += mill_bonus
@@ -2518,6 +2571,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     deep_game=(cfg.scheduled_index % 20 == 0),
                     torch_generator=_game_torch_generator(cfg.torch_seed),
                     sanmill_game=sanmill_game,
+                    mill_bonus_mode=args.mill_bonus_mode,
                 )
 
             if sanmill_installation is None:
@@ -2598,6 +2652,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             args.seed, cfg.scheduled_index, "confirm"
                         )[1]
                     ),
+                    mill_bonus_mode=args.mill_bonus_mode,
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
@@ -2697,6 +2752,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             args.seed, cfg.scheduled_index, "retry"
                         )[1]
                     ),
+                    mill_bonus_mode=args.mill_bonus_mode,
                 )
                 if retry_result.trajectory:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
@@ -2777,6 +2833,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             f"branch:{branch_candidate_index}:{branch_ply}:{bucket}",
                         )[1]
                     ),
+                    mill_bonus_mode=args.mill_bonus_mode,
                 )
 
                 if branch_result.trajectory:
@@ -3159,6 +3216,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help="Per-game forcing probability in (0, 1] when enabled",
     )
     p.add_argument("--ppo",      action="store_true")
+    p.add_argument(
+        "--mill-bonus-mode",
+        choices=MILL_BONUS_MODES,
+        default="legacy-unconditional",
+        help=(
+            "Mill-formation shaping contract. The corrected successor uses "
+            "malom-preserving-only; the default preserves historical runs."
+        ),
+    )
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument(
         "--segment-games",

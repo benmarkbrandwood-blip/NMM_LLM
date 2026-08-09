@@ -20,12 +20,14 @@ def _required_prepare_args() -> list[str]:
         "dev-v4-rules-corrected-v2",
         "--max-ply",
         "120",
+        "--mill-bonus-mode",
+        "malom-preserving-only",
     ]
 
 
 @pytest.mark.parametrize(
     "omitted",
-    ["--objective", "--experiment-id", "--max-ply"],
+    ["--objective", "--experiment-id", "--max-ply", "--mill-bonus-mode"],
 )
 def test_prepare_requires_successor_identity_and_truncation(
     omitted: str,
@@ -47,6 +49,9 @@ def test_common_args_record_explicit_truncation_ceiling(tmp_path) -> None:
     assert common[common.index("--max-ply-branch") + 1] == "120"
     assert common[common.index("--experiment-id") + 1] == (
         "dev-v4-rules-corrected-v2"
+    )
+    assert common[common.index("--mill-bonus-mode") + 1] == (
+        "malom-preserving-only"
     )
 
 

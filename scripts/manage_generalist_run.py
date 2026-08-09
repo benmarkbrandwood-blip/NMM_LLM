@@ -107,6 +107,8 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "42",
         "--temp-start",
         "0.90",
+        "--mill-bonus-mode",
+        args.mill_bonus_mode,
         "--self-play-ratio",
         str(self_play_ratio),
         "--update-target-every",
@@ -298,6 +300,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Explicit experiment truncation ceiling in complete logical plies; "
             "this is not a rules draw"
+        ),
+    )
+    prepare.add_argument(
+        "--mill-bonus-mode",
+        required=True,
+        choices=trainer.MILL_BONUS_MODES,
+        help=(
+            "Explicit reward-shaping contract. New retained successors must "
+            "not inherit the trainer's legacy compatibility default."
         ),
     )
     prepare.add_argument(
