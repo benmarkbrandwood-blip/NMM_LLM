@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import subprocess
@@ -389,30 +390,34 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.command == "prepare":
-            result = _prepare(args)
-        elif args.command == "authorize":
-            authorize_plan(
-                args.plan,
-                args.authorization,
-                authorized_by=args.authorized_by,
-                decision_note=args.decision_note,
-            )
-            result = managed_status(args.plan, args.authorization)
-        elif args.command == "status":
-            result = managed_status(args.plan, args.authorization)
-        elif args.command == "run-next":
-            result = run_next_segment(args.plan, args.authorization)
-        elif args.command == "recover-interrupted":
-            result = recover_interrupted_segment(args.plan, args.authorization)
-        elif args.command == "recover-failed":
-            result = recover_failed_segment(
-                args.plan,
-                args.authorization,
-                technical_evidence_path=args.technical_evidence,
-            )
-        else:
-            result = run_authorized_plan(args.plan, args.authorization)
+        # This CLI is consumed as a JSON subprocess protocol. Keep incidental
+        # trainer, path-resolution, and supervisor diagnostics on stderr so
+        # stdout always contains exactly one machine-readable document.
+        with contextlib.redirect_stdout(sys.stderr):
+            if args.command == "prepare":
+                result = _prepare(args)
+            elif args.command == "authorize":
+                authorize_plan(
+                    args.plan,
+                    args.authorization,
+                    authorized_by=args.authorized_by,
+                    decision_note=args.decision_note,
+                )
+                result = managed_status(args.plan, args.authorization)
+            elif args.command == "status":
+                result = managed_status(args.plan, args.authorization)
+            elif args.command == "run-next":
+                result = run_next_segment(args.plan, args.authorization)
+            elif args.command == "recover-interrupted":
+                result = recover_interrupted_segment(args.plan, args.authorization)
+            elif args.command == "recover-failed":
+                result = recover_failed_segment(
+                    args.plan,
+                    args.authorization,
+                    technical_evidence_path=args.technical_evidence,
+                )
+            else:
+                result = run_authorized_plan(args.plan, args.authorization)
     except (ManagedContractError, FileNotFoundError, subprocess.SubprocessError) as exc:
         print(
             json.dumps(

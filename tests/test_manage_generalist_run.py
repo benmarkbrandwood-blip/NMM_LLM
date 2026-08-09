@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from scripts import manage_generalist_run as manager
@@ -140,3 +142,26 @@ def test_local_profile_keeps_explicit_game_ai_budget(tmp_path) -> None:
 
     assert common[common.index("--heuristic-node-budget") + 1] == "500000"
     assert "--sanmill-node-ladder" not in common
+
+
+def test_prepare_cli_reserves_stdout_for_one_json_document(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    def noisy_prepare(_args: object) -> dict[str, object]:
+        print("[s_gen_v2] Path config: machine-local.json")
+        return {
+            "state": "awaiting_product_authorization",
+            "needs_product_decision": True,
+        }
+
+    monkeypatch.setattr(manager, "_prepare", noisy_prepare)
+
+    assert manager.main(_required_prepare_args()) == 0
+
+    captured = capsys.readouterr()
+    assert json.loads(captured.out) == {
+        "needs_product_decision": True,
+        "state": "awaiting_product_authorization",
+    }
+    assert "[s_gen_v2] Path config" in captured.err
