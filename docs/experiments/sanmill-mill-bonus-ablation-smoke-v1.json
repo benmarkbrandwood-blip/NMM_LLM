@@ -20,6 +20,7 @@
       "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
       "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
       "critical_states": 29,
+      "device": "cuda",
       "minimum_candidate_preserving_rate": 0.5,
       "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
       "required_direct_signal_preserving_rate": 1.0,
@@ -229,7 +230,7 @@
     "schedule_identity": "the trainer derives learner colour, opponent source, retry ply and per-game Torch generator only from seed, scheduled index and role; each same-seed pair therefore shares its exogenous schedule",
     "single_process_at_a_time": true
   },
-  "plan_identity": "e1f99c156fab9a851fb75d869d649190d0abcd8eb98c96ba2876e356483523ec",
+  "plan_identity": "4074bf9a34bef4e846f72bfd35a33128f8e104e462184c0758b59a1a5ef94e96",
   "prior_evidence": {
     "full_oracle_audit_identity": "7cfa9ede873ae4fb34d7821472c62bba540f1b509476073062d52b487995cf65",
     "heldout_result_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",

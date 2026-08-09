@@ -85,10 +85,11 @@ median absolute reduction is at least five percentage points.
 The 29-state phase corpus is an inspected development safety diagnostic. It
 must retain direct-signal preserving rate 1.0, candidate preserving rate at
 least 0.50, and preserving-minus-downgrading logit margin at least -0.10. It
-is not renamed as a validation set or held-out strength evidence. Ordinary RL
-training has no supervised validation curve here. Any later playing-strength
-claim requires a newly frozen evaluation corpus that was not used to diagnose
-or select this reward change.
+is evaluated on the frozen CUDA device path and is not renamed as a validation
+set or held-out strength evidence. Ordinary RL training has no supervised
+validation curve here. Any later playing-strength claim requires a newly
+frozen evaluation corpus that was not used to diagnose or select this reward
+change.
 
 Also report policy/value losses by optimizer update; entropy, temperature,
 chosen probability and top-1 curves; reward components; all-action Malom
@@ -109,6 +110,17 @@ cross-plan audit must prove that only the allowlisted fields differ. Product
 authorization may then approve the one six-arm resource envelope. A result,
 timeout or promising curve never authorizes a second segment, a 5,000-game
 continuation, promotion or publication.
+
+The fail-closed preparation entry point first audits the published source,
+template and runtime identities. Adding `--prepare` copies the six isolated
+databases, creates the managed plans, runs six read-only long-run preflights
+and writes one ignored combined readiness report. It never writes an
+authorization or starts a segment:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py
+.\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py --prepare
+```
 
 ## Main-branch boundary
 

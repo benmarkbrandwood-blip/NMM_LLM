@@ -6,6 +6,8 @@ import json
 import random
 from pathlib import Path
 
+import pytest
+
 from learned_ai.training.run_contract import canonical_sha256
 from scripts import train_s_gen_v2 as trainer
 
@@ -110,7 +112,8 @@ def test_ablation_schedule_counts_match_the_trainer_seed_contract() -> None:
 
 
 def test_ablation_uses_one_closed_empty_specialist_template() -> None:
-    template = _load_plan()["data_contract"]["specialist_db_initial_template"]
+    plan = _load_plan()
+    template = plan["data_contract"]["specialist_db_initial_template"]
 
     assert template["label_version"] == "sector-corrected-v1"
     assert template["quick_check"] == "ok"
@@ -119,6 +122,7 @@ def test_ablation_uses_one_closed_empty_specialist_template() -> None:
     assert template["preferred_plays"] == 0
     assert template["sidecars"] == "absent"
     assert len(template["sha256"]) == 64
+    assert plan["analysis"]["fixed_development_diagnostic"]["device"] == "cuda"
 
 
 def test_ablation_plan_identity_is_canonical() -> None:
@@ -126,3 +130,18 @@ def test_ablation_plan_identity_is_canonical() -> None:
     identity = plan.pop("plan_identity")
 
     assert identity == canonical_sha256(plan)
+
+
+def test_ablation_temperature_schedule_matches_the_frozen_contract() -> None:
+    common = _load_plan()["common_training_contract"]
+
+    assert trainer.TEMP_END == common["temperature_end"]
+    assert trainer._compute_temperature(
+        0, common["max_games_schedule"], common["temperature_start"]
+    ) == common["temperature_start"]
+    assert trainer._compute_temperature(
+        4000, common["max_games_schedule"], common["temperature_start"]
+    ) == pytest.approx(common["temperature_end"])
+    assert trainer._compute_temperature(
+        5000, common["max_games_schedule"], common["temperature_start"]
+    ) == pytest.approx(common["temperature_end"])
