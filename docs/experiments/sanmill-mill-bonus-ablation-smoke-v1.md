@@ -132,6 +132,21 @@ The managed subprocess reserves stdout for exactly one JSON document and sends
 path-resolution or trainer diagnostics to stderr. This boundary is required so
 preparation never has to ignore or guess around non-protocol output.
 
+Each long-run preflight is bound to the exact proposed segment-0001 run ID,
+fresh segment output directory, 500-game segment size and 500-game completion
+ceiling. It does not reuse the machine-local default output directory. Closed
+SpecialistDB inputs are opened with SQLite immutable mode; any WAL, SHM or
+rollback-journal sidecar is a fatal input-state error. A failed subprocess
+preserves both captured output streams so its structured fatal-stop diagnostic
+is not lost.
+
+Two pre-publication preparation attempts failed closed while these boundaries
+were being verified. Neither attempt created an authorization, segment output,
+checkpoint or game. Their partial plans and copied empty databases are retained
+under the ignored quarantine tree; the current formal preparation targets are
+absent. The exact failure chronology is recorded in the handover rather than
+being treated as experiment evidence.
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py
 .\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py --prepare

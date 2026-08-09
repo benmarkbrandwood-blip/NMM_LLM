@@ -363,15 +363,43 @@ authorization from reaching a second segment. Commit `e46359d` adds exact
 phase-specific support denominators, and `e200cb1` adds a fail-closed six-arm
 result analyzer with complete-window curves and paired-seed decisions. Its
 manager subprocess boundary is fixed by `c7c9be8`, which reserves stdout for
-one JSON document and sends incidental diagnostics to stderr. Its
-current plan identity is
-`6ead245beccb616b611307d252f926665613df7f8fd002a80218ff0087f7be15`.
-The final local regression gate passes `253` focused reward, observability,
-probe, trainer, manager, checkpoint, exact-resume, policy-health and Sanmill
-referee tests. The separate mandatory Malom, DB-teacher and label-provenance
-gate passes `103` tests plus `498` parameterized subtests. Ruff and
-`git diff --check` also pass. All generated targets remain ignored and no
-managed arm, authorization or game exists.
+one JSON document and sends incidental diagnostics to stderr. The first
+published preparation attempt at source `ca179f6` stopped at that boundary;
+its partial control directory and byte-identical empty SpecialistDB are kept
+under ignored quarantine
+`out/quarantine/mill-bonus-ablation-preparation-failed-ca179f6-20260809T062958Z`.
+
+A second source-only attempt at published `649abba` also failed closed before
+authorization or training. Its preflight inherited the machine-local historic
+output directory instead of the proposed first segment directory, and the
+SQLite read-only probe created WAL/SHM sidecars beside the copied empty
+SpecialistDB. The five partial files are retained under
+`out/quarantine/mill-bonus-ablation-preparation-failed-649abba-20260809T064645Z`;
+the quarantined main database still has template SHA-256
+`5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`.
+All formal control and arm-database targets are absent again.
+
+Local commits `f305ad0`, `1a47d52`, `7aa4e80` and `3bafbf3` respectively make
+SpecialistDB preflight immutable and sidecar-closed, reserve trainer preflight
+stdout for JSON, bind preflight to the actual first managed segment, and
+preserve both subprocess output streams on failure. The current source-only
+plan identity is
+`717d76af61e4c62dd0c32ffa1a5d8879a9cb576503ef1140e43809d048234890`.
+The post-fix local gate passes `239` focused Generalist, reward, observability,
+trainer, manager, checkpoint, exact-resume, policy-health and Sanmill-referee
+tests plus `41` route-contract tests. The separate mandatory Malom, DB-teacher
+and label-provenance gate passes `103` tests plus `498` parameterized subtests.
+Ruff passes the changed modules; the trainer retains its separately known
+legacy lint baseline, and the changed trainer lines pass with those pre-existing
+codes excluded. `git diff --check` also passes.
+
+An exploratory run of the older `test_sanmill_uci.py` gate produced four
+fail-closed local-installation failures because that suite still pins an older
+Sanmill bridge source scope while the checkout is intentionally at the newer
+training-referee commit. Its other tests passed. This is not a failure of the
+current `sanmill_training_referee` route, but it must not be reported as a full
+repository green baseline. No managed arm, authorization, segment, checkpoint
+or game exists.
 
 Counter-evidence and limits: the no-update result proves reward-component
 behavior, not a learned causal effect. The inspected 29-state diagnostic is
