@@ -335,6 +335,57 @@ remain weights-only maintainer-`main` artifacts with unknown corrected-data
 lineage. The older v2a trainer fork is preserved but quarantined on `dev`, and
 the imported in-place SpecialistDB clearing tool has been made non-destructive.
 
+### 9 August reward-shaping successor status
+
+Observation facts: the retained-v2 held-out candidate is behind its frozen
+Sanmill endpoint. A first-transition audit found 19 candidate WDL downgrades;
+16 were complete Mill-forming turns. The full-oracle audit found at least one
+exact-WDL-preserving alternative in every state, while the historical trainer
+awarded `+0.25` to each of the 16 contradictory Mill formations. A no-update
+production-component probe reproduced a legacy reward total of `+4.0` and a
+corrected `malom-preserving-only` total of `0.0` on those states, without
+loading a candidate or changing an action, board, database, checkpoint or
+weight.
+
+Hypothesis: unconditional Mill reward is one causal contributor to the later
+preference for visually decisive but value-downgrading Mill turns. Removing
+only contradictory Mill reward should lower the exact-Malom downgrade rate
+without crossing the existing fixed-state policy-health limits.
+
+Supporting evidence: local commits `704b3a1`, `d90aced`, `3292107` and
+`db68937` implement, expose, probe and record the one-factor reward change.
+Commit `40370d0` requires an explicit managed-plan seed. The initial experiment
+contract is `badcee6`; `bdf42e9` removes four whitespace-only EOF defects; and
+`9e5df00` binds the current contract to CUDA and adds fail-closed six-arm
+preparation. Its current plan identity is
+`4074bf9a34bef4e846f72bfd35a33128f8e104e462184c0758b59a1a5ef94e96`.
+The combined reward, observability, probe, manager, checkpoint, Malom and
+label-provenance gate passes `180` tests plus `498` parameterized subtests. All
+generated targets remain ignored and no managed arm, authorization or game
+exists.
+
+Counter-evidence and limits: the no-update result proves reward-component
+behavior, not a learned causal effect. The inspected 29-state diagnostic is
+not supervised validation or held-out strength evidence. The failed retained
+candidate had only one training seed, and other policy, feature or
+optimization effects may also contribute. The current 64-start evaluation was
+used to find this mechanism and cannot later be relabelled as an independent
+strength gate for the selected successor.
+
+Next verification experiment: the unlaunched
+[`sanmill-mill-bonus-ablation-smoke-v1`](../experiments/sanmill-mill-bonus-ablation-smoke-v1.md)
+contains matched fresh seeds 42, 43 and 44, each comparing
+`legacy-unconditional` with `malom-preserving-only`. Every arm is limited to
+one 500-game segment at the 1,000-node level; the full envelope is at most
+3,000 games, six active wall hours and 73,200,000 requested Sanmill nodes.
+Raw and 50-game curves, support counts, seed-level results, opponent, colour,
+phase, node and termination classes remain separate. The source contract
+explicitly authorizes zero segments. After the exact local source is published,
+the preparation tool must prove `dev == origin/dev`, unchanged reviewed
+`origin/main`, exact runtime/data identities, six passing read-only preflights
+and same-seed one-factor equivalence before a single product-level launch
+decision is requested.
+
 Read
 [`docs/local-training-layout.md`](../local-training-layout.md) for the relative
 storage map and machine-local lookup keys, and
