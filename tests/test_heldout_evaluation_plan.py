@@ -43,6 +43,12 @@ WDL_TRANSITION_EVIDENCE = (
     / "evidence"
     / "sanmill-corrected-retained-v2-heldout-wdl-transition-audit-2026-08-09.json"
 )
+ORACLE_ALTERNATIVE_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-corrected-retained-v2-heldout-oracle-alternatives-2026-08-09.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -166,4 +172,29 @@ def test_wdl_transition_evidence_binds_diagnostic_scope() -> None:
     )
     assert evidence["claim_boundary"]["candidate_loaded_or_requeried"] is False
     assert evidence["claim_boundary"]["diagnostic_not_inferential"] is True
+    assert evidence["claim_boundary"]["new_training_authorized"] is False
+
+
+def test_oracle_alternative_evidence_binds_reward_hypothesis_scope() -> None:
+    evidence = json.loads(ORACLE_ALTERNATIVE_EVIDENCE.read_text(encoding="utf-8"))
+    evidence_identity = evidence.pop("evidence_identity")
+
+    assert canonical_sha256(evidence) == evidence_identity
+    assert evidence["status"] == "completed_diagnostic_only"
+    assert evidence["oracle_results"]["states"] == 19
+    assert evidence["oracle_results"]["classification_counts"] == {
+        "primary_action": 3,
+        "primary_action_or_mill_timing": 16,
+        "wrong_capture_target": 0,
+    }
+    assert evidence["oracle_results"]["preserving_alternatives"] == {
+        "capture_count": 0,
+        "mean_per_state": 18.473684210526315,
+        "states_with_capture": 0,
+        "total": 351,
+    }
+    assert evidence["audit_artifact"]["sha256"] == (
+        "29e3ed6d2af1389a90ef46869db5a2b8800e8c9c3993e13dd80af72ef07a7f28"
+    )
+    assert evidence["claim_boundary"]["causal_reward_attribution"] is False
     assert evidence["claim_boundary"]["new_training_authorized"] is False

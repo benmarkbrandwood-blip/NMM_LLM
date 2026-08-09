@@ -1,0 +1,193 @@
+{
+  "analysis": {
+    "counterevidence": [
+      "Mill formation is strongly associated with successful trajectories in the available training logs: winning games contain 540 inferred mill actions in 2,550 learner steps. Removing all mill shaping could therefore discard useful signal.",
+      "The training logs do not persist a step-level mill-formation by Malom-downgrade cross-tab. The held-out overlap cannot be projected back onto all training actions.",
+      "Movement and flying actions also receive heuristic-delta shaping, and every action receives delayed outcome credit. The unconditional mill bonus is not the only possible explanation outside placement.",
+      "The full-oracle audit identifies better actions but does not load the candidate, inspect logits, or prove which reward component caused the learned ranking.",
+      "The 19 states are outcome-selected from one checkpoint and one seed. Their frequencies are not estimates for arbitrary play."
+    ],
+    "hypotheses": [
+      {
+        "hypothesis": "The legacy unconditional mill bonus can reinforce premature mill closure even when the complete turn loses corrected Malom value.",
+        "support": "All 16 capture-bearing first downgrades require a different primary action to preserve WDL; no preserving or full-best alternative captures. The trainer awards +0.25 for every newly formed mill while the immediate Malom reward weight is zero.",
+        "test": "Add an explicit reward mode that pays the existing mill bonus only when corrected complete-turn Malom quality is value-preserving. Compare it with the unchanged legacy mode under identical seeds, data, curriculum and evaluator."
+      },
+      {
+        "hypothesis": "The placement failures are the cleanest reward-conflict cell.",
+        "support": "Four of six placement downgrades form mills and capture within two to five post-prefix plies. In placement, Sentinel and heuristic-delta rewards are gated off, Malom reward is zero, and the immediate positive shaping on those turns is the mill bonus.",
+        "test": "Before any long run, use fixed placement states to verify that legacy mode rewards these downgrades and the new mode suppresses only the contradictory bonus."
+      },
+      {
+        "hypothesis": "A surgical Malom gate is safer than globally removing mill shaping.",
+        "support": "Winning trajectories have a much higher inferred mill-action rate than losing or drawn trajectories, while every audited first downgrade has at least one non-capturing value-preserving alternative.",
+        "test": "Freeze a legacy-unconditional versus Malom-preserving-only ablation. Log formed-mill count, mill reward, Malom downgrade count and their intersection per game and phase."
+      }
+    ],
+    "next_validation": [
+      "Add explicit, backward-compatible mill-bonus modes and fail closed on missing Malom quality when the preserving-only mode is selected.",
+      "Add per-game and per-phase observability for formed mills, awarded mill bonuses, Malom downgrades and formed-mill by downgrade intersections.",
+      "Run focused reward tests and a no-update integration probe on the 19 frozen states without loading the retained candidate.",
+      "Freeze one successor smoke and a matched legacy ablation with identical seeds, hyperparameters, data identities, baseline and phase-specific metrics before authorising retained training.",
+      "Audit conversion progress separately for the four favourable-colour counterpart draws; coarse WDL and this alternative audit do not explain live-rule draws."
+    ],
+    "observed_facts": [
+      "The full corrected Malom inventory exactly matches the local legal-turn inventory at all 19 first-downgrade states.",
+      "The committed candidate action is not full-oracle best in any of the 19 states.",
+      "All 19 states have at least one value-preserving alternative and at least one strictly better full-oracle alternative.",
+      "None of the 351 value-preserving alternatives and none of the 347 full-oracle-best alternatives contains a capture.",
+      "The 16 capture-bearing downgrades have no value-preserving alternative with the same from/to primary action and a different capture target.",
+      "The resulting classifications are 16 primary-action-or-mill-timing errors and three non-capturing primary-action errors; there are zero wrong-capture-target classifications.",
+      "The trainer source blob is identical at the managed plan commit, final segment commit and current audit commit."
+    ]
+  },
+  "audit_artifact": {
+    "audit_identity": "7cfa9ede873ae4fb34d7821472c62bba540f1b509476073062d52b487995cf65",
+    "canonical_json": true,
+    "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/oracle-alternative-audit.json",
+    "sha256": "29e3ed6d2af1389a90ef46869db5a2b8800e8c9c3993e13dd80af72ef07a7f28",
+    "size_bytes": 265637
+  },
+  "audit_implementation": {
+    "commit": "51cf3b7d39bf2624842fb7ee1b43f3e42cfdbc97",
+    "module_sha256": "61d090156ad19d07da0285fe5bdd60e758f49dc2180e40f5c1b0e162534195a1",
+    "script_sha256": "3c05df43e7e0a16cd6cab138d758ab5b80e642159fc3743ac20a924a7e54f68b",
+    "tracked_worktree_clean": true,
+    "tree": "bffa9fb0afd64d6071dd6f58b293e5282e6e6fe9"
+  },
+  "claim_boundary": {
+    "candidate_loaded_or_requeried": false,
+    "causal_reward_attribution": false,
+    "complete_legal_turns_enumerated": true,
+    "counterfactual_oracle_search": true,
+    "diagnostic_not_inferential": true,
+    "model_promotion": false,
+    "new_evaluation_games": false,
+    "new_training_authorized": false,
+    "overall_strength_claim": false
+  },
+  "evidence_date": "2026-08-09",
+  "evidence_identity": "e9bf90f15e943c3c0629c1bf053c68421b9394d95857fe5718aa52750fed843e",
+  "evaluation_binding": {
+    "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+    "ledger_sha256": "100863efa58381fc736096440bf8ff4a178cd34215ac7b43e3d6f6767fae7892",
+    "ledger_tail_record_sha256": "fb57fd8eeb96c0b84db68ff05fbd9ddc81486fd2471269915e1194a7672f03d0",
+    "report_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",
+    "spec_identity": "ceb6f2230c448abd23b3e2cdffe479bb697b953a76d0072852bf99b131282332",
+    "source_wdl_audit_identity": "6bbb4a50aa7999d06679c802cfeb5b913f0f5abf0689aa0291ec55459304b504",
+    "source_wdl_audit_sha256": "871dd7935f7aa3231e6e364974e5207ef272501483e29338014cde16525b5692"
+  },
+  "malom": {
+    "component_count": 512,
+    "identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "size_bytes": 83582223577,
+    "trust_level": "sector-corrected-v1"
+  },
+  "oracle_results": {
+    "chosen_capture_counts": {
+      "capture": 16,
+      "no_capture": 3
+    },
+    "chosen_full_oracle_best": 0,
+    "classification_counts": {
+      "primary_action": 3,
+      "primary_action_or_mill_timing": 16,
+      "wrong_capture_target": 0
+    },
+    "complete_legal_turns": {
+      "mean_per_state": 32.21052631578947,
+      "total": 612
+    },
+    "full_oracle_best_alternatives": {
+      "capture_count": 0,
+      "states_with_capture": 0,
+      "total": 347
+    },
+    "phase_counts": {
+      "fly": 9,
+      "move": 4,
+      "place": 6
+    },
+    "preserving_alternatives": {
+      "capture_count": 0,
+      "mean_per_state": 18.473684210526315,
+      "states_with_capture": 0,
+      "total": 351
+    },
+    "states": 19,
+    "stratum_counts": {
+      "book": 6,
+      "human_db": 2,
+      "perfect_db": 11
+    },
+    "strictly_better_alternatives_total": 400
+  },
+  "schema_version": "nmm.sanmill-heldout-oracle-alternative-audit-evidence.v1",
+  "status": "completed_diagnostic_only",
+  "trainer_mechanism": {
+    "code_facts": {
+      "heuristic_and_sentinel_reward_disabled_during_placement": true,
+      "malom_reward_weight": 0.0,
+      "mill_bonus": 0.25,
+      "mill_bonus_application": "unconditional_for_each_newly_formed_mill",
+      "move_quality_query_available": true
+    },
+    "final_segment_commit": "4973e321d17a5b6f3cb697d66ccdc9701d4d8a30",
+    "managed_plan_commit": "ff7e360d3660c142768b1247d2d17ad79ceb435f",
+    "trainer_blob_at_plan_final_and_current": "ed89c7cd40666340b738d0470b7fc905324084a7"
+  },
+  "training_log_context": {
+    "available_game_logs": 4800,
+    "coverage_note": "Accepted train logs cover games 1-3000 and 3201-5000; games 3001-3200 are absent after the documented segment-13 recovery.",
+    "derived_counts": {
+      "inferred_mill_actions": 5955,
+      "learner_steps": 115765,
+      "malom_downgrading_actions": 4097
+    },
+    "derivation": "mill actions equal steps times (reward_total_mean - reward_sentinel_mean - reward_heuristic_mean - reward_retro_mean) divided by 0.25; maximum integer-rounding residual is below 3e-14",
+    "final_200_available_logs": {
+      "games": 200,
+      "inferred_mill_actions": 349,
+      "learner_steps": 6717,
+      "malom_downgrading_actions": 67
+    },
+    "mill_action_counts_by_outcome": {
+      "max_ply_truncation_-0.25": {
+        "games": 440,
+        "learner_steps": 26400,
+        "mill_actions": 1406,
+        "termination_reasons": {
+          "max-ply-truncation": 440
+        }
+      },
+      "rules_draw_-0.15": {
+        "games": 1405,
+        "learner_steps": 39069,
+        "mill_actions": 1783,
+        "termination_reasons": {
+          "draw_fifty_move": 158,
+          "draw_threefold_repetition": 1247
+        }
+      },
+      "loss_-1.0": {
+        "games": 2862,
+        "learner_steps": 47746,
+        "mill_actions": 2226,
+        "termination_reasons": {
+          "lose_fewer_than_three": 1575,
+          "lose_no_legal_moves": 1287
+        }
+      },
+      "win_1.5": {
+        "games": 93,
+        "learner_steps": 2550,
+        "mill_actions": 540,
+        "termination_reasons": {
+          "lose_fewer_than_three": 81,
+          "lose_no_legal_moves": 12
+        }
+      }
+    },
+    "missing_joint_metric": "formed_mill_by_malom_downgrade"
+  }
+}
