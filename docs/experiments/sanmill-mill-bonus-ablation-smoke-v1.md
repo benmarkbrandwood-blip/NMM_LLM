@@ -128,6 +128,10 @@ databases, creates the managed plans, runs six read-only long-run preflights
 and writes one ignored combined readiness report. It never writes an
 authorization or starts a segment:
 
+The managed subprocess reserves stdout for exactly one JSON document and sends
+path-resolution or trainer diagnostics to stderr. This boundary is required so
+preparation never has to ignore or guess around non-protocol output.
+
 ```powershell
 .\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py
 .\.venv\Scripts\python.exe scripts\prepare_mill_bonus_ablation.py --prepare

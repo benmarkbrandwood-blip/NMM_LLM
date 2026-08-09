@@ -362,9 +362,11 @@ from a hard 500-game controller completion bound, preventing one arm's
 authorization from reaching a second segment. Commit `e46359d` adds exact
 phase-specific support denominators, and `e200cb1` adds a fail-closed six-arm
 result analyzer with complete-window curves and paired-seed decisions. Its
+manager subprocess boundary is fixed by `c7c9be8`, which reserves stdout for
+one JSON document and sends incidental diagnostics to stderr. Its
 current plan identity is
-`f5207a8c839f14a14631102239992f58374b44f663ea7890dd0509fe32fca154`.
-The final local regression gate passes `252` focused reward, observability,
+`6ead245beccb616b611307d252f926665613df7f8fd002a80218ff0087f7be15`.
+The final local regression gate passes `253` focused reward, observability,
 probe, trainer, manager, checkpoint, exact-resume, policy-health and Sanmill
 referee tests. The separate mandatory Malom, DB-teacher and label-provenance
 gate passes `103` tests plus `498` parameterized subtests. Ruff and
