@@ -99,21 +99,12 @@ def test_audit_measures_components_without_mutating_sources() -> None:
     }
     assert report["objectives"]["auxiliary"]["raw_gradient_l2"] > 0.0
     assert report["gradients"]["joint_pre_clip_l2"] > 0.0
+    assert report["gradients"]["auxiliary_to_ordinary_gradient_l2_ratio"] > 0.0
     assert (
-        report["gradients"]["auxiliary_to_ordinary_gradient_l2_ratio"]
-        > 0.0
-    )
-    assert (
-        report["gradients"][
-            "auxiliary_to_ordinary_policy_head_gradient_l2_ratio"
-        ]
-        > 0.0
+        report["gradients"]["auxiliary_to_ordinary_policy_head_gradient_l2_ratio"] > 0.0
     )
     assert report["gradients"]["ordinary_policy_head_gradient_l2"] > 0.0
-    assert (
-        report["adam_step"]["treatment_minus_baseline_preserving_mass"]
-        >= 0.0
-    )
+    assert report["adam_step"]["treatment_minus_baseline_preserving_mass"] >= 0.0
     assert report["adam_step"]["persisted_treatment_replay_difference"] == {
         "raw": {"l2": 0.0, "max_abs": 0.0},
         "functionally_relevant": {"l2": 0.0, "max_abs": 0.0},
@@ -122,8 +113,7 @@ def test_audit_measures_components_without_mutating_sources() -> None:
     assert report["original_model_unchanged"] is True
     assert report["original_optimizer_unchanged"] is True
     assert all(
-        torch.equal(before[name], value)
-        for name, value in model.state_dict().items()
+        torch.equal(before[name], value) for name, value in model.state_dict().items()
     )
     assert optimizer.state_dict() == optimizer_before
 
@@ -210,14 +200,10 @@ def test_persisted_replay_separates_shared_policy_bias_invariance() -> None:
         device=torch.device("cpu"),
         expected_treatment_model=expected,
     )
-    difference = report["adam_step"][
-        "persisted_treatment_replay_difference"
-    ]
+    difference = report["adam_step"]["persisted_treatment_replay_difference"]
     assert difference["raw"]["max_abs"] == pytest.approx(0.125)
     assert difference["functionally_relevant"]["max_abs"] == 0.0
-    assert difference["softmax_invariant_parameter_names"] == [
-        "policy_mlp.2.bias"
-    ]
+    assert difference["softmax_invariant_parameter_names"] == ["policy_mlp.2.bias"]
 
 
 def test_batch_measurement_derives_ratios_without_an_optimizer_or_mutation() -> None:
@@ -253,12 +239,13 @@ def test_batch_measurement_derives_ratios_without_an_optimizer_or_mutation() -> 
     assert model.training is False
     assert all(not parameter.requires_grad for parameter in model.parameters())
     assert all(
-        torch.equal(before[name], value)
-        for name, value in model.state_dict().items()
+        torch.equal(before[name], value) for name, value in model.state_dict().items()
     )
 
 
-def test_batch_measurement_reports_an_all_safe_batch_without_fabricating_scale() -> None:
+def test_batch_measurement_reports_an_all_safe_batch_without_fabricating_scale() -> (
+    None
+):
     model = _FixedPolicyValue()
     steps = _steps()
     for step in steps:

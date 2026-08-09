@@ -33,9 +33,7 @@ class MalomPolicyAuxiliaryGradientInteractionError(ValueError):
 def _require_finite(value: float, *, label: str) -> float:
     result = float(value)
     if not math.isfinite(result):
-        raise MalomPolicyAuxiliaryGradientInteractionError(
-            f"{label} must be finite"
-        )
+        raise MalomPolicyAuxiliaryGradientInteractionError(f"{label} must be finite")
     return result
 
 
@@ -91,7 +89,9 @@ def _phase(step: ScaffoldedStep) -> str:
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "legal actions disagree on the state phase"
         )
-    if not np.array_equal(reference, np.eye(4, dtype=reference.dtype)[np.argmax(reference)]):
+    if not np.array_equal(
+        reference, np.eye(4, dtype=reference.dtype)[np.argmax(reference)]
+    ):
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "move features contain an invalid phase one-hot"
         )
@@ -158,9 +158,7 @@ def _objective_tensors(
     current_value = model.value(all_vi)
     advantages = (targets - current_value).detach()
     if advantages.std() > 1e-3:
-        advantages = (advantages - advantages.mean()) / (
-            advantages.std() + 1e-8
-        )
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
     policy_terms: list[torch.Tensor] = []
     entropy_terms: list[torch.Tensor] = []
@@ -217,9 +215,7 @@ def _objective_tensors(
     entropy = torch.stack(entropy_terms).mean()
     value_loss = F.mse_loss(current_value, targets.detach())
     auxiliary_loss = (
-        torch.stack(auxiliary_terms).mean()
-        if auxiliary_terms
-        else policy_loss * 0.0
+        torch.stack(auxiliary_terms).mean() if auxiliary_terms else policy_loss * 0.0
     )
     objectives = {
         "policy": policy_loss,
@@ -248,8 +244,7 @@ def _objective_tensors(
 
 def _require_target_ratios(values: Sequence[float]) -> tuple[float, ...]:
     ratios = tuple(
-        _require_finite(value, label="target policy-head ratio")
-        for value in values
+        _require_finite(value, label="target policy-head ratio") for value in values
     )
     if not ratios or any(value <= 0.0 for value in ratios):
         raise MalomPolicyAuxiliaryGradientInteractionError(
@@ -288,9 +283,7 @@ def _gradients(
 def _dot(left: Sequence[torch.Tensor], right: Sequence[torch.Tensor]) -> float:
     return float(
         sum(
-            (
-                first.detach().double() * second.detach().double()
-            ).sum().item()
+            (first.detach().double() * second.detach().double()).sum().item()
             for first, second in zip(left, right, strict=True)
         )
     )
@@ -300,9 +293,7 @@ def _norm(values: Sequence[torch.Tensor]) -> float:
     return math.sqrt(max(0.0, _dot(values, values)))
 
 
-def _scaled(
-    values: Sequence[torch.Tensor], scale: float
-) -> tuple[torch.Tensor, ...]:
+def _scaled(values: Sequence[torch.Tensor], scale: float) -> tuple[torch.Tensor, ...]:
     return tuple(value * scale for value in values)
 
 
@@ -310,7 +301,9 @@ def _sum_gradients(
     gradients: Sequence[Sequence[torch.Tensor]],
 ) -> tuple[torch.Tensor, ...]:
     return tuple(
-        sum((group[index] for group in gradients), torch.zeros_like(gradients[0][index]))
+        sum(
+            (group[index] for group in gradients), torch.zeros_like(gradients[0][index])
+        )
         for index in range(len(gradients[0]))
     )
 
@@ -358,8 +351,7 @@ def measure_malom_policy_auxiliary_batch_gradients(
             "denominator floor must be positive"
         )
     if any(
-        isinstance(module, nn.Dropout) and module.p > 0.0
-        for module in model.modules()
+        isinstance(module, nn.Dropout) and module.p > 0.0 for module in model.modules()
     ):
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "gradient measurement requires dropout-free model semantics"
@@ -391,12 +383,8 @@ def measure_malom_policy_auxiliary_batch_gradients(
         applied_policy = raw_gradients["policy"]
         applied_entropy = _scaled(raw_gradients["entropy"], -entropy_coef)
         applied_value = _scaled(raw_gradients["value"], value_coef)
-        ordinary_policy = _sum_gradients(
-            [applied_policy, applied_entropy]
-        )
-        ordinary_full = _sum_gradients(
-            [ordinary_policy, applied_value]
-        )
+        ordinary_policy = _sum_gradients([applied_policy, applied_entropy])
+        ordinary_full = _sum_gradients([ordinary_policy, applied_value])
         raw_auxiliary = raw_gradients["auxiliary"]
         ordinary_policy_norm = _norm(ordinary_policy)
         raw_auxiliary_norm = _norm(raw_auxiliary)
@@ -431,21 +419,15 @@ def measure_malom_policy_auxiliary_batch_gradients(
                     }
                 )
                 continue
-            coefficient = (
-                target * ordinary_policy_norm / raw_auxiliary_norm
-            )
+            coefficient = target * ordinary_policy_norm / raw_auxiliary_norm
             applied_auxiliary = _scaled(raw_auxiliary, coefficient)
-            joint_policy = _sum_gradients(
-                [ordinary_policy, applied_auxiliary]
-            )
+            joint_policy = _sum_gradients([ordinary_policy, applied_auxiliary])
             candidates.append(
                 {
                     "target_policy_head_ratio": target,
                     "status": "measured",
                     "effective_coefficient": coefficient,
-                    "applied_auxiliary_gradient_l2": _norm(
-                        applied_auxiliary
-                    ),
+                    "applied_auxiliary_gradient_l2": _norm(applied_auxiliary),
                     "joint_policy_head_gradient_l2": _norm(joint_policy),
                     "auxiliary_to_ordinary_policy_head_cosine": _cosine(
                         applied_auxiliary,
@@ -467,9 +449,7 @@ def measure_malom_policy_auxiliary_batch_gradients(
             "ordinary_full_gradient_l2": _norm(ordinary_full),
             "raw_auxiliary_gradient_l2": raw_auxiliary_norm,
             "raw_auxiliary_to_ordinary_policy_head_cosine": (
-                _cosine(raw_auxiliary, ordinary_policy)
-                if informative > 0
-                else None
+                _cosine(raw_auxiliary, ordinary_policy) if informative > 0 else None
             ),
             "denominator_floor": denominator_floor,
             "candidate_scales": candidates,
@@ -632,8 +612,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
             "gradient clip must be positive"
         )
     if any(
-        isinstance(module, nn.Dropout) and module.p > 0.0
-        for module in model.modules()
+        isinstance(module, nn.Dropout) and module.p > 0.0 for module in model.modules()
     ):
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "gradient interaction audit requires dropout-free model semantics"
@@ -668,15 +647,9 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         name: _scaled(raw_gradients[name], scale)
         for name, scale in applied_scales.items()
     }
-    ordinary = _sum_gradients(
-        [applied["policy"], applied["entropy"], applied["value"]]
-    )
-    ordinary_policy = _sum_gradients(
-        [applied["policy"], applied["entropy"]]
-    )
-    joint_policy = _sum_gradients(
-        [ordinary_policy, applied["auxiliary"]]
-    )
+    ordinary = _sum_gradients([applied["policy"], applied["entropy"], applied["value"]])
+    ordinary_policy = _sum_gradients([applied["policy"], applied["entropy"]])
+    joint_policy = _sum_gradients([ordinary_policy, applied["auxiliary"]])
     joint = _sum_gradients([ordinary, applied["auxiliary"]])
     joint_norm = _norm(joint)
     ordinary_norm = _norm(ordinary)
@@ -694,9 +667,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
             "applied_scale": applied_scales[name],
             "applied_gradient_l2": _norm(applied[name]),
             "projection_fraction_of_joint": (
-                _dot(applied[name], joint) / denominator
-                if denominator > 0.0
-                else 0.0
+                _dot(applied[name], joint) / denominator if denominator > 0.0 else 0.0
             ),
             "projection_fraction_of_policy_joint": (
                 _dot(applied[name], joint_policy)
@@ -709,9 +680,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
     pairwise: dict[str, float] = {}
     for left_index, left in enumerate(objective_names):
         for right in objective_names[left_index + 1 :]:
-            pairwise[f"{left}__{right}"] = _cosine(
-                applied[left], applied[right]
-            )
+            pairwise[f"{left}__{right}"] = _cosine(applied[left], applied[right])
 
     baseline_model, baseline_optimizer = _clone_adam(model, optimizer)
     treatment_model, treatment_optimizer = _clone_adam(model, optimizer)
@@ -758,38 +727,30 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         "baseline_reported_losses": list(baseline_losses),
         "treatment_reported_losses": list(treatment_losses),
         "treatment_auxiliary_diagnostics": treatment_diagnostics,
-        "baseline_parameter_delta": _parameter_distance(
-            baseline_model, model
-        ),
-        "treatment_parameter_delta": _parameter_distance(
-            treatment_model, model
-        ),
+        "baseline_parameter_delta": _parameter_distance(baseline_model, model),
+        "treatment_parameter_delta": _parameter_distance(treatment_model, model),
         "treatment_minus_baseline_parameter_delta": _parameter_distance(
             treatment_model, baseline_model
         ),
         "informative_batch_preserving_mass_before": before_mass,
         "informative_batch_preserving_mass_after_baseline": baseline_mass,
         "informative_batch_preserving_mass_after_treatment": treatment_mass,
-        "treatment_minus_baseline_preserving_mass": (
-            treatment_mass - baseline_mass
-        ),
+        "treatment_minus_baseline_preserving_mass": (treatment_mass - baseline_mass),
     }
     if expected_treatment_model is not None:
         invariant_names = _softmax_invariant_policy_bias_names(treatment_model)
-        adam_step["persisted_treatment_replay_difference"] = (
-            {
-                "raw": _parameter_distance(
-                    treatment_model,
-                    expected_treatment_model,
-                ),
-                "functionally_relevant": _parameter_distance(
-                    treatment_model,
-                    expected_treatment_model,
-                    excluded=invariant_names,
-                ),
-                "softmax_invariant_parameter_names": list(invariant_names),
-            }
-        )
+        adam_step["persisted_treatment_replay_difference"] = {
+            "raw": _parameter_distance(
+                treatment_model,
+                expected_treatment_model,
+            ),
+            "functionally_relevant": _parameter_distance(
+                treatment_model,
+                expected_treatment_model,
+                excluded=invariant_names,
+            ),
+            "softmax_invariant_parameter_names": list(invariant_names),
+        }
 
     return {
         "support": support,
@@ -802,9 +763,7 @@ def audit_malom_policy_auxiliary_gradient_interaction(
             "auxiliary_to_ordinary_gradient_l2_ratio": (
                 auxiliary_norm / ordinary_norm if ordinary_norm > 0.0 else None
             ),
-            "auxiliary_to_ordinary_cosine": _cosine(
-                applied["auxiliary"], ordinary
-            ),
+            "auxiliary_to_ordinary_cosine": _cosine(applied["auxiliary"], ordinary),
             "auxiliary_to_ordinary_policy_head_gradient_l2_ratio": (
                 auxiliary_norm / ordinary_policy_norm
                 if ordinary_policy_norm > 0.0
