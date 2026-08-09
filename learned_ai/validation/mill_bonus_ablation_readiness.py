@@ -680,6 +680,37 @@ def _run_checked(
     return result
 
 
+def _build_fresh_preflight_command(
+    plan: ManagedPlan,
+    *,
+    root: Path,
+    python_executable: str,
+) -> list[str]:
+    """Build a read-only preflight for the actual first managed segment."""
+    segment_index = 1
+    segment_output = (
+        Path(plan.control_dir) / "segments" / f"segment-{segment_index:04d}"
+    )
+    segment_stop_game = min(plan.segment_games, plan.game_bound)
+    return [
+        python_executable,
+        str(root / "scripts/train_s_gen_v2.py"),
+        "--preflight",
+        "long-run",
+        "--run-id",
+        f"{plan.plan_id}-segment-{segment_index:04d}",
+        "--out-dir",
+        str(segment_output),
+        "--segment-games",
+        str(plan.segment_games),
+        "--segment-stop-game",
+        str(segment_stop_game),
+        *plan.common_trainer_args,
+        "--start-mode",
+        "fresh",
+    ]
+
+
 def prepare_ablation(
     *,
     root: Path,
@@ -733,15 +764,11 @@ def prepare_ablation(
             root, arm["control_dir"], field="control_dir"
         ) / "plan.json"
         plan = load_managed_plan(plan_path)
-        preflight_command = [
-            python_executable,
-            str(root / "scripts/train_s_gen_v2.py"),
-            "--preflight",
-            "long-run",
-            *plan.common_trainer_args,
-            "--start-mode",
-            "fresh",
-        ]
+        preflight_command = _build_fresh_preflight_command(
+            plan,
+            root=root,
+            python_executable=python_executable,
+        )
         preflight_result = _run_checked(
             preflight_command, root=root, runner=runner
         )

@@ -6,10 +6,12 @@ import copy
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from learned_ai.data.specialist_db import SpecialistDB
+from learned_ai.validation import mill_bonus_ablation_readiness as readiness_module
 from learned_ai.validation.mill_bonus_ablation_readiness import (
     DEFAULT_CONTRACT,
     MillBonusAblationReadinessError,
@@ -148,6 +150,35 @@ def test_preparation_refuses_any_existing_target(tmp_path: Path) -> None:
             contract,
             report_path=tmp_path / "out/readiness.json",
         )
+
+
+def test_fresh_preflight_targets_first_managed_segment(tmp_path: Path) -> None:
+    plan = SimpleNamespace(
+        common_trainer_args=["--max-games", "5000"],
+        control_dir=str(tmp_path / "control"),
+        game_bound=500,
+        plan_id="six-arm-seed-42-legacy",
+        segment_games=500,
+    )
+
+    command = readiness_module._build_fresh_preflight_command(
+        plan,
+        root=tmp_path,
+        python_executable="python-under-test",
+    )
+    parsed = trainer._build_argument_parser().parse_args(command[2:])
+
+    assert command[:2] == [
+        "python-under-test",
+        str(tmp_path / "scripts/train_s_gen_v2.py"),
+    ]
+    assert parsed.preflight == "long-run"
+    assert parsed.launch is None
+    assert parsed.start_mode == "fresh"
+    assert parsed.run_id == "six-arm-seed-42-legacy-segment-0001"
+    assert parsed.out_dir == str(tmp_path / "control/segments/segment-0001")
+    assert parsed.segment_games == 500
+    assert parsed.segment_stop_game == 500
 
 
 def test_real_preparation_outputs_are_all_git_ignored() -> None:
