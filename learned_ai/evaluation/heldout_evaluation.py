@@ -63,6 +63,9 @@ HELDOUT_LAUNCH_SCHEMA = "nmm.sanmill-heldout-launch.v1"
 HELDOUT_PROGRESS_SCHEMA = "nmm.sanmill-heldout-progress.v1"
 HELDOUT_FAILURE_SCHEMA = "nmm.sanmill-heldout-failure.v1"
 
+ATOMIC_REPLACE_PERMISSION_RETRIES = 80
+ATOMIC_REPLACE_RETRY_SECONDS = 0.025
+
 PLAN_RELATIVE = Path(
     "docs/experiments/sanmill-corrected-retained-v2-heldout-eval-v1.json"
 )
@@ -1344,7 +1347,14 @@ def replace_canonical(path: str | Path, value: Mapping[str, Any]) -> None:
             handle.write(canonical_json_bytes(dict(value)))
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(temporary, target)
+        for attempt in range(ATOMIC_REPLACE_PERMISSION_RETRIES):
+            try:
+                os.replace(temporary, target)
+                break
+            except PermissionError:
+                if attempt + 1 == ATOMIC_REPLACE_PERMISSION_RETRIES:
+                    raise
+                time.sleep(ATOMIC_REPLACE_RETRY_SECONDS)
     finally:
         if temporary.exists():
             temporary.unlink()

@@ -313,6 +313,61 @@ def test_complete_ledger_recomputes_frozen_primary_and_subgroup_results(
     assert result["termination_reasons"] == {"loseFewerThanThree": 128}
 
 
+def test_replace_canonical_retries_a_transient_windows_reader(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    target = tmp_path / "progress.json"
+    heldout.write_new_canonical(target, {"generation": 1})
+    real_replace = heldout.os.replace
+    calls = 0
+    sleeps: list[float] = []
+
+    def transient_replace(source, destination) -> None:
+        nonlocal calls
+        calls += 1
+        if calls <= 2:
+            raise PermissionError(5, "target is temporarily open by a reader")
+        real_replace(source, destination)
+
+    monkeypatch.setattr(heldout.os, "replace", transient_replace)
+    monkeypatch.setattr(heldout.time, "sleep", sleeps.append)
+
+    heldout.replace_canonical(target, {"generation": 2})
+
+    assert json.loads(target.read_text(encoding="utf-8")) == {"generation": 2}
+    assert calls == 3
+    assert sleeps == [
+        heldout.ATOMIC_REPLACE_RETRY_SECONDS,
+        heldout.ATOMIC_REPLACE_RETRY_SECONDS,
+    ]
+    assert list(tmp_path.glob(".progress.json.*.tmp")) == []
+
+
+def test_replace_canonical_fails_closed_after_bounded_permission_retries(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    target = tmp_path / "progress.json"
+    heldout.write_new_canonical(target, {"generation": 1})
+    calls = 0
+
+    def blocked_replace(_source, _destination) -> None:
+        nonlocal calls
+        calls += 1
+        raise PermissionError(5, "target remains inaccessible")
+
+    monkeypatch.setattr(heldout.os, "replace", blocked_replace)
+    monkeypatch.setattr(heldout.time, "sleep", lambda _seconds: None)
+
+    with pytest.raises(PermissionError, match="remains inaccessible"):
+        heldout.replace_canonical(target, {"generation": 2})
+
+    assert calls == heldout.ATOMIC_REPLACE_PERMISSION_RETRIES
+    assert json.loads(target.read_text(encoding="utf-8")) == {"generation": 1}
+    assert list(tmp_path.glob(".progress.json.*.tmp")) == []
+
+
 def test_safety_ceiling_invalidates_instead_of_manufacturing_a_draw(
     monkeypatch,
     runtime_spec,
