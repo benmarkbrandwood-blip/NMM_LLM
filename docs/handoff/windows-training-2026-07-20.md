@@ -364,10 +364,12 @@ phase-specific support denominators, and `e200cb1` adds a fail-closed six-arm
 result analyzer with complete-window curves and paired-seed decisions. Its
 current plan identity is
 `f5207a8c839f14a14631102239992f58374b44f663ea7890dd0509fe32fca154`.
-The combined reward, observability, probe, manager, checkpoint, Malom and
-label-provenance gate passes `180` tests plus `498` parameterized subtests. All
-generated targets remain ignored and no managed arm, authorization or game
-exists.
+The final local regression gate passes `252` focused reward, observability,
+probe, trainer, manager, checkpoint, exact-resume, policy-health and Sanmill
+referee tests. The separate mandatory Malom, DB-teacher and label-provenance
+gate passes `103` tests plus `498` parameterized subtests. Ruff and
+`git diff --check` also pass. All generated targets remain ignored and no
+managed arm, authorization or game exists.
 
 Counter-evidence and limits: the no-update result proves reward-component
 behavior, not a learned causal effect. The inspected 29-state diagnostic is
