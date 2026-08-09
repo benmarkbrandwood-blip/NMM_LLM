@@ -81,8 +81,12 @@ off, and no Perfect DB, patch, shallow-search, or random fallback.
 The runtime tree is
 `17b9b0fd51ee8dac54c0454a6935978a47d19e0c`; its release binary SHA-256
 is `5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619`;
-and the repository-defined runtime identity is
-`705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea`.
+and the repository-defined operational runtime identity for this seed-58
+experiment is
+`5d436ac3eff3d7a7f186a4a7fb1c656739bafc93baeb5bb4e5b1dbf905dbaf04`.
+The operational identity includes all strict options, including
+`SearchShuffleSeed=58`; the commit, tree and binary identities above remain
+seed-independent.
 The portable strict-referee semantic digest is
 `sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94`.
 

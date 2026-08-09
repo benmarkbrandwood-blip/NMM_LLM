@@ -120,3 +120,36 @@ After an explicitly authorized ordinary push:
 
 No retry, extension, evaluation, promotion, publication or long training is
 authorized by this source-readiness record.
+
+## Post-publication preparation correction
+
+The seven source-preparation commits were ordinarily pushed, and clean
+published commit `d708e10ecd54cfefa39ee0af29b42567a3538001` was used for the
+first ignored preparation. The copied database was an unchanged 45,056-byte
+empty `sector-corrected-v1` template with SHA-256
+`5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`.
+The generated plan had semantic identity
+`91d3c0af412fa5090d8d41c40c2df46a67df384da89da5c8f99d36bc09502098`,
+raw-file SHA-256
+`9f795f812ad2a787f0214d39b55b7265a80a9c74b6e70d1f2abc5ec828751c57`,
+and resume-config identity
+`51a774bd78c23a2fe1a3cdfdff192d42cedf6f4007a87ab02d392e6c114748b4`.
+
+The authorization-free first-segment preflight found no technical error and
+reproduced the plan's resume-config identity, but it exposed a contradiction
+in the frozen document. The recorded Sanmill operational identity
+`705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea`
+is the identity for `SearchShuffleSeed=42`. Recomputing the same installation
+record with the frozen seed 58 changed only that strict option and produced
+`5d436ac3eff3d7a7f186a4a7fb1c656739bafc93baeb5bb4e5b1dbf905dbaf04`.
+The Sanmill commit, tree, binary and strict-referee semantic digest did not
+change.
+
+This makes the preliminary managed-plan instance `fatal_stop`: it must never
+be authorized or launched. Its plan, controller event and fresh database were
+moved without deletion to the ignored recoverable quarantine
+`out/quarantine/sanmill-preserving-retained-v3-preparation-superseded-d708e10-20260809T232402Z`.
+No authorization, segment, checkpoint, log, optimiser, update or counted game
+existed. After this correction is published, the exact target database and
+managed plan must be recreated and the final preflight repeated from the new
+clean published tip.

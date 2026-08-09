@@ -25,6 +25,7 @@ from learned_ai.training.sanmill_referee import (
     inspect_sanmill_training_installation,
     nmm_move_actions,
     probe_sanmill_training_runtime,
+    training_installation_record,
 )
 from learned_ai.training import sanmill_referee
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
@@ -221,6 +222,37 @@ def test_training_runtime_identity_and_cross_process_search_are_fixed() -> None:
     assert report["strict_options"]["StrictFailurePolicy"] == "true"
     assert report["strict_options"]["Shuffling"] == "false"
     assert report["strict_options"]["UsePerfectDatabase"] == "false"
+
+
+def test_training_runtime_identity_includes_the_search_seed() -> None:
+    installation = inspect_sanmill_training_installation(_training_checkout())
+    seed_42 = training_installation_record(installation, seed=42)
+    seed_58 = training_installation_record(installation, seed=58)
+
+    assert seed_42["identity"] == (
+        "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea"
+    )
+    assert seed_58["identity"] == (
+        "5d436ac3eff3d7a7f186a4a7fb1c656739bafc93baeb5bb4e5b1dbf905dbaf04"
+    )
+
+    seed_42_options = dict(seed_42["strict_options"])
+    seed_58_options = dict(seed_58["strict_options"])
+    assert seed_42_options.pop("SearchShuffleSeed") == "42"
+    assert seed_58_options.pop("SearchShuffleSeed") == "58"
+    assert seed_42_options == seed_58_options
+
+    seed_42_without_identity_or_options = {
+        key: value
+        for key, value in seed_42.items()
+        if key not in {"identity", "strict_options"}
+    }
+    seed_58_without_identity_or_options = {
+        key: value
+        for key, value in seed_58.items()
+        if key not in {"identity", "strict_options"}
+    }
+    assert seed_42_without_identity_or_options == seed_58_without_identity_or_options
 
 
 def test_training_referee_replays_complete_logical_turn_with_capture() -> None:

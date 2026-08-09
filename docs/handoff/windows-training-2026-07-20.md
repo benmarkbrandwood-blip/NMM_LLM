@@ -1750,6 +1750,21 @@ an immutable managed plan, complete focused verification, and a final
 readiness identity. Training remains unlaunched and needs explicit product
 authorization against that identity.
 
+The first ignored preparation at published commit `d708e10` stopped before
+authorization or training because final preflight found that the experiment
+document had retained the seed-42 Sanmill operational identity. The
+installation record includes `SearchShuffleSeed`: seed 42 produces
+`705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea`,
+while the frozen seed 58 produces
+`5d436ac3eff3d7a7f186a4a7fb1c656739bafc93baeb5bb4e5b1dbf905dbaf04`.
+All seed-independent Sanmill source, tree, binary and referee identities were
+unchanged. The preliminary plan and fresh empty database were moved without
+deletion to
+`out/quarantine/sanmill-preserving-retained-v3-preparation-superseded-d708e10-20260809T232402Z`.
+That plan is `fatal_stop` and must never be authorized. Publish the identity
+correction, then recreate both exact targets and repeat final preflight; do not
+reuse the quarantined preparation.
+
 ## Recommended Next Actions
 
 The corrected retained 5,000-game run is complete. Preserve its plan,
