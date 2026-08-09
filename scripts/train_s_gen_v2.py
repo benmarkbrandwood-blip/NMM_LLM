@@ -692,9 +692,16 @@ def _configure_paths(args: argparse.Namespace) -> dict[str, str]:
     """Apply CLI > environment > local/shared config > default precedence."""
     settings = load_training_settings(_ROOT, args.paths_config)
     if settings.local_config_path is not None:
-        print(f"[s_gen_v2] Path config: {settings.local_config_path}")
+        print(
+            f"[s_gen_v2] Path config: {settings.local_config_path}",
+            file=sys.stderr,
+        )
     else:
-        print("[s_gen_v2] No local path config; using environment/shared/default paths")
+        print(
+            "[s_gen_v2] No local path config; using "
+            "environment/shared/default paths",
+            file=sys.stderr,
+        )
     sources = configure_generalist_paths(args, root=_ROOT, settings=settings)
     setattr(args, "_path_sources", sources)
     return sources

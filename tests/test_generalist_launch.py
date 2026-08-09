@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
+from learned_ai.training.generalist_preflight import LoadedTrainingSettings
 from scripts import train_s_gen_v2 as trainer
 
 
@@ -109,3 +113,49 @@ def test_long_run_preflight_accepts_ready_for_long_run(
 
     assert exit_code == 0
     assert '"verdict": "ready_for_long_run"' in capsys.readouterr().out
+
+
+def test_preflight_reserves_stdout_for_one_json_document(
+    monkeypatch,
+    capsys,
+) -> None:
+    monkeypatch.setattr(
+        trainer,
+        "load_training_settings",
+        lambda *_args, **_kwargs: LoadedTrainingSettings(
+            {}, {}, Path("machine-local.json")
+        ),
+    )
+    monkeypatch.setattr(
+        trainer,
+        "configure_generalist_paths",
+        lambda *_args, **_kwargs: {},
+    )
+    monkeypatch.setattr(
+        trainer,
+        "run_generalist_preflight",
+        lambda *_args, **_kwargs: {
+            "mode": "long-run",
+            "verdict": "ready_for_long_run",
+            "checks": {"checkpoint": None},
+        },
+    )
+
+    exit_code = trainer.main(
+        [
+            "--preflight",
+            "long-run",
+            "--no-sentinel",
+            "--no-value-net",
+            "--no-gap-net",
+            "--max-games",
+            "1",
+            "--batch-games",
+            "1",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert json.loads(captured.out)["verdict"] == "ready_for_long_run"
+    assert "[s_gen_v2] Path config: machine-local.json" in captured.err
