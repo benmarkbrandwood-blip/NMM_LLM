@@ -1,0 +1,230 @@
+{
+  "analysis": {
+    "counterevidence": [
+      "Capture-bearing turns are naturally high-leverage Mill decisions; observing captures in 16 of 19 first downgrades does not distinguish a removal-target error from a bad primary action or bad mill timing.",
+      "The cohorts are outcome-aware diagnostics, not random or preregistered inferential samples. Only 18 of 23 selected loss/control pairs also match prefix WDL.",
+      "Malom WDL has no repetition or fifty-move history and this audit does not use complete oracle step ordering. A WDL-preserving policy can therefore fail to convert a winning position before a live-rules draw.",
+      "One loss first drops from W to D. Because the audit stops at the first value downgrade, it does not locate that game's later D-to-L transition.",
+      "The audit never loads the candidate, so it cannot attribute a bad action to policy logits, temperature, sampling, or a particular feature route.",
+      "The result remains evidence from one training seed, one checkpoint, one fixed baseline and one frozen corpus."
+    ],
+    "hypotheses": [
+      {
+        "hypothesis": "Complete-turn choice around mill closure and compulsory removal is a plausible policy bottleneck.",
+        "support": "Sixteen of 19 first value downgrades include a capture: all nine flying downgrades, three of four movement downgrades and four of six placement downgrades.",
+        "test": "For each downgrade state, enumerate every complete legal turn with full corrected Malom ordering. Separate a wrong capture target under the same primary action from a wrong primary action or mill-timing decision."
+      },
+      {
+        "hypothesis": "The observed losses contain at least two failure regimes rather than one global collapse.",
+        "support": "Six downgrades occur only two to five logical plies after the prefix during placement, while nine occur in flying with exactly three candidate pieces and a mean post-prefix ply of 46.11.",
+        "test": "Keep placement and flying diagnostics separate, then freeze one intervention and measure it with phase-stratified fixed states and an unchanged held-out evaluator."
+      },
+      {
+        "hypothesis": "Some paired deficits are advantage-conversion and draw-history failures, not mistakes by the colour that eventually lost.",
+        "support": "Four candidate losses begin already lost by WDL; in every corresponding colour-swapped game, the candidate has the favourable side but only draws.",
+        "test": "Audit those four counterpart draws with full Malom move ordering plus repetition and no-progress history, locating the first loss of conversion progress even when coarse WDL remains winning."
+      }
+    ],
+    "next_validation": [
+      "Run a read-only full-oracle alternative audit on the 19 first-downgrade states; do not ask the candidate to replay or sample any corpus move.",
+      "Audit the four favourable-colour counterpart draws with complete Malom ordering and live-rule repetition/no-progress counters.",
+      "Use those two audits to choose exactly one successor-training intervention and one matching ablation; do not bundle reward, curriculum and architecture changes.",
+      "Freeze train/validation diagnostics, multiple independent seeds, hyperparameters, data identities, baseline, ablation and per-class metrics before the successor retained run."
+    ],
+    "observed_facts": [
+      "All 23 candidate losses and 23 deterministic non-reused matched draws were replayed from the immutable ledger with no Malom coverage gap.",
+      "Nineteen losses contain a candidate WDL downgrade; four are already losing for the candidate at the 12-ply prefix.",
+      "The 19 first downgrades are 18 draw-to-loss transitions and one win-to-draw transition.",
+      "First downgrades occur in six placement, four movement and nine flying states.",
+      "The six placement downgrades occur at post-prefix plies 2 through 5; the nine flying downgrades all occur with three candidate pieces.",
+      "Among the 18 loss/control pairs with equal prefix WDL, 17 losses have a downgrade and one starts lost; 16 controls have no observed downgrade, one has a win-to-draw downgrade and one starts lost.",
+      "Both colours lose from Perfect DB sources source-core-049 and source-core-058; these are the two full-point pair deficits."
+    ]
+  },
+  "audit_artifact": {
+    "audit_identity": "6bbb4a50aa7999d06679c802cfeb5b913f0f5abf0689aa0291ec55459304b504",
+    "canonical_json": true,
+    "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/wdl-transition-audit.json",
+    "sha256": "871dd7935f7aa3231e6e364974e5207ef272501483e29338014cde16525b5692",
+    "size_bytes": 79957
+  },
+  "audit_implementation": {
+    "commit": "c00ccb1b7c72885551141f32a84db2f5d5a0acec",
+    "module_sha256": "4e2e3c28e1cd1fb29154a67e3dc1e1c9f6003ce22af80120986a4306ae932ac9",
+    "script_sha256": "fab7010c85973d1fe25541a4d7cbdaab1a2a2b551fc888cb173257247fca35fa",
+    "tracked_worktree_clean": true,
+    "tree": "c76d9b60956540c758bfee3f41c8d60b43b4c21a"
+  },
+  "claim_boundary": {
+    "candidate_loaded_or_requeried": false,
+    "causal_component_attribution": false,
+    "complete_oracle_step_ordering": false,
+    "counterfactual_move_search": false,
+    "diagnostic_not_inferential": true,
+    "model_promotion": false,
+    "new_evaluation_games": false,
+    "new_training_authorized": false,
+    "overall_strength_claim": false
+  },
+  "diagnostic_cohorts": {
+    "candidate_losses": {
+      "classification_counts": {
+        "candidate_already_losing_at_prefix": 4,
+        "candidate_wdl_downgrade_found": 19
+      },
+      "first_downgrade_phase_counts": {
+        "fly": 9,
+        "move": 4,
+        "place": 6
+      },
+      "first_downgrade_ply": {
+        "max": 92,
+        "mean": 30.210526315789473,
+        "min": 2,
+        "support": 19
+      },
+      "first_downgrade_transition_counts": {
+        "D->L": 18,
+        "W->D": 1
+      },
+      "games": 23,
+      "prefix_candidate_wdl_counts": {
+        "D": 19,
+        "L": 4
+      }
+    },
+    "matched_draw_controls": {
+      "classification_counts": {
+        "candidate_already_losing_at_prefix": 1,
+        "candidate_wdl_downgrade_found": 2,
+        "no_candidate_wdl_downgrade_observed": 20
+      },
+      "first_downgrade_transition_counts": {
+        "W->D": 2
+      },
+      "games": 23,
+      "prefix_candidate_wdl_counts": {
+        "D": 20,
+        "L": 1,
+        "W": 2
+      }
+    },
+    "prefix_wdl_exact_match_subset": {
+      "control_classification_counts": {
+        "candidate_already_losing_at_prefix": 1,
+        "candidate_wdl_downgrade_found": 1,
+        "no_candidate_wdl_downgrade_observed": 16
+      },
+      "games_per_cohort": 18,
+      "loss_classification_counts": {
+        "candidate_already_losing_at_prefix": 1,
+        "candidate_wdl_downgrade_found": 17
+      },
+      "stratum_counts": {
+        "book": 5,
+        "human_db": 2,
+        "perfect_db": 11
+      }
+    },
+    "selection": {
+      "loss_games": 23,
+      "matched_draw_controls": 23,
+      "matching_fields": [
+        "stratum",
+        "candidate_color",
+        "strict_independence_sensitivity"
+      ],
+      "prefix_wdl_exact_matches": 18,
+      "prefix_wdl_mismatches": 5,
+      "selection_identity": "06f216a8024360323438e643a362fb658bcefc24c222b09e661cd0817fdd97c6"
+    }
+  },
+  "evidence_date": "2026-08-09",
+  "evidence_identity": "c3acc2448151350d54184315a9cc728bc21830c779bacef01f239051ddca0314",
+  "evaluation_binding": {
+    "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+    "ledger_sha256": "100863efa58381fc736096440bf8ff4a178cd34215ac7b43e3d6f6767fae7892",
+    "ledger_tail_record_sha256": "fb57fd8eeb96c0b84db68ff05fbd9ddc81486fd2471269915e1194a7672f03d0",
+    "report_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",
+    "result_evidence_identity": "aaad33699bd7e6f15ea203e52fca6f275fcea711bd72e5f36dca1884eb79cab6",
+    "spec_identity": "ceb6f2230c448abd23b3e2cdffe479bb697b953a76d0072852bf99b131282332"
+  },
+  "malom": {
+    "component_count": 512,
+    "identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "size_bytes": 83582223577,
+    "trust_level": "sector-corrected-v1"
+  },
+  "pair_context": {
+    "double_loss_pairs": {
+      "pair_count": 2,
+      "source_core_ids": [
+        "source-core-049",
+        "source-core-058"
+      ],
+      "stratum": "perfect_db"
+    },
+    "loss_plus_draw_pairs": 19,
+    "prefix_losing_candidate_losses": {
+      "all_counterpart_games_drawn": true,
+      "count": 4,
+      "source_core_ids": [
+        "source-core-002",
+        "source-core-009",
+        "source-core-020",
+        "source-core-032"
+      ]
+    }
+  },
+  "schema_version": "nmm.sanmill-heldout-wdl-transition-audit-evidence.v1",
+  "status": "completed_diagnostic_only",
+  "value_transition_context": {
+    "capture_bearing_first_downgrades": {
+      "capture": 16,
+      "no_capture": 3,
+      "total": 19
+    },
+    "candidate_turn_exposure_before_first_downgrade": {
+      "capture_turns": 62,
+      "non_capture_turns": 228,
+      "total_turns": 290
+    },
+    "phase_descriptives": {
+      "fly": {
+        "first_downgrades": 9,
+        "material_difference_at_downgrade": {
+          "max": -1,
+          "mean": -1.2222222222222223,
+          "min": -3
+        },
+        "mean_post_prefix_logical_ply": 46.111111111111114,
+        "mean_primary_mobility_difference": 40.77777777777778
+      },
+      "move": {
+        "first_downgrades": 4,
+        "material_difference_at_downgrade": {
+          "max": 1,
+          "mean": -1.5,
+          "min": -3
+        },
+        "mean_post_prefix_logical_ply": 34.25,
+        "mean_primary_mobility_difference": 1.5
+      },
+      "place": {
+        "first_downgrades": 6,
+        "material_difference_at_downgrade": {
+          "max": 1,
+          "mean": -1,
+          "min": -3
+        },
+        "mean_post_prefix_logical_ply": 3.6666666666666665,
+        "mean_primary_mobility_difference": 0
+      }
+    },
+    "terminal_context": {
+      "downgrade_then_fewer_than_three": 14,
+      "downgrade_then_no_legal_moves": 5,
+      "prefix_losing_then_no_legal_moves": 4
+    }
+  }
+}

@@ -37,6 +37,12 @@ RESULT_EVIDENCE = (
     / "evidence"
     / "sanmill-corrected-retained-v2-heldout-result-2026-08-09.json"
 )
+WDL_TRANSITION_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-corrected-retained-v2-heldout-wdl-transition-audit-2026-08-09.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -137,4 +143,27 @@ def test_completed_heldout_evidence_binds_result_and_claim_boundary() -> None:
     assert evidence["host_interruption"]["interrupted_game_committed"] is False
     assert evidence["verification"]["recompute_equal_to_persisted_report"] is True
     assert evidence["claim_boundary"]["automatic_promotion"] is False
+    assert evidence["claim_boundary"]["new_training_authorized"] is False
+
+
+def test_wdl_transition_evidence_binds_diagnostic_scope() -> None:
+    evidence = json.loads(WDL_TRANSITION_EVIDENCE.read_text(encoding="utf-8"))
+    evidence_identity = evidence.pop("evidence_identity")
+
+    assert canonical_sha256(evidence) == evidence_identity
+    assert evidence["status"] == "completed_diagnostic_only"
+    assert evidence["diagnostic_cohorts"]["candidate_losses"][
+        "classification_counts"
+    ] == {
+        "candidate_already_losing_at_prefix": 4,
+        "candidate_wdl_downgrade_found": 19,
+    }
+    assert evidence["value_transition_context"][
+        "capture_bearing_first_downgrades"
+    ] == {"capture": 16, "no_capture": 3, "total": 19}
+    assert evidence["audit_artifact"]["sha256"] == (
+        "871dd7935f7aa3231e6e364974e5207ef272501483e29338014cde16525b5692"
+    )
+    assert evidence["claim_boundary"]["candidate_loaded_or_requeried"] is False
+    assert evidence["claim_boundary"]["diagnostic_not_inferential"] is True
     assert evidence["claim_boundary"]["new_training_authorized"] is False
