@@ -203,7 +203,9 @@
       "mill_bonus_gate": "704b3a19c54021b5d09b039f2110b80c0890550d",
       "mill_bonus_no_update_probe": "3292107eb5c16faa95623b7bfc07087607b65117",
       "mill_bonus_observability": "d90aced923257b3c2fd5717f6042fe3b4584ea9c",
+      "mill_bonus_phase_denominators": "e46359d4b9440a1a97574981b8b85829e29b3cc0",
       "mill_bonus_probe_evidence": "db6893728c0abb897380d473c2610d7be9861860",
+      "mill_bonus_result_analyzer": "e200cb19e44a5c680e27408548eab2ebce2bc662",
       "managed_completion_bound": "b38afe2116de1fd03e818ee1fddf088d6ba382ef",
       "managed_explicit_seed": "40370d0ed618d5891b74002aca48e74020875aa2"
     },
@@ -231,7 +233,7 @@
     "schedule_identity": "the trainer derives learner colour, opponent source, retry ply and per-game Torch generator only from seed, scheduled index and role; each same-seed pair therefore shares its exogenous schedule",
     "single_process_at_a_time": true
   },
-  "plan_identity": "3db50b6f3e35eb9ed96ac229176a67b9abaa9062b63ecc018202e42075543fc4",
+  "plan_identity": "f5207a8c839f14a14631102239992f58374b44f663ea7890dd0509fe32fca154",
   "prior_evidence": {
     "full_oracle_audit_identity": "7cfa9ede873ae4fb34d7821472c62bba540f1b509476073062d52b487995cf65",
     "heldout_result_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",

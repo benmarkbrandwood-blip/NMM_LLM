@@ -359,8 +359,11 @@ contract is `badcee6`; `bdf42e9` removes four whitespace-only EOF defects; and
 `9e5df00` binds the current contract to CUDA and adds fail-closed six-arm
 preparation. Commit `b38afe2` separates the 5,000-game trainer schedule horizon
 from a hard 500-game controller completion bound, preventing one arm's
-authorization from reaching a second segment. Its current plan identity is
-`3db50b6f3e35eb9ed96ac229176a67b9abaa9062b63ecc018202e42075543fc4`.
+authorization from reaching a second segment. Commit `e46359d` adds exact
+phase-specific support denominators, and `e200cb1` adds a fail-closed six-arm
+result analyzer with complete-window curves and paired-seed decisions. Its
+current plan identity is
+`f5207a8c839f14a14631102239992f58374b44f663ea7890dd0509fe32fca154`.
 The combined reward, observability, probe, manager, checkpoint, Malom and
 label-provenance gate passes `180` tests plus `498` parameterized subtests. All
 generated targets remain ignored and no managed arm, authorization or game

@@ -98,6 +98,15 @@ chosen probability and top-1 curves; reward components; all-action Malom
 quality; and W/D/L separated by opponent, colour, node level and termination.
 W/D/L is a training diagnostic only, not the selection metric.
 
+The tracked result analyzer verifies every input and reports raw observations,
+complete 50-game windows, exact phase denominators, individual seed pairs and
+the preregistered decision. It refuses partial, non-finite, identity-drifted or
+schedule-drifted evidence:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\report_mill_bonus_ablation.py
+```
+
 ## Resource and authority boundary
 
 The complete envelope is at most 3,000 games, six sequential processes and six
