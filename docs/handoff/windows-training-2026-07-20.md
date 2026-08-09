@@ -97,13 +97,15 @@ that the complete operational corpus is not wholly data-disjoint: 30 starts
 match HumanDB under D4 and one matches the final SpecialistDB. The same frozen
 ledger therefore reports a separate 34-start zero-database-match sensitivity
 subset. The product owner granted one bounded execution after a tested runner
-and final read-only preflight pass. No evaluation game has started and the
-grant remains unconsumed. See the
+and final read-only preflight pass. Published `dev` commit
+`23dd90008b1d260a054e0c3cb471b8aad71e99a6` passed every final gate, and the
+one allowed execution is now complete. The grant is consumed and must not be
+used for another run. See the
 [evaluation plan](../experiments/sanmill-corrected-retained-v2-heldout-eval-v1.md),
 [authorization](../experiments/sanmill-corrected-retained-v2-heldout-eval-v1-authorization.md)
 and [exposure audit](../evidence/sanmill-corrected-retained-v2-heldout-exposure-2026-08-09.md).
 
-The dedicated evaluator now exists at local `dev` implementation commit
+The dedicated evaluator was published at implementation commit
 `e32d9d46a361d2ed6877b669cdf653eba78e3f3c`. It provides the guarded CLI,
 canonical hash-chained game ledger, strict result validation, active-time
 ceiling, exact missing-suffix resume and recomputable paired/subgroup report.
@@ -112,10 +114,35 @@ Pre-publish evidence commit
 prefix replays, a real non-corpus candidate/Sanmill interoperability canary,
 79 current focused tests, and 103 Malom/provenance tests with 498 subtests.
 Every read-only gate passed except the deliberate publication gate because
-local `dev` is still ahead of `origin/dev`. No corpus game or corpus candidate
-move has occurred, so the one-run authorization remains unconsumed. The next
-action is an ordinary `dev` push followed by a complete final preflight; see the
+local `dev` was still ahead of `origin/dev` at that earlier audit. The seven
+preparation commits were subsequently pushed by ordinary fast-forward before
+the final preflight; see the historical
 [runner readiness evidence](../evidence/sanmill-corrected-retained-v2-heldout-runner-readiness-2026-08-09.md).
+
+The evaluation completed all 64 colour-swapped pairs. The retained candidate
+scored 3 wins, 102 draws and 23 losses, or 42.1875%. Its mean paired score
+difference was -0.15625 with interval
+`[-0.23146381558966117, -0.08103618441033884]`, so the frozen decision is
+`candidate_behind`. HumanDB was inconclusive at 48.81%; Book was behind at
+40.91%; Perfect DB was behind at 36.90%; and the strict 34-pair zero-match
+sensitivity subset was behind at 37.50%. This is fixed-corpus relation
+evidence, not a general strength or Elo claim.
+
+After four completed games, a concurrent read of `progress.json` overlapped a
+Windows atomic replacement and stopped the process with `WinError 5`. The
+original failure bytes are preserved under SHA-256
+`63615c1460fe0fc6c567c234bf1b2e368355b6c5fc2f758aa5ae870d38eab6af`.
+An exact-resume preflight bound the same commit, specification, host and
+four-record ledger, then ran only the missing 124-game suffix. The final
+128-record ledger SHA-256 is
+`100863efa58381fc736096440bf8ff4a178cd34215ac7b43e3d6f6767fae7892`,
+and independent recomputation exactly matches result identity
+`8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81`.
+Result evidence commit `8d247e9` records the complete claim boundary. Local
+commit `6a88deb` separately adds bounded retries for transient Windows
+progress-file readers; it does not alter gameplay or the completed report.
+See the
+[held-out result evidence](../evidence/sanmill-corrected-retained-v2-heldout-result-2026-08-09.md).
 
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
@@ -1435,10 +1462,8 @@ controller completed.
 
 The post-completion focused verification passed, but the repository still has
 the separately documented moving-checkout Sanmill failures; no new clean
-full-suite claim was made. The held-out protocol, one-run authorization,
-evaluator and pre-publish readiness evidence now exist. The grant remains
-unconsumed because the implementation has not yet been published and the final
-published-commit preflight has therefore not passed. Proceed in this order:
+full-suite claim was made. The held-out protocol has also completed, and its
+one-run authorization is consumed. Proceed in this order:
 
 1. Preserve the corrected retained plan, authorization, ledgers, every
    accepted segment checkpoint, both recovery bundles, the final candidate
@@ -1484,12 +1509,11 @@ published-commit preflight has therefore not passed. Proceed in this order:
    22/21/21 twelve-ply opening corpus. It is domain feedback, not an automatic
    phase-corpus freeze. Any later tactical stratum must remain separately
    identified.
-10. Preserve the frozen retained-v2 held-out plan, exposure audit, one-run
-    authorization, runner and pre-publish readiness evidence. Publish the
-    existing `dev` chain by ordinary push, then perform the complete final
-    read-only preflight. If every frozen gate passes, the grant permits one
-    64-pair execution without another product-choice prompt. Do not pool its
-    result with Stage 0 or the training diagnostics.
+10. Preserve the frozen retained-v2 held-out plan, exposure audit, consumed
+    authorization, runner, host-interruption archive, 128-record ledger and
+    final result evidence. Do not rerun it, pool it with Stage 0 or training
+    diagnostics, or promote the candidate. The next safe task is the specified
+    read-only first-losing-turn audit over the existing ledger.
 
 The previously executed isolated smoke command was:
 
@@ -1548,15 +1572,15 @@ The following choices are recorded for the next formal-evaluation design:
 - use twelve logical plies and separately report Book, genuine HumanDB, and
   StrictSteps Perfect DB strata for the current design; the 22/21/21
   composition, 64 source-member identities, HumanDB strict replays, and
-  executable corpus are frozen; the retained-v2 protocol and its one-run
-  authorization are now separately frozen and no game has started;
+  executable corpus are frozen; the retained-v2 protocol has completed and
+  its one-run authorization is consumed;
 - preserve all 33 D4-unique expert-curated Book placement patterns in a
   separately reported diagnostic catalogue while retaining all 36 source
   records as provenance; its execution protocol is not yet frozen;
 - use 60 complete turns only as a bridge/performance smoke ceiling; it is not a
   rules draw or a formal match-length decision; and
-- do not run candidate-versus-baseline games until a later immutable contract
-  and explicit launch authorization exist.
+- do not run any additional candidate-versus-baseline games until a later
+  immutable contract and explicit launch authorization exist.
 
 The product owner delegated routine technical choices for the authorized
 managed baseline to the Agent. The resulting immutable plan used A2C, no
@@ -1577,13 +1601,12 @@ endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
-evaluation's authorization is consumed. The retained-v2 held-out grant is a
-different, unconsumed authorization. Its exact runner, tests and pre-publish
-readiness evidence are complete locally. Safe work now consists of publishing
-the existing `dev` commits without rewriting them and rerunning the final
-read-only preflight. Only after all frozen gates pass may that one evaluation
-begin. No additional evaluation, smoke or training job,
-promotion/publication, protocol change or history rewrite is authorized.
+evaluation's authorization is consumed. The retained-v2 held-out grant is
+also consumed after one completed 128-game evaluation. Safe work now consists
+of preserving and publishing the result evidence and I/O-hardening commits,
+then performing the read-only first-losing-turn audit without re-querying the
+candidate on corpus positions. No additional evaluation, smoke or training
+job, promotion/publication, protocol change or history rewrite is authorized.
 
 ## Reference Material
 
