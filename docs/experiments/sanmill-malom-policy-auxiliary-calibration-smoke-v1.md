@@ -134,10 +134,14 @@ clean checkpoints, passing referee/database/policy-health gates, no policy
 collapse, and no material entropy or repetition-draw safety regression.
 
 Among eligible nonzero arms, select the lowest coefficient that produces a
-detectable fixed-state preserving-mass improvement while its median scaled
-auxiliary loss is no greater than the median absolute A2C policy loss. If none
-does, stop and redesign normalization. This calibration does not select by
-training-game W/D/L.
+fixed-state scheduled preserving-mass improvement of at least 0.001 over the
+control while its median scaled auxiliary loss is no greater than the median
+absolute A2C policy loss. Its fixed-state scheduled entropy may not fall more
+than 0.15 below control, and its repetition-draw rate may not exceed control by
+more than 0.10. If no nonzero arm passes, stop and redesign normalization. This
+calibration does not select by training-game W/D/L. These engineering-scale
+gates only decide whether a coefficient is suitable for a later multi-seed
+effectiveness experiment; they are not strength or promotion thresholds.
 
 Any identity drift, non-finite value, incomplete exact action labelling,
 SpecialistDB or rules mismatch, Sanmill error, checkpoint corruption,

@@ -2,6 +2,10 @@
   "analysis": {
     "decision_rule": {
       "eligible": "finite and identity-valid arm with complete exact-label support, passing checkpoint/referee/database/policy-health gates, no policy collapse, and no material entropy or repetition-draw safety regression",
+      "maximum_fixed_state_entropy_drop_over_control": 0.15,
+      "maximum_repetition_draw_rate_increase_over_control": 0.1,
+      "maximum_scaled_auxiliary_to_absolute_policy_loss_ratio": 1.0,
+      "minimum_fixed_state_preserving_mass_gain_over_control": 0.001,
       "selection": "among eligible nonzero arms with a detectable fixed-state preserving-mass improvement and median scaled auxiliary loss no greater than median absolute A2C policy loss, select the lowest coefficient; otherwise stop and redesign normalization",
       "unsafe": "any infrastructure, identity, non-finite, exact-label coverage, checkpoint, referee, database, reward-accounting, policy-health, collapse, or material repetition-draw failure"
     },
@@ -192,7 +196,7 @@
     "single_changed_factor": "malom_policy_aux_coef",
     "single_process_at_a_time": true
   },
-  "plan_identity": "4029c9ad0d10b4c9af7ffcca91a6ef9eb1647badf2c3fbf0db80da2f48dfa2f0",
+  "plan_identity": "b1b2fc15a6eae2dd73f16a1a86a2d89536355c9dab6cf895dc9bdf7f5e03b33c",
   "preparation_evidence": {
     "tracked_manifest": {
       "path": "docs/evidence/sanmill-malom-policy-auxiliary-gradient-probe-2026-08-09.json",

@@ -158,6 +158,15 @@ def test_calibration_binds_the_exact_gradient_evidence() -> None:
     }
 
 
+def test_calibration_decision_gates_are_numeric_and_precommitted() -> None:
+    rule = _load_plan()["analysis"]["decision_rule"]
+
+    assert rule["minimum_fixed_state_preserving_mass_gain_over_control"] == 0.001
+    assert rule["maximum_scaled_auxiliary_to_absolute_policy_loss_ratio"] == 1.0
+    assert rule["maximum_repetition_draw_rate_increase_over_control"] == 0.1
+    assert rule["maximum_fixed_state_entropy_drop_over_control"] == 0.15
+
+
 def test_calibration_plan_identity_and_temperature_are_canonical() -> None:
     plan = _load_plan()
     common = plan["common_training_contract"]
