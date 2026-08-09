@@ -1,0 +1,359 @@
+{
+  "analysis": {
+    "decision_rule": {
+      "eligible": "all six arms complete with finite updates, immutable identities, exact Malom labels in treatment arms, valid checkpoints, passing referee/database/policy-health gates, and no resource violation",
+      "fixed_state_comparison": "within each seed compute candidate minus reconstructed scratch for each arm, then normalized minus control as a paired difference-in-differences",
+      "maximum_fixed_state_entropy_drop_over_control": 0.15,
+      "maximum_repetition_draw_rate_increase_over_control": 0.1,
+      "minimum_fixed_state_preserving_mass_median_gain": 0.001,
+      "minimum_positive_seed_pairs": 2,
+      "normalized_applied_ratio_upper_bound": 0.250001,
+      "selection": "if all safety gates pass, at least two seed pairs improve, and the median paired preserving-mass gain reaches 0.001, the mechanism is eligible only for a later effectiveness experiment; otherwise stop and redesign",
+      "training_wdl_is_not_a_selection_metric": true,
+      "unsafe": "any identity, non-finite, label coverage, denominator, checkpoint, referee, database, policy-health, collapse, or resource failure stops the entire sequence"
+    },
+    "fixed_development_diagnostic": {
+      "audit_script": "tools/audit_generalist_policy_health.py",
+      "audit_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+      "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+      "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+      "critical_states": 29,
+      "device": "cuda",
+      "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
+      "minimum_candidate_preserving_rate": 0.5,
+      "required_direct_signal_preserving_rate": 1.0,
+      "role": "inspected development safety diagnostic; not held-out validation or strength evidence"
+    },
+    "normalization_diagnostics": [
+      "ordinary policy-head gradient L2",
+      "raw auxiliary gradient L2",
+      "effective coefficient and cap status",
+      "applied auxiliary to ordinary policy-head ratio",
+      "auxiliary to ordinary policy-head cosine",
+      "labelled and informative steps by phase"
+    ],
+    "per_class_reports": [
+      "seed and condition",
+      "board phase",
+      "opponent source",
+      "learner colour",
+      "termination reason"
+    ],
+    "required_curves": [
+      "raw and complete-window policy loss, value loss, and entropy",
+      "raw auxiliary loss, effective coefficient, applied ratio, and cosine by update",
+      "fixed-state preserving mass and entropy by seed and condition",
+      "exact selected-action downgrade rate by phase and opponent source",
+      "W/D/L by opponent source and learner colour",
+      "repetition and max-ply termination rates"
+    ]
+  },
+  "arms": [
+    {
+      "arm_id": "seed55-control",
+      "condition": "control",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed55-control",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s55-control",
+      "launch_order": 1,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "fixed",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s55-control",
+      "seed": 55,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s55.control.sqlite"
+    },
+    {
+      "arm_id": "seed55-normalized-r025",
+      "condition": "normalized-0.25",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed55-normalized-r025",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s55-r025",
+      "launch_order": 2,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "policy-head-normalized",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s55-r025",
+      "seed": 55,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s55.r025.sqlite"
+    },
+    {
+      "arm_id": "seed56-control",
+      "condition": "control",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed56-control",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s56-control",
+      "launch_order": 3,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "fixed",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s56-control",
+      "seed": 56,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s56.control.sqlite"
+    },
+    {
+      "arm_id": "seed56-normalized-r025",
+      "condition": "normalized-0.25",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed56-normalized-r025",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s56-r025",
+      "launch_order": 4,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "policy-head-normalized",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s56-r025",
+      "seed": 56,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s56.r025.sqlite"
+    },
+    {
+      "arm_id": "seed57-control",
+      "condition": "control",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed57-control",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s57-control",
+      "launch_order": 5,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "fixed",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s57-control",
+      "seed": 57,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s57.control.sqlite"
+    },
+    {
+      "arm_id": "seed57-normalized-r025",
+      "condition": "normalized-0.25",
+      "control_dir": "out/malom-policy-auxiliary-normalized-calibration-v1/seed57-normalized-r025",
+      "experiment_id": "dev-v4-sanmill-malom-policy-aux-normalized-v1-s57-r025",
+      "launch_order": 6,
+      "malom_policy_aux_coef": 0.0,
+      "malom_policy_aux_coef_cap": 0.25,
+      "malom_policy_aux_denominator_floor": 1e-12,
+      "malom_policy_aux_mode": "policy-head-normalized",
+      "malom_policy_aux_target_ratio": 0.25,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-policy-aux-normalized-v1-s57-r025",
+      "seed": 57,
+      "specialist_db": "data/specialist_db.malom_policy_aux_normalized_calibration_v1.s57.r025.sqlite"
+    }
+  ],
+  "authorization": {
+    "authorized_segments_per_arm": 0,
+    "launch_authorized": false,
+    "promotion_allowed": false,
+    "publication_allowed": false
+  },
+  "claim_boundary": "Three-seed optimizer-integration calibration only; not held-out validation, playing strength, promotion, retained-run, or long-run evidence.",
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "fixed_resource_stage_games": [
+      500,
+      500,
+      500,
+      1000,
+      2500
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "log_and_checkpoint_every_games": 50,
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "minimal_rollouts": true,
+    "one_segment_games": 100,
+    "only_observed_node_level": 1,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "start_mode": "fresh",
+    "target_refresh_every_games": 50,
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_start": 0.9,
+    "update_every_steps": 64
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_policy_auxiliary": "condition-specific fixed-off or policy-head-normalized target 0.25",
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    },
+    "specialist_db_policy": "copy the exact closed template once to each unique arm path; never share a writable database between arms"
+  },
+  "experiment_family_id": "sanmill-malom-policy-auxiliary-normalized-calibration-v1",
+  "hypothesis": "per-batch policy-head normalization at target ratio 0.25 produces a detectable and repeatable preserving-policy effect without allowing the exact-WDL auxiliary to dominate ordinary A2C learning",
+  "lineage": {
+    "exact_resume_between_arms": false,
+    "fresh_random_weights_per_arm": true,
+    "implementation_commits": {
+      "normalized_policy_auxiliary": "702c669a624f3ead7099126c6707e6513ed821c3",
+      "no_update_batch_capture": "1edd4e0f26aa09eeee064abde5ae185e3396cc18",
+      "no_update_result_evidence": "bcceab547cc7de9177a24964bd021816d656bd7c"
+    },
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main experiments change recovery, auxiliary networks and curriculum variables and are excluded from this one-factor scaling calibration",
+      "reviewed_tip": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9"
+    },
+    "resume_source": null
+  },
+  "objective": "compare no auxiliary policy loss with per-batch target-0.25 policy-head normalization across three fresh paired seeds before any effectiveness or retained experiment",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "arm_id",
+      "condition",
+      "control_dir",
+      "experiment_id",
+      "launch_order",
+      "malom_policy_aux_mode",
+      "plan_id",
+      "specialist_db"
+    ],
+    "conditions": [
+      "control",
+      "normalized-0.25"
+    ],
+    "pair_order_is_frozen": true,
+    "same_fresh_initialization_and_schedule_within_seed": true,
+    "seeds": [
+      55,
+      56,
+      57
+    ],
+    "single_changed_training_factor": "malom_policy_aux_mode",
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104",
+  "preparation_evidence": {
+    "no_update_batch_capture": {
+      "interpretation_commit": "bcceab547cc7de9177a24964bd021816d656bd7c",
+      "interpretation_path": "docs/evidence/sanmill-malom-policy-auxiliary-no-update-batch-capture-result-2026-08-10.md",
+      "interpretation_sha256": "775e23b9b4dbbd9fb26589c334654de10b4063b852a15ffce8840813ecbdb82e",
+      "interpretation_size_bytes": 9601,
+      "plan_identity": "a5c85ed13baecf3efed6780effdf590e97560a12e9ab197c5fc7bb4bf7341fab",
+      "plan_raw_sha256": "5813dbf320bc7de6a492ed975e6a807285ffa1f9728e7d15648c2771510b6a49",
+      "readiness_identity": "f8858720cafd994d9471af3312d9d428ffa4278b78883a66ec19ddb4954404f7",
+      "result_identity": "b0dfd3415c55196c59e71cf67e45b00ab5844e9f62fbc9f3bdc31b09a694bd86",
+      "result_path": "out/diagnostics/sanmill-malom-policy-auxiliary-no-update-batch-capture-v1-20260809-001.json",
+      "result_sha256": "2e310ecccf869f16b314093c6f50395e91019839b603d805ad3e0cab9d651fee",
+      "result_source_commit": "9b4655872cebc62e9e643039d24f6dfcd7da565d",
+      "result_source_tree": "66c054382ed462b1a0cb213ab6dd0b61b544d769",
+      "result_status": "completed_no_update_batch_capture",
+      "result_summary": {
+        "batches": 19,
+        "batches_with_informative_steps": 19,
+        "fresh_seeds": [
+          52,
+          53,
+          54
+        ],
+        "games": 60,
+        "informative_steps": 453,
+        "labelled_steps": 1473,
+        "target_025_effective_coefficient_max": 0.21542703065968208,
+        "target_025_effective_coefficient_median": 0.10439983015532883,
+        "target_025_effective_coefficient_min": 0.0480909139357529
+      }
+    }
+  },
+  "resources": {
+    "active_wall_hours_per_arm": 0.3333333333333333,
+    "completed_games_per_arm": 100,
+    "maximum_active_wall_hours_total": 2.0,
+    "maximum_completed_games_total": 600,
+    "maximum_requested_sanmill_nodes_total": 16200000,
+    "schedule_counts_by_seed": {
+      "55": {
+        "frozen_black": 33,
+        "frozen_white": 28,
+        "sanmill_black": 23,
+        "sanmill_white": 16
+      },
+      "56": {
+        "frozen_black": 34,
+        "frozen_white": 28,
+        "sanmill_black": 19,
+        "sanmill_white": 19
+      },
+      "57": {
+        "frozen_black": 20,
+        "frozen_white": 22,
+        "sanmill_black": 35,
+        "sanmill_white": 23
+      }
+    }
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.sanmill-malom-policy-auxiliary-normalized-calibration-plan.v1",
+  "status": "designed_unlaunched_needs_publication",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_promotion": false,
+    "continue_after_arm_failure": false,
+    "post_result_gate_changes": false,
+    "stop_on": [
+      "identity drift",
+      "non-finite state",
+      "incomplete exact Malom action labels",
+      "normalization denominator failure",
+      "SpecialistDB or rules identity drift",
+      "Sanmill error or checkpoint corruption",
+      "policy-health failure",
+      "resource envelope reached"
+    ]
+  }
+}
