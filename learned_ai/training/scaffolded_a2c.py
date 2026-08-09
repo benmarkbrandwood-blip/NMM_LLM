@@ -125,6 +125,23 @@ def _malom_preserving_mask(
     return torch.as_tensor(mask, dtype=torch.bool, device=device)
 
 
+def malom_preserving_set_loss(
+    log_probs: torch.Tensor,
+    preserving_mask: torch.Tensor,
+) -> torch.Tensor:
+    """Return ``-log P(preserving set)`` for one legal action set."""
+    if log_probs.ndim != 1 or preserving_mask.ndim != 1:
+        raise NonFiniteTrainingError("A2C: preserving-set inputs must be vectors")
+    if log_probs.shape != preserving_mask.shape:
+        raise NonFiniteTrainingError("A2C: preserving-set shape mismatch")
+    if preserving_mask.dtype != torch.bool:
+        raise NonFiniteTrainingError("A2C: preserving-set mask must be boolean")
+    if not bool(preserving_mask.any()):
+        raise NonFiniteTrainingError("A2C: preserving set is empty")
+    _require_finite(log_probs, label="preserving-set log probabilities")
+    return -torch.logsumexp(log_probs[preserving_mask], dim=0)
+
+
 def scaffolded_a2c_update(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -222,12 +239,13 @@ def scaffolded_a2c_update(
                 legal_move_count=len(log_probs),
                 device=device,
             )
-            log_preserving_mass = torch.logsumexp(log_probs[preserving], dim=0)
+            auxiliary_loss = malom_preserving_set_loss(log_probs, preserving)
+            log_preserving_mass = -auxiliary_loss
             malom_preserving_masses.append(
                 float(log_preserving_mass.detach().exp().item())
             )
             if not bool(preserving.all()):
-                malom_aux_terms.append(-log_preserving_mass)
+                malom_aux_terms.append(auxiliary_loss)
 
     policy_loss  = torch.stack(policy_terms).mean()
     entropy_loss = torch.stack(entropy_terms).mean()
