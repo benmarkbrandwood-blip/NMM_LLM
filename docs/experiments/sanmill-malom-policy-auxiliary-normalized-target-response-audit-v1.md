@@ -1,6 +1,6 @@
 # Normalized Malom policy-auxiliary target-response audit v1
 
-Status: `frozen_unrun`
+Status: `completed_stop_gradient_ratio_escalation`
 
 Machine-readable plan:
 [`sanmill-malom-policy-auxiliary-normalized-target-response-audit-v1.json`](sanmill-malom-policy-auxiliary-normalized-target-response-audit-v1.json)
@@ -82,3 +82,17 @@ The ignored output is created exclusively and must never be overwritten.
   --output out\malom-policy-auxiliary-normalized-target-response-audit-v1\result.json `
   --expected-source-commit <frozen-plan-commit>
 ```
+
+## Completed outcome
+
+The one permitted audit completed without mutating its persisted inputs. The
+target-0.25 production update replayed in all three seeds and every bounded
+response check passed. Seed 56 nevertheless failed the frozen monotonicity
+gate: its already tiny preserving-mass delta became more negative as the
+target increased. The preregistered verdict is therefore
+`stop_gradient_ratio_escalation`.
+
+Preserve the detailed
+[result evidence](../evidence/sanmill-malom-policy-auxiliary-normalized-target-response-2026-08-10.md).
+No normalized target is selected for retained training, and this audit grants
+no authority for another calibration or long run.

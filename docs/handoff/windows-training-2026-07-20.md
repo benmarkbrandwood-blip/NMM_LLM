@@ -1724,6 +1724,20 @@ reproduce the real 0.25 update, report post-Adam response and phase support,
 and mutate no persisted artefact. It is diagnosis only and cannot select a
 training setting or launch another run.
 
+That audit subsequently completed once. Its raw identity is
+`819d84d2ed7bb943260aa0627c22db0c0b94944ea2c058ee3fba3116a49f2fa4`,
+its decision identity is
+`6f6359df371be56e5b5f25c2a31287363e4d31fe58f87422f4cd46767e6249fc`,
+and its verdict is `stop_gradient_ratio_escalation`. Target 0.25 replayed the
+persisted production update for every seed, all bounded-response checks
+passed, and the median preserving-mass response increased with target. Seed
+56 nevertheless moved monotonically in the opposite direction, and all
+responses remained near float32 resolution. No normalized target is selected.
+Keep the policy auxiliary off in the next retained baseline; a future
+KL-constrained or safe-action mechanism is a separate experiment, not a
+long-run prerequisite. Preserve the detailed
+[audit evidence](../evidence/sanmill-malom-policy-auxiliary-normalized-target-response-2026-08-10.md).
+
 ## Recommended Next Actions
 
 The corrected retained 5,000-game run is complete. Preserve its plan,
@@ -1811,13 +1825,14 @@ the current successor in this order:
     further learning run, perform only the separately frozen no-game target
     response audit described above. No retry, extension, resume, promotion,
     model publication, or long training is currently authorized.
-16. The normalized target-response audit is now frozen as a no-game,
-    no-persistent-update comparison of targets `0.25`, `0.50`, and `1.00` on
-    the three treatment final-flush batches. Its machine-readable plan pins
-    every checkpoint, update log, result byte, implementation file, target,
-    cap, replay tolerance, and decision boundary. Run it once only from its
-    clean committed source; its result may authorize preparation of another
-    bounded calibration, never retained training by itself.
+16. Preserve the completed normalized target-response audit, raw identity
+    `819d84d2`, decision identity `6f6359df`, and verdict
+    `stop_gradient_ratio_escalation`. Its one permitted execution is consumed.
+    Do not raise the target, rerun a batch, lower the monotonicity threshold,
+    or adopt any normalized target in retained training. Keep the auxiliary
+    off in the next baseline. Any KL-constrained teacher or safe-action
+    sampler requires a separate contract and is not a prerequisite for that
+    baseline.
 
 The previously executed isolated smoke command was:
 
@@ -1908,11 +1923,11 @@ The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, and the no-update batch-capture grant are also consumed. Safe work now
-is limited to publishing the normalized result-analyzer and handover commits
-when explicitly authorized, generating six replacement unlaunched plans from
-the final clean published tip, and reviewing that new readiness evidence. The
-superseded preliminary plans are already preserved in recoverable quarantine.
-No normalized arm, additional calibration, long training job,
+is limited to preserving the completed normalized calibration and
+target-response evidence, selecting only already justified semantics for a
+successor baseline, and preparing a new immutable plan and readiness audit.
+The superseded preliminary plans are already preserved in recoverable
+quarantine. No normalized arm, additional calibration, long training job,
 promotion/publication, protocol change or history rewrite is authorized by
 this handover.
 
