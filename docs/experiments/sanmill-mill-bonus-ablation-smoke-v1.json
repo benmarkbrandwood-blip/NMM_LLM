@@ -1,0 +1,290 @@
+{
+  "analysis": {
+    "curve_policy": {
+      "raw_training_curves": true,
+      "rolling_window_games": 50,
+      "tail_window_games": 200,
+      "training_and_diagnostic_curves_reported_separately": true,
+      "validation_curve_available": false
+    },
+    "decision_rule": {
+      "inconclusive": "any other finite and identity-valid result",
+      "material_absolute_reduction": 0.05,
+      "primary_metric": "tail known mill-forming actions that downgrade exact Malom WDL divided by all tail known mill-forming actions",
+      "supports_malom_preserving_only": "all corrected arms pass the fixed safety gates, at least two of three corrected-minus-legacy seed differences are negative, and the median paired absolute downgrade-rate reduction is at least 0.05",
+      "unsafe": "any corrected arm has an infrastructure, identity, finite-value, checkpoint, referee, database, or fixed policy-health safety failure"
+    },
+    "fixed_development_diagnostic": {
+      "audit_script": "tools/audit_generalist_policy_health.py",
+      "audit_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+      "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+      "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+      "critical_states": 29,
+      "minimum_candidate_preserving_rate": 0.5,
+      "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
+      "required_direct_signal_preserving_rate": 1.0,
+      "role": "inspected development safety diagnostic; not an ordinary supervised validation set and not held-out strength evidence"
+    },
+    "per_class_reports": [
+      "seed",
+      "reward arm",
+      "opponent source",
+      "learner colour",
+      "board phase",
+      "Sanmill node level",
+      "termination reason"
+    ],
+    "secondary_metrics": [
+      "whole-run mill downgrade rate with support counts",
+      "mill bonus awarded total and mean",
+      "all-action exact Malom preserving and downgrade rates",
+      "policy and value loss curves by optimizer update",
+      "entropy, temperature, chosen probability and policy/heuristic top-1 curves",
+      "fixed-state candidate preserving rate, logit margin, probability mass and expected Malom quality",
+      "W/D/L by opponent source and colour as training diagnostics only"
+    ],
+    "seed_summary": "report every seed pair first, then median, range, and outliers; never replace seed-level results with one pooled curve"
+  },
+  "arms": [
+    {
+      "arm_id": "s42-legacy",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-42/legacy",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s42-legacy",
+      "launch_order": 1,
+      "mill_bonus_mode": "legacy-unconditional",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s42-legacy",
+      "seed": 42,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed42.legacy.sqlite"
+    },
+    {
+      "arm_id": "s42-preserving",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-42/preserving",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s42-preserving",
+      "launch_order": 2,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s42-preserving",
+      "seed": 42,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed42.preserving.sqlite"
+    },
+    {
+      "arm_id": "s43-preserving",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-43/preserving",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s43-preserving",
+      "launch_order": 3,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s43-preserving",
+      "seed": 43,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed43.preserving.sqlite"
+    },
+    {
+      "arm_id": "s43-legacy",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-43/legacy",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s43-legacy",
+      "launch_order": 4,
+      "mill_bonus_mode": "legacy-unconditional",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s43-legacy",
+      "seed": 43,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed43.legacy.sqlite"
+    },
+    {
+      "arm_id": "s44-legacy",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-44/legacy",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s44-legacy",
+      "launch_order": 5,
+      "mill_bonus_mode": "legacy-unconditional",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s44-legacy",
+      "seed": 44,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed44.legacy.sqlite"
+    },
+    {
+      "arm_id": "s44-preserving",
+      "control_dir": "out/mill-bonus-ablation-smoke-v1/seed-44/preserving",
+      "experiment_id": "dev-v4-sanmill-mill-bonus-ablation-v1-s44-preserving",
+      "launch_order": 6,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-mill-bonus-ablation-v1-s44-preserving",
+      "seed": 44,
+      "specialist_db": "data/specialist_db.mill_bonus_ablation_v1.seed44.preserving.sqlite"
+    }
+  ],
+  "authorization": {
+    "authorized_segments_per_arm": 0,
+    "launch_authorized": false,
+    "product_decision_required": "approve or reject one six-arm envelope of at most 3000 completed games and six active wall hours",
+    "publication_allowed": false,
+    "promotion_allowed": false
+  },
+  "claim_boundary": {
+    "causal_claim_requires_matched_completion": true,
+    "development_diagnostic_is_held_out": false,
+    "long_run": false,
+    "ordinary_supervised_validation": false,
+    "playing_strength": false,
+    "promotion": false,
+    "scope": "bounded multi-seed reward-shaping learning evidence only"
+  },
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "fixed_resource_stage_games": [
+      500,
+      500,
+      500,
+      1000,
+      2500
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "log_and_checkpoint_every_games": 50,
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "minimal_rollouts": true,
+    "one_segment_games": 500,
+    "only_observed_node_level": 1,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "start_mode": "fresh",
+    "target_refresh_every_games": 50,
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_start": 0.9,
+    "update_every_steps": 64
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    },
+    "specialist_db_policy": "copy the exact closed template once to each unique arm path before plan preparation; never share a writable database between arms"
+  },
+  "experiment_family_id": "dev-v4-sanmill-mill-bonus-ablation-smoke-v1",
+  "hypothesis": "removing the immediate reward for Malom-downgrading mill formation will reduce later value-downgrading mill choices without violating the fixed policy-health safety boundary",
+  "lineage": {
+    "exact_resume_between_arms": false,
+    "fresh_random_weights_per_arm": true,
+    "implementation_commits": {
+      "mill_bonus_gate": "704b3a19c54021b5d09b039f2110b80c0890550d",
+      "mill_bonus_no_update_probe": "3292107eb5c16faa95623b7bfc07087607b65117",
+      "mill_bonus_observability": "d90aced923257b3c2fd5717f6042fe3b4584ea9c",
+      "mill_bonus_probe_evidence": "db6893728c0abb897380d473c2610d7be9861860",
+      "managed_explicit_seed": "40370d0ed618d5891b74002aca48e74020875aa2"
+    },
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main v2c recovery, repetition, GapNet, Sentinel, UI and optimizer experiments change additional variables and are excluded from a one-factor reward ablation",
+      "reviewed_tip": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9"
+    },
+    "resume_source": null
+  },
+  "objective": "determine whether exact-Malom-preserving mill shaping is a safer retained successor than the historical unconditional mill bonus",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "experiment_id",
+      "plan_id",
+      "control_dir",
+      "specialist_db",
+      "mill_bonus_mode"
+    ],
+    "paired_seeds": [
+      42,
+      43,
+      44
+    ],
+    "schedule_identity": "the trainer derives learner colour, opponent source, retry ply and per-game Torch generator only from seed, scheduled index and role; each same-seed pair therefore shares its exogenous schedule",
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "e1f99c156fab9a851fb75d869d649190d0abcd8eb98c96ba2876e356483523ec",
+  "prior_evidence": {
+    "full_oracle_audit_identity": "7cfa9ede873ae4fb34d7821472c62bba540f1b509476073062d52b487995cf65",
+    "heldout_result_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",
+    "mill_bonus_probe_identity": "8f554f113ca65f05b8733f7e28b1e26177f58283c10b1c6f7d97abd603ef2186",
+    "wdl_transition_audit_identity": "6bbb4a50aa7999d06679c802cfeb5b913f0f5abf0689aa0291ec55459304b504"
+  },
+  "resources": {
+    "active_wall_hours_per_arm": 1.0,
+    "completed_games_per_arm": 500,
+    "maximum_active_wall_hours_total": 6.0,
+    "maximum_completed_games_total": 3000,
+    "maximum_requested_sanmill_nodes_total": 73200000,
+    "schedule_counts_per_arm": {
+      "42": {
+        "frozen_black": 145,
+        "frozen_white": 148,
+        "sanmill_black": 102,
+        "sanmill_white": 105
+      },
+      "43": {
+        "frozen_black": 151,
+        "frozen_white": 153,
+        "sanmill_black": 97,
+        "sanmill_white": 99
+      },
+      "44": {
+        "frozen_black": 152,
+        "frozen_white": 141,
+        "sanmill_black": 103,
+        "sanmill_white": 104
+      }
+    }
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.sanmill-mill-bonus-ablation-smoke-plan.v1",
+  "status": "designed_unlaunched_needs_product_authorization",
+  "stop_rules": {
+    "fatal_global": [
+      "non-finite model, loss, reward or logit",
+      "Malom, HumanDB, rules, MIF, Sanmill runtime or path-config identity drift",
+      "SpecialistDB label-version, isolation, integrity or lineage failure",
+      "checkpoint, CUDA, strict-referee or evidence-chain failure"
+    ],
+    "host_interruption": "only evidence-bound exact resume inside the same arm is eligible; never restart from a contaminated directory or substitute another seed",
+    "no_result_based_early_stop": true,
+    "pair_policy": "an invalid arm invalidates causal interpretation for that seed pair; do not impute or pool it"
+  }
+}

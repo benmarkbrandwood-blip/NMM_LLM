@@ -169,6 +169,7 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Human game files | `data/human_games`, 95,389 `.jsonl` files plus import metadata; the 20 July author update added 406 files and raised `imported.json` from 94,134 to 94,540 entries |
 | Human game source archive | `../human_database/human_games_94559.zip`, 121,796,279 bytes; SHA-256 `45523234085518031A09725A2DBCAB395E55026787E420A04C37EBA10A0E4D07` |
 | Corrected SpecialistDB | `data/specialist_db.sector_corrected.sqlite`; after the completed managed run it is 17,268,736 bytes with 132,182 positions, 41,904 Malom labels, 916 winning lines, no preferred plays, and current metadata |
+| Mill-bonus ablation SpecialistDB template | Ignored closed template at `data/specialist_db.mill_bonus_ablation_v1.template.sqlite`; 45,056 bytes, SHA-256 `5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`, `quick_check=ok`, `malom_label_version=sector-corrected-v1`, zero positions, winning lines and preferred plays, with no WAL/SHM sidecars; copy once to each arm-specific writable path only under the frozen ablation contract |
 | Archived rebuilt SpecialistDB candidate | `data/backups/maintainer_upload_20260721/specialist_db.sqlite`, 290,820,096 bytes; versioned empirical-history candidate only, not active |
 | Legacy SpecialistDB snapshots | Two ignored, read-only snapshots under `data/backups/drive_import_20260720`; neither is an active training database |
 | Endgame databases | `data/endgame`, fourteen `.wdl` files plus `fullgame.bin` at 571,683,560 bytes |
