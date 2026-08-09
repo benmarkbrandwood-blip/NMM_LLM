@@ -21,6 +21,7 @@ from learned_ai.validation.mill_bonus_ablation_readiness import (
     assert_preparation_targets_absent,
     build_prepare_commands,
     inspect_template,
+    inspect_preparation_evidence,
     load_ablation_contract,
 )
 from scripts import manage_generalist_run as manager
@@ -34,6 +35,210 @@ PATHS_CONFIG = ROOT / "data/training_paths.local.json"
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _write_probe(
+    root: Path,
+    *,
+    summary: dict[str, object],
+    module_path: Path,
+    script_path: Path,
+    commit: str = "a" * 40,
+    tree: str = "b" * 40,
+) -> tuple[dict[str, object], dict[str, object]]:
+    spec = {
+        "path": "out/probe.json",
+        "schema_version": "nmm.malom-downgrade-penalty-no-update-probe.v1",
+        "source_probe_identity": "c" * 64,
+        "source_probe_sha256": "d" * 64,
+        "module_path": module_path.relative_to(root).as_posix(),
+        "script_path": script_path.relative_to(root).as_posix(),
+        "expected_summary": summary,
+    }
+    per_state = [
+        {
+            "ordinal": 1,
+            "mills_formed": 1,
+            "malom_quality": -1.0,
+            "phase": "move",
+            "stratum": "book",
+            "rewards": {
+                "control": {"total": 0.0},
+                "treatment": {"total": -0.25},
+            },
+        }
+    ]
+    body = {
+        "schema_version": spec["schema_version"],
+        "source_probe": {
+            "probe_identity": spec["source_probe_identity"],
+            "sha256": spec["source_probe_sha256"],
+        },
+        "auditor": {
+            "implementation_commit": commit,
+            "implementation_tree": tree,
+            "module_sha256": _sha256(module_path),
+            "script_sha256": _sha256(script_path),
+            "tracked_worktree_clean": True,
+        },
+        "summary": summary,
+        "per_state": per_state,
+        "claim_boundary": {
+            "candidate_policy_loaded": False,
+            "new_games": False,
+            "optimizer_created": False,
+            "weights_updated": False,
+            "actions_changed_between_modes": False,
+            "states_changed_between_modes": False,
+            "reward_component_only": True,
+            "causal_training_effect_proven": False,
+        },
+    }
+    probe = {
+        **body,
+        "probe_identity": readiness_module.canonical_sha256(body),
+    }
+    path = root / spec["path"]
+    path.parent.mkdir(parents=True)
+    path.write_bytes(readiness_module.canonical_json_bytes(probe))
+    contract = {
+        "preparation_evidence": {
+            "downgrade_penalty_no_update_probe": spec
+        }
+    }
+    return contract, probe
+
+
+def test_required_probe_binds_source_summary_and_implementation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "module.py"
+    script_path = tmp_path / "script.py"
+    module_path.write_text("module\n", encoding="utf-8")
+    script_path.write_text("script\n", encoding="utf-8")
+    summary = {
+        "states": 1,
+        "affected_states": 1,
+        "mill_forming_states": 1,
+        "non_mill_states": 0,
+        "quality_rank_counts": {"1": 1},
+        "phase_counts": {"move": 1},
+        "stratum_counts": {"book": 1},
+        "control_reward_total": 0.0,
+        "treatment_reward_total": -0.25,
+        "treatment_minus_control": -0.25,
+    }
+    contract, probe = _write_probe(
+        tmp_path,
+        summary=summary,
+        module_path=module_path,
+        script_path=script_path,
+    )
+
+    monkeypatch.setattr(
+        readiness_module,
+        "_git_output",
+        lambda _root, *args: "b" * 40
+        if args == ("rev-parse", f"{'a' * 40}^{{tree}}")
+        else "",
+    )
+    monkeypatch.setattr(
+        readiness_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0),
+    )
+
+    result = inspect_preparation_evidence(
+        tmp_path, contract, source={"head": "e" * 40}
+    )
+
+    assert result is not None
+    assert result["probe_identity"] == probe["probe_identity"]
+    assert result["summary"] == summary
+
+
+def test_required_probe_rejects_summary_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "module.py"
+    script_path = tmp_path / "script.py"
+    module_path.write_text("module\n", encoding="utf-8")
+    script_path.write_text("script\n", encoding="utf-8")
+    contract, _probe = _write_probe(
+        tmp_path,
+        summary={
+            "states": 1,
+            "affected_states": 1,
+            "mill_forming_states": 1,
+            "non_mill_states": 0,
+            "quality_rank_counts": {"1": 1},
+            "phase_counts": {"move": 1},
+            "stratum_counts": {"book": 1},
+            "control_reward_total": 0.0,
+            "treatment_reward_total": -0.25,
+            "treatment_minus_control": -0.25,
+        },
+        module_path=module_path,
+        script_path=script_path,
+    )
+    contract["preparation_evidence"][
+        "downgrade_penalty_no_update_probe"
+    ]["expected_summary"] = {"states": 2}
+    monkeypatch.setattr(
+        readiness_module.subprocess,
+        "run",
+        lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0),
+    )
+
+    with pytest.raises(
+        MillBonusAblationReadinessError,
+        match="summary differs",
+    ):
+        inspect_preparation_evidence(
+            tmp_path, contract, source={"head": "e" * 40}
+        )
+
+
+def test_required_probe_rejects_unpublished_lineage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module_path = tmp_path / "module.py"
+    script_path = tmp_path / "script.py"
+    module_path.write_text("module\n", encoding="utf-8")
+    script_path.write_text("script\n", encoding="utf-8")
+    contract, _probe = _write_probe(
+        tmp_path,
+        summary={
+            "states": 1,
+            "affected_states": 1,
+            "mill_forming_states": 1,
+            "non_mill_states": 0,
+            "quality_rank_counts": {"1": 1},
+            "phase_counts": {"move": 1},
+            "stratum_counts": {"book": 1},
+            "control_reward_total": 0.0,
+            "treatment_reward_total": -0.25,
+            "treatment_minus_control": -0.25,
+        },
+        module_path=module_path,
+        script_path=script_path,
+    )
+
+    def run(command, *_args, **_kwargs):
+        return subprocess.CompletedProcess(
+            command,
+            1 if command[1:3] == ["merge-base", "--is-ancestor"] else 0,
+        )
+
+    monkeypatch.setattr(readiness_module.subprocess, "run", run)
+
+    with pytest.raises(
+        MillBonusAblationReadinessError,
+        match="not in the published lineage",
+    ):
+        inspect_preparation_evidence(
+            tmp_path, contract, source={"head": "e" * 40}
+        )
 
 
 def test_prepare_commands_encode_all_six_unlaunched_arms() -> None:

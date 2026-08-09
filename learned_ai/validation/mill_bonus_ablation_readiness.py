@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import shutil
 import sqlite3
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -255,6 +257,254 @@ def inspect_published_source(
         "origin_dev": upstream,
         "origin_main": actual_main,
         "worktree_clean": True,
+    }
+
+
+def inspect_preparation_evidence(
+    root: Path,
+    contract: Mapping[str, Any],
+    *,
+    source: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Validate an optional, experiment-specific no-update probe.
+
+    The original Mill-bonus experiment predates this gate and has no such
+    entry.  Successor contracts can require one canonical probe without
+    creating a circular dependency between the contract identity and the
+    probe identity: the contract freezes the source cohort, implementation
+    paths and expected summary, while the probe binds the clean published
+    commit that actually produced it.
+    """
+    evidence = contract.get("preparation_evidence")
+    if evidence is None:
+        return None
+    if not isinstance(evidence, Mapping) or set(evidence) != {
+        "downgrade_penalty_no_update_probe"
+    }:
+        raise MillBonusAblationReadinessError(
+            "preparation evidence contract is invalid"
+        )
+    spec = evidence["downgrade_penalty_no_update_probe"]
+    required_spec = {
+        "path",
+        "schema_version",
+        "source_probe_identity",
+        "source_probe_sha256",
+        "module_path",
+        "script_path",
+        "expected_summary",
+    }
+    if not isinstance(spec, Mapping) or set(spec) != required_spec:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe contract is invalid"
+        )
+    probe_path = _repository_path(
+        root, str(spec["path"]), field="downgrade-penalty probe"
+    )
+    if not probe_path.is_file():
+        raise MillBonusAblationReadinessError(
+            "required downgrade-penalty probe is missing"
+        )
+    relative = probe_path.relative_to(root.resolve()).as_posix()
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "--", relative],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if ignored.returncode != 0:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe must remain ignored by Git"
+        )
+    try:
+        raw = probe_path.read_bytes()
+    except OSError as exc:
+        raise MillBonusAblationReadinessError(
+            "cannot read downgrade-penalty probe"
+        ) from exc
+    probe = _strict_json(probe_path)
+    if raw != canonical_json_bytes(probe):
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe is not canonical JSON"
+        )
+    identity = probe.get("probe_identity")
+    body = {key: value for key, value in probe.items() if key != "probe_identity"}
+    if not isinstance(identity, str) or identity != canonical_sha256(body):
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe identity differs"
+        )
+    if probe.get("schema_version") != spec["schema_version"]:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe schema differs"
+        )
+    expected_source = {
+        "probe_identity": spec["source_probe_identity"],
+        "sha256": spec["source_probe_sha256"],
+    }
+    if probe.get("source_probe") != expected_source:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty source probe differs"
+        )
+    if probe.get("summary") != spec["expected_summary"]:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe summary differs"
+        )
+    rows = probe.get("per_state")
+    if not isinstance(rows, list) or not rows:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe has no state records"
+        )
+    ordinals: set[int] = set()
+    affected = 0
+    mill_forming = 0
+    quality_ranks: Counter[str] = Counter()
+    phases: Counter[str] = Counter()
+    strata: Counter[str] = Counter()
+    control_total = 0.0
+    treatment_total = 0.0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise MillBonusAblationReadinessError(
+                "downgrade-penalty state record is invalid"
+            )
+        ordinal = row.get("ordinal")
+        mills_formed = row.get("mills_formed")
+        quality = row.get("malom_quality")
+        phase = row.get("phase")
+        stratum = row.get("stratum")
+        rewards = row.get("rewards")
+        if (
+            isinstance(ordinal, bool)
+            or not isinstance(ordinal, int)
+            or ordinal in ordinals
+            or isinstance(mills_formed, bool)
+            or not isinstance(mills_formed, int)
+            or mills_formed < 0
+            or isinstance(quality, bool)
+            or not isinstance(quality, (int, float))
+            or float(quality) not in (-1.0, -2.0)
+            or not isinstance(phase, str)
+            or not phase
+            or not isinstance(stratum, str)
+            or not stratum
+            or not isinstance(rewards, Mapping)
+        ):
+            raise MillBonusAblationReadinessError(
+                "downgrade-penalty state record is invalid"
+            )
+        ordinals.add(ordinal)
+        totals: dict[str, float] = {}
+        for mode in ("control", "treatment"):
+            components = rewards.get(mode)
+            total = (
+                components.get("total")
+                if isinstance(components, Mapping)
+                else None
+            )
+            if (
+                isinstance(total, bool)
+                or not isinstance(total, (int, float))
+                or not math.isfinite(float(total))
+            ):
+                raise MillBonusAblationReadinessError(
+                    "downgrade-penalty state reward is invalid"
+                )
+            totals[mode] = float(total)
+        affected += int(totals["control"] != totals["treatment"])
+        mill_forming += int(mills_formed > 0)
+        quality_ranks[str(int(-float(quality)))] += 1
+        phases[phase] += 1
+        strata[stratum] += 1
+        control_total += totals["control"]
+        treatment_total += totals["treatment"]
+    reconstructed_summary = {
+        "states": len(rows),
+        "affected_states": affected,
+        "mill_forming_states": mill_forming,
+        "non_mill_states": len(rows) - mill_forming,
+        "quality_rank_counts": dict(sorted(quality_ranks.items())),
+        "phase_counts": dict(sorted(phases.items())),
+        "stratum_counts": dict(sorted(strata.items())),
+        "control_reward_total": control_total,
+        "treatment_reward_total": treatment_total,
+        "treatment_minus_control": treatment_total - control_total,
+    }
+    if reconstructed_summary != probe["summary"]:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe records do not reconcile"
+        )
+    claim = probe.get("claim_boundary")
+    required_claim = {
+        "candidate_policy_loaded": False,
+        "new_games": False,
+        "optimizer_created": False,
+        "weights_updated": False,
+        "actions_changed_between_modes": False,
+        "states_changed_between_modes": False,
+        "reward_component_only": True,
+        "causal_training_effect_proven": False,
+    }
+    if claim != required_claim:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe claim boundary differs"
+        )
+    auditor = probe.get("auditor")
+    required_auditor = {
+        "implementation_commit",
+        "implementation_tree",
+        "module_sha256",
+        "script_sha256",
+        "tracked_worktree_clean",
+    }
+    if not isinstance(auditor, Mapping) or set(auditor) != required_auditor:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe auditor differs"
+        )
+    commit = auditor.get("implementation_commit")
+    if not isinstance(commit, str) or len(commit) != 40:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe commit is invalid"
+        )
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, str(source["head"])],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if ancestor.returncode != 0:
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe commit is not in the published lineage"
+        )
+    if (
+        auditor.get("implementation_tree")
+        != _git_output(root, "rev-parse", f"{commit}^{{tree}}")
+        or auditor.get("tracked_worktree_clean") is not True
+    ):
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe source identity differs"
+        )
+    module_path = _repository_path(
+        root, str(spec["module_path"]), field="probe module"
+    )
+    script_path = _repository_path(
+        root, str(spec["script_path"]), field="probe script"
+    )
+    if (
+        not module_path.is_file()
+        or not script_path.is_file()
+        or auditor.get("module_sha256") != _sha256_file(module_path)
+        or auditor.get("script_sha256") != _sha256_file(script_path)
+    ):
+        raise MillBonusAblationReadinessError(
+            "downgrade-penalty probe implementation bytes differ"
+        )
+    return {
+        "path": str(probe_path),
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "probe_identity": identity,
+        "auditor": dict(auditor),
+        "summary": probe["summary"],
+        "claim_boundary": probe["claim_boundary"],
     }
 
 
@@ -813,6 +1063,9 @@ def prepare_ablation(
     """Create six plans and read-only preflights without authorizing a run."""
     contract = load_ablation_contract(contract_path)
     source = inspect_published_source(root, contract)
+    preparation_evidence = inspect_preparation_evidence(
+        root, contract, source=source
+    )
     template_record = inspect_template(root, contract)
     runtime = inspect_runtime_identities(root, paths_config, contract)
     assert_preparation_outputs_ignored(
@@ -909,6 +1162,7 @@ def prepare_ablation(
             "file_sha256": _sha256_file(contract_path),
         },
         "source": source,
+        "preparation_evidence": preparation_evidence,
         "template": template_record,
         "runtime": runtime,
         "commands": commands,

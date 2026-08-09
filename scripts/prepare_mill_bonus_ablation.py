@@ -20,6 +20,7 @@ from learned_ai.validation.mill_bonus_ablation_readiness import (  # noqa: E402
     MillBonusAblationReadinessError,
     build_prepare_commands,
     inspect_published_source,
+    inspect_preparation_evidence,
     inspect_runtime_identities,
     inspect_template,
     load_ablation_contract,
@@ -69,11 +70,15 @@ def main(argv: list[str] | None = None) -> int:
             )
         else:
             contract = load_ablation_contract(contract_path)
+            source = inspect_published_source(ROOT, contract)
             result = {
                 "state": "source_ready_for_local_preparation",
                 "launch_authorized": False,
                 "contract_identity": contract["plan_identity"],
-                "source": inspect_published_source(ROOT, contract),
+                "source": source,
+                "preparation_evidence": inspect_preparation_evidence(
+                    ROOT, contract, source=source
+                ),
                 "template": inspect_template(ROOT, contract),
                 "runtime": inspect_runtime_identities(
                     ROOT, paths_config, contract
