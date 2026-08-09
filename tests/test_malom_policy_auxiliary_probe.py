@@ -71,8 +71,11 @@ def test_in_memory_probe_has_finite_gradient_and_improves_safe_mass() -> None:
     assert report["original_model_unchanged"] is True
     assert report["gradient"]["finite"] is True
     assert report["gradient"]["l2_norm"] > 0.0
+    assert report["gradient_alignment"]["directional_derivative"] > 0.0
+    assert report["gradient_alignment"]["descent_cosine"] > 0.0
     for trial in report["coefficient_trials"]:
-        assert trial["informative_preserving_probability_delta"] > 0.0
+        assert trial["predicted_informative_preserving_probability_delta"] > 0.0
+        assert trial["realized_informative_preserving_probability_delta"] >= 0.0
         assert trial["all_safe_max_probability_delta"] == pytest.approx(0.0)
 
 

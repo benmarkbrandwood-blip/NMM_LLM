@@ -186,20 +186,63 @@ def _mean_auxiliary_loss(
     return torch.stack(terms).mean()
 
 
-def _gradient_summary(model: torch.nn.Module) -> dict[str, float | bool | int]:
+def _mean_informative_preserving_probability(
+    model: torch.nn.Module,
+    states: Sequence[MalomPolicyAuxiliaryProbeState],
+    *,
+    temperature: float,
+    device: torch.device,
+) -> torch.Tensor:
+    masses: list[torch.Tensor] = []
+    for state in states:
+        preserving = torch.as_tensor(
+            state.preserving_mask,
+            dtype=torch.bool,
+            device=device,
+        )
+        if bool(preserving.all()):
+            continue
+        features = torch.as_tensor(
+            state.features,
+            dtype=torch.float32,
+            device=device,
+        )
+        logits = model.policy_logits(features)
+        probabilities = torch.softmax(logits / temperature, dim=-1)
+        masses.append(probabilities[preserving].sum())
+    if not masses:
+        raise ValueError("policy auxiliary probe found no informative state")
+    return torch.stack(masses).mean()
+
+
+def _gradient_tensors(model: torch.nn.Module) -> dict[str, torch.Tensor]:
+    return {
+        name: parameter.grad.detach().clone()
+        for name, parameter in model.named_parameters()
+        if parameter.grad is not None
+    }
+
+
+def _gradient_summary(model: torch.nn.Module) -> dict[str, Any]:
     squared_norm = 0.0
     parameters_with_gradient = 0
     finite = True
-    for parameter in model.parameters():
+    parameter_norms: dict[str, float] = {}
+    for name, parameter in model.named_parameters():
         if parameter.grad is None:
             continue
         parameters_with_gradient += 1
         finite = finite and bool(torch.isfinite(parameter.grad).all())
-        squared_norm += float(parameter.grad.detach().double().square().sum().item())
+        parameter_squared = float(
+            parameter.grad.detach().double().square().sum().item()
+        )
+        squared_norm += parameter_squared
+        parameter_norms[name] = math.sqrt(parameter_squared)
     return {
         "finite": finite,
         "parameters_with_gradient": parameters_with_gradient,
         "l2_norm": math.sqrt(squared_norm),
+        "parameter_l2_norms": parameter_norms,
     }
 
 
@@ -242,8 +285,36 @@ def run_in_memory_auxiliary_probe(
     )
     auxiliary_loss.backward()
     gradient = _gradient_summary(gradient_model)
+    loss_gradients = _gradient_tensors(gradient_model)
     if not gradient["finite"] or gradient["parameters_with_gradient"] == 0:
         raise ValueError("policy auxiliary gradient is missing or non-finite")
+    gradient_model.zero_grad(set_to_none=True)
+    informative_mass = _mean_informative_preserving_probability(
+        gradient_model,
+        state_list,
+        temperature=temperature,
+        device=device,
+    )
+    informative_mass.backward()
+    mass_gradient = _gradient_summary(gradient_model)
+    mass_gradients = _gradient_tensors(gradient_model)
+    shared_names = set(loss_gradients) & set(mass_gradients)
+    gradient_dot = sum(
+        float(
+            (
+                loss_gradients[name].detach().double()
+                * mass_gradients[name].detach().double()
+            ).sum().item()
+        )
+        for name in shared_names
+    )
+    directional_derivative = -gradient_dot
+    denominator = float(gradient["l2_norm"]) * float(mass_gradient["l2_norm"])
+    descent_cosine = (
+        directional_derivative / denominator if denominator > 0.0 else 0.0
+    )
+    if not math.isfinite(directional_derivative) or directional_derivative <= 0.0:
+        raise ValueError("auxiliary descent direction does not increase preserving mass")
 
     trials: list[dict[str, Any]] = []
     before_all = baseline["all"]
@@ -290,7 +361,10 @@ def run_in_memory_auxiliary_probe(
             {
                 "coefficient": coefficient,
                 "scaled_gradient_l2_norm": candidate_gradient["l2_norm"],
-                "informative_preserving_probability_delta": (
+                "predicted_informative_preserving_probability_delta": (
+                    directional_derivative * coefficient * step_size
+                ),
+                "realized_informative_preserving_probability_delta": (
                     after_informative - before_informative
                 ),
                 "all_safe_max_probability_delta": all_safe_delta,
@@ -306,6 +380,15 @@ def run_in_memory_auxiliary_probe(
         "baseline": baseline,
         "auxiliary_loss": float(auxiliary_loss.detach().item()),
         "gradient": gradient,
+        "gradient_alignment": {
+            "informative_preserving_probability": float(
+                informative_mass.detach().item()
+            ),
+            "preserving_probability_gradient_l2_norm": mass_gradient["l2_norm"],
+            "loss_mass_gradient_dot": gradient_dot,
+            "directional_derivative": directional_derivative,
+            "descent_cosine": descent_cosine,
+        },
         "coefficient_trials": trials,
         "original_model_unchanged": _model_digest(model) == original_digest,
         "interpretation": (

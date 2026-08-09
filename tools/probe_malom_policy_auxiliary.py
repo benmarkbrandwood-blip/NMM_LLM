@@ -41,7 +41,7 @@ from learned_ai.validation.malom_policy_auxiliary_probe import (  # noqa: E402
 from scripts import train_s_gen_v2 as trainer  # noqa: E402
 
 
-SCHEMA_VERSION = "nmm.malom-policy-auxiliary-gradient-probe.v1"
+SCHEMA_VERSION = "nmm.malom-policy-auxiliary-gradient-probe.v2"
 DEFAULT_CORPUS = ROOT / "docs/experiments/dev-v4-phase-covered-corpus-v1.json"
 DEFAULT_CORPUS_SHA256 = (
     "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e"
