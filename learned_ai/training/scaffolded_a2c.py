@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import Any, List, Optional, Sequence
 
 import numpy as np
 import torch
@@ -40,6 +40,10 @@ ENTROPY_COEF = 0.01
 VALUE_COEF   = 0.5
 GRAD_CLIP    = 1.0
 MIN_UPDATE_STEPS = 8
+MALOM_POLICY_AUX_MODES = ("fixed", "policy-head-normalized")
+DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO = 0.25
+DEFAULT_MALOM_POLICY_AUX_COEF_CAP = 0.25
+DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR = 1e-12
 
 
 class NonFiniteTrainingError(RuntimeError):
@@ -142,6 +146,79 @@ def malom_preserving_set_loss(
     return -torch.logsumexp(log_probs[preserving_mask], dim=0)
 
 
+def malom_policy_auxiliary_enabled(
+    *,
+    mode: str,
+    fixed_coefficient: float,
+) -> bool:
+    """Return whether exact-WDL action labels are required for this update."""
+    return mode == "policy-head-normalized" or fixed_coefficient > 0.0
+
+
+def _detached_gradients(
+    objective: torch.Tensor,
+    parameters: Sequence[nn.Parameter],
+) -> tuple[torch.Tensor, ...]:
+    gradients = torch.autograd.grad(
+        objective,
+        parameters,
+        retain_graph=True,
+        allow_unused=True,
+    )
+    detached = tuple(
+        torch.zeros_like(parameter) if gradient is None else gradient.detach()
+        for parameter, gradient in zip(parameters, gradients, strict=True)
+    )
+    if not all(bool(torch.isfinite(gradient).all()) for gradient in detached):
+        raise NonFiniteTrainingError(
+            "A2C: non-finite Malom policy auxiliary scale gradient"
+        )
+    return detached
+
+
+def _gradient_dot(
+    left: Sequence[torch.Tensor],
+    right: Sequence[torch.Tensor],
+) -> float:
+    return float(
+        sum(
+            (first.double() * second.double()).sum().item()
+            for first, second in zip(left, right, strict=True)
+        )
+    )
+
+
+def _gradient_l2(gradients: Sequence[torch.Tensor]) -> float:
+    return math.sqrt(max(0.0, _gradient_dot(gradients, gradients)))
+
+
+def _gradient_cosine(
+    left: Sequence[torch.Tensor],
+    right: Sequence[torch.Tensor],
+) -> float | None:
+    denominator = _gradient_l2(left) * _gradient_l2(right)
+    if denominator == 0.0:
+        return None
+    return _gradient_dot(left, right) / denominator
+
+
+def _step_phase(step: ScaffoldedStep) -> str:
+    """Return the production phase encoded by the first four move features."""
+    features = np.asarray(step.move_features)
+    if features.ndim != 2 or features.shape[0] == 0 or features.shape[1] < 4:
+        return "unknown"
+    one_hots = features[:, :4]
+    reference = one_hots[0]
+    if not np.allclose(one_hots, reference, rtol=0.0, atol=0.0):
+        return "unknown"
+    expected = np.eye(4, dtype=reference.dtype)[int(np.argmax(reference))]
+    if not np.array_equal(reference, expected):
+        return "unknown"
+    return ("placement", "movement", "movement", "flying")[
+        int(np.argmax(reference))
+    ]
+
+
 def scaffolded_a2c_update(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -153,7 +230,13 @@ def scaffolded_a2c_update(
     grad_clip: float = GRAD_CLIP,
     min_batch: int = MIN_UPDATE_STEPS,
     malom_policy_aux_coef: float = 0.0,
-    diagnostics: Optional[dict[str, float | int]] = None,
+    malom_policy_aux_mode: str = "fixed",
+    malom_policy_aux_target_ratio: float = DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+    malom_policy_aux_coef_cap: float = DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+    malom_policy_aux_denominator_floor: float = (
+        DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR
+    ),
+    diagnostics: Optional[dict[str, Any]] = None,
 ) -> tuple[float, float, float]:
     """One A2C gradient update over a batch of ScaffoldedSteps.
 
@@ -170,6 +253,45 @@ def scaffolded_a2c_update(
         raise NonFiniteTrainingError(
             "A2C: Malom policy auxiliary coefficient must be finite and non-negative"
         )
+    if malom_policy_aux_mode not in MALOM_POLICY_AUX_MODES:
+        raise NonFiniteTrainingError(
+            f"A2C: unsupported Malom policy auxiliary mode={malom_policy_aux_mode!r}"
+        )
+    try:
+        malom_policy_aux_target_ratio = float(malom_policy_aux_target_ratio)
+        malom_policy_aux_coef_cap = float(malom_policy_aux_coef_cap)
+        malom_policy_aux_denominator_floor = float(
+            malom_policy_aux_denominator_floor
+        )
+    except (TypeError, ValueError) as exc:
+        raise NonFiniteTrainingError(
+            "A2C: invalid Malom policy auxiliary normalization setting"
+        ) from exc
+    if (
+        not math.isfinite(malom_policy_aux_target_ratio)
+        or malom_policy_aux_target_ratio <= 0.0
+        or not math.isfinite(malom_policy_aux_coef_cap)
+        or malom_policy_aux_coef_cap <= 0.0
+        or not math.isfinite(malom_policy_aux_denominator_floor)
+        or malom_policy_aux_denominator_floor <= 0.0
+    ):
+        raise NonFiniteTrainingError(
+            "A2C: Malom policy auxiliary normalization settings must be "
+            "finite and positive"
+        )
+    if (
+        malom_policy_aux_mode == "policy-head-normalized"
+        and malom_policy_aux_coef != 0.0
+    ):
+        raise NonFiniteTrainingError(
+            "A2C: normalized Malom policy auxiliary mode requires fixed "
+            "coefficient zero"
+        )
+
+    auxiliary_enabled = malom_policy_auxiliary_enabled(
+        mode=malom_policy_aux_mode,
+        fixed_coefficient=malom_policy_aux_coef,
+    )
 
     if len(steps) < min_batch:
         if diagnostics is not None:
@@ -179,6 +301,9 @@ def scaffolded_a2c_update(
                     "malom_policy_aux_informative_steps": 0,
                     "malom_policy_aux_labelled_steps": 0,
                     "malom_policy_aux_mean_preserving_mass": 0.0,
+                    "malom_policy_aux_mode": malom_policy_aux_mode,
+                    "malom_policy_aux_effective_coef": 0.0,
+                    "malom_policy_aux_scale_status": "undersized_batch",
                 }
             )
         return 0.0, 0.0, 0.0
@@ -224,6 +349,8 @@ def scaffolded_a2c_update(
     entropy_terms: list[torch.Tensor] = []
     malom_aux_terms: list[torch.Tensor] = []
     malom_preserving_masses: list[float] = []
+    labelled_by_phase: dict[str, int] = {}
+    informative_by_phase: dict[str, int] = {}
 
     for i, step in enumerate(steps):
         feat   = torch.tensor(step.move_features, dtype=torch.float32).to(device)
@@ -233,7 +360,7 @@ def scaffolded_a2c_update(
         policy_terms.append(-log_probs[step.chosen_idx] * advantages[i])
         probs = log_probs.exp()
         entropy_terms.append(-(probs * log_probs).sum())
-        if malom_policy_aux_coef > 0.0:
+        if auxiliary_enabled:
             preserving = _malom_preserving_mask(
                 step,
                 legal_move_count=len(log_probs),
@@ -244,8 +371,13 @@ def scaffolded_a2c_update(
             malom_preserving_masses.append(
                 float(log_preserving_mass.detach().exp().item())
             )
+            phase = _step_phase(step)
+            labelled_by_phase[phase] = labelled_by_phase.get(phase, 0) + 1
             if not bool(preserving.all()):
                 malom_aux_terms.append(auxiliary_loss)
+                informative_by_phase[phase] = (
+                    informative_by_phase.get(phase, 0) + 1
+                )
 
     policy_loss  = torch.stack(policy_terms).mean()
     entropy_loss = torch.stack(entropy_terms).mean()
@@ -256,11 +388,89 @@ def scaffolded_a2c_update(
         else policy_loss.new_zeros(())
     )
 
+    effective_aux_coefficient = malom_policy_aux_coef
+    scale_diagnostics: dict[str, Any] = {
+        "malom_policy_aux_mode": malom_policy_aux_mode,
+        "malom_policy_aux_effective_coef": effective_aux_coefficient,
+        "malom_policy_aux_scale_status": (
+            "fixed" if auxiliary_enabled else "disabled"
+        ),
+    }
+    if malom_policy_aux_mode == "policy-head-normalized":
+        parameters = tuple(model.parameters())
+        ordinary_policy_objective = policy_loss - entropy_coef * entropy_loss
+        ordinary_gradients = _detached_gradients(
+            ordinary_policy_objective,
+            parameters,
+        )
+        ordinary_norm = _gradient_l2(ordinary_gradients)
+        raw_auxiliary_norm = 0.0
+        applied_auxiliary_norm = 0.0
+        cosine = None
+        capped = False
+        if not malom_aux_terms:
+            effective_aux_coefficient = 0.0
+            scale_status = "no_informative_steps"
+        else:
+            auxiliary_gradients = _detached_gradients(
+                malom_aux_loss,
+                parameters,
+            )
+            raw_auxiliary_norm = _gradient_l2(auxiliary_gradients)
+            cosine = _gradient_cosine(auxiliary_gradients, ordinary_gradients)
+            if raw_auxiliary_norm <= malom_policy_aux_denominator_floor:
+                raise NonFiniteTrainingError(
+                    "A2C: informative Malom auxiliary gradient is below the "
+                    "normalization denominator floor"
+                )
+            if ordinary_norm <= malom_policy_aux_denominator_floor:
+                effective_aux_coefficient = 0.0
+                scale_status = "ordinary_policy_gradient_below_floor"
+            else:
+                uncapped = (
+                    malom_policy_aux_target_ratio
+                    * ordinary_norm
+                    / raw_auxiliary_norm
+                )
+                effective_aux_coefficient = min(
+                    uncapped,
+                    malom_policy_aux_coef_cap,
+                )
+                capped = effective_aux_coefficient < uncapped
+                scale_status = "capped" if capped else "normalized"
+                applied_auxiliary_norm = (
+                    effective_aux_coefficient * raw_auxiliary_norm
+                )
+        scale_diagnostics = {
+            "malom_policy_aux_mode": malom_policy_aux_mode,
+            "malom_policy_aux_scale_status": scale_status,
+            "malom_policy_aux_target_policy_head_ratio": (
+                malom_policy_aux_target_ratio
+            ),
+            "malom_policy_aux_coef_cap": malom_policy_aux_coef_cap,
+            "malom_policy_aux_denominator_floor": (
+                malom_policy_aux_denominator_floor
+            ),
+            "malom_policy_aux_effective_coef": effective_aux_coefficient,
+            "malom_policy_aux_coefficient_capped": capped,
+            "malom_policy_aux_ordinary_policy_head_gradient_l2": ordinary_norm,
+            "malom_policy_aux_raw_auxiliary_gradient_l2": raw_auxiliary_norm,
+            "malom_policy_aux_applied_auxiliary_gradient_l2": (
+                applied_auxiliary_norm
+            ),
+            "malom_policy_aux_applied_to_ordinary_policy_head_ratio": (
+                applied_auxiliary_norm / ordinary_norm
+                if ordinary_norm > malom_policy_aux_denominator_floor
+                else 0.0
+            ),
+            "malom_policy_auxiliary_to_ordinary_policy_head_cosine": cosine,
+        }
+
     total_loss = (
         policy_loss
         - entropy_coef * entropy_loss
         + value_coef * value_loss
-        + malom_policy_aux_coef * malom_aux_loss
+        + effective_aux_coefficient * malom_aux_loss
     )
     _require_finite(total_loss, label="total loss")
 
@@ -292,6 +502,9 @@ def scaffolded_a2c_update(
                     if malom_preserving_masses
                     else 0.0
                 ),
+                "malom_policy_aux_labelled_by_phase": labelled_by_phase,
+                "malom_policy_aux_informative_by_phase": informative_by_phase,
+                **scale_diagnostics,
             }
         )
 

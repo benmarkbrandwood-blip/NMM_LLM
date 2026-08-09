@@ -34,7 +34,14 @@ from learned_ai.training.checkpoint_envelope import (
     is_checkpoint_envelope,
     load_checkpoint,
 )
-from learned_ai.training.scaffolded_a2c import MIN_UPDATE_STEPS
+from learned_ai.training.scaffolded_a2c import (
+    DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+    DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR,
+    DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+    MALOM_POLICY_AUX_MODES,
+    MIN_UPDATE_STEPS,
+    malom_policy_auxiliary_enabled,
+)
 from learned_ai.training.sanmill_referee import probe_sanmill_training_runtime
 from learned_ai.training.training_identity import (
     TrainingIdentityError,
@@ -297,7 +304,64 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             "malom_policy_aux_coef must not be negative"
         )
-    if malom_policy_aux_coef > 0.0:
+    malom_policy_aux_mode = getattr(args, "malom_policy_aux_mode", "fixed")
+    if malom_policy_aux_mode not in MALOM_POLICY_AUX_MODES:
+        raise PreflightConfigurationError(
+            "malom_policy_aux_mode is unsupported"
+        )
+    malom_policy_aux_target_ratio = _finite_number(
+        getattr(
+            args,
+            "malom_policy_aux_target_ratio",
+            DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+        ),
+        field="malom_policy_aux_target_ratio",
+    )
+    malom_policy_aux_coef_cap = _finite_number(
+        getattr(
+            args,
+            "malom_policy_aux_coef_cap",
+            DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+        ),
+        field="malom_policy_aux_coef_cap",
+    )
+    malom_policy_aux_denominator_floor = _finite_number(
+        getattr(
+            args,
+            "malom_policy_aux_denominator_floor",
+            DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR,
+        ),
+        field="malom_policy_aux_denominator_floor",
+    )
+    if (
+        malom_policy_aux_target_ratio <= 0.0
+        or malom_policy_aux_coef_cap <= 0.0
+        or malom_policy_aux_denominator_floor <= 0.0
+    ):
+        raise PreflightConfigurationError(
+            "Malom policy auxiliary normalization settings must be positive"
+        )
+    if malom_policy_aux_mode == "fixed":
+        if (
+            malom_policy_aux_target_ratio
+            != DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO
+            or malom_policy_aux_coef_cap != DEFAULT_MALOM_POLICY_AUX_COEF_CAP
+            or malom_policy_aux_denominator_floor
+            != DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR
+        ):
+            raise PreflightConfigurationError(
+                "fixed Malom policy auxiliary mode must not override "
+                "normalization-only settings"
+            )
+    elif malom_policy_aux_coef != 0.0:
+        raise PreflightConfigurationError(
+            "policy-head-normalized Malom supervision requires "
+            "malom_policy_aux_coef=0"
+        )
+    if malom_policy_auxiliary_enabled(
+        mode=malom_policy_aux_mode,
+        fixed_coefficient=malom_policy_aux_coef,
+    ):
         if args.ppo:
             raise PreflightConfigurationError(
                 "Malom policy auxiliary supervision requires A2C"
@@ -877,6 +941,14 @@ def resolved_resume_config(args: Any) -> dict[str, Any]:
         for key, value in vars(args).items()
         if not key.startswith("_") and key not in _RESUME_CONFIG_EXCLUDED_FIELDS
     }
+    if raw.get("malom_policy_aux_mode", "fixed") == "fixed":
+        for field in (
+            "malom_policy_aux_mode",
+            "malom_policy_aux_target_ratio",
+            "malom_policy_aux_coef_cap",
+            "malom_policy_aux_denominator_floor",
+        ):
+            raw.pop(field, None)
     return json.loads(canonical_json_bytes(raw))
 
 

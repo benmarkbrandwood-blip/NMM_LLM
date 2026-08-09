@@ -21,6 +21,7 @@ from learned_ai.training.generalist_preflight import (
     _file_sha256,
     configure_generalist_paths,
     load_training_settings,
+    resolved_resume_config,
     resume_config_sha256,
     run_generalist_preflight,
     validate_generalist_configuration,
@@ -431,6 +432,34 @@ def test_imitation_mix_control_changes_resume_semantics(tmp_path: Path) -> None:
     args.no_imitation_mix = False
 
     assert resume_config_sha256(args) != disabled
+
+
+def test_fixed_auxiliary_defaults_preserve_legacy_resume_config_shape(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+
+    config = resolved_resume_config(args)
+
+    assert "malom_policy_aux_mode" not in config
+    assert "malom_policy_aux_target_ratio" not in config
+    assert "malom_policy_aux_coef_cap" not in config
+    assert "malom_policy_aux_denominator_floor" not in config
+
+
+def test_normalized_auxiliary_settings_bind_resume_semantics(tmp_path: Path) -> None:
+    args = _smoke_args(tmp_path)
+    fixed = resume_config_sha256(args)
+    args.malom_policy_aux_mode = "policy-head-normalized"
+    args.mill_bonus_mode = "malom-preserving-only"
+
+    config = resolved_resume_config(args)
+
+    assert config["malom_policy_aux_mode"] == "policy-head-normalized"
+    assert config["malom_policy_aux_target_ratio"] == 0.25
+    assert config["malom_policy_aux_coef_cap"] == 0.25
+    assert config["malom_policy_aux_denominator_floor"] == 1e-12
+    assert resume_config_sha256(args) != fixed
 
 
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:

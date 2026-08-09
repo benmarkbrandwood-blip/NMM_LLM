@@ -163,6 +163,24 @@ def test_manifest_records_sanmill_as_referee_and_opponent_asset(
     assert runtime.identity == "sanmill-runtime-identity"
 
 
+def test_manifest_records_normalized_auxiliary_as_enabled(tmp_path: Path) -> None:
+    args = _args(tmp_path)
+    args.malom_policy_aux_mode = "policy-head-normalized"
+
+    manifest = build_generalist_run_manifest(
+        args,
+        report=_report(),
+        root=tmp_path,
+        command=("python", "trainer.py"),
+        run_id="normalized-auxiliary",
+        experiment_id="normalized-auxiliary",
+        created_at_utc="2026-08-10T00:00:00Z",
+        environment={"python": "3.13.1"},
+    )
+
+    assert manifest.components["malom_policy_auxiliary"] is True
+
+
 def test_manifest_rejects_nonpassing_or_inconsistent_preflight(tmp_path: Path) -> None:
     report = _report()
     report["verdict"] = "fatal_stop"

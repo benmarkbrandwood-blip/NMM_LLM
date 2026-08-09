@@ -112,6 +112,14 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         args.mill_bonus_mode,
         "--malom-policy-aux-coef",
         str(args.malom_policy_aux_coef),
+        "--malom-policy-aux-mode",
+        args.malom_policy_aux_mode,
+        "--malom-policy-aux-target-ratio",
+        str(args.malom_policy_aux_target_ratio),
+        "--malom-policy-aux-coef-cap",
+        str(args.malom_policy_aux_coef_cap),
+        "--malom-policy-aux-denominator-floor",
+        str(args.malom_policy_aux_denominator_floor),
         "--self-play-ratio",
         str(self_play_ratio),
         "--update-target-every",
@@ -339,6 +347,30 @@ def _build_parser() -> argparse.ArgumentParser:
             "Explicit A2C preserving-set auxiliary coefficient; zero keeps "
             "the historical update"
         ),
+    )
+    prepare.add_argument(
+        "--malom-policy-aux-mode",
+        choices=trainer.MALOM_POLICY_AUX_MODES,
+        default="fixed",
+        help="Explicit fixed or per-batch policy-head-normalized scaling rule",
+    )
+    prepare.add_argument(
+        "--malom-policy-aux-target-ratio",
+        type=trainer._finite_positive_float,
+        default=trainer.DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+        help="Normalized applied-gradient target relative to the policy head",
+    )
+    prepare.add_argument(
+        "--malom-policy-aux-coef-cap",
+        type=trainer._finite_positive_float,
+        default=trainer.DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+        help="Maximum detached coefficient in normalized mode",
+    )
+    prepare.add_argument(
+        "--malom-policy-aux-denominator-floor",
+        type=trainer._finite_positive_float,
+        default=trainer.DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR,
+        help="Fail-closed raw auxiliary gradient denominator floor",
     )
     prepare.add_argument(
         "--specialist-db",

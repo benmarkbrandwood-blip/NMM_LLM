@@ -500,6 +500,162 @@ class TestScaffoldedA2C:
         assert diagnostics["malom_policy_aux_loss"] == 0.0
         assert diagnostics["malom_policy_aux_mean_preserving_mass"] == 1.0
 
+    def test_normalized_auxiliary_targets_policy_head_gradient_ratio(self):
+        class FixedPolicyValue(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.policy = torch.nn.Parameter(torch.tensor([0.2, -0.1, 0.0]))
+                self.value_bias = torch.nn.Parameter(torch.tensor(0.0))
+
+            def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
+                assert features.shape == (3, 4)
+                return self.policy
+
+            def value(self, features: torch.Tensor) -> torch.Tensor:
+                return self.value_bias.expand(features.shape[0])
+
+        steps = []
+        for _ in range(8):
+            features = np.zeros((3, 4), dtype=np.float32)
+            features[:, 0] = 1.0
+            steps.append(
+                ScaffoldedStep(
+                    move_features=features,
+                    value_input=np.zeros(1, dtype=np.float32),
+                    chosen_idx=2,
+                    log_prob_old=-1.0,
+                    reward=1.0,
+                    next_move_features=features.copy(),
+                    next_value_input=np.zeros(1, dtype=np.float32),
+                    done=True,
+                    behaviour_temperature=1.0,
+                    malom_preserving_mask=np.asarray([True, True, False]),
+                )
+            )
+        model = FixedPolicyValue()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.0)
+        diagnostics = {}
+
+        scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            entropy_coef=0.0,
+            value_coef=0.0,
+            malom_policy_aux_mode="policy-head-normalized",
+            malom_policy_aux_target_ratio=0.25,
+            malom_policy_aux_coef_cap=10.0,
+            diagnostics=diagnostics,
+        )
+
+        ordinary = diagnostics[
+            "malom_policy_aux_ordinary_policy_head_gradient_l2"
+        ]
+        raw_auxiliary = diagnostics[
+            "malom_policy_aux_raw_auxiliary_gradient_l2"
+        ]
+        assert diagnostics["malom_policy_aux_scale_status"] == "normalized"
+        assert diagnostics["malom_policy_aux_effective_coef"] == pytest.approx(
+            0.25 * ordinary / raw_auxiliary
+        )
+        assert diagnostics[
+            "malom_policy_aux_applied_to_ordinary_policy_head_ratio"
+        ] == pytest.approx(0.25)
+        assert diagnostics["malom_policy_aux_coefficient_capped"] is False
+        assert diagnostics["malom_policy_aux_labelled_by_phase"] == {
+            "placement": 8
+        }
+        assert diagnostics["malom_policy_aux_informative_by_phase"] == {
+            "placement": 8
+        }
+
+    def test_normalized_auxiliary_caps_inverse_norm_scaling(self):
+        steps = self._make_steps(8)
+        for step in steps:
+            step.malom_preserving_mask = np.asarray(
+                [index == 0 for index in range(len(step.move_features))]
+            )
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+        diagnostics = {}
+
+        scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            malom_policy_aux_mode="policy-head-normalized",
+            malom_policy_aux_target_ratio=0.25,
+            malom_policy_aux_coef_cap=1e-9,
+            diagnostics=diagnostics,
+        )
+
+        assert diagnostics["malom_policy_aux_scale_status"] == "capped"
+        assert diagnostics["malom_policy_aux_coefficient_capped"] is True
+        assert diagnostics["malom_policy_aux_effective_coef"] == pytest.approx(1e-9)
+        assert diagnostics[
+            "malom_policy_aux_applied_to_ordinary_policy_head_ratio"
+        ] < 0.25
+
+    def test_normalized_auxiliary_skips_an_all_safe_batch_explicitly(self):
+        steps = self._make_steps(8)
+        for step in steps:
+            step.malom_preserving_mask = np.ones(
+                len(step.move_features), dtype=np.bool_
+            )
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+        diagnostics = {}
+
+        scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            malom_policy_aux_mode="policy-head-normalized",
+            diagnostics=diagnostics,
+        )
+
+        assert diagnostics["malom_policy_aux_scale_status"] == (
+            "no_informative_steps"
+        )
+        assert diagnostics["malom_policy_aux_effective_coef"] == 0.0
+        assert diagnostics["malom_policy_aux_informative_steps"] == 0
+
+    def test_normalized_auxiliary_fails_below_raw_gradient_floor(self):
+        steps = self._make_steps(8)
+        for step in steps:
+            step.malom_preserving_mask = np.asarray(
+                [index == 0 for index in range(len(step.move_features))]
+            )
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+
+        with pytest.raises(NonFiniteTrainingError, match="denominator floor"):
+            scaffolded_a2c_update(
+                model,
+                optimizer,
+                steps,
+                torch.device("cpu"),
+                malom_policy_aux_mode="policy-head-normalized",
+                malom_policy_aux_denominator_floor=1e6,
+            )
+
+    def test_normalized_auxiliary_rejects_a_fixed_coefficient(self):
+        model = ScaffoldedPolicyNet()
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.0)
+
+        with pytest.raises(NonFiniteTrainingError, match="requires fixed coefficient"):
+            scaffolded_a2c_update(
+                model,
+                optimizer,
+                self._make_steps(8),
+                torch.device("cpu"),
+                malom_policy_aux_coef=0.1,
+                malom_policy_aux_mode="policy-head-normalized",
+            )
+
     @pytest.mark.parametrize(
         ("mask", "match"),
         [

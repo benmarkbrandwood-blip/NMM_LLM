@@ -105,6 +105,47 @@ def test_rollout_attaches_complete_exact_action_labels(monkeypatch) -> None:
     assert result.step_diags[0].malom_preserving_probability == pytest.approx(2 / 3)
 
 
+def test_normalized_rollout_collects_labels_with_zero_fixed_coefficient(
+    monkeypatch,
+) -> None:
+    legal_moves = [
+        {"from": None, "to": "a7", "capture": None},
+        {"from": None, "to": "d7", "capture": None},
+        {"from": None, "to": "g7", "capture": None},
+    ]
+    teacher = _ExactActionTeacher(legal_moves)
+    monkeypatch.setattr(
+        trainer,
+        "encode_position_with_lookahead",
+        lambda *_args, **_kwargs: _encoded(legal_moves),
+    )
+
+    result = trainer._rollout(
+        model=_ZeroModel(),
+        device=torch.device("cpu"),
+        start_board=BoardState.new_game(),
+        learner_color="W",
+        opponent=_UnexpectedOpponent(),
+        opp_color="B",
+        sentinel=None,
+        value_net=None,
+        temperature=1.0,
+        max_ply=1,
+        record_branches=False,
+        branch_every=0,
+        retry_ply=0,
+        forced_placements=["a7"],
+        malom_db=teacher,
+        persist_rollout_evidence=False,
+        mill_bonus_mode="malom-preserving-only",
+        malom_policy_aux_coef=0.0,
+        malom_policy_aux_mode="policy-head-normalized",
+    )
+
+    assert len(result.trajectory) == 1
+    assert result.trajectory[0].malom_preserving_mask.tolist() == [True, False, True]
+
+
 def test_update_wrapper_passes_auxiliary_configuration_and_diagnostics() -> None:
     calls = []
 
@@ -132,6 +173,38 @@ def test_update_wrapper_passes_auxiliary_configuration_and_diagnostics() -> None
     assert diagnostics["malom_policy_aux_loss"] == 0.125
 
 
+def test_update_wrapper_passes_normalized_scaling_contract() -> None:
+    calls = []
+
+    def update(*args, **kwargs):
+        calls.append((args, kwargs))
+        return 1.0, 2.0, 3.0
+
+    diagnostics = {}
+    trainer._update_if_ready(
+        update_fn=update,
+        model=object(),
+        optimizer=object(),
+        steps=[object()] * trainer.MIN_UPDATE_STEPS,
+        device=torch.device("cpu"),
+        gamma=0.99,
+        entropy_coef=0.01,
+        malom_policy_aux_mode="policy-head-normalized",
+        malom_policy_aux_target_ratio=0.25,
+        malom_policy_aux_coef_cap=0.25,
+        malom_policy_aux_denominator_floor=1e-12,
+        diagnostics=diagnostics,
+    )
+
+    kwargs = calls[0][1]
+    assert kwargs["malom_policy_aux_coef"] == 0.0
+    assert kwargs["malom_policy_aux_mode"] == "policy-head-normalized"
+    assert kwargs["malom_policy_aux_target_ratio"] == 0.25
+    assert kwargs["malom_policy_aux_coef_cap"] == 0.25
+    assert kwargs["malom_policy_aux_denominator_floor"] == 1e-12
+    assert kwargs["diagnostics"] is diagnostics
+
+
 def test_parser_defaults_auxiliary_off_and_accepts_nonnegative_value() -> None:
     parser = trainer._build_argument_parser()
 
@@ -141,7 +214,31 @@ def test_parser_defaults_auxiliary_off_and_accepts_nonnegative_value() -> None:
     )
 
     assert default.malom_policy_aux_coef == 0.0
+    assert default.malom_policy_aux_mode == "fixed"
+    assert default.malom_policy_aux_target_ratio == 0.25
+    assert default.malom_policy_aux_coef_cap == 0.25
+    assert default.malom_policy_aux_denominator_floor == 1e-12
     assert enabled.malom_policy_aux_coef == 0.25
+
+
+def test_parser_accepts_normalized_auxiliary_contract() -> None:
+    args = trainer._build_argument_parser().parse_args(
+        [
+            "--preflight",
+            "smoke",
+            "--malom-policy-aux-mode",
+            "policy-head-normalized",
+            "--malom-policy-aux-target-ratio",
+            "0.25",
+            "--malom-policy-aux-coef-cap",
+            "0.25",
+            "--malom-policy-aux-denominator-floor",
+            "1e-12",
+        ]
+    )
+
+    assert args.malom_policy_aux_mode == "policy-head-normalized"
+    assert args.malom_policy_aux_coef == 0.0
 
 
 @pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])
@@ -175,3 +272,40 @@ def test_auxiliary_requires_a2c_and_preserving_only_reward() -> None:
         match="malom-preserving-only",
     ):
         trainer.validate_generalist_configuration(wrong_reward)
+
+
+def test_normalized_auxiliary_requires_zero_fixed_coefficient() -> None:
+    args = trainer._build_argument_parser().parse_args(
+        [
+            "--preflight",
+            "smoke",
+            "--no-opening-forcing",
+            "--mill-bonus-mode",
+            "malom-preserving-only",
+            "--malom-policy-aux-mode",
+            "policy-head-normalized",
+            "--malom-policy-aux-coef",
+            "0.1",
+        ]
+    )
+
+    with pytest.raises(PreflightConfigurationError, match="requires.*coef=0"):
+        trainer.validate_generalist_configuration(args)
+
+
+def test_fixed_auxiliary_rejects_normalization_only_override() -> None:
+    args = trainer._build_argument_parser().parse_args(
+        [
+            "--preflight",
+            "smoke",
+            "--no-opening-forcing",
+            "--malom-policy-aux-target-ratio",
+            "0.5",
+        ]
+    )
+
+    with pytest.raises(
+        PreflightConfigurationError,
+        match="must not override normalization-only settings",
+    ):
+        trainer.validate_generalist_configuration(args)

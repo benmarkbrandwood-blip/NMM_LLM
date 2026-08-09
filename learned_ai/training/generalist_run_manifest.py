@@ -14,6 +14,7 @@ from uuid import uuid4
 
 import torch
 
+from learned_ai.training.scaffolded_a2c import malom_policy_auxiliary_enabled
 from learned_ai.training.run_contract import (
     AssetManifestRef,
     ContractValidationError,
@@ -226,8 +227,11 @@ def build_generalist_run_manifest(
             "imitation_warmstart": not args.no_s1a_warmstart,
             "imitation_mix": not args.no_imitation_mix,
             "opening_forcing": not args.no_opening_forcing,
-            "malom_policy_auxiliary": (
-                float(getattr(args, "malom_policy_aux_coef", 0.0)) > 0.0
+            "malom_policy_auxiliary": malom_policy_auxiliary_enabled(
+                mode=getattr(args, "malom_policy_aux_mode", "fixed"),
+                fixed_coefficient=float(
+                    getattr(args, "malom_policy_aux_coef", 0.0)
+                ),
             ),
             "sanmill_referee": (
                 getattr(args, "referee_engine", "local") == "sanmill"

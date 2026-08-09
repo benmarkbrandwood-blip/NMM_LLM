@@ -55,9 +55,14 @@ from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.training.scaffolded_a2c import (
+    DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+    DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR,
+    DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+    MALOM_POLICY_AUX_MODES,
     MIN_UPDATE_STEPS,
     NonFiniteTrainingError,
     ScaffoldedStep,
+    malom_policy_auxiliary_enabled,
     scaffolded_a2c_update,
     scaffolded_ppo_update,
 )
@@ -771,7 +776,13 @@ def _update_if_ready(
     gamma: float,
     entropy_coef: float,
     malom_policy_aux_coef: float = 0.0,
-    diagnostics: Optional[dict[str, float | int]] = None,
+    malom_policy_aux_mode: str = "fixed",
+    malom_policy_aux_target_ratio: float = DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+    malom_policy_aux_coef_cap: float = DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+    malom_policy_aux_denominator_floor: float = (
+        DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR
+    ),
+    diagnostics: Optional[dict[str, Any]] = None,
 ) -> Optional[tuple[float, float, float]]:
     """Run a real policy update only when the optimizer can consume the batch."""
     if len(steps) < MIN_UPDATE_STEPS:
@@ -780,10 +791,19 @@ def _update_if_ready(
         "gamma": gamma,
         "entropy_coef": entropy_coef,
     }
-    if malom_policy_aux_coef > 0.0:
+    if malom_policy_auxiliary_enabled(
+        mode=malom_policy_aux_mode,
+        fixed_coefficient=malom_policy_aux_coef,
+    ):
         kwargs.update(
             {
                 "malom_policy_aux_coef": malom_policy_aux_coef,
+                "malom_policy_aux_mode": malom_policy_aux_mode,
+                "malom_policy_aux_target_ratio": malom_policy_aux_target_ratio,
+                "malom_policy_aux_coef_cap": malom_policy_aux_coef_cap,
+                "malom_policy_aux_denominator_floor": (
+                    malom_policy_aux_denominator_floor
+                ),
                 "diagnostics": diagnostics,
             }
         )
@@ -1595,6 +1615,7 @@ def _rollout(
     timing_observer: Optional[Callable[[str, float], None]] = None,
     mill_bonus_mode: str = "legacy-unconditional",
     malom_policy_aux_coef: float = 0.0,
+    malom_policy_aux_mode: str = "fixed",
 ) -> RolloutResult:
     """Run one production rollout with optional additive probe controls."""
     with _temporary_rollout_sim_depth(
@@ -1629,6 +1650,7 @@ def _rollout(
             timing_observer=timing_observer,
             mill_bonus_mode=mill_bonus_mode,
             malom_policy_aux_coef=malom_policy_aux_coef,
+            malom_policy_aux_mode=malom_policy_aux_mode,
         )
 
 
@@ -1660,6 +1682,7 @@ def _rollout_impl(
     timing_observer: Optional[Callable[[str, float], None]] = None,
     mill_bonus_mode: str = "legacy-unconditional",
     malom_policy_aux_coef: float = 0.0,
+    malom_policy_aux_mode: str = "fixed",
 ) -> RolloutResult:
     board                   = start_board
     ply                     = 0
@@ -1821,7 +1844,10 @@ def _rollout_impl(
 
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
             malom_policy_labels = None
-            if malom_policy_aux_coef > 0.0:
+            if malom_policy_auxiliary_enabled(
+                mode=malom_policy_aux_mode,
+                fixed_coefficient=malom_policy_aux_coef,
+            ):
                 with _timed_rollout_stage(
                     timing_observer,
                     "malom_policy_labels",
@@ -2873,6 +2899,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     sanmill_game=sanmill_game,
                     mill_bonus_mode=args.mill_bonus_mode,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    malom_policy_aux_mode=args.malom_policy_aux_mode,
                 )
 
             if sanmill_installation is None:
@@ -2955,6 +2982,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    malom_policy_aux_mode=args.malom_policy_aux_mode,
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
@@ -3056,6 +3084,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    malom_policy_aux_mode=args.malom_policy_aux_mode,
                 )
                 if retry_result.trajectory:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
@@ -3138,6 +3167,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    malom_policy_aux_mode=args.malom_policy_aux_mode,
                 )
 
                 if branch_result.trajectory:
@@ -3178,7 +3208,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
-                update_diagnostics: dict[str, float | int] = {}
+                update_diagnostics: dict[str, Any] = {}
                 update_result = _update_if_ready(
                     update_fn=update_fn,
                     model=model,
@@ -3188,6 +3218,14 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     gamma=args.gamma_td,
                     entropy_coef=args.entropy_coef,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    malom_policy_aux_mode=args.malom_policy_aux_mode,
+                    malom_policy_aux_target_ratio=(
+                        args.malom_policy_aux_target_ratio
+                    ),
+                    malom_policy_aux_coef_cap=args.malom_policy_aux_coef_cap,
+                    malom_policy_aux_denominator_floor=(
+                        args.malom_policy_aux_denominator_floor
+                    ),
                     diagnostics=update_diagnostics,
                 )
                 if update_result is None:
@@ -3373,6 +3411,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             gamma=args.gamma_td,
             entropy_coef=args.entropy_coef,
             malom_policy_aux_coef=args.malom_policy_aux_coef,
+            malom_policy_aux_mode=args.malom_policy_aux_mode,
+            malom_policy_aux_target_ratio=args.malom_policy_aux_target_ratio,
+            malom_policy_aux_coef_cap=args.malom_policy_aux_coef_cap,
+            malom_policy_aux_denominator_floor=(
+                args.malom_policy_aux_denominator_floor
+            ),
             diagnostics=update_diagnostics,
         )
         if update_result is not None:
@@ -3558,6 +3602,37 @@ def _build_argument_parser() -> argparse.ArgumentParser:
             "A2C-only coefficient for training-time exact-WDL preserving-set "
             "policy supervision; zero preserves the historical update"
         ),
+    )
+    p.add_argument(
+        "--malom-policy-aux-mode",
+        choices=MALOM_POLICY_AUX_MODES,
+        default="fixed",
+        help=(
+            "Auxiliary scaling rule. 'fixed' preserves historical behavior; "
+            "'policy-head-normalized' derives a detached coefficient from "
+            "the current production batch."
+        ),
+    )
+    p.add_argument(
+        "--malom-policy-aux-target-ratio",
+        type=_finite_positive_float,
+        default=DEFAULT_MALOM_POLICY_AUX_TARGET_RATIO,
+        help=(
+            "Target applied auxiliary gradient norm as a fraction of the "
+            "ordinary policy-head gradient norm in normalized mode"
+        ),
+    )
+    p.add_argument(
+        "--malom-policy-aux-coef-cap",
+        type=_finite_positive_float,
+        default=DEFAULT_MALOM_POLICY_AUX_COEF_CAP,
+        help="Maximum detached per-batch coefficient in normalized mode",
+    )
+    p.add_argument(
+        "--malom-policy-aux-denominator-floor",
+        type=_finite_positive_float,
+        default=DEFAULT_MALOM_POLICY_AUX_DENOMINATOR_FLOOR,
+        help="Fail-closed lower bound for the raw auxiliary gradient norm",
     )
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument(
