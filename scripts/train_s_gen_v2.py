@@ -38,7 +38,7 @@ sys.path.insert(0, str(_ROOT))
 
 from game.board import BoardState, MILLS
 from game.draw_rules import StandardDrawState, StandardDrawTracker
-from game.rules import is_terminal, terminal_result
+from game.rules import get_game_phase, is_terminal, terminal_result
 from learned_ai.agents.heuristic_agent import HeuristicAgent
 from learned_ai.agents.heuristic_agent import GameAI as _GA
 from learned_ai.models.lookahead_advisor import LookaheadAdvisor
@@ -404,6 +404,10 @@ class StepDiag:
     malom_chosen_dtm:  Optional[float]
     was_top1_policy:   int
     was_top1_heuristic: int
+    board_phase:        str = "legacy-unknown"
+    mills_formed:       int = 0
+    mill_bonus_awarded: float = 0.0
+    malom_quality:      Optional[float] = None
 
 
 @dataclass
@@ -453,6 +457,19 @@ class GameDiag:
     opponent_search_calls:   int = 0
     opponent_search_depth_mean: float = 0.0
     opponent_node_budget:    Optional[int] = None
+    reward_mill_bonus_mean:   float = 0.0
+    formed_mill_count:        int = 0
+    formed_mill_move_count:   int = 0
+    mill_bonus_awarded_total: float = 0.0
+    malom_known_move_rate:    float = 0.0
+    malom_preserving_move_rate: float = 0.0
+    malom_downgrade_move_rate: float = 0.0
+    formed_mill_malom_downgrade_count: int = 0
+    formed_mill_malom_downgrade_rate: float = 0.0
+    formed_mill_malom_unknown_count: int = 0
+    formed_mill_malom_downgrade_place: int = 0
+    formed_mill_malom_downgrade_move: int = 0
+    formed_mill_malom_downgrade_fly: int = 0
 
 
 def _make_checkpoint_payload(
@@ -1827,6 +1844,10 @@ def _rollout_impl(
                 malom_chosen_dtm=malom_q,
                 was_top1_policy=was_top1_policy,
                 was_top1_heuristic=heuristic_top1,
+                board_phase=get_game_phase(board, learner_color),
+                mills_formed=mills_formed,
+                mill_bonus_awarded=mill_bonus,
+                malom_quality=malom_q,
             ))
 
             learner_move_count += 1
@@ -2012,6 +2033,41 @@ def _build_game_diag(
 ) -> GameDiag:
     sd       = result.step_diags
     win_rate = sum(1 for x in win_history if x == 1.0) / max(len(win_history), 1)
+    quality_steps = [
+        (
+            step,
+            step.malom_quality
+            if step.malom_quality is not None
+            else step.malom_chosen_dtm,
+        )
+        for step in sd
+    ]
+    known_quality_steps = [
+        (step, quality)
+        for step, quality in quality_steps
+        if quality is not None
+    ]
+    mill_steps = [
+        (step, quality)
+        for step, quality in quality_steps
+        if step.mills_formed > 0
+    ]
+    known_mill_steps = [
+        (step, quality)
+        for step, quality in mill_steps
+        if quality is not None
+    ]
+    downgrade_mill_steps = [
+        (step, quality)
+        for step, quality in known_mill_steps
+        if float(quality) < 0.0
+    ]
+    malom_preserving_rate = _safe_mean(
+        [
+            1.0 if float(quality) == 0.0 else 0.0
+            for _, quality in known_quality_steps
+        ]
+    )
     return GameDiag(
         game_id=game_id,
         game=game_count,
@@ -2039,9 +2095,13 @@ def _build_game_diag(
         legal_moves_mean     =_safe_mean([float(d.legal_moves) for d in sd]),
         policy_top1_rate     =_safe_mean([float(d.was_top1_policy)    for d in sd]),
         heuristic_top1_rate  =_safe_mean([float(d.was_top1_heuristic) for d in sd]),
-        malom_win_move_rate  =_safe_mean([1.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm >= 0] +
-                                         [0.0 for d in sd if d.malom_chosen_dtm is not None and d.malom_chosen_dtm < 0]),
-        malom_unknown_rate   =_safe_mean([1.0 if d.malom_chosen_dtm is None else 0.0 for d in sd]),
+        malom_win_move_rate  =malom_preserving_rate,
+        malom_unknown_rate   =_safe_mean(
+            [
+                1.0 if quality is None else 0.0
+                for _, quality in quality_steps
+            ]
+        ),
         best_win_rate  =float(best_win_rate),
         temp_frozen    =int(temp_frozen),
         lr             =float(opt.param_groups[0]["lr"]),
@@ -2063,6 +2123,48 @@ def _build_game_diag(
             3,
         ),
         opponent_node_budget=result.opponent_node_budget,
+        reward_mill_bonus_mean=_safe_mean(
+            [step.mill_bonus_awarded for step in sd]
+        ),
+        formed_mill_count=sum(step.mills_formed for step in sd),
+        formed_mill_move_count=len(mill_steps),
+        mill_bonus_awarded_total=sum(
+            step.mill_bonus_awarded for step in sd
+        ),
+        malom_known_move_rate=(
+            len(known_quality_steps) / len(sd) if sd else 0.0
+        ),
+        malom_preserving_move_rate=malom_preserving_rate,
+        malom_downgrade_move_rate=_safe_mean(
+            [
+                1.0 if float(quality) < 0.0 else 0.0
+                for _, quality in known_quality_steps
+            ]
+        ),
+        formed_mill_malom_downgrade_count=len(downgrade_mill_steps),
+        formed_mill_malom_downgrade_rate=(
+            len(downgrade_mill_steps) / len(known_mill_steps)
+            if known_mill_steps
+            else 0.0
+        ),
+        formed_mill_malom_unknown_count=sum(
+            1 for _, quality in mill_steps if quality is None
+        ),
+        formed_mill_malom_downgrade_place=sum(
+            1
+            for step, _ in downgrade_mill_steps
+            if step.board_phase == "place"
+        ),
+        formed_mill_malom_downgrade_move=sum(
+            1
+            for step, _ in downgrade_mill_steps
+            if step.board_phase == "move"
+        ),
+        formed_mill_malom_downgrade_fly=sum(
+            1
+            for step, _ in downgrade_mill_steps
+            if step.board_phase == "fly"
+        ),
     )
 
 

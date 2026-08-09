@@ -153,3 +153,7 @@ def test_rollout_suppresses_only_the_contradictory_mill_bonus(monkeypatch) -> No
 
     assert legacy.trajectory[0].reward == pytest.approx(trainer.MILL_BONUS)
     assert corrected.trajectory[0].reward == 0.0
+    assert corrected.step_diags[0].mills_formed == 1
+    assert corrected.step_diags[0].malom_quality == -1.0
+    assert corrected.step_diags[0].mill_bonus_awarded == 0.0
+    assert corrected.step_diags[0].board_phase == "place"
