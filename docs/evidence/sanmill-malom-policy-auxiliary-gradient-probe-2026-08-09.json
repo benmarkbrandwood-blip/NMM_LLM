@@ -1,0 +1,56 @@
+{
+  "claim_boundary": "Development-corpus exact-label and in-memory gradient evidence only; not an Adam trajectory, training result, validation result, strength result, promotion decision, or long-run authority.",
+  "decision": {
+    "next_stage": "bounded_optimizer_integration_smoke",
+    "reward_only_escalation": "closed",
+    "training_launch_authorized": false,
+    "verdict": "ready_for_optimizer_integration_smoke_preparation"
+  },
+  "probe": {
+    "identity": "5ea60e2955a7a9b878ec4119648ed91ddcffd94687bb3c0976571e96048daa9c",
+    "path": "out/diagnostics/malom-policy-auxiliary-gradient-probe-v2.json",
+    "schema_version": "nmm.malom-policy-auxiliary-gradient-probe.v2",
+    "sha256": "ad1e6e3ee7596a872d3129e623d377e083c439f6bcbee23705a10bf8ced1b003",
+    "size_bytes": 34974,
+    "source_commit": "b2ccecf2a7518adc99d1e1b8c38887ab3938b8ec"
+  },
+  "result": {
+    "all_safe_states": 35,
+    "corpus_states_per_seed": 64,
+    "downgrading_actions_per_seed": 415,
+    "fresh_seeds": [
+      48,
+      49,
+      50
+    ],
+    "gradient_descent_cosine_range": [
+      0.9702062414599654,
+      0.9864590744822569
+    ],
+    "gradient_directional_derivative_range": [
+      5.271680990836506e-07,
+      5.380911864969359e-07
+    ],
+    "gradient_l2_norm_range": [
+      0.0015033719134520582,
+      0.0015676212832518863
+    ],
+    "informative_states": 29,
+    "labelled_actions_per_seed": 1583,
+    "mean_informative_preserving_probability_range": [
+      0.3675830901182931,
+      0.3675831517140413
+    ],
+    "mean_preserving_set_loss_range": [
+      1.5265350341796875,
+      1.5265355110168457
+    ],
+    "mutation_checks_passed": true,
+    "preserving_actions_per_seed": 1168,
+    "warm_label_seconds_range": [
+      0.04196550000051502,
+      0.04382980000127645
+    ]
+  },
+  "schema_version": "nmm.malom-policy-auxiliary-gradient-evidence.v1"
+}
