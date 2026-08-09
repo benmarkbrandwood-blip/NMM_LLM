@@ -1670,17 +1670,23 @@ the current successor in this order:
 11. Preserve the completed six-arm downgrade-penalty experiment and its
     `inconclusive` verdict. Its authorization is consumed, and reward-only
     escalation is closed.
-12. Publish the current atomic `dev` successor chain by an ordinary push only
-    after explicit authorization. Do not amend, rebase or force-push it.
-13. At the resulting clean `dev == origin/dev`, run the auxiliary-calibration
-    preparer once with `--prepare`. Inspect its four technical preflights,
-    one-factor audit, identities, isolated databases and output paths. A valid
-    result stops at `ready_for_product_authorization`; it is not launch
-    authority.
-14. Only after that readiness report passes may the product owner authorize
-    exactly one four-arm, 400-game, two-active-hour calibration envelope. No
-    training, extension, continuation, promotion or publication is currently
-    authorized.
+12. Preserve the completed four-arm Malom policy-auxiliary calibration and its
+    `inconclusive_recalibration_required` verdict. Its authorization is
+    consumed. No raw coefficient was selected, and coefficient `0.30` must not
+    be extended after crossing the frozen loss-scale limit.
+13. Preserve the subsequent no-update gradient-interaction evidence. It found
+    that the applied auxiliary-to-policy gradient ratio varied from about
+    `0.69` to `26.7` across the two recoverable production batches. This is a
+    scale-diagnosis result, not authority to choose a normalization target.
+14. Use the immutable three-seed, 60-game no-update batch-capture plan to
+    measure the missing production-batch distribution. Its implementation and
+    schema-aware readiness publisher are on published `dev`; the preliminary
+    preflight passed from commit `ba74a35a59af1f4d52d67982c6916f139dfe7f51`.
+15. Publish the batch-capture readiness evidence and this handover update, then
+    run one final preflight from the resulting clean `dev == origin/dev`.
+    Only an explicit one-run authorization naming that final readiness
+    identity may consume the 60-game diagnostic. No optimizer, training,
+    retry, extension, continuation, promotion or publication is authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1768,12 +1774,14 @@ endgame/fullgame files also remain exploratory unless separately validated and
 promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
-evaluation's authorization is consumed. The retained-v2 held-out grant and
-the later six-arm downgrade-penalty grant are also consumed. Safe work now is
-to publish the atomic policy-auxiliary implementation and evidence chain, then
-generate its fail-closed readiness report. No auxiliary-calibration arm,
-additional evaluation, long training job, promotion/publication, protocol
-change or history rewrite is authorized by this handover.
+evaluation's authorization is consumed. The retained-v2 held-out grant, the
+six-arm downgrade-penalty grant and the four-arm policy-auxiliary calibration
+grant are also consumed. Safe work now is limited to publishing the
+batch-capture readiness record, repeating its fail-closed preflight from the
+final published tip, and requesting identity-bound authority for that one
+no-update diagnostic. No additional calibration, long training job,
+promotion/publication, protocol change or history rewrite is authorized by
+this handover.
 
 ## Reference Material
 
