@@ -1,0 +1,332 @@
+{
+  "analysis": {
+    "curve_policy": {
+      "raw_training_curves": true,
+      "rolling_window_games": 50,
+      "tail_window_games": 200,
+      "training_and_diagnostic_curves_reported_separately": true,
+      "validation_curve_available": false
+    },
+    "decision_rule": {
+      "inconclusive": "any other finite and identity-valid result; do not extend or lower the gate after seeing it",
+      "material_absolute_reduction": 0.02,
+      "maximum_allowed_seed_harm": 0.02,
+      "minimum_tail_known_actions_per_arm": 2000,
+      "primary_metric": "tail learner actions that lose one or two exact Malom WDL ranks divided by all tail learner actions with exact Malom support",
+      "supports_downgrade_penalty": "all treatment arms pass fixed safety gates, every arm has at least 2000 known tail actions, at least two of three paired reductions are positive, no paired seed is harmed by more than 0.02, and the median paired absolute reduction is at least 0.02",
+      "unsafe": "any treatment arm has an infrastructure, identity, finite-value, checkpoint, referee, database, reward-accounting, exact-Malom-coverage, or fixed policy-health safety failure"
+    },
+    "fixed_development_diagnostic": {
+      "audit_script": "tools/audit_generalist_policy_health.py",
+      "audit_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+      "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+      "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+      "critical_states": 29,
+      "device": "cuda",
+      "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
+      "minimum_candidate_preserving_rate": 0.5,
+      "required_direct_signal_preserving_rate": 1.0,
+      "role": "inspected development safety diagnostic; not an ordinary supervised validation set and not held-out strength evidence"
+    },
+    "per_class_reports": [
+      "seed",
+      "reward arm",
+      "opponent source",
+      "learner colour",
+      "board phase",
+      "Sanmill node level",
+      "termination reason"
+    ],
+    "secondary_metrics": [
+      "whole-run all-action exact Malom downgrade rate with support counts",
+      "one-rank and two-rank downgrade totals",
+      "per-phase exact Malom support and downgrade counts",
+      "Malom penalty reward total and mean",
+      "Mill-only downgrade rate as a historical sensitivity measure",
+      "policy and value loss curves by optimizer update",
+      "entropy, temperature, chosen probability and policy/heuristic top-1 curves",
+      "fixed-state candidate preserving rate, logit margin, probability mass and expected Malom quality",
+      "W/D/L by opponent source and colour as training diagnostics only"
+    ],
+    "seed_summary": "report every seed pair first, then median, range and outliers; never replace seed-level results with one pooled curve"
+  },
+  "arms": [
+    {
+      "arm_id": "s45-control",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-45/control",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s45-control",
+      "launch_order": 1,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s45-control",
+      "seed": 45,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed45.control.sqlite"
+    },
+    {
+      "arm_id": "s45-penalty",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-45/penalty",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s45-penalty",
+      "launch_order": 2,
+      "mill_bonus_mode": "malom-preserving-plus-downgrade-penalty",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s45-penalty",
+      "seed": 45,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed45.penalty.sqlite"
+    },
+    {
+      "arm_id": "s46-penalty",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-46/penalty",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s46-penalty",
+      "launch_order": 3,
+      "mill_bonus_mode": "malom-preserving-plus-downgrade-penalty",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s46-penalty",
+      "seed": 46,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed46.penalty.sqlite"
+    },
+    {
+      "arm_id": "s46-control",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-46/control",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s46-control",
+      "launch_order": 4,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s46-control",
+      "seed": 46,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed46.control.sqlite"
+    },
+    {
+      "arm_id": "s47-control",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-47/control",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s47-control",
+      "launch_order": 5,
+      "mill_bonus_mode": "malom-preserving-only",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s47-control",
+      "seed": 47,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed47.control.sqlite"
+    },
+    {
+      "arm_id": "s47-penalty",
+      "control_dir": "out/malom-downgrade-penalty-ablation-smoke-v1/seed-47/penalty",
+      "experiment_id": "dev-v4-sanmill-malom-downgrade-penalty-v1-s47-penalty",
+      "launch_order": 6,
+      "mill_bonus_mode": "malom-preserving-plus-downgrade-penalty",
+      "plan_id": "managed-sanmill-malom-downgrade-penalty-v1-s47-penalty",
+      "seed": 47,
+      "specialist_db": "data/specialist_db.malom_downgrade_penalty_ablation_v1.seed47.penalty.sqlite"
+    }
+  ],
+  "authorization": {
+    "authorized_segments_per_arm": 0,
+    "launch_authorized": false,
+    "product_decision_required": "approve or reject one six-arm envelope of at most 3000 completed games and six active wall hours after readiness passes",
+    "promotion_allowed": false,
+    "publication_allowed": false
+  },
+  "claim_boundary": {
+    "causal_claim_requires_matched_completion": true,
+    "development_diagnostic_is_held_out": false,
+    "long_run": false,
+    "ordinary_supervised_validation": false,
+    "playing_strength": false,
+    "promotion": false,
+    "scope": "bounded multi-seed exact-Malom downgrade-penalty learning evidence only"
+  },
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "fixed_resource_stage_games": [
+      500,
+      500,
+      500,
+      1000,
+      2500
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "log_and_checkpoint_every_games": 50,
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "minimal_rollouts": true,
+    "one_segment_games": 500,
+    "only_observed_node_level": 1,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "start_mode": "fresh",
+    "target_refresh_every_games": 50,
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_start": 0.9,
+    "update_every_steps": 64
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    },
+    "specialist_db_policy": "copy the exact closed template once to each unique arm path before plan preparation; never share a writable database between arms"
+  },
+  "experiment_family_id": "dev-v4-sanmill-malom-downgrade-penalty-ablation-smoke-v1",
+  "hypothesis": "a fixed asymmetric penalty on every exact Malom WDL rank loss will reduce later value-downgrading learner actions more consistently than Mill-only bonus suppression, without violating the fixed policy-health safety boundary",
+  "lineage": {
+    "exact_resume_between_arms": false,
+    "fresh_random_weights_per_arm": true,
+    "implementation_commits": {
+      "downgrade_penalty_no_update_probe": "bfd9b0890a1429ec9cc156f156492f2f30371c5f",
+      "downgrade_penalty_result_analyzer": "3d1a13336f9b1648c8367e78d501921d0d30f79b",
+      "downgrade_penalty_shaping": "b8b86adf5aeaec72b8ada45966bb3cdd714d9284",
+      "managed_first_segment_preflight": "7aa4e80fc5c19184bc959e763cd5aea9c166b4df",
+      "mill_bonus_followup_audit": "fb284615793a0dd81898eb4d76bb0f6d32479d69",
+      "no_update_preparation_gate": "2bc7a3ab975b7030bdc01e5181475b0e8ae5c334",
+      "specialist_db_immutable_preflight": "f305ad0e73cfc736887d56cbd3a7d821ba0cdbb7"
+    },
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main v2c recovery, repetition, GapNet, Sentinel, optimizer and UI experiments change additional variables and are excluded from a one-factor reward ablation",
+      "reviewed_tip": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9"
+    },
+    "resume_source": null
+  },
+  "objective": "determine whether exact-WDL downgrade penalties provide a stable retained reward successor before committing resources to another long run",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "experiment_id",
+      "plan_id",
+      "control_dir",
+      "specialist_db",
+      "mill_bonus_mode"
+    ],
+    "paired_seeds": [
+      45,
+      46,
+      47
+    ],
+    "schedule_identity": "the trainer derives learner colour, opponent source, retry ply and per-game Torch generator only from seed, scheduled index and role; each same-seed pair therefore shares its exogenous schedule",
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "3e6c4d356934c4d35ba298ce9b6430446a96f97354b52daf052c198142b5df21",
+  "preparation_evidence": {
+    "downgrade_penalty_no_update_probe": {
+      "expected_summary": {
+        "affected_states": 19,
+        "control_reward_total": 0.0,
+        "mill_forming_states": 16,
+        "non_mill_states": 3,
+        "phase_counts": {
+          "fly": 9,
+          "move": 4,
+          "place": 6
+        },
+        "quality_rank_counts": {
+          "1": 19
+        },
+        "states": 19,
+        "stratum_counts": {
+          "book": 6,
+          "human_db": 2,
+          "perfect_db": 11
+        },
+        "treatment_minus_control": -4.75,
+        "treatment_reward_total": -4.75
+      },
+      "module_path": "learned_ai/validation/malom_downgrade_penalty_probe.py",
+      "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/malom-downgrade-penalty-no-update-probe.json",
+      "schema_version": "nmm.malom-downgrade-penalty-no-update-probe.v1",
+      "script_path": "scripts/probe_malom_downgrade_penalty.py",
+      "source_probe_identity": "8f554f113ca65f05b8733f7e28b1e26177f58283c10b1c6f7d97abd603ef2186",
+      "source_probe_sha256": "0560c3fe3b89f32e4a9f59778c214167496e404be10ba24b03622fdc5a618f37"
+    }
+  },
+  "prior_evidence": {
+    "earlier_mill_bonus_result_file_sha256": "8d7557483f102dcea548d1568f53523f51e0faa782bc2abaca6ff175055548fe",
+    "earlier_mill_bonus_result_identity": "4c030be00932306c2270d5407c79d939991f65f24653f6af1a84e8308c5d134d",
+    "earlier_mill_bonus_verdict": "inconclusive",
+    "heldout_result_identity": "8848ad32e588daf2fcd0686be65b337e7fc621faaebdb58bd1dbefc73bcdff81",
+    "source_no_update_probe_identity": "8f554f113ca65f05b8733f7e28b1e26177f58283c10b1c6f7d97abd603ef2186"
+  },
+  "resources": {
+    "active_wall_hours_per_arm": 1.0,
+    "completed_games_per_arm": 500,
+    "maximum_active_wall_hours_total": 6.0,
+    "maximum_completed_games_total": 3000,
+    "maximum_requested_sanmill_nodes_total": 73800000,
+    "schedule_counts_per_arm": {
+      "45": {
+        "frozen_black": 155,
+        "frozen_white": 152,
+        "sanmill_black": 100,
+        "sanmill_white": 93
+      },
+      "46": {
+        "frozen_black": 145,
+        "frozen_white": 140,
+        "sanmill_black": 104,
+        "sanmill_white": 111
+      },
+      "47": {
+        "frozen_black": 147,
+        "frozen_white": 146,
+        "sanmill_black": 99,
+        "sanmill_white": 108
+      }
+    }
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.sanmill-mill-bonus-ablation-smoke-plan.v1",
+  "status": "designed_unlaunched_needs_product_authorization",
+  "stop_rules": {
+    "fatal_global": [
+      "non-finite model, loss, reward or logit",
+      "Malom, HumanDB, rules, MIF, Sanmill runtime or path-config identity drift",
+      "SpecialistDB label-version, isolation, integrity or lineage failure",
+      "checkpoint, CUDA, strict-referee or evidence-chain failure",
+      "exact Malom support missing for any learner action",
+      "per-game downgrade or reward accounting does not reconcile"
+    ],
+    "host_interruption": "only evidence-bound exact resume inside the same arm is eligible; never restart from a contaminated directory or substitute another seed",
+    "no_result_based_early_stop": true,
+    "pair_policy": "an invalid arm invalidates causal interpretation for that seed pair; do not impute or pool it"
+  }
+}
