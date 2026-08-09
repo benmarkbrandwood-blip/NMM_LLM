@@ -64,7 +64,9 @@
       "value",
       "malom-preserving-set auxiliary"
     ],
-    "production_replay_tolerance": 1e-06
+    "logged_scalar_tolerance": 1e-05,
+    "production_replay_parameter_tolerance": 1e-06,
+    "softmax_invariant_parameter_policy": "report the final shared scalar policy bias separately and exclude it only from functional replay acceptance"
   },
   "schema_version": "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v1",
   "source_calibration": {

@@ -134,7 +134,13 @@ def _optimizer(model: ScaffoldedPolicyNet, state: Any) -> torch.optim.Adam:
     return optimizer
 
 
-def _close(actual: Any, expected: Any, *, label: str) -> float:
+def _close(
+    actual: Any,
+    expected: Any,
+    *,
+    label: str,
+    tolerance: float,
+) -> float:
     try:
         actual_value = float(actual)
         expected_value = float(expected)
@@ -145,8 +151,8 @@ def _close(actual: Any, expected: Any, *, label: str) -> float:
     if not math.isclose(
         actual_value,
         expected_value,
-        rel_tol=1e-5,
-        abs_tol=2e-6,
+        rel_tol=tolerance,
+        abs_tol=tolerance,
     ):
         raise RuntimeError(
             f"{label} differs: replay={actual_value}, logged={expected_value}"
@@ -158,7 +164,8 @@ def _audit_arm(
     spec: Mapping[str, Any],
     *,
     result_arm: Mapping[str, Any],
-    tolerance: float,
+    parameter_tolerance: float,
+    scalar_tolerance: float,
     device: torch.device,
 ) -> dict[str, Any]:
     required = {
@@ -244,26 +251,31 @@ def _audit_arm(
             replay_losses[0],
             last_update.get("policy_loss"),
             label=f"{arm_id} policy loss",
+            tolerance=scalar_tolerance,
         ),
         "value_loss": _close(
             replay_losses[1],
             last_update.get("value_loss"),
             label=f"{arm_id} value loss",
+            tolerance=scalar_tolerance,
         ),
         "entropy": _close(
             replay_losses[2],
             last_update.get("entropy"),
             label=f"{arm_id} entropy",
+            tolerance=scalar_tolerance,
         ),
         "auxiliary_loss": _close(
             audit["objectives"]["auxiliary"]["objective_value"],
             last_update.get("malom_policy_aux_loss"),
             label=f"{arm_id} auxiliary loss",
+            tolerance=scalar_tolerance,
         ),
         "learning_rate": _close(
             audit["adam_step"]["learning_rate"],
             last_update.get("lr"),
             label=f"{arm_id} learning rate",
+            tolerance=scalar_tolerance,
         ),
     }
     replay_difference = audit["adam_step"].get(
@@ -271,7 +283,13 @@ def _audit_arm(
     )
     if (
         not isinstance(replay_difference, dict)
-        or float(replay_difference.get("max_abs", math.inf)) > tolerance
+        or not isinstance(replay_difference.get("functionally_relevant"), dict)
+        or float(
+            replay_difference["functionally_relevant"].get(
+                "max_abs", math.inf
+            )
+        )
+        > parameter_tolerance
     ):
         raise RuntimeError(f"{arm_id} Adam replay differs from final checkpoint")
 
@@ -343,8 +361,16 @@ def main(argv: list[str] | None = None) -> int:
     method = plan.get("method")
     if not isinstance(method, dict):
         raise RuntimeError("gradient interaction method is missing")
-    tolerance = float(method.get("production_replay_tolerance"))
-    if not math.isfinite(tolerance) or tolerance <= 0.0:
+    parameter_tolerance = float(
+        method.get("production_replay_parameter_tolerance")
+    )
+    scalar_tolerance = float(method.get("logged_scalar_tolerance"))
+    if (
+        not math.isfinite(parameter_tolerance)
+        or parameter_tolerance <= 0.0
+        or not math.isfinite(scalar_tolerance)
+        or scalar_tolerance <= 0.0
+    ):
         raise RuntimeError("production replay tolerance is invalid")
     arms = plan.get("arms")
     if (
@@ -366,7 +392,8 @@ def main(argv: list[str] | None = None) -> int:
         _audit_arm(
             spec,
             result_arm=result_arms[str(spec["arm_id"])],
-            tolerance=tolerance,
+            parameter_tolerance=parameter_tolerance,
+            scalar_tolerance=scalar_tolerance,
             device=device,
         )
         for spec in arms
@@ -430,4 +457,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

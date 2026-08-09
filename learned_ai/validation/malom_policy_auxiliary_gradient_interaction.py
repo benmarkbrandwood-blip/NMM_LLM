@@ -325,7 +325,29 @@ def _clone_adam(
     return candidate, candidate_optimizer
 
 
-def _parameter_distance(left: nn.Module, right: nn.Module) -> dict[str, float]:
+def _softmax_invariant_policy_bias_names(model: nn.Module) -> tuple[str, ...]:
+    policy_mlp = getattr(model, "policy_mlp", None)
+    if not isinstance(policy_mlp, nn.Sequential):
+        return ()
+    linear_modules = [
+        (name, module)
+        for name, module in policy_mlp.named_modules()
+        if name and isinstance(module, nn.Linear)
+    ]
+    if not linear_modules or linear_modules[-1][1].out_features != 1:
+        return ()
+    name, module = linear_modules[-1]
+    if module.bias is None:
+        return ()
+    return (f"policy_mlp.{name}.bias",)
+
+
+def _parameter_distance(
+    left: nn.Module,
+    right: nn.Module,
+    *,
+    excluded: Sequence[str] = (),
+) -> dict[str, float]:
     squared = 0.0
     maximum = 0.0
     left_parameters = dict(left.named_parameters())
@@ -334,7 +356,14 @@ def _parameter_distance(left: nn.Module, right: nn.Module) -> dict[str, float]:
         raise MalomPolicyAuxiliaryGradientInteractionError(
             "model parameter names differ"
         )
+    excluded_set = set(excluded)
+    if not excluded_set <= set(left_parameters):
+        raise MalomPolicyAuxiliaryGradientInteractionError(
+            "excluded parameter name is not present"
+        )
     for name in sorted(left_parameters):
+        if name in excluded_set:
+            continue
         difference = (
             left_parameters[name].detach().double()
             - right_parameters[name].detach().double()
@@ -536,8 +565,20 @@ def audit_malom_policy_auxiliary_gradient_interaction(
         ),
     }
     if expected_treatment_model is not None:
+        invariant_names = _softmax_invariant_policy_bias_names(treatment_model)
         adam_step["persisted_treatment_replay_difference"] = (
-            _parameter_distance(treatment_model, expected_treatment_model)
+            {
+                "raw": _parameter_distance(
+                    treatment_model,
+                    expected_treatment_model,
+                ),
+                "functionally_relevant": _parameter_distance(
+                    treatment_model,
+                    expected_treatment_model,
+                    excluded=invariant_names,
+                ),
+                "softmax_invariant_parameter_names": list(invariant_names),
+            }
         )
 
     return {

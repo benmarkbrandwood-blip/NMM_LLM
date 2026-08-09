@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import torch
 
+from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.training.scaffolded_a2c import (
     ScaffoldedStep,
     scaffolded_a2c_update,
@@ -106,8 +107,9 @@ def test_audit_measures_components_without_mutating_sources() -> None:
         >= 0.0
     )
     assert report["adam_step"]["persisted_treatment_replay_difference"] == {
-        "l2": 0.0,
-        "max_abs": 0.0,
+        "raw": {"l2": 0.0, "max_abs": 0.0},
+        "functionally_relevant": {"l2": 0.0, "max_abs": 0.0},
+        "softmax_invariant_parameter_names": [],
     }
     assert report["original_model_unchanged"] is True
     assert report["original_optimizer_unchanged"] is True
@@ -167,3 +169,44 @@ def test_audit_rejects_invalid_phase_encoding() -> None:
             coefficient=0.1,
             device=torch.device("cpu"),
         )
+
+
+def test_persisted_replay_separates_shared_policy_bias_invariance() -> None:
+    torch.manual_seed(7)
+    model = ScaffoldedPolicyNet(
+        move_feat_dim=4,
+        value_input_dim=1,
+        policy_hidden=(4,),
+        value_hidden=(4,),
+    )
+    optimizer = _adam(model)
+    steps = _steps()
+    expected = copy.deepcopy(model)
+    expected_optimizer = _adam(expected)
+    expected_optimizer.load_state_dict(copy.deepcopy(optimizer.state_dict()))
+    scaffolded_a2c_update(
+        expected,
+        expected_optimizer,
+        steps,
+        torch.device("cpu"),
+        malom_policy_aux_coef=0.1,
+    )
+    with torch.no_grad():
+        expected.policy_mlp[2].bias.add_(0.125)
+
+    report = audit_malom_policy_auxiliary_gradient_interaction(
+        model,
+        optimizer,
+        steps,
+        coefficient=0.1,
+        device=torch.device("cpu"),
+        expected_treatment_model=expected,
+    )
+    difference = report["adam_step"][
+        "persisted_treatment_replay_difference"
+    ]
+    assert difference["raw"]["max_abs"] == pytest.approx(0.125)
+    assert difference["functionally_relevant"]["max_abs"] == 0.0
+    assert difference["softmax_invariant_parameter_names"] == [
+        "policy_mlp.2.bias"
+    ]
