@@ -14,6 +14,7 @@ from learned_ai.training.scaffolded_a2c import (
 from learned_ai.validation.malom_policy_auxiliary_gradient_interaction import (
     MalomPolicyAuxiliaryGradientInteractionError,
     audit_malom_policy_auxiliary_gradient_interaction,
+    measure_malom_policy_auxiliary_batch_gradients,
 )
 
 
@@ -217,3 +218,91 @@ def test_persisted_replay_separates_shared_policy_bias_invariance() -> None:
     assert difference["softmax_invariant_parameter_names"] == [
         "policy_mlp.2.bias"
     ]
+
+
+def test_batch_measurement_derives_ratios_without_an_optimizer_or_mutation() -> None:
+    model = _FixedPolicyValue()
+    model.eval()
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
+    before = copy.deepcopy(model.state_dict())
+
+    report = measure_malom_policy_auxiliary_batch_gradients(
+        model,
+        _steps(),
+        device=torch.device("cpu"),
+        target_policy_head_ratios=(0.25, 0.5, 1.0),
+    )
+
+    assert report["support"]["informative_steps"] == 8
+    assert report["ordinary_policy_head_gradient_l2"] > 0.0
+    assert report["raw_auxiliary_gradient_l2"] > 0.0
+    assert [item["status"] for item in report["candidate_scales"]] == [
+        "measured",
+        "measured",
+        "measured",
+    ]
+    ordinary = report["ordinary_policy_head_gradient_l2"]
+    for item in report["candidate_scales"]:
+        assert item["applied_auxiliary_gradient_l2"] == pytest.approx(
+            ordinary * item["target_policy_head_ratio"]
+        )
+    assert report["optimizer_constructed"] is False
+    assert report["optimizer_steps"] == 0
+    assert report["backward_calls"] == 0
+    assert model.training is False
+    assert all(not parameter.requires_grad for parameter in model.parameters())
+    assert all(
+        torch.equal(before[name], value)
+        for name, value in model.state_dict().items()
+    )
+
+
+def test_batch_measurement_reports_an_all_safe_batch_without_fabricating_scale() -> None:
+    model = _FixedPolicyValue()
+    steps = _steps()
+    for step in steps:
+        step.malom_preserving_mask = np.ones(3, dtype=np.bool_)
+
+    report = measure_malom_policy_auxiliary_batch_gradients(
+        model,
+        steps,
+        device=torch.device("cpu"),
+        target_policy_head_ratios=(0.5,),
+    )
+
+    assert report["support"]["informative_steps"] == 0
+    assert report["raw_auxiliary_gradient_l2"] == 0.0
+    assert report["raw_auxiliary_to_ordinary_policy_head_cosine"] is None
+    assert report["candidate_scales"] == [
+        {
+            "target_policy_head_ratio": 0.5,
+            "status": "no_informative_steps",
+            "effective_coefficient": None,
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "ratios, message",
+    [
+        ((), "must be finite and positive"),
+        ((0.0,), "must be finite and positive"),
+        ((0.5, 0.25), "must be unique and increasing"),
+        ((0.5, 0.5), "must be unique and increasing"),
+    ],
+)
+def test_batch_measurement_rejects_invalid_target_ratios(
+    ratios: tuple[float, ...],
+    message: str,
+) -> None:
+    with pytest.raises(
+        MalomPolicyAuxiliaryGradientInteractionError,
+        match=message,
+    ):
+        measure_malom_policy_auxiliary_batch_gradients(
+            _FixedPolicyValue(),
+            _steps(),
+            device=torch.device("cpu"),
+            target_policy_head_ratios=ratios,
+        )
