@@ -1664,6 +1664,17 @@ reports 13 existing preliminary targets: six plan directories, six empty
 database files and the old readiness report. It authorizes nothing and lists
 both publication and quarantine as unresolved gates.
 
+Those 13 targets were subsequently moved without deletion into the ignored
+recoverable quarantine
+`out/quarantine/malom-policy-aux-normalized-preparation-superseded-30246f6-20260809T192421Z`.
+The quarantine records every plan, preflight, controller-event and database
+hash, the superseded contract identity, and the original readiness SHA-256.
+No authorization, segment, checkpoint, log or counted game existed. A new
+source-only audit at local commit `985c523e4c647b788ab0744f4713f45a19d79022`
+reports all preparation targets absent under readiness identity
+`7dd72688613efd6d2b248fea6a125eadf3a6689db1c02f52ed228e4592fa5161`.
+Its only unresolved gate is ordinary publication of the implementation.
+
 Seeds 55, 56 and 57 each compare auxiliary-off control with normalized target
 0.25. Each arm is bounded to 100 games and one third active hour, so the whole
 sequence is capped at 600 games and two active hours. Only the first,
@@ -1769,15 +1780,14 @@ the current successor in this order:
     one-run authorization is consumed. Do not rerun it or treat its implied
     coefficient distribution as a selected training setting.
 15. Keep result-analyzer commit `a6de71a`, target-audit commit `2a263f0` and
-    this handover update local until ordinary publication is explicitly
-    authorized. The preliminary
-    `30246f6` plans and empty databases bind the superseded contract and must be
-    quarantined before preparation is repeated. After clean final
-    `dev == origin/dev`, run the fail-closed preparer once to create six new
-    plans, preflights and isolated database copies bound to plan identity
-    `1b6f8d0`. Review the resulting readiness identity before requesting a
-    separate launch authorization. No training, retry, extension, resume,
-    promotion or publication is currently authorized.
+    the handover updates local until ordinary publication is explicitly
+    authorized. The preliminary `30246f6` plans and empty databases bind the
+    superseded contract and are preserved in the recoverable quarantine named
+    above. After clean final `dev == origin/dev`, run the fail-closed preparer
+    once to create six new plans, preflights and isolated database copies bound
+    to plan identity `1b6f8d0`. Review the resulting readiness identity before
+    requesting a separate launch authorization. No training, retry, extension,
+    resume, promotion or publication is currently authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1869,11 +1879,12 @@ evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, and the no-update batch-capture grant are also consumed. Safe work now
 is limited to publishing the normalized result-analyzer and handover commits
-when explicitly authorized, quarantining the superseded preliminary plans,
-generating six replacement unlaunched plans from the final clean published
-tip, and reviewing that new readiness evidence. No normalized arm, additional
-calibration, long training job, promotion/publication, protocol change or
-history rewrite is authorized by this handover.
+when explicitly authorized, generating six replacement unlaunched plans from
+the final clean published tip, and reviewing that new readiness evidence. The
+superseded preliminary plans are already preserved in recoverable quarantine.
+No normalized arm, additional calibration, long training job,
+promotion/publication, protocol change or history rewrite is authorized by
+this handover.
 
 ## Reference Material
 
