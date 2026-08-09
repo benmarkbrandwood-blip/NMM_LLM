@@ -357,8 +357,10 @@ Supporting evidence: local commits `704b3a1`, `d90aced`, `3292107` and
 Commit `40370d0` requires an explicit managed-plan seed. The initial experiment
 contract is `badcee6`; `bdf42e9` removes four whitespace-only EOF defects; and
 `9e5df00` binds the current contract to CUDA and adds fail-closed six-arm
-preparation. Its current plan identity is
-`4074bf9a34bef4e846f72bfd35a33128f8e104e462184c0758b59a1a5ef94e96`.
+preparation. Commit `b38afe2` separates the 5,000-game trainer schedule horizon
+from a hard 500-game controller completion bound, preventing one arm's
+authorization from reaching a second segment. Its current plan identity is
+`3db50b6f3e35eb9ed96ac229176a67b9abaa9062b63ecc018202e42075543fc4`.
 The combined reward, observability, probe, manager, checkpoint, Malom and
 label-provenance gate passes `180` tests plus `498` parameterized subtests. All
 generated targets remain ignored and no managed arm, authorization or game

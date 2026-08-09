@@ -40,7 +40,9 @@ Each arm runs exactly one 500-game segment on the unchanged 5,000-game global
 temperature and resource schedule. It therefore remains at the measured
 1,000-node Sanmill level and ends at the first curriculum boundary. This
 mirrors the earlier corrected-learning smoke and avoids introducing a second
-change while testing the reward gate.
+change while testing the reward gate. The managed-plan controller records a
+separate 500-game completion ceiling, so the 5,000-game schedule horizon cannot
+authorize a second segment.
 
 ## Frozen training contract
 
