@@ -49,6 +49,12 @@ ORACLE_ALTERNATIVE_EVIDENCE = (
     / "evidence"
     / "sanmill-corrected-retained-v2-heldout-oracle-alternatives-2026-08-09.json"
 )
+MILL_BONUS_PROBE_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-corrected-retained-v2-mill-bonus-probe-2026-08-09.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -198,3 +204,20 @@ def test_oracle_alternative_evidence_binds_reward_hypothesis_scope() -> None:
     )
     assert evidence["claim_boundary"]["causal_reward_attribution"] is False
     assert evidence["claim_boundary"]["new_training_authorized"] is False
+
+
+def test_mill_bonus_probe_evidence_binds_no_update_scope() -> None:
+    evidence = json.loads(MILL_BONUS_PROBE_EVIDENCE.read_text(encoding="utf-8"))
+    evidence_identity = evidence.pop("evidence_identity")
+
+    assert canonical_sha256(evidence) == evidence_identity
+    assert evidence["status"] == "passed"
+    assert evidence["summary"]["states"] == 19
+    assert evidence["summary"]["mill_forming_states"] == 16
+    assert evidence["summary"]["legacy_reward_total"] == 4.0
+    assert evidence["summary"]["preserving_only_reward_total"] == 0.0
+    assert evidence["probe_artifact"]["probe_identity"] == (
+        "8f554f113ca65f05b8733f7e28b1e26177f58283c10b1c6f7d97abd603ef2186"
+    )
+    assert evidence["claim_boundary"]["weights_updated"] is False
+    assert evidence["claim_boundary"]["causal_training_effect_proven"] is False

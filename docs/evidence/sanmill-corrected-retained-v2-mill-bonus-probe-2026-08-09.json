@@ -1,0 +1,78 @@
+{
+  "analysis": {
+    "counterevidence": [
+      "The 19 states were selected because the retained candidate lost WDL on them; they are not an unbiased sample of training or play.",
+      "The probe does not update weights and therefore cannot establish that suppressing these bonuses improves a learned policy.",
+      "The prior training logs show that mill formation is dense in winning trajectories, so disabling all mill shaping remains unsupported.",
+      "The probe does not address conversion failures, repetition draws, fifty-move draws, architecture, curriculum, or delayed credit."
+    ],
+    "hypothesis": {
+      "statement": "Suppressing immediate mill shaping only when the complete logical turn downgrades corrected Malom WDL may reduce premature mill closure without removing the useful value-preserving mill signal.",
+      "support": "All 16 mill-forming frozen downgrade turns receive +0.25 in legacy mode and zero in malom-preserving-only mode; all non-mill turns remain zero and the action and successor state are identical.",
+      "next_test": "Run a matched legacy-unconditional versus malom-preserving-only learning smoke with identical seed, data, curriculum, baseline, update count and held-out evaluator."
+    },
+    "observed_facts": [
+      "All 19 frozen first-downgrade turns replay as complete legal turns to their committed successor FEN.",
+      "Live sector-corrected-v1 Malom reproduces the committed downgrade quality on all 19 states.",
+      "Sixteen states form a mill and receive a total +4.0 legacy shaping reward.",
+      "Malom-preserving-only and disabled modes both award zero on these value-downgrading turns.",
+      "The preserving-only result equals disabled only because this cohort contains only downgrades; fixed tests separately prove that preserving mills retain the bonus.",
+      "No candidate model, optimizer, new action selection, new game, or weight update was used."
+    ]
+  },
+  "claim_boundary": {
+    "candidate_interrogated": false,
+    "causal_training_effect_proven": false,
+    "new_games": false,
+    "promotion_evidence": false,
+    "reward_route_integration_evidence": true,
+    "weights_updated": false
+  },
+  "evidence_date": "2026-08-09",
+  "evidence_identity": "a3966e80e29598ebc4243ac8bc1d37353b088fa767c9bdbbb4241e002979a9e8",
+  "implementation": {
+    "commit": "3292107eb5c16faa95623b7bfc07087607b65117",
+    "module_sha256": "7a9750113f15c8fe8b16cb2f76afdba4fc3569d0af8eecd1874ff54a69b96404",
+    "script_sha256": "3ae260333b548aa2ce9b00fa7dd4c2e4dddd56984fba99298a70c80774117cb3",
+    "tree": "0da8186044b2caacb75b984e9564b987c4d8b604"
+  },
+  "inputs": {
+    "corrected_malom_manifest": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "heldout_ledger_sha256": "100863efa58381fc736096440bf8ff4a178cd34215ac7b43e3d6f6767fae7892",
+    "oracle_audit_identity": "7cfa9ede873ae4fb34d7821472c62bba540f1b509476073062d52b487995cf65",
+    "oracle_audit_sha256": "29e3ed6d2af1389a90ef46869db5a2b8800e8c9c3993e13dd80af72ef07a7f28",
+    "wdl_audit_identity": "6bbb4a50aa7999d06679c802cfeb5b913f0f5abf0689aa0291ec55459304b504",
+    "wdl_audit_sha256": "871dd7935f7aa3231e6e364974e5207ef272501483e29338014cde16525b5692"
+  },
+  "probe_artifact": {
+    "canonical_json": true,
+    "path": "learned_ai/checkpoints/evaluation/sanmill-corrected-retained-v2-heldout-v1/mill-bonus-no-update-probe.json",
+    "probe_identity": "8f554f113ca65f05b8733f7e28b1e26177f58283c10b1c6f7d97abd603ef2186",
+    "sha256": "0560c3fe3b89f32e4a9f59778c214167496e404be10ba24b03622fdc5a618f37"
+  },
+  "schema_version": "nmm.mill-bonus-no-update-evidence.v1",
+  "status": "passed",
+  "summary": {
+    "disabled_reward_total": 0.0,
+    "legacy_reward_total": 4.0,
+    "mill_forming_states": 16,
+    "phase_counts": {
+      "fly": 9,
+      "move": 4,
+      "place": 6
+    },
+    "preserving_only_reward_total": 0.0,
+    "states": 19,
+    "stratum_counts": {
+      "book": 6,
+      "human_db": 2,
+      "perfect_db": 11
+    }
+  },
+  "verification": {
+    "focused_probe_and_audit_tests": "28 passed",
+    "probe_identity_recomputed": true,
+    "raw_canonical_bytes_verified": true,
+    "unique_ordinals": 19
+  }
+}
