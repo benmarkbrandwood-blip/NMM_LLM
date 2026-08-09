@@ -110,6 +110,8 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "0.90",
         "--mill-bonus-mode",
         args.mill_bonus_mode,
+        "--malom-policy-aux-coef",
+        str(args.malom_policy_aux_coef),
         "--self-play-ratio",
         str(self_play_ratio),
         "--update-target-every",
@@ -327,6 +329,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Explicit reward-shaping contract. New retained successors must "
             "not inherit the trainer's legacy compatibility default."
+        ),
+    )
+    prepare.add_argument(
+        "--malom-policy-aux-coef",
+        type=trainer._finite_nonnegative_float,
+        default=0.0,
+        help=(
+            "Explicit A2C preserving-set auxiliary coefficient; zero keeps "
+            "the historical update"
         ),
     )
     prepare.add_argument(

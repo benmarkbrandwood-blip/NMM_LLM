@@ -64,6 +64,27 @@ def test_common_args_record_explicit_truncation_ceiling(tmp_path) -> None:
     assert common[common.index("--mill-bonus-mode") + 1] == (
         "malom-preserving-only"
     )
+    assert common[common.index("--malom-policy-aux-coef") + 1] == "0.0"
+
+
+def test_common_args_bind_explicit_malom_policy_auxiliary(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        _required_prepare_args()
+        + ["--malom-policy-aux-coef", "0.1"]
+    )
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert common[common.index("--malom-policy-aux-coef") + 1] == "0.1"
+
+
+@pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])
+def test_prepare_rejects_invalid_malom_policy_auxiliary(value: str) -> None:
+    with pytest.raises(SystemExit):
+        manager._build_parser().parse_args(
+            _required_prepare_args()
+            + ["--malom-policy-aux-coef", value]
+        )
 
 
 def test_completion_bound_does_not_shorten_trainer_schedule(tmp_path) -> None:
