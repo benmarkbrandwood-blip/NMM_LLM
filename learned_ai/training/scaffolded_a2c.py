@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 import torch
@@ -60,6 +60,7 @@ class ScaffoldedStep:
     done:               bool
     behaviour_temperature: float = 1.0
     bootstrap_perspective: str = "same"
+    malom_preserving_mask: Optional[np.ndarray] = None
 
 
 def _behaviour_temperature(step: ScaffoldedStep) -> float:
@@ -102,6 +103,28 @@ def _require_finite(tensor: torch.Tensor, *, label: str) -> None:
         raise NonFiniteTrainingError(f"A2C: non-finite {label}")
 
 
+def _malom_preserving_mask(
+    step: ScaffoldedStep,
+    *,
+    legal_move_count: int,
+    device: torch.device,
+) -> torch.Tensor:
+    """Return an exact per-action preserving mask or fail closed."""
+    raw_mask = getattr(step, "malom_preserving_mask", None)
+    if raw_mask is None:
+        raise NonFiniteTrainingError("A2C: missing Malom preserving mask")
+    mask = np.asarray(raw_mask)
+    if mask.ndim != 1 or len(mask) != legal_move_count:
+        raise NonFiniteTrainingError(
+            "A2C: Malom preserving mask length does not match legal moves"
+        )
+    if mask.dtype != np.bool_:
+        raise NonFiniteTrainingError("A2C: Malom preserving mask must be boolean")
+    if not bool(mask.any()):
+        raise NonFiniteTrainingError("A2C: Malom label set has no preserving action")
+    return torch.as_tensor(mask, dtype=torch.bool, device=device)
+
+
 def scaffolded_a2c_update(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -112,16 +135,36 @@ def scaffolded_a2c_update(
     value_coef: float = VALUE_COEF,
     grad_clip: float = GRAD_CLIP,
     min_batch: int = MIN_UPDATE_STEPS,
+    malom_policy_aux_coef: float = 0.0,
+    diagnostics: Optional[dict[str, float | int]] = None,
 ) -> tuple[float, float, float]:
     """One A2C gradient update over a batch of ScaffoldedSteps.
 
     Returns (policy_loss, value_loss, entropy) as Python floats.
     Returns (0, 0, 0) if batch is too small.
     """
-    if len(steps) < min_batch:
-        return 0.0, 0.0, 0.0
+    try:
+        malom_policy_aux_coef = float(malom_policy_aux_coef)
+    except (TypeError, ValueError) as exc:
+        raise NonFiniteTrainingError(
+            "A2C: invalid Malom policy auxiliary coefficient"
+        ) from exc
+    if not math.isfinite(malom_policy_aux_coef) or malom_policy_aux_coef < 0.0:
+        raise NonFiniteTrainingError(
+            "A2C: Malom policy auxiliary coefficient must be finite and non-negative"
+        )
 
-    B = len(steps)
+    if len(steps) < min_batch:
+        if diagnostics is not None:
+            diagnostics.update(
+                {
+                    "malom_policy_aux_loss": 0.0,
+                    "malom_policy_aux_informative_steps": 0,
+                    "malom_policy_aux_labelled_steps": 0,
+                    "malom_policy_aux_mean_preserving_mass": 0.0,
+                }
+            )
+        return 0.0, 0.0, 0.0
 
     # ── Batch value inputs (fixed size — easy to stack) ────────────────────────
     all_vi  = torch.tensor(
@@ -162,6 +205,8 @@ def scaffolded_a2c_update(
     # ── Policy loss + entropy (per-step, variable k) ───────────────────────────
     policy_terms:  list[torch.Tensor] = []
     entropy_terms: list[torch.Tensor] = []
+    malom_aux_terms: list[torch.Tensor] = []
+    malom_preserving_masses: list[float] = []
 
     for i, step in enumerate(steps):
         feat   = torch.tensor(step.move_features, dtype=torch.float32).to(device)
@@ -171,15 +216,33 @@ def scaffolded_a2c_update(
         policy_terms.append(-log_probs[step.chosen_idx] * advantages[i])
         probs = log_probs.exp()
         entropy_terms.append(-(probs * log_probs).sum())
+        if malom_policy_aux_coef > 0.0:
+            preserving = _malom_preserving_mask(
+                step,
+                legal_move_count=len(log_probs),
+                device=device,
+            )
+            log_preserving_mass = torch.logsumexp(log_probs[preserving], dim=0)
+            malom_preserving_masses.append(
+                float(log_preserving_mass.detach().exp().item())
+            )
+            if not bool(preserving.all()):
+                malom_aux_terms.append(-log_preserving_mass)
 
     policy_loss  = torch.stack(policy_terms).mean()
     entropy_loss = torch.stack(entropy_terms).mean()
     value_loss   = F.mse_loss(v_curr, td_targets.detach())
+    malom_aux_loss = (
+        torch.stack(malom_aux_terms).mean()
+        if malom_aux_terms
+        else policy_loss.new_zeros(())
+    )
 
     total_loss = (
         policy_loss
         - entropy_coef * entropy_loss
         + value_coef * value_loss
+        + malom_policy_aux_coef * malom_aux_loss
     )
     _require_finite(total_loss, label="total loss")
 
@@ -199,6 +262,20 @@ def scaffolded_a2c_update(
     optimizer.step()
     for name, parameter in model.named_parameters():
         _require_finite(parameter, label=f"parameter {name} after optimizer step")
+
+    if diagnostics is not None:
+        diagnostics.update(
+            {
+                "malom_policy_aux_loss": float(malom_aux_loss.item()),
+                "malom_policy_aux_informative_steps": len(malom_aux_terms),
+                "malom_policy_aux_labelled_steps": len(malom_preserving_masses),
+                "malom_policy_aux_mean_preserving_mass": (
+                    float(sum(malom_preserving_masses) / len(malom_preserving_masses))
+                    if malom_preserving_masses
+                    else 0.0
+                ),
+            }
+        )
 
     return (
         float(policy_loss.item()),

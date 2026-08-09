@@ -237,7 +237,6 @@ class TestScaffoldedAgent:
 class TestScaffoldedA2C:
     def _make_steps(self, n: int = 16) -> list[ScaffoldedStep]:
         enc = fresh_enc()
-        k = len(enc.legal_moves)
         steps = []
         for _ in range(n):
             steps.append(ScaffoldedStep(
@@ -400,3 +399,133 @@ class TestScaffoldedA2C:
             match="predates behaviour-temperature tracking",
         ):
             scaffolded_a2c_update(model, optimizer, steps, torch.device("cpu"))
+
+    def test_malom_preserving_auxiliary_increases_total_safe_probability(self):
+        class FixedPolicyValue(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.policy = torch.nn.Parameter(torch.zeros(3))
+                self.value_bias = torch.nn.Parameter(torch.tensor(0.0))
+
+            def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
+                assert features.shape == (3, 1)
+                return self.policy
+
+            def value(self, features: torch.Tensor) -> torch.Tensor:
+                return self.value_bias.expand(features.shape[0])
+
+        steps = [
+            ScaffoldedStep(
+                move_features=np.zeros((3, 1), dtype=np.float32),
+                value_input=np.zeros(1, dtype=np.float32),
+                chosen_idx=2,
+                log_prob_old=float(-np.log(3.0)),
+                reward=0.0,
+                next_move_features=np.zeros((3, 1), dtype=np.float32),
+                next_value_input=np.zeros(1, dtype=np.float32),
+                done=True,
+                behaviour_temperature=1.0,
+                malom_preserving_mask=np.asarray([True, True, False]),
+            )
+            for _ in range(8)
+        ]
+        model = FixedPolicyValue()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.25)
+        before = float(torch.softmax(model.policy.detach(), dim=-1)[:2].sum())
+        diagnostics: dict[str, float | int] = {}
+
+        result = scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            entropy_coef=0.0,
+            value_coef=0.0,
+            malom_policy_aux_coef=1.0,
+            diagnostics=diagnostics,
+        )
+
+        after = float(torch.softmax(model.policy.detach(), dim=-1)[:2].sum())
+        assert len(result) == 3
+        assert after > before
+        assert diagnostics["malom_policy_aux_informative_steps"] == 8
+        assert diagnostics["malom_policy_aux_loss"] == pytest.approx(-np.log(2 / 3))
+        assert diagnostics["malom_policy_aux_mean_preserving_mass"] == pytest.approx(2 / 3)
+
+    def test_malom_preserving_auxiliary_does_not_rank_all_safe_actions(self):
+        class FixedPolicyValue(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.policy = torch.nn.Parameter(torch.tensor([-2.0, 0.0, 3.0]))
+                self.value_bias = torch.nn.Parameter(torch.tensor(0.0))
+
+            def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
+                return self.policy
+
+            def value(self, features: torch.Tensor) -> torch.Tensor:
+                return self.value_bias.expand(features.shape[0])
+
+        steps = [
+            ScaffoldedStep(
+                move_features=np.zeros((3, 1), dtype=np.float32),
+                value_input=np.zeros(1, dtype=np.float32),
+                chosen_idx=0,
+                log_prob_old=-5.0,
+                reward=0.0,
+                next_move_features=np.zeros((3, 1), dtype=np.float32),
+                next_value_input=np.zeros(1, dtype=np.float32),
+                done=True,
+                malom_preserving_mask=np.asarray([True, True, True]),
+            )
+            for _ in range(8)
+        ]
+        model = FixedPolicyValue()
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.25)
+        before = model.policy.detach().clone()
+        diagnostics: dict[str, float | int] = {}
+
+        scaffolded_a2c_update(
+            model,
+            optimizer,
+            steps,
+            torch.device("cpu"),
+            entropy_coef=0.0,
+            value_coef=0.0,
+            malom_policy_aux_coef=1.0,
+            diagnostics=diagnostics,
+        )
+
+        assert torch.equal(model.policy.detach(), before)
+        assert diagnostics["malom_policy_aux_informative_steps"] == 0
+        assert diagnostics["malom_policy_aux_loss"] == 0.0
+        assert diagnostics["malom_policy_aux_mean_preserving_mass"] == 1.0
+
+    @pytest.mark.parametrize(
+        ("mask", "match"),
+        [
+            (None, "missing Malom preserving mask"),
+            (np.asarray([True]), "mask length"),
+            (np.asarray([False, False]), "no preserving action"),
+        ],
+    )
+    def test_malom_preserving_auxiliary_fails_closed_on_bad_labels(
+        self,
+        mask,
+        match: str,
+    ):
+        steps = self._make_steps(8)
+        for step in steps:
+            step.move_features = np.zeros((2, 1), dtype=np.float32)
+            step.chosen_idx = 0
+            step.malom_preserving_mask = mask
+        model = ScaffoldedPolicyNet(move_feat_dim=1, value_input_dim=23)
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+        with pytest.raises(NonFiniteTrainingError, match=match):
+            scaffolded_a2c_update(
+                model,
+                optimizer,
+                steps,
+                torch.device("cpu"),
+                malom_policy_aux_coef=1.0,
+            )
