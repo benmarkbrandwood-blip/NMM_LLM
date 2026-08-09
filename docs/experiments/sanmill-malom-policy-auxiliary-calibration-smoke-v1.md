@@ -145,6 +145,34 @@ policy-health failure, or resource ceiling stops the entire four-arm sequence.
 There is no result-based extension, automatic promotion, or automatic second
 segment.
 
+## Fail-closed preparation
+
+After the design and readiness implementation are published, the audit entry
+point requires a clean `dev == origin/dev`, the reviewed `origin/main` tip, the
+exact tracked gradient-evidence manifest, its ignored raw probe, the closed
+database template, and the frozen MIF, rules, and Sanmill identities:
+
+```powershell
+.\.venv\Scripts\python.exe `
+  scripts\prepare_malom_policy_auxiliary_calibration.py
+```
+
+Adding `--prepare` copies four isolated databases, creates four managed plans,
+runs a read-only long-run preflight for each proposed first segment, audits
+one-factor equivalence, and writes one ignored readiness report:
+
+```powershell
+.\.venv\Scripts\python.exe `
+  scripts\prepare_malom_policy_auxiliary_calibration.py --prepare
+```
+
+Every technical preflight must contain zero errors and only the missing product
+authorization decision. The resulting state is
+`ready_for_product_authorization` with `launch_authorized=false`. Preparation
+does not create `authorization.json`, a segment directory, a checkpoint, or a
+training process. It refuses existing targets instead of overwriting or
+resuming them.
+
 ## Main-branch boundary
 
 `origin/main` was reviewed through
