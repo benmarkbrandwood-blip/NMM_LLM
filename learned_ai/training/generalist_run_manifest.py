@@ -226,6 +226,9 @@ def build_generalist_run_manifest(
             "imitation_warmstart": not args.no_s1a_warmstart,
             "imitation_mix": not args.no_imitation_mix,
             "opening_forcing": not args.no_opening_forcing,
+            "malom_policy_auxiliary": (
+                float(getattr(args, "malom_policy_aux_coef", 0.0)) > 0.0
+            ),
             "sanmill_referee": (
                 getattr(args, "referee_engine", "local") == "sanmill"
             ),

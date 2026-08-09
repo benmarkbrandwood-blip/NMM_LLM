@@ -61,6 +61,10 @@ from learned_ai.training.scaffolded_a2c import (
     scaffolded_a2c_update,
     scaffolded_ppo_update,
 )
+from learned_ai.training.malom_policy_labels import (
+    MalomPolicyLabelError,
+    label_malom_preserving_actions,
+)
 from learned_ai.training.advance_stats import (
     check_advance as _sanmill_check_advance,
     advance_target,
@@ -410,6 +414,9 @@ class StepDiag:
     mills_formed:       int = 0
     mill_bonus_awarded: float = 0.0
     malom_quality:      Optional[float] = None
+    malom_preserving_action_count: int = 0
+    malom_downgrading_action_count: int = 0
+    malom_preserving_probability: float = 0.0
 
 
 @dataclass
@@ -485,6 +492,11 @@ class GameDiag:
     formed_mill_malom_downgrade_place: int = 0
     formed_mill_malom_downgrade_move: int = 0
     formed_mill_malom_downgrade_fly: int = 0
+    malom_action_labelled_move_rate: float = 0.0
+    malom_preserving_action_count_mean: float = 0.0
+    malom_downgrading_action_count_mean: float = 0.0
+    malom_informative_action_set_rate: float = 0.0
+    malom_preserving_probability_mean: float = 0.0
 
 
 def _make_checkpoint_payload(
@@ -758,18 +770,24 @@ def _update_if_ready(
     device: torch.device,
     gamma: float,
     entropy_coef: float,
+    malom_policy_aux_coef: float = 0.0,
+    diagnostics: Optional[dict[str, float | int]] = None,
 ) -> Optional[tuple[float, float, float]]:
     """Run a real policy update only when the optimizer can consume the batch."""
     if len(steps) < MIN_UPDATE_STEPS:
         return None
-    return update_fn(
-        model,
-        optimizer,
-        steps,
-        device,
-        gamma=gamma,
-        entropy_coef=entropy_coef,
-    )
+    kwargs: dict[str, Any] = {
+        "gamma": gamma,
+        "entropy_coef": entropy_coef,
+    }
+    if malom_policy_aux_coef > 0.0:
+        kwargs.update(
+            {
+                "malom_policy_aux_coef": malom_policy_aux_coef,
+                "diagnostics": diagnostics,
+            }
+        )
+    return update_fn(model, optimizer, steps, device, **kwargs)
 
 
 def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) -> str:
@@ -1576,6 +1594,7 @@ def _rollout(
     persist_rollout_evidence: bool = True,
     timing_observer: Optional[Callable[[str, float], None]] = None,
     mill_bonus_mode: str = "legacy-unconditional",
+    malom_policy_aux_coef: float = 0.0,
 ) -> RolloutResult:
     """Run one production rollout with optional additive probe controls."""
     with _temporary_rollout_sim_depth(
@@ -1609,6 +1628,7 @@ def _rollout(
             persist_rollout_evidence=persist_rollout_evidence,
             timing_observer=timing_observer,
             mill_bonus_mode=mill_bonus_mode,
+            malom_policy_aux_coef=malom_policy_aux_coef,
         )
 
 
@@ -1639,6 +1659,7 @@ def _rollout_impl(
     persist_rollout_evidence: bool = True,
     timing_observer: Optional[Callable[[str, float], None]] = None,
     mill_bonus_mode: str = "legacy-unconditional",
+    malom_policy_aux_coef: float = 0.0,
 ) -> RolloutResult:
     board                   = start_board
     ply                     = 0
@@ -1799,12 +1820,34 @@ def _rollout_impl(
                 )
 
             total_pieces = board.pieces_on_board.get("W", 0) + board.pieces_on_board.get("B", 0)
-            with _timed_rollout_stage(timing_observer, "malom_move_quality"):
-                malom_q = (
-                    malom_db.query_move_quality(board, move)
-                    if malom_db is not None
-                    else None
-                )
+            malom_policy_labels = None
+            if malom_policy_aux_coef > 0.0:
+                with _timed_rollout_stage(
+                    timing_observer,
+                    "malom_policy_labels",
+                ):
+                    try:
+                        malom_policy_labels = label_malom_preserving_actions(
+                            malom_db,
+                            board=board,
+                            player=player,
+                            legal_moves=enc.legal_moves,
+                        )
+                    except MalomPolicyLabelError as exc:
+                        raise RuntimeError(
+                            f"exact Malom policy labels failed: {exc}"
+                        ) from exc
+                malom_q = float(malom_policy_labels.qualities[chosen_idx])
+            else:
+                with _timed_rollout_stage(
+                    timing_observer,
+                    "malom_move_quality",
+                ):
+                    malom_q = (
+                        malom_db.query_move_quality(board, move)
+                        if malom_db is not None
+                        else None
+                    )
             reward, rb = _compute_per_move_reward(
                 enc, chosen_idx, enc_after,
                 board_phase=board.phase,
@@ -1864,6 +1907,11 @@ def _rollout_impl(
                 done=terminal_next,
                 behaviour_temperature=temperature,
                 bootstrap_perspective="opponent",
+                malom_preserving_mask=(
+                    None
+                    if malom_policy_labels is None
+                    else malom_policy_labels.preserving_mask.copy()
+                ),
             )
             game_trajectory.append(step)
 
@@ -1901,6 +1949,29 @@ def _rollout_impl(
                 mills_formed=mills_formed,
                 mill_bonus_awarded=mill_bonus,
                 malom_quality=malom_q,
+                malom_preserving_action_count=(
+                    0
+                    if malom_policy_labels is None
+                    else malom_policy_labels.preserving_count
+                ),
+                malom_downgrading_action_count=(
+                    0
+                    if malom_policy_labels is None
+                    else malom_policy_labels.downgrading_count
+                ),
+                malom_preserving_probability=(
+                    0.0
+                    if malom_policy_labels is None
+                    else float(
+                        probs[
+                            torch.as_tensor(
+                                malom_policy_labels.preserving_mask,
+                                dtype=torch.bool,
+                                device=probs.device,
+                            )
+                        ].sum().item()
+                    )
+                ),
             ))
 
             learner_move_count += 1
@@ -2266,6 +2337,31 @@ def _build_game_diag(
             1
             for step, _ in downgrade_mill_steps
             if step.board_phase == "fly"
+        ),
+        malom_action_labelled_move_rate=_safe_mean(
+            [
+                1.0 if step.malom_preserving_action_count > 0 else 0.0
+                for step in sd
+            ]
+        ),
+        malom_preserving_action_count_mean=_safe_mean(
+            [float(step.malom_preserving_action_count) for step in sd]
+        ),
+        malom_downgrading_action_count_mean=_safe_mean(
+            [float(step.malom_downgrading_action_count) for step in sd]
+        ),
+        malom_informative_action_set_rate=_safe_mean(
+            [
+                1.0 if step.malom_downgrading_action_count > 0 else 0.0
+                for step in sd
+            ]
+        ),
+        malom_preserving_probability_mean=_safe_mean(
+            [
+                step.malom_preserving_probability
+                for step in sd
+                if step.malom_preserving_action_count > 0
+            ]
         ),
     )
 
@@ -2776,6 +2872,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     torch_generator=_game_torch_generator(cfg.torch_seed),
                     sanmill_game=sanmill_game,
                     mill_bonus_mode=args.mill_bonus_mode,
+                    malom_policy_aux_coef=args.malom_policy_aux_coef,
                 )
 
             if sanmill_installation is None:
@@ -2857,6 +2954,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         )[1]
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
+                    malom_policy_aux_coef=args.malom_policy_aux_coef,
                 )
                 if confirm_result.trajectory:
                     _retroactive_rescore(confirm_result.trajectory, confirm_result.step_diags,
@@ -2957,6 +3055,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         )[1]
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
+                    malom_policy_aux_coef=args.malom_policy_aux_coef,
                 )
                 if retry_result.trajectory:
                     _retroactive_rescore(retry_result.trajectory, retry_result.step_diags, retry_result.outcome, _draw_scale)
@@ -3038,6 +3137,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         )[1]
                     ),
                     mill_bonus_mode=args.mill_bonus_mode,
+                    malom_policy_aux_coef=args.malom_policy_aux_coef,
                 )
 
                 if branch_result.trajectory:
@@ -3078,6 +3178,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
+                update_diagnostics: dict[str, float | int] = {}
                 update_result = _update_if_ready(
                     update_fn=update_fn,
                     model=model,
@@ -3086,6 +3187,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     device=device,
                     gamma=args.gamma_td,
                     entropy_coef=args.entropy_coef,
+                    malom_policy_aux_coef=args.malom_policy_aux_coef,
+                    diagnostics=update_diagnostics,
                 )
                 if update_result is None:
                     raise RuntimeError("update cadence produced an undersized batch")
@@ -3100,6 +3203,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     "batch_steps": len(ep_steps),
                     "reason":      "periodic",
                 }
+                upd_entry.update(update_diagnostics)
                 with open(update_log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(upd_entry) + "\n")
                 ep_steps.clear()
@@ -3259,6 +3363,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     # ── Final flush ────────────────────────────────────────────────────────────
     if ep_steps:
         final_batch_steps = len(ep_steps)
+        update_diagnostics = {}
         update_result = _update_if_ready(
             update_fn=update_fn,
             model=model,
@@ -3267,6 +3372,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             device=device,
             gamma=args.gamma_td,
             entropy_coef=args.entropy_coef,
+            malom_policy_aux_coef=args.malom_policy_aux_coef,
+            diagnostics=update_diagnostics,
         )
         if update_result is not None:
             last_update_pl, last_update_vl, last_update_ent = update_result
@@ -3282,6 +3389,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             "lr": float(opt.param_groups[0]["lr"]),
                             "batch_steps": final_batch_steps,
                             "reason": "final_flush",
+                            **update_diagnostics,
                         }
                     )
                     + "\n"
@@ -3315,6 +3423,19 @@ def _finite_positive_float(value: str) -> float:
         ) from exc
     if not math.isfinite(parsed) or parsed <= 0.0:
         raise argparse.ArgumentTypeError("must be a finite positive number")
+    return parsed
+
+
+def _finite_nonnegative_float(value: str) -> float:
+    """Parse a finite, non-negative command-line float."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number"
+        ) from exc
+    if not math.isfinite(parsed) or parsed < 0.0:
+        raise argparse.ArgumentTypeError("must be a finite non-negative number")
     return parsed
 
 
@@ -3427,6 +3548,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Mill-formation and optional exact-WDL downgrade shaping contract. "
             "The default preserves historical runs."
+        ),
+    )
+    p.add_argument(
+        "--malom-policy-aux-coef",
+        type=_finite_nonnegative_float,
+        default=0.0,
+        help=(
+            "A2C-only coefficient for training-time exact-WDL preserving-set "
+            "policy supervision; zero preserves the historical update"
         ),
     )
     p.add_argument("--max-games",           type=int,   default=5000)

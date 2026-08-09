@@ -289,6 +289,24 @@ def validate_generalist_configuration(args: Any) -> None:
     entropy_coef = _finite_number(args.entropy_coef, field="entropy_coef")
     if entropy_coef < 0:
         raise PreflightConfigurationError("entropy_coef must not be negative")
+    malom_policy_aux_coef = _finite_number(
+        getattr(args, "malom_policy_aux_coef", 0.0),
+        field="malom_policy_aux_coef",
+    )
+    if malom_policy_aux_coef < 0:
+        raise PreflightConfigurationError(
+            "malom_policy_aux_coef must not be negative"
+        )
+    if malom_policy_aux_coef > 0.0:
+        if args.ppo:
+            raise PreflightConfigurationError(
+                "Malom policy auxiliary supervision requires A2C"
+            )
+        if args.mill_bonus_mode != "malom-preserving-only":
+            raise PreflightConfigurationError(
+                "Malom policy auxiliary supervision requires "
+                "mill_bonus_mode=malom-preserving-only"
+            )
     self_play_ratio = _finite_number(args.self_play_ratio, field="self_play_ratio")
     if not 0 <= self_play_ratio <= 1:
         raise PreflightConfigurationError(
