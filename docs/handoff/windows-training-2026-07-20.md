@@ -1624,10 +1624,38 @@ zero auxiliary weight when the ordinary gradient is below the floor, and logs
 the applied ratio and gradient cosine. Fixed coefficient zero remains the
 control and compatibility default.
 
-Local commit `bfd59106100d28a1cb046728bfc87b5be6708120` freezes the
-[three-seed paired calibration](../experiments/sanmill-malom-policy-auxiliary-normalized-calibration-v1.md),
-whose plan identity is
-`14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104`.
+Commits `702c669a624f3ead7099126c6707e6513ed821c3`,
+`bfd59106100d28a1cb046728bfc87b5be6708120` and
+`30246f6c610185a7bc48841ce31231f74b48979b` were ordinarily pushed. The
+first published preparation at `30246f6` produced six plans, six
+`needs_decision` preflights and six byte-identical empty database copies. Its
+preliminary readiness identity was
+`f684e9624ed878290aef6702c3aab5223a46ccd843f6be295ea49292f04671f6`;
+the report SHA-256 was
+`c632ed633dc550c5db295cdff865fa39399f3da232372aa9e50f9eaca0891502`.
+It created no authorization, segment, checkpoint or result.
+
+Review then found that the only existing policy-auxiliary result publisher was
+for four fixed coefficients. It could not interpret normalized-mode update
+diagnostics or apply the frozen three-seed paired decision. Those preliminary
+plans are therefore superseded and must not be authorized. The publisher
+correctly rejects their readiness as binding another contract.
+
+Local commit `a6de71a9ca052f5eccbb4f836067976eee483a89` adds the dedicated
+fail-closed result analyzer and immutable publisher before any training. The
+[revised three-seed paired calibration](../experiments/sanmill-malom-policy-auxiliary-normalized-calibration-v1.md)
+has plan identity
+`1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab`.
+It binds the analyzer SHA-256
+`afbefb7f9bedb0fafda8edf1e313f88f591ed47c995578b76842793f38290aaf`
+and publisher SHA-256
+`276ca8c34567d507eed225135cc1ec3db4986972c576c174c7935fdecd33f6fe`.
+The analyzer validates effective coefficients, ordinary and auxiliary gradient
+norms, applied ratios, cap status, cosine, exact labels, phase support, raw and
+complete-window curves, all artifact identities and the paired decision. The
+control records selected-action Malom diagnostics but does not enumerate the
+all-action auxiliary labels.
+
 Seeds 55, 56 and 57 each compare auxiliary-off control with normalized target
 0.25. Each arm is bounded to 100 games and one third active hour, so the whole
 sequence is capped at 600 games and two active hours. Only the first,
@@ -1637,24 +1665,12 @@ median preserving-mass gain of at least 0.001, and explicit entropy,
 repetition, identity, label, checkpoint and resource gates. Passing can only
 justify designing a later effectiveness experiment.
 
-The source-only readiness report is ignored at
-`out/malom-policy-auxiliary-normalized-calibration-v1/source-readiness.json`.
-Its readiness identity is
-`a81209e884564fea1814ce15874a6fc157ba9ce95eef8bb7673c0581fab5061e`
-and its file SHA-256 is
-`7c7dbf410fc6a5dfc4aff3a4ff4350fdd7de5065a5353566c4d4a3ccafad7daa`.
-It verifies the no-update evidence, empty `sector-corrected-v1` template,
-Sanmill binary and checkout, MIF release and active ruleset. Its state is
-`implementation_complete_needs_publication` because local `dev` is two commits
-ahead of `origin/dev`. No arm plan, database copy, authorization, segment,
-checkpoint or trainer process was created.
-
-The final local gate passes 162 normalized-auxiliary, trainer, managed-run,
-contract and readiness tests. The mandatory Malom, DB-teacher and label-
-provenance gate separately passes 103 tests plus 498 parameterized subtests.
-Ruff passes every changed non-legacy Python module, and the changed legacy
-trainer passes the fatal-error rule set; `git diff --check` passes. This is a
-focused preparation result, not a new clean full-repository test claim.
+The final local gate passes 173 normalized-auxiliary, result, trainer,
+managed-run, contract and readiness tests. The mandatory Malom, DB-teacher and
+label-provenance gate separately passes 103 tests plus 498 parameterized
+subtests. Ruff passes every changed Python module and `git diff --check`
+passes. This is a focused preparation result, not a new clean full-repository
+test claim.
 
 Observed facts support testing normalization as a scale-control mechanism.
 They do not establish that its gradient direction cooperates with A2C or that
@@ -1744,13 +1760,15 @@ the current successor in this order:
     result and tracked interpretation under their recorded identities. Its
     one-run authorization is consumed. Do not rerun it or treat its implied
     coefficient distribution as a selected training setting.
-15. Keep commits `702c669` and `bfd5910` local until ordinary publication is
-    explicitly authorized. After clean `dev == origin/dev`, run the
-    fail-closed normalized-calibration preparer once. It may create only six
-    ignored managed plans, six preflight records and six isolated database
-    copies. Review their new readiness identity before requesting a separate
-    launch authorization. No training, retry, extension, resume, promotion or
-    publication is currently authorized.
+15. Keep result-analyzer commit `a6de71a` and this handover update local until
+    ordinary publication is explicitly authorized. The preliminary
+    `30246f6` plans and empty databases bind the superseded contract and must be
+    quarantined before preparation is repeated. After clean final
+    `dev == origin/dev`, run the fail-closed preparer once to create six new
+    plans, preflights and isolated database copies bound to plan identity
+    `1b6f8d0`. Review the resulting readiness identity before requesting a
+    separate launch authorization. No training, retry, extension, resume,
+    promotion or publication is currently authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1841,11 +1859,12 @@ The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, and the no-update batch-capture grant are also consumed. Safe work now
-is limited to publishing the two normalized-calibration preparation commits
-when explicitly authorized, generating its six unlaunched plans from the final
-clean published tip, and reviewing that new readiness evidence. No normalized
-arm, additional calibration, long training job, promotion/publication,
-protocol change or history rewrite is authorized by this handover.
+is limited to publishing the normalized result-analyzer and handover commits
+when explicitly authorized, quarantining the superseded preliminary plans,
+generating six replacement unlaunched plans from the final clean published
+tip, and reviewing that new readiness evidence. No normalized arm, additional
+calibration, long training job, promotion/publication, protocol change or
+history rewrite is authorized by this handover.
 
 ## Reference Material
 
