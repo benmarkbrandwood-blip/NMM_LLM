@@ -529,6 +529,43 @@ def inspect_result_implementation(
     return result
 
 
+def inspect_preparation_targets(
+    root: Path,
+    contract: Mapping[str, Any],
+    *,
+    report_path: Path,
+) -> dict[str, Any]:
+    """Report existing one-shot preparation targets without changing them."""
+    targets: list[tuple[str, Path]] = [("readiness_report", report_path)]
+    for arm in _ordered_arms(contract):
+        targets.extend(
+            (
+                (
+                    f"{arm['arm_id']}:control_dir",
+                    _repository_path(
+                        root, arm["control_dir"], field="control_dir"
+                    ),
+                ),
+                (
+                    f"{arm['arm_id']}:specialist_db",
+                    _repository_path(
+                        root, arm["specialist_db"], field="specialist_db"
+                    ),
+                ),
+            )
+        )
+    existing = [
+        {
+            "label": label,
+            "path": path.relative_to(root.resolve()).as_posix(),
+            "kind": "directory" if path.is_dir() else "file",
+        }
+        for label, path in targets
+        if path.exists()
+    ]
+    return {"absent": not existing, "existing": existing}
+
+
 def _objective(contract: Mapping[str, Any], arm: Mapping[str, Any]) -> str:
     return f'{contract["objective"]}; arm={arm["arm_id"]}'
 
@@ -864,13 +901,33 @@ def inspect_source_readiness(
     template = inspect_template(root, contract)
     runtime = inspect_runtime_identities(root, paths_config, contract)
     result_analysis = inspect_result_implementation(root, contract)
+    targets = inspect_preparation_targets(
+        root,
+        contract,
+        report_path=root / DEFAULT_REPORT,
+    )
+    if not source["published"]:
+        state = "implementation_complete_needs_publication"
+    elif not targets["absent"]:
+        state = "published_source_needs_target_quarantine"
+    else:
+        state = "source_ready_for_local_preparation"
+    unresolved: list[str] = []
+    if not source["published"]:
+        unresolved.append(
+            "publish the implementation and preparation commits to origin/dev"
+        )
+    if not targets["absent"]:
+        unresolved.append(
+            "quarantine the superseded preliminary preparation targets"
+        )
+    if not unresolved:
+        unresolved.append(
+            "run fail-closed local preparation; training remains unauthorized"
+        )
     body = {
         "schema_version": SOURCE_READINESS_SCHEMA,
-        "state": (
-            "source_ready_for_local_preparation"
-            if source["published"]
-            else "implementation_complete_needs_publication"
-        ),
+        "state": state,
         "launch_authorized": False,
         "contract": {
             "path": str(contract_path),
@@ -882,6 +939,7 @@ def inspect_source_readiness(
         "template": template,
         "runtime": runtime,
         "result_analysis": result_analysis,
+        "preparation_targets": targets,
         "commands": build_prepare_commands(
             root=root,
             contract=contract,
@@ -890,11 +948,7 @@ def inspect_source_readiness(
         ),
         "resource_envelope": contract["resources"],
         "claim_boundary": contract["claim_boundary"],
-        "unresolved_decisions": (
-            ["publish the implementation and preparation commits to origin/dev"]
-            if not source["published"]
-            else ["run fail-closed local preparation; training remains unauthorized"]
-        ),
+        "unresolved_decisions": unresolved,
     }
     return {**body, "readiness_identity": canonical_sha256(body)}
 

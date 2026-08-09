@@ -15,6 +15,7 @@ from learned_ai.validation.malom_policy_auxiliary_normalized_calibration_readine
     _normalised_training_semantics,
     build_prepare_commands,
     inspect_batch_capture_evidence,
+    inspect_preparation_targets,
     load_normalized_calibration_contract,
     publish_source_readiness,
 )
@@ -193,3 +194,37 @@ def test_source_readiness_publisher_refuses_overwrite(tmp_path: Path) -> None:
         match="already exists",
     ):
         publish_source_readiness(path, report)
+
+
+def test_source_audit_reports_existing_preparation_targets(tmp_path: Path) -> None:
+    contract = copy.deepcopy(load_normalized_calibration_contract(CONTRACT_PATH))
+    for index, arm in enumerate(contract["arms"]):
+        arm["control_dir"] = f"out/arm-{index}"
+        arm["specialist_db"] = f"data/arm-{index}.sqlite"
+    report_path = tmp_path / "out/readiness.json"
+
+    assert inspect_preparation_targets(
+        tmp_path, contract, report_path=report_path
+    ) == {"absent": True, "existing": []}
+
+    existing_dir = tmp_path / contract["arms"][0]["control_dir"]
+    existing_dir.mkdir(parents=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.touch()
+    observed = inspect_preparation_targets(
+        tmp_path, contract, report_path=report_path
+    )
+
+    assert observed["absent"] is False
+    assert observed["existing"] == [
+        {
+            "label": "readiness_report",
+            "path": "out/readiness.json",
+            "kind": "file",
+        },
+        {
+            "label": "seed55-control:control_dir",
+            "path": "out/arm-0",
+            "kind": "directory",
+        },
+    ]
