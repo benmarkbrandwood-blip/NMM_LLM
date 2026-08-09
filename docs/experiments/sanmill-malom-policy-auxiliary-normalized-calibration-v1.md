@@ -1,12 +1,18 @@
 # Sanmill Malom policy-auxiliary normalized calibration v1
 
-Status: `designed_unlaunched_needs_publication`
+Status: `completed_inconclusive_stop_and_redesign`
 
 Machine-readable contract:
 [`sanmill-malom-policy-auxiliary-normalized-calibration-v1.json`](sanmill-malom-policy-auxiliary-normalized-calibration-v1.json)
 
 Plan identity:
 `1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab`
+
+Completed result:
+[normalized calibration result evidence](../evidence/sanmill-malom-policy-auxiliary-normalized-calibration-result-2026-08-10.md)
+
+Result identity:
+`669124f2803609fe87fabc15c38a798711e78541ed1a39614cf44837a51a58ac`
 
 This experiment is a bounded optimizer-integration calibration. It is not a
 held-out evaluation, a playing-strength comparison, a promotion decision, or

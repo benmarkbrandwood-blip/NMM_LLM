@@ -1699,6 +1699,31 @@ scratch/control baselines, paired ablation changes and phase/opponent/colour/
 termination metrics must be considered together. The 29-state diagnostic is
 development evidence, not held-out validation.
 
+The authorized six-arm run subsequently completed exactly once under readiness
+identity `a5fb75eda17b4609902294f424300cb45f964440852ecfe4a008f1ea70733637`.
+All 600 games, 176 optimizer updates, six checkpoints, six policy-health gates,
+and six isolated corrected databases passed their infrastructure and numerical
+checks. The immutable local result has identity
+`669124f2803609fe87fabc15c38a798711e78541ed1a39614cf44837a51a58ac`,
+file SHA-256
+`0d59bc587d66006255020e5ab3b7faab2f8b9c693a1c139686a475d0e93828bb`,
+and verdict `inconclusive_stop_and_redesign`.
+
+The normalized ratio was exactly 0.25 on all 88 treatment updates and every
+seed moved the fixed development diagnostic in the intended direction. The
+median paired preserving-mass gain was only `0.0000298`, below the frozen
+`0.001` gate, while seed 55 exceeded the raw repetition-rate safety limit by
+one percentage point. No target is selected and no retained or long run is
+authorized. Preserve the detailed
+[result evidence](../evidence/sanmill-malom-policy-auxiliary-normalized-calibration-result-2026-08-10.md).
+
+The next safe step is a no-game, disposable target-response audit on the three
+persisted treatment final-flush batches. It should compare normalized target
+ratios 0.25, 0.50, and 1.00 from the same pre-update model and Adam state,
+reproduce the real 0.25 update, report post-Adam response and phase support,
+and mutate no persisted artefact. It is diagnosis only and cannot select a
+training setting or launch another run.
+
 ## Recommended Next Actions
 
 The corrected retained 5,000-game run is complete. Preserve its plan,
@@ -1779,15 +1804,13 @@ the current successor in this order:
     result and tracked interpretation under their recorded identities. Its
     one-run authorization is consumed. Do not rerun it or treat its implied
     coefficient distribution as a selected training setting.
-15. Keep result-analyzer commit `a6de71a`, target-audit commit `2a263f0` and
-    the handover updates local until ordinary publication is explicitly
-    authorized. The preliminary `30246f6` plans and empty databases bind the
-    superseded contract and are preserved in the recoverable quarantine named
-    above. After clean final `dev == origin/dev`, run the fail-closed preparer
-    once to create six new plans, preflights and isolated database copies bound
-    to plan identity `1b6f8d0`. Review the resulting readiness identity before
-    requesting a separate launch authorization. No training, retry, extension,
-    resume, promotion or publication is currently authorized.
+15. Preserve the completed normalized calibration, its six consumed
+    authorizations, all plans and ledgers, result identity `669124f2`, and the
+    recoverable superseded-preparation quarantine. Its verdict is
+    `inconclusive_stop_and_redesign`; target 0.25 is not selected. Before any
+    further learning run, perform only the separately frozen no-game target
+    response audit described above. No retry, extension, resume, promotion,
+    model publication, or long training is currently authorized.
 
 The previously executed isolated smoke command was:
 
