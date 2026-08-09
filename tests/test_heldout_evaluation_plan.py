@@ -25,6 +25,12 @@ AUTHORIZATION = (
     / "experiments"
     / "sanmill-corrected-retained-v2-heldout-eval-v1-authorization.json"
 )
+READINESS_EVIDENCE = (
+    ROOT
+    / "docs"
+    / "evidence"
+    / "sanmill-corrected-retained-v2-heldout-runner-readiness-2026-08-09.json"
+)
 
 
 def test_frozen_plan_binds_operational_and_strict_analysis() -> None:
@@ -81,3 +87,21 @@ def test_authorization_binds_one_exact_plan_and_no_promotion() -> None:
     assert authorization["claim_boundary"]["new_training"] is False
     assert authorization["claim_boundary"]["model_promotion"] is False
     assert authorization["claim_boundary"]["model_publication"] is False
+
+
+def test_prepublish_readiness_evidence_preserves_the_unconsumed_gate() -> None:
+    evidence = json.loads(READINESS_EVIDENCE.read_text(encoding="utf-8"))
+    evidence_identity = evidence.pop("readiness_evidence_identity")
+
+    assert canonical_sha256(evidence) == evidence_identity
+    assert evidence["status"] == (
+        "implementation_verified_awaiting_publish_and_final_preflight"
+    )
+    assert evidence["implementation"]["commit"] == (
+        "e32d9d46a361d2ed6877b669cdf653eba78e3f3c"
+    )
+    assert evidence["final_gate"]["ready"] is False
+    assert evidence["final_gate"]["failed_gate"] == "repository"
+    assert evidence["authorization_state"]["grant_consumed"] is False
+    assert evidence["authorization_state"]["corpus_games_played"] == 0
+    assert evidence["claim_boundary"]["evaluation_result"] is False

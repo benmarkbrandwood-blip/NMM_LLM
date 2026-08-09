@@ -1,0 +1,113 @@
+{
+  "authorization_state": {
+    "authorization_identity": "6426ffd109d28145a4148855d70a181d50fd4277068fe01b501934d212378fb1",
+    "corpus_candidate_moves_requested": 0,
+    "corpus_games_played": 0,
+    "grant_consumed": false
+  },
+  "candidate": {
+    "bundle_identity": "c2652119b64a2808ebcd5e7dc661873f3f897065b7d529bd9e261328f0981f23",
+    "checkpoint_file_sha256": "df00861a5ced53b6c9b16ed89f2762d41a82f1d74fce970b5d0bdf6adba4ac4d",
+    "checkpoint_id": "managed-sanmill-corrected-retained-v2-segment-0020:checkpoint:00000006",
+    "checkpoint_payload_sha256": "8b4017ce856012fa3c4d578c56c5f32a6d5ebae97b9f17c6cbd2c5228146de19",
+    "synthetic_canary_move_identity": "d3a540c3bd65e534bef90f4129613d504e39cf111e4e753f2eea7cd7b125e0f1",
+    "synthetic_candidate_moves_requested": 2
+  },
+  "claim_boundary": {
+    "evaluation_result": false,
+    "full_test_suite_clean": false,
+    "model_promotion": false,
+    "model_publication": false,
+    "new_training": false,
+    "ready_to_launch": false
+  },
+  "corpus_replay": {
+    "candidate_loaded": false,
+    "fresh_processes": 64,
+    "games_played": 0,
+    "observations_identity": "48c63007f0f6b617ae099419ad23b9f340e895f3df3ccc2c7d049102c88c7648",
+    "records": 64
+  },
+  "evidence_date": "2026-08-09",
+  "evaluation_id": "dev-v4-sanmill-corrected-retained-v2-heldout-v1",
+  "final_gate": {
+    "failed_gate": "repository",
+    "failure_message": "held-out evaluation requires dev == origin/dev",
+    "passed_gates": [
+      "contract",
+      "outputs",
+      "rules",
+      "candidate",
+      "sanmill",
+      "synthetic_route_interop",
+      "prefix_replay",
+      "process_ownership",
+      "tests"
+    ],
+    "prepublish_readiness_identity": "d1071b704457275850a10b58d51bd12b1d67c0b112fbd3825f9e9710ce4427d6",
+    "ready": false,
+    "required_next_action": "publish dev by ordinary push, then rerun the complete read-only preflight"
+  },
+  "implementation": {
+    "branch": "dev",
+    "commit": "e32d9d46a361d2ed6877b669cdf653eba78e3f3c",
+    "files": {
+      "learned_ai/evaluation/heldout_evaluation.py": "14a9b3c734251440523dca3f56a507dcfc03ce33fa7ea40376085b645e9e4939",
+      "scripts/run_heldout_evaluation.py": "61e6f7449d9206c352b41470ae42dff0b1421e1851e56b8a2752a82866eaba16",
+      "tests/test_heldout_evaluation_runner.py": "ffa73e30807e5a1ae2a4f8b753c0517cd1c8c5e914bea033f5ed05e6fbc58e69"
+    },
+    "origin_dev_at_audit": "c2cf435bd7238b9f3d1e322d206550d4dee00e74",
+    "tree": "3ec863c2012524b3efcf8b04e5bb3ff85f6a1129",
+    "unpushed_commit_count": 5
+  },
+  "known_counterevidence": {
+    "interpretation": "These legacy smoke failures bind a different db65eb3e binary contract and do not exercise the exact a6623f8 training runtime used by this evaluation. They prevent a full-suite-clean claim but do not replace or weaken the held-out gates.",
+    "legacy_sanmill_uci_test_result": {
+      "failed": 4,
+      "passed": 41,
+      "reason": "the moving development checkout no longer satisfies the immutable db65eb3e source and binary pin, and no matching cac2ec6f binary exists in the configured runtime locations"
+    },
+    "main_review": {
+      "decision": "no cherry-pick into the frozen retained-v2 evaluator",
+      "origin_main_commit": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9",
+      "reason": "recent main changes target the separate v2c, GapNet, puzzle, explorer, and autosave lineages"
+    }
+  },
+  "plan": {
+    "file_sha256": "06f168d1687557a9146455fae0a8174c7714b7dd864cfd5a1e2c383c26009b21",
+    "identity": "212076e9423b671b83783efef411db3b4a56c8c67ae36a463d381d6939d4d982"
+  },
+  "readiness_evidence_identity": "8aadc1cd156386edf9ea44b2e54a8bb18b57233ae3aaa92290ed45f30cafa9bb",
+  "sanmill": {
+    "binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "deterministic_fresh_processes": 2,
+    "fixed_node_ceiling": 500000,
+    "runtime_identity": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+    "strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.sanmill-heldout-prepublish-readiness-evidence.v1",
+  "status": "implementation_verified_awaiting_publish_and_final_preflight",
+  "synthetic_route_interop": {
+    "candidate_actions": [
+      "d6"
+    ],
+    "corpus_prefix_loaded": false,
+    "game_scored": false,
+    "logical_plies": 2,
+    "resulting_history_sha256": "ad8bb7aa2fe8cf5d3addfd898061b5c1851ef31bd55777ff464b962036e73503",
+    "sanmill_actions": [
+      "f4"
+    ],
+    "sanmill_completed_depth": 1,
+    "sanmill_observed_nodes": 50
+  },
+  "tests": {
+    "additional_runtime_dependency_tests": "59 passed",
+    "current_focused_with_evidence_identity_test": "79 passed",
+    "focused": "78 passed",
+    "mandatory_malom_and_provenance": "103 passed, 498 subtests passed",
+    "ruff": "passed"
+  }
+}
