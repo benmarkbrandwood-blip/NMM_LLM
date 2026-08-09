@@ -1,0 +1,231 @@
+{
+  "batch_contract": {
+    "draw_penalty_scale": 1.0,
+    "final_flush_minimum_steps": 8,
+    "preserve_complete_game_trajectories": true,
+    "periodic_update_threshold_steps": 64,
+    "production_cadence_note": "append each complete primary trajectory, measure and clear after the accumulated batch reaches 64 steps, then measure a final residual only when it has at least 8 steps",
+    "retroactive_rescore": true
+  },
+  "bounded_work": {
+    "complete_games": 60,
+    "fresh_seeds": 3,
+    "frozen_target_games": 36,
+    "maximum_active_seconds": 7200,
+    "maximum_gradient_batches": 33,
+    "maximum_logical_plies": 7200,
+    "maximum_requested_search_node_ceilings": 1440000,
+    "maximum_search_calls": 1440,
+    "sanmill_games": 24
+  },
+  "claim_boundary": {
+    "candidate_checkpoint_loaded": false,
+    "coefficient_or_normalization_selected": false,
+    "fresh_random_models": 3,
+    "optimizer_constructed": false,
+    "optimizer_steps": 0,
+    "strength_or_promotion_claim": false,
+    "training_updates": 0
+  },
+  "decision_rules": {
+    "automatic_extension": false,
+    "automatic_retry": false,
+    "execution_requires_explicit_authority": true,
+    "publish_only_complete_schedule": true,
+    "refuse_output_overwrite": true,
+    "select_coefficient_or_target": false,
+    "stop_all_seeds_on_any_failure": true,
+    "training_launch": false
+  },
+  "experiment_id": "sanmill-malom-policy-auxiliary-no-update-batch-capture-v1",
+  "gradient_measurement": {
+    "denominator_floor": 1e-12,
+    "entropy_coefficient": 0.01,
+    "gamma_td": 0.99,
+    "report_dimensions": [
+      "seed",
+      "batch",
+      "board phase",
+      "opponent source",
+      "learner colour",
+      "termination reason"
+    ],
+    "target_policy_head_ratios": [
+      0.25,
+      0.5,
+      1.0
+    ],
+    "value_coefficient": 0.5
+  },
+  "model_route": {
+    "batch_games": 1,
+    "checkpoint": null,
+    "cuda_required": true,
+    "disabled_components": [
+      "sentinel",
+      "value_net",
+      "gap_net",
+      "s1a_warmstart",
+      "s1b_refresher",
+      "imitation_mix",
+      "opening_forcing",
+      "recovery",
+      "retry_rollouts",
+      "branch_rollouts"
+    ],
+    "malom_policy_label_capture_trigger": 1.0,
+    "max_ply": 120,
+    "mill_bonus_mode": "malom-preserving-only",
+    "optimizer": null,
+    "policy_hidden": [
+      512,
+      256,
+      128
+    ],
+    "rollout_persistence": false,
+    "sim_ply_depth_deep": 12,
+    "sim_ply_depth_normal": 5,
+    "start_mode": "fresh",
+    "temperature": 0.9
+  },
+  "parent_route_contract": {
+    "path": "docs/experiments/sanmill-no-update-integrated-route-probe-v1.json",
+    "plan_identity": "7aa079dcf59556d35f3fbd58072b6baa8c9f798e087cc336e29c8309552e3cfb",
+    "raw_sha256": "b422ea44fad5fa4181294a4bc3d6e77a48692b43672ccc2ed6976d87f1aabe36"
+  },
+  "plan_identity": "f6c79590425d6ed23ecf11eb9bb7b6f6833da7abbd790b510d4c4f80fb4d5b30",
+  "schedule_contract": {
+    "deep_local_index_by_seed": {
+      "52": 0,
+      "53": 1,
+      "54": 2
+    },
+    "games_per_seed": 20,
+    "pattern": [
+      {
+        "learner_color": "W",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      },
+      {
+        "learner_color": "B",
+        "node_budget": 1000,
+        "opponent_kind": "sanmill"
+      },
+      {
+        "learner_color": "W",
+        "node_budget": null,
+        "opponent_kind": "frozen_target"
+      }
+    ],
+    "per_seed": {
+      "deep_games": 1,
+      "frozen_target_black": 6,
+      "frozen_target_games": 12,
+      "frozen_target_white": 6,
+      "normal_games": 19,
+      "sanmill_black": 4,
+      "sanmill_games": 8,
+      "sanmill_white": 4
+    },
+    "seeds": [
+      52,
+      53,
+      54
+    ]
+  },
+  "schema_version": "nmm.sanmill-malom-policy-auxiliary-no-update-batch-capture-plan.v1",
+  "source_evidence": {
+    "calibration_plan_identity": "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba",
+    "calibration_result_identity": "d11384f661192db84662a6e43e85cdd6eb299672724178a83a02858b0b12113f",
+    "calibration_result_sha256": "bdfbfbb4b68dca011277d76604e385a2a5918dd818dca963c50600528fb64761",
+    "gradient_interaction_audit_identity": "9d338f3b0e3c2a8d4a94a480a814ebc1137c5d3ffe60f1141865ceedd1b715e0",
+    "gradient_interaction_report_sha256": "2576a9323170a5f590e2751ec58f1ef391fc0658cc8be3fbc77bbef748ff98be"
+  },
+  "status": "prepared_unlaunched"
+}
