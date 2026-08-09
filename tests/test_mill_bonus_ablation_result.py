@@ -10,7 +10,9 @@ import pytest
 
 from learned_ai.evaluation.mill_bonus_ablation_result import (
     MillBonusAblationResultError,
+    _inspect_analysis_source,
     _validate_manifest,
+    _validate_policy_health,
     decide_paired_result,
     publish_result,
     summarize_game_rows,
@@ -342,6 +344,107 @@ def test_manifest_must_match_readiness_protocol_and_assets() -> None:
             contract=contract,
             preflight=preflight,
         )
+
+
+def test_policy_health_comparison_uses_json_semantics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded = {
+        "passed": True,
+        "failures": (),
+        "report": str(tmp_path / "policy-health.json"),
+        "metrics": {"candidate_value_preserving_rate": 1.0},
+    }
+    validated = {
+        "passed": True,
+        "failures": [],
+        "report": str(tmp_path / "policy-health.json"),
+        "metrics": {"candidate_value_preserving_rate": 1.0},
+    }
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result.managed."
+        "_trainer_arg_value",
+        lambda plan, argument: str(tmp_path / "specialist.sqlite"),
+    )
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result.managed."
+        "_validate_policy_health_report",
+        lambda *args, **kwargs: validated,
+    )
+
+    result = _validate_policy_health(
+        SimpleNamespace(game_bound=500, git_commit="a" * 40),
+        details={"policy_health": recorded},
+        checkpoint=tmp_path / "latest.pt",
+    )
+
+    assert result == validated
+
+
+def test_analysis_source_allows_only_published_analyzer_erratum(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = "a" * 40
+    head = "b" * 40
+    outputs = {
+        ("branch", "--show-current"): "dev",
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "origin/dev"): head,
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
+        ("merge-base", expected, head): expected,
+        (
+            "diff",
+            "--name-only",
+            f"{expected}..{head}",
+            "--",
+        ): (
+            "learned_ai/evaluation/mill_bonus_ablation_result.py\n"
+            "tests/test_mill_bonus_ablation_result.py"
+        ),
+    }
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result._git_output",
+        lambda root, *arguments: outputs[arguments],
+    )
+
+    source = _inspect_analysis_source(tmp_path, expected)
+
+    assert source["head"] == head
+    assert source["training_source_commit"] == expected
+    assert source["post_training_analysis_paths"] == [
+        "learned_ai/evaluation/mill_bonus_ablation_result.py",
+        "tests/test_mill_bonus_ablation_result.py",
+    ]
+
+
+def test_analysis_source_rejects_non_analysis_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    expected = "a" * 40
+    head = "b" * 40
+    outputs = {
+        ("branch", "--show-current"): "dev",
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "origin/dev"): head,
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
+        ("merge-base", expected, head): expected,
+        (
+            "diff",
+            "--name-only",
+            f"{expected}..{head}",
+            "--",
+        ): "scripts/train_s_gen_v2.py",
+    }
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result._git_output",
+        lambda root, *arguments: outputs[arguments],
+    )
+
+    with pytest.raises(
+        MillBonusAblationResultError,
+        match="post-training source changes are not analysis-only",
+    ):
+        _inspect_analysis_source(tmp_path, expected)
 
 
 def test_result_publication_is_canonical_and_exclusive(tmp_path: Path) -> None:

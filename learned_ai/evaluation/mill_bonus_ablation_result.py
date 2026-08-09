@@ -44,6 +44,13 @@ TAIL_FIRST_GAME = 301
 TAIL_LAST_GAME = 500
 PHASES = ("place", "move", "fly")
 
+_POST_TRAINING_ANALYSIS_PATHS = frozenset(
+    {
+        "learned_ai/evaluation/mill_bonus_ablation_result.py",
+        "tests/test_mill_bonus_ablation_result.py",
+    }
+)
+
 _REQUIRED_GAME_FIELDS = {
     "game_id",
     "game",
@@ -661,14 +668,40 @@ def _inspect_analysis_source(root: Path, expected_commit: str) -> dict[str, Any]
     dirty = _git_output(
         root, "status", "--porcelain=v1", "--untracked-files=all"
     )
-    if branch != "dev" or head != upstream or head != expected_commit or dirty:
+    if branch != "dev" or head != upstream or dirty:
         raise MillBonusAblationResultError(
             "result analysis requires the clean published plan source on dev"
         )
+    changed_paths: list[str] = []
+    if head != expected_commit:
+        merge_base = _git_output(root, "merge-base", expected_commit, head)
+        if merge_base != expected_commit:
+            raise MillBonusAblationResultError(
+                "result analysis source does not descend from the training source"
+            )
+        changed_paths = sorted(
+            path
+            for path in _git_output(
+                root,
+                "diff",
+                "--name-only",
+                f"{expected_commit}..{head}",
+                "--",
+            ).splitlines()
+            if path
+        )
+        if not changed_paths or not set(changed_paths).issubset(
+            _POST_TRAINING_ANALYSIS_PATHS
+        ):
+            raise MillBonusAblationResultError(
+                "post-training source changes are not analysis-only"
+            )
     return {
         "branch": branch,
         "head": head,
         "origin_dev": upstream,
+        "training_source_commit": expected_commit,
+        "post_training_analysis_paths": changed_paths,
         "worktree_clean": True,
     }
 
@@ -910,7 +943,10 @@ def _validate_policy_health(
         completed_games=plan.game_bound,
         runtime_commit=plan.git_commit,
     )
-    if validated != dict(recorded) or not validated["passed"]:
+    if (
+        canonical_json_bytes(validated) != canonical_json_bytes(recorded)
+        or not validated["passed"]
+    ):
         raise MillBonusAblationResultError("policy-health evidence changed")
     return validated
 
