@@ -518,20 +518,31 @@ def _read_git_state(root: Path) -> GitState:
     )
 
 
-def _sqlite_read_only(path: Path) -> sqlite3.Connection:
-    uri = f"{path.resolve().as_uri()}?mode=ro"
+def _sqlite_read_only(
+    path: Path,
+    *,
+    immutable: bool = False,
+) -> sqlite3.Connection:
+    options = "mode=ro"
+    if immutable:
+        options += "&immutable=1"
+    uri = f"{path.resolve().as_uri()}?{options}"
     connection = sqlite3.connect(uri, uri=True)
     connection.execute("PRAGMA query_only=ON")
     return connection
 
 
-def _probe_sqlite(path: Path) -> tuple[sqlite3.Connection | None, dict[str, Any]]:
+def _probe_sqlite(
+    path: Path,
+    *,
+    immutable: bool = False,
+) -> tuple[sqlite3.Connection | None, dict[str, Any]]:
     report: dict[str, Any] = {"exists": path.exists(), "kind": "sqlite"}
     if not path.is_file():
         report["error"] = "path is not an existing file"
         return None, report
     try:
-        connection = _sqlite_read_only(path)
+        connection = _sqlite_read_only(path, immutable=immutable)
         quick_check = connection.execute("PRAGMA quick_check").fetchone()
         report["quick_check"] = quick_check[0] if quick_check else None
         if report["quick_check"] != "ok":
@@ -575,7 +586,19 @@ def _probe_specialist_db(path: Path) -> dict[str, Any]:
                 }
             ),
         }
-    connection, report = _probe_sqlite(path)
+    sidecars = [
+        Path(f"{path}{suffix}")
+        for suffix in ("-wal", "-shm", "-journal")
+        if Path(f"{path}{suffix}").exists()
+    ]
+    if sidecars:
+        return {
+            "exists": True,
+            "kind": "sqlite",
+            "error": "immutable SpecialistDB has SQLite sidecars: "
+            + ", ".join(item.name for item in sidecars),
+        }
+    connection, report = _probe_sqlite(path, immutable=True)
     if connection is None:
         return report
     try:

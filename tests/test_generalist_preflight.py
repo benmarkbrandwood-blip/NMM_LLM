@@ -14,6 +14,7 @@ import torch
 from learned_ai.training import generalist_preflight as preflight_module
 from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
 from learned_ai.data.data_contract import publish_dataset_manifest
+from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.training.generalist_preflight import (
     GitState,
     PreflightConfigurationError,
@@ -474,6 +475,54 @@ def test_smoke_preflight_is_read_only_and_ready_for_corrected_baseline(
         path: path.stat().st_mtime_ns
         for path in (Path(args.human_db), Path(args.specialist_db))
     }
+
+
+def test_fresh_preflight_does_not_create_specialist_db_sidecars(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    database = SpecialistDB(args.specialist_db)
+    database.close()
+    wal = Path(f"{args.specialist_db}-wal")
+    shm = Path(f"{args.specialist_db}-shm")
+    assert not wal.exists()
+    assert not shm.exists()
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={"out_dir": "cli"},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_smoke"
+    assert not wal.exists()
+    assert not shm.exists()
+
+
+def test_fresh_preflight_rejects_existing_specialist_db_sidecars(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    database = SpecialistDB(args.specialist_db)
+    database.close()
+    Path(f"{args.specialist_db}-wal").touch()
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={"out_dir": "cli"},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "fatal_stop"
+    assert any("SQLite sidecars" in error for error in report["errors"])
 
 
 def test_smoke_preflight_rejects_existing_output_and_legacy_specialist_db(
