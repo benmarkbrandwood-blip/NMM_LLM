@@ -103,6 +103,20 @@ grant remains unconsumed. See the
 [authorization](../experiments/sanmill-corrected-retained-v2-heldout-eval-v1-authorization.md)
 and [exposure audit](../evidence/sanmill-corrected-retained-v2-heldout-exposure-2026-08-09.md).
 
+The dedicated evaluator now exists at local `dev` implementation commit
+`e32d9d46a361d2ed6877b669cdf653eba78e3f3c`. It provides the guarded CLI,
+canonical hash-chained game ledger, strict result validation, active-time
+ceiling, exact missing-suffix resume and recomputable paired/subgroup report.
+Pre-publish evidence commit
+`43cb0189930d7071403e825c603e2b91feff7b18` records 64/64 fresh-process
+prefix replays, a real non-corpus candidate/Sanmill interoperability canary,
+79 current focused tests, and 103 Malom/provenance tests with 498 subtests.
+Every read-only gate passed except the deliberate publication gate because
+local `dev` is still ahead of `origin/dev`. No corpus game or corpus candidate
+move has occurred, so the one-run authorization remains unconsumed. The next
+action is an ordinary `dev` push followed by a complete final preflight; see the
+[runner readiness evidence](../evidence/sanmill-corrected-retained-v2-heldout-runner-readiness-2026-08-09.md).
+
 On 8 August the product owner selected a separate fresh
 `dev-v4-sanmill-refereed-fresh-v1` lineage after confirming that Sanmill must
 participate in training, not merely in later evaluation. The new route starts
@@ -1421,9 +1435,10 @@ controller completed.
 
 The post-completion focused verification passed, but the repository still has
 the separately documented moving-checkout Sanmill failures; no new clean
-full-suite claim was made. The held-out protocol and one-run authorization are
-now frozen, but the grant remains unconsumed because its evaluator and final
-preflight do not yet exist. Proceed in this order:
+full-suite claim was made. The held-out protocol, one-run authorization,
+evaluator and pre-publish readiness evidence now exist. The grant remains
+unconsumed because the implementation has not yet been published and the final
+published-commit preflight has therefore not passed. Proceed in this order:
 
 1. Preserve the corrected retained plan, authorization, ledgers, every
    accepted segment checkpoint, both recovery bundles, the final candidate
@@ -1469,11 +1484,12 @@ preflight do not yet exist. Proceed in this order:
    22/21/21 twelve-ply opening corpus. It is domain feedback, not an automatic
    phase-corpus freeze. Any later tactical stratum must remain separately
    identified.
-10. Preserve the frozen retained-v2 held-out plan, exposure audit and one-run
-    authorization. Implement and audit the exact formal runner, then perform
-    its final read-only preflight. If every frozen gate passes, the grant
-    permits one 64-pair execution without another product-choice prompt. Do
-    not pool its result with Stage 0 or the training diagnostics.
+10. Preserve the frozen retained-v2 held-out plan, exposure audit, one-run
+    authorization, runner and pre-publish readiness evidence. Publish the
+    existing `dev` chain by ordinary push, then perform the complete final
+    read-only preflight. If every frozen gate passes, the grant permits one
+    64-pair execution without another product-choice prompt. Do not pool its
+    result with Stage 0 or the training diagnostics.
 
 The previously executed isolated smoke command was:
 
@@ -1562,9 +1578,11 @@ promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant is a
-different, unconsumed authorization. Safe work now includes its exact runner,
-tests and read-only readiness evidence. Only after all frozen gates pass may
-that one evaluation begin. No additional evaluation, smoke or training job,
+different, unconsumed authorization. Its exact runner, tests and pre-publish
+readiness evidence are complete locally. Safe work now consists of publishing
+the existing `dev` commits without rewriting them and rerunning the final
+read-only preflight. Only after all frozen gates pass may that one evaluation
+begin. No additional evaluation, smoke or training job,
 promotion/publication, protocol change or history rewrite is authorized.
 
 ## Reference Material
