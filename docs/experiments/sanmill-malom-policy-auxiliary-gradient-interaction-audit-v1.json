@@ -1,0 +1,75 @@
+{
+  "arms": [
+    {
+      "arm_id": "medium-c010",
+      "coefficient": 0.1,
+      "final_checkpoint": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/medium-c010/segments/segment-0001/latest.pt",
+        "sha256": "71868dcf8f3ec652ae54f7aafa4502a42e3fa73e7dcdacbbab09a2619803a4db",
+        "size_bytes": 2120247
+      },
+      "pre_update_checkpoint": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/medium-c010/segments/segment-0001/latest.prev0.pt",
+        "sha256": "ec87dbd3484b80c4df5f820ff50630829139a2f811fcdebe9880de5aff8cbe7f",
+        "size_bytes": 3168314
+      },
+      "update_log": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/medium-c010/segments/segment-0001/update_log.jsonl",
+        "sha256": "849c345e392018183cefddaac86e28afc40546e07fc2b4a3cf4e598651c8cafd",
+        "size_bytes": 9254
+      }
+    },
+    {
+      "arm_id": "high-c030",
+      "coefficient": 0.3,
+      "final_checkpoint": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/high-c030/segments/segment-0001/latest.pt",
+        "sha256": "6837fecdd046297aa4f61bea468bd2a1d9044b2544d02434ba1d0c6636fa8eff",
+        "size_bytes": 2120247
+      },
+      "pre_update_checkpoint": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/high-c030/segments/segment-0001/latest.prev0.pt",
+        "sha256": "a26cc8fa949f1f7e498465706f3369159f8a107130a7c31036822ef2cb79364b",
+        "size_bytes": 3126714
+      },
+      "update_log": {
+        "path": "out/malom-policy-auxiliary-calibration-smoke-v1/high-c030/segments/segment-0001/update_log.jsonl",
+        "sha256": "3e1216494c43c38ad4d2a3bf5dd67dc11c3372dd3a8912a6dc7c6184db690b11",
+        "size_bytes": 9258
+      }
+    }
+  ],
+  "calibration_result": {
+    "path": "out/malom-policy-auxiliary-calibration-smoke-v1/result.json",
+    "result_identity": "d11384f661192db84662a6e43e85cdd6eb299672724178a83a02858b0b12113f",
+    "sha256": "bdfbfbb4b68dca011277d76604e385a2a5918dd818dca963c50600528fb64761",
+    "size_bytes": 459253,
+    "verdict": "inconclusive_recalibration_required"
+  },
+  "claim_boundary": {
+    "candidate_model_loaded": true,
+    "new_games": 0,
+    "optimizer_or_model_mutation": false,
+    "strength_or_promotion_claim": false,
+    "training_updates": 0
+  },
+  "experiment_id": "sanmill-malom-policy-auxiliary-gradient-interaction-audit-v1",
+  "method": {
+    "adam_replay": "production scaffolded_a2c_update on disposable model and optimizer copies",
+    "batch_source": "persisted pending steps immediately before each arm's final flush",
+    "comparison": "same pre-update model and Adam state with coefficient zero versus the arm coefficient",
+    "gradient_components": [
+      "policy",
+      "entropy",
+      "value",
+      "malom-preserving-set auxiliary"
+    ],
+    "production_replay_tolerance": 1e-06
+  },
+  "schema_version": "nmm.sanmill-malom-policy-auxiliary-gradient-interaction-plan.v1",
+  "source_calibration": {
+    "plan_identity": "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba",
+    "readiness_identity": "62a17abe2ecbb05aac07e7b1fa7f42d7be70cf9cca707d8a598bd98564b15bc0",
+    "training_source_commit": "2b04d5af09468c191409cfa70b3699411dd9ed85"
+  }
+}
