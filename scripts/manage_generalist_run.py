@@ -104,7 +104,7 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         "--max-games",
         str(args.max_games),
         "--seed",
-        "42",
+        str(args.seed),
         "--temp-start",
         "0.90",
         "--mill-bonus-mode",
@@ -258,6 +258,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "--experiment-id",
         required=True,
         help="New experiment identity; do not reuse a completed run ID",
+    )
+    prepare.add_argument(
+        "--seed",
+        required=True,
+        type=int,
+        help="Explicit trainer seed recorded in the immutable run plan",
     )
     prepare.add_argument("--max-games", type=int, default=DEFAULT_MAX_GAMES)
     prepare.add_argument(

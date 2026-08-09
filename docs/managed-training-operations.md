@@ -94,6 +94,7 @@ From a clean committed worktree, the Agent runs a command equivalent to:
   --max-wall-hours <product-resource-limit> `
   --objective <product-approved-objective> `
   --experiment-id <new-experiment-id> `
+  --seed <explicit-trainer-seed> `
   --max-ply <explicit-experiment-truncation>
 ```
 
