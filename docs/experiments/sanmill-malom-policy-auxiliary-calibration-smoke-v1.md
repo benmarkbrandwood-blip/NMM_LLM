@@ -118,7 +118,12 @@ The fixed 29-informative-state development diagnostic must separately compare
 the resulting checkpoints. It is inspected development data, not held-out
 validation. The diagnostic retains its existing direct-signal, preserving-rate
 and logit-margin safety gates and additionally supplies the fixed-state
-preserving-mass comparison needed for coefficient calibration.
+preserving-mass comparison needed for coefficient calibration. Each arm first
+computes candidate minus its same-seed reconstructed scratch policy on that
+arm's exact feature and SpecialistDB route. The nonzero-arm training change is
+then compared with the control training change. This difference-in-differences
+prevents divergent, downstream SpecialistDB contents from being mistaken for
+a direct coefficient effect at the diagnostic starting point.
 
 There is no ordinary supervised train/validation split in this RL smoke.
 Training W/D/L and the inspected development corpus therefore cannot support a
@@ -133,15 +138,17 @@ complete exact labels wherever the auxiliary is active, valid identities,
 clean checkpoints, passing referee/database/policy-health gates, no policy
 collapse, and no material entropy or repetition-draw safety regression.
 
-Among eligible nonzero arms, select the lowest coefficient that produces a
-fixed-state scheduled preserving-mass improvement of at least 0.001 over the
-control while its median scaled auxiliary loss is no greater than the median
-absolute A2C policy loss. Its fixed-state scheduled entropy may not fall more
-than 0.15 below control, and its repetition-draw rate may not exceed control by
-more than 0.10. If no nonzero arm passes, stop and redesign normalization. This
-calibration does not select by training-game W/D/L. These engineering-scale
-gates only decide whether a coefficient is suitable for a later multi-seed
-effectiveness experiment; they are not strength or promotion thresholds.
+Among eligible nonzero arms, select the lowest coefficient whose
+scratch-normalized fixed-state scheduled preserving-mass training gain exceeds
+the control training gain by at least 0.001, while its median scaled auxiliary
+loss is no greater than the median absolute A2C policy loss. Its
+scratch-normalized fixed-state scheduled entropy may not fall more than 0.15
+beyond the control training change, and its repetition-draw rate may not exceed
+control by more than 0.10. If no nonzero arm passes, stop and redesign
+normalization. This calibration does not select by training-game W/D/L. These
+engineering-scale gates only decide whether a coefficient is suitable for a
+later multi-seed effectiveness experiment; they are not strength or promotion
+thresholds.
 
 Any identity drift, non-finite value, incomplete exact action labelling,
 SpecialistDB or rules mismatch, Sanmill error, checkpoint corruption,

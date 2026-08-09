@@ -161,6 +161,9 @@ def test_calibration_binds_the_exact_gradient_evidence() -> None:
 def test_calibration_decision_gates_are_numeric_and_precommitted() -> None:
     rule = _load_plan()["analysis"]["decision_rule"]
 
+    assert rule["fixed_state_comparison"].startswith(
+        "within each arm compute candidate minus"
+    )
     assert rule["minimum_fixed_state_preserving_mass_gain_over_control"] == 0.001
     assert rule["maximum_scaled_auxiliary_to_absolute_policy_loss_ratio"] == 1.0
     assert rule["maximum_repetition_draw_rate_increase_over_control"] == 0.1

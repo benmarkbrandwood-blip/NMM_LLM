@@ -34,7 +34,7 @@ def test_loader_accepts_only_the_frozen_four_arm_contract() -> None:
     contract = load_calibration_contract(CONTRACT_PATH)
 
     assert contract["plan_identity"] == (
-        "b1b2fc15a6eae2dd73f16a1a86a2d89536355c9dab6cf895dc9bdf7f5e03b33c"
+        "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba"
     )
     assert [
         arm["malom_policy_aux_coef"]

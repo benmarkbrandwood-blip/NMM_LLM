@@ -2,6 +2,7 @@
   "analysis": {
     "decision_rule": {
       "eligible": "finite and identity-valid arm with complete exact-label support, passing checkpoint/referee/database/policy-health gates, no policy collapse, and no material entropy or repetition-draw safety regression",
+      "fixed_state_comparison": "within each arm compute candidate minus same-seed reconstructed scratch on that arm's exact feature and SpecialistDB route, then compare each nonzero arm's training change with the control training change",
       "maximum_fixed_state_entropy_drop_over_control": 0.15,
       "maximum_repetition_draw_rate_increase_over_control": 0.1,
       "maximum_scaled_auxiliary_to_absolute_policy_loss_ratio": 1.0,
@@ -196,7 +197,7 @@
     "single_changed_factor": "malom_policy_aux_coef",
     "single_process_at_a_time": true
   },
-  "plan_identity": "b1b2fc15a6eae2dd73f16a1a86a2d89536355c9dab6cf895dc9bdf7f5e03b33c",
+  "plan_identity": "bdee5fc858b065203d61edbd199e4e77be32262c3fb75a72172e4f7489542aba",
   "preparation_evidence": {
     "tracked_manifest": {
       "path": "docs/evidence/sanmill-malom-policy-auxiliary-gradient-probe-2026-08-09.json",
