@@ -35,7 +35,7 @@ def test_loader_accepts_only_the_frozen_six_arm_contract() -> None:
     contract = load_normalized_calibration_contract(CONTRACT_PATH)
 
     assert contract["plan_identity"] == (
-        "14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104"
+        "1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab"
     )
     assert [arm["seed"] for arm in contract["arms"]] == [55, 55, 56, 56, 57, 57]
     assert [arm["malom_policy_aux_mode"] for arm in contract["arms"]] == [

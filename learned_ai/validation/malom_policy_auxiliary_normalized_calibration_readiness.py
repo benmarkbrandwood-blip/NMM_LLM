@@ -42,6 +42,9 @@ SOURCE_READINESS_SCHEMA = (
 READINESS_SCHEMA = (
     "nmm.sanmill-malom-policy-auxiliary-normalized-calibration-readiness.v1"
 )
+RESULT_SCHEMA = (
+    "nmm.sanmill-malom-policy-auxiliary-normalized-calibration-result.v1"
+)
 DEFAULT_CONTRACT = Path(
     "docs/experiments/"
     "sanmill-malom-policy-auxiliary-normalized-calibration-v1.json"
@@ -228,6 +231,28 @@ def load_normalized_calibration_contract(path: str | Path) -> dict[str, Any]:
         raise MalomPolicyAuxiliaryNormalizedCalibrationReadinessError(
             "normalized calibration pairing contract differs"
         )
+
+    implementation = contract.get("analysis", {}).get("result_implementation")
+    if (
+        not isinstance(implementation, Mapping)
+        or set(implementation) != {"module", "publisher", "result_schema"}
+        or implementation.get("result_schema") != RESULT_SCHEMA
+    ):
+        raise MalomPolicyAuxiliaryNormalizedCalibrationReadinessError(
+            "normalized result implementation contract differs"
+        )
+    for name in ("module", "publisher"):
+        record = implementation.get(name)
+        if (
+            not isinstance(record, Mapping)
+            or set(record) != {"path", "sha256"}
+            or not isinstance(record.get("path"), str)
+            or not isinstance(record.get("sha256"), str)
+            or len(record["sha256"]) != 64
+        ):
+            raise MalomPolicyAuxiliaryNormalizedCalibrationReadinessError(
+                f"normalized result implementation identity differs: {name}"
+            )
 
     common = contract.get("common_training_contract")
     resources = contract.get("resources")
@@ -473,6 +498,35 @@ def inspect_batch_capture_evidence(
         "result_identity": identity,
         "summary": observed_summary,
     }
+
+
+def inspect_result_implementation(
+    root: Path, contract: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Verify the pre-result analyzer and publisher bytes are frozen."""
+    implementation = contract["analysis"]["result_implementation"]
+    result = {"result_schema": implementation["result_schema"]}
+    for name in ("module", "publisher"):
+        expected = implementation[name]
+        path = _repository_path(
+            root,
+            expected["path"],
+            field=f"normalized result {name}",
+        )
+        if not path.is_file() or not _tracked_file(root, path):
+            raise MalomPolicyAuxiliaryNormalizedCalibrationReadinessError(
+                f"normalized result {name} is not tracked"
+            )
+        observed = _sha256_file(path)
+        if observed != expected["sha256"]:
+            raise MalomPolicyAuxiliaryNormalizedCalibrationReadinessError(
+                f"normalized result {name} SHA-256 differs"
+            )
+        result[name] = {
+            "path": expected["path"],
+            "sha256": observed,
+        }
+    return result
 
 
 def _objective(contract: Mapping[str, Any], arm: Mapping[str, Any]) -> str:
@@ -809,6 +863,7 @@ def inspect_source_readiness(
     )
     template = inspect_template(root, contract)
     runtime = inspect_runtime_identities(root, paths_config, contract)
+    result_analysis = inspect_result_implementation(root, contract)
     body = {
         "schema_version": SOURCE_READINESS_SCHEMA,
         "state": (
@@ -826,6 +881,7 @@ def inspect_source_readiness(
         "batch_capture_evidence": evidence,
         "template": template,
         "runtime": runtime,
+        "result_analysis": result_analysis,
         "commands": build_prepare_commands(
             root=root,
             contract=contract,
@@ -862,6 +918,7 @@ def prepare_normalized_calibration(
     )
     template_record = inspect_template(root, contract)
     runtime = inspect_runtime_identities(root, paths_config, contract)
+    result_analysis = inspect_result_implementation(root, contract)
     assert_preparation_outputs_ignored(root, contract, report_path=report_path)
     assert_preparation_targets_absent(root, contract, report_path=report_path)
     commands = build_prepare_commands(
@@ -959,6 +1016,7 @@ def prepare_normalized_calibration(
         "batch_capture_evidence": evidence,
         "template": template_record,
         "runtime": runtime,
+        "result_analysis": result_analysis,
         "commands": commands,
         "arms": audited,
         "resource_envelope": contract["resources"],

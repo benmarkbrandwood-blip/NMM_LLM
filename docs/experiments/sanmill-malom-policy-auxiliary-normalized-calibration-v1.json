@@ -24,6 +24,17 @@
       "required_direct_signal_preserving_rate": 1.0,
       "role": "inspected development safety diagnostic; not held-out validation or strength evidence"
     },
+    "result_implementation": {
+      "module": {
+        "path": "learned_ai/evaluation/malom_policy_auxiliary_normalized_calibration_result.py",
+        "sha256": "afbefb7f9bedb0fafda8edf1e313f88f591ed47c995578b76842793f38290aaf"
+      },
+      "publisher": {
+        "path": "scripts/report_malom_policy_auxiliary_normalized_calibration.py",
+        "sha256": "276ca8c34567d507eed225135cc1ec3db4986972c576c174c7935fdecd33f6fe"
+      },
+      "result_schema": "nmm.sanmill-malom-policy-auxiliary-normalized-calibration-result.v1"
+    },
     "normalization_diagnostics": [
       "ordinary policy-head gradient L2",
       "raw auxiliary gradient L2",
@@ -267,7 +278,7 @@
     "single_changed_training_factor": "malom_policy_aux_mode",
     "single_process_at_a_time": true
   },
-  "plan_identity": "14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104",
+  "plan_identity": "1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab",
   "preparation_evidence": {
     "no_update_batch_capture": {
       "interpretation_commit": "bcceab547cc7de9177a24964bd021816d656bd7c",

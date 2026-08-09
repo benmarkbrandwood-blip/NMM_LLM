@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import random
 from pathlib import Path
 
@@ -166,3 +167,16 @@ def test_contract_identity_and_temperature_schedule_are_canonical() -> None:
         common["max_games_schedule"],
         common["temperature_start"],
     ) == pytest.approx(common["temperature_end"])
+
+
+def test_contract_pins_the_pre_result_analyzer_and_publisher() -> None:
+    implementation = _plan()["analysis"]["result_implementation"]
+
+    assert implementation["result_schema"] == (
+        "nmm.sanmill-malom-policy-auxiliary-normalized-calibration-result.v1"
+    )
+    for name in ("module", "publisher"):
+        record = implementation[name]
+        path = ROOT / record["path"]
+        assert path.is_file()
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]

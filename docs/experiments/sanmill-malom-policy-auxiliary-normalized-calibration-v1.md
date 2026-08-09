@@ -6,7 +6,7 @@ Machine-readable contract:
 [`sanmill-malom-policy-auxiliary-normalized-calibration-v1.json`](sanmill-malom-policy-auxiliary-normalized-calibration-v1.json)
 
 Plan identity:
-`14d7ea7f5ac6aa3128d749310603c407d3a09396315a9fac8da3a6d9e6089104`
+`1b6f8d05047c4de9d6603d9ae1f26714cb1a23b3b96749e76136387a5f0b53ab`
 
 This experiment is a bounded optimizer-integration calibration. It is not a
 held-out evaluation, a playing-strength comparison, a promotion decision, or
@@ -134,9 +134,12 @@ that floor fails closed. If the ordinary policy-head norm is below the floor,
 the auxiliary coefficient is explicitly zero. A batch with no downgrading
 alternative is labelled but applies no auxiliary update.
 
-The control runs the same label collection and diagnostics with fixed
-coefficient zero. This keeps observation coverage comparable while applying no
-auxiliary gradient.
+The control keeps the selected-action Malom quality diagnostics but does not
+enumerate the all-action auxiliary labels and applies no auxiliary gradient.
+The treatment enumerates the complete legal action set because those labels
+are required to compute its loss. This diagnostic-cost difference is recorded;
+it is not a second learning signal, and the completed-game rather than
+wall-clock comparison is primary.
 
 ## Evidence to collect
 
@@ -153,6 +156,24 @@ by opponent source and colour rather than collapsed into one headline rate.
 There is no validation-loss curve in this calibration because no supervised
 train/validation split is being optimized. The fixed-state diagnostic is the
 predeclared development comparison; later held-out evaluation remains separate.
+
+The contract also pins the dedicated result analyzer and immutable publisher
+by path and SHA-256 before any arm can be authorized. The analyzer rejects
+partial normalization diagnostics, non-reconciling norms or ratios, incomplete
+phase support, changed runtime identities, incomplete arms and post-training
+decision-rule changes. The result publisher writes once into the ignored
+experiment directory and refuses overwrite.
+
+After, and only after, all six authorized arms have completed, the frozen
+publisher command is:
+
+```powershell
+.\.venv\Scripts\python.exe `
+  scripts/report_malom_policy_auxiliary_normalized_calibration.py
+```
+
+Before completion it must return `not_reportable`; it never starts, resumes or
+modifies training.
 
 ## Frozen decision rule
 
