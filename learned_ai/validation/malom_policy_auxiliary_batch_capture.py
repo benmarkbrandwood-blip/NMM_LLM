@@ -1607,9 +1607,15 @@ def failure_output_path(path: str | Path) -> Path:
 
 def publish_report(path: str | Path, report: Mapping[str, Any]) -> None:
     target = validate_output_path(path)
-    identity = report.get("report_identity")
+    schema_version = report.get("schema_version")
+    identity_key = (
+        "readiness_identity"
+        if schema_version == PREFLIGHT_SCHEMA
+        else "report_identity"
+    )
+    identity = report.get(identity_key)
     body = dict(report)
-    body.pop("report_identity", None)
+    body.pop(identity_key, None)
     if identity != canonical_sha256(body):
         raise MalomPolicyAuxiliaryBatchCaptureError(
             "batch-capture report identity is invalid"

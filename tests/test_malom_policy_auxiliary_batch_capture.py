@@ -384,3 +384,20 @@ def test_readiness_validation_binds_plan_source_and_identity(monkeypatch) -> Non
             expected_identity=report["readiness_identity"],
             source=changed,
         )
+
+
+def test_publish_report_uses_readiness_identity_for_preflight(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(capture, "_ROOT", tmp_path)
+    body = {
+        "schema_version": capture.PREFLIGHT_SCHEMA,
+        "status": "ready_for_explicit_one_run_authorization",
+    }
+    report = {**body, "readiness_identity": canonical_sha256(body)}
+    output = tmp_path / "out" / "diagnostics" / "readiness.json"
+
+    capture.publish_report(output, report)
+
+    assert json.loads(output.read_text(encoding="utf-8")) == report
