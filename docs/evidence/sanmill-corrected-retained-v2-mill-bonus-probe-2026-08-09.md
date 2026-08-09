@@ -63,4 +63,3 @@ difference may be `--mill-bonus-mode`.
 
 The machine-readable evidence is
 [`sanmill-corrected-retained-v2-mill-bonus-probe-2026-08-09.json`](sanmill-corrected-retained-v2-mill-bonus-probe-2026-08-09.json).
-

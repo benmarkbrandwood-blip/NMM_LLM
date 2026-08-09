@@ -97,4 +97,3 @@ def test_probe_rejects_an_incomplete_mill_turn() -> None:
             malom_quality=-1.0,
             expected_after_fen=board.to_fen_string(),
         )
-

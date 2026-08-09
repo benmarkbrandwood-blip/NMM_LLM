@@ -320,4 +320,3 @@ def build_mill_bonus_no_update_probe(
         },
     }
     return {**body, "probe_identity": canonical_sha256(body)}
-
