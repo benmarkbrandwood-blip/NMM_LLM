@@ -674,8 +674,16 @@ def _run_checked(
             f"command could not run: {command[1]}"
         ) from exc
     if result.returncode != 0:
+        details = []
+        stdout = (result.stdout or "").strip()
+        stderr = (result.stderr or "").strip()
+        if stdout:
+            details.append(f"stdout={stdout}")
+        if stderr:
+            details.append(f"stderr={stderr}")
         raise MillBonusAblationReadinessError(
-            f"command failed with {result.returncode}: {result.stderr.strip()}"
+            f"command failed with {result.returncode}: "
+            + ("; ".join(details) if details else "<no output>")
         )
     return result
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -149,6 +150,28 @@ def test_preparation_refuses_any_existing_target(tmp_path: Path) -> None:
             tmp_path,
             contract,
             report_path=tmp_path / "out/readiness.json",
+        )
+
+
+def test_failed_command_preserves_stdout_diagnostic(tmp_path: Path) -> None:
+    diagnostic = '{"verdict":"fatal_stop","errors":["wrong output"]}'
+
+    def failed_runner(*_args, **_kwargs):
+        return subprocess.CompletedProcess(
+            args=["python", "trainer.py"],
+            returncode=2,
+            stdout=diagnostic,
+            stderr="",
+        )
+
+    with pytest.raises(
+        MillBonusAblationReadinessError,
+        match="fatal_stop",
+    ):
+        readiness_module._run_checked(
+            ["python", "trainer.py"],
+            root=tmp_path,
+            runner=failed_runner,
         )
 
 
