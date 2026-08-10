@@ -120,7 +120,7 @@ def _relative(path: Path) -> str:
         ) from exc
 
 
-def _git_identity(expected_commit: str) -> dict[str, Any]:
+def _git_identity(expected_training_commit: str) -> dict[str, Any]:
     def output(*arguments: str) -> str:
         return subprocess.check_output(
             ["git", *arguments], cwd=ROOT, text=True
@@ -130,16 +130,41 @@ def _git_identity(expected_commit: str) -> dict[str, Any]:
     branch = output("branch", "--show-current")
     head = output("rev-parse", "HEAD")
     origin_dev = output("rev-parse", "origin/dev")
-    if status or branch != "dev" or head != origin_dev or head != expected_commit:
+    training_is_ancestor = (
+        subprocess.run(
+            [
+                "git",
+                "merge-base",
+                "--is-ancestor",
+                expected_training_commit,
+                head,
+            ],
+            cwd=ROOT,
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode
+        == 0
+    )
+    if (
+        status
+        or branch != "dev"
+        or head != origin_dev
+        or not training_is_ancestor
+    ):
         raise EqualTransitionReportError(
-            "result publication requires the exact clean published training source"
+            "result publication requires a clean published analysis source "
+            "descending from the exact training source"
         )
     return {
         "branch": branch,
-        "head": head,
+        "head": expected_training_commit,
         "origin_dev": origin_dev,
         "tracked_clean": True,
         "published": True,
+        "analysis_head": head,
+        "analysis_origin_dev": origin_dev,
+        "training_source_is_ancestor": True,
     }
 
 
@@ -247,6 +272,7 @@ def _load_fork(
         "path": _relative(path),
         "file_sha256": _sha256_file(path),
         "checkpoint_id": envelope.descriptor.checkpoint_id,
+        "payload_sha256": envelope.payload_sha256,
         "model_state_sha256": _state_dict_sha256(envelope.payload.model_state),
         "game_count": int(state["game_count"]),
         "update_count": int(state["update_count"]),
@@ -278,6 +304,7 @@ def _load_candidate_pair(
         state = envelope.payload.trainer_state
         recovery = state.get("recovery_state", {})
         fork = recovery.get("target_refresh_fork_state", {})
+        implementation = envelope.descriptor.implementation
         origin = fork.get("post_fork_transition_origin")
         consumed = recovery.get("optimizer_consumed_transition_count")
         if (
@@ -290,13 +317,21 @@ def _load_candidate_pair(
             or not isinstance(consumed, int)
             or consumed - origin != boundary
             or len(recovery.get("pending_steps", [])) >= 64
+            or implementation.get("target_refresh_branch_kind")
+            != "target-refresh-fork-v1"
+            or implementation.get("target_refresh_branch_source_checkpoint_id")
+            != fork_record["checkpoint_id"]
+            or implementation.get("target_refresh_branch_source_payload_sha256")
+            != fork_record["payload_sha256"]
+            or implementation.get("target_refresh_branch_treatment") != condition
         ):
             raise EqualTransitionReportError(
                 f"candidate semantics differ: seed {seed}, {condition}, {boundary}"
             )
-        if str(recovery.get("source_checkpoint")) != str(
-            (ROOT / arm["resume_checkpoint"]).resolve()
-        ):
+        branch_resume = (
+            ROOT / str(arm["control_dir"]) / "initial-target-refresh-fork.pt"
+        ).resolve()
+        if str(recovery.get("source_checkpoint")) != str(branch_resume):
             raise EqualTransitionReportError(
                 f"candidate fork source differs: seed {seed}, {condition}"
             )
