@@ -48,6 +48,36 @@ def test_read_only_specialist_db_rejects_runtime_writes(tmp_path: Path) -> None:
     database.close()
 
 
+def test_policy_health_style_read_does_not_recreate_sidecars(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "specialist.sqlite"
+    writable = SpecialistDB(path)
+    writable.bind_training_lineage("test-lineage")
+    writable.checkpoint_identity()
+    writable.close()
+
+    assert not path.with_name(path.name + "-wal").exists()
+    assert not path.with_name(path.name + "-shm").exists()
+
+    audit_view = SpecialistDB(path, read_only=True)
+    assert audit_view.training_lineage_root_run_id == "test-lineage"
+    audit_view.require_trusted_malom_labels()
+    audit_view.close()
+
+    assert not path.with_name(path.name + "-wal").exists()
+    assert not path.with_name(path.name + "-shm").exists()
+
+
+def test_read_only_specialist_db_rejects_sidecars(tmp_path: Path) -> None:
+    path = tmp_path / "specialist.sqlite"
+    SpecialistDB(path).close()
+    path.with_name(path.name + "-wal").write_bytes(b"")
+
+    with pytest.raises(RuntimeError, match="has SQLite sidecars"):
+        SpecialistDB(path, read_only=True)
+
+
 def test_router_quarantines_without_mutating_specialist_db(tmp_path: Path) -> None:
     database_path = tmp_path / "specialist.sqlite"
     writable = SpecialistDB(database_path)

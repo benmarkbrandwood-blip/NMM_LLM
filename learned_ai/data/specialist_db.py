@@ -117,7 +117,20 @@ class SpecialistDB:
             raise FileNotFoundError(f"read-only SpecialistDB does not exist: {self._path}")
         self._path.parent.mkdir(parents=True, exist_ok=True)
         if self._read_only:
-            uri = f"file:{self._path.resolve().as_posix()}?mode=ro"
+            sidecars = [
+                self._path.with_name(self._path.name + suffix)
+                for suffix in ("-wal", "-shm", "-journal")
+                if self._path.with_name(self._path.name + suffix).exists()
+            ]
+            if sidecars:
+                names = ", ".join(path.name for path in sidecars)
+                raise RuntimeError(
+                    "read-only SpecialistDB snapshot has SQLite sidecars: "
+                    f"{names}"
+                )
+            uri = (
+                f"file:{self._path.resolve().as_posix()}?mode=ro&immutable=1"
+            )
             self._conn = sqlite3.connect(
                 uri, uri=True, check_same_thread=False
             )
