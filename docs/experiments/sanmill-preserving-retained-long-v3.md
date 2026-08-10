@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `frozen_unlaunched_needs_product_authorization`
+Status: `completed_evidence_recorded`
 
 Experiment ID: `dev-v4-sanmill-preserving-retained-v3-seed58`
 
@@ -13,6 +13,12 @@ read-only preparation, creation of one ignored managed plan and one fresh
 isolated SpecialistDB, and final readiness checks. It does not itself authorize
 training, retry, recovery outside the managed exact-resume contract,
 evaluation, promotion, publication, or a larger resource envelope.
+
+The authorized run completed 5,000 games on 10 August 2026. Its immutable
+[completion evidence](../evidence/sanmill-preserving-retained-v3-result-2026-08-10.md)
+records the exact lineage, two pre-game technical recoveries, final checkpoint,
+SpecialistDB identity and diagnostic claim boundary. Completion does not grant
+promotion, publication or held-out-evaluation authority.
 
 ## Evidence-based decision
 
