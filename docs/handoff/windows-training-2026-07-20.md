@@ -1933,14 +1933,26 @@ the current successor in this order:
     all six consumed arm grants and its null selection. Its game-50 target
     refresh and learning-rate change were coupled, so do not use that result
     to assign causality to either mechanism.
-18. Publish local commits `0d9f7b8`, `00cddd2` and `d450d50` by ordinary
-    fast-forward before preparing their successor. Then repeat the source
-    audit from `dev == origin/dev`. If it passes, preparation may create only
-    the eight authorization-free plans and preflights in the frozen two-seed
-    2x2 target-refresh/LR diagnostic. Review those artifacts against plan
-    identity `94f6381a`. Do not authorize or run any arm without a later
-    explicit grant. Held-out evaluation and long training remain blocked
-    until this diagnostic is completed and interpreted under its frozen rule.
+18. Preserve published target-refresh/LR preparation commits `0d9f7b8`,
+    `00cddd2` and `d450d50`, the clean-source audit, the eight isolated plans,
+    and readiness identity `893c38fa`. Their later product authorization was
+    limited to the frozen 800-game, two-hour envelope and prohibited retries,
+    extensions, held-out evaluation, promotion, publication, and long
+    training.
+19. Preserve the completed two-seed 2x2 target-refresh/LR diagnostic and its
+    [tracked result evidence](../evidence/target-refresh-lr-factorial-diagnostic-result-2026-08-10.md)
+    at commit `d2879b2`. All eight arms completed 100 games and all
+    policy-health gates passed. The raw result identity is
+    `fb6ca7f5`, with file SHA-256 `6ea82762`. The preregistered signed contrast
+    is `no refresh - refresh`: it was `+0.7857` for seed 64 and `+0.7656` for
+    seed 65 against the endogenous frozen opponent. Fixed-minus-adaptive LR
+    and interaction contrasts were zero, while the learner won no
+    post-boundary game against the 1,000-node Sanmill stratum. This detects a
+    refresh-boundary mechanism signal but does not show that refresh harms
+    transferable learning and does not select no-refresh or either LR mode.
+    The eight grants are consumed. Before any held-out or long run, prepare a
+    separately frozen successor design that keeps a common measurement anchor
+    distinct from the training target and controls optimizer-step exposure.
 
 The previously executed isolated smoke command was:
 
@@ -2030,14 +2042,14 @@ promoted.
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
-grant, the no-update batch-capture grant, the retained-v3 grant and all six
-SpecialistDB read-calibration grants are also consumed. Safe work now is
-limited to publishing the three local target-refresh/LR commits, repeating the
-source audit from that clean published tip and, only after it passes,
-generating the eight authorization-free paired-diagnostic plans and
-preflights. No diagnostic arm, held-out match, additional calibration, long
-training job, model promotion/publication, protocol change or history rewrite
-is authorized by this handover.
+grant, the no-update batch-capture grant, the retained-v3 grant, all six
+SpecialistDB read-calibration grants, and all eight target-refresh/LR grants
+are also consumed. Safe work is limited to publishing the local tracked result
+evidence after explicit approval and preparing an authorization-free
+successor-design document with a common fixed measurement anchor. No
+successor probe, held-out match, additional calibration, long training job,
+model promotion/publication, protocol change, or history rewrite is authorized
+by this handover.
 
 ## Reference Material
 
