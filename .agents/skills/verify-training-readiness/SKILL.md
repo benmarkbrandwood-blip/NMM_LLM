@@ -9,7 +9,8 @@ description: Verify and analyze an NMM_LLM training smoke, long run, resume, or 
 
 Audit the selected training run against repository reality and emit a concise,
 evidence-backed verdict. Keep the audit read-only unless the user separately
-authorises a smoke or training launch.
+authorises a smoke or training launch directly, or a recorded standing
+delegation already covers the exact immutable plan.
 
 ## Establish the Contract
 
@@ -24,6 +25,11 @@ authorises a smoke or training launch.
    historical notes as claims to verify, not executable truth.
 5. Classify the request as `fresh` or `resume`, and as `smoke` or `long_run`.
    If that intent is ambiguous and changes lineage, report `needs_decision`.
+6. Locate any direct authorization or standing delegated authorization. A
+   standing grant is valid only when its objective or plan family, aggregate
+   resource envelope, allowed operations and order, claim boundary, stop and
+   prohibited conditions, and expiry are all recorded and cover the exact
+   child plan.
 
 ## Resolve Inputs Read-Only
 
@@ -63,6 +69,28 @@ For a long run, every experiment-owned choice must already be frozen in its
 experiment document. Do not infer a consequential value just to make the gate
 pass. A smoke may use bounded disposable values, but it must state which
 long-run decisions it does not approve.
+
+## Resolve Launch Authority Without Repeated Prompts
+
+- Technical readiness and launch authority are separate checks.
+- If a direct plan authorization exists, verify its plan hash and bounds.
+- If a valid standing delegation covers the exact plan, do not return
+  `needs_decision` merely because the leaf `authorization.json` is absent. Run
+  preflight, verify prerequisite children and aggregate consumption, create the
+  ordinary plan-bound authorization just in time with
+  `product-owner-delegated-agent`, and continue without asking again.
+- Do not ask the product owner to choose seeds, arms, learning rates, node
+  budgets, transition counts, checkpoint cadence, or other technical details
+  already inside the recorded envelope.
+- On an anomaly, stop the sequence and diagnose it. Do not automatically retry
+  counted work unless the grant explicitly covers a proven
+  semantics-identical recovery.
+- Ask once, without a timeout or default, only when the parent objective or
+  aggregate resource envelope is missing or when the requested action expands
+  scope. Long training, held-out evaluation, promotion, publication, release,
+  destructive cleanup, and Git history rewriting require explicit coverage.
+- A user's request for autonomy is not by itself evidence of unbounded
+  authority; bind the concrete grant before relying on it.
 
 ## Run Proportionate Verification
 
@@ -137,5 +165,7 @@ Use exactly one verdict:
 Summarise evidence in a compact table with `gate`, `observed`, `expected`, and
 `result`, followed by unresolved decisions and the reviewed exact command.
 Separate facts from inferences. Do not turn an audit request into a launch. If
-the user explicitly requested launch, proceed only after reporting a passing
-gate; otherwise stop with the failed or unresolved condition.
+the user explicitly requested launch, or a valid standing delegation covers
+the exact plan, proceed only after reporting a passing gate. Otherwise stop
+with the failed or unresolved condition. Never request the same product
+decision again for each child plan inside one valid standing delegation.

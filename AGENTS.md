@@ -29,6 +29,33 @@ Before changing code or Git history:
   focused test, and runtime evidence. A screenshot, narrative, or generated
   report is supporting context, not acceptance evidence by itself.
 
+## Standing Delegated Training Authorization
+
+- The product owner may explicitly authorize one bounded, preregistered
+  sequence instead of answering once per plan or arm. Record that standing
+  delegation in the owning experiment document or current handover. It must
+  identify the objective or plan family, aggregate game and wall-time bounds,
+  permitted order and operations, claim boundary, stop conditions, prohibited
+  actions, and expiry or revocation condition.
+- When a standing delegation exactly covers an immutable child plan, the Agent
+  may create its per-plan `authorization.json` just in time and launch it after
+  all technical gates pass. Record `product-owner-delegated-agent` as the
+  operator and cite the standing delegation in the decision note. Do not ask
+  the product owner to approve each seed, arm, segment, node count, learning
+  rate, or other technical choice already inside that envelope.
+- A failure remains fail closed. Diagnose it autonomously, but do not retry a
+  counted run unless the standing delegation explicitly permits a
+  semantics-identical recovery and the recovery path is proven safe.
+- Standing delegation never silently expands its scope. A new objective,
+  larger aggregate game or wall-time budget, long training not explicitly
+  named by the grant, held-out evaluation, model promotion, publication,
+  release, destructive cleanup, Git history rewrite, or external side effect
+  still requires the applicable explicit authority.
+- General requests for autonomy are not an unlimited training grant. If the
+  required objective or aggregate resource envelope is absent, ask once for
+  the parent decision, never once per technical child plan. The product owner
+  may revoke a standing delegation at any time.
+
 ## Git Safety
 
 - Do not use a blind `git pull` to resolve rewritten but patch-equivalent
@@ -91,6 +118,8 @@ Before changing code or Git history:
 - Use `.agents/skills/verify-training-readiness` when preparing, reviewing,
   resuming, smoke-testing, or starting a training run. It is a preflight and
   evidence workflow; invoking it does not itself authorise a training launch.
+  Before requesting authority, check whether a recorded standing delegation
+  already covers the exact immutable plan.
 - Long-running training still requires an explicit user request and the launch
   gate recorded by the owning experiment document.
 

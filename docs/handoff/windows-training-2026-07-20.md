@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-### Latest state: retained v3 completion and SpecialistDB isolation
+### Latest state: equal-transition diagnostic completed, analysis pending
 
 The seed-58 `managed-sanmill-preserving-retained-v3-seed58` run is complete
 and frozen as evidence. It reached 5,000 games in 20 accepted segments and
@@ -89,22 +89,36 @@ equal-action uniform reference. The policies are therefore classified
 parameter-space separation. See the
 [full-action evidence](../evidence/target-refresh-common-anchor-policy-distribution-2026-08-10.md).
 
-The next design is a three-seed, single-refresh fork with exact 64-transition
-optimizer batches and fixed 1,024/2,048/4,096/8,192 post-fork transition
-boundaries. It is documented in the
-[equal-transition diagnostic](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md).
-The implementation, result publisher, managed external-fork resume,
-payload-preserving checkpoint branch operation, deferred arm preparer,
-machine-readable contract and staged preparation are complete in local
-commits `bd3e5ce` through `dc83439`. The exact tracked source still requires
-ordinary publication before any new readiness or plan may be generated. All
-prospective targets are absent after the obsolete preparations were moved to
-ignored quarantine. The broad related gate previously reported `275 passed`,
-the mandatory Malom/provenance gate reported `103 passed, 498 subtests
-passed`, and the new fork/arm-focused tests pass. No active plan, database
-copy, preflight, authorization or training output exists. No held-out
-evaluation, successor training, extension, promotion or long run is
-authorized.
+The three-seed equal-transition target-refresh diagnostic was executed once at
+clean published training source `33a98696994cddf8be0b1ab516a879f52483ef02`
+under plan identity
+`b14d69db9a33b005c0a19fbb97e7f5b9a16364f1f74390ae85ff3e9d4edabb97`.
+Seeds 64, 65 and 66 each completed a 50-game shared prefix followed by paired
+`refresh-once` and `no-refresh` arms. Every arm reached exactly 8,192 consumed
+post-fork transitions as 128 batches of 64, with fixed learning rate, finite
+updates, trusted Malom coverage and isolated sidecar-free SpecialistDB files.
+The treatment reset target age while the control retained it, so the mechanism
+separation executed as designed. This is still mechanism evidence only.
+
+The first result-publication attempt failed closed because the analyser
+compared the trainer's branch-local copied fork path with the original shared
+prefix path. Training provenance was intact: branch descriptors retained the
+shared checkpoint and payload identities. Local analysis-only commit
+`e958a3a` fixes that validation and adds focused regression tests. It must be
+published before the immutable result can be generated, because the publisher
+requires a clean published analysis commit descending from the exact training
+commit. No held-out evaluation, promotion, publication of a model, successor
+training, or long run is authorized by the completed diagnostic.
+
+On 11 August 2026 the product owner explicitly delegated just-in-time launch
+authorization for the remaining bounded plans in this already frozen
+equal-transition sequence. The Agent recorded each leaf authorization as
+`product-owner-delegated-agent`, retained the original aggregate resource and
+claim boundaries, and completed launch orders 3 through 9 without repeated
+product prompts. The durable standing-delegation policy now belongs in
+`AGENTS.md`, the managed-operations document and the training-readiness skill.
+It removes per-arm rubber-stamping but does not authorize a new objective,
+resource expansion, held-out work, long training, promotion or publication.
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -2153,25 +2167,26 @@ decision. The active ruleset has a 100-movement-logical-ply no-progress draw,
 so a full-game cap must exceed the placement phase plus that window if the
 rule is to be observable.
 
-The product owner should be asked only about the objective, total game or
-wall-time envelope, launch, later resource expansion, and publication or
-promotion. Technical failures remain Agent diagnosis. The local
-endgame/fullgame files also remain exploratory unless separately validated and
-promoted.
+The product owner should be asked only once for the objective, aggregate game
+or wall-time envelope, initial direct or standing launch authority, later
+resource expansion, and publication or promotion. A valid standing delegation
+removes repeated per-seed, per-arm and per-segment prompts inside its exact
+scope. Technical failures remain Agent diagnosis. The local endgame/fullgame
+files also remain exploratory unless separately validated and promoted.
 
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, the no-update batch-capture grant, the retained-v3 grant, all six
 SpecialistDB read-calibration grants, all eight target-refresh/LR grants and
-all attempt-003 grants are also consumed. The equal-transition successor has
-no preparation or launch grant. Its exact source must first be published
-normally and `dev == origin/dev` re-established. The first preparation action
-may create only the three shared-prefix database copies, immutable plans and
-preflights. The implemented later action may prepare only the two arms owned
-by a completed and audited game-50 prefix. Neither action authorizes a
-segment, arm authorization, held-out match, additional calibration, long
-training, model promotion/publication, protocol change, or history rewrite.
+all attempt-003 grants are also consumed. The equal-transition sequence has
+now completed all three prefixes and all six paired arms once. Its delegated
+leaf authorizations are consumed and do not permit a rerun. Publish the
+analysis-only correction, generate and audit the immutable three-seed result,
+then use that evidence to decide the next long-training design. No held-out
+match, additional calibration, long training, model promotion/publication,
+protocol change, resource expansion, or history rewrite is authorized by that
+sequence.
 
 ## Reference Material
 

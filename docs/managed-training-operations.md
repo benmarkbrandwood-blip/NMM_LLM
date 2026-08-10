@@ -11,13 +11,15 @@ The central rule is separation of authority:
 
 - the Agent owns technical configuration, preflight, diagnostics, bounded
   recovery, evidence validation, and quarantine;
-- the product owner owns the objective, total resource envelope, launch
-  authorization, any later resource expansion, and publication or promotion;
+- the product owner owns the objective, aggregate resource envelope, the
+  initial direct or standing launch authorization, any later resource
+  expansion, and publication or promotion;
 - creating or editing a technical plan never authorizes training;
 - a technical failure does not become an ML question for the product owner.
 
-No managed plan or launch authorization existed when this document was added,
-and no training was started as part of the infrastructure change.
+This document distinguishes a direct one-plan authorization from a standing
+delegation over a finite preregistered plan family. Both remain separate from
+technical readiness.
 
 ## Product Decisions
 
@@ -26,7 +28,7 @@ boundaries changes:
 
 1. whether to pursue the stated training objective;
 2. the maximum game count or wall-clock resource envelope;
-3. whether to authorize the first smoke or long-run launch;
+3. whether to authorize one launch or a finite preregistered sequence;
 4. whether to create a successor plan after the authorized resources are
    exhausted;
 5. whether evidence may support publication, model promotion, or a release
@@ -36,6 +38,41 @@ Questions about learning rate, node budget, temperature, checkpoint cadence,
 data-loader structure, CUDA diagnostics, or exact-resume compatibility belong
 to the Agent. The Agent must choose conservatively, record the choice, test it,
 and stop fail-closed if evidence is inadequate.
+
+## Standing Delegated Authorization
+
+A product owner who does not want to operate individual technical arms may
+authorize a parent sequence once. The durable record must bind all of these:
+
+- the objective and owning experiment or plan-family identity;
+- the complete allowed plan set or deterministic eligibility rule and order;
+- aggregate game, active wall-time, and hardware bounds;
+- whether preparation, per-plan authorization, launch, and proven
+  semantics-identical recovery are allowed;
+- the claim boundary and actions that remain forbidden; and
+- an expiry condition and the fact that the owner may revoke the grant.
+
+For a covered child plan, the Agent performs readiness just in time, verifies
+that prior required children completed cleanly, and writes the ordinary
+plan-bound `authorization.json` with
+`authorized-by=product-owner-delegated-agent`. Its decision note cites the
+standing grant and the exact child scope. The Agent then launches without a
+second product prompt. A missing leaf authorization file is therefore an
+operation for the Agent, not an unresolved product decision, when and only when
+a valid standing delegation covers that exact plan.
+
+The delegation does not authorize a retry merely because a process failed. An
+anomaly stops the sequence for Agent diagnosis. Automatic continuation is
+allowed only after the evidence shows the next action is still inside the same
+immutable semantics and the grant explicitly covers that recovery. Otherwise
+the Agent preserves and quarantines the evidence before requesting any truly
+new product scope.
+
+Long training, held-out evaluation, resource expansion, promotion,
+publication, release, destructive cleanup, external writes, and Git history
+rewrites remain outside a standing preparatory grant unless each is explicitly
+named. Ordinary Git push authority is also governed separately by
+`AGENTS.md`.
 
 ## Durable Contracts
 
@@ -102,7 +139,7 @@ Preparation validates the technical configuration and records the current Git
 commit and local path-config hash. It writes no model checkpoint and starts no
 training. Its status is `awaiting_product_authorization`.
 
-### 2. Product owner authorizes or rejects
+### 2. Resolve direct or standing authorization
 
 The Agent presents a short product view containing the objective, maximum game
 count, wall-time bound, and claim boundary. If the product owner explicitly
@@ -116,9 +153,12 @@ approves, the Agent records that decision with a command equivalent to:
   --decision-note <recorded-product-decision>
 ```
 
-The Agent must not create this authorization merely because a plan exists.
-When asking for this decision through Codex, it must wait for an explicit user
-answer and must not use a response timeout.
+The Agent must not create this authorization merely because a plan exists. It
+first checks for a recorded standing delegation. If that grant covers the
+exact plan, the Agent creates the same plan-bound file just in time and records
+the delegated operator and parent decision. If no valid grant exists, the
+Agent asks once for the parent objective and resource envelope, waits for an
+explicit answer, and never uses a response timeout or a default selection.
 
 ### 3. Agent launches bounded work
 
@@ -195,8 +235,9 @@ timeout, or broken evidence chain.
 Technical stops use `stopped_for_agent_review` and do not ask the product owner
 to diagnose ML or infrastructure details. The Agent investigates using the run
 contracts, event ledgers, focused tests, and the training-readiness workflow.
-The Agent may continue only when an existing authorization still covers the
-same immutable semantics and the recovery path is proven safe.
+The Agent may continue only when a direct authorization or recorded standing
+delegation still covers the same immutable semantics and the recovery path is
+proven safe.
 
 `resource_limit_reached` is different: increasing the wall-time or game budget
 changes product scope. The Agent must present the evidence and request a new
@@ -218,7 +259,9 @@ This infrastructure does not by itself make the long run ready. Before launch,
 the Agent must invoke the repository's training-readiness workflow, run a new
 disposable smoke that reaches at least one RL update, validate the intended
 empty corrected SpecialistDB and output isolation, and record the exact launch
-plan. A long run still requires an explicit product launch authorization.
-The readiness question must wait for an explicit product answer; no timeout or
-default selection may create the objective, resource envelope, truncation
-ceiling, or authorization.
+plan. A long run still requires an explicit product launch authorization or a
+standing delegation that explicitly names that exact long-run scope. If the
+current standing grant covers the plan, the Agent must not ask again. If it
+does not, the readiness question must wait for an explicit product answer; no
+timeout or default selection may create the objective, aggregate resource
+envelope, truncation ceiling, or authorization.
