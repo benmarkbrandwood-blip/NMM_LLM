@@ -462,6 +462,20 @@ def test_normalized_auxiliary_settings_bind_resume_semantics(tmp_path: Path) -> 
     assert resume_config_sha256(args) != fixed
 
 
+def test_learning_rate_mode_preserves_default_and_binds_fixed_semantics(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    adaptive = resume_config_sha256(args)
+
+    assert "lr_adaptation_mode" not in resolved_resume_config(args)
+
+    args.lr_adaptation_mode = "fixed"
+
+    assert resolved_resume_config(args)["lr_adaptation_mode"] == "fixed"
+    assert resume_config_sha256(args) != adaptive
+
+
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:
     with pytest.raises(SystemExit) as raised:
         trainer.main(["--max-games", "1", "--max-games=2"])

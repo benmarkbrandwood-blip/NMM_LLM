@@ -290,6 +290,16 @@ def validate_generalist_configuration(args: Any) -> None:
     for field in ("lr", "temp_start", "s1b_refresher_lr"):
         if _finite_number(getattr(args, field), field=field) <= 0:
             raise PreflightConfigurationError(f"{field} must be greater than zero")
+    lr_adaptation_mode = getattr(
+        args,
+        "lr_adaptation_mode",
+        "adaptive-search-opponent-win-rate",
+    )
+    if lr_adaptation_mode not in {
+        "adaptive-search-opponent-win-rate",
+        "fixed",
+    }:
+        raise PreflightConfigurationError("lr_adaptation_mode is unsupported")
     gamma_td = _finite_number(args.gamma_td, field="gamma_td")
     if not 0 <= gamma_td <= 1:
         raise PreflightConfigurationError("gamma_td must be between zero and one")
@@ -949,6 +959,16 @@ def resolved_resume_config(args: Any) -> dict[str, Any]:
             "malom_policy_aux_denominator_floor",
         ):
             raw.pop(field, None)
+    if (
+        raw.get(
+            "lr_adaptation_mode",
+            "adaptive-search-opponent-win-rate",
+        )
+        == "adaptive-search-opponent-win-rate"
+    ):
+        # The named mode is the historical behavior. Omitting its default
+        # preserves exact-resume compatibility with pre-switch checkpoints.
+        raw.pop("lr_adaptation_mode", None)
     return json.loads(canonical_json_bytes(raw))
 
 

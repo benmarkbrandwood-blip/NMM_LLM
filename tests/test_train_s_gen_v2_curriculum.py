@@ -68,6 +68,34 @@ def test_frozen_or_branch_game_only_feeds_all_game_history() -> None:
     assert list(advancement_games) == []
 
 
+def test_adaptive_learning_rate_preserves_existing_search_opponent_rule() -> None:
+    parameter = torch.nn.Parameter(torch.tensor(0.0))
+    optimizer = torch.optim.Adam([parameter], lr=1e-4)
+
+    trainer._apply_learning_rate_mode(
+        optimizer,
+        search_opponent_win_rate=0.0,
+        lr_base=1e-4,
+        mode="adaptive-search-opponent-win-rate",
+    )
+
+    assert optimizer.param_groups[0]["lr"] == 5e-5
+
+
+def test_fixed_learning_rate_ignores_search_opponent_win_rate() -> None:
+    parameter = torch.nn.Parameter(torch.tensor(0.0))
+    optimizer = torch.optim.Adam([parameter], lr=5e-5)
+
+    trainer._apply_learning_rate_mode(
+        optimizer,
+        search_opponent_win_rate=0.0,
+        lr_base=1e-4,
+        mode="fixed",
+    )
+
+    assert optimizer.param_groups[0]["lr"] == 1e-4
+
+
 def test_advancement_preserves_model_and_optimizer_continuity() -> None:
     model = trainer.ScaffoldedPolicyNet(
         move_feat_dim=trainer.MOVE_FEAT_DIM_WITH_LOOKAHEAD,

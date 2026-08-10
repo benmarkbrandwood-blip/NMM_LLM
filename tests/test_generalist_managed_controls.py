@@ -89,6 +89,14 @@ def test_parser_exposes_explicit_sanmill_resource_schedule() -> None:
     assert args.no_recovery is True
 
 
+def test_parser_exposes_explicit_learning_rate_mode() -> None:
+    args = trainer._build_argument_parser().parse_args(
+        ["--lr-adaptation-mode", "fixed"]
+    )
+
+    assert args.lr_adaptation_mode == "fixed"
+
+
 @pytest.mark.parametrize(
     ("game_count", "expected_level"),
     [

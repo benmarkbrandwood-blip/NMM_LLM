@@ -78,6 +78,23 @@ def test_common_args_bind_explicit_malom_policy_auxiliary(tmp_path) -> None:
     assert common[common.index("--malom-policy-aux-coef") + 1] == "0.1"
 
 
+def test_common_args_bind_refresh_cadence_and_learning_rate_mode(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        _required_prepare_args()
+        + [
+            "--target-refresh-every",
+            "5001",
+            "--lr-adaptation-mode",
+            "fixed",
+        ]
+    )
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert common[common.index("--update-target-every") + 1] == "5001"
+    assert common[common.index("--lr-adaptation-mode") + 1] == "fixed"
+
+
 @pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])
 def test_prepare_rejects_invalid_malom_policy_auxiliary(value: str) -> None:
     with pytest.raises(SystemExit):

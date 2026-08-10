@@ -122,10 +122,12 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         str(args.malom_policy_aux_denominator_floor),
         "--specialist-read-mode",
         args.specialist_read_mode,
+        "--lr-adaptation-mode",
+        args.lr_adaptation_mode,
         "--self-play-ratio",
         str(self_play_ratio),
         "--update-target-every",
-        "50",
+        str(args.target_refresh_every),
         "--max-ply",
         str(args.max_ply),
         "--max-ply-branch",
@@ -306,6 +308,21 @@ def _build_parser() -> argparse.ArgumentParser:
         type=float,
         default=None,
         help="Frozen-target share; defaults to 0.50 local or 0.60 Sanmill",
+    )
+    prepare.add_argument(
+        "--target-refresh-every",
+        type=int,
+        default=50,
+        help=(
+            "Frozen-target refresh cadence in completed games; set beyond the "
+            "whole schedule only for a separately frozen no-refresh diagnostic"
+        ),
+    )
+    prepare.add_argument(
+        "--lr-adaptation-mode",
+        choices=trainer.LR_ADAPTATION_MODES,
+        default="adaptive-search-opponent-win-rate",
+        help="Explicit historical adaptive or fixed learning-rate rule",
     )
     prepare.add_argument(
         "--heuristic-node-budget",

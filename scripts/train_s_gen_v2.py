@@ -368,6 +368,10 @@ LOG_EVERY    = 50
 LR_SCALE_WIN = 0.35
 LR_SCALE_MIN = 0.50
 LR_SCALE_MAX = 2.00
+LR_ADAPTATION_MODES = (
+    "adaptive-search-opponent-win-rate",
+    "fixed",
+)
 RECOVERY_THRESHOLD  = 0.12
 RECOVERY_MIN_GAMES  = 30
 
@@ -1141,9 +1145,24 @@ def _compute_temperature(
     return float(temp_start - (temp_start - TEMP_END) * progress)
 
 
-def _adapt_lr(opt: torch.optim.Optimizer, win_rate: float, lr_base: float) -> None:
-    scale  = max(LR_SCALE_MIN, min(LR_SCALE_MAX, win_rate / LR_SCALE_WIN))
-    new_lr = lr_base * scale
+def _apply_learning_rate_mode(
+    opt: torch.optim.Optimizer,
+    *,
+    search_opponent_win_rate: float,
+    lr_base: float,
+    mode: str,
+) -> None:
+    """Apply the explicit fixed or historical adaptive learning-rate rule."""
+    if mode == "fixed":
+        new_lr = lr_base
+    elif mode == "adaptive-search-opponent-win-rate":
+        scale = max(
+            LR_SCALE_MIN,
+            min(LR_SCALE_MAX, search_opponent_win_rate / LR_SCALE_WIN),
+        )
+        new_lr = lr_base * scale
+    else:
+        raise RuntimeError(f"unsupported learning-rate adaptation mode: {mode!r}")
     for g in opt.param_groups:
         g["lr"] = new_lr
 
@@ -3314,7 +3333,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     / max(len(recent_reference), 1)
                 )
 
-                _adapt_lr(opt, win_rate, args.lr)
+                _apply_learning_rate_mode(
+                    opt,
+                    search_opponent_win_rate=win_rate,
+                    lr_base=args.lr,
+                    mode=args.lr_adaptation_mode,
+                )
 
                 if (not args.no_recovery
                         and len(win_history_heuristic) >= RECOVERY_MIN_GAMES
@@ -3795,6 +3819,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--self-play-ratio",     type=float, default=SELF_PLAY_RATIO)
     p.add_argument("--update-target-every", type=int,   default=UPDATE_TARGET_EVERY)
+    p.add_argument(
+        "--lr-adaptation-mode",
+        choices=LR_ADAPTATION_MODES,
+        default="adaptive-search-opponent-win-rate",
+        help=(
+            "Learning-rate rule applied at each log boundary: preserve the "
+            "historical search-opponent-win-rate adaptation or hold --lr fixed"
+        ),
+    )
     p.add_argument("--branch-every",        type=int,   default=BRANCH_EVERY)
     p.add_argument("--max-branches-per-game", type=int, default=0)
     p.add_argument("--bucket-window",       type=int,   default=BUCKET_WINDOW)
