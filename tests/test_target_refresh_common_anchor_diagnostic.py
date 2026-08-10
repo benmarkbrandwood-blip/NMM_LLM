@@ -25,6 +25,11 @@ from learned_ai.validation.target_refresh_common_anchor_diagnostic import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / DEFAULT_CONTRACT
+SUCCESSOR_CONTRACT_PATH = (
+    ROOT
+    / "docs/experiments/"
+    / "sanmill-target-refresh-common-anchor-diagnostic-v1-attempt-002.json"
+)
 
 
 def _measurement_arm(
@@ -156,6 +161,39 @@ def test_contract_and_prepare_commands_are_frozen() -> None:
             command.index("--measurement-anchor-expected-update-count") + 1
         ] == str(arm["anchor_expected_update_count"])
         assert "--no-exact-resume" in command
+
+
+def test_attempt_002_is_a_fresh_unauthorized_successor() -> None:
+    predecessor = load_target_refresh_common_anchor_contract(CONTRACT_PATH)
+    successor = load_target_refresh_common_anchor_contract(
+        SUCCESSOR_CONTRACT_PATH
+    )
+
+    assert successor["plan_identity"] != predecessor["plan_identity"]
+    assert successor["attempt"] == {
+        "attempt_number": 2,
+        "predecessor_plan_identity": predecessor["plan_identity"],
+        "predecessor_readiness_identity": (
+            "d6ed98beebb01d9c3482b9dcc7547656dace88df8afe5ad3a8550f7b86c24547"
+        ),
+        "predecessor_disposition": "fatal_stop_no_result_no_retry",
+        "reason": (
+            "fresh successor after the attempt-001 checkpoint-envelope role "
+            "failure was fixed and regression-tested"
+        ),
+        "requires_new_product_authorization": True,
+    }
+    assert successor["authorization"]["launch_authorized"] is False
+
+    for field in (
+        "control_dir",
+        "experiment_id",
+        "plan_id",
+        "specialist_db",
+    ):
+        predecessor_values = {arm[field] for arm in predecessor["arms"]}
+        successor_values = {arm[field] for arm in successor["arms"]}
+        assert predecessor_values.isdisjoint(successor_values)
 
 
 def test_command_validator_rejects_hidden_target_refresh_change() -> None:
