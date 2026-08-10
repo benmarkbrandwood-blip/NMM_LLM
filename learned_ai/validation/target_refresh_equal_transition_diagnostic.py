@@ -787,9 +787,11 @@ def prepare_prefix_plans(
                 "segment_output_present": False,
             }
         )
-    if len({record["resume_config_sha256"] for record in prefix_records}) != 1:
+    if len({record["resume_config_sha256"] for record in prefix_records}) != len(
+        prefix_records
+    ):
         raise TargetRefreshEqualTransitionError(
-            "prefix resume semantics differ across seeds"
+            "prefix resume identities collide across seed-owned lineages"
         )
     body = {
         "schema_version": READINESS_SCHEMA,

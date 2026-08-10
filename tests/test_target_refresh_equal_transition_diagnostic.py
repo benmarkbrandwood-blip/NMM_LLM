@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from learned_ai.training.generalist_preflight import resume_config_sha256
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_equal_transition_diagnostic import (
     TargetRefreshEqualTransitionError,
@@ -101,6 +102,7 @@ def test_prefix_commands_build_valid_frozen_trainer_configuration(
         python_executable="python",
     )
 
+    resume_identities: set[str] = set()
     for command in commands:
         parsed = manager._build_parser().parse_args(command[2:])
         common = manager._common_trainer_args(parsed, paths_config)
@@ -109,8 +111,10 @@ def test_prefix_commands_build_valid_frozen_trainer_configuration(
         )
         trainer._configure_paths(args)
         trainer.validate_generalist_configuration(args)
+        resume_identities.add(resume_config_sha256(args))
         assert args.post_fork_transition_bound is None
         assert args.start_mode == "fresh"
+    assert len(resume_identities) == 3
 
 
 def test_all_arm_paths_are_deferred_and_distinct() -> None:
