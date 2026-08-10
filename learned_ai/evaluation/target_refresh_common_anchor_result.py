@@ -743,6 +743,7 @@ def _analyze_arm(
         plan,
         details=completed_details,
         checkpoint=checkpoint,
+        completed_games=int(completed_details["completed_games"]),
     )
     segment = control_dir / "segments" / "segment-0001"
     manifest_path = segment / "run-manifest.json"

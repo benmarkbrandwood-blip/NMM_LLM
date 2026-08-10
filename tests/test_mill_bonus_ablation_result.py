@@ -381,6 +381,43 @@ def test_policy_health_comparison_uses_json_semantics(
     assert result == validated
 
 
+def test_policy_health_accepts_optimizer_bounded_completion_count(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded = {
+        "passed": True,
+        "failures": [],
+        "report": str(tmp_path / "policy-health.json"),
+        "metrics": {"candidate_value_preserving_rate": 1.0},
+    }
+    observed: dict[str, int] = {}
+
+    def validate(*args, **kwargs):
+        observed["completed_games"] = kwargs["completed_games"]
+        return recorded
+
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result.managed."
+        "_trainer_arg_value",
+        lambda plan, argument: str(tmp_path / "specialist.sqlite"),
+    )
+    monkeypatch.setattr(
+        "learned_ai.evaluation.mill_bonus_ablation_result.managed."
+        "_validate_policy_health_report",
+        validate,
+    )
+
+    result = _validate_policy_health(
+        SimpleNamespace(game_bound=150, git_commit="a" * 40),
+        details={"policy_health": recorded},
+        checkpoint=tmp_path / "latest.pt",
+        completed_games=92,
+    )
+
+    assert result == recorded
+    assert observed == {"completed_games": 92}
+
+
 def test_analysis_source_allows_only_published_analyzer_erratum(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

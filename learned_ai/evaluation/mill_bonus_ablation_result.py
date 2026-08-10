@@ -926,7 +926,19 @@ def _validate_policy_health(
     *,
     details: Mapping[str, Any],
     checkpoint: Path,
+    completed_games: int | None = None,
 ) -> dict[str, Any]:
+    if completed_games is None:
+        completed_games = plan.game_bound
+    elif (
+        isinstance(completed_games, bool)
+        or not isinstance(completed_games, int)
+        or completed_games <= 0
+        or completed_games > plan.game_bound
+    ):
+        raise MillBonusAblationResultError(
+            "policy-health completion count is invalid"
+        )
     recorded = details.get("policy_health")
     if not isinstance(recorded, Mapping) or recorded.get("passed") is not True:
         raise MillBonusAblationResultError("policy-health gate did not pass")
@@ -940,7 +952,7 @@ def _validate_policy_health(
         report_path=report_path,
         checkpoint=checkpoint,
         specialist_db=specialist_db,
-        completed_games=plan.game_bound,
+        completed_games=completed_games,
         runtime_commit=plan.git_commit,
     )
     if (
