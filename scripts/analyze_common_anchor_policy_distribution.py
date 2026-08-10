@@ -228,6 +228,15 @@ def _read_only_observations(
     }
 
 
+def _open_immutable_human_db(path: Path) -> HumanDB:
+    """Open the frozen main file without participating in WAL/SHM locking."""
+    human_db = HumanDB(path, read_only=True, immutable=True)
+    if not human_db.is_available():
+        human_db.close()
+        raise CommonAnchorAnalysisError("immutable HumanDB open failed")
+    return human_db
+
+
 def _validate_attempt_contract(path: Path) -> dict[str, Any]:
     contract = _strict_json(path)
     if contract.get("plan_identity") != EXPECTED_ATTEMPT_PLAN_IDENTITY:
@@ -630,9 +639,9 @@ def main(argv: list[str] | None = None) -> int:
         human_db_path=human_db_path,
         malom_path=malom_path,
     )
-    human_db = HumanDB(human_db_path, read_only=True)
+    human_db = _open_immutable_human_db(human_db_path)
     malom = ExternalSolvedDB(str(malom_path), strict=True)
-    if not human_db.is_available() or not malom.is_available():
+    if not malom.is_available():
         raise CommonAnchorAnalysisError("read-only policy dependency is unavailable")
     arms = _arm_by_cell(contract)
     seed_reports: dict[str, Any] = {}

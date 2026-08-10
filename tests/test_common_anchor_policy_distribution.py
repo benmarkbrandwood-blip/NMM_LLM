@@ -10,6 +10,7 @@ from learned_ai.evaluation.common_anchor_policy_distribution import (
     compare_action_logits,
     summarize_state_comparisons,
 )
+from scripts import analyze_common_anchor_policy_distribution as analysis
 
 
 def _record(phase: str, comparison: dict) -> dict:
@@ -128,3 +129,37 @@ def test_misaligned_or_nonfinite_inputs_fail_closed() -> None:
             action_keys=["a", "b"],
             malom_qualities=[0.0, -1.0],
         )
+
+
+def test_human_db_is_opened_in_immutable_read_only_mode(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    observed = {}
+
+    class _FakeHumanDB:
+        def __init__(self, path, *, read_only, immutable):
+            observed.update(
+                {
+                    "path": path,
+                    "read_only": read_only,
+                    "immutable": immutable,
+                }
+            )
+
+        def is_available(self) -> bool:
+            return True
+
+        def close(self) -> None:
+            observed["closed"] = True
+
+    monkeypatch.setattr(analysis, "HumanDB", _FakeHumanDB)
+
+    database = analysis._open_immutable_human_db(tmp_path / "human.sqlite")
+
+    assert observed == {
+        "path": tmp_path / "human.sqlite",
+        "read_only": True,
+        "immutable": True,
+    }
+    database.close()
+    assert observed["closed"] is True
