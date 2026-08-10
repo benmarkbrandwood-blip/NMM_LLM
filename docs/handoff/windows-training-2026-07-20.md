@@ -1953,6 +1953,20 @@ the current successor in this order:
     The eight grants are consumed. Before any held-out or long run, prepare a
     separately frozen successor design that keeps a common measurement anchor
     distinct from the training target and controls optimizer-step exposure.
+20. Preserve the authorization-free successor design in
+    [the common-anchor contract](../experiments/sanmill-target-refresh-common-anchor-diagnostic-v1.md),
+    plan identity `8e398233`. It contains four fresh arms: seeds 64 and 65,
+    each with target refresh at game 50 or no refresh. Same-seed arms must be
+    byte-identical through game 50 and freeze the same development-only model
+    anchor there. Each arm then performs exactly 16 A2C optimizer steps and
+    records balanced no-update measurements at update deltas 4, 8, 12 and 16
+    against that common anchor and a separately reported 1,000-node Sanmill
+    opponent. The measurement route cannot read the growing SpecialistDB or
+    write training evidence. Commits `6b98a5d` and `d65efea` implement the
+    runtime, managed-plan and fail-closed analysis support. The contract is
+    unlaunched and unauthorized; exact source publication, fresh databases,
+    managed plans and preflights must still be completed before any product
+    authorization could be considered.
 
 The previously executed isolated smoke command was:
 
@@ -2046,10 +2060,12 @@ grant, the no-update batch-capture grant, the retained-v3 grant, all six
 SpecialistDB read-calibration grants, and all eight target-refresh/LR grants
 are also consumed. Safe work is limited to publishing the local tracked result
 evidence after explicit approval and preparing an authorization-free
-successor-design document with a common fixed measurement anchor. No
-successor probe, held-out match, additional calibration, long training job,
-model promotion/publication, protocol change, or history rewrite is authorized
-by this handover.
+successor-design document with a common fixed measurement anchor. The design
+document and implementation now exist locally, but no successor probe,
+held-out match, additional calibration, long training job, model
+promotion/publication, protocol change, or history rewrite is authorized by
+this handover. Before even generating arm plans, the exact design source must
+be published normally and `dev == origin/dev` must be re-established.
 
 ## Reference Material
 

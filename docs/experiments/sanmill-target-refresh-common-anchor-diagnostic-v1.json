@@ -1,0 +1,324 @@
+{
+  "analysis": {
+    "decision_rule": {
+      "contrast": "no-refresh minus refresh",
+      "effect_support": "both seeds must have the same non-zero mean contrast direction across post-anchor update checkpoints, the final-checkpoint direction must agree, and the absolute median seed mean must reach the material threshold",
+      "external_reference": "fixed-node Sanmill is reported separately as corroboration or counterevidence and is not part of the primary gate",
+      "minimum_material_score_effect": 0.1,
+      "primary_metric": "learner score against the common game-50 frozen model anchor at post-anchor optimizer-update deltas 4, 8, 12 and 16",
+      "selection": "no target-refresh setting is selected for retained, held-out or long training by this diagnostic",
+      "unsafe": "any identity, pairing, optimizer exposure, measurement balance, non-finite, checkpoint, referee, database, Malom-label, policy-health or resource failure stops the entire sequence"
+    },
+    "per_class_reports": [
+      "seed and target-refresh condition",
+      "post-anchor optimizer-update checkpoint",
+      "fixed model anchor and fixed-node Sanmill opponent",
+      "learner colour",
+      "termination reason"
+    ],
+    "policy_health_gate": {
+      "audit_script": "tools/audit_generalist_policy_health.py",
+      "audit_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+      "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+      "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+      "critical_states": 29,
+      "device": "auto",
+      "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
+      "minimum_candidate_preserving_rate": 0.5,
+      "required_direct_signal_preserving_rate": 1.0,
+      "role": "segment-boundary development safety gate; not held-out validation or strength evidence"
+    },
+    "required_curves": [
+      "raw policy loss, value loss, update entropy, learning rate and batch_steps",
+      "temperature, chosen probability, policy entropy, policy top-1, heuristic top-1 and target age",
+      "Malom preserving and downgrade rates",
+      "fixed-anchor and Sanmill W/D/L at each update checkpoint by colour and termination reason",
+      "explicit notice that supervised train and validation curves do not exist for this online RL diagnostic"
+    ],
+    "result_implementation": {
+      "module": {
+        "path": "learned_ai/evaluation/target_refresh_common_anchor_result.py",
+        "sha256": "cd62444b8abd75d9be5c057db533fa2333272d0d0302ba8bcd9df95e5194f094"
+      },
+      "publisher": {
+        "path": "scripts/report_target_refresh_common_anchor_diagnostic.py",
+        "sha256": "a3b0934b2daf63bb06862da3ff665a4175accc67fd7d5791ebd9e00c218fc4cb"
+      },
+      "result_schema": "nmm.target-refresh-common-anchor-diagnostic-result.v1"
+    }
+  },
+  "arms": [
+    {
+      "anchor_expected_update_count": 18,
+      "arm_id": "seed64-refresh",
+      "condition": "refresh",
+      "control_dir": "out/target-refresh-common-anchor-diagnostic-v1/seed64-refresh",
+      "experiment_id": "dev-v4-target-refresh-anchor-v1-s64-refresh",
+      "launch_order": 1,
+      "lr_adaptation_mode": "fixed",
+      "optimizer_update_bound": 34,
+      "plan_id": "managed-target-refresh-anchor-v1-s64-refresh",
+      "seed": 64,
+      "specialist_db": "data/specialist_db.target_refresh_anchor_v1.s64.refresh.sqlite",
+      "specialist_read_mode": "theoretical-only",
+      "target_refresh_every_games": 50
+    },
+    {
+      "anchor_expected_update_count": 18,
+      "arm_id": "seed64-no-refresh",
+      "condition": "no-refresh",
+      "control_dir": "out/target-refresh-common-anchor-diagnostic-v1/seed64-no-refresh",
+      "experiment_id": "dev-v4-target-refresh-anchor-v1-s64-no-refresh",
+      "launch_order": 2,
+      "lr_adaptation_mode": "fixed",
+      "optimizer_update_bound": 34,
+      "plan_id": "managed-target-refresh-anchor-v1-s64-no-refresh",
+      "seed": 64,
+      "specialist_db": "data/specialist_db.target_refresh_anchor_v1.s64.no_refresh.sqlite",
+      "specialist_read_mode": "theoretical-only",
+      "target_refresh_every_games": 5001
+    },
+    {
+      "anchor_expected_update_count": 16,
+      "arm_id": "seed65-refresh",
+      "condition": "refresh",
+      "control_dir": "out/target-refresh-common-anchor-diagnostic-v1/seed65-refresh",
+      "experiment_id": "dev-v4-target-refresh-anchor-v1-s65-refresh",
+      "launch_order": 3,
+      "lr_adaptation_mode": "fixed",
+      "optimizer_update_bound": 32,
+      "plan_id": "managed-target-refresh-anchor-v1-s65-refresh",
+      "seed": 65,
+      "specialist_db": "data/specialist_db.target_refresh_anchor_v1.s65.refresh.sqlite",
+      "specialist_read_mode": "theoretical-only",
+      "target_refresh_every_games": 50
+    },
+    {
+      "anchor_expected_update_count": 16,
+      "arm_id": "seed65-no-refresh",
+      "condition": "no-refresh",
+      "control_dir": "out/target-refresh-common-anchor-diagnostic-v1/seed65-no-refresh",
+      "experiment_id": "dev-v4-target-refresh-anchor-v1-s65-no-refresh",
+      "launch_order": 4,
+      "lr_adaptation_mode": "fixed",
+      "optimizer_update_bound": 32,
+      "plan_id": "managed-target-refresh-anchor-v1-s65-no-refresh",
+      "seed": 65,
+      "specialist_db": "data/specialist_db.target_refresh_anchor_v1.s65.no_refresh.sqlite",
+      "specialist_read_mode": "theoretical-only",
+      "target_refresh_every_games": 5001
+    }
+  ],
+  "authorization": {
+    "authorized_segments_per_arm": 0,
+    "launch_authorized": false,
+    "promotion_allowed": false,
+    "publication_allowed": false
+  },
+  "claim_boundary": "Two-seed target-refresh mechanism diagnostic with a common development anchor and equal optimizer-step exposure only; not held-out validation, trap-learning evidence, playing strength, promotion, retained-run or long-run evidence.",
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "fixed_resource_stage_games": [
+      500,
+      500,
+      500,
+      1000,
+      2500
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "learning_rate_mode": "fixed",
+    "log_and_checkpoint_every_games": 50,
+    "malom_policy_aux_coefficient": 0.0,
+    "malom_policy_aux_mode": "fixed",
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "mill_bonus_mode": "malom-preserving-only",
+    "minimal_rollouts": true,
+    "one_segment_game_safety_ceiling": 150,
+    "only_observed_node_level": 1,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "specialist_read_mode": "theoretical-only",
+    "start_mode": "fresh",
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_start": 0.9,
+    "update_every_steps": 64
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_policy_auxiliary": false,
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_main_file_sha256": "d8e22da38273f7c26eb76803ae91fc3fae711f508383ffbe3096c2946912b440",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    },
+    "specialist_db_policy": "copy the exact closed template once to each unique arm path; never share a writable database between arms"
+  },
+  "experiment_family_id": "sanmill-target-refresh-common-anchor-diagnostic-v1",
+  "hypothesis": "the repeatable post-boundary difference in the prior game-matched diagnostic is caused by frozen-target refresh rather than by changing the opponent used as the score denominator or by unequal optimizer-step exposure",
+  "lineage": {
+    "exact_resume_between_arms": false,
+    "fresh_random_weights_per_arm": true,
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main changes do not isolate the target-refresh treatment and are excluded from this development diagnostic",
+      "reviewed_tip": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9"
+    },
+    "required_implementation_commits": [
+      "6b98a5da63cb0ab11e50fa18a9bb4ecc89556661",
+      "d65efeaeda067ca95b1d5e8948f48c3847568b61"
+    ],
+    "resume_source": null
+  },
+  "measurement_contract": {
+    "anchor_game": 50,
+    "anchor_update_count_by_seed": {
+      "64": 18,
+      "65": 16
+    },
+    "candidate_sampling": "fixed temperature with explicit per-game torch generators",
+    "games_per_opponent_per_checkpoint": 8,
+    "measurement_every_updates": 4,
+    "measurement_route": "fresh start position, strict Sanmill referee, fixed game-50 lookahead advisor, no branches and no training writes",
+    "measurement_temperature": 0.2,
+    "opponents": [
+      "fixed_model_anchor",
+      "sanmill_fixed_node"
+    ],
+    "optimizer_update_bound_by_seed": {
+      "64": 34,
+      "65": 32
+    },
+    "post_anchor_optimizer_updates": 16,
+    "sanmill_node_budget": 1000,
+    "specialist_read_mode": "disabled",
+    "writes_training_data": false
+  },
+  "objective": "estimate the target-refresh mechanism against a never-refreshed common anchor while matching post-boundary A2C optimizer-step exposure",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "arm_id",
+      "condition",
+      "control_dir",
+      "experiment_id",
+      "launch_order",
+      "plan_id",
+      "specialist_db",
+      "target_refresh_every_games"
+    ],
+    "changed_training_factors": [
+      "target_refresh_every_games"
+    ],
+    "conditions": [
+      "refresh",
+      "no-refresh"
+    ],
+    "equal_post_anchor_optimizer_updates": 16,
+    "launch_order_is_frozen": true,
+    "same_first_50_games_within_seed": true,
+    "seeds": [
+      64,
+      65
+    ],
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "8e3982338f517472a73603b6b34080622433dedbc8d6ed3afdc5ce0c969609a4",
+  "resources": {
+    "active_wall_hours_per_arm": 0.5,
+    "maximum_active_wall_hours_total": 2.0,
+    "maximum_measurement_games_per_arm": 64,
+    "maximum_measurement_games_total": 256,
+    "maximum_requested_sanmill_nodes_total": 41520000,
+    "maximum_training_games_per_arm": 150,
+    "maximum_training_games_total": 600,
+    "no_automatic_extension_retry_resume_or_training": true,
+    "training_schedule_counts_by_seed_at_game_ceiling": {
+      "64": {
+        "frozen_black": 52,
+        "frozen_white": 42,
+        "sanmill_black": 27,
+        "sanmill_white": 29
+      },
+      "65": {
+        "frozen_black": 56,
+        "frozen_white": 41,
+        "sanmill_black": 30,
+        "sanmill_white": 23
+      }
+    }
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.target-refresh-common-anchor-diagnostic-plan.v1",
+  "source_evidence": {
+    "prior_target_refresh_lr_result": {
+      "path": "docs/evidence/target-refresh-lr-factorial-diagnostic-result-2026-08-10.md",
+      "sha256": "23fa9a820caf7594b4242df8c5d9a3062f84f893bc2cf7fdaa2bad4b64fc94c7"
+    }
+  },
+  "status": "designed_unlaunched_needs_publication",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_promotion": false,
+    "continue_after_arm_failure": false,
+    "post_result_gate_changes": false,
+    "stop_on": [
+      "identity drift",
+      "non-identical same-seed first 50 games or anchor model state",
+      "target-refresh intervention mismatch",
+      "optimizer update bound or measurement schedule mismatch",
+      "non-finite state",
+      "SpecialistDB or Malom-label identity drift",
+      "Sanmill error or checkpoint corruption",
+      "policy-health failure",
+      "resource envelope reached"
+    ]
+  }
+}
