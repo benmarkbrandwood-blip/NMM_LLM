@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import learned_ai.validation.target_refresh_common_anchor_diagnostic as diagnostic
 from learned_ai.evaluation.target_refresh_common_anchor_result import (
     TargetRefreshCommonAnchorResultError,
     decide_common_anchor_result,
@@ -242,6 +243,84 @@ def test_attempt_003_is_a_fresh_analysis_corrected_successor() -> None:
         predecessor_values = {arm[field] for arm in predecessor["arms"]}
         successor_values = {arm[field] for arm in successor["arms"]}
         assert predecessor_values.isdisjoint(successor_values)
+
+
+def test_source_readiness_audits_requested_report_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    contract_path = tmp_path / "contract.json"
+    paths_config = tmp_path / "paths.json"
+    contract_path.write_text("{}", encoding="utf-8")
+    paths_config.write_text("{}", encoding="utf-8")
+    requested_report = tmp_path / "attempt-003" / "readiness.json"
+    contract = {
+        "plan_identity": "plan-identity",
+        "resources": {},
+        "claim_boundary": "development only",
+    }
+    observed: dict[str, Path] = {}
+
+    monkeypatch.setattr(
+        diagnostic,
+        "load_target_refresh_common_anchor_contract",
+        lambda path: contract,
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "_inspect_source",
+        lambda root, loaded: {"published": True},
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "_inspect_source_evidence",
+        lambda root, loaded: {},
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "inspect_template",
+        lambda root, loaded: {},
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "inspect_runtime_identities",
+        lambda root, config, loaded: {},
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "inspect_result_implementation",
+        lambda root, loaded: {},
+    )
+
+    def inspect_targets(root, loaded, *, report_path):
+        observed["report_path"] = report_path
+        return {"absent": True}
+
+    monkeypatch.setattr(
+        diagnostic,
+        "inspect_preparation_targets",
+        inspect_targets,
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "build_prepare_commands",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        diagnostic,
+        "validate_prepare_commands",
+        lambda loaded, commands: None,
+    )
+
+    report = diagnostic.inspect_source_readiness(
+        root=tmp_path,
+        contract_path=contract_path,
+        paths_config=paths_config,
+        report_path=requested_report,
+        python_executable="python-under-test",
+    )
+
+    assert observed == {"report_path": requested_report.resolve()}
+    assert report["state"] == "source_ready_for_local_preparation"
 
 
 def test_command_validator_rejects_hidden_target_refresh_change() -> None:

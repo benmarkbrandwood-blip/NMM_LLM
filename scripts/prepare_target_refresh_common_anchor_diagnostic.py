@@ -65,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
                 root=ROOT,
                 contract_path=_resolve(args.contract),
                 paths_config=_resolve(args.paths_config),
+                report_path=_resolve(args.report),
                 python_executable=sys.executable,
             )
             if args.write_source_readiness:

@@ -736,12 +736,16 @@ def inspect_source_readiness(
     root: Path,
     contract_path: Path,
     paths_config: Path,
+    report_path: Path | None = None,
     python_executable: str = sys.executable,
 ) -> dict[str, Any]:
     """Perform a read-only audit without creating plans or databases."""
     root = root.resolve()
     contract_path = contract_path.resolve(strict=True)
     paths_config = paths_config.resolve(strict=True)
+    if report_path is None:
+        report_path = root / DEFAULT_REPORT
+    report_path = report_path.resolve(strict=False)
     contract = load_target_refresh_common_anchor_contract(contract_path)
     source = _inspect_source(root, contract)
     evidence = _inspect_source_evidence(root, contract)
@@ -751,7 +755,7 @@ def inspect_source_readiness(
     targets = inspect_preparation_targets(
         root,
         contract,
-        report_path=root / DEFAULT_REPORT,
+        report_path=report_path,
     )
     commands = build_prepare_commands(
         root=root,
