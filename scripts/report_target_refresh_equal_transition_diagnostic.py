@@ -297,6 +297,29 @@ def _load_candidate_pair(
     immutable_assets: dict[str, Any] | None = None
     for condition in EXPECTED_CONDITIONS:
         arm = arms[(seed, condition)]
+        branch_resume = (
+            ROOT / str(arm["control_dir"]) / "initial-target-refresh-fork.pt"
+        ).resolve()
+        branch = load_checkpoint(branch_resume, map_location=device)
+        branch_implementation = dict(branch.descriptor.implementation)
+        expected_branch_id = f"{fork_record['checkpoint_id']}:branch:{condition}"
+        if (
+            branch.descriptor.role != "target_refresh_fork"
+            or branch.descriptor.experiment_id != arm["experiment_id"]
+            or branch.descriptor.checkpoint_id != expected_branch_id
+            or branch.descriptor.parent_checkpoint_id != fork_record["checkpoint_id"]
+            or branch.payload_sha256 != fork_record["payload_sha256"]
+            or branch_implementation.get("target_refresh_branch_kind")
+            != "target-refresh-fork-v1"
+            or branch_implementation.get("target_refresh_branch_source_checkpoint_id")
+            != fork_record["checkpoint_id"]
+            or branch_implementation.get("target_refresh_branch_source_payload_sha256")
+            != fork_record["payload_sha256"]
+            or branch_implementation.get("target_refresh_branch_treatment") != condition
+        ):
+            raise EqualTransitionReportError(
+                f"branch checkpoint semantics differ: seed {seed}, {condition}"
+            )
         path = _segment(str(arm["control_dir"])) / (
             f"transition-{boundary:08d}.pt"
         )
@@ -304,12 +327,19 @@ def _load_candidate_pair(
         state = envelope.payload.trainer_state
         recovery = state.get("recovery_state", {})
         fork = recovery.get("target_refresh_fork_state", {})
-        implementation = envelope.descriptor.implementation
+        implementation = dict(envelope.descriptor.implementation)
+        expected_runtime_implementation = {
+            key: value
+            for key, value in branch_implementation.items()
+            if not key.startswith("target_refresh_branch_")
+        }
         origin = fork.get("post_fork_transition_origin")
         consumed = recovery.get("optimizer_consumed_transition_count")
         if (
             envelope.descriptor.role != "transition_diagnostic_candidate"
             or envelope.descriptor.experiment_id != arm["experiment_id"]
+            or envelope.descriptor.config_sha256 != branch.descriptor.config_sha256
+            or implementation != expected_runtime_implementation
             or fork.get("captured") is not True
             or fork.get("fork_game") != 50
             or fork.get("treatment") != condition
@@ -317,20 +347,10 @@ def _load_candidate_pair(
             or not isinstance(consumed, int)
             or consumed - origin != boundary
             or len(recovery.get("pending_steps", [])) >= 64
-            or implementation.get("target_refresh_branch_kind")
-            != "target-refresh-fork-v1"
-            or implementation.get("target_refresh_branch_source_checkpoint_id")
-            != fork_record["checkpoint_id"]
-            or implementation.get("target_refresh_branch_source_payload_sha256")
-            != fork_record["payload_sha256"]
-            or implementation.get("target_refresh_branch_treatment") != condition
         ):
             raise EqualTransitionReportError(
                 f"candidate semantics differ: seed {seed}, {condition}, {boundary}"
             )
-        branch_resume = (
-            ROOT / str(arm["control_dir"]) / "initial-target-refresh-fork.pt"
-        ).resolve()
         if str(recovery.get("source_checkpoint")) != str(branch_resume):
             raise EqualTransitionReportError(
                 f"candidate fork source differs: seed {seed}, {condition}"

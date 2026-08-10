@@ -74,8 +74,15 @@ def test_result_contract_rejects_duplicate_json_keys(tmp_path) -> None:
         report._strict_json(path)
 
 
+@pytest.mark.parametrize(
+    ("tamper_branch", "expected_error"),
+    [
+        (False, None),
+        (True, "branch checkpoint semantics differ"),
+    ],
+)
 def test_candidate_uses_verified_branch_copy_as_runtime_source(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, tamper_branch, expected_error
 ) -> None:
     control_dir = "out/64-refresh-once"
     branch_resume = (
@@ -97,6 +104,8 @@ def test_candidate_uses_verified_branch_copy_as_runtime_source(
             role="transition_diagnostic_candidate",
             experiment_id="arm-64-refresh-once",
             checkpoint_id="candidate-1024",
+            parent_checkpoint_id="candidate-parent",
+            config_sha256="branch-config",
             asset_identities={
                 "human_db": "human",
                 "malom_tablebase": "malom",
@@ -104,12 +113,7 @@ def test_candidate_uses_verified_branch_copy_as_runtime_source(
                 "sanmill_training_runtime": "sanmill",
                 "training_ruleset": "rules",
             },
-            implementation={
-                "target_refresh_branch_kind": "target-refresh-fork-v1",
-                "target_refresh_branch_source_checkpoint_id": "shared-fork",
-                "target_refresh_branch_source_payload_sha256": "payload",
-                "target_refresh_branch_treatment": "refresh-once",
-            },
+            implementation={"experiment_digest": "sha256:experiment"},
         ),
         payload=SimpleNamespace(
             trainer_state={"recovery_state": recovery, "model_config": {}},
@@ -131,6 +135,29 @@ def test_candidate_uses_verified_branch_copy_as_runtime_source(
 
     def fake_load(path, *, map_location):
         condition = "no-refresh" if "no-refresh" in str(path) else "refresh-once"
+        if str(path).endswith("initial-target-refresh-fork.pt"):
+            recorded_treatment = (
+                "no-refresh"
+                if tamper_branch and condition == "refresh-once"
+                else condition
+            )
+            return SimpleNamespace(
+                descriptor=SimpleNamespace(
+                    role="target_refresh_fork",
+                    experiment_id=arms[(64, condition)]["experiment_id"],
+                    checkpoint_id=f"shared-fork:branch:{condition}",
+                    parent_checkpoint_id="shared-fork",
+                    config_sha256="branch-config",
+                    implementation={
+                        "experiment_digest": "sha256:experiment",
+                        "target_refresh_branch_kind": "target-refresh-fork-v1",
+                        "target_refresh_branch_source_checkpoint_id": "shared-fork",
+                        "target_refresh_branch_source_payload_sha256": "payload",
+                        "target_refresh_branch_treatment": recorded_treatment,
+                    },
+                ),
+                payload_sha256="payload",
+            )
         candidate = SimpleNamespace(
             descriptor=SimpleNamespace(**vars(envelope.descriptor)),
             payload=SimpleNamespace(
@@ -159,10 +186,6 @@ def test_candidate_uses_verified_branch_copy_as_runtime_source(
         candidate.descriptor.experiment_id = arms[(64, condition)][
             "experiment_id"
         ]
-        candidate.descriptor.implementation = {
-            **candidate.descriptor.implementation,
-            "target_refresh_branch_treatment": condition,
-        }
         return candidate
 
     monkeypatch.setattr(report, "ROOT", tmp_path)
@@ -176,15 +199,31 @@ def test_candidate_uses_verified_branch_copy_as_runtime_source(
     monkeypatch.setattr(report, "_sha256_file", lambda value: "checkpoint-file")
     monkeypatch.setattr(report, "_state_dict_sha256", lambda value: "model")
 
-    _, records = report._load_candidate_pair(
-        arms,
-        seed=64,
-        boundary=1_024,
-        fork_record={"checkpoint_id": "shared-fork", "payload_sha256": "payload"},
-        device=report.torch.device("cpu"),
-    )
+    if expected_error is not None:
+        with pytest.raises(report.EqualTransitionReportError, match=expected_error):
+            report._load_candidate_pair(
+                arms,
+                seed=64,
+                boundary=1_024,
+                fork_record={
+                    "checkpoint_id": "shared-fork",
+                    "payload_sha256": "payload",
+                },
+                device=report.torch.device("cpu"),
+            )
+    else:
+        _, records = report._load_candidate_pair(
+            arms,
+            seed=64,
+            boundary=1_024,
+            fork_record={
+                "checkpoint_id": "shared-fork",
+                "payload_sha256": "payload",
+            },
+            device=report.torch.device("cpu"),
+        )
 
-    assert set(records) == {"refresh-once", "no-refresh"}
+        assert set(records) == {"refresh-once", "no-refresh"}
 
 
 def test_git_identity_allows_published_analysis_descendant(monkeypatch) -> None:
