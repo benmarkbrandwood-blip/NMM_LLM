@@ -1,0 +1,143 @@
+"""Tests for staged equal-transition diagnostic preparation."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from learned_ai.training.run_contract import canonical_sha256
+from learned_ai.validation.target_refresh_equal_transition_diagnostic import (
+    TargetRefreshEqualTransitionError,
+    build_prefix_prepare_commands,
+    load_equal_transition_contract,
+    validate_prefix_prepare_commands,
+)
+from scripts import manage_generalist_run as manager
+from scripts import train_s_gen_v2 as trainer
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT = ROOT / (
+    "docs/experiments/"
+    "sanmill-target-refresh-equal-transition-diagnostic-v1.json"
+)
+
+
+def test_tracked_equal_transition_contract_is_self_consistent() -> None:
+    contract = load_equal_transition_contract(CONTRACT)
+
+    assert contract["plan_identity"] == (
+        "18c005e8b9257531700886d96685f8be0d2ae59dc1519fdb761ba44d182e7d3b"
+    )
+    assert [prefix["seed"] for prefix in contract["prefixes"]] == [64, 65, 66]
+    assert len(contract["arms"]) == 6
+    assert contract["authorization"]["launch_authorized"] is False
+
+
+def test_contract_tampering_fails_closed(tmp_path: Path) -> None:
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract["resources"]["maximum_active_wall_hours_total"] = 7.0
+    path = tmp_path / "contract.json"
+    path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(TargetRefreshEqualTransitionError, match="plan identity"):
+        load_equal_transition_contract(path)
+
+
+def test_arm_difference_outside_allowlist_fails_even_with_new_identity(
+    tmp_path: Path,
+) -> None:
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract["arms"][1]["resume_checkpoint"] = "different.pt"
+    body = {key: value for key, value in contract.items() if key != "plan_identity"}
+    contract["plan_identity"] = canonical_sha256(body)
+    path = tmp_path / "contract.json"
+    path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(TargetRefreshEqualTransitionError, match="lineage differs"):
+        load_equal_transition_contract(path)
+
+
+def test_prefix_prepare_commands_are_read_only_and_semantically_paired(
+    tmp_path: Path,
+) -> None:
+    contract = load_equal_transition_contract(CONTRACT)
+    commands = build_prefix_prepare_commands(
+        root=ROOT,
+        contract=contract,
+        paths_config=tmp_path / "training_paths.local.json",
+        python_executable="python",
+    )
+
+    validate_prefix_prepare_commands(contract, commands)
+    assert len(commands) == 3
+    for expected_seed, command in zip((64, 65, 66), commands, strict=True):
+        assert "authorize" not in command
+        assert "run-next" not in command
+        assert "run-all" not in command
+        parsed = manager._build_parser().parse_args(command[2:])
+        assert parsed.seed == expected_seed
+        assert parsed.completion_game_bound == 50
+        assert parsed.no_exact_resume is True
+        assert parsed.exact_transition_batches is True
+        assert parsed.target_refresh_fork_treatment == "capture"
+
+
+def test_prefix_commands_build_valid_frozen_trainer_configuration(
+    tmp_path: Path,
+) -> None:
+    contract = load_equal_transition_contract(CONTRACT)
+    paths_config = tmp_path / "training_paths.local.json"
+    paths_config.write_text(
+        json.dumps({"sanmill_training_checkout": str(tmp_path)}),
+        encoding="utf-8",
+    )
+    commands = build_prefix_prepare_commands(
+        root=ROOT,
+        contract=contract,
+        paths_config=paths_config,
+        python_executable="python",
+    )
+
+    for command in commands:
+        parsed = manager._build_parser().parse_args(command[2:])
+        common = manager._common_trainer_args(parsed, paths_config)
+        args = trainer._build_argument_parser().parse_args(
+            ["--preflight", "long-run", *common]
+        )
+        trainer._configure_paths(args)
+        trainer.validate_generalist_configuration(args)
+        assert args.post_fork_transition_bound is None
+        assert args.start_mode == "fresh"
+
+
+def test_all_arm_paths_are_deferred_and_distinct() -> None:
+    contract = load_equal_transition_contract(CONTRACT)
+
+    paths = [arm["specialist_db"] for arm in contract["arms"]]
+    assert len(paths) == len(set(paths)) == 6
+    for seed in (64, 65, 66):
+        seed_arms = [arm for arm in contract["arms"] if arm["seed"] == seed]
+        assert seed_arms[0]["resume_checkpoint"] == seed_arms[1][
+            "resume_checkpoint"
+        ]
+        assert seed_arms[0]["prefix_specialist_db"] == seed_arms[1][
+            "prefix_specialist_db"
+        ]
+
+
+def test_contract_requires_exact_frozen_transition_boundaries(tmp_path: Path) -> None:
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    contract["measurement_contract"]["transition_boundaries"] = [1024, 8192]
+    body = {key: value for key, value in contract.items() if key != "plan_identity"}
+    contract["plan_identity"] = canonical_sha256(body)
+    path = tmp_path / "contract.json"
+    path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(
+        TargetRefreshEqualTransitionError,
+        match="scientific values differ",
+    ):
+        load_equal_transition_contract(path)
