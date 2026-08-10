@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from learned_ai.data.specialist_db import SpecialistDB
 from learned_ai.training.generalist_preflight import LoadedTrainingSettings
 from scripts import train_s_gen_v2 as trainer
 
@@ -67,6 +68,54 @@ def test_launch_records_running_then_completed(monkeypatch, capsys) -> None:
     assert exit_code == 0
     assert statuses == ["running", "completed"]
     assert '"verdict": "ready_for_smoke"' in capsys.readouterr().out
+
+
+def test_launch_closes_runtime_specialist_db_before_return(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_launch_mocks(monkeypatch)
+    database_path = tmp_path / "runtime-specialist.sqlite"
+    retained: list[SpecialistDB] = []
+
+    def run(args, **_kwargs) -> None:
+        database = SpecialistDB(database_path)
+        database.checkpoint_identity()
+        retained.append(database)
+        setattr(args, "_runtime_specialist_db", database)
+        assert Path(f"{database_path}-wal").exists()
+        assert Path(f"{database_path}-shm").exists()
+
+    monkeypatch.setattr(trainer, "run", run)
+
+    assert trainer.main(_launch_arguments()) == 0
+    assert retained
+    assert not Path(f"{database_path}-wal").exists()
+    assert not Path(f"{database_path}-shm").exists()
+
+
+def test_launch_closes_runtime_specialist_db_after_training_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_launch_mocks(monkeypatch)
+    database_path = tmp_path / "runtime-specialist.sqlite"
+    retained: list[SpecialistDB] = []
+
+    def run(args, **_kwargs) -> None:
+        database = SpecialistDB(database_path)
+        database.checkpoint_identity()
+        retained.append(database)
+        setattr(args, "_runtime_specialist_db", database)
+        raise RuntimeError("simulated failure after database open")
+
+    monkeypatch.setattr(trainer, "run", run)
+
+    with pytest.raises(RuntimeError, match="simulated failure"):
+        trainer.main(_launch_arguments())
+    assert retained
+    assert not Path(f"{database_path}-wal").exists()
+    assert not Path(f"{database_path}-shm").exists()
 
 
 def test_launch_records_failed_before_propagating_training_error(

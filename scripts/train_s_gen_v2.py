@@ -2516,6 +2516,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     # ── SpecialistDB ─────────────────────────────────────────────────────────
     specialist_db = SpecialistDB(args.specialist_db)
+    # main() owns final cleanup so every normal or exceptional launch closes
+    # the WAL connection before a managed exact-resume preflight begins.
+    setattr(args, "_runtime_specialist_db", specialist_db)
     specialist_db.require_trusted_malom_labels()
     if args.start_mode != "exact-resume":
         specialist_db.bind_training_lineage(getattr(args, "_run_manifest").run_id)
@@ -3874,6 +3877,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             details={"exception_type": type(exc).__name__},
         )
         raise
+    finally:
+        specialist_db = getattr(args, "_runtime_specialist_db", None)
+        if specialist_db is not None:
+            specialist_db.close()
     append_run_lifecycle_event(
         args.out_dir,
         run_id=args.run_id,
