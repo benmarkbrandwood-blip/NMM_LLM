@@ -68,12 +68,35 @@ Neither attempt produced target-refresh evidence. See the
 and
 [attempt-002 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-002-failure-2026-08-10.md).
 
-An authorization-free attempt-003 contract is now frozen locally at plan
-identity `8cc192f5`. It preserves the exact scientific and resource contract,
-changes only lineage-owned paths and identities, binds correction `873e126`,
-and adds the attempt-002 failure record as source evidence. It must be
-published normally before its four fresh databases, plans and preflights may
-be generated. It does not authorize training.
+Attempt 003 was subsequently published, prepared and authorized once under
+plan identity `8cc192f5` and readiness identity `43e9eb75`. All four arms
+completed: seed-64 refresh/no-refresh used 122/92 games and 34 optimizer
+updates; seed-65 refresh/no-refresh used 110/100 games and 32 optimizer
+updates. The run produced 424 training games and 256 no-update measurement
+games. All policy-health gates passed, but both fixed-anchor strata remained
+at the outcome floor and the result selected no target-refresh setting.
+
+A no-training full-action follow-up now compares the four post-anchor
+checkpoints on the same 64 placement/movement/flying positions. Its raw local
+report SHA-256 is `02f84765`, and analysis identity is `a885711a`. At the final
+checkpoint, temperature-0.2 mean total variation was only `4.60e-5` for seed
+64 and `7.09e-5` for seed 65; mean Jensen-Shannon distances were `1.97e-9`
+and `6.45e-9`. All 1,583 legal actions had exact Malom quality, and both
+conditions selected a preserving top-1 action in every state, but their
+preserving probability mass was only about `0.00009` to `0.00019` above an
+equal-action uniform reference. The policies are therefore classified
+`near_identical` and almost uniform at this horizon, despite material
+parameter-space separation. See the
+[full-action evidence](../evidence/target-refresh-common-anchor-policy-distribution-2026-08-10.md).
+
+The next design is a three-seed, single-refresh fork with exact 64-transition
+optimizer batches and fixed 1,024/2,048/4,096/8,192 post-fork transition
+boundaries. It is documented in the
+[equal-transition diagnostic](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md),
+but remains `designed_needs_implementation_no_launch_authority`. No held-out
+evaluation, successor training, extension, promotion or long run is
+authorized. The analyzer, evidence and successor design are currently local
+commits ahead of `origin/dev`; no push has been performed.
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
