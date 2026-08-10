@@ -2885,7 +2885,6 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     measurement_anchor_opponent: Optional[FrozenModelOpponent] = None
     measurement_lookahead_advisor: Optional[LookaheadAdvisor] = None
-    measurement_specialist_read_db: Optional[SpecialistTrainingReadView] = None
     measurement_anchor_update_count: Optional[int] = None
     measurement_anchor_checkpoint_id: Optional[str] = None
     measurement_batch_count = 0
@@ -2895,7 +2894,6 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     def _capture_measurement_anchor_if_due() -> None:
         nonlocal measurement_anchor_opponent
         nonlocal measurement_lookahead_advisor
-        nonlocal measurement_specialist_read_db
         nonlocal measurement_anchor_update_count
         nonlocal measurement_anchor_checkpoint_id
         if args.measurement_anchor_game is None:
@@ -2910,10 +2908,6 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 f"expected {args.measurement_anchor_expected_update_count}, "
                 f"observed {update_count}"
             )
-        measurement_specialist_read_db = SpecialistTrainingReadView(
-            specialist_db,
-            args.specialist_read_mode,
-        )
         measurement_lookahead_advisor = LookaheadAdvisor(
             sentinel=sentinel,
             evaluate_fn=_simple_evaluate,
@@ -2931,7 +2925,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             sentinel=sentinel,
             value_net=value_net,
             lookahead_advisor=measurement_lookahead_advisor,
-            specialist_db=measurement_specialist_read_db,
+            specialist_db=None,
         )
         measurement_lookahead_advisor.set_frozen_model(
             measurement_anchor_opponent._model,
@@ -3018,7 +3012,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         lookahead_advisor=measurement_lookahead_advisor,
                         game_difficulty=1,
                         human_db=human_db,
-                        specialist_db=measurement_specialist_read_db,
+                        specialist_db=None,
                         malom_db=db,
                         deep_game=False,
                         torch_generator=_game_torch_generator(torch_seed),
@@ -3050,6 +3044,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         ),
                         "learner_color": learner_color,
                         "temperature": args.measurement_temperature,
+                        "specialist_read_mode": "disabled",
                         "no_update": True,
                         **_development_measurement_metrics(result),
                     }

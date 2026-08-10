@@ -95,6 +95,44 @@ def test_common_args_bind_refresh_cadence_and_learning_rate_mode(tmp_path) -> No
     assert common[common.index("--lr-adaptation-mode") + 1] == "fixed"
 
 
+def test_common_args_bind_optimizer_and_measurement_contract(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        _required_prepare_args()
+        + [
+            "--optimizer-update-bound",
+            "34",
+            "--measurement-anchor-game",
+            "50",
+            "--measurement-anchor-expected-update-count",
+            "18",
+            "--measurement-every-updates",
+            "4",
+            "--measurement-games-per-opponent",
+            "8",
+            "--measurement-sanmill-node-budget",
+            "1000",
+            "--measurement-temperature",
+            "0.2",
+            "--no-exact-resume",
+        ]
+    )
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    expected = {
+        "--optimizer-update-bound": "34",
+        "--measurement-anchor-game": "50",
+        "--measurement-anchor-expected-update-count": "18",
+        "--measurement-every-updates": "4",
+        "--measurement-games-per-opponent": "8",
+        "--measurement-sanmill-node-budget": "1000",
+        "--measurement-temperature": "0.2",
+    }
+    for option, value in expected.items():
+        assert common[common.index(option) + 1] == value
+    assert args.no_exact_resume is True
+
+
 @pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])
 def test_prepare_rejects_invalid_malom_policy_auxiliary(value: str) -> None:
     with pytest.raises(SystemExit):

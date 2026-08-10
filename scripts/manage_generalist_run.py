@@ -177,6 +177,25 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
     specialist_db = getattr(args, "specialist_db", None)
     if specialist_db:
         common_args.extend(("--specialist-db", str(Path(specialist_db).resolve())))
+    if args.optimizer_update_bound is not None:
+        common_args.extend(
+            (
+                "--optimizer-update-bound",
+                str(args.optimizer_update_bound),
+                "--measurement-anchor-game",
+                str(args.measurement_anchor_game),
+                "--measurement-anchor-expected-update-count",
+                str(args.measurement_anchor_expected_update_count),
+                "--measurement-every-updates",
+                str(args.measurement_every_updates),
+                "--measurement-games-per-opponent",
+                str(args.measurement_games_per_opponent),
+                "--measurement-sanmill-node-budget",
+                str(args.measurement_sanmill_node_budget),
+                "--measurement-temperature",
+                str(args.measurement_temperature),
+            )
+        )
     return common_args
 
 
@@ -227,7 +246,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         segment_games=args.segment_games,
         max_wall_hours=args.max_wall_hours,
         common_trainer_args=tuple(common_args),
-        allow_safe_exact_resume=True,
+        allow_safe_exact_resume=not args.no_exact_resume,
         publication_allowed=False,
         promotion_allowed=False,
         policy_health=policy_health,
@@ -296,6 +315,39 @@ def _build_parser() -> argparse.ArgumentParser:
         "--segment-games",
         type=int,
         default=DEFAULT_SEGMENT_GAMES,
+    )
+    prepare.add_argument(
+        "--optimizer-update-bound",
+        type=int,
+        default=None,
+        help="Optional absolute A2C optimizer-step completion bound",
+    )
+    prepare.add_argument("--measurement-anchor-game", type=int, default=None)
+    prepare.add_argument(
+        "--measurement-anchor-expected-update-count",
+        type=int,
+        default=None,
+    )
+    prepare.add_argument("--measurement-every-updates", type=int, default=None)
+    prepare.add_argument(
+        "--measurement-games-per-opponent",
+        type=int,
+        default=None,
+    )
+    prepare.add_argument(
+        "--measurement-sanmill-node-budget",
+        type=int,
+        default=None,
+    )
+    prepare.add_argument(
+        "--measurement-temperature",
+        type=trainer._finite_positive_float,
+        default=None,
+    )
+    prepare.add_argument(
+        "--no-exact-resume",
+        action="store_true",
+        help="Freeze a single-process diagnostic that cannot exact-resume",
     )
     prepare.add_argument(
         "--engine-profile",
