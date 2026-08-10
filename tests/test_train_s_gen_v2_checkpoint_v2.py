@@ -27,7 +27,14 @@ def _model() -> ScaffoldedPolicyNet:
     )
 
 
-def _payload(model: ScaffoldedPolicyNet, *, game_count: int = 7):
+def _payload(
+    model: ScaffoldedPolicyNet,
+    *,
+    game_count: int = 7,
+    fork_state: dict | None = None,
+    pending_steps: list | None = None,
+    optimizer_consumed_transition_count: int = 128,
+):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     return trainer._make_checkpoint_payload(
         model=model,
@@ -49,12 +56,13 @@ def _payload(model: ScaffoldedPolicyNet, *, game_count: int = 7):
         frozen_model=copy.deepcopy(model),
         games_since_target_update=3,
         recovery_grace=0,
-        pending_steps=[],
+        pending_steps=[] if pending_steps is None else pending_steps,
         last_update_losses=(0.1, 0.2, 0.3),
         source_checkpoint="scratch",
         checkpoint_sequence=1,
         specialist_db_identity={"sha256": "specialist-identity"},
-        optimizer_consumed_transition_count=128,
+        optimizer_consumed_transition_count=optimizer_consumed_transition_count,
+        target_refresh_fork_state=fork_state,
     )
 
 
@@ -200,6 +208,57 @@ def test_exact_resume_accepts_legacy_transition_counter_absence() -> None:
     )
 
     assert restored["optimizer_consumed_transition_count"] == 0
+
+
+def test_exact_resume_preserves_target_refresh_fork_state() -> None:
+    model = _model()
+    fork_state = trainer._new_target_refresh_fork_state(50)
+    fork_state["captured"] = True
+    payload = _payload(model, game_count=50, fork_state=fork_state)
+
+    restored = trainer._restore_exact_resume_payload(
+        payload,
+        optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
+        game_rng=random.Random(99),
+        frozen_model=copy.deepcopy(model),
+        rolling_win=40,
+        bucket_window=300,
+    )
+
+    assert restored["target_refresh_fork_state"] == fork_state
+    assert restored["target_refresh_fork_state"] is not fork_state
+
+
+def test_exact_resume_preserves_consumed_and_pending_transition_counts() -> None:
+    model = _model()
+    pending = [{"transition": index} for index in range(11)]
+    fork_state = trainer._new_target_refresh_fork_state(50)
+    fork_state.update(
+        captured=True,
+        treatment="no-refresh",
+        post_fork_transition_origin=128,
+    )
+    payload = _payload(
+        model,
+        game_count=93,
+        fork_state=fork_state,
+        pending_steps=pending,
+        optimizer_consumed_transition_count=640,
+    )
+
+    restored = trainer._restore_exact_resume_payload(
+        payload,
+        optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
+        game_rng=random.Random(99),
+        frozen_model=copy.deepcopy(model),
+        rolling_win=40,
+        bucket_window=300,
+    )
+
+    assert restored["optimizer_consumed_transition_count"] == 640
+    assert restored["pending_steps"] == pending
+    assert restored["pending_steps"] is not pending
+    assert restored["target_refresh_fork_state"] == fork_state
 
 
 def test_exact_resume_rejects_inconsistent_data_cursor() -> None:

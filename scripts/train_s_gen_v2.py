@@ -547,8 +547,23 @@ def _make_checkpoint_payload(
     checkpoint_sequence: int,
     specialist_db_identity: dict,
     optimizer_consumed_transition_count: int = 0,
+    target_refresh_fork_state: Optional[dict[str, Any]] = None,
 ) -> CheckpointPayload:
     """Capture every mutable state element needed for exact continuation."""
+    recovery_state = {
+        "grace": recovery_grace,
+        "pending_steps": list(pending_steps),
+        "optimizer_consumed_transition_count": (
+            optimizer_consumed_transition_count
+        ),
+        "last_update_losses": last_update_losses,
+        "source_checkpoint": source_checkpoint,
+        "checkpoint_sequence": checkpoint_sequence,
+    }
+    if target_refresh_fork_state is not None:
+        recovery_state["target_refresh_fork_state"] = copy.deepcopy(
+            target_refresh_fork_state
+        )
     return CheckpointPayload(
         model_state=model.state_dict(),
         optimizer_state=optimizer.state_dict(),
@@ -574,16 +589,7 @@ def _make_checkpoint_payload(
                 "games_since_update": games_since_target_update,
                 "model_state": frozen_model.state_dict(),
             },
-            "recovery_state": {
-                "grace": recovery_grace,
-                "pending_steps": list(pending_steps),
-                "optimizer_consumed_transition_count": (
-                    optimizer_consumed_transition_count
-                ),
-                "last_update_losses": last_update_losses,
-                "source_checkpoint": source_checkpoint,
-                "checkpoint_sequence": checkpoint_sequence,
-            },
+            "recovery_state": recovery_state,
             "model_config": model.get_config(),
         },
         data_state={
@@ -644,9 +650,13 @@ def _restore_exact_resume_payload(
     current_recovery_fields = legacy_recovery_fields | {
         "optimizer_consumed_transition_count"
     }
+    diagnostic_recovery_fields = current_recovery_fields | {
+        "target_refresh_fork_state"
+    }
     if not isinstance(recovery, dict) or set(recovery) not in (
         legacy_recovery_fields,
         current_recovery_fields,
+        diagnostic_recovery_fields,
     ):
         raise RuntimeError("exact-resume recovery_state state is incomplete")
     if cursor["completed_games"] != trainer_state["game_count"]:
@@ -689,6 +699,9 @@ def _restore_exact_resume_payload(
         "pending_steps": list(recovery["pending_steps"]),
         "optimizer_consumed_transition_count": int(
             recovery.get("optimizer_consumed_transition_count", 0)
+        ),
+        "target_refresh_fork_state": copy.deepcopy(
+            recovery.get("target_refresh_fork_state")
         ),
         "last_update_losses": last_losses,
     }
@@ -858,6 +871,104 @@ def _take_exact_transition_batch(
     batch = list(pending_steps[:batch_size])
     del pending_steps[:batch_size]
     return batch
+
+
+def _should_run_final_transition_flush(
+    *,
+    pending_count: int,
+    exact_transition_batches: bool,
+    optimizer_update_bound: Optional[int],
+    update_count: int,
+) -> bool:
+    """Return whether the historical all-pending final update is allowed."""
+    if pending_count < 0 or update_count < 0:
+        raise ValueError("transition and update counts must be non-negative")
+    return (
+        pending_count > 0
+        and not exact_transition_batches
+        and (
+            optimizer_update_bound is None
+            or update_count < optimizer_update_bound
+        )
+    )
+
+
+TARGET_REFRESH_FORK_STATE_SCHEMA = "nmm.target-refresh-fork-state.v1"
+TARGET_REFRESH_TRANSITION_BOUNDARIES = (1024, 2048, 4096, 8192)
+
+
+def _new_target_refresh_fork_state(fork_game: int) -> dict[str, Any]:
+    if isinstance(fork_game, bool) or not isinstance(fork_game, int):
+        raise ValueError("fork_game must be a positive integer")
+    if fork_game <= 0:
+        raise ValueError("fork_game must be a positive integer")
+    return {
+        "schema_version": TARGET_REFRESH_FORK_STATE_SCHEMA,
+        "fork_game": fork_game,
+        "captured": False,
+        "treatment": None,
+        "post_fork_transition_origin": None,
+    }
+
+
+def _validate_target_refresh_fork_state(value: Any) -> dict[str, Any]:
+    expected_fields = {
+        "schema_version",
+        "fork_game",
+        "captured",
+        "treatment",
+        "post_fork_transition_origin",
+    }
+    if not isinstance(value, dict) or set(value) != expected_fields:
+        raise RuntimeError("target-refresh fork state is incomplete")
+    if value["schema_version"] != TARGET_REFRESH_FORK_STATE_SCHEMA:
+        raise RuntimeError("target-refresh fork state schema is unsupported")
+    fork_game = value["fork_game"]
+    if isinstance(fork_game, bool) or not isinstance(fork_game, int):
+        raise RuntimeError("target-refresh fork game is invalid")
+    if fork_game <= 0 or not isinstance(value["captured"], bool):
+        raise RuntimeError("target-refresh fork state is invalid")
+    if value["treatment"] not in (None, "refresh-once", "no-refresh"):
+        raise RuntimeError("target-refresh fork treatment is invalid")
+    origin = value["post_fork_transition_origin"]
+    if origin is not None and (
+        isinstance(origin, bool) or not isinstance(origin, int) or origin < 0
+    ):
+        raise RuntimeError("target-refresh transition origin is invalid")
+    return copy.deepcopy(value)
+
+
+def _apply_target_refresh_fork_treatment(
+    *,
+    state: dict[str, Any],
+    treatment: str,
+    optimizer_consumed_transition_count: int,
+    games_since_target_update: int,
+    refresh_target: Callable[[], None],
+) -> tuple[dict[str, Any], int, bool]:
+    """Apply the single allowlisted fork intervention exactly once."""
+    restored = _validate_target_refresh_fork_state(state)
+    if not restored["captured"]:
+        raise RuntimeError("target-refresh treatment requires a captured fork")
+    if treatment not in ("refresh-once", "no-refresh"):
+        raise RuntimeError("target-refresh treatment is unsupported")
+    observed = restored["treatment"]
+    if observed is not None:
+        if observed != treatment:
+            raise RuntimeError("target-refresh fork treatment changed on resume")
+        if restored["post_fork_transition_origin"] is None:
+            raise RuntimeError("target-refresh fork origin is missing")
+        return restored, games_since_target_update, False
+    if optimizer_consumed_transition_count < 0:
+        raise RuntimeError("optimizer consumed-transition count is invalid")
+    if treatment == "refresh-once":
+        refresh_target()
+        games_since_target_update = 0
+    restored["treatment"] = treatment
+    restored["post_fork_transition_origin"] = (
+        optimizer_consumed_transition_count
+    )
+    return restored, games_since_target_update, True
 
 
 def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) -> str:
@@ -2761,6 +2872,11 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     batch_count = 0
     update_count = 0
     optimizer_consumed_transition_count = 0
+    target_refresh_fork_state = (
+        _new_target_refresh_fork_state(args.target_refresh_fork_game)
+        if args.target_refresh_fork_treatment == "capture"
+        else None
+    )
     if exact_resume is not None:
         restored = _restore_exact_resume_payload(
             exact_resume.payload,
@@ -2776,6 +2892,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         optimizer_consumed_transition_count = restored[
             "optimizer_consumed_transition_count"
         ]
+        target_refresh_fork_state = restored["target_refresh_fork_state"]
         difficulty = restored["difficulty"]
         temperature = restored["temperature"]
         win_history = restored["win_history"]
@@ -2796,6 +2913,25 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             f"[s_gen_v2] Exact state restored at game {game_count}, "
             f"batch {batch_count}, update {update_count}, consumed transitions "
             f"{optimizer_consumed_transition_count}"
+        )
+    if args.target_refresh_fork_treatment in ("refresh-once", "no-refresh"):
+        if target_refresh_fork_state is None:
+            raise RuntimeError("exact-resume checkpoint has no target-refresh fork")
+        target_refresh_fork_state, games_since_target_update, applied = (
+            _apply_target_refresh_fork_treatment(
+                state=target_refresh_fork_state,
+                treatment=args.target_refresh_fork_treatment,
+                optimizer_consumed_transition_count=(
+                    optimizer_consumed_transition_count
+                ),
+                games_since_target_update=games_since_target_update,
+                refresh_target=lambda: frozen_opp.refresh(model),
+            )
+        )
+        action = "applied" if applied else "verified on exact resume"
+        print(
+            f"[s_gen_v2] Target-refresh fork treatment {action}: "
+            f"{args.target_refresh_fork_treatment}"
         )
     checkpoint_sequence = 0
     parent_checkpoint_id: Optional[str] = getattr(
@@ -2822,6 +2958,13 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         f"[s_gen_v2] Segment stop at game {segment_stop_game} "
         f"(current={game_count})"
     )
+    if (
+        args.target_refresh_fork_treatment == "capture"
+        and segment_stop_game != args.target_refresh_fork_game
+    ):
+        raise RuntimeError(
+            "target-refresh fork capture must stop exactly at fork_game"
+        )
     optimizer_update_bound = args.optimizer_update_bound
     if optimizer_update_bound is not None:
         if update_count > optimizer_update_bound:
@@ -2919,6 +3062,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             optimizer_consumed_transition_count=(
                 optimizer_consumed_transition_count
             ),
+            target_refresh_fork_state=target_refresh_fork_state,
         )
         save_checkpoint(path, descriptor, payload)
         if advance_lineage:
@@ -2932,6 +3076,63 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     measurement_batch_count = 0
     measurement_game_count = 0
     measurement_updates_seen: set[int] = set()
+
+    def _post_fork_consumed_transition_count() -> Optional[int]:
+        if target_refresh_fork_state is None:
+            return None
+        origin = target_refresh_fork_state["post_fork_transition_origin"]
+        if origin is None:
+            return None
+        consumed = optimizer_consumed_transition_count - origin
+        if consumed < 0:
+            raise RuntimeError("post-fork consumed-transition count is negative")
+        return consumed
+
+    def _post_fork_transition_bound_reached() -> bool:
+        if args.post_fork_transition_bound is None:
+            return False
+        consumed = _post_fork_consumed_transition_count()
+        if consumed is None:
+            raise RuntimeError("post-fork transition origin is missing")
+        if consumed > args.post_fork_transition_bound:
+            raise RuntimeError("post-fork transition bound was overrun")
+        return consumed == args.post_fork_transition_bound
+
+    def _capture_target_refresh_fork_if_due() -> None:
+        if args.target_refresh_fork_treatment != "capture":
+            return
+        if target_refresh_fork_state is None:
+            raise RuntimeError("target-refresh fork state is missing")
+        if game_count != args.target_refresh_fork_game:
+            return
+        if target_refresh_fork_state["captured"]:
+            return
+        if games_since_target_update != args.target_refresh_fork_game:
+            raise RuntimeError(
+                "target-refresh fork age differs from the frozen boundary"
+            )
+        target_refresh_fork_state["captured"] = True
+        _save_runtime_checkpoint(
+            out_dir / "target-refresh-fork.pt",
+            role="target_refresh_fork",
+            reason="before_single_target_refresh_decision",
+            advance_lineage=False,
+        )
+        print(
+            "[s_gen_v2] Captured target-refresh fork before the game "
+            f"{game_count} refresh decision"
+        )
+
+    def _save_transition_boundary_if_due() -> None:
+        consumed = _post_fork_consumed_transition_count()
+        if consumed not in TARGET_REFRESH_TRANSITION_BOUNDARIES:
+            return
+        _save_runtime_checkpoint(
+            out_dir / f"transition-{consumed:08d}.pt",
+            role="transition_diagnostic_candidate",
+            reason=f"exact_post_fork_transition_{consumed}",
+            advance_lineage=False,
+        )
 
     def _capture_measurement_anchor_if_due() -> None:
         nonlocal measurement_anchor_opponent
@@ -3107,6 +3308,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             optimizer_update_bound is None
             or update_count < optimizer_update_bound
         )
+        and not _post_fork_transition_bound_reached()
     ):
         batch_count += 1
         temperature = _compute_temperature(
@@ -3130,7 +3332,14 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     f"{args.sanmill_node_ladder[difficulty - 1]}"
                 )
 
-        if games_since_target_update >= args.update_target_every:
+        fork_treatment_active = (
+            target_refresh_fork_state is not None
+            and target_refresh_fork_state["treatment"] is not None
+        )
+        if (
+            not fork_treatment_active
+            and games_since_target_update >= args.update_target_every
+        ):
             frozen_opp.refresh(model)
             games_since_target_update = 0
             print(f"[s_gen_v2] Frozen model updated at game {game_count}")
@@ -3563,6 +3772,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     optimizer_update_bound is None
                     or update_count < optimizer_update_bound
                 )
+                and not _post_fork_transition_bound_reached()
             ):
                 update_diagnostics: dict[str, Any] = {}
                 if args.exact_transition_batches:
@@ -3619,6 +3829,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     "optimizer_consumed_transition_count": (
                         optimizer_consumed_transition_count
                     ),
+                    "post_fork_consumed_transition_count": (
+                        _post_fork_consumed_transition_count()
+                    ),
                     "generated_transition_count": (
                         optimizer_consumed_transition_count + len(ep_steps)
                     ),
@@ -3630,6 +3843,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     f.write(json.dumps(upd_entry) + "\n")
                 if _imitation_data is not None:
                     _imitation_mix_step(model, device, _imitation_data, opt)
+                _save_transition_boundary_if_due()
                 if not args.exact_transition_batches:
                     break
 
@@ -3788,16 +4002,17 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         f"diff {difficulty}; latest.pt records the transition"
                     )
 
+            _capture_target_refresh_fork_if_due()
+
         if _advance_done:
             break
 
     # ── Final flush ────────────────────────────────────────────────────────────
-    if (
-        ep_steps
-        and not args.exact_transition_batches
-        and (
-        optimizer_update_bound is None or update_count < optimizer_update_bound
-        )
+    if _should_run_final_transition_flush(
+        pending_count=len(ep_steps),
+        exact_transition_batches=args.exact_transition_batches,
+        optimizer_update_bound=optimizer_update_bound,
+        update_count=update_count,
     ):
         final_batch_steps = len(ep_steps)
         update_diagnostics = {}
@@ -4096,6 +4311,30 @@ def _build_argument_parser() -> argparse.ArgumentParser:
             "Optional absolute optimizer update_count ceiling. It is intended "
             "for bounded diagnostics with warm-start and imitation updates "
             "disabled; --segment-stop-game remains the game safety ceiling."
+        ),
+    )
+    p.add_argument(
+        "--target-refresh-fork-game",
+        type=int,
+        default=None,
+        help="Completed-game boundary captured before one target-refresh decision",
+    )
+    p.add_argument(
+        "--target-refresh-fork-treatment",
+        choices=("capture", "refresh-once", "no-refresh"),
+        default=None,
+        help=(
+            "Capture a shared pre-refresh fork or apply/verify exactly one "
+            "allowlisted fork treatment during exact resume"
+        ),
+    )
+    p.add_argument(
+        "--post-fork-transition-bound",
+        type=int,
+        default=None,
+        help=(
+            "Stop after this many optimizer-consumed transitions beyond the "
+            "captured target-refresh fork"
         ),
     )
     p.add_argument(

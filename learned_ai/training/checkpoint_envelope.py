@@ -33,6 +33,8 @@ CHECKPOINT_ROLES = frozenset(
         "accepted",
         "development_measurement_anchor",
         "development_measurement_candidate",
+        "target_refresh_fork",
+        "transition_diagnostic_candidate",
     }
 )
 CHECKPOINT_START_MODES = frozenset({"fresh", "weights-only", "exact-resume"})

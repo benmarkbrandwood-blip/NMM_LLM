@@ -19,6 +19,7 @@ from learned_ai.training.generalist_preflight import (
     GitState,
     PreflightConfigurationError,
     _file_sha256,
+    _target_refresh_fork_checkpoint_errors,
     configure_generalist_paths,
     load_training_settings,
     resolved_resume_config,
@@ -511,6 +512,8 @@ def test_fixed_auxiliary_defaults_preserve_legacy_resume_config_shape(
     assert "malom_policy_aux_target_ratio" not in config
     assert "malom_policy_aux_coef_cap" not in config
     assert "malom_policy_aux_denominator_floor" not in config
+    assert "exact_transition_batches" not in config
+    assert "target_refresh_fork_game" not in config
 
 
 def test_normalized_auxiliary_settings_bind_resume_semantics(tmp_path: Path) -> None:
@@ -540,6 +543,48 @@ def test_learning_rate_mode_preserves_default_and_binds_fixed_semantics(
 
     assert resolved_resume_config(args)["lr_adaptation_mode"] == "fixed"
     assert resume_config_sha256(args) != adaptive
+
+
+@pytest.mark.parametrize(
+    ("role", "observed_treatment", "expected"),
+    [
+        ("target_refresh_fork", None, []),
+        (
+            "latest",
+            None,
+            ["checkpoint: initial treatment requires fork role"],
+        ),
+        ("latest", "refresh-once", []),
+        (
+            "latest",
+            "no-refresh",
+            ["checkpoint: target-refresh treatment changed"],
+        ),
+    ],
+)
+def test_target_refresh_fork_checkpoint_gate(
+    tmp_path: Path,
+    role: str,
+    observed_treatment: str | None,
+    expected: list[str],
+) -> None:
+    args = _smoke_args(tmp_path)
+    args.target_refresh_fork_game = 50
+    args.target_refresh_fork_treatment = "refresh-once"
+    report = {
+        "checkpoint_role": role,
+        "target_refresh_fork_state": {
+            "schema_version": trainer.TARGET_REFRESH_FORK_STATE_SCHEMA,
+            "fork_game": 50,
+            "captured": True,
+            "treatment": observed_treatment,
+            "post_fork_transition_origin": (
+                None if observed_treatment is None else 128
+            ),
+        },
+    }
+
+    assert _target_refresh_fork_checkpoint_errors(args, report) == expected
 
 
 def test_main_rejects_duplicate_cli_options_before_training(capsys) -> None:

@@ -101,7 +101,12 @@ def test_checkpoint_round_trip_preserves_complete_state(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "role",
-    ["development_measurement_anchor", "development_measurement_candidate"],
+    [
+        "development_measurement_anchor",
+        "development_measurement_candidate",
+        "target_refresh_fork",
+        "transition_diagnostic_candidate",
+    ],
 )
 def test_checkpoint_round_trip_preserves_development_measurement_role(
     tmp_path: Path,

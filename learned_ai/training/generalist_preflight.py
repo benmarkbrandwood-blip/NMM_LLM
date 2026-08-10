@@ -300,6 +300,89 @@ def validate_generalist_configuration(args: Any) -> None:
                 "recovery, parallel games, and branch rollouts to be disabled"
             )
 
+    fork_game = getattr(args, "target_refresh_fork_game", None)
+    fork_treatment = getattr(args, "target_refresh_fork_treatment", None)
+    post_fork_bound = getattr(args, "post_fork_transition_bound", None)
+    if (fork_game is None) != (fork_treatment is None):
+        raise PreflightConfigurationError(
+            "target-refresh fork game and treatment must be specified together"
+        )
+    if fork_treatment is None and post_fork_bound is not None:
+        raise PreflightConfigurationError(
+            "post_fork_transition_bound requires a target-refresh fork"
+        )
+    if fork_treatment is not None:
+        _positive_integer(fork_game, field="target_refresh_fork_game")
+        if fork_game >= args.max_games:
+            raise PreflightConfigurationError(
+                "target_refresh_fork_game must be below max_games"
+            )
+        if not getattr(args, "exact_transition_batches", False):
+            raise PreflightConfigurationError(
+                "target-refresh fork requires exact_transition_batches"
+            )
+        if args.update_target_every != fork_game:
+            raise PreflightConfigurationError(
+                "target-refresh fork game must equal update_target_every"
+            )
+        if args.curriculum_advance_policy == "legacy-score":
+            raise PreflightConfigurationError(
+                "target-refresh fork requires a non-statistical curriculum"
+            )
+        frozen_fork_controls = (
+            args.update_every == 64
+            and args.minimal_rollouts
+            and not args.ppo
+            and args.no_sentinel
+            and args.no_value_net
+            and args.no_gap_net
+            and args.no_opening_forcing
+            and args.referee_engine == "sanmill"
+            and args.opponent_engine == "sanmill"
+            and args.curriculum_advance_policy == "fixed-resource"
+            and args.specialist_read_mode == "theoretical-only"
+            and args.mill_bonus_mode == "malom-preserving-only"
+            and args.lr_adaptation_mode == "fixed"
+            and args.malom_policy_aux_coef == 0.0
+            and args.malom_policy_aux_mode == "fixed"
+            and args.max_ply == 120
+            and args.max_ply_branch == 120
+            and args.sim_ply_depth == 5
+            and args.max_games == 5_000
+            and args.self_play_ratio == 0.60
+            and args.lr == 1e-4
+            and args.entropy_coef == 0.01
+            and args.temp_start == 0.90
+        )
+        if not frozen_fork_controls:
+            raise PreflightConfigurationError(
+                "target-refresh fork controls differ from the frozen "
+                "equal-transition diagnostic"
+            )
+        if getattr(args, "optimizer_update_bound", None) is not None:
+            raise PreflightConfigurationError(
+                "target-refresh fork cannot combine optimizer_update_bound"
+            )
+        if fork_treatment == "capture":
+            if args.start_mode != "fresh" or post_fork_bound is not None:
+                raise PreflightConfigurationError(
+                    "target-refresh capture must start fresh without a "
+                    "post-fork transition bound"
+                )
+        else:
+            if args.start_mode != "exact-resume":
+                raise PreflightConfigurationError(
+                    "target-refresh treatment arms must exact-resume"
+                )
+            _positive_integer(
+                post_fork_bound,
+                field="post_fork_transition_bound",
+            )
+            if post_fork_bound % args.update_every:
+                raise PreflightConfigurationError(
+                    "post_fork_transition_bound must be divisible by update_every"
+                )
+
     optimizer_update_bound = getattr(args, "optimizer_update_bound", None)
     if optimizer_update_bound is not None:
         _positive_integer(
@@ -1056,6 +1139,8 @@ _RESUME_CONFIG_EXCLUDED_FIELDS = {
     "segment_games",
     "segment_stop_game",
     "start_mode",
+    "post_fork_transition_bound",
+    "target_refresh_fork_treatment",
 }
 
 
@@ -1084,12 +1169,39 @@ def resolved_resume_config(args: Any) -> dict[str, Any]:
         # The named mode is the historical behavior. Omitting its default
         # preserves exact-resume compatibility with pre-switch checkpoints.
         raw.pop("lr_adaptation_mode", None)
+    if not raw.get("exact_transition_batches", False):
+        # The disabled value is the historical all-pending update behavior.
+        raw.pop("exact_transition_batches", None)
+    if raw.get("target_refresh_fork_game") is None:
+        raw.pop("target_refresh_fork_game", None)
     return json.loads(canonical_json_bytes(raw))
 
 
 def resume_config_sha256(args: Any) -> str:
     """Hash training semantics independently of run-segment invocation fields."""
     return canonical_sha256(resolved_resume_config(args))
+
+
+def _target_refresh_fork_checkpoint_errors(
+    args: Any,
+    checkpoint_report: Mapping[str, Any],
+) -> list[str]:
+    treatment = getattr(args, "target_refresh_fork_treatment", None)
+    if treatment not in {"refresh-once", "no-refresh"}:
+        return []
+    fork_state = checkpoint_report.get("target_refresh_fork_state", {})
+    if not fork_state or not fork_state.get("captured"):
+        return ["checkpoint: target-refresh fork is not captured"]
+    if fork_state.get("fork_game") != args.target_refresh_fork_game:
+        return ["checkpoint: target-refresh fork game changed"]
+    if fork_state.get("treatment") not in (None, treatment):
+        return ["checkpoint: target-refresh treatment changed"]
+    if (
+        fork_state.get("treatment") is None
+        and checkpoint_report.get("checkpoint_role") != "target_refresh_fork"
+    ):
+        return ["checkpoint: initial treatment requires fork role"]
+    return []
 
 
 def _probe_source_checkpoint(
@@ -1119,6 +1231,7 @@ def _probe_source_checkpoint(
                         }
                     ),
                     "checkpoint_id": descriptor.checkpoint_id,
+                    "checkpoint_role": descriptor.role,
                     "source_run_id": descriptor.run_id,
                     "resume_config_sha256": descriptor.config_sha256,
                     "feature_schema_version": descriptor.feature_schema_version,
@@ -1128,6 +1241,11 @@ def _probe_source_checkpoint(
                     "implementation": dict(descriptor.implementation),
                     "mutable_assets": dict(
                         envelope.payload.data_state["mutable_assets"]
+                    ),
+                    "target_refresh_fork_state": dict(
+                        envelope.payload.trainer_state["recovery_state"].get(
+                            "target_refresh_fork_state", {}
+                        )
                     ),
                 }
             )
@@ -1401,6 +1519,7 @@ def run_generalist_preflight(
             errors.append("checkpoint: SpecialistDB content identity has changed")
         if checkpoint_report.get("experiment_id") != args.experiment_id:
             errors.append("checkpoint: experiment identity has changed")
+        errors.extend(_target_refresh_fork_checkpoint_errors(args, checkpoint_report))
     if args.start_mode in {"fresh", "weights-only"} and specialist_report.get(
         "exists"
     ):
