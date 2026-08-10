@@ -1,12 +1,30 @@
 # Sanmill target-refresh equal-transition diagnostic v1
 
-Status: `designed_needs_implementation_no_launch_authority`
+Status: `implementation_complete_needs_publication_no_launch_authority`
 
 This successor is required only because the read-only common-anchor action
 analysis classified the refresh and no-refresh policies as `near_identical`.
-It must not be prepared or launched until its exact-transition implementation,
-focused tests, immutable machine-readable contract, fresh database lineage,
-managed plans, and preflights have been reviewed separately.
+Its exact-transition implementation, focused tests and immutable
+machine-readable contract are complete locally. It must not create plans or
+launch until that exact source is published. Fresh database lineage, managed
+plans and preflights remain separate later gates.
+
+## Implementation and current gate
+
+Commits `bd3e5ce`, `8adefba`, `4ca4f03`, `3cf4a19`, `beba5d0` and
+`0429cbd` implement exact transition accounting, the deterministic fork,
+the frozen decision rule, the result publisher, managed-plan passthrough and
+staged preparation. The machine-readable contract is
+[`sanmill-target-refresh-equal-transition-diagnostic-v1.json`](sanmill-target-refresh-equal-transition-diagnostic-v1.json),
+with plan identity `18c005e8b9257531700886d96685f8be0d2ae59dc1519fdb761ba44d182e7d3b`.
+
+The source-only audit passes with all future targets absent, but reports
+`implementation_complete_needs_publication`. It deliberately permits only
+three game-50 shared-prefix plans after publication. Six treatment plans
+remain impossible to prepare honestly until each real fork checkpoint and
+closed prefix SpecialistDB exist. No placeholder checkpoint or database may
+be substituted. No plan, database copy, preflight, authorization or training
+output has been created.
 
 ## Question
 
