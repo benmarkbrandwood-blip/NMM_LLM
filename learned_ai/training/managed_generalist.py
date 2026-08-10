@@ -1061,43 +1061,50 @@ def recover_interrupted_segment(
         plan.game_bound,
     )
     incomplete = _segment_output_dir(plan, segment_index)
+    preflight_only_failure = technical_repair is not None and not incomplete.exists()
     if not incomplete.exists():
-        if technical_repair is not None:
-            raise ManagedContractError(
-                "failed segment output is missing; refusing technical recovery"
+        if technical_repair is None:
+            _append_controller_event(
+                plan,
+                status="interrupted",
+                event_type="managed_segment_interrupted",
+                reason_code=recovery_reason,
+                details={
+                    "segment_index": segment_index,
+                    "incomplete_output": None,
+                    "recovery_checkpoint": None,
+                },
             )
-        _append_controller_event(
-            plan,
-            status="interrupted",
-            event_type="managed_segment_interrupted",
-            reason_code=recovery_reason,
-            details={
-                "segment_index": segment_index,
-                "incomplete_output": None,
-                "recovery_checkpoint": None,
-            },
-        )
-        return managed_status(plan_path, authorization_path)
-
-    latest = incomplete / "latest.pt"
-    checkpoint_origin = "interrupted_latest"
-    if latest.is_file():
-        source_checkpoint = latest
-        expected_checkpoint_run = _segment_run_id(plan, segment_index)
-    else:
-        if technical_repair is not None:
-            raise ManagedContractError(
-                "failed segment has no latest.pt; refusing technical recovery"
-            )
+            return managed_status(plan_path, authorization_path)
         if not completed_events:
             raise ManagedContractError(
-                "first-segment interruption has no checkpoint to recover"
+                "preflight-only failure has no completed parent checkpoint"
             )
         source_checkpoint = Path(
             str(completed_events[-1].details["checkpoint"])
         ).resolve(strict=True)
         expected_checkpoint_run = str(completed_events[-1].details["run_id"])
         checkpoint_origin = "previous_completed_boundary"
+    else:
+        latest = incomplete / "latest.pt"
+        checkpoint_origin = "interrupted_latest"
+        if latest.is_file():
+            source_checkpoint = latest
+            expected_checkpoint_run = _segment_run_id(plan, segment_index)
+        else:
+            if technical_repair is not None:
+                raise ManagedContractError(
+                    "failed segment has no latest.pt; refusing technical recovery"
+                )
+            if not completed_events:
+                raise ManagedContractError(
+                    "first-segment interruption has no checkpoint to recover"
+                )
+            source_checkpoint = Path(
+                str(completed_events[-1].details["checkpoint"])
+            ).resolve(strict=True)
+            expected_checkpoint_run = str(completed_events[-1].details["run_id"])
+            checkpoint_origin = "previous_completed_boundary"
     envelope = load_checkpoint(source_checkpoint, map_location="cpu")
     game_count = int(envelope.payload.trainer_state["game_count"])
     if envelope.descriptor.run_id != expected_checkpoint_run:
@@ -1113,15 +1120,17 @@ def recover_interrupted_segment(
         )
 
     stamp = datetime.now().strftime("%Y%m%dT%H%M%SZ")
-    quarantine = (
-        Path(plan.control_dir)
-        / "quarantine"
-        / f"segment-{segment_index:04d}.{quarantine_kind}-{stamp}"
-    )
-    quarantine.parent.mkdir(parents=True, exist_ok=True)
-    if quarantine.exists():
-        raise ManagedContractError("quarantine target already exists")
-    incomplete.rename(quarantine)
+    quarantine: Path | None = None
+    if incomplete.exists():
+        quarantine = (
+            Path(plan.control_dir)
+            / "quarantine"
+            / f"segment-{segment_index:04d}.{quarantine_kind}-{stamp}"
+        )
+        quarantine.parent.mkdir(parents=True, exist_ok=True)
+        if quarantine.exists():
+            raise ManagedContractError("quarantine target already exists")
+        incomplete.rename(quarantine)
 
     specialist_path = _specialist_db_path_for_plan(plan)
     backup_dir = Path(plan.control_dir) / "quarantine" / f"specialist-db-{stamp}"
@@ -1131,7 +1140,17 @@ def recover_interrupted_segment(
         if src.exists():
             shutil.copy2(src, backup_dir / src.name)
     specialist_identity = _live_specialist_identity(specialist_path)
+    if preflight_only_failure:
+        checkpoint_specialist = envelope.payload.data_state["mutable_assets"][
+            "specialist_db"
+        ]["sha256"]
+        if specialist_identity["sha256"] != checkpoint_specialist:
+            raise ManagedContractError(
+                "preflight-only failure changed the SpecialistDB"
+            )
     if checkpoint_origin == "interrupted_latest":
+        if quarantine is None:
+            raise ManagedContractError("interrupted checkpoint quarantine is missing")
         source_checkpoint = quarantine / "latest.pt"
     recovery_checkpoint = _write_recovery_checkpoint(
         source_checkpoint,
@@ -1143,7 +1162,9 @@ def recover_interrupted_segment(
     )
     details = {
         "segment_index": segment_index,
-        "incomplete_output": str(quarantine.resolve(strict=False)),
+        "incomplete_output": (
+            None if quarantine is None else str(quarantine.resolve(strict=False))
+        ),
         "recovery_checkpoint": str(recovery_checkpoint),
         "resume_game_count": game_count,
         "expected_segment_end": expected_games,
@@ -1171,8 +1192,7 @@ def recover_interrupted_segment(
     return {
         "state": status["state"],
         "summary": (
-            "Incomplete segment quarantined; a verified recovery checkpoint is "
-            "ready for exact-resume continuation."
+            "Verified recovery checkpoint is ready for exact-resume continuation."
         ),
         "recovery": details,
         "status": status,
