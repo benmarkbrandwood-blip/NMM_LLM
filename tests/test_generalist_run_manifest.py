@@ -109,6 +109,7 @@ def test_manifest_binds_preflight_assets_components_and_outputs(tmp_path: Path) 
         "imitation_warmstart": False,
         "imitation_mix": False,
         "opening_forcing": False,
+        "specialist_empirical_reads": True,
         "malom_policy_auxiliary": False,
         "sanmill_referee": False,
         "sanmill_opponent": False,

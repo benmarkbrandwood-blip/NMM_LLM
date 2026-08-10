@@ -227,6 +227,9 @@ def build_generalist_run_manifest(
             "imitation_warmstart": not args.no_s1a_warmstart,
             "imitation_mix": not args.no_imitation_mix,
             "opening_forcing": not args.no_opening_forcing,
+            "specialist_empirical_reads": (
+                getattr(args, "specialist_read_mode", "full") == "full"
+            ),
             "malom_policy_auxiliary": malom_policy_auxiliary_enabled(
                 mode=getattr(args, "malom_policy_aux_mode", "fixed"),
                 fixed_coefficient=float(

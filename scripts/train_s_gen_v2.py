@@ -52,6 +52,11 @@ from learned_ai.models.scaffolded_encoder import (
     VALUE_INPUT_DIM,
 )
 from learned_ai.data.specialist_db import SpecialistDB
+from learned_ai.data.specialist_read_view import (
+    SPECIALIST_READ_MODES,
+    SpecialistTrainingReadView,
+    specialist_read_stats_delta,
+)
 from learned_ai.models.scaffolded_net import ScaffoldedPolicyNet
 from learned_ai.sentinel.infer import load_advisor
 from learned_ai.training.scaffolded_a2c import (
@@ -502,6 +507,13 @@ class GameDiag:
     malom_downgrading_action_count_mean: float = 0.0
     malom_informative_action_set_rate: float = 0.0
     malom_preserving_probability_mean: float = 0.0
+    specialist_read_mode: str = "legacy-full"
+    specialist_read_queries: int = 0
+    specialist_read_rows_present: int = 0
+    specialist_read_theoretical_available: int = 0
+    specialist_read_empirical_available: int = 0
+    specialist_read_projections_returned: int = 0
+    specialist_read_empirical_suppressed: int = 0
 
 
 def _make_checkpoint_payload(
@@ -1460,6 +1472,7 @@ class RolloutResult:
     opponent_search_observations: list[dict[str, int]] = field(
         default_factory=list
     )
+    specialist_read_stats: dict[str, int | str] = field(default_factory=dict)
 
 
 def _move_notation(mv: dict) -> str:
@@ -1618,11 +1631,13 @@ def _rollout(
     malom_policy_aux_mode: str = "fixed",
 ) -> RolloutResult:
     """Run one production rollout with optional additive probe controls."""
+    snapshot = getattr(specialist_db, "snapshot_stats", None)
+    specialist_before = snapshot() if callable(snapshot) else None
     with _temporary_rollout_sim_depth(
         lookahead_advisor,
         deep_game=deep_game,
     ):
-        return _rollout_impl(
+        result = _rollout_impl(
             model=model,
             device=device,
             start_board=start_board,
@@ -1652,6 +1667,12 @@ def _rollout(
             malom_policy_aux_coef=malom_policy_aux_coef,
             malom_policy_aux_mode=malom_policy_aux_mode,
         )
+    specialist_after = snapshot() if callable(snapshot) else None
+    result.specialist_read_stats = specialist_read_stats_delta(
+        specialist_before,
+        specialist_after,
+    )
+    return result
 
 
 def _rollout_impl(
@@ -2389,6 +2410,27 @@ def _build_game_diag(
                 if step.malom_preserving_action_count > 0
             ]
         ),
+        specialist_read_mode=str(
+            result.specialist_read_stats.get("mode", "legacy-full")
+        ),
+        specialist_read_queries=int(
+            result.specialist_read_stats.get("queries", 0)
+        ),
+        specialist_read_rows_present=int(
+            result.specialist_read_stats.get("rows_present", 0)
+        ),
+        specialist_read_theoretical_available=int(
+            result.specialist_read_stats.get("theoretical_available", 0)
+        ),
+        specialist_read_empirical_available=int(
+            result.specialist_read_stats.get("empirical_available", 0)
+        ),
+        specialist_read_projections_returned=int(
+            result.specialist_read_stats.get("projections_returned", 0)
+        ),
+        specialist_read_empirical_suppressed=int(
+            result.specialist_read_stats.get("empirical_suppressed", 0)
+        ),
     )
 
 
@@ -2523,6 +2565,14 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     if args.start_mode != "exact-resume":
         specialist_db.bind_training_lineage(getattr(args, "_run_manifest").run_id)
     print(f"[s_gen_v2] SpecialistDB: {specialist_db.stats()}")
+    specialist_read_db = SpecialistTrainingReadView(
+        specialist_db,
+        args.specialist_read_mode,
+    )
+    print(
+        "[s_gen_v2] SpecialistDB training read mode: "
+        f"{specialist_read_db.mode}"
+    )
 
     # ── Load model ─────────────────────────────────────────────────────────────
     resume_path, source_tag = _choose_resume_path(args)
@@ -2556,7 +2606,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         sentinel=sentinel,
         value_net=value_net,
         lookahead_advisor=lookahead_advisor,
-        specialist_db=specialist_db,
+        specialist_db=specialist_read_db,
     )
     # Option C: lookahead uses same frozen snapshot for learner-side simulated moves.
     lookahead_advisor.set_frozen_model(frozen_opp._model, device=device)
@@ -2895,7 +2945,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     lookahead_advisor=lookahead_advisor,
                     game_difficulty=cfg.game_difficulty,
                     human_db=human_db,
-                    specialist_db=specialist_db,
+                    specialist_db=specialist_read_db,
                     malom_db=db,
                     deep_game=(cfg.scheduled_index % 20 == 0),
                     torch_generator=_game_torch_generator(cfg.torch_seed),
@@ -2975,7 +3025,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     lookahead_advisor=lookahead_advisor,
                     game_difficulty=game_difficulty,
                     human_db=human_db,
-                    specialist_db=specialist_db,
+                    specialist_db=specialist_read_db,
                     malom_db=db,
                     draw_state=result.retry_draw_state,
                     torch_generator=_game_torch_generator(
@@ -3077,7 +3127,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     lookahead_advisor=lookahead_advisor,
                     game_difficulty=game_difficulty,
                     human_db=human_db,
-                    specialist_db=specialist_db,
+                    specialist_db=specialist_read_db,
                     malom_db=db,
                     draw_state=result.retry_draw_state,
                     torch_generator=_game_torch_generator(
@@ -3158,7 +3208,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     lookahead_advisor=lookahead_advisor,
                     game_difficulty=game_difficulty,
                     human_db=human_db,
-                    specialist_db=specialist_db,
+                    specialist_db=specialist_read_db,
                     malom_db=db,
                     draw_state=branch_draw_state,
                     torch_generator=_game_torch_generator(
@@ -3561,6 +3611,16 @@ def _build_argument_parser() -> argparse.ArgumentParser:
                    help="Disable GapNet even when a path is configured")
     p.add_argument("--human-db",      default=None, type=str)
     p.add_argument("--specialist-db", default=None, type=str)
+    p.add_argument(
+        "--specialist-read-mode",
+        choices=SPECIALIST_READ_MODES,
+        default="full",
+        help=(
+            "Training-time SpecialistDB projection. 'full' preserves the "
+            "historical empirical-first route; 'theoretical-only' keeps "
+            "trusted Malom labels while suppressing empirical reads."
+        ),
+    )
     p.add_argument(
         "--ruleset-manifest",
         default=None,

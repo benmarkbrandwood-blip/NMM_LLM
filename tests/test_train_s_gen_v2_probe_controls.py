@@ -84,6 +84,42 @@ def test_probe_suppresses_persistence_but_preserves_specialist_reads(
     assert result.termination_reason == "max-ply-truncation"
 
 
+def test_rollout_records_specialist_read_counter_delta(monkeypatch) -> None:
+    move = {"from": None, "to": "a7", "capture": None}
+
+    class _ReadView:
+        def __init__(self) -> None:
+            self.queries = 0
+
+        def snapshot_stats(self):
+            return {
+                "mode": "theoretical-only",
+                "queries": self.queries,
+                "rows_present": 0,
+                "theoretical_available": 0,
+                "empirical_available": 0,
+                "projections_returned": 0,
+                "empirical_suppressed": 0,
+            }
+
+    view = _ReadView()
+
+    def encode(_board, *_args, **kwargs):
+        if kwargs.get("specialist_db") is view:
+            view.queries += 1
+        return _encoded(move)
+
+    monkeypatch.setattr(trainer, "encode_position_with_lookahead", encode)
+
+    result = _one_ply_rollout(
+        specialist_db=view,
+        persist_rollout_evidence=False,
+    )
+
+    assert result.specialist_read_stats["mode"] == "theoretical-only"
+    assert result.specialist_read_stats["queries"] == 1
+
+
 def test_rollout_persistence_remains_enabled_by_default(monkeypatch) -> None:
     move = {"from": None, "to": "a7", "capture": None}
     calls: list[dict] = []

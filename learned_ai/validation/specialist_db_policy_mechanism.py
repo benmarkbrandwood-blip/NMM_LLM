@@ -9,6 +9,7 @@ from typing import Any, Iterable
 import numpy as np
 
 from learned_ai.data.specialist_db import SpecialistWdlEvidence
+from learned_ai.data.specialist_read_view import project_training_wdl
 
 
 PROJECTION_MODES = (
@@ -19,12 +20,6 @@ PROJECTION_MODES = (
 )
 MATERIAL_ARGMAX_CHANGES = 3
 MATERIAL_MEAN_TOTAL_VARIATION = 0.05
-
-_MALOM_PRIORS = {
-    "W": (0.90, 0.05, 0.05),
-    "D": (0.05, 0.90, 0.05),
-    "L": (0.05, 0.05, 0.90),
-}
 
 
 def project_wdl(
@@ -37,18 +32,11 @@ def project_wdl(
     if evidence is None or mode == "all_disabled":
         return None
 
-    theoretical = evidence.theoretical_wdl
     empirical = evidence.empirical_distribution
     if mode == "full":
-        if empirical is not None:
-            return tuple(float(value) for value in empirical)
-        if theoretical is not None:
-            return _MALOM_PRIORS[theoretical.value]
-        return None
+        return project_training_wdl(evidence, "full")
     if mode == "empirical_disabled":
-        if theoretical is None:
-            return None
-        return _MALOM_PRIORS[theoretical.value]
+        return project_training_wdl(evidence, "theoretical-only")
     if mode == "malom_disabled":
         if empirical is None:
             return None
