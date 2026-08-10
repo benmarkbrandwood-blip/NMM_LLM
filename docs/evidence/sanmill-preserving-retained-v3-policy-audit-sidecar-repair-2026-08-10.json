@@ -1,0 +1,42 @@
+{
+  "schema_version": "nmm.managed-technical-recovery.v1",
+  "plan_sha256": "e7fccb1ad174e59b4ccdd71b34b11f180e77b23c985f50716f2acabfeb88ed65",
+  "failed_event_sha256": "15912555415ea5109105f286094641d7ef4bdbb4ad66e0b516964803e1c23497",
+  "failed_segment_index": 3,
+  "failure_code": "policy-health-read-created-sqlite-sidecars",
+  "source_commit": "3f400135c833f49de6700f1ab9c246cca9ab25f7",
+  "tested_repair_commit": "e983515474a75f52cc64b5b89ee1b1391cac063c",
+  "reproduction": {
+    "result": "reproduced-and-fixed",
+    "scope": "segment 3 exact-resume preflight before any segment 3 output or game",
+    "segment_2_completed_games": 500,
+    "segment_2_checkpoint_sha256": "0230156573892fff911b6f415776b5a03cc160471b47d9a5db5e32f57f56fac9",
+    "segment_2_policy_health_sha256": "487187f283ac70e992705ba95f4675cf07f87162532fe57bda6ffdd12eee4afa",
+    "checkpoint_specialist_db_sha256": "41d9d0eeff19a1ee8649348a135b11e8e0f17b3477bdb2513b27572375337bf4",
+    "live_specialist_db_sha256": "41d9d0eeff19a1ee8649348a135b11e8e0f17b3477bdb2513b27572375337bf4",
+    "wal_size_bytes": 0,
+    "shm_size_bytes": 32768,
+    "segment_3_output_existed": false,
+    "frozen_policy_health_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+    "cause": "After the trainer closed the writable database, the frozen policy-health audit reopened the WAL-mode SpecialistDB through ordinary SQLite read-only mode. That read created a zero-byte WAL and SHM, so the next immutable preflight failed closed even though the main database still matched the completed segment checkpoint.",
+    "repair": "Read-only SpecialistDB instances now reject snapshots with sidecars and use SQLite immutable mode. The frozen policy-health audit script remains byte-identical to the authorized plan.",
+    "real_checkpoint_replay": {
+      "copied_specialist_db_sha256": "41d9d0eeff19a1ee8649348a135b11e8e0f17b3477bdb2513b27572375337bf4",
+      "report_sha256": "0405cfbc69331eaebfc2510de80dbca831559aa1ca07fd15de5be3a396daba69",
+      "report_evidence_id": "bbfe1c619bc182213e8a929da63fa9754018b75bc0e1ab08b3d7233bd150701c",
+      "candidate_critical_states": 29,
+      "candidate_value_preserving_rate": 0.9655172413793104,
+      "candidate_preserving_logit_margin": 0.00438688921838485,
+      "sqlite_sidecars_created": false
+    }
+  },
+  "verification": [
+    "Focused SpecialistDB snapshot and quarantine tests passed 6 tests.",
+    "Affected runtime, preflight, launch, manager, checkpoint, route-probe, evaluation, and auxiliary-probe scope passed 97 tests.",
+    "Required Malom, DB-teacher, and label-provenance scope passed 103 tests and 498 subtests.",
+    "Ruff passed for specialist_db.py and its focused regression tests.",
+    "The frozen policy-health audit script retained its plan-pinned SHA-256.",
+    "A real segment-2 checkpoint replay produced the same policy-health metrics on a byte-identical SpecialistDB copy without creating WAL or SHM sidecars."
+  ],
+  "claim_boundary": "Technical exact-resume recovery only. The completed 500-game boundary and unchanged SpecialistDB may be preserved; this evidence does not establish learning quality, playing strength, promotion, publication, or held-out evaluation."
+}
