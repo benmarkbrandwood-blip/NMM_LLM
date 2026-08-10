@@ -1,0 +1,311 @@
+{
+  "analysis": {
+    "decision_rule": {
+      "eligible": "all six arms complete with finite updates, exact identities, valid checkpoints, passing referee/database/policy-health gates, and an engaged read-mode intervention in every seed pair",
+      "empirical_read_engagement": {
+        "full": "empirical_available > 0 and empirical_suppressed = 0",
+        "theoretical-only": "empirical_available > 0 and empirical_suppressed = empirical_available"
+      },
+      "fixed_state_comparison": "reconstruct the same-seed scratch policy, evaluate final and scratch weights with SpecialistDB projections disabled, and compare theoretical-only minus full changes within each seed",
+      "minimum_argmax_changes_for_detectable_pair": 3,
+      "minimum_mean_total_variation_for_detectable_pair": 0.01,
+      "minimum_reproducible_seed_pairs": 2,
+      "selection": "a reproducible policy effect permits only a separately frozen held-out effectiveness comparison; it does not select either read mode for a retained run",
+      "training_wdl_is_not_a_selection_metric": true,
+      "unsafe": "any identity, non-finite, checkpoint, referee, database, Malom-label, policy-health, or resource failure stops the entire sequence"
+    },
+    "fixed_development_diagnostics": [
+      {
+        "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+        "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+        "role": "phase-covered value-preservation safety diagnostic; inspected development evidence, not held-out strength evidence"
+      },
+      {
+        "corpus": "docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-2026-08-10.json",
+        "corpus_sha256": "5d0f1f548ebf7bc2d9522a345de5e375f2ab8fae7f37ef6caf976d92aebfa88b",
+        "role": "candidate-blind coverage-positive placement mechanism corpus; inspected development evidence, not held-out strength evidence"
+      }
+    ],
+    "per_class_reports": [
+      "seed and read mode",
+      "board phase",
+      "opponent source",
+      "learner colour",
+      "termination reason"
+    ],
+    "required_curves": [
+      "raw and complete-window policy loss, value loss, and entropy",
+      "temperature and chosen probability",
+      "SpecialistDB query, row, theoretical, empirical, returned, and suppressed counts",
+      "fixed-state all-disabled policy total variation and argmax changes",
+      "exact selected-action Malom downgrade rate by phase and opponent source",
+      "W/D/L by opponent source and learner colour",
+      "repetition, fifty-move, max-ply, material-loss, and blocked-loss rates"
+    ]
+  },
+  "arms": [
+    {
+      "arm_id": "seed61-full",
+      "condition": "full",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed61-full",
+      "experiment_id": "dev-v4-specialist-read-v1-s61-full",
+      "launch_order": 1,
+      "plan_id": "managed-specialist-read-v1-s61-full",
+      "seed": 61,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s61.full.sqlite",
+      "specialist_read_mode": "full"
+    },
+    {
+      "arm_id": "seed61-theoretical-only",
+      "condition": "theoretical-only",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed61-theoretical-only",
+      "experiment_id": "dev-v4-specialist-read-v1-s61-theoretical-only",
+      "launch_order": 2,
+      "plan_id": "managed-specialist-read-v1-s61-theoretical-only",
+      "seed": 61,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s61.theoretical-only.sqlite",
+      "specialist_read_mode": "theoretical-only"
+    },
+    {
+      "arm_id": "seed62-full",
+      "condition": "full",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed62-full",
+      "experiment_id": "dev-v4-specialist-read-v1-s62-full",
+      "launch_order": 3,
+      "plan_id": "managed-specialist-read-v1-s62-full",
+      "seed": 62,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s62.full.sqlite",
+      "specialist_read_mode": "full"
+    },
+    {
+      "arm_id": "seed62-theoretical-only",
+      "condition": "theoretical-only",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed62-theoretical-only",
+      "experiment_id": "dev-v4-specialist-read-v1-s62-theoretical-only",
+      "launch_order": 4,
+      "plan_id": "managed-specialist-read-v1-s62-theoretical-only",
+      "seed": 62,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s62.theoretical-only.sqlite",
+      "specialist_read_mode": "theoretical-only"
+    },
+    {
+      "arm_id": "seed63-full",
+      "condition": "full",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed63-full",
+      "experiment_id": "dev-v4-specialist-read-v1-s63-full",
+      "launch_order": 5,
+      "plan_id": "managed-specialist-read-v1-s63-full",
+      "seed": 63,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s63.full.sqlite",
+      "specialist_read_mode": "full"
+    },
+    {
+      "arm_id": "seed63-theoretical-only",
+      "condition": "theoretical-only",
+      "control_dir": "out/specialist-db-training-read-calibration-v1/seed63-theoretical-only",
+      "experiment_id": "dev-v4-specialist-read-v1-s63-theoretical-only",
+      "launch_order": 6,
+      "plan_id": "managed-specialist-read-v1-s63-theoretical-only",
+      "seed": 63,
+      "specialist_db": "data/specialist_db.training_read_calibration_v1.s63.theoretical-only.sqlite",
+      "specialist_read_mode": "theoretical-only"
+    }
+  ],
+  "authorization": {
+    "authorized_segments_per_arm": 0,
+    "launch_authorized": false,
+    "promotion_allowed": false,
+    "publication_allowed": false
+  },
+  "claim_boundary": "Three-seed SpecialistDB read-mechanism calibration only; not held-out validation, trap-learning evidence, playing strength, promotion, retained-run, or long-run evidence.",
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "fixed_resource_stage_games": [
+      500,
+      500,
+      500,
+      1000,
+      2500
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "log_and_checkpoint_every_games": 50,
+    "malom_policy_aux_coefficient": 0.0,
+    "malom_policy_aux_mode": "fixed",
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "mill_bonus_mode": "malom-preserving-only",
+    "minimal_rollouts": true,
+    "one_segment_games": 250,
+    "only_observed_node_level": 1,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000,
+      5000,
+      25000,
+      100000,
+      500000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "start_mode": "fresh",
+    "target_refresh_every_games": 50,
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_start": 0.9,
+    "update_every_steps": 64
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_policy_auxiliary": false,
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_main_file_sha256": "d8e22da38273f7c26eb76803ae91fc3fae711f508383ffbe3096c2946912b440",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    },
+    "specialist_db_policy": "copy the exact closed template once to each unique arm path; never share a writable database between arms"
+  },
+  "experiment_family_id": "specialist-db-training-read-calibration-v1",
+  "hypothesis": "the cumulative empirical-first SpecialistDB projection causes a repeatable change in learned policy weights beyond trusted theoretical Malom labels alone, without changing persistence, rules, rewards, opponent work, or initialization",
+  "lineage": {
+    "exact_resume_between_arms": false,
+    "fresh_random_weights_per_arm": true,
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main v2c recovery, repetition shaping, auxiliary-network, and curriculum experiments change other factors and are excluded from this read-mechanism calibration",
+      "reviewed_tip": "bc46b51e69724e12a8e5f17e3ff696b9f88456d9"
+    },
+    "required_implementation_commits": [
+      "98ef28d",
+      "9e9b8da"
+    ],
+    "resume_source": null
+  },
+  "objective": "compare the historical empirical-first SpecialistDB training projection with trusted theoretical Malom labels alone across three fresh paired seeds",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "arm_id",
+      "condition",
+      "control_dir",
+      "experiment_id",
+      "launch_order",
+      "plan_id",
+      "specialist_db",
+      "specialist_read_mode"
+    ],
+    "conditions": [
+      "full",
+      "theoretical-only"
+    ],
+    "pair_order_is_frozen": true,
+    "same_fresh_initialization_and_schedule_within_seed": true,
+    "seeds": [
+      61,
+      62,
+      63
+    ],
+    "single_changed_training_factor": "specialist_read_mode",
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772",
+  "resources": {
+    "active_wall_hours_per_arm": 0.5,
+    "completed_games_per_arm": 250,
+    "maximum_active_wall_hours_total": 3.0,
+    "maximum_completed_games_total": 1500,
+    "maximum_requested_sanmill_nodes_total": 67920000,
+    "no_automatic_extension_retry_resume_or_training": true,
+    "schedule_counts_by_seed": {
+      "61": {
+        "frozen_black": 73,
+        "frozen_white": 85,
+        "sanmill_black": 42,
+        "sanmill_white": 50
+      },
+      "62": {
+        "frozen_black": 90,
+        "frozen_white": 60,
+        "sanmill_black": 51,
+        "sanmill_white": 49
+      },
+      "63": {
+        "frozen_black": 83,
+        "frozen_white": 76,
+        "sanmill_black": 53,
+        "sanmill_white": 38
+      }
+    }
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.specialist-db-training-read-calibration-plan.v1",
+  "source_evidence": {
+    "completed_retained_v3": {
+      "path": "docs/evidence/sanmill-preserving-retained-v3-result-2026-08-10.md",
+      "sha256": "21347d9242ff348d68905846dc61506a75736f390a30fabbf9541cfa4a4ff633"
+    },
+    "coverage_positive_corpus": {
+      "evidence_identity": "4e3abbd8eb99ca9572a6524e83d71c91c058e0c331c5d2f0674b54e335c6558d",
+      "path": "docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-2026-08-10.json",
+      "sha256": "5d0f1f548ebf7bc2d9522a345de5e375f2ab8fae7f37ef6caf976d92aebfa88b"
+    },
+    "material_policy_audit": {
+      "evidence_identity": "62ceccc88a401cbe46c7c473c199a4b598aa12c0f6ed2633b7ecef206e8d519a",
+      "path": "docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-policy-audit-2026-08-10.json",
+      "sha256": "b7b2894fd91c590f4ad4858d55acb37af7a9ca39e1e09083d897e04f1684e759"
+    }
+  },
+  "status": "designed_unlaunched_needs_publication",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_promotion": false,
+    "continue_after_arm_failure": false,
+    "post_result_gate_changes": false,
+    "stop_on": [
+      "identity drift",
+      "non-finite state",
+      "SpecialistDB read-mode telemetry contradiction",
+      "SpecialistDB or Malom-label identity drift",
+      "Sanmill error or checkpoint corruption",
+      "policy-health failure",
+      "resource envelope reached"
+    ]
+  }
+}
