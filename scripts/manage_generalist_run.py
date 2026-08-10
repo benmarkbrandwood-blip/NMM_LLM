@@ -196,6 +196,24 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
                 str(args.measurement_temperature),
             )
         )
+    if args.exact_transition_batches:
+        common_args.append("--exact-transition-batches")
+    if args.target_refresh_fork_game is not None:
+        common_args.extend(
+            (
+                "--target-refresh-fork-game",
+                str(args.target_refresh_fork_game),
+                "--target-refresh-fork-treatment",
+                str(args.target_refresh_fork_treatment),
+            )
+        )
+    if args.post_fork_transition_bound is not None:
+        common_args.extend(
+            (
+                "--post-fork-transition-bound",
+                str(args.post_fork_transition_bound),
+            )
+        )
     return common_args
 
 
@@ -321,6 +339,29 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Optional absolute A2C optimizer-step completion bound",
+    )
+    prepare.add_argument(
+        "--exact-transition-batches",
+        action="store_true",
+        help="Consume fixed update-size transition batches and retain overflow",
+    )
+    prepare.add_argument(
+        "--target-refresh-fork-game",
+        type=int,
+        default=None,
+        help="Capture or consume a frozen-target intervention checkpoint",
+    )
+    prepare.add_argument(
+        "--target-refresh-fork-treatment",
+        choices=("capture", "refresh-once", "no-refresh"),
+        default=None,
+        help="Frozen one-time target-refresh intervention",
+    )
+    prepare.add_argument(
+        "--post-fork-transition-bound",
+        type=int,
+        default=None,
+        help="Exact optimizer-consumed transition ceiling after the fork",
     )
     prepare.add_argument("--measurement-anchor-game", type=int, default=None)
     prepare.add_argument(

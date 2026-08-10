@@ -32,6 +32,7 @@ from learned_ai.training.managed_generalist import (
     run_next_segment,
     verify_managed_launch,
 )
+from scripts import manage_generalist_run as manager
 
 
 def _managed_checkpoint_payload(
@@ -265,6 +266,58 @@ def test_completion_bound_round_trip_keeps_larger_schedule_horizon(
     assert restored.to_dict()["completion_game_bound"] == 100
     assert command[command.index("--segment-stop-game") + 1] == "100"
     assert command[command.index("--max-games") + 1] == "5000"
+
+
+def test_manager_preserves_exact_transition_fork_arguments(tmp_path: Path) -> None:
+    args = manager._build_parser().parse_args(
+        [
+            "prepare",
+            "--control-dir",
+            str(tmp_path / "control"),
+            "--max-wall-hours",
+            "0.25",
+            "--objective",
+            "capture one shared target-refresh fork",
+            "--experiment-id",
+            "target-refresh-equal-transition-s64",
+            "--seed",
+            "64",
+            "--completion-game-bound",
+            "50",
+            "--segment-games",
+            "50",
+            "--engine-profile",
+            "sanmill-fixed-resource",
+            "--target-refresh-every",
+            "50",
+            "--lr-adaptation-mode",
+            "fixed",
+            "--max-ply",
+            "120",
+            "--mill-bonus-mode",
+            "malom-preserving-only",
+            "--specialist-read-mode",
+            "theoretical-only",
+            "--exact-transition-batches",
+            "--target-refresh-fork-game",
+            "50",
+            "--target-refresh-fork-treatment",
+            "capture",
+        ]
+    )
+
+    common = manager._common_trainer_args(
+        args,
+        tmp_path / "training_paths.local.json",
+    )
+    trainer_args = manager.trainer._build_argument_parser().parse_args(
+        ["--preflight", "long-run", *common]
+    )
+
+    assert trainer_args.exact_transition_batches is True
+    assert trainer_args.target_refresh_fork_game == 50
+    assert trainer_args.target_refresh_fork_treatment == "capture"
+    assert trainer_args.post_fork_transition_bound is None
 
 
 def test_authorization_is_separate_and_bound_to_exact_plan(tmp_path: Path) -> None:
