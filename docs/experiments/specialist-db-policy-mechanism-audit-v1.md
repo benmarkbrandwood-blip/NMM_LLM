@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `frozen_unexecuted`
+Status: `executed_coverage_negative`
 
 Audit ID: `specialist-db-policy-mechanism-audit-v1`
 
@@ -125,3 +125,16 @@ frozen-target and tactical-conversion hypotheses.
 
 Either result remains development evidence. A future promotion claim requires
 a separately frozen, candidate-blind held-out evaluation.
+
+## Result
+
+The immutable report and its interpretation are recorded in:
+
+- `docs/evidence/specialist-db-policy-mechanism-audit-v1-2026-08-10.json`
+- `docs/evidence/specialist-db-policy-mechanism-audit-v1-result-2026-08-10.md`
+
+The report's preregistered machine decision is
+`not_material_on_fixed_corpus`, but none of the 1,583 legal successors in the
+fixed corpus had a usable SpecialistDB projection. The result is therefore a
+coverage-negative, uninformative mechanism result. It does not close the
+SpecialistDB hypothesis or authorize the conditional calibration.
