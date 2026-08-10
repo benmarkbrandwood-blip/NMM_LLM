@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 
 import pytest
@@ -14,6 +15,7 @@ from learned_ai.validation.specialist_db_coverage_corpus import (
     build_empirical_coverage_corpus,
     replay_unique_prefix_states,
 )
+from tools.build_specialist_db_coverage_corpus import _quick_check
 
 
 def _source_record(corpus_id: str) -> dict:
@@ -97,3 +99,20 @@ def test_replay_fails_closed_on_final_fen_drift() -> None:
 
     with pytest.raises(SpecialistCoverageCorpusError, match="final FEN"):
         replay_unique_prefix_states([record])
+
+
+def test_quick_check_does_not_create_wal_sidecars(tmp_path) -> None:
+    path = tmp_path / "snapshot.sqlite"
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("CREATE TABLE evidence (value INTEGER NOT NULL)")
+        connection.execute("INSERT INTO evidence VALUES (1)")
+        connection.commit()
+    finally:
+        connection.close()
+
+    _quick_check(path)
+
+    assert not path.with_name(path.name + "-wal").exists()
+    assert not path.with_name(path.name + "-shm").exists()

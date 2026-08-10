@@ -60,7 +60,8 @@ def _sidecars(path: Path) -> list[str]:
 
 
 def _quick_check(path: Path) -> None:
-    connection = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
+    uri = f"file:{path.resolve().as_posix()}?mode=ro&immutable=1"
+    connection = sqlite3.connect(uri, uri=True)
     try:
         connection.execute("PRAGMA query_only=ON")
         result = connection.execute("PRAGMA quick_check").fetchone()
