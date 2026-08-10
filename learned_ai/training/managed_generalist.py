@@ -42,6 +42,7 @@ from learned_ai.training.training_identity import (
 
 MANAGED_PLAN_SCHEMA = "nmm.managed-generalist-plan.v1"
 MANAGED_AUTHORIZATION_SCHEMA = "nmm.managed-authorization.v1"
+MANAGED_INITIAL_RESUME_SCHEMA = "nmm.managed-initial-resume.v1"
 POLICY_HEALTH_GATE_SCHEMA = "nmm.managed-policy-health-gate.v1"
 TECHNICAL_RECOVERY_EVIDENCE_SCHEMA = "nmm.managed-technical-recovery.v1"
 CONTROLLER_LEDGER_NAME = "controller-events.jsonl"
@@ -93,16 +94,37 @@ def _optimizer_update_bound(plan: ManagedPlan) -> int | None:
     )
 
 
+def _post_fork_transition_bound(plan: ManagedPlan) -> int | None:
+    return _optional_positive_trainer_arg(
+        plan.common_trainer_args, "--post-fork-transition-bound"
+    )
+
+
+def _initial_completed_games(plan: ManagedPlan) -> int:
+    return 0 if plan.initial_resume is None else plan.initial_resume.completed_games
+
+
 def _plan_completion_reached(
     plan: ManagedPlan,
     *,
     completed_games: int,
     completed_updates: int | None,
+    completed_post_fork_transitions: int | None = None,
 ) -> bool:
     update_bound = _optimizer_update_bound(plan)
-    if update_bound is None:
-        return completed_games >= plan.game_bound
-    return completed_updates is not None and completed_updates >= update_bound
+    transition_bound = _post_fork_transition_bound(plan)
+    if update_bound is not None and transition_bound is not None:
+        raise ManagedContractError(
+            "optimizer and post-fork transition bounds are mutually exclusive"
+        )
+    if update_bound is not None:
+        return completed_updates is not None and completed_updates >= update_bound
+    if transition_bound is not None:
+        return (
+            completed_post_fork_transitions is not None
+            and completed_post_fork_transitions >= transition_bound
+        )
+    return completed_games >= plan.game_bound
 
 
 class ManagedContractError(RuntimeError):
@@ -306,6 +328,63 @@ class PolicyHealthGate:
 
 
 @dataclass(frozen=True)
+class ManagedInitialResume:
+    """Immutable external checkpoint used to start a managed branch."""
+
+    checkpoint_path: str
+    checkpoint_sha256: str
+    checkpoint_id: str
+    checkpoint_role: str
+    parent_run_id: str
+    completed_games: int
+
+    _FIELDS: ClassVar[set[str]] = {
+        "schema_version",
+        "checkpoint_path",
+        "checkpoint_sha256",
+        "checkpoint_id",
+        "checkpoint_role",
+        "parent_run_id",
+        "completed_games",
+    }
+
+    def __post_init__(self) -> None:
+        checkpoint = Path(
+            _require_text(self.checkpoint_path, field="checkpoint_path")
+        )
+        if not checkpoint.is_absolute():
+            raise ManagedContractError("checkpoint_path must be an absolute path")
+        _require_sha256(self.checkpoint_sha256, field="checkpoint_sha256")
+        for field in ("checkpoint_id", "checkpoint_role", "parent_run_id"):
+            _require_text(getattr(self, field), field=field)
+        _require_positive_int(self.completed_games, field="completed_games")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": MANAGED_INITIAL_RESUME_SCHEMA,
+            "checkpoint_path": self.checkpoint_path,
+            "checkpoint_sha256": self.checkpoint_sha256,
+            "checkpoint_id": self.checkpoint_id,
+            "checkpoint_role": self.checkpoint_role,
+            "parent_run_id": self.parent_run_id,
+            "completed_games": self.completed_games,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> ManagedInitialResume:
+        if set(value) != cls._FIELDS:
+            raise ManagedContractError("managed initial-resume fields differ")
+        if value["schema_version"] != MANAGED_INITIAL_RESUME_SCHEMA:
+            raise ManagedContractError("unsupported managed initial-resume schema")
+        return cls(
+            **{
+                key: value[key]
+                for key in cls._FIELDS - {"schema_version"}
+            }
+        )
+
+
+@dataclass(frozen=True)
 class ManagedPlan:
     """Immutable technical and resource envelope for one local training goal."""
 
@@ -327,6 +406,7 @@ class ManagedPlan:
     promotion_allowed: bool
     policy_health: PolicyHealthGate | None = None
     completion_game_bound: int | None = None
+    initial_resume: ManagedInitialResume | None = None
 
     _FIELDS: ClassVar[set[str]] = {
         "schema_version",
@@ -349,11 +429,13 @@ class ManagedPlan:
         "promotion_allowed",
         "policy_health",
         "completion_game_bound",
+        "initial_resume",
     }
 
     _OPTIONAL_FIELDS: ClassVar[set[str]] = {
         "policy_health",
         "completion_game_bound",
+        "initial_resume",
     }
 
     def __post_init__(self) -> None:
@@ -381,6 +463,25 @@ class ManagedPlan:
             raise ManagedContractError(
                 "segment_games must not exceed the completion game bound"
             )
+        if self.initial_resume is not None:
+            if not isinstance(self.initial_resume, ManagedInitialResume):
+                raise ManagedContractError(
+                    "initial_resume must be a ManagedInitialResume or null"
+                )
+            if self.initial_resume.completed_games >= self.game_bound:
+                raise ManagedContractError(
+                    "initial resume must precede the completion game bound"
+                )
+            checkpoint = Path(self.initial_resume.checkpoint_path).resolve(
+                strict=False
+            )
+            segment_root = (
+                Path(self.control_dir).resolve(strict=False) / "segments"
+            )
+            if checkpoint == segment_root or segment_root in checkpoint.parents:
+                raise ManagedContractError(
+                    "initial resume checkpoint must be outside segment outputs"
+                )
         _require_positive_number(self.max_wall_hours, field="max_wall_hours")
         args = tuple(self.common_trainer_args)
         if not args or any(not isinstance(item, str) or not item for item in args):
@@ -391,7 +492,16 @@ class ManagedPlan:
                 "common_trainer_args contains controller-owned options: "
                 + ", ".join(forbidden)
             )
-        _optional_positive_trainer_arg(args, "--optimizer-update-bound")
+        optimizer_bound = _optional_positive_trainer_arg(
+            args, "--optimizer-update-bound"
+        )
+        transition_bound = _optional_positive_trainer_arg(
+            args, "--post-fork-transition-bound"
+        )
+        if optimizer_bound is not None and transition_bound is not None:
+            raise ManagedContractError(
+                "optimizer and post-fork transition bounds are mutually exclusive"
+            )
         object.__setattr__(self, "common_trainer_args", args)
         for field in (
             "allow_safe_exact_resume",
@@ -440,6 +550,8 @@ class ManagedPlan:
             payload["policy_health"] = self.policy_health.to_dict()
         if self.completion_game_bound is not None:
             payload["completion_game_bound"] = self.completion_game_bound
+        if self.initial_resume is not None:
+            payload["initial_resume"] = self.initial_resume.to_dict()
         return payload
 
     @property
@@ -474,6 +586,13 @@ class ManagedPlan:
             fields["policy_health"] = PolicyHealthGate.from_dict(raw_health)
         if "completion_game_bound" in value:
             fields["completion_game_bound"] = value["completion_game_bound"]
+        if "initial_resume" in value:
+            raw_resume = value["initial_resume"]
+            if not isinstance(raw_resume, Mapping):
+                raise ManagedContractError(
+                    "managed plan initial_resume must be an object"
+                )
+            fields["initial_resume"] = ManagedInitialResume.from_dict(raw_resume)
         plan = cls(**fields)
         if value["plan_sha256"] != plan.plan_sha256:
             raise ManagedContractError("managed plan hash does not match its content")
@@ -556,6 +675,30 @@ def publish_managed_plan(path: str | Path, plan: ManagedPlan) -> None:
 
 def load_managed_plan(path: str | Path) -> ManagedPlan:
     return ManagedPlan.from_dict(_strict_json(Path(path)))
+
+
+def _assert_initial_resume_checkpoint(plan: ManagedPlan) -> Path | None:
+    initial = plan.initial_resume
+    if initial is None:
+        return None
+    checkpoint = Path(initial.checkpoint_path).resolve(strict=True)
+    if _file_sha256(checkpoint) != initial.checkpoint_sha256:
+        raise ManagedContractError("managed initial-resume checkpoint changed")
+    envelope = load_checkpoint(checkpoint, map_location="cpu")
+    descriptor = envelope.descriptor
+    if (
+        descriptor.checkpoint_id != initial.checkpoint_id
+        or descriptor.role != initial.checkpoint_role
+        or descriptor.run_id != initial.parent_run_id
+        or descriptor.experiment_id != plan.experiment_id
+        or descriptor.config_sha256 != plan.resume_config_sha256
+        or int(envelope.payload.trainer_state["game_count"])
+        != initial.completed_games
+    ):
+        raise ManagedContractError(
+            "managed initial-resume checkpoint identity differs"
+        )
+    return checkpoint
 
 
 def load_managed_authorization(path: str | Path) -> ManagedAuthorization:
@@ -649,11 +792,20 @@ def managed_status(
     plan = load_managed_plan(plan_path)
     completed = _completed_segment_events(plan)
     completed_games = (
-        int(completed[-1].details["completed_games"]) if completed else 0
+        int(completed[-1].details["completed_games"])
+        if completed
+        else _initial_completed_games(plan)
     )
     completed_updates = (
         int(completed[-1].details["completed_updates"])
         if completed and completed[-1].details.get("completed_updates") is not None
+        else None
+    )
+    completed_post_fork_transitions = (
+        int(completed[-1].details["completed_post_fork_transitions"])
+        if completed
+        and completed[-1].details.get("completed_post_fork_transitions")
+        is not None
         else None
     )
     elapsed_seconds = sum(
@@ -675,13 +827,20 @@ def managed_status(
         plan,
         completed_games=completed_games,
         completed_updates=completed_updates,
+        completed_post_fork_transitions=completed_post_fork_transitions,
     ) or last.event_type == "managed_plan_completed":
         state = "completed"
-        summary = (
-            "The authorized training plan reached its optimizer-update bound."
-            if _optimizer_update_bound(plan) is not None
-            else "The authorized training plan reached its game bound."
-        )
+        if _optimizer_update_bound(plan) is not None:
+            summary = (
+                "The authorized training plan reached its optimizer-update bound."
+            )
+        elif _post_fork_transition_bound(plan) is not None:
+            summary = (
+                "The authorized training plan reached its post-fork "
+                "transition bound."
+            )
+        else:
+            summary = "The authorized training plan reached its game bound."
     elif last.reason_code == "wall_time_limit":
         state = "resource_limit_reached"
         summary = "The authorized wall-time envelope is exhausted."
@@ -716,6 +875,15 @@ def managed_status(
             {
                 "completed_optimizer_updates": completed_updates,
                 "optimizer_update_bound": _optimizer_update_bound(plan),
+            }
+        )
+    if _post_fork_transition_bound(plan) is not None:
+        progress.update(
+            {
+                "completed_post_fork_transitions": (
+                    completed_post_fork_transitions
+                ),
+                "post_fork_transition_bound": _post_fork_transition_bound(plan),
             }
         )
     return {
@@ -1113,7 +1281,9 @@ def recover_interrupted_segment(
     if segment_index != len(completed_events) + 1:
         raise ManagedContractError("interrupted segment index does not follow completions")
     previous_completed_games = (
-        int(completed_events[-1].details["completed_games"]) if completed_events else 0
+        int(completed_events[-1].details["completed_games"])
+        if completed_events
+        else _initial_completed_games(plan)
     )
     expected_games = min(
         previous_completed_games + plan.segment_games,
@@ -1315,9 +1485,35 @@ def build_segment_command(
         *plan.common_trainer_args,
     ]
     if segment_index == 1:
-        if previous_checkpoint is not None or previous_run_id is not None:
-            raise ManagedContractError("the first segment must start fresh")
-        command.extend(("--start-mode", "fresh"))
+        initial = plan.initial_resume
+        if initial is None:
+            if previous_checkpoint is not None or previous_run_id is not None:
+                raise ManagedContractError("the first segment must start fresh")
+            command.extend(("--start-mode", "fresh"))
+        else:
+            expected_checkpoint = Path(initial.checkpoint_path).resolve(
+                strict=False
+            )
+            if (
+                previous_checkpoint is None
+                or previous_checkpoint.resolve(strict=False)
+                != expected_checkpoint
+                or previous_run_id != initial.parent_run_id
+                or previous_completed_games != initial.completed_games
+            ):
+                raise ManagedContractError(
+                    "the first segment initial-resume source differs"
+                )
+            command.extend(
+                (
+                    "--start-mode",
+                    "exact-resume",
+                    "--resume",
+                    str(expected_checkpoint),
+                    "--parent-run-id",
+                    initial.parent_run_id,
+                )
+            )
     else:
         if not plan.allow_safe_exact_resume:
             raise ManagedContractError("the plan does not authorize exact resume")
@@ -1370,7 +1566,9 @@ def verify_managed_launch(
     if len(completed_events) != segment_index - 1:
         raise ManagedContractError("managed segment index does not follow completions")
     previous_completed_games = (
-        int(completed_events[-1].details["completed_games"]) if completed_events else 0
+        int(completed_events[-1].details["completed_games"])
+        if completed_events
+        else _initial_completed_games(plan)
     )
     expected_stop = min(
         previous_completed_games + plan.segment_games,
@@ -1393,8 +1591,23 @@ def verify_managed_launch(
     if Path(out_dir).resolve(strict=False) != expected_output:
         raise ManagedContractError("managed output directory is outside the plan")
     if segment_index == 1:
-        if start_mode != "fresh" or resume or parent_run_id is not None:
-            raise ManagedContractError("the first managed segment must start fresh")
+        initial = plan.initial_resume
+        if initial is None:
+            if start_mode != "fresh" or resume or parent_run_id is not None:
+                raise ManagedContractError(
+                    "the first managed segment must start fresh"
+                )
+        else:
+            checkpoint = _assert_initial_resume_checkpoint(plan)
+            if (
+                start_mode != "exact-resume"
+                or checkpoint is None
+                or Path(resume).resolve(strict=False) != checkpoint
+                or parent_run_id != initial.parent_run_id
+            ):
+                raise ManagedContractError(
+                    "the first managed segment initial resume differs"
+                )
     else:
         expected_previous_run = _segment_run_id(plan, segment_index - 1)
         expected_resume = (
@@ -1473,6 +1686,30 @@ def _assert_managed_git_state(
     raise ManagedContractError("managed training Git commit has changed")
 
 
+def _checkpoint_post_fork_transition_count(checkpoint: Path) -> int:
+    envelope = load_checkpoint(checkpoint, map_location="cpu")
+    recovery = envelope.payload.trainer_state["recovery_state"]
+    fork = recovery.get("target_refresh_fork_state")
+    if not isinstance(fork, Mapping):
+        raise ManagedContractError(
+            "post-fork transition checkpoint lacks fork state"
+        )
+    origin = fork.get("post_fork_transition_origin")
+    consumed = recovery.get("optimizer_consumed_transition_count")
+    if (
+        isinstance(origin, bool)
+        or not isinstance(origin, int)
+        or origin < 0
+        or isinstance(consumed, bool)
+        or not isinstance(consumed, int)
+        or consumed < origin
+    ):
+        raise ManagedContractError(
+            "post-fork transition checkpoint counters are invalid"
+        )
+    return consumed - origin
+
+
 def _inspect_completed_segment(
     plan: ManagedPlan,
     *,
@@ -1499,7 +1736,29 @@ def _inspect_completed_segment(
         plan.game_bound,
     )
     update_bound = _optimizer_update_bound(plan)
-    if update_bound is None:
+    transition_bound = _post_fork_transition_bound(plan)
+    if transition_bound is not None:
+        completed_transitions = _checkpoint_post_fork_transition_count(checkpoint)
+        if completed_transitions > transition_bound:
+            raise ManagedContractError(
+                "segment checkpoint exceeded the post-fork transition bound"
+            )
+        if completed_transitions == transition_bound:
+            if not previous_completed_games < completed_games <= expected_games:
+                raise ManagedContractError(
+                    "transition-bounded segment game count is outside its "
+                    "safety ceiling"
+                )
+        elif completed_games != expected_games:
+            raise ManagedContractError(
+                "segment stopped before its game ceiling and post-fork "
+                "transition bound"
+            )
+        elif completed_games >= plan.game_bound:
+            raise ManagedContractError(
+                "post-fork transition bound was not reached before the game ceiling"
+            )
+    elif update_bound is None:
         if completed_games != expected_games:
             raise ManagedContractError(
                 "segment checkpoint game count does not match the bounded schedule"
@@ -1813,7 +2072,7 @@ def run_next_segment(
     previous_completed_games = (
         int(completed_events[-1].details["completed_games"])
         if completed_events
-        else 0
+        else _initial_completed_games(plan)
     )
     previous_completed_updates = (
         int(completed_events[-1].details["completed_updates"])
@@ -1821,10 +2080,18 @@ def run_next_segment(
         and completed_events[-1].details.get("completed_updates") is not None
         else None
     )
+    previous_post_fork_transitions = (
+        int(completed_events[-1].details["completed_post_fork_transitions"])
+        if completed_events
+        and completed_events[-1].details.get("completed_post_fork_transitions")
+        is not None
+        else None
+    )
     if _plan_completion_reached(
         plan,
         completed_games=previous_completed_games,
         completed_updates=previous_completed_updates,
+        completed_post_fork_transitions=previous_post_fork_transitions,
     ):
         return managed_status(plan_path, authorization_path)
     elapsed_seconds = sum(
@@ -1870,9 +2137,12 @@ def run_next_segment(
             previous_completed_games=(
                 int(completed_events[-2].details["completed_games"])
                 if len(completed_events) > 1
-                else 0
+                else _initial_completed_games(plan)
             ),
         )
+    elif plan.initial_resume is not None:
+        previous_checkpoint = _assert_initial_resume_checkpoint(plan)
+        previous_run_id = plan.initial_resume.parent_run_id
     if recovery is not None:
         previous_checkpoint = Path(str(recovery["recovery_checkpoint"]))
         if previous_run_id is None and recovery.get("parent_run_id"):
@@ -2047,6 +2317,12 @@ def run_next_segment(
                     "update_count"
                 ]
             )
+        completed_post_fork_transitions = None
+        transition_bound = _post_fork_transition_bound(plan)
+        if transition_bound is not None:
+            completed_post_fork_transitions = (
+                _checkpoint_post_fork_transition_count(checkpoint)
+            )
         policy_health: dict[str, Any] | None = None
         if plan.policy_health is not None:
             try:
@@ -2118,6 +2394,9 @@ def run_next_segment(
                 "run_id": _segment_run_id(plan, segment_index),
                 "completed_games": completed_games,
                 "completed_updates": completed_updates,
+                "completed_post_fork_transitions": (
+                    completed_post_fork_transitions
+                ),
                 "checkpoint": str(checkpoint.resolve(strict=False)),
                 "elapsed_seconds": elapsed,
                 "policy_health": policy_health,
@@ -2127,6 +2406,7 @@ def run_next_segment(
             plan,
             completed_games=completed_games,
             completed_updates=completed_updates,
+            completed_post_fork_transitions=completed_post_fork_transitions,
         ):
             _append_controller_event(
                 plan,
@@ -2135,6 +2415,9 @@ def run_next_segment(
                 details={
                     "completed_games": completed_games,
                     "completed_updates": completed_updates,
+                    "completed_post_fork_transitions": (
+                        completed_post_fork_transitions
+                    ),
                 },
             )
         return managed_status(plan_path, authorization_path)

@@ -15,8 +15,10 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
+from learned_ai.training.checkpoint_envelope import load_checkpoint  # noqa: E402
 from learned_ai.training.managed_generalist import (  # noqa: E402
     ManagedContractError,
+    ManagedInitialResume,
     ManagedPlan,
     PolicyHealthGate,
     authorize_plan,
@@ -227,9 +229,58 @@ def _prepare(args: argparse.Namespace) -> dict:
     common_args = _common_trainer_args(args, paths_config)
 
     parser = trainer._build_argument_parser()
-    semantic_args = parser.parse_args(["--preflight", "long-run", *common_args])
+    initial_values = (
+        args.initial_resume_checkpoint,
+        args.initial_resume_completed_games,
+    )
+    if any(value is not None for value in initial_values) != all(
+        value is not None for value in initial_values
+    ):
+        raise ManagedContractError(
+            "initial resume checkpoint and completed games must be specified together"
+        )
+    initial_resume = None
+    dynamic_args: list[str] = []
+    initial_envelope = None
+    initial_checkpoint = None
+    if args.initial_resume_checkpoint is not None:
+        initial_checkpoint = Path(args.initial_resume_checkpoint).resolve(strict=True)
+        initial_envelope = load_checkpoint(initial_checkpoint, map_location="cpu")
+        dynamic_args = [
+            "--start-mode",
+            "exact-resume",
+            "--resume",
+            str(initial_checkpoint),
+            "--parent-run-id",
+            initial_envelope.descriptor.run_id,
+        ]
+    semantic_args = parser.parse_args(
+        ["--preflight", "long-run", *common_args, *dynamic_args]
+    )
     trainer._configure_paths(semantic_args)
     validate_generalist_configuration(semantic_args)
+    resume_sha256 = resume_config_sha256(semantic_args)
+    if initial_envelope is not None and initial_checkpoint is not None:
+        completed_games = int(
+            initial_envelope.payload.trainer_state["game_count"]
+        )
+        if completed_games != args.initial_resume_completed_games:
+            raise ManagedContractError(
+                "initial resume completed-game count differs"
+            )
+        descriptor = initial_envelope.descriptor
+        if descriptor.experiment_id != args.experiment_id:
+            raise ManagedContractError("initial resume experiment differs")
+        if descriptor.config_sha256 != resume_sha256:
+            raise ManagedContractError("initial resume configuration differs")
+        initial_resume = ManagedInitialResume(
+            checkpoint_path=str(initial_checkpoint),
+            checkpoint_sha256=_file_sha256(initial_checkpoint),
+            checkpoint_id=descriptor.checkpoint_id,
+            checkpoint_role=descriptor.role,
+            parent_run_id=descriptor.run_id,
+            completed_games=completed_games,
+        )
     policy_health = None
     if args.policy_health_gate:
         corpus = Path(args.policy_health_corpus).resolve(strict=True)
@@ -259,7 +310,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         control_dir=str(control_dir),
         paths_config=str(paths_config),
         paths_config_sha256=_file_sha256(paths_config),
-        resume_config_sha256=resume_config_sha256(semantic_args),
+        resume_config_sha256=resume_sha256,
         max_games=args.max_games,
         segment_games=args.segment_games,
         max_wall_hours=args.max_wall_hours,
@@ -269,6 +320,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         promotion_allowed=False,
         policy_health=policy_health,
         completion_game_bound=args.completion_game_bound,
+        initial_resume=initial_resume,
     )
     publish_managed_plan(plan_path, plan)
     return {
@@ -333,6 +385,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--segment-games",
         type=int,
         default=DEFAULT_SEGMENT_GAMES,
+    )
+    prepare.add_argument(
+        "--initial-resume-checkpoint",
+        default=None,
+        help=(
+            "Immutable external CheckpointEnvelope v2 used to start the first "
+            "managed segment in exact-resume mode"
+        ),
+    )
+    prepare.add_argument(
+        "--initial-resume-completed-games",
+        type=int,
+        default=None,
+        help="Expected completed-game count in the initial resume checkpoint",
     )
     prepare.add_argument(
         "--optimizer-update-bound",

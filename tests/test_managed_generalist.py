@@ -20,6 +20,7 @@ from learned_ai.training.checkpoint_envelope import (
 )
 from learned_ai.training.managed_generalist import (
     ManagedContractError,
+    ManagedInitialResume,
     ManagedPlan,
     PolicyHealthGate,
     authorize_plan,
@@ -39,7 +40,23 @@ def _managed_checkpoint_payload(
     game_count: int,
     *,
     update_count: int = 0,
+    optimizer_consumed_transition_count: int | None = None,
+    post_fork_transition_origin: int | None = None,
 ) -> CheckpointPayload:
+    recovery_state = {}
+    if optimizer_consumed_transition_count is not None:
+        recovery_state = {
+            "optimizer_consumed_transition_count": (
+                optimizer_consumed_transition_count
+            ),
+            "target_refresh_fork_state": {
+                "schema_version": "nmm.target-refresh-fork-state.v1",
+                "fork_game": 50,
+                "captured": True,
+                "treatment": "no-refresh",
+                "post_fork_transition_origin": post_fork_transition_origin,
+            },
+        }
     return CheckpointPayload(
         model_state={},
         optimizer_state=None,
@@ -55,7 +72,7 @@ def _managed_checkpoint_payload(
             "rolling_metrics": {},
             "curriculum": {},
             "target_network": {},
-            "recovery_state": {},
+            "recovery_state": recovery_state,
             "model_config": {},
         },
         data_state={
@@ -103,6 +120,55 @@ def _plan(tmp_path: Path) -> ManagedPlan:
         allow_safe_exact_resume=True,
         publication_allowed=False,
         promotion_allowed=False,
+    )
+
+
+def _initial_resume_plan(tmp_path: Path) -> tuple[ManagedPlan, Path]:
+    base = _plan(tmp_path)
+    checkpoint = tmp_path / "initial-target-refresh-fork.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="prefix-segment-0001:target-refresh-fork:1",
+        run_id="prefix-segment-0001",
+        experiment_id=base.experiment_id,
+        parent_checkpoint_id=None,
+        role="target_refresh_fork",
+        save_reason="target-refresh-fork",
+        created_at_utc="2026-07-20T12:10:00Z",
+        config_sha256=base.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        checkpoint,
+        descriptor,
+        _managed_checkpoint_payload(50),
+        previous_copies=0,
+    )
+    initial = ManagedInitialResume(
+        checkpoint_path=str(checkpoint.resolve()),
+        checkpoint_sha256=hashlib.sha256(checkpoint.read_bytes()).hexdigest(),
+        checkpoint_id=descriptor.checkpoint_id,
+        checkpoint_role=descriptor.role,
+        parent_run_id=descriptor.run_id,
+        completed_games=50,
+    )
+    return (
+        replace(
+            base,
+            max_games=5_000,
+            completion_game_bound=600,
+            segment_games=550,
+            common_trainer_args=(
+                *base.common_trainer_args,
+                "--post-fork-transition-bound",
+                "8192",
+            ),
+            initial_resume=initial,
+        ),
+        checkpoint,
     )
 
 
@@ -320,6 +386,101 @@ def test_manager_preserves_exact_transition_fork_arguments(tmp_path: Path) -> No
     assert trainer_args.post_fork_transition_bound is None
 
 
+def test_manager_prepares_a_hash_bound_initial_exact_resume(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    paths_config = tmp_path / "training_paths.local.json"
+    paths_config.write_text("{}\n", encoding="utf-8")
+    checkpoint = tmp_path / "initial.pt"
+    command = [
+        "prepare",
+        "--control-dir",
+        str(tmp_path / "control"),
+        "--max-wall-hours",
+        "0.5",
+        "--objective",
+        "continue one immutable external branch",
+        "--paths-config",
+        str(paths_config),
+        "--experiment-id",
+        "managed-initial-resume-test",
+        "--seed",
+        "64",
+        "--max-games",
+        "500",
+        "--completion-game-bound",
+        "200",
+        "--segment-games",
+        "150",
+        "--engine-profile",
+        "local-game-ai",
+        "--max-ply",
+        "120",
+        "--mill-bonus-mode",
+        "malom-preserving-only",
+        "--specialist-read-mode",
+        "theoretical-only",
+        "--initial-resume-checkpoint",
+        str(checkpoint),
+        "--initial-resume-completed-games",
+        "50",
+    ]
+    args = manager._build_parser().parse_args(command)
+    common = manager._common_trainer_args(args, paths_config)
+    semantic = manager.trainer._build_argument_parser().parse_args(
+        [
+            "--preflight",
+            "long-run",
+            *common,
+            "--start-mode",
+            "exact-resume",
+            "--resume",
+            str(checkpoint),
+            "--parent-run-id",
+            "prefix-segment-0001",
+        ]
+    )
+    manager.trainer._configure_paths(semantic)
+    config_sha256 = manager.resume_config_sha256(semantic)
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="prefix-segment-0001:checkpoint:1",
+        run_id="prefix-segment-0001",
+        experiment_id="managed-initial-resume-test",
+        parent_checkpoint_id=None,
+        role="latest",
+        save_reason="branch-source",
+        created_at_utc="2026-07-20T12:10:00Z",
+        config_sha256=config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        checkpoint,
+        descriptor,
+        _managed_checkpoint_payload(50),
+        previous_copies=0,
+    )
+    monkeypatch.setattr(
+        manager,
+        "_git_state",
+        lambda: ("a" * 40, False),
+    )
+
+    result = manager._prepare(args)
+    plan = load_managed_plan(result["plan_path"])
+
+    assert plan.initial_resume is not None
+    assert plan.initial_resume.checkpoint_sha256 == hashlib.sha256(
+        checkpoint.read_bytes()
+    ).hexdigest()
+    assert plan.initial_resume.completed_games == 50
+    assert plan.resume_config_sha256 == config_sha256
+
+
 def test_authorization_is_separate_and_bound_to_exact_plan(tmp_path: Path) -> None:
     plan = _plan(tmp_path)
     plan_path = tmp_path / "control" / "plan.json"
@@ -377,6 +538,206 @@ def test_segment_commands_only_allow_fresh_then_exact_resume(tmp_path: Path) -> 
         "managed-v4-test-segment-0001"
     )
     assert second[second.index("--segment-stop-game") + 1] == "200"
+
+
+def test_initial_resume_plan_round_trips_and_starts_first_segment_exactly(
+    tmp_path: Path,
+) -> None:
+    plan, checkpoint = _initial_resume_plan(tmp_path)
+    plan_path = Path(plan.control_dir) / "plan.json"
+    authorization_path = Path(plan.control_dir) / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+
+    loaded = load_managed_plan(plan_path)
+    assert loaded == plan
+    assert managed_status(plan_path, authorization_path)["progress"][
+        "completed_games"
+    ] == 50
+    command = build_segment_command(
+        plan,
+        plan_path=plan_path,
+        authorization_path=authorization_path,
+        segment_index=1,
+        previous_checkpoint=checkpoint,
+        previous_run_id="prefix-segment-0001",
+        previous_completed_games=50,
+        python_executable="python",
+    )
+
+    assert command[command.index("--start-mode") + 1] == "exact-resume"
+    assert command[command.index("--resume") + 1] == str(checkpoint.resolve())
+    assert command[command.index("--parent-run-id") + 1] == (
+        "prefix-segment-0001"
+    )
+    assert command[command.index("--segment-stop-game") + 1] == "600"
+
+
+def test_initial_resume_launch_verification_binds_checkpoint_bytes(
+    tmp_path: Path,
+) -> None:
+    plan, checkpoint = _initial_resume_plan(tmp_path)
+    plan_path = Path(plan.control_dir) / "plan.json"
+    authorization_path = Path(plan.control_dir) / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approve the frozen branch segment.",
+        authorized_at_utc="2026-07-20T12:15:00Z",
+    )
+
+    verified = verify_managed_launch(
+        plan_path,
+        authorization_path,
+        git_commit=plan.git_commit,
+        resume_config_sha256=plan.resume_config_sha256,
+        out_dir=Path(plan.control_dir) / "segments" / "segment-0001",
+        run_id="managed-v4-test-segment-0001",
+        segment_games=550,
+        segment_stop_game=600,
+        start_mode="exact-resume",
+        resume=str(checkpoint),
+        parent_run_id="prefix-segment-0001",
+        experiment_id=plan.experiment_id,
+    )
+    assert verified == plan
+
+    with checkpoint.open("ab") as handle:
+        handle.write(b"tamper")
+    with pytest.raises(ManagedContractError, match="checkpoint changed"):
+        verify_managed_launch(
+            plan_path,
+            authorization_path,
+            git_commit=plan.git_commit,
+            resume_config_sha256=plan.resume_config_sha256,
+            out_dir=Path(plan.control_dir) / "segments" / "segment-0001",
+            run_id="managed-v4-test-segment-0001",
+            segment_games=550,
+            segment_stop_game=600,
+            start_mode="exact-resume",
+            resume=str(checkpoint),
+            parent_run_id="prefix-segment-0001",
+            experiment_id=plan.experiment_id,
+        )
+
+
+def test_post_fork_transition_count_is_an_exact_completion_axis(
+    tmp_path: Path,
+) -> None:
+    plan, _checkpoint = _initial_resume_plan(tmp_path)
+    candidate = tmp_path / "transition-boundary.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="managed-v4-test-segment-0001:transition:8192",
+        run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+        parent_checkpoint_id=None,
+        role="transition_diagnostic_candidate",
+        save_reason="exact-post-fork-transition-8192",
+        created_at_utc="2026-07-20T12:30:00Z",
+        config_sha256=plan.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        candidate,
+        descriptor,
+        _managed_checkpoint_payload(
+            173,
+            optimizer_consumed_transition_count=9_216,
+            post_fork_transition_origin=1_024,
+        ),
+        previous_copies=0,
+    )
+
+    assert managed._checkpoint_post_fork_transition_count(candidate) == 8_192
+    assert managed._plan_completion_reached(
+        plan,
+        completed_games=173,
+        completed_updates=None,
+        completed_post_fork_transitions=8_192,
+    )
+
+
+def test_supervisor_completes_initial_branch_on_post_fork_transition_bound(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan, initial_checkpoint = _initial_resume_plan(tmp_path)
+    plan_path = Path(plan.control_dir) / "plan.json"
+    authorization_path = Path(plan.control_dir) / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approve one transition-bounded branch segment.",
+        authorized_at_utc="2026-07-20T12:15:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    candidate = tmp_path / "transition-complete.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="managed-v4-test-segment-0001:transition:8192",
+        run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+        parent_checkpoint_id=plan.initial_resume.checkpoint_id,
+        role="latest",
+        save_reason="post-fork-transition-bound",
+        created_at_utc="2026-07-20T12:30:00Z",
+        config_sha256=plan.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        candidate,
+        descriptor,
+        _managed_checkpoint_payload(
+            173,
+            optimizer_consumed_transition_count=9_216,
+            post_fork_transition_origin=1_024,
+        ),
+        previous_copies=0,
+    )
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (173, candidate),
+    )
+    calls: list[list[str]] = []
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+    second = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+
+    assert len(calls) == 1
+    assert calls[0][calls[0].index("--resume") + 1] == str(
+        initial_checkpoint.resolve()
+    )
+    assert calls[0][calls[0].index("--segment-stop-game") + 1] == "600"
+    assert status["state"] == "completed"
+    assert status["progress"]["completed_games"] == 173
+    assert status["progress"]["completed_post_fork_transitions"] == 8_192
+    assert status["progress"]["post_fork_transition_bound"] == 8_192
+    assert second["state"] == "completed"
 
 
 def test_launch_verification_rejects_wrong_semantics(tmp_path: Path) -> None:
