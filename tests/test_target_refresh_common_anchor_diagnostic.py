@@ -25,10 +25,15 @@ from learned_ai.validation.target_refresh_common_anchor_diagnostic import (
 
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = ROOT / DEFAULT_CONTRACT
-SUCCESSOR_CONTRACT_PATH = (
+ATTEMPT_002_CONTRACT_PATH = (
     ROOT
     / "docs/experiments/"
     / "sanmill-target-refresh-common-anchor-diagnostic-v1-attempt-002.json"
+)
+ATTEMPT_003_CONTRACT_PATH = (
+    ROOT
+    / "docs/experiments/"
+    / "sanmill-target-refresh-common-anchor-diagnostic-v1-attempt-003.json"
 )
 
 
@@ -166,7 +171,7 @@ def test_contract_and_prepare_commands_are_frozen() -> None:
 def test_attempt_002_is_a_fresh_unauthorized_successor() -> None:
     predecessor = load_target_refresh_common_anchor_contract(CONTRACT_PATH)
     successor = load_target_refresh_common_anchor_contract(
-        SUCCESSOR_CONTRACT_PATH
+        ATTEMPT_002_CONTRACT_PATH
     )
 
     assert successor["plan_identity"] != predecessor["plan_identity"]
@@ -184,6 +189,49 @@ def test_attempt_002_is_a_fresh_unauthorized_successor() -> None:
         "requires_new_product_authorization": True,
     }
     assert successor["authorization"]["launch_authorized"] is False
+
+    for field in (
+        "control_dir",
+        "experiment_id",
+        "plan_id",
+        "specialist_db",
+    ):
+        predecessor_values = {arm[field] for arm in predecessor["arms"]}
+        successor_values = {arm[field] for arm in successor["arms"]}
+        assert predecessor_values.isdisjoint(successor_values)
+
+
+def test_attempt_003_is_a_fresh_analysis_corrected_successor() -> None:
+    predecessor = load_target_refresh_common_anchor_contract(
+        ATTEMPT_002_CONTRACT_PATH
+    )
+    successor = load_target_refresh_common_anchor_contract(
+        ATTEMPT_003_CONTRACT_PATH
+    )
+
+    assert successor["plan_identity"] != predecessor["plan_identity"]
+    assert successor["attempt"] == {
+        "attempt_number": 3,
+        "predecessor_plan_identity": predecessor["plan_identity"],
+        "predecessor_readiness_identity": (
+            "bcbb625d6d903ce8257a550a2489cf302bbb0fae50558f999c1a62b08a53165c"
+        ),
+        "predecessor_disposition": "fatal_stop_no_result_no_retry",
+        "reason": (
+            "fresh successor after the attempt-002 optimizer-bounded "
+            "policy-health analysis failure was fixed and regression-tested"
+        ),
+        "requires_new_product_authorization": True,
+    }
+    assert successor["authorization"]["launch_authorized"] is False
+    assert successor["common_training_contract"] == predecessor[
+        "common_training_contract"
+    ]
+    assert successor["measurement_contract"] == predecessor[
+        "measurement_contract"
+    ]
+    assert successor["pairing"] == predecessor["pairing"]
+    assert successor["resources"] == predecessor["resources"]
 
     for field in (
         "control_dir",

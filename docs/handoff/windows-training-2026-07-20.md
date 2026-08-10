@@ -68,6 +68,13 @@ Neither attempt produced target-refresh evidence. See the
 and
 [attempt-002 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-002-failure-2026-08-10.md).
 
+An authorization-free attempt-003 contract is now frozen locally at plan
+identity `8cc192f5`. It preserves the exact scientific and resource contract,
+changes only lineage-owned paths and identities, binds correction `873e126`,
+and adds the attempt-002 failure record as source evidence. It must be
+published normally before its four fresh databases, plans and preflights may
+be generated. It does not authorize training.
+
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
 beside that historical database. They were not deleted. All accepted policy
@@ -2009,6 +2016,17 @@ the current successor in this order:
     copies and a new explicit product authorisation. Do not resume, retry,
     run held-out evaluation, promote, publish or start long training from this
     incomplete sequence.
+23. Preserve the authorization-free
+    [attempt-003 contract](../experiments/sanmill-target-refresh-common-anchor-diagnostic-v1-attempt-003.md),
+    plan identity `8cc192f5`. Its hypothesis, seeds, four-arm order, target
+    refresh treatment, fixed game-50 anchor, optimizer exposure, no-update
+    measurement schedule, policy-health gate and resource limits are unchanged.
+    Only the lineage-owned paths, attempt metadata, failure evidence and fixed
+    analyser identity differ. No attempt-003 database, plan, preflight,
+    authorization or segment exists yet. Publish the exact contract source
+    normally, re-establish `dev == origin/dev`, then generate only four pristine
+    database copies, immutable plans and preflights. Do not create an
+    authorization or start training without a later explicit product grant.
 
 The previously executed isolated smoke command was:
 
@@ -2100,14 +2118,13 @@ evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, the no-update batch-capture grant, the retained-v3 grant, all six
 SpecialistDB read-calibration grants, and all eight target-refresh/LR grants
-are also consumed. Safe work is limited to publishing the local tracked result
-evidence after explicit approval and preparing an authorization-free
-successor-design document with a common fixed measurement anchor. The design
-document and implementation now exist locally, but no successor probe,
-held-out match, additional calibration, long training job, model
-promotion/publication, protocol change, or history rewrite is authorized by
-this handover. Before even generating arm plans, the exact design source must
-be published normally and `dev == origin/dev` must be re-established.
+are also consumed. Attempt-003 preparation authority is limited to publishing
+its exact contract source and, only after `dev == origin/dev`, generating four
+fresh database copies, immutable plans and preflights. It does not authorize
+arm authorizations, a successor probe, held-out match, additional calibration,
+long training, model promotion/publication, protocol change, or history
+rewrite. Before generating arm plans, the exact design source must be
+published normally and `dev == origin/dev` must be re-established.
 
 ## Reference Material
 
