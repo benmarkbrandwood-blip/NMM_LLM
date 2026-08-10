@@ -4,26 +4,31 @@ Status: `implementation_complete_needs_publication_no_launch_authority`
 
 This successor is required only because the read-only common-anchor action
 analysis classified the refresh and no-refresh policies as `near_identical`.
-Its exact-transition implementation, focused tests and immutable
-machine-readable contract are complete locally. It must not create plans or
-launch until that exact source is published. Fresh database lineage, managed
-plans and preflights remain separate later gates.
+Its exact-transition implementation, external fork-resume support,
+payload-preserving branch publication, deferred arm preparation, focused
+tests and immutable machine-readable contract are complete locally. It must
+not create plans or launch until that exact source is published. Fresh
+database lineage, managed plans and preflights remain separate later gates.
 
 ## Implementation and current gate
 
-Commits `bd3e5ce`, `8adefba`, `4ca4f03`, `3cf4a19`, `beba5d0` and
-`0429cbd` implement exact transition accounting, the deterministic fork,
-the frozen decision rule, the result publisher, managed-plan passthrough and
-staged preparation. The machine-readable contract is
+Commits `bd3e5ce`, `8adefba`, `4ca4f03`, `3cf4a19`, `beba5d0`,
+`0429cbd`, `c9fc4fc`, `c88b0f2` and `dc83439` implement exact transition
+accounting, the deterministic fork, the frozen decision rule, the result
+publisher, managed-plan passthrough, external first-segment exact resume,
+byte-preserving checkpoint rebinding and staged arm preparation. The
+machine-readable contract is
 [`sanmill-target-refresh-equal-transition-diagnostic-v1.json`](sanmill-target-refresh-equal-transition-diagnostic-v1.json),
-with plan identity `18c005e8b9257531700886d96685f8be0d2ae59dc1519fdb761ba44d182e7d3b`.
+with the full plan identity recorded in that file.
 
 The source-only audit passes with all future targets absent, but reports
 `implementation_complete_needs_publication`. It deliberately permits only
-three game-50 shared-prefix plans after publication. Six treatment plans
-remain impossible to prepare honestly until each real fork checkpoint and
-closed prefix SpecialistDB exist. No placeholder checkpoint or database may
-be substituted. No plan, database copy, preflight, authorization or training
+three game-50 shared-prefix plans after publication. The arm preparer exists,
+but each pair remains impossible to prepare honestly until its real fork
+checkpoint and closed prefix SpecialistDB exist. It then copies the closed
+database to two independent paths and publishes two envelope headers over the
+exact same source payload bytes. No placeholder checkpoint or database may be
+substituted. No plan, database copy, preflight, authorization or training
 output has been created.
 
 ## Question
@@ -59,7 +64,9 @@ the target-refresh decision. The checkpoint must contain the complete model,
 optimizer, Python/NumPy/PyTorch/component RNG state, rolling histories,
 pending transition queue, target state and age, and mutable data identity.
 
-Two arms are then created from byte-identical copies of that fork state:
+Two arms are then created from descriptor-rebound envelopes over the exact
+same fork payload bytes and from byte-identical independent SpecialistDB
+copies:
 
 - `refresh-once`: replace the frozen target with the current candidate at the
   fork boundary and reset target age;
@@ -69,10 +76,12 @@ No later target refresh is allowed in either arm. This isolates the one
 game-50 intervention instead of confounding it with a different number of
 later game-count-triggered refreshes.
 
-The fork operation must be explicit and allowlisted. It may change only the
-frozen target model and target-age fields in `refresh-once`, plus identities
-that name the successor arm. It must not rebuild weights, optimizer state,
-RNG state, histories, pending steps, data cursors, or reward state.
+Branch publication must be explicit and allowlisted. Before training it may
+change only envelope descriptor identities; its payload SHA-256 and size must
+equal the source fork exactly. At first resume, `refresh-once` may change only
+the frozen target model and target-age fields, while `no-refresh` preserves
+them. Neither path may rebuild weights, optimizer state, RNG state, histories,
+pending steps, data cursors, or reward state.
 
 ### Exact transition accounting
 

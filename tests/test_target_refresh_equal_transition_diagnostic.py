@@ -30,7 +30,7 @@ def test_tracked_equal_transition_contract_is_self_consistent() -> None:
     contract = load_equal_transition_contract(CONTRACT)
 
     assert contract["plan_identity"] == (
-        "18c005e8b9257531700886d96685f8be0d2ae59dc1519fdb761ba44d182e7d3b"
+        "b14d69db9a33b005c0a19fbb97e7f5b9a16364f1f74390ae85ff3e9d4edabb97"
     )
     assert [prefix["seed"] for prefix in contract["prefixes"]] == [64, 65, 66]
     assert len(contract["arms"]) == 6

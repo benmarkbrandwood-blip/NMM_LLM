@@ -93,15 +93,18 @@ The next design is a three-seed, single-refresh fork with exact 64-transition
 optimizer batches and fixed 1,024/2,048/4,096/8,192 post-fork transition
 boundaries. It is documented in the
 [equal-transition diagnostic](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md).
-The implementation, result publisher, machine-readable contract and staged
-preparation are complete in local commits `bd3e5ce` through `0429cbd`, but
-those six commits remain ahead of `origin/dev`. The source-only readiness
-audit is `implementation_complete_needs_publication`; all prospective output
-targets are absent. Related trainer and diagnostic tests report `275 passed`,
-the mandatory Malom/provenance gate reports `103 passed, 498 subtests passed`,
-and relevant Ruff checks pass. No plan, database copy, preflight,
-authorization or training output has been created. No held-out evaluation,
-successor training, extension, promotion or long run is authorized.
+The implementation, result publisher, managed external-fork resume,
+payload-preserving checkpoint branch operation, deferred arm preparer,
+machine-readable contract and staged preparation are complete in local
+commits `bd3e5ce` through `dc83439`. The exact tracked source still requires
+ordinary publication before any new readiness or plan may be generated. All
+prospective targets are absent after the obsolete preparations were moved to
+ignored quarantine. The broad related gate previously reported `275 passed`,
+the mandatory Malom/provenance gate reported `103 passed, 498 subtests
+passed`, and the new fork/arm-focused tests pass. No active plan, database
+copy, preflight, authorization or training output exists. No held-out
+evaluation, successor training, extension, promotion or long run is
+authorized.
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -2057,15 +2060,19 @@ the current successor in this order:
     authorization or start training without a later explicit product grant.
 24. Preserve the implemented but unpublished
     [equal-transition successor](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md),
-    plan identity `18c005e8`. Commits `bd3e5ce` through `0429cbd` add exact
+    using the full plan identity in its machine-readable contract. Commits
+    `bd3e5ce` through `dc83439` add exact
     64-transition consumption, a complete game-50 pre-refresh fork, one-time
     refresh/no-refresh treatments, fixed 1,024/2,048/4,096/8,192-transition
-    checkpoints, a three-seed decision rule, a result publisher and staged
-    preparation. The source audit requires ordinary publication before it may
-    create three prefix plans and preflights. Six arm plans remain deferred
-    until each real prefix checkpoint and its closed SpecialistDB have been
-    audited and cloned. There is no launch, held-out, retry, extension,
-    promotion, publication or long-training authority.
+    checkpoints, a three-seed decision rule, a result publisher, managed
+    external first-segment resume, byte-preserving descriptor rebinding and
+    staged preparation. The source audit requires ordinary publication before
+    it may create three prefix plans and preflights. Each same-seed pair stays
+    deferred until its real fork checkpoint and closed SpecialistDB have been
+    audited; the arm preparer then creates two independent database clones,
+    two payload-identical branch checkpoints and authorization-free plans.
+    There is no launch, held-out, retry, extension, promotion, publication or
+    long-training authority.
 
 The previously executed isolated smoke command was:
 
@@ -2159,12 +2166,12 @@ grant, the no-update batch-capture grant, the retained-v3 grant, all six
 SpecialistDB read-calibration grants, all eight target-refresh/LR grants and
 all attempt-003 grants are also consumed. The equal-transition successor has
 no preparation or launch grant. Its exact source must first be published
-normally and `dev == origin/dev` re-established. A later preparation action
+normally and `dev == origin/dev` re-established. The first preparation action
 may create only the three shared-prefix database copies, immutable plans and
-preflights; it must not create arm plans before the real game-50 artefacts
-exist. It does not authorize any segment, arm authorization, held-out match,
-additional calibration, long training, model promotion/publication, protocol
-change, or history rewrite.
+preflights. The implemented later action may prepare only the two arms owned
+by a completed and audited game-50 prefix. Neither action authorizes a
+segment, arm authorization, held-out match, additional calibration, long
+training, model promotion/publication, protocol change, or history rewrite.
 
 ## Reference Material
 

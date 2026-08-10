@@ -197,7 +197,10 @@
       "8adefba401ee9fc6e0350e422cdc3324f259cc3f",
       "4ca4f0391ba49e0935cf504344f92523bb612b6d",
       "3cf4a191e9b7311c04292de724fa97d2ec1dc8ff",
-      "beba5d0aec639d8c766caa21efbb6ba198fec157"
+      "beba5d0aec639d8c766caa21efbb6ba198fec157",
+      "c9fc4fc1b7dcd7f5f87c3ba82d71680d94605033",
+      "c88b0f2a3346daba887e2f6b6d7edbe6a4e3d9df",
+      "dc83439c40def79ae150f7eb752709f174054aef"
     ],
     "shared_prefix_per_seed": true,
     "treatment_arms_exact_resume_from_shared_prefix": true
@@ -245,7 +248,7 @@
     ],
     "single_process_at_a_time": true
   },
-  "plan_identity": "18c005e8b9257531700886d96685f8be0d2ae59dc1519fdb761ba44d182e7d3b",
+  "plan_identity": "b14d69db9a33b005c0a19fbb97e7f5b9a16364f1f74390ae85ff3e9d4edabb97",
   "prefixes": [
     {
       "control_dir": "out/target-refresh-equal-transition-diagnostic-v1/seed64-prefix",
@@ -273,7 +276,7 @@
     }
   ],
   "preparation_stages": {
-    "arm_stage": "only after the corresponding prefix completes, its explicit fork checkpoint and closed SpecialistDB identities pass audit, and a new arm readiness is generated",
+    "arm_stage": "only after the corresponding prefix completes, audit its explicit untreated fork checkpoint and closed SpecialistDB, clone the database byte-identically, publish payload-preserving descriptor-rebound checkpoints, and generate two authorization-free arm plans and preflights",
     "current_stage": "source_and_prefix_plan_preparation_only",
     "prefix_stage": "prepare three fresh unauthorized prefix plans and preflights; do not launch"
   },
