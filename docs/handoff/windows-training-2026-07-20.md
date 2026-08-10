@@ -43,20 +43,26 @@ its file SHA-256 is
 No read mode was selected. The run is mechanism evidence only and does not
 authorize held-out evaluation or retained training.
 
-The follow-up diagnosis found that every arm refreshed its frozen target and
-changed its learning rate at the same game-50 boundary. Local commit
-`0d9f7b8` adds explicit historical-adaptive versus fixed learning-rate modes,
-without changing the historical default. Commit `00cddd2` records the
-observed pre/post W/D/L evidence and competing explanations. Commit `d450d50`
-freezes a two-seed, two-by-two paired diagnostic under plan identity
-`94f6381a40ab86401cb0e957677dd3a21dde01ed9ffd4c69b3fa252b21787e58`.
-It independently varies target refresh at game 50 and fixed versus adaptive
-learning rate, requires byte-identical same-seed games 1-50, and analyzes only
-games 51-100 for factor effects. The full ceiling is 800 games and two active
-hours. Source readiness identity `0eab813b90b4ff8be66d40b52b4168d36297fe65b30644cecdef50b71f1c10a7`
-reports `implementation_complete_needs_publication`: the three commits are
-local, all preparation targets are absent, and no plan, preflight,
-authorization, game, held-out match or long run has been created.
+The follow-up two-seed target-refresh/LR diagnostic subsequently completed all
+eight arms. It found a repeatable post-game-50 contrast against each arm's own
+training target, no learning-rate factor effect, and no Sanmill-facing win.
+Because target refresh changed both the trained opponent and the measurement
+denominator, it selected no training setting. The successor common-anchor
+design therefore separates the training target from a fixed game-50
+measurement anchor and matches 16 post-boundary optimiser steps.
+
+That successor was published, prepared and authorised once under readiness
+identity `d6ed98be`. Attempt 001 stopped fail closed in the first arm at game
+50 after 18 optimiser updates: the trainer requested the dedicated
+`development_measurement_anchor` checkpoint role, but the version-2 envelope
+had not registered either new measurement role. No anchor, accepted segment,
+policy-health result or experiment result exists, and the other three arms
+did not start. All four authorisations are consumed by the aborted sequence.
+Local correction commit `e02aca4` extends only the checkpoint-role vocabulary
+and passes the focused regression gates. A successor still requires ordinary
+publication, new plans, control directories and fresh database copies, final
+preflights, and a new explicit product authorisation. See the
+[attempt-001 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-001-failure-2026-08-10.md).
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -1967,6 +1973,22 @@ the current successor in this order:
     unlaunched and unauthorized; exact source publication, fresh databases,
     managed plans and preflights must still be completed before any product
     authorization could be considered.
+21. The product owner subsequently authorised that exact four-arm sequence at
+    readiness identity `d6ed98be`. Attempt 001 stopped fail closed in the
+    first `seed64-refresh` arm at game 50, after 18 optimiser updates, because
+    the trainer requested checkpoint role `development_measurement_anchor`
+    while the version-2 envelope had not registered either new development
+    measurement role. No anchor, candidate checkpoint, accepted segment,
+    policy-health result or experiment result exists, and the remaining three
+    arms did not start. Treat all four authorisation files as consumed by the
+    aborted sequence. The first database contains failed-attempt writes; the
+    other three remain empty but are still attempt-001 evidence and must not be
+    reused. Local correction commit `e02aca4` extends only the checkpoint role
+    vocabulary and adds round-trip tests for both evidence roles. Preserve the
+    [failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-001-failure-2026-08-10.md).
+    A retry requires ordinary publication, new plan/control/database identities,
+    fresh preflights and a new explicit product authorisation; no automatic
+    retry, held-out evaluation or long training is authorised.
 
 The previously executed isolated smoke command was:
 
