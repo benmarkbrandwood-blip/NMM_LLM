@@ -546,6 +546,7 @@ def _make_checkpoint_payload(
     source_checkpoint: str,
     checkpoint_sequence: int,
     specialist_db_identity: dict,
+    optimizer_consumed_transition_count: int = 0,
 ) -> CheckpointPayload:
     """Capture every mutable state element needed for exact continuation."""
     return CheckpointPayload(
@@ -576,6 +577,9 @@ def _make_checkpoint_payload(
             "recovery_state": {
                 "grace": recovery_grace,
                 "pending_steps": list(pending_steps),
+                "optimizer_consumed_transition_count": (
+                    optimizer_consumed_transition_count
+                ),
                 "last_update_losses": last_update_losses,
                 "source_checkpoint": source_checkpoint,
                 "checkpoint_sequence": checkpoint_sequence,
@@ -624,23 +628,27 @@ def _restore_exact_resume_payload(
         ),
         ("curriculum", curriculum, {"games_at_level"}),
         ("target_network", target, {"games_since_update", "model_state"}),
-        (
-            "recovery_state",
-            recovery,
-            {
-                "grace",
-                "pending_steps",
-                "last_update_losses",
-                "source_checkpoint",
-                "checkpoint_sequence",
-            },
-        ),
         ("cursor", cursor, {"completed_games"}),
         ("buckets", buckets, {"branch_history"}),
     )
     for name, value, expected in expected_nested_fields:
         if not isinstance(value, dict) or set(value) != expected:
             raise RuntimeError(f"exact-resume {name} state is incomplete")
+    legacy_recovery_fields = {
+        "grace",
+        "pending_steps",
+        "last_update_losses",
+        "source_checkpoint",
+        "checkpoint_sequence",
+    }
+    current_recovery_fields = legacy_recovery_fields | {
+        "optimizer_consumed_transition_count"
+    }
+    if not isinstance(recovery, dict) or set(recovery) not in (
+        legacy_recovery_fields,
+        current_recovery_fields,
+    ):
+        raise RuntimeError("exact-resume recovery_state state is incomplete")
     if cursor["completed_games"] != trainer_state["game_count"]:
         raise RuntimeError("exact-resume data cursor disagrees with game_count")
     if payload.optimizer_state is None:
@@ -679,6 +687,9 @@ def _restore_exact_resume_payload(
         "games_since_target_update": int(target["games_since_update"]),
         "recovery_grace": int(recovery["grace"]),
         "pending_steps": list(recovery["pending_steps"]),
+        "optimizer_consumed_transition_count": int(
+            recovery.get("optimizer_consumed_transition_count", 0)
+        ),
         "last_update_losses": last_losses,
     }
 
@@ -824,6 +835,29 @@ def _update_if_ready(
             }
         )
     return update_fn(model, optimizer, steps, device, **kwargs)
+
+
+def _take_exact_transition_batch(
+    pending_steps: list[Any],
+    *,
+    batch_size: int,
+) -> Optional[list[Any]]:
+    """Remove and return exactly one ordered optimizer batch.
+
+    The ordinary trainer intentionally keeps its historical all-pending update
+    behavior.  Transition-bounded diagnostics opt into this helper so an
+    optimizer step cannot silently consume a different number of learner
+    transitions in paired arms.
+    """
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int):
+        raise ValueError("batch_size must be a positive integer")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+    if len(pending_steps) < batch_size:
+        return None
+    batch = list(pending_steps[:batch_size])
+    del pending_steps[:batch_size]
+    return batch
 
 
 def _phase_bucket(board: BoardState, moves_into_movement: Optional[int] = None) -> str:
@@ -2726,6 +2760,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
     batch_count = 0
     update_count = 0
+    optimizer_consumed_transition_count = 0
     if exact_resume is not None:
         restored = _restore_exact_resume_payload(
             exact_resume.payload,
@@ -2738,6 +2773,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         game_count = restored["game_count"]
         batch_count = restored["batch_count"]
         update_count = restored["update_count"]
+        optimizer_consumed_transition_count = restored[
+            "optimizer_consumed_transition_count"
+        ]
         difficulty = restored["difficulty"]
         temperature = restored["temperature"]
         win_history = restored["win_history"]
@@ -2756,7 +2794,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         ]
         print(
             f"[s_gen_v2] Exact state restored at game {game_count}, "
-            f"batch {batch_count}, update {update_count}"
+            f"batch {batch_count}, update {update_count}, consumed transitions "
+            f"{optimizer_consumed_transition_count}"
         )
     checkpoint_sequence = 0
     parent_checkpoint_id: Optional[str] = getattr(
@@ -2877,6 +2916,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             source_checkpoint=source_checkpoint,
             checkpoint_sequence=checkpoint_sequence,
             specialist_db_identity=specialist_db_identity,
+            optimizer_consumed_transition_count=(
+                optimizer_consumed_transition_count
+            ),
         )
         save_checkpoint(path, descriptor, payload)
         if advance_lineage:
@@ -3515,13 +3557,31 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         print(f"[s_gen_v2] {game_count:6d}  +b  {learner_color} | {bucket:7s} | {_boc} ply={branch_result.ply:3d} | (from ply {branch_ply})")
 
             # ── Update ─────────────────────────────────────────────────────────
-            if len(ep_steps) >= args.update_every:
+            while (
+                len(ep_steps) >= args.update_every
+                and (
+                    optimizer_update_bound is None
+                    or update_count < optimizer_update_bound
+                )
+            ):
                 update_diagnostics: dict[str, Any] = {}
+                if args.exact_transition_batches:
+                    update_steps = _take_exact_transition_batch(
+                        ep_steps,
+                        batch_size=args.update_every,
+                    )
+                    if update_steps is None:
+                        raise RuntimeError(
+                            "exact transition queue produced no complete batch"
+                        )
+                else:
+                    update_steps = ep_steps
+                batch_steps = len(update_steps)
                 update_result = _update_if_ready(
                     update_fn=update_fn,
                     model=model,
                     optimizer=opt,
-                    steps=ep_steps,
+                    steps=update_steps,
                     device=device,
                     gamma=args.gamma_td,
                     entropy_coef=args.entropy_coef,
@@ -3540,21 +3600,38 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     raise RuntimeError("update cadence produced an undersized batch")
                 last_update_pl, last_update_vl, last_update_ent = update_result
                 update_count += 1
+                optimizer_consumed_transition_count += batch_steps
+                if not args.exact_transition_batches:
+                    ep_steps.clear()
                 upd_entry = {
-                    "game":        game_count,
-                    "policy_loss": None if last_update_pl  is None else float(last_update_pl),
-                    "value_loss":  None if last_update_vl  is None else float(last_update_vl),
-                    "entropy":     None if last_update_ent is None else float(last_update_ent),
-                    "lr":          float(opt.param_groups[0]["lr"]),
-                    "batch_steps": len(ep_steps),
-                    "reason":      "periodic",
+                    "game": game_count,
+                    "policy_loss": (
+                        None if last_update_pl is None else float(last_update_pl)
+                    ),
+                    "value_loss": (
+                        None if last_update_vl is None else float(last_update_vl)
+                    ),
+                    "entropy": (
+                        None if last_update_ent is None else float(last_update_ent)
+                    ),
+                    "lr": float(opt.param_groups[0]["lr"]),
+                    "batch_steps": batch_steps,
+                    "optimizer_consumed_transition_count": (
+                        optimizer_consumed_transition_count
+                    ),
+                    "generated_transition_count": (
+                        optimizer_consumed_transition_count + len(ep_steps)
+                    ),
+                    "pending_transition_count": len(ep_steps),
+                    "reason": "periodic",
                 }
                 upd_entry.update(update_diagnostics)
                 with open(update_log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(upd_entry) + "\n")
-                ep_steps.clear()
                 if _imitation_data is not None:
                     _imitation_mix_step(model, device, _imitation_data, opt)
+                if not args.exact_transition_batches:
+                    break
 
             _capture_measurement_anchor_if_due()
             _run_development_measurements_if_due()
@@ -3715,8 +3792,12 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             break
 
     # ── Final flush ────────────────────────────────────────────────────────────
-    if ep_steps and (
+    if (
+        ep_steps
+        and not args.exact_transition_batches
+        and (
         optimizer_update_bound is None or update_count < optimizer_update_bound
+        )
     ):
         final_batch_steps = len(ep_steps)
         update_diagnostics = {}
@@ -3740,6 +3821,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         if update_result is not None:
             last_update_pl, last_update_vl, last_update_ent = update_result
             update_count += 1
+            optimizer_consumed_transition_count += final_batch_steps
             with open(update_log_path, "a", encoding="utf-8") as f:
                 f.write(
                     json.dumps(
@@ -3750,6 +3832,13 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             "entropy": float(last_update_ent),
                             "lr": float(opt.param_groups[0]["lr"]),
                             "batch_steps": final_batch_steps,
+                            "optimizer_consumed_transition_count": (
+                                optimizer_consumed_transition_count
+                            ),
+                            "generated_transition_count": (
+                                optimizer_consumed_transition_count
+                            ),
+                            "pending_transition_count": 0,
                             "reason": "final_flush",
                             **update_diagnostics,
                         }
@@ -4050,6 +4139,15 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     p.add_argument("--gamma-td",            type=float, default=GAMMA_TD)
     p.add_argument("--entropy-coef",        type=float, default=ENTROPY_COEF)
     p.add_argument("--update-every",        type=int,   default=UPDATE_EVERY)
+    p.add_argument(
+        "--exact-transition-batches",
+        action="store_true",
+        help=(
+            "Consume exactly --update-every ordered learner transitions per "
+            "optimizer update, retain overflow, and disable final undersized "
+            "flushes. Intended only for controlled paired diagnostics."
+        ),
+    )
     p.add_argument("--rolling-win",         type=int,   default=ROLLING_WIN)
     p.add_argument("--diff-start",          type=int,   default=None)
     p.add_argument("--diff-max",            type=int,   default=DIFF_MAX)

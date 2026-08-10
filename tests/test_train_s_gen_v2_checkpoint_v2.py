@@ -54,6 +54,7 @@ def _payload(model: ScaffoldedPolicyNet, *, game_count: int = 7):
         source_checkpoint="scratch",
         checkpoint_sequence=1,
         specialist_db_identity={"sha256": "specialist-identity"},
+        optimizer_consumed_transition_count=128,
     )
 
 
@@ -85,6 +86,12 @@ def test_generalist_payload_captures_mutable_training_state() -> None:
         1.0
     ]
     assert payload.trainer_state["target_network"]["games_since_update"] == 3
+    assert (
+        payload.trainer_state["recovery_state"][
+            "optimizer_consumed_transition_count"
+        ]
+        == 128
+    )
     assert payload.trainer_state["model_config"] == model.get_config()
     assert payload.data_state["cursor"] == {"completed_games": 7}
     assert payload.data_state["mutable_assets"]["specialist_db"] == {
@@ -166,6 +173,7 @@ def test_exact_resume_restores_complete_mutable_state() -> None:
     assert restored["games_since_target_update"] == 5
     assert restored["recovery_grace"] == 2
     assert restored["last_update_losses"] == (0.4, 0.5, 0.6)
+    assert restored["optimizer_consumed_transition_count"] == 128
     assert list(restored["branch_bucket_history"]) == ["midgame", "endgame"]
     assert optimizer.param_groups[0]["lr"] == 1e-4
     assert game_rng.getstate() == payload.rng_state["components"]["game"]
@@ -173,6 +181,25 @@ def test_exact_resume_restores_complete_mutable_state() -> None:
     assert torch.equal(torch.get_rng_state(), payload.rng_state["torch_cpu"])
     for name, tensor in model.state_dict().items():
         assert torch.equal(frozen.state_dict()[name], tensor)
+
+
+def test_exact_resume_accepts_legacy_transition_counter_absence() -> None:
+    model = _model()
+    payload = _payload(model)
+    del payload.trainer_state["recovery_state"][
+        "optimizer_consumed_transition_count"
+    ]
+
+    restored = trainer._restore_exact_resume_payload(
+        payload,
+        optimizer=torch.optim.Adam(model.parameters(), lr=0.5),
+        game_rng=random.Random(99),
+        frozen_model=copy.deepcopy(model),
+        rolling_win=40,
+        bucket_window=300,
+    )
+
+    assert restored["optimizer_consumed_transition_count"] == 0
 
 
 def test_exact_resume_rejects_inconsistent_data_cursor() -> None:

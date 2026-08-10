@@ -286,6 +286,19 @@ def validate_generalist_configuration(args: Any) -> None:
         raise PreflightConfigurationError(
             f"update_every must be at least {MIN_UPDATE_STEPS} steps"
         )
+    if getattr(args, "exact_transition_batches", False):
+        if not (
+            args.no_s1a_warmstart
+            and args.no_imitation_mix
+            and args.no_s1b_refresher
+            and args.no_recovery
+            and args.batch_games == 1
+            and args.max_branches_per_game == 0
+        ):
+            raise PreflightConfigurationError(
+                "exact_transition_batches requires auxiliary optimizer steps, "
+                "recovery, parallel games, and branch rollouts to be disabled"
+            )
 
     optimizer_update_bound = getattr(args, "optimizer_update_bound", None)
     if optimizer_update_bound is not None:
