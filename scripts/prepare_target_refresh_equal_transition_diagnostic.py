@@ -23,6 +23,9 @@ from learned_ai.validation.target_refresh_equal_transition_diagnostic import (  
     prepare_prefix_plans,
     publish_source_readiness,
 )
+from learned_ai.validation.target_refresh_equal_transition_arms import (  # noqa: E402
+    prepare_seed_arms,
+)
 
 
 def _resolve(value: str | Path) -> Path:
@@ -42,9 +45,39 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="create prefix plans/preflights only; never starts training",
     )
+    parser.add_argument(
+        "--prepare-seed-arms",
+        type=int,
+        choices=(64, 65, 66),
+        help=(
+            "prepare two same-seed arms only after its prefix completed; "
+            "never starts training"
+        ),
+    )
+    parser.add_argument(
+        "--arm-report",
+        help="exclusive ignored readiness path for --prepare-seed-arms",
+    )
     args = parser.parse_args(argv)
     try:
-        if args.prepare_prefixes:
+        if args.prepare_seed_arms is not None:
+            if args.prepare_prefixes or args.write_source_readiness:
+                raise TargetRefreshEqualTransitionError(
+                    "arm, prefix, and source-readiness modes are exclusive"
+                )
+            if not args.arm_report:
+                raise TargetRefreshEqualTransitionError(
+                    "--prepare-seed-arms requires --arm-report"
+                )
+            report = prepare_seed_arms(
+                root=ROOT,
+                contract_path=_resolve(args.contract),
+                paths_config=_resolve(args.paths_config),
+                seed=args.prepare_seed_arms,
+                report_path=_resolve(args.arm_report),
+                python_executable=sys.executable,
+            )
+        elif args.prepare_prefixes:
             if args.write_source_readiness:
                 raise TargetRefreshEqualTransitionError(
                     "--prepare-prefixes and --write-source-readiness are exclusive"
