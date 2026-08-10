@@ -1914,10 +1914,15 @@ the current successor in this order:
     its 5,000-game lineage, checkpoint, database, completion evidence and
     consumed authorization. Do not resume or promote it. Preserve both
     SpecialistDB mechanism audits, distinguishing the first zero-coverage
-    result from the second coverage-positive material result. The next safe
-    work is publication and source audit of the frozen three-seed read-mode
-    calibration, followed by pre-result analyzer implementation. No arm is
-    authorized.
+    result from the second coverage-positive material result. The three-seed
+    read-mode calibration now binds result analyzer and publisher hashes under
+    plan identity `36a1feb6`. Analyzer/preparation implementation commit
+    `39f2cf0` passed source audit at that commit with identity `53346b5a` and
+    state `implementation_complete_needs_publication`; the audit created no
+    plan, database, authorization or trainer output. The next safe work is an
+    ordinary publication of the new source, then a fresh source audit and
+    authorization-free generation of exactly six plans and preflights. No arm
+    is authorized.
 
 The previously executed isolated smoke command was:
 
@@ -2009,12 +2014,12 @@ evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, the no-update batch-capture grant, and the retained-v3 grant are also
 consumed. Safe work now is limited to publishing the completed retained-v3 and
-SpecialistDB audit chain, implementing the frozen read-calibration result
-analyzer, and producing authorization-free plans and preflights from a clean
-published tip. The superseded preliminary plans are already preserved in
-recoverable quarantine. No read-calibration arm, additional calibration,
-long training job, promotion/publication, protocol change or history rewrite
-is authorized by this handover.
+SpecialistDB audit chain, publishing the frozen read-calibration analyzer, and
+then producing authorization-free plans and preflights from a clean published
+tip. The superseded preliminary plans are already preserved in recoverable
+quarantine. No read-calibration arm, additional calibration, long training
+job, model promotion/publication, protocol change or history rewrite is
+authorized by this handover.
 
 ## Reference Material
 
