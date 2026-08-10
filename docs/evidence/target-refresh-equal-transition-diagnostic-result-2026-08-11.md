@@ -1,6 +1,6 @@
 # Target-refresh equal-transition diagnostic result
 
-Status: `complete_inconclusive_late_onset`  
+Status: `complete_inconclusive_late_onset`
 Training-readiness verdict: `needs_successor_design`
 
 This is the immutable result of the three-seed equal-transition mechanism
