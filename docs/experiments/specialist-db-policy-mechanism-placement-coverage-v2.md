@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `coverage_corpus_frozen_pending_policy_audit`
+Status: `executed_material_calibration_preparation_authorized`
 
 Audit ID: `specialist-db-policy-mechanism-placement-coverage-v2`
 
@@ -97,4 +97,11 @@ The immutable corpus and interpretation are recorded in:
 - `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-2026-08-10.json`
 - `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-result-2026-08-10.md`
 
-The final policy comparison remains unexecuted at this status boundary.
+The final policy comparison is recorded in:
+
+- `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-policy-audit-2026-08-10.json`
+- `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-policy-audit-result-2026-08-10.md`
+
+It triggered the preregistered material rule through exactly three argmax
+changes. This authorizes preparation, but not launch, of the conditional
+paired three-seed calibration.
