@@ -1,6 +1,8 @@
 # SpecialistDB training-read calibration v1
 
-Status: `designed_unlaunched_needs_publication`
+Frozen design status: `designed_unlaunched_needs_publication`. Operational
+publication and preparation state is recorded by the external readiness
+report; this immutable design label is not a live launch authorization.
 
 Machine-readable contract:
 [`specialist-db-training-read-calibration-v1.json`](specialist-db-training-read-calibration-v1.json)

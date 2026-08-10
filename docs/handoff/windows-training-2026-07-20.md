@@ -35,14 +35,16 @@ bound in the run manifest and managed trainer command.
 The next bounded mechanism experiment is frozen in
 [`specialist-db-training-read-calibration-v1.md`](../experiments/specialist-db-training-read-calibration-v1.md),
 with plan identity
-`032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772`.
+`36a1feb6bc9e403890f7c3b6b6f3444a97a9cd721272b760a2b25d0f8091459b`.
 It pairs `full` and `theoretical-only` across fresh seeds 61, 62 and 63, one
 250-game segment per arm, no more than 1,500 games or three active hours. It
 holds Sanmill work, persistence, reward, temperature, opponent mix and all
-optional networks fixed. Its source audit state is
-`implementation_complete_needs_publication`; all six arms have zero authorized
-segments, and the result analyzer must still be implemented and frozen before
-any launch authorization.
+optional networks fixed. Result-analyzer commit `39f2cf0` and handover commit
+`a5d683d` are published on `origin/dev`. A post-publication source audit at
+`a5d683d` returned `source_ready_for_local_preparation` with identity
+`da31ec0e`; all six preparation targets were absent. The owner has authorized
+only creation and review of the six immutable plans and preflights. All six
+arms still have zero authorized segments, and no trainer may be started.
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -1917,12 +1919,12 @@ the current successor in this order:
     result from the second coverage-positive material result. The three-seed
     read-mode calibration now binds result analyzer and publisher hashes under
     plan identity `36a1feb6`. Analyzer/preparation implementation commit
-    `39f2cf0` passed source audit at that commit with identity `53346b5a` and
-    state `implementation_complete_needs_publication`; the audit created no
-    plan, database, authorization or trainer output. The next safe work is an
-    ordinary publication of the new source, then a fresh source audit and
-    authorization-free generation of exactly six plans and preflights. No arm
-    is authorized.
+    `39f2cf0` and handover commit `a5d683d` are published. The post-publication
+    source audit at `a5d683d` has identity `da31ec0e` and state
+    `source_ready_for_local_preparation`; it confirmed that all six targets
+    were absent and created no plan, database, authorization or trainer
+    output. The owner has authorized authorization-free generation and review
+    of exactly six plans and preflights. No arm is authorized.
 
 The previously executed isolated smoke command was:
 
@@ -2014,12 +2016,12 @@ evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, the no-update batch-capture grant, and the retained-v3 grant are also
 consumed. Safe work now is limited to publishing the completed retained-v3 and
-SpecialistDB audit chain, publishing the frozen read-calibration analyzer, and
-then producing authorization-free plans and preflights from a clean published
-tip. The superseded preliminary plans are already preserved in recoverable
-quarantine. No read-calibration arm, additional calibration, long training
-job, model promotion/publication, protocol change or history rewrite is
-authorized by this handover.
+SpecialistDB audit chain and producing authorization-free plans and preflights
+from a clean published tip after this handover correction is published. The
+superseded preliminary plans are already preserved in recoverable quarantine.
+No read-calibration arm, additional calibration, long training job, model
+promotion/publication, protocol change or history rewrite is authorized by
+this handover.
 
 ## Reference Material
 
