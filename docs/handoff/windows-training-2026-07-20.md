@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-### Latest state: equal-transition diagnostic completed, analysis pending
+### Latest state: equal-transition result is inconclusive; redesign required
 
 The seed-58 `managed-sanmill-preserving-retained-v3-seed58` run is complete
 and frozen as evidence. It reached 5,000 games in 20 accepted segments and
@@ -100,15 +100,28 @@ updates, trusted Malom coverage and isolated sidecar-free SpecialistDB files.
 The treatment reset target age while the control retained it, so the mechanism
 separation executed as designed. This is still mechanism evidence only.
 
-The first result-publication attempt failed closed because the analyser
-compared the trainer's branch-local copied fork path with the original shared
-prefix path. Training provenance was intact: branch descriptors retained the
-shared checkpoint and payload identities. Local analysis-only commit
-`e958a3a` fixes that validation and adds focused regression tests. It must be
-published before the immutable result can be generated, because the publisher
-requires a clean published analysis commit descending from the exact training
-commit. No held-out evaluation, promotion, publication of a model, successor
-training, or long run is authorized by the completed diagnostic.
+The immutable equal-transition result has now been generated from clean,
+published analysis commit
+`0f8e9eb04e9fe046f72fbe47ed0551eeeafc22d4`. Its SHA-256 is
+`b518849fa4ca3339bf1b3e4842cf5c10f20002088e9b4f4074da3891cb2d2ca3`,
+its result identity is
+`8c6be27feb96d0e50662e299b594140c96b14ec57cf447ecf572fe07757a95dd`,
+and the predeclared classification is `inconclusive_late_onset`. Seeds 64 and
+65 first crossed a material distribution threshold only at 8,192 transitions;
+no seed had a persistent trigger from 4,096 through 8,192, and the Malom-mass
+direction reversed between seeds. The result selects neither target-refresh
+condition.
+
+The result also exposes game-count schedule coupling. Exact transition
+exposure produced different game counts; by the final boundary, refresh seeds
+64 and 66 had cooled further and reached the 5,000-node Sanmill level while
+their controls remained at 1,000 nodes. Seed 65 provides counterevidence to a
+schedule-only explanation, so this is a plausible mediator rather than a
+complete diagnosis. Every arm remained winless against its Sanmill training
+stratum. Preserve the full
+[result evidence](../evidence/target-refresh-equal-transition-diagnostic-result-2026-08-11.md).
+No held-out evaluation, promotion, model publication, successor training, or
+long run is authorized by the completed diagnostic.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2072,21 +2085,19 @@ the current successor in this order:
     normally, re-establish `dev == origin/dev`, then generate only four pristine
     database copies, immutable plans and preflights. Do not create an
     authorization or start training without a later explicit product grant.
-24. Preserve the implemented but unpublished
-    [equal-transition successor](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md),
-    using the full plan identity in its machine-readable contract. Commits
-    `bd3e5ce` through `dc83439` add exact
-    64-transition consumption, a complete game-50 pre-refresh fork, one-time
-    refresh/no-refresh treatments, fixed 1,024/2,048/4,096/8,192-transition
-    checkpoints, a three-seed decision rule, a result publisher, managed
-    external first-segment resume, byte-preserving descriptor rebinding and
-    staged preparation. The source audit requires ordinary publication before
-    it may create three prefix plans and preflights. Each same-seed pair stays
-    deferred until its real fork checkpoint and closed SpecialistDB have been
-    audited; the arm preparer then creates two independent database clones,
-    two payload-identical branch checkpoints and authorization-free plans.
-    There is no launch, held-out, retry, extension, promotion, publication or
-    long-training authority.
+24. Preserve the completed
+    [equal-transition diagnostic](../experiments/sanmill-target-refresh-equal-transition-diagnostic-v1.md),
+    its three shared prefixes, six arm lineages, consumed authorizations,
+    ignored raw result, and
+    [tracked result evidence](../evidence/target-refresh-equal-transition-diagnostic-result-2026-08-11.md).
+    Every arm consumed exactly 8,192 post-fork transitions. Result identity
+    `8c6be27f` has classification `inconclusive_late_onset`: seeds 64 and 65
+    first crossed a material threshold only at the final boundary, with no
+    persistent trigger and opposite Malom-mass directions. Do not select a
+    target policy, retry, extend, run held-out evaluation, promote, publish or
+    start long training. The next design must isolate the game-count-indexed
+    temperature and Sanmill resource schedules before another target-refresh
+    setting can be considered.
 
 The previously executed isolated smoke command was:
 
@@ -2180,13 +2191,13 @@ six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
 grant, the no-update batch-capture grant, the retained-v3 grant, all six
 SpecialistDB read-calibration grants, all eight target-refresh/LR grants and
 all attempt-003 grants are also consumed. The equal-transition sequence has
-now completed all three prefixes and all six paired arms once. Its delegated
-leaf authorizations are consumed and do not permit a rerun. Publish the
-analysis-only correction, generate and audit the immutable three-seed result,
-then use that evidence to decide the next long-training design. No held-out
-match, additional calibration, long training, model promotion/publication,
-protocol change, resource expansion, or history rewrite is authorized by that
-sequence.
+completed all three prefixes and all six paired arms once. Its immutable
+result is `inconclusive_late_onset`, and its delegated leaf authorizations are
+consumed. A schedule-isolation successor is recommended but is not yet a
+frozen or authorized experiment. No held-out match, additional calibration,
+long training, model promotion/publication, protocol change, resource
+expansion, or history rewrite is authorized by that sequence. Ordinary
+Git operations are governed separately from that sequence.
 
 ## Reference Material
 

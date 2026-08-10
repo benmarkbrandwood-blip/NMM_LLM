@@ -1,16 +1,48 @@
 # Sanmill target-refresh equal-transition diagnostic v1
 
-Status: `implementation_complete_needs_publication_no_launch_authority`
+Status: `completed_inconclusive_late_onset_authorizations_consumed`
 
-This successor is required only because the read-only common-anchor action
+## Completion and result
+
+The frozen sequence completed exactly once from published training commit
+`33a98696994cddf8be0b1ab516a879f52483ef02`. Three shared prefixes and all six
+paired arms completed without retry. Every arm consumed exactly 8,192
+post-fork transitions in 128 batches of 64.
+
+The immutable result was generated from published analysis commit
+`0f8e9eb04e9fe046f72fbe47ed0551eeeafc22d4`. Its SHA-256 is
+`b518849fa4ca3339bf1b3e4842cf5c10f20002088e9b4f4074da3891cb2d2ca3`,
+its result identity is
+`8c6be27feb96d0e50662e299b594140c96b14ec57cf447ecf572fe07757a95dd`,
+and its predeclared classification is `inconclusive_late_onset`.
+
+Seeds 64 and 65 first crossed a material distribution threshold only at the
+final 8,192-transition boundary. No seed had a persistent material trigger
+from 4,096 through 8,192. The direction of Malom-preserving mass also reversed
+between those two seeds. Neither treatment is selected.
+
+The complete evidence, including phase, opponent, colour, termination,
+training-loss, schedule-coupling, data-version, and counterevidence analysis,
+is in the
+[result record](../evidence/target-refresh-equal-transition-diagnostic-result-2026-08-11.md).
+All prefix and arm authorizations are consumed. There is no retry, extension,
+held-out, promotion, publication, or long-training authority.
+
+The machine-readable contract remains the immutable pre-run record. Its
+original publisher identity is not rewritten after execution. Analysis-only
+commits `e958a3a` and `0f8e9eb` correct fail-closed lineage validation without
+changing the result thresholds, training state, or gameplay.
+
+This successor was required because the read-only common-anchor action
 analysis classified the refresh and no-refresh policies as `near_identical`.
-Its exact-transition implementation, external fork-resume support,
-payload-preserving branch publication, deferred arm preparation, focused
-tests and immutable machine-readable contract are complete locally. It must
-not create plans or launch until that exact source is published. Fresh
-database lineage, managed plans and preflights remain separate later gates.
+Before execution, its exact-transition implementation, external fork-resume
+support, payload-preserving branch publication, deferred arm preparation,
+focused tests, and immutable machine-readable contract were completed. The
+separate publication, fresh database, managed-plan, preflight, and product
+authorization gates were subsequently satisfied without changing this frozen
+design.
 
-## Implementation and current gate
+## Frozen implementation and pre-launch history
 
 Commits `bd3e5ce`, `8adefba`, `4ca4f03`, `3cf4a19`, `beba5d0`,
 `0429cbd`, `c9fc4fc`, `c88b0f2` and `dc83439` implement exact transition
@@ -21,15 +53,13 @@ machine-readable contract is
 [`sanmill-target-refresh-equal-transition-diagnostic-v1.json`](sanmill-target-refresh-equal-transition-diagnostic-v1.json),
 with the full plan identity recorded in that file.
 
-The source-only audit passes with all future targets absent, but reports
-`implementation_complete_needs_publication`. It deliberately permits only
-three game-50 shared-prefix plans after publication. The arm preparer exists,
-but each pair remains impossible to prepare honestly until its real fork
-checkpoint and closed prefix SpecialistDB exist. It then copies the closed
-database to two independent paths and publishes two envelope headers over the
-exact same source payload bytes. No placeholder checkpoint or database may be
-substituted. No plan, database copy, preflight, authorization or training
-output has been created.
+The historical source-only audit passed with all future targets absent and
+reported `implementation_complete_needs_publication`. It permitted only three
+game-50 shared-prefix plans after publication. Each pair was prepared only
+after its real fork checkpoint and closed prefix SpecialistDB existed. The arm
+preparer copied that database to two independent paths and published two
+envelope headers over the exact same source payload bytes. No placeholder
+checkpoint or database was substituted.
 
 ## Question
 
