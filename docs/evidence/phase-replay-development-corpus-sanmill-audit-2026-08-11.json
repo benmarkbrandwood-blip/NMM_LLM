@@ -1,0 +1,196 @@
+{
+  "audit_identity": "9d4c54270c6e66dd9e16b4dae5af9291b1fea6d1385856650e71119dc4c0dbbf",
+  "claim_boundary": "strict history replay and nonterminal-state evidence only; no candidate, search, training, strength, or promotion claim",
+  "corpus_id": "dev-v4-phase-replay-development-corpus-v1",
+  "corpus_identity": "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4",
+  "fresh_process_count": 24,
+  "records": [
+    {
+      "action_token_count": 5,
+      "fen": "......WB.....B..W.....W.|B|3|2",
+      "history_sha256": "2c85705f4128e971b3ad2c8d44560a4f30c269c94cc53c15553f6daa0d1e526c",
+      "logical_ply_count": 5,
+      "record_identity": "d6808084aed11aab5837076de65bb2e23e727eaa53320091d0fd263d307c954d",
+      "record_index": 1,
+      "terminal": false
+    },
+    {
+      "action_token_count": 4,
+      "fen": ".......WBW..........B...|W|2|2",
+      "history_sha256": "a1eda250874103b4f551dde2272627ad2ee81b2d9bf5d851f968b899722c655c",
+      "logical_ply_count": 4,
+      "record_identity": "df1c16331604d5fa9391907a04bf1d702b4dc1d33e325fab2605f8a0844fd664",
+      "record_index": 2,
+      "terminal": false
+    },
+    {
+      "action_token_count": 3,
+      "fen": "..B.................W.W.|B|2|1",
+      "history_sha256": "fe68cbeb34dd86a2178aaf56c98e609f7c8bfbe4716270a0aae91b8422033389",
+      "logical_ply_count": 3,
+      "record_identity": "70cd52ff653bd0c64c17543aa4b87953faf9b546cf8abf255fde395da846fd06",
+      "record_index": 3,
+      "terminal": false
+    },
+    {
+      "action_token_count": 9,
+      "fen": "W......BW....WBB.......B|W|4|4",
+      "history_sha256": "30f4273d81e344df110e3834fa88167aea4f56b8394ff1546ffb63492dc0a8f9",
+      "logical_ply_count": 8,
+      "record_identity": "fe37f8f98ed7a61f3ba8226e3f969e71e3a8a10cd63c2de8773ae4d46b16f279",
+      "record_index": 4,
+      "terminal": false
+    },
+    {
+      "action_token_count": 45,
+      "fen": "BBWBB.W.BB..WBBW.WBW....|W|9|9",
+      "history_sha256": "a5d8e07ece5848224a9a581260ff820bcf20f04d7748fcd7210c8b208baf1f68",
+      "logical_ply_count": 42,
+      "record_identity": "6c8f008cd834102987ac8f0425a2418d479d7a27a156eb985522a60734270119",
+      "record_index": 5,
+      "terminal": false
+    },
+    {
+      "action_token_count": 19,
+      "fen": "WBWWWWB.B.BBW.W..BWB..WB|W|9|9",
+      "history_sha256": "976db69f454891e37de33da56e610a85a3b544ded01ee5384574b774eccecf48",
+      "logical_ply_count": 18,
+      "record_identity": "a977d59081e1703867a14639d825a7a33e84c2a0943d9eac8354101ce4e01285",
+      "record_index": 6,
+      "terminal": false
+    },
+    {
+      "action_token_count": 22,
+      "fen": "B..W.BWWWB.BWBW.BWBBWB..|B|9|9",
+      "history_sha256": "8bb8b491ca898352846a9638cc075055f78ac51f11951f3349db8f58f338b459",
+      "logical_ply_count": 21,
+      "record_identity": "2ab68f221988a92cd27fbb97fd4dcd51e21a84740b213d4d7c752e423dbfaaf0",
+      "record_index": 7,
+      "terminal": false
+    },
+    {
+      "action_token_count": 50,
+      "fen": "..W...B.BWWW..WBWBB.BBB.|W|9|9",
+      "history_sha256": "e1e761de17aeb31ae1fdc8b3dae69858dd2c752a2aa1a0ae92a60de6db6b37f2",
+      "logical_ply_count": 46,
+      "record_identity": "ee29a77cefc81e591139a4b6830a62fa3486004fedb388b0d917735cf9411b05",
+      "record_index": 8,
+      "terminal": false
+    },
+    {
+      "action_token_count": 121,
+      "fen": ".BW.BWB...BBB.BW.......B|W|9|9",
+      "history_sha256": "10047bf460b776997ddc2e170d1e7fe7a7e6a5865b419c720070c0df84c428bb",
+      "logical_ply_count": 114,
+      "record_identity": "fafd6269ae424b1f85bfb4c03d64c94ecfbfdbc85cb071d35c74a1a82a175952",
+      "record_index": 9,
+      "terminal": false
+    },
+    {
+      "action_token_count": 74,
+      "fen": ".WBB.B.......B.W..BWBBBB|W|9|9",
+      "history_sha256": "05f46313f6cea58b46565c4403752119aa678d2e55bb939e6920b6aa8e33571a",
+      "logical_ply_count": 68,
+      "record_identity": "ef45feff2e64aaa33b65da28ba107cc2caac4b4e8bb3709e5d4fb1873c320842",
+      "record_index": 10,
+      "terminal": false
+    },
+    {
+      "action_token_count": 156,
+      "fen": ".WB...B.BW..W.....B..B..|W|9|9",
+      "history_sha256": "312cfa9efe4090291563375e3d4fdfec6dbc85558bbff4df83074e8810fdcfe4",
+      "logical_ply_count": 146,
+      "record_identity": "df10e0d54332f3289fc716fb41af9ee23b4ca0392949fb57f0b4b0ca04c22e74",
+      "record_index": 11,
+      "terminal": false
+    },
+    {
+      "action_token_count": 171,
+      "fen": ".......B..WB.W...BB.W...|W|9|9",
+      "history_sha256": "c31f49221140d06289a4ccd64c3f7b554e4221bed54b9a90ab757c0ef898f983",
+      "logical_ply_count": 160,
+      "record_identity": "cb07f5394eb1212711ff745d54926e01bafbb4e33b75da02eae5be721436ca5b",
+      "record_index": 12,
+      "terminal": false
+    }
+  ],
+  "repeat_passes": 2,
+  "repeat_passes_byte_equal": true,
+  "sanmill_training_runtime": {
+    "binary_relative_path": "target/release/tgf.exe",
+    "binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "binary_size": 5641216,
+    "build_command": "cargo build --release -p tgf-cli",
+    "checkout_head": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "checkout_policy": "exact pinned commit with a clean worktree",
+    "commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "contract_id": "nmm.sanmill-training-runtime.v1",
+    "identity": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+    "license": {
+      "relative_path": "Copying.txt",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+      "spdx": "AGPL-3.0-or-later"
+    },
+    "path_lookup_key": "sanmill_training_checkout",
+    "search": {
+      "command": "go logical nodes N [depth D]",
+      "fixed_work": true,
+      "random_failure_fallback": false
+    },
+    "strict_failure_protocol_version": 1,
+    "strict_options": {
+      "AiIsLazy": "false",
+      "Algorithm": "2",
+      "BoardFullAction": "0",
+      "ConsiderMobility": "true",
+      "CustodianCaptureEnabled": "false",
+      "DepthExtension": "true",
+      "DeveloperMode": "false",
+      "DrawOnHumanExperience": "true",
+      "EndgameNMoveRule": "100",
+      "FocusOnBlockingPaths": "false",
+      "HasDiagonalLines": "false",
+      "Hash": "16",
+      "IDSEnabled": "true",
+      "InterventionCaptureEnabled": "false",
+      "IsDefenderMoveFirst": "false",
+      "LeapCaptureEnabled": "false",
+      "MaxQuiescenceDepth": "0",
+      "MayFly": "true",
+      "MayMoveInPlacingPhase": "false",
+      "MayRemoveFromMillsAlways": "false",
+      "MayRemoveMultiple": "false",
+      "MillFormationActionInPlacingPhase": "0",
+      "MoveTimeMs": "0",
+      "MultiPV": "1",
+      "NMoveRule": "100",
+      "OneTimeUseMill": "false",
+      "PatchAvoidTraps": "false",
+      "PatchMakeTraps": "false",
+      "PiecesAtLeastCount": "3",
+      "PiecesCount": "9",
+      "Ponder": "false",
+      "RestrictRepeatedMillsFormation": "false",
+      "SearchShuffleSeed": "42",
+      "Shuffling": "false",
+      "SkillLevel": "30",
+      "StalemateAction": "0",
+      "StopPlacingWhenTwoEmptySquares": "false",
+      "StrictFailurePolicy": "true",
+      "Threads": "1",
+      "ThreefoldRepetitionRule": "true",
+      "UseLazySmp": "false",
+      "UsePerfectDatabase": "false",
+      "flyPieceCount": "3"
+    },
+    "strict_referee": {
+      "format": "SANMILL-STRICT-REFEREE-RULES/1",
+      "originCounted": true,
+      "profile": "mif-stable-moving-v1",
+      "repetitionObservation": "stable-moving-v1",
+      "semanticDigest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94"
+    },
+    "tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.phase-replay-sanmill-audit.v1"
+}

@@ -1,0 +1,3063 @@
+{
+  "claim_boundaries": [
+    "candidate-blind-source-selection",
+    "development-corpus-not-held-out",
+    "not-strength-or-promotion-evidence",
+    "not-training-input"
+  ],
+  "corpus_id": "dev-v4-phase-replay-development-corpus-v1",
+  "corpus_identity": "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4",
+  "measurement_contract": {
+    "candidate_colors_per_start": [
+      "W",
+      "B"
+    ],
+    "checkpoint_transition_boundaries": [
+      4096,
+      8192
+    ],
+    "games_per_checkpoint": 24,
+    "optimizer_updates": 0,
+    "purpose": "development-only common-anchor outcome measurement",
+    "start_count": 12,
+    "training_games": 0,
+    "writes_training_data": false
+  },
+  "records": [
+    {
+      "action_history": [
+        "c5",
+        "d2",
+        "c3",
+        "a4",
+        "a1"
+      ],
+      "action_token_count": 5,
+      "fen": "......WB.....B..W.....W.|B|3|2",
+      "logical_ply_count": 5,
+      "logical_turns": [
+        [
+          "c5"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "c3"
+        ],
+        [
+          "a4"
+        ],
+        [
+          "a1"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "placement",
+      "record_identity": "d6808084aed11aab5837076de65bb2e23e727eaa53320091d0fd263d307c954d",
+      "record_index": 1,
+      "ring16_canonical_fen": "......WB.....B..W.....W.|B|3|2",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 19,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 2,
+        "picked_uci": "d6",
+        "ply": 5,
+        "side_to_move": 2,
+        "source_identity": "ce41d0aefa7cb1cbc25668c411914abd198c360f4aa19f04875a26177dd9293f",
+        "step_index": 6,
+        "tgf_fen": "*****O*O/****@***/*****O@* b p p 3 6 2 7 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 3,
+        "trajectory_seed": 11936128518282650883
+      },
+      "source_entry_index": 1,
+      "turn": "B"
+    },
+    {
+      "action_history": [
+        "d6",
+        "e3",
+        "a4",
+        "b6"
+      ],
+      "action_token_count": 4,
+      "fen": ".......WBW..........B...|W|2|2",
+      "logical_ply_count": 4,
+      "logical_turns": [
+        [
+          "d6"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "a4"
+        ],
+        [
+          "b6"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "record_identity": "df1c16331604d5fa9391907a04bf1d702b4dc1d33e325fab2605f8a0844fd664",
+      "record_index": 2,
+      "ring16_canonical_fen": ".......W.....WB...B.....|W|2|2",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 20,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 2,
+        "picked_uci": "f2",
+        "ply": 4,
+        "side_to_move": 1,
+        "source_identity": "6bb6c131657773be2b65c6c8725fcee2333740eba75827dc7465ae5714f265bb",
+        "step_index": 5,
+        "tgf_fen": "***@****/O******@/******O* w p p 2 7 2 7 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 8,
+        "trajectory_seed": 11936128518282650888
+      },
+      "source_entry_index": 10,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "c3",
+        "g7",
+        "e3"
+      ],
+      "action_token_count": 3,
+      "fen": "..B.................W.W.|B|2|1",
+      "logical_ply_count": 3,
+      "logical_turns": [
+        [
+          "c3"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "e3"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "placement",
+      "record_identity": "70cd52ff653bd0c64c17543aa4b87953faf9b546cf8abf255fde395da846fd06",
+      "record_index": 3,
+      "ring16_canonical_fen": "......B...........W.W...|B|2|1",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 21,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 2,
+        "picked_uci": "a4",
+        "ply": 3,
+        "side_to_move": 2,
+        "source_identity": "1e4d57a0b392a939fb8100a4443caad41ed1b5b62b7e6cfda7314e17bcb816e7",
+        "step_index": 4,
+        "tgf_fen": "***O*O**/********/*@****** b p p 2 7 1 8 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 4,
+        "trajectory_seed": 11936128518282650884
+      },
+      "source_entry_index": 17,
+      "turn": "B"
+    },
+    {
+      "action_history": [
+        "a7",
+        "b4",
+        "d1",
+        "c4",
+        "b6",
+        "a4",
+        "xd1",
+        "d2",
+        "b2"
+      ],
+      "action_token_count": 9,
+      "fen": "W......BW....WBB.......B|W|4|4",
+      "logical_ply_count": 8,
+      "logical_turns": [
+        [
+          "a7"
+        ],
+        [
+          "b4"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "a4",
+          "xd1"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "b2"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "placement",
+      "record_identity": "fe37f8f98ed7a61f3ba8226e3f969e71e3a8a10cd63c2de8773ae4d46b16f279",
+      "record_index": 4,
+      "ring16_canonical_fen": ".......BBW....WB......WB|W|4|4",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 17,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 2,
+        "picked_uci": "a1",
+        "ply": 9,
+        "side_to_move": 1,
+        "source_identity": "85036af975a01021360e5c6fffcd870d26dda0e80617a4505b2d878bb7a71e5e",
+        "step_index": 10,
+        "tgf_fen": "******@*/****O@@O/******@O w p p 3 5 4 5 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 1,
+        "trajectory_seed": 11936128518282650881
+      },
+      "source_entry_index": 19,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "c5",
+        "d2",
+        "c3",
+        "a4",
+        "a1",
+        "d6",
+        "g7",
+        "g1",
+        "a7",
+        "d7",
+        "f2",
+        "b6",
+        "f4",
+        "e4",
+        "e3",
+        "g4",
+        "d1",
+        "d3",
+        "c3-c4",
+        "d6-f6",
+        "c4-b4",
+        "d2-b2",
+        "c5-c4",
+        "e4-e5",
+        "c4-c3",
+        "d3-d2",
+        "c3-c4",
+        "e5-d5",
+        "c4-c5",
+        "d7-d6",
+        "xg7",
+        "f4-e4",
+        "f6-f4",
+        "a7-d7",
+        "f4-f6",
+        "xd1",
+        "d7-g7",
+        "d6-d7",
+        "e4-f4",
+        "f6-d6",
+        "xe3",
+        "f4-e4",
+        "d5-e5",
+        "c5-d5",
+        "a4-a7"
+      ],
+      "action_token_count": 45,
+      "fen": "BBWBB.W.BB..WBBW.WBW....|W|9|9",
+      "logical_ply_count": 42,
+      "logical_turns": [
+        [
+          "c5"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "c3"
+        ],
+        [
+          "a4"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "d6"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "g1"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "d3"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "d6-f6"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "d2-b2"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "c4-c3"
+        ],
+        [
+          "d3-d2"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "e5-d5"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "d7-d6",
+          "xg7"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "f6-f4"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "f4-f6",
+          "xd1"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "d6-d7"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "f6-d6",
+          "xe3"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "a4-a7"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "record_identity": "6c8f008cd834102987ac8f0425a2418d479d7a27a156eb985522a60734270119",
+      "record_index": 5,
+      "ring16_canonical_fen": ".....WBWBWBBW..BB.W.BBWB|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 8,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "e4-f4",
+        "ply": 45,
+        "side_to_move": 1,
+        "source_identity": "cc059b8ade8a06990b53a357e95e12e74bf6780e4f3d1cd80c22136202eb2413",
+        "step_index": 46,
+        "tgf_fen": "O@O*****/@**O@@O@/@O@@*O*@ w m s 6 0 9 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 3,
+        "trajectory_seed": 11936128518282650883
+      },
+      "source_entry_index": 23,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "d1",
+        "e4",
+        "g4",
+        "a1",
+        "e5",
+        "c4",
+        "c3",
+        "d5",
+        "g7",
+        "b6",
+        "g1",
+        "xb6",
+        "f4",
+        "a7",
+        "f6",
+        "f2",
+        "d7",
+        "b2",
+        "b6"
+      ],
+      "action_token_count": 19,
+      "fen": "WBWWWWB.B.BBW.W..BWB..WB|W|9|9",
+      "logical_ply_count": 18,
+      "logical_turns": [
+        [
+          "d1"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "e5"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "c3"
+        ],
+        [
+          "d5"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "g1",
+          "xb6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "b2"
+        ],
+        [
+          "b6"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "movement",
+      "record_identity": "a977d59081e1703867a14639d825a7a33e84c2a0943d9eac8354101ce4e01285",
+      "record_index": 6,
+      "ring16_canonical_fen": "..WB.BWBW.W.B.BBWWB.WBWW|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 6,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "b2-b4",
+        "ply": 19,
+        "side_to_move": 1,
+        "source_identity": "76001ea6667d844976796e987e6384cc8cd61336b16e2fd6acabb5970bf33fe0",
+        "step_index": 20,
+        "tgf_fen": "@O@**O@*/*@@O*O*@/@OOOO@*O w m s 9 0 8 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 7,
+        "trajectory_seed": 11936128518282650887
+      },
+      "source_entry_index": 36,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "b2",
+        "d2",
+        "e3",
+        "d3",
+        "d5",
+        "f6",
+        "g7",
+        "c5",
+        "a1",
+        "e5",
+        "g1",
+        "e4",
+        "b4",
+        "d1",
+        "xg1",
+        "f2",
+        "a7",
+        "a4",
+        "f4",
+        "b4-b6",
+        "f6-d6",
+        "g7-g4"
+      ],
+      "action_token_count": 22,
+      "fen": "B..W.BWWWB.BWBW.BWBBWB..|B|9|9",
+      "logical_ply_count": 21,
+      "logical_turns": [
+        [
+          "b2"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "d3"
+        ],
+        [
+          "d5"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "c5"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "e5"
+        ],
+        [
+          "g1"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "b4"
+        ],
+        [
+          "d1",
+          "xg1"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "a4"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "g7-g4"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "movement",
+      "record_identity": "2ab68f221988a92cd27fbb97fd4dcd51e21a84740b213d4d7c752e423dbfaaf0",
+      "record_index": 7,
+      "ring16_canonical_fen": "..BWBBWBW.WB.BWBWWB..W.B|B|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 7,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "c5-c4",
+        "ply": 22,
+        "side_to_move": 2,
+        "source_identity": "8080acf6cc696c9a27a84bddb58d497001ea48900a22629bee6b80b87810aee7",
+        "step_index": 23,
+        "tgf_fen": "O@@O@**@/@*@O@O*O/**O*@OO@ b m s 8 0 9 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 5,
+        "trajectory_seed": 11936128518282650885
+      },
+      "source_entry_index": 39,
+      "turn": "B"
+    },
+    {
+      "action_history": [
+        "d5",
+        "b6",
+        "g1",
+        "a7",
+        "b2",
+        "a1",
+        "d6",
+        "b4",
+        "d7",
+        "xb6",
+        "d3",
+        "b6",
+        "f4",
+        "f2",
+        "e3",
+        "g4",
+        "e4",
+        "d1",
+        "c4",
+        "d5-c5",
+        "e4-e5",
+        "d6-f6",
+        "e5-d5",
+        "g4-g7",
+        "a1-a4",
+        "xd7",
+        "b6-d6",
+        "b4-b6",
+        "d1-a1",
+        "d3-c3",
+        "g7-d7",
+        "e3-e4",
+        "b2-b4",
+        "e4-e5",
+        "b4-b2",
+        "f4-e4",
+        "g1-g4",
+        "a4-b4",
+        "f2-d2",
+        "c3-d3",
+        "g4-f4",
+        "a7-a4",
+        "xd2",
+        "a1-d1",
+        "c4-c3",
+        "d1-g1",
+        "a4-a1",
+        "d7-g7",
+        "e4-e3",
+        "xg1"
+      ],
+      "action_token_count": 50,
+      "fen": "..W...B.BWWW..WBWBB.BBB.|W|9|9",
+      "logical_ply_count": 46,
+      "logical_turns": [
+        [
+          "d5"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "g1"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "b2"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "d6"
+        ],
+        [
+          "b4"
+        ],
+        [
+          "d7",
+          "xb6"
+        ],
+        [
+          "d3"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "d6-f6"
+        ],
+        [
+          "e5-d5"
+        ],
+        [
+          "g4-g7"
+        ],
+        [
+          "a1-a4",
+          "xd7"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "g1-g4"
+        ],
+        [
+          "a4-b4"
+        ],
+        [
+          "f2-d2"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "g4-f4"
+        ],
+        [
+          "a7-a4",
+          "xd2"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "c4-c3"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "e4-e3",
+          "xg1"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "movement",
+      "record_identity": "ee29a77cefc81e591139a4b6830a62fa3486004fedb388b0d917735cf9411b05",
+      "record_index": 8,
+      "ring16_canonical_fen": "..B...W...WBBWWWBBB.WBB.|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 8,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "f4-g4",
+        "ply": 50,
+        "side_to_move": 1,
+        "source_identity": "348d2ed4922654f6da3d945ef89ecd9ffa87e9c5f945b361043b7746bc26474e",
+        "step_index": 51,
+        "tgf_fen": "@@*@@@*O/OOO**O@@/*O***@** w m s 6 0 8 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 6,
+        "trajectory_seed": 11936128518282650886
+      },
+      "source_entry_index": 41,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "c3",
+        "g7",
+        "e3",
+        "a4",
+        "a7",
+        "d6",
+        "c4",
+        "e5",
+        "d5",
+        "b4",
+        "e4",
+        "d2",
+        "b6",
+        "d1",
+        "d7",
+        "f6",
+        "f4",
+        "f2",
+        "c3-d3",
+        "d1-g1",
+        "d5-c5",
+        "g1-d1",
+        "c4-c3",
+        "xa4",
+        "b4-b2",
+        "xa7",
+        "c5-d5",
+        "d1-g1",
+        "f4-g4",
+        "b2-b4",
+        "e4-f4",
+        "d2-d1",
+        "f4-e4",
+        "f6-f4",
+        "d7-a7",
+        "b4-b2",
+        "c3-c4",
+        "f4-f6",
+        "d3-d2",
+        "f6-f4",
+        "a7-d7",
+        "d6-f6",
+        "xb6",
+        "d7-a7",
+        "b2-b4",
+        "c4-c5",
+        "f6-d6",
+        "c5-c4",
+        "d6-f6",
+        "xe4",
+        "d2-d3",
+        "b4-b6",
+        "c4-b4",
+        "b6-d6",
+        "d3-d2",
+        "d6-b6",
+        "d5-d6",
+        "e5-d5",
+        "b4-b2",
+        "g7-d7",
+        "g4-g7",
+        "f4-g4",
+        "d2-d3",
+        "g4-f4",
+        "xa7",
+        "d3-d2",
+        "g1-g4",
+        "d2-d3",
+        "d1-g1",
+        "b2-b4",
+        "g1-d1",
+        "d3-c3",
+        "d1-d2",
+        "b4-c4",
+        "d2-b2",
+        "e3-e4",
+        "d5-c5",
+        "c3-d3",
+        "g4-g1",
+        "g7-g4",
+        "b2-d2",
+        "d3-c3",
+        "g1-d1",
+        "c4-b4",
+        "d1-a1",
+        "g4-g1",
+        "f4-g4",
+        "g1-d1",
+        "g4-f4",
+        "xd1",
+        "c3-d3",
+        "d2-b2",
+        "b4-a4",
+        "b6-b4",
+        "d3-c3",
+        "b4-b6",
+        "e4-e3",
+        "b6-b4",
+        "d6-d5",
+        "a1-d1",
+        "c3-c4",
+        "f2-d2",
+        "a4-a1",
+        "b4-a4",
+        "e3-d3",
+        "d7-g7",
+        "c4-c3",
+        "g7-d7",
+        "d5-d6",
+        "d2-f2",
+        "xc3",
+        "a1-b6",
+        "d1-g1",
+        "d3-b4",
+        "a4-a1",
+        "b6-g7",
+        "c5-c4",
+        "d6-e5",
+        "b2-d2",
+        "e5-d1",
+        "d2-b2"
+      ],
+      "action_token_count": 121,
+      "fen": ".BW.BWB...BBB.BW.......B|W|9|9",
+      "logical_ply_count": 114,
+      "logical_turns": [
+        [
+          "c3"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "a4"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "d6"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "e5"
+        ],
+        [
+          "d5"
+        ],
+        [
+          "b4"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "c4-c3",
+          "xa4"
+        ],
+        [
+          "b4-b2",
+          "xa7"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "f4-g4"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "d2-d1"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "f6-f4"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "f4-f6"
+        ],
+        [
+          "d3-d2"
+        ],
+        [
+          "f6-f4"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "d6-f6",
+          "xb6"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "d6-f6",
+          "xe4"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "d3-d2"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "d5-d6"
+        ],
+        [
+          "e5-d5"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "g4-g7"
+        ],
+        [
+          "f4-g4"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "g4-f4",
+          "xa7"
+        ],
+        [
+          "d3-d2"
+        ],
+        [
+          "g1-g4"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "b4-c4"
+        ],
+        [
+          "d2-b2"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "g7-g4"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "f4-g4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "g4-f4",
+          "xd1"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d2-b2"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "b6-b4"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "b6-b4"
+        ],
+        [
+          "d6-d5"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "f2-d2"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "e3-d3"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "c4-c3"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "d5-d6"
+        ],
+        [
+          "d2-f2",
+          "xc3"
+        ],
+        [
+          "a1-b6"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "d3-b4"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "b6-g7"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "d6-e5"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "e5-d1"
+        ],
+        [
+          "d2-b2"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "record_identity": "fafd6269ae424b1f85bfb4c03d64c94ecfbfdbc85cb071d35c74a1a82a175952",
+      "record_index": 9,
+      "ring16_canonical_fen": ".......B..BBB.BW.BW.BWB.|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 39,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "b4-a7",
+        "ply": 121,
+        "side_to_move": 1,
+        "source_identity": "e81bcf45c40f2dffa4900f7884ff244163ac7e1d573e2da7b53af04a8896ae4e",
+        "step_index": 122,
+        "tgf_fen": "******@*/*@@@*@O*/@O*@O@** w m s 3 0 8 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 4,
+        "trajectory_seed": 11936128518282650884
+      },
+      "source_entry_index": 45,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "a7",
+        "b4",
+        "d1",
+        "c4",
+        "b6",
+        "a4",
+        "xd1",
+        "d2",
+        "b2",
+        "a1",
+        "f4",
+        "e4",
+        "e3",
+        "d3",
+        "d1",
+        "d7",
+        "f6",
+        "g4",
+        "g7",
+        "d3-c3",
+        "f6-d6",
+        "e4-e5",
+        "d6-f6",
+        "c3-d3",
+        "f4-f2",
+        "b6-d6",
+        "c4-c3",
+        "d6-d5",
+        "f2-f4",
+        "d2-f2",
+        "d1-g1",
+        "a1-d1",
+        "a4-a1",
+        "d5-d6",
+        "b4-c4",
+        "d1-d2",
+        "a1-d1",
+        "a7-a4",
+        "c4-c5",
+        "d7-a7",
+        "d1-a1",
+        "d2-d1",
+        "b2-b4",
+        "e5-d5",
+        "b4-c4",
+        "xd3",
+        "d5-e5",
+        "c5-d5",
+        "d1-d2",
+        "f4-e4",
+        "a7-d7",
+        "f6-f4",
+        "d6-b6",
+        "d5-c5",
+        "xg4",
+        "d2-d1",
+        "f4-g4",
+        "xd1",
+        "f2-d2",
+        "e3-d3",
+        "b6-d6",
+        "e4-e3",
+        "xd2",
+        "a4-a7",
+        "a1-d1",
+        "e5-e4",
+        "c5-d5",
+        "d6-b6",
+        "d1-d2",
+        "b6-b4",
+        "g1-d1",
+        "xd7",
+        "a7-d7",
+        "d5-e5"
+      ],
+      "action_token_count": 74,
+      "fen": ".WBB.B.......B.W..BWBBBB|W|9|9",
+      "logical_ply_count": 68,
+      "logical_turns": [
+        [
+          "a7"
+        ],
+        [
+          "b4"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "a4",
+          "xd1"
+        ],
+        [
+          "d2"
+        ],
+        [
+          "b2"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "e3"
+        ],
+        [
+          "d3"
+        ],
+        [
+          "d1"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "d6-f6"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "f4-f2"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "c4-c3"
+        ],
+        [
+          "d6-d5"
+        ],
+        [
+          "f2-f4"
+        ],
+        [
+          "d2-f2"
+        ],
+        [
+          "d1-g1"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "d5-d6"
+        ],
+        [
+          "b4-c4"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "a7-a4"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "d2-d1"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "e5-d5"
+        ],
+        [
+          "b4-c4",
+          "xd3"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "f6-f4"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "d5-c5",
+          "xg4"
+        ],
+        [
+          "d2-d1"
+        ],
+        [
+          "f4-g4",
+          "xd1"
+        ],
+        [
+          "f2-d2"
+        ],
+        [
+          "e3-d3"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "e4-e3",
+          "xd2"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "b6-b4"
+        ],
+        [
+          "g1-d1",
+          "xd7"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "d5-e5"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "L",
+      "phase": "flying",
+      "record_identity": "ef45feff2e64aaa33b65da28ba107cc2caac4b4e8bb3709e5d4fb1873c320842",
+      "record_index": 10,
+      "ring16_canonical_fen": "...B.BBW.W.B.....BBBBWB.|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 36,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "e4-g1",
+        "ply": 74,
+        "side_to_move": 1,
+        "source_identity": "d1c5c84dab19dd12affc2a50a903c4c28225317e90dd76cba6963779d2e95c8b",
+        "step_index": 75,
+        "tgf_fen": "*@O@@@@*/****@*O*/O@@*@*** w m s 3 0 9 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 1,
+        "trajectory_seed": 11936128518282650881
+      },
+      "source_entry_index": 48,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "d1",
+        "e4",
+        "g4",
+        "a1",
+        "e5",
+        "c4",
+        "c3",
+        "d5",
+        "g7",
+        "b6",
+        "g1",
+        "xb6",
+        "f4",
+        "a7",
+        "f6",
+        "f2",
+        "d7",
+        "b2",
+        "b6",
+        "b2-b4",
+        "b6-d6",
+        "xd1",
+        "c3-d3",
+        "d6-b6",
+        "d3-c3",
+        "f6-d6",
+        "xa7",
+        "g1-d1",
+        "d5-c5",
+        "b4-b2",
+        "a1-a4",
+        "d1-g1",
+        "xb6",
+        "a4-a7",
+        "b2-d2",
+        "a7-a4",
+        "g1-d1",
+        "a4-b4",
+        "d1-a1",
+        "b4-a4",
+        "c3-d3",
+        "d6-b6",
+        "a1-d1",
+        "xe4",
+        "a4-a7",
+        "e5-e4",
+        "c4-b4",
+        "e4-e3",
+        "f4-f6",
+        "d2-b2",
+        "d7-d6",
+        "xd3",
+        "f2-f4",
+        "a7-d7",
+        "d1-a1",
+        "d7-a7",
+        "g4-g1",
+        "b4-a4",
+        "a1-d1",
+        "c5-d5",
+        "g1-g4",
+        "d5-e5",
+        "d1-g1",
+        "xa7",
+        "a4-a1",
+        "g7-d7",
+        "a1-d1",
+        "b2-d2",
+        "d1-a1",
+        "g4-g7",
+        "d6-d5",
+        "f4-f2",
+        "a1-d1",
+        "e3-e4",
+        "b6-d6",
+        "d7-a7",
+        "d5-c5",
+        "d2-d3",
+        "d6-d5",
+        "xg1",
+        "g7-g4",
+        "d1-a1",
+        "g4-f4",
+        "a1-d1",
+        "d3-c3",
+        "c5-c4",
+        "e4-e3",
+        "f6-d6",
+        "a7-d7",
+        "e5-e4",
+        "f4-g4",
+        "e4-f4",
+        "d7-g7",
+        "d6-d7",
+        "e3-e4",
+        "c4-c5",
+        "e4-e5",
+        "d7-a7",
+        "g4-g1",
+        "f4-e4",
+        "c3-c4",
+        "d1-a1",
+        "g1-d1",
+        "e4-f4",
+        "c4-b4",
+        "c5-c4",
+        "d1-d2",
+        "f4-e4",
+        "b4-b6",
+        "a1-a4",
+        "b6-d6",
+        "d5-c5",
+        "d6-d7",
+        "c4-b4",
+        "d2-d3",
+        "e4-e3",
+        "e5-e4",
+        "c5-c4",
+        "xd3",
+        "g7-g4",
+        "a4-a1",
+        "d7-g7",
+        "c4-c5",
+        "g4-g1",
+        "c5-d5",
+        "e4-f4",
+        "b4-b2",
+        "f4-e4",
+        "a7-a4",
+        "g1-d1",
+        "b2-b4",
+        "f2-f4",
+        "b4-b6",
+        "e4-e5",
+        "a4-a7",
+        "d1-d2",
+        "a7-d7",
+        "e5-e4",
+        "b6-d6",
+        "xd2",
+        "e4-f6",
+        "d5-e5",
+        "f4-d3",
+        "d6-b6",
+        "f6-d6",
+        "a1-d1",
+        "d3-c3",
+        "d1-a1",
+        "c3-g4",
+        "e3-d3",
+        "g7-e4",
+        "a1-d1",
+        "g4-f2",
+        "d7-g7",
+        "e4-d7",
+        "d1-a1"
+      ],
+      "action_token_count": 156,
+      "fen": ".WB...B.BW..W.....B..B..|W|9|9",
+      "logical_ply_count": 146,
+      "logical_turns": [
+        [
+          "d1"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "e5"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "c3"
+        ],
+        [
+          "d5"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "g1",
+          "xb6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "b2"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "b6-d6",
+          "xd1"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "f6-d6",
+          "xa7"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "a1-a4"
+        ],
+        [
+          "d1-g1",
+          "xb6"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "a7-a4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "a4-b4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "a1-d1",
+          "xe4"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "f4-f6"
+        ],
+        [
+          "d2-b2"
+        ],
+        [
+          "d7-d6",
+          "xd3"
+        ],
+        [
+          "f2-f4"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "g1-g4"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "d1-g1",
+          "xa7"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g4-g7"
+        ],
+        [
+          "d6-d5"
+        ],
+        [
+          "f4-f2"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "d6-d5",
+          "xg1"
+        ],
+        [
+          "g7-g4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g4-f4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "f4-g4"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "d6-d7"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "a1-a4"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "d6-d7"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "c5-c4",
+          "xd3"
+        ],
+        [
+          "g7-g4"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "a7-a4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "f2-f4"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "b6-d6",
+          "xd2"
+        ],
+        [
+          "e4-f6"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "f4-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "c3-g4"
+        ],
+        [
+          "e3-d3"
+        ],
+        [
+          "g7-e4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "g4-f2"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "e4-d7"
+        ],
+        [
+          "d1-a1"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "D",
+      "phase": "flying",
+      "record_identity": "df10e0d54332f3289fc716fb41af9ee23b4ca0392949fb57f0b4b0ca04c22e74",
+      "record_index": 11,
+      "ring16_canonical_fen": "....B..B..BW..W.B..WB...|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 48,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "f2-d5",
+        "ply": 156,
+        "side_to_move": 1,
+        "source_identity": "8f7969ebc0838542970c0b987a39920955c268281c314f5733a94e3ec8f72343",
+        "step_index": 157,
+        "tgf_fen": "*@**@***/O**O***@/O@***@** w m s 3 0 5 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 7,
+        "trajectory_seed": 11936128518282650887
+      },
+      "source_entry_index": 58,
+      "turn": "W"
+    },
+    {
+      "action_history": [
+        "d1",
+        "e4",
+        "g4",
+        "a1",
+        "e5",
+        "c4",
+        "c3",
+        "d5",
+        "g7",
+        "b6",
+        "g1",
+        "xb6",
+        "f4",
+        "a7",
+        "f6",
+        "f2",
+        "d7",
+        "b2",
+        "b6",
+        "b2-b4",
+        "b6-d6",
+        "xd1",
+        "c3-d3",
+        "d6-b6",
+        "d3-c3",
+        "f6-d6",
+        "xa7",
+        "g1-d1",
+        "d5-c5",
+        "b4-b2",
+        "a1-a4",
+        "d1-g1",
+        "xb6",
+        "a4-a7",
+        "b2-d2",
+        "a7-a4",
+        "g1-d1",
+        "a4-b4",
+        "d1-a1",
+        "b4-a4",
+        "c3-d3",
+        "d6-b6",
+        "a1-d1",
+        "xe4",
+        "a4-a7",
+        "e5-e4",
+        "c4-b4",
+        "e4-e3",
+        "f4-f6",
+        "d2-b2",
+        "d7-d6",
+        "xd3",
+        "f2-f4",
+        "a7-d7",
+        "d1-a1",
+        "d7-a7",
+        "g4-g1",
+        "b4-a4",
+        "a1-d1",
+        "c5-d5",
+        "g1-g4",
+        "d5-e5",
+        "d1-g1",
+        "xa7",
+        "a4-a1",
+        "g7-d7",
+        "a1-d1",
+        "b2-d2",
+        "d1-a1",
+        "g4-g7",
+        "d6-d5",
+        "f4-f2",
+        "a1-d1",
+        "e3-e4",
+        "b6-d6",
+        "d7-a7",
+        "d5-c5",
+        "d2-d3",
+        "d6-d5",
+        "xg1",
+        "g7-g4",
+        "d1-a1",
+        "g4-f4",
+        "a1-d1",
+        "d3-c3",
+        "c5-c4",
+        "e4-e3",
+        "f6-d6",
+        "a7-d7",
+        "e5-e4",
+        "f4-g4",
+        "e4-f4",
+        "d7-g7",
+        "d6-d7",
+        "e3-e4",
+        "c4-c5",
+        "e4-e5",
+        "d7-a7",
+        "g4-g1",
+        "f4-e4",
+        "c3-c4",
+        "d1-a1",
+        "g1-d1",
+        "e4-f4",
+        "c4-b4",
+        "c5-c4",
+        "d1-d2",
+        "f4-e4",
+        "b4-b6",
+        "a1-a4",
+        "b6-d6",
+        "d5-c5",
+        "d6-d7",
+        "c4-b4",
+        "d2-d3",
+        "e4-e3",
+        "e5-e4",
+        "c5-c4",
+        "xd3",
+        "g7-g4",
+        "a4-a1",
+        "d7-g7",
+        "c4-c5",
+        "g4-g1",
+        "c5-d5",
+        "e4-f4",
+        "b4-b2",
+        "f4-e4",
+        "a7-a4",
+        "g1-d1",
+        "b2-b4",
+        "f2-f4",
+        "b4-b6",
+        "e4-e5",
+        "a4-a7",
+        "d1-d2",
+        "a7-d7",
+        "e5-e4",
+        "b6-d6",
+        "xd2",
+        "e4-f6",
+        "d5-e5",
+        "f4-d3",
+        "d6-b6",
+        "f6-d6",
+        "a1-d1",
+        "d3-c3",
+        "d1-a1",
+        "c3-g4",
+        "e3-d3",
+        "g7-e4",
+        "a1-d1",
+        "g4-f2",
+        "d7-g7",
+        "e4-d7",
+        "d1-a1",
+        "f2-d5",
+        "xb6",
+        "d3-e3",
+        "d7-f6",
+        "a1-a4",
+        "d5-e4",
+        "g7-d7",
+        "d6-d3",
+        "d7-d6",
+        "e4-f2",
+        "e3-e4",
+        "d3-d2",
+        "d6-d5",
+        "f2-e3",
+        "e4-f4"
+      ],
+      "action_token_count": 171,
+      "fen": ".......B..WB.W...BB.W...|W|9|9",
+      "logical_ply_count": 160,
+      "logical_turns": [
+        [
+          "d1"
+        ],
+        [
+          "e4"
+        ],
+        [
+          "g4"
+        ],
+        [
+          "a1"
+        ],
+        [
+          "e5"
+        ],
+        [
+          "c4"
+        ],
+        [
+          "c3"
+        ],
+        [
+          "d5"
+        ],
+        [
+          "g7"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "g1",
+          "xb6"
+        ],
+        [
+          "f4"
+        ],
+        [
+          "a7"
+        ],
+        [
+          "f6"
+        ],
+        [
+          "f2"
+        ],
+        [
+          "d7"
+        ],
+        [
+          "b2"
+        ],
+        [
+          "b6"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "b6-d6",
+          "xd1"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "f6-d6",
+          "xa7"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "a1-a4"
+        ],
+        [
+          "d1-g1",
+          "xb6"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "a7-a4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "a4-b4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "c3-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "a1-d1",
+          "xe4"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "f4-f6"
+        ],
+        [
+          "d2-b2"
+        ],
+        [
+          "d7-d6",
+          "xd3"
+        ],
+        [
+          "f2-f4"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "b4-a4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "g1-g4"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "d1-g1",
+          "xa7"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "b2-d2"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g4-g7"
+        ],
+        [
+          "d6-d5"
+        ],
+        [
+          "f4-f2"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "d6-d5",
+          "xg1"
+        ],
+        [
+          "g7-g4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g4-f4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "f4-g4"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "d6-d7"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "d7-a7"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "c3-c4"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "c5-c4"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "a1-a4"
+        ],
+        [
+          "b6-d6"
+        ],
+        [
+          "d5-c5"
+        ],
+        [
+          "d6-d7"
+        ],
+        [
+          "c4-b4"
+        ],
+        [
+          "d2-d3"
+        ],
+        [
+          "e4-e3"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "c5-c4",
+          "xd3"
+        ],
+        [
+          "g7-g4"
+        ],
+        [
+          "a4-a1"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "c4-c5"
+        ],
+        [
+          "g4-g1"
+        ],
+        [
+          "c5-d5"
+        ],
+        [
+          "e4-f4"
+        ],
+        [
+          "b4-b2"
+        ],
+        [
+          "f4-e4"
+        ],
+        [
+          "a7-a4"
+        ],
+        [
+          "g1-d1"
+        ],
+        [
+          "b2-b4"
+        ],
+        [
+          "f2-f4"
+        ],
+        [
+          "b4-b6"
+        ],
+        [
+          "e4-e5"
+        ],
+        [
+          "a4-a7"
+        ],
+        [
+          "d1-d2"
+        ],
+        [
+          "a7-d7"
+        ],
+        [
+          "e5-e4"
+        ],
+        [
+          "b6-d6",
+          "xd2"
+        ],
+        [
+          "e4-f6"
+        ],
+        [
+          "d5-e5"
+        ],
+        [
+          "f4-d3"
+        ],
+        [
+          "d6-b6"
+        ],
+        [
+          "f6-d6"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "d3-c3"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "c3-g4"
+        ],
+        [
+          "e3-d3"
+        ],
+        [
+          "g7-e4"
+        ],
+        [
+          "a1-d1"
+        ],
+        [
+          "g4-f2"
+        ],
+        [
+          "d7-g7"
+        ],
+        [
+          "e4-d7"
+        ],
+        [
+          "d1-a1"
+        ],
+        [
+          "f2-d5",
+          "xb6"
+        ],
+        [
+          "d3-e3"
+        ],
+        [
+          "d7-f6"
+        ],
+        [
+          "a1-a4"
+        ],
+        [
+          "d5-e4"
+        ],
+        [
+          "g7-d7"
+        ],
+        [
+          "d6-d3"
+        ],
+        [
+          "d7-d6"
+        ],
+        [
+          "e4-f2"
+        ],
+        [
+          "e3-e4"
+        ],
+        [
+          "d3-d2"
+        ],
+        [
+          "d6-d5"
+        ],
+        [
+          "f2-e3"
+        ],
+        [
+          "e4-f4"
+        ]
+      ],
+      "malom_wdl_for_side_to_move": "W",
+      "phase": "flying",
+      "record_identity": "cb07f5394eb1212711ff745d54926e01bafbb4e33b75da02eae5be721436ca5b",
+      "record_index": 12,
+      "ring16_canonical_fen": ".......B..WB.W...BB.W...|W|9|9",
+      "source": {
+        "color_transform": "identity",
+        "legal_uci_count": 51,
+        "nmm_illegal_oracle_moves": [],
+        "oracle_moves": [],
+        "phase_tag": 3,
+        "picked_uci": "e3-a7",
+        "ply": 171,
+        "side_to_move": 1,
+        "source_identity": "f128dbeb090edbb49c44f0fb229b907a35153ea7b8d09328e4fe3146ff11b766",
+        "step_index": 172,
+        "tgf_fen": "@@*O****/*O@*O***/******@* w m s 3 0 4 0 0 0 0 0 0 0 0 0 1",
+        "trajectory_index": 7,
+        "trajectory_seed": 11936128518282650887
+      },
+      "source_entry_index": 63,
+      "turn": "W"
+    }
+  ],
+  "schema_version": "nmm.phase-replay-development-corpus.v1",
+  "selection_contract": {
+    "algorithm": "earliest-per-wdl-plus-new-trajectory-v1",
+    "candidate_model_loaded": false,
+    "color_transform": "identity-only",
+    "fourth_start": "earliest remaining source from a not-yet-used trajectory when available; otherwise earliest remaining source",
+    "phase_order": [
+      "placement",
+      "movement",
+      "flying"
+    ],
+    "starts_per_phase": 4,
+    "wdl_first_pass_order": [
+      "W",
+      "D",
+      "L"
+    ]
+  },
+  "source_fixture": {
+    "asset_path": "crates/tgf-mill/testdata/legacy_oracle/0.json",
+    "asset_sha256": "4b0ffc4e0d754e9cf2b3275726c366109173d303b1fa2dc0965c76d2db2b1f03",
+    "fixture_generator_git_sha": "3b7b52390",
+    "fixture_version": 1,
+    "git_blob": "a12eb55c32b5b6ccda0e1fbbde3761d384b453af",
+    "path_lookup_key": "sanmill_checkout",
+    "rule_idx": 0,
+    "rule_name": "Nine Men's Morris",
+    "sanmill_commit": "f8be034d10ba7b293f9c10d661b1cfd81e9be096"
+  },
+  "source_phase_corpus": {
+    "corpus_identity": "cc5477b777cf38ea59c5f20af4bb7b6019b0d12b328ac139b2a8e7d9f2df0bc8",
+    "file_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+    "path": "docs/experiments/dev-v4-phase-covered-corpus-v1.json"
+  },
+  "status": "frozen_development_measurement_only"
+}
