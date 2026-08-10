@@ -2,7 +2,7 @@
 
 ## Status and authority
 
-Status: `frozen_unexecuted`
+Status: `coverage_corpus_frozen_pending_policy_audit`
 
 Audit ID: `specialist-db-policy-mechanism-placement-coverage-v2`
 
@@ -82,3 +82,19 @@ If the frozen material rule triggers, prepare but do not launch a paired,
 three-seed, single-factor calibration of empirical SpecialistDB reads. If it
 does not trigger, do not prepare that calibration solely from this mechanism
 audit; return to the other registered hypotheses.
+
+## Candidate-blind corpus result
+
+The source-only stage passed its frozen gate before the candidate was loaded:
+
+- 489 unique replayed placement states;
+- 100 selected coverage-positive states;
+- 688 empirical successor hits at the three-sample floor; and
+- no SpecialistDB byte change or audit-snapshot sidecar.
+
+The immutable corpus and interpretation are recorded in:
+
+- `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-2026-08-10.json`
+- `docs/evidence/specialist-db-policy-mechanism-placement-coverage-v2-corpus-result-2026-08-10.md`
+
+The final policy comparison remains unexecuted at this status boundary.
