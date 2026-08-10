@@ -62,6 +62,14 @@ Before changing code or Git history:
   commits. Establish the commit graph and patch equivalence first.
 - Do not push, force-push, merge, rebase, or rewrite history unless the user
   explicitly authorises that operation.
+- The product owner granted standing authority on 11 August 2026 for Codex to
+  make an ordinary fast-forward push of its own verified commits from local
+  `dev` to `origin/dev` without asking again. Before relying on this grant,
+  fetch the remote, confirm the active branch is `dev`, confirm `origin/dev`
+  is an ancestor of local `dev`, preserve unrelated changes, and verify the
+  commits being published. This grant does not cover force-push, merge,
+  rebase, amend, or any other history rewrite, and the owner may revoke it at
+  any time.
 - Preserve unrelated user changes and ignored local training artefacts.
 - Keep one independently justified fix per commit.
 - Write commit subjects and bodies in English. Unless the user asks for a

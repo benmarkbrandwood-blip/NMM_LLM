@@ -91,6 +91,11 @@ long-run decisions it does not approve.
   destructive cleanup, and Git history rewriting require explicit coverage.
 - A user's request for autonomy is not by itself evidence of unbounded
   authority; bind the concrete grant before relying on it.
+- Git publication is a separate authority check. When `AGENTS.md` records a
+  standing ordinary-push grant, use it without another product prompt only
+  after fetching, confirming local `dev`, proving `origin/dev` is an ancestor,
+  and verifying the Codex-created commits. Never reinterpret it as authority
+  for force-push, merge, rebase, amend, or another history rewrite.
 
 ## Run Proportionate Verification
 

@@ -133,6 +133,15 @@ product prompts. The durable standing-delegation policy now belongs in
 It removes per-arm rubber-stamping but does not authorize a new objective,
 resource expansion, held-out work, long training, promotion or publication.
 
+On 11 August 2026 the product owner separately granted standing Git authority
+for Codex to publish commits it created and verified from local `dev` to
+`origin/dev` by ordinary fast-forward without another prompt. Before each such
+push, fetch and prove that the active branch is `dev` and that `origin/dev` is
+an ancestor of local `dev`. The grant excludes force-push, merge, rebase,
+amend, and every other history rewrite. It is independent of training,
+evaluation, promotion, and publication authority and may be revoked at any
+time.
+
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
 beside that historical database. They were not deleted. All accepted policy
@@ -2197,7 +2206,9 @@ consumed. A schedule-isolation successor is recommended but is not yet a
 frozen or authorized experiment. No held-out match, additional calibration,
 long training, model promotion/publication, protocol change, resource
 expansion, or history rewrite is authorized by that sequence. Ordinary
-Git operations are governed separately from that sequence.
+verified fast-forward pushes of Codex-created `dev` commits are separately
+authorized under the standing Git grant recorded in the executive summary;
+all other Git history operations remain outside it.
 
 ## Reference Material
 

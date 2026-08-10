@@ -71,8 +71,11 @@ new product scope.
 Long training, held-out evaluation, resource expansion, promotion,
 publication, release, destructive cleanup, external writes, and Git history
 rewrites remain outside a standing preparatory grant unless each is explicitly
-named. Ordinary Git push authority is also governed separately by
-`AGENTS.md`.
+named. Ordinary Git push authority is governed separately by `AGENTS.md`. The
+11 August 2026 standing Git grant permits Codex to publish its own verified
+`dev` commits to `origin/dev` only as an ordinary fast-forward, after checking
+the remote ancestry. It does not authorize force-push, merge, rebase, amend,
+or another history rewrite, and it does not expand any experiment grant.
 
 ## Durable Contracts
 
