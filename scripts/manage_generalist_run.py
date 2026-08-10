@@ -120,6 +120,8 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
         str(args.malom_policy_aux_coef_cap),
         "--malom-policy-aux-denominator-floor",
         str(args.malom_policy_aux_denominator_floor),
+        "--specialist-read-mode",
+        args.specialist_read_mode,
         "--self-play-ratio",
         str(self_play_ratio),
         "--update-target-every",
@@ -378,6 +380,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Optional disposable SpecialistDB path. Required for smoke so the "
             "active sector-corrected baseline database is never reused."
+        ),
+    )
+    prepare.add_argument(
+        "--specialist-read-mode",
+        choices=trainer.SPECIALIST_READ_MODES,
+        default="full",
+        help=(
+            "Explicit training read projection for the writable SpecialistDB; "
+            "defaults to the historical empirical-first route"
         ),
     )
     prepare.add_argument(

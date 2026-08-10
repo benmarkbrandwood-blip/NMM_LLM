@@ -14,6 +14,7 @@ from learned_ai.data.specialist_read_view import (
     project_training_wdl,
     specialist_read_stats_delta,
 )
+from scripts import manage_generalist_run as manager
 from scripts import train_s_gen_v2 as trainer
 
 
@@ -137,3 +138,35 @@ def test_trainer_cli_defaults_to_legacy_full_and_accepts_ablation() -> None:
 
     assert default.specialist_read_mode == "full"
     assert ablation.specialist_read_mode == "theoretical-only"
+
+
+def test_managed_plan_propagates_the_explicit_read_mode(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        [
+            "prepare",
+            "--control-dir",
+            str(tmp_path / "control"),
+            "--max-wall-hours",
+            "1",
+            "--objective",
+            "focused test",
+            "--experiment-id",
+            "focused-test",
+            "--seed",
+            "61",
+            "--max-ply",
+            "120",
+            "--mill-bonus-mode",
+            "malom-preserving-only",
+            "--specialist-read-mode",
+            "theoretical-only",
+        ]
+    )
+
+    common_args = manager._common_trainer_args(
+        args,
+        tmp_path / "training_paths.local.json",
+    )
+    index = common_args.index("--specialist-read-mode")
+
+    assert common_args[index + 1] == "theoretical-only"
