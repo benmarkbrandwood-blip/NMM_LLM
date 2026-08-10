@@ -11,7 +11,9 @@ from learned_ai.training.scaffolded_a2c import NonFiniteTrainingError
 from scripts.train_s_gen_v2 import (
     TEMP_END,
     TEMP_START,
+    _compute_post_fork_temperature,
     _compute_temperature,
+    _compute_training_temperature,
     _finite_positive_float,
     _policy_distribution,
 )
@@ -40,6 +42,61 @@ def test_default_temperature_schedule_is_unchanged():
     assert _compute_temperature(0, 1_000, TEMP_START) == pytest.approx(0.90)
     assert _compute_temperature(400, 1_000, TEMP_START) == pytest.approx(0.55)
     assert _compute_temperature(800, 1_000, TEMP_START) == pytest.approx(TEMP_END)
+
+
+def test_post_fork_temperature_starts_at_global_fork_boundary():
+    temperature = _compute_post_fork_temperature(
+        post_fork_consumed_transitions=0,
+        fork_game=50,
+        max_games=5_000,
+        temp_start=0.90,
+        anneal_transitions=106_304,
+    )
+
+    assert temperature == pytest.approx(
+        _compute_temperature(50, 5_000, 0.90)
+    )
+
+
+def test_post_fork_temperature_depends_on_transitions_not_game_count():
+    first = _compute_training_temperature(
+        schedule_axis="post-fork-transitions",
+        game_count=300,
+        max_games=5_000,
+        temp_start=0.90,
+        post_fork_consumed_transitions=8_192,
+        fork_game=50,
+        anneal_transitions=106_304,
+    )
+    second = _compute_training_temperature(
+        schedule_axis="post-fork-transitions",
+        game_count=500,
+        max_games=5_000,
+        temp_start=0.90,
+        post_fork_consumed_transitions=8_192,
+        fork_game=50,
+        anneal_transitions=106_304,
+    )
+
+    assert first == pytest.approx(second)
+    assert first == pytest.approx(0.8379808850090307)
+
+
+@pytest.mark.parametrize(
+    ("consumed", "anneal"),
+    [(-1, 106_304), (0, 0), (0, -1)],
+)
+def test_post_fork_temperature_rejects_invalid_transition_schedule(
+    consumed, anneal
+):
+    with pytest.raises(ValueError, match="transition"):
+        _compute_post_fork_temperature(
+            post_fork_consumed_transitions=consumed,
+            fork_game=50,
+            max_games=5_000,
+            temp_start=0.90,
+            anneal_transitions=anneal,
+        )
 
 
 @pytest.mark.parametrize(

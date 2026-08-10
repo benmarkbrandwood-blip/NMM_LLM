@@ -487,6 +487,66 @@ def test_fork_treatments_preserve_resume_semantics_but_bind_run_config(
     assert vars(refresh) != vars(no_refresh)
 
 
+def test_post_fork_temperature_schedule_is_resume_semantic(tmp_path) -> None:
+    refresh = _equal_transition_fork_args(tmp_path, treatment="refresh-once")
+    alternate = _equal_transition_fork_args(tmp_path, treatment="refresh-once")
+    for args in (refresh, alternate):
+        args.temperature_schedule_axis = "post-fork-transitions"
+        args.post_fork_temperature_anneal_transitions = 106_304
+    alternate.post_fork_temperature_anneal_transitions = 106_368
+
+    trainer.validate_generalist_configuration(refresh)
+    trainer.validate_generalist_configuration(alternate)
+
+    assert trainer.resume_config_sha256(refresh) != trainer.resume_config_sha256(
+        alternate
+    )
+
+
+@pytest.mark.parametrize(
+    ("treatment", "axis", "anneal", "message"),
+    [
+        (
+            "capture",
+            "post-fork-transitions",
+            106_304,
+            "requires a treatment arm",
+        ),
+        (
+            "refresh-once",
+            "post-fork-transitions",
+            None,
+            "requires post_fork_temperature_anneal_transitions",
+        ),
+        (
+            "refresh-once",
+            "global-games",
+            106_304,
+            "only valid with post-fork-transitions",
+        ),
+        (
+            "refresh-once",
+            "post-fork-transitions",
+            8_128,
+            "must cover post_fork_transition_bound",
+        ),
+    ],
+)
+def test_configuration_rejects_invalid_post_fork_temperature_schedule(
+    tmp_path,
+    treatment,
+    axis,
+    anneal,
+    message,
+) -> None:
+    args = _equal_transition_fork_args(tmp_path, treatment=treatment)
+    args.temperature_schedule_axis = axis
+    args.post_fork_temperature_anneal_transitions = anneal
+
+    with pytest.raises(PreflightConfigurationError, match=message):
+        trainer.validate_generalist_configuration(args)
+
+
 @pytest.mark.parametrize(
     "outcome",
     [trainer.WIN_REWARD, trainer.LOSS_REWARD, trainer.DRAW_SHORT, trainer.DRAW_LONG],

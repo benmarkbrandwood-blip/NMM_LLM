@@ -133,6 +133,33 @@ def test_common_args_bind_optimizer_and_measurement_contract(tmp_path) -> None:
     assert args.no_exact_resume is True
 
 
+def test_common_args_bind_post_fork_temperature_schedule(tmp_path) -> None:
+    args = manager._build_parser().parse_args(
+        _required_prepare_args()
+        + [
+            "--target-refresh-fork-game",
+            "50",
+            "--target-refresh-fork-treatment",
+            "refresh-once",
+            "--post-fork-transition-bound",
+            "8192",
+            "--temperature-schedule-axis",
+            "post-fork-transitions",
+            "--post-fork-temperature-anneal-transitions",
+            "106304",
+        ]
+    )
+
+    common = manager._common_trainer_args(args, tmp_path / "paths.json")
+
+    assert common[common.index("--temperature-schedule-axis") + 1] == (
+        "post-fork-transitions"
+    )
+    assert common[
+        common.index("--post-fork-temperature-anneal-transitions") + 1
+    ] == "106304"
+
+
 @pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])
 def test_prepare_rejects_invalid_malom_policy_auxiliary(value: str) -> None:
     with pytest.raises(SystemExit):

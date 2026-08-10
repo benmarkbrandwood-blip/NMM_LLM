@@ -216,6 +216,20 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
                 str(args.post_fork_transition_bound),
             )
         )
+    if args.temperature_schedule_axis != "global-games":
+        common_args.extend(
+            (
+                "--temperature-schedule-axis",
+                args.temperature_schedule_axis,
+            )
+        )
+    if args.post_fork_temperature_anneal_transitions is not None:
+        common_args.extend(
+            (
+                "--post-fork-temperature-anneal-transitions",
+                str(args.post_fork_temperature_anneal_transitions),
+            )
+        )
     return common_args
 
 
@@ -428,6 +442,18 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Exact optimizer-consumed transition ceiling after the fork",
+    )
+    prepare.add_argument(
+        "--temperature-schedule-axis",
+        choices=("global-games", "post-fork-transitions"),
+        default="global-games",
+        help="Temperature schedule coordinate used by the trainer",
+    )
+    prepare.add_argument(
+        "--post-fork-temperature-anneal-transitions",
+        type=int,
+        default=None,
+        help="Transition horizon for a post-fork temperature schedule",
     )
     prepare.add_argument("--measurement-anchor-game", type=int, default=None)
     prepare.add_argument(

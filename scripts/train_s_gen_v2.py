@@ -1290,6 +1290,64 @@ def _compute_temperature(
     return float(temp_start - (temp_start - TEMP_END) * progress)
 
 
+def _compute_post_fork_temperature(
+    *,
+    post_fork_consumed_transitions: int,
+    fork_game: int,
+    max_games: int,
+    temp_start: float,
+    anneal_transitions: int,
+) -> float:
+    """Anneal from the global fork boundary using consumed transitions only."""
+    if (
+        isinstance(post_fork_consumed_transitions, bool)
+        or not isinstance(post_fork_consumed_transitions, int)
+        or post_fork_consumed_transitions < 0
+    ):
+        raise ValueError("post-fork transition count must be non-negative")
+    if (
+        isinstance(anneal_transitions, bool)
+        or not isinstance(anneal_transitions, int)
+        or anneal_transitions <= 0
+    ):
+        raise ValueError("temperature anneal transition count must be positive")
+    fork_temperature = _compute_temperature(fork_game, max_games, temp_start)
+    progress = min(1.0, post_fork_consumed_transitions / anneal_transitions)
+    return float(
+        fork_temperature - (fork_temperature - TEMP_END) * progress
+    )
+
+
+def _compute_training_temperature(
+    *,
+    schedule_axis: str,
+    game_count: int,
+    max_games: int,
+    temp_start: float,
+    post_fork_consumed_transitions: Optional[int] = None,
+    fork_game: Optional[int] = None,
+    anneal_transitions: Optional[int] = None,
+) -> float:
+    """Resolve the configured temperature coordinate without hidden fallback."""
+    if schedule_axis == "global-games":
+        return _compute_temperature(game_count, max_games, temp_start)
+    if schedule_axis != "post-fork-transitions":
+        raise ValueError(f"unsupported temperature schedule axis: {schedule_axis!r}")
+    if (
+        post_fork_consumed_transitions is None
+        or fork_game is None
+        or anneal_transitions is None
+    ):
+        raise ValueError("post-fork temperature schedule is incomplete")
+    return _compute_post_fork_temperature(
+        post_fork_consumed_transitions=post_fork_consumed_transitions,
+        fork_game=fork_game,
+        max_games=max_games,
+        temp_start=temp_start,
+        anneal_transitions=anneal_transitions,
+    )
+
+
 def _apply_learning_rate_mode(
     opt: torch.optim.Optimizer,
     *,
@@ -3311,9 +3369,21 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         and not _post_fork_transition_bound_reached()
     ):
         batch_count += 1
-        temperature = _compute_temperature(
-            game_count, args.max_games, args.temp_start
-        )
+        post_fork_consumed = _post_fork_consumed_transition_count()
+        try:
+            temperature = _compute_training_temperature(
+                schedule_axis=args.temperature_schedule_axis,
+                game_count=game_count,
+                max_games=args.max_games,
+                temp_start=args.temp_start,
+                post_fork_consumed_transitions=post_fork_consumed,
+                fork_game=args.target_refresh_fork_game,
+                anneal_transitions=(
+                    args.post_fork_temperature_anneal_transitions
+                ),
+            )
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
 
         if args.curriculum_advance_policy == "fixed-resource":
             scheduled_difficulty = _fixed_resource_transition_level(
@@ -3825,6 +3895,8 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                         None if last_update_ent is None else float(last_update_ent)
                     ),
                     "lr": float(opt.param_groups[0]["lr"]),
+                    "temperature": float(temperature),
+                    "temperature_schedule_axis": args.temperature_schedule_axis,
                     "batch_steps": batch_steps,
                     "optimizer_consumed_transition_count": (
                         optimizer_consumed_transition_count
@@ -4407,6 +4479,25 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help=(
             f"Initial rollout temperature; linearly anneals to {TEMP_END:.2f} "
             "after 80 percent of --max-games"
+        ),
+    )
+    p.add_argument(
+        "--temperature-schedule-axis",
+        choices=("global-games", "post-fork-transitions"),
+        default="global-games",
+        help=(
+            "Anneal temperature by historical global game count or, for a "
+            "controlled target-refresh treatment arm, by exact consumed "
+            "transitions after the fork"
+        ),
+    )
+    p.add_argument(
+        "--post-fork-temperature-anneal-transitions",
+        type=int,
+        default=None,
+        help=(
+            "Positive transition horizon used only by "
+            "--temperature-schedule-axis post-fork-transitions"
         ),
     )
     p.add_argument("--log-every",           type=int,   default=LOG_EVERY)

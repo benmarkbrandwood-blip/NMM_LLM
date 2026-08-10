@@ -383,6 +383,41 @@ def validate_generalist_configuration(args: Any) -> None:
                     "post_fork_transition_bound must be divisible by update_every"
                 )
 
+    temperature_axis = getattr(args, "temperature_schedule_axis", "global-games")
+    temperature_anneal_transitions = getattr(
+        args,
+        "post_fork_temperature_anneal_transitions",
+        None,
+    )
+    if temperature_axis == "global-games":
+        if temperature_anneal_transitions is not None:
+            raise PreflightConfigurationError(
+                "post_fork_temperature_anneal_transitions is only valid with "
+                "post-fork-transitions"
+            )
+    elif temperature_axis == "post-fork-transitions":
+        if fork_treatment not in {"refresh-once", "no-refresh"}:
+            raise PreflightConfigurationError(
+                "post-fork-transitions temperature schedule requires a "
+                "treatment arm"
+            )
+        if temperature_anneal_transitions is None:
+            raise PreflightConfigurationError(
+                "post-fork-transitions requires "
+                "post_fork_temperature_anneal_transitions"
+            )
+        _positive_integer(
+            temperature_anneal_transitions,
+            field="post_fork_temperature_anneal_transitions",
+        )
+        if temperature_anneal_transitions < post_fork_bound:
+            raise PreflightConfigurationError(
+                "post_fork_temperature_anneal_transitions must cover "
+                "post_fork_transition_bound"
+            )
+    else:
+        raise PreflightConfigurationError("temperature_schedule_axis is unsupported")
+
     optimizer_update_bound = getattr(args, "optimizer_update_bound", None)
     if optimizer_update_bound is not None:
         _positive_integer(
@@ -1172,6 +1207,9 @@ def resolved_resume_config(args: Any) -> dict[str, Any]:
     if not raw.get("exact_transition_batches", False):
         # The disabled value is the historical all-pending update behavior.
         raw.pop("exact_transition_batches", None)
+    if raw.get("temperature_schedule_axis", "global-games") == "global-games":
+        raw.pop("temperature_schedule_axis", None)
+        raw.pop("post_fork_temperature_anneal_transitions", None)
     if raw.get("target_refresh_fork_game") is None:
         raw.pop("target_refresh_fork_game", None)
     return json.loads(canonical_json_bytes(raw))
