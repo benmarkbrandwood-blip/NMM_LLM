@@ -51,18 +51,22 @@ denominator, it selected no training setting. The successor common-anchor
 design therefore separates the training target from a fixed game-50
 measurement anchor and matches 16 post-boundary optimiser steps.
 
-That successor was published, prepared and authorised once under readiness
-identity `d6ed98be`. Attempt 001 stopped fail closed in the first arm at game
-50 after 18 optimiser updates: the trainer requested the dedicated
-`development_measurement_anchor` checkpoint role, but the version-2 envelope
-had not registered either new measurement role. No anchor, accepted segment,
-policy-health result or experiment result exists, and the other three arms
-did not start. All four authorisations are consumed by the aborted sequence.
-Local correction commit `e02aca4` extends only the checkpoint-role vocabulary
-and passes the focused regression gates. A successor still requires ordinary
-publication, new plans, control directories and fresh database copies, final
-preflights, and a new explicit product authorisation. See the
-[attempt-001 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-001-failure-2026-08-10.md).
+Attempt 001 stopped fail closed at its first game-50 measurement anchor because
+the checkpoint envelope lacked the dedicated evidence roles. Correction
+`e02aca4` and a fresh successor were published. Attempt 002 was then prepared
+and authorised once under readiness identity `bcbb625d`. Its two seed-64 arms
+completed 122 and 92 training games respectively, each reached 34 optimiser
+updates, produced four common-anchor measurement batches and passed policy
+health. Their first 50 canonical game rows and anchor model tensors are
+identical. The frozen result analyser nevertheless rejected the valid early
+optimizer-bounded endings because a reused fixed-game helper required 150
+games. The sequence stopped before either seed-65 arm started, and all four
+authorisations are consumed. Analysis-only correction `873e126` accepts the
+validated actual completion count without changing training or gameplay.
+Neither attempt produced target-refresh evidence. See the
+[attempt-001 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-001-failure-2026-08-10.md)
+and
+[attempt-002 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-002-failure-2026-08-10.md).
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -1989,6 +1993,22 @@ the current successor in this order:
     A retry requires ordinary publication, new plan/control/database identities,
     fresh preflights and a new explicit product authorisation; no automatic
     retry, held-out evaluation or long training is authorised.
+22. Preserve attempt 002 under readiness identity `bcbb625d`. Both seed-64
+    arms completed and passed policy health at their exact 34-update bound,
+    using 122 and 92 training games and 64 no-update measurement games each.
+    Their first 50 canonical game rows and anchor model tensors are identical,
+    with anchor state SHA-256 `94aed99f`. The frozen analyser then failed
+    because the reused policy-health helper required the 150-game safety
+    ceiling rather than each arm's validated optimizer-bounded completion
+    count. Seed 65 did not start; no result file or causal decision exists.
+    All four grants and databases are consumed attempt-002 evidence. Commit
+    `873e126` corrects only analysis validation and passes the focused runtime
+    and test gates. Preserve the
+    [attempt-002 failure record](../evidence/target-refresh-common-anchor-diagnostic-attempt-002-failure-2026-08-10.md).
+    Any successor requires publication, wholly new identities, fresh database
+    copies and a new explicit product authorisation. Do not resume, retry,
+    run held-out evaluation, promote, publish or start long training from this
+    incomplete sequence.
 
 The previously executed isolated smoke command was:
 
