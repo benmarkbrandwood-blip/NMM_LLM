@@ -1536,6 +1536,42 @@ def _game_torch_generator(seed: int) -> torch.Generator:
     return generator
 
 
+def _development_measurement_metrics(result: RolloutResult) -> dict[str, Any]:
+    """Return outcome and policy observations for one no-update game."""
+    quality = [
+        (
+            step.malom_quality
+            if step.malom_quality is not None
+            else step.malom_chosen_dtm
+        )
+        for step in result.step_diags
+    ]
+    known_quality = [float(value) for value in quality if value is not None]
+    return {
+        "outcome": float(result.outcome),
+        "ply": int(result.ply),
+        "termination_reason": result.termination_reason,
+        "steps": len(result.step_diags),
+        "chosen_probability_mean": _safe_mean(
+            [step.chosen_prob for step in result.step_diags]
+        ),
+        "entropy_mean": _safe_mean(
+            [step.entropy for step in result.step_diags]
+        ),
+        "policy_top1_rate": _safe_mean(
+            [float(step.was_top1_policy) for step in result.step_diags]
+        ),
+        "heuristic_top1_rate": _safe_mean(
+            [float(step.was_top1_heuristic) for step in result.step_diags]
+        ),
+        "malom_preserving_rate": _safe_mean(
+            [1.0 if value == 0.0 else 0.0 for value in known_quality]
+        ),
+        "malom_known_steps": len(known_quality),
+        "specialist_read_stats": result.specialist_read_stats,
+    }
+
+
 def _initialize_training_rngs(seed: int) -> random.Random:
     """Seed every trainer-global RNG and return the explicit scheduling RNG."""
     random.seed(seed)
@@ -2656,6 +2692,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
 
     log_path        = out_dir / "train_log.jsonl"
     update_log_path = out_dir / "update_log.jsonl"
+    measurement_log_path = out_dir / "development_measurement_log.jsonl"
 
     # Generalist starts every game from scratch (no position pool)
 
@@ -2746,8 +2783,24 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
         f"[s_gen_v2] Segment stop at game {segment_stop_game} "
         f"(current={game_count})"
     )
+    optimizer_update_bound = args.optimizer_update_bound
+    if optimizer_update_bound is not None:
+        if update_count > optimizer_update_bound:
+            raise RuntimeError(
+                "current update_count already exceeds optimizer_update_bound"
+            )
+        print(
+            f"[s_gen_v2] Optimizer update stop at {optimizer_update_bound} "
+            f"(current={update_count})"
+        )
 
-    def _save_runtime_checkpoint(path: Path, *, role: str, reason: str) -> str:
+    def _save_runtime_checkpoint(
+        path: Path,
+        *,
+        role: str,
+        reason: str,
+        advance_lineage: bool = True,
+    ) -> str:
         nonlocal checkpoint_sequence, parent_checkpoint_id
         checkpoint_sequence += 1
         checkpoint_id = f"{run_manifest.run_id}:checkpoint:{checkpoint_sequence:08d}"
@@ -2826,10 +2879,198 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             specialist_db_identity=specialist_db_identity,
         )
         save_checkpoint(path, descriptor, payload)
-        parent_checkpoint_id = checkpoint_id
+        if advance_lineage:
+            parent_checkpoint_id = checkpoint_id
         return checkpoint_id
 
-    while game_count < segment_stop_game:
+    measurement_anchor_opponent: Optional[FrozenModelOpponent] = None
+    measurement_lookahead_advisor: Optional[LookaheadAdvisor] = None
+    measurement_specialist_read_db: Optional[SpecialistTrainingReadView] = None
+    measurement_anchor_update_count: Optional[int] = None
+    measurement_anchor_checkpoint_id: Optional[str] = None
+    measurement_batch_count = 0
+    measurement_game_count = 0
+    measurement_updates_seen: set[int] = set()
+
+    def _capture_measurement_anchor_if_due() -> None:
+        nonlocal measurement_anchor_opponent
+        nonlocal measurement_lookahead_advisor
+        nonlocal measurement_specialist_read_db
+        nonlocal measurement_anchor_update_count
+        nonlocal measurement_anchor_checkpoint_id
+        if args.measurement_anchor_game is None:
+            return
+        if game_count != args.measurement_anchor_game:
+            return
+        if measurement_anchor_opponent is not None:
+            return
+        if update_count != args.measurement_anchor_expected_update_count:
+            raise RuntimeError(
+                "measurement anchor update_count differs: "
+                f"expected {args.measurement_anchor_expected_update_count}, "
+                f"observed {update_count}"
+            )
+        measurement_specialist_read_db = SpecialistTrainingReadView(
+            specialist_db,
+            args.specialist_read_mode,
+        )
+        measurement_lookahead_advisor = LookaheadAdvisor(
+            sentinel=sentinel,
+            evaluate_fn=_simple_evaluate,
+            value_net=value_net,
+            gap_net=gap_net,
+            human_db=human_db,
+            use_sentinel=True,
+            ply_depth=12,
+            sim_ply_depth=args.sim_ply_depth,
+            endgame_db=db,
+        )
+        measurement_anchor_opponent = FrozenModelOpponent(
+            model,
+            device,
+            sentinel=sentinel,
+            value_net=value_net,
+            lookahead_advisor=measurement_lookahead_advisor,
+            specialist_db=measurement_specialist_read_db,
+        )
+        measurement_lookahead_advisor.set_frozen_model(
+            measurement_anchor_opponent._model,
+            device=device,
+        )
+        measurement_anchor_update_count = update_count
+        measurement_anchor_checkpoint_id = _save_runtime_checkpoint(
+            out_dir / "development-measurement-anchor.pt",
+            role="development_measurement_anchor",
+            reason="fixed_no_update_measurement_anchor",
+            advance_lineage=False,
+        )
+        print(
+            "[s_gen_v2] Captured fixed development measurement anchor at "
+            f"game {game_count}, update {update_count}"
+        )
+
+    def _run_development_measurements_if_due() -> None:
+        nonlocal measurement_batch_count, measurement_game_count
+        if measurement_anchor_opponent is None:
+            return
+        if measurement_anchor_update_count is None:
+            raise RuntimeError("measurement anchor update identity is missing")
+        update_delta = update_count - measurement_anchor_update_count
+        if update_delta <= 0 or update_delta % args.measurement_every_updates:
+            return
+        if update_count in measurement_updates_seen:
+            return
+        if sanmill_installation is None:
+            raise RuntimeError("development measurement requires Sanmill runtime")
+        measurement_updates_seen.add(update_count)
+        measurement_batch_count += 1
+        candidate_checkpoint = (
+            out_dir
+            / f"development-measurement-update-{update_count:08d}.pt"
+        )
+        candidate_checkpoint_id = _save_runtime_checkpoint(
+            candidate_checkpoint,
+            role="development_measurement_candidate",
+            reason=f"no_update_measurement_at_update_{update_count}",
+            advance_lineage=False,
+        )
+        rows: list[dict[str, Any]] = []
+        for opponent_source in ("fixed_model_anchor", "sanmill_fixed_node"):
+            for within_opponent in range(args.measurement_games_per_opponent):
+                measurement_index = measurement_game_count
+                role = (
+                    "development-measurement:"
+                    f"{opponent_source}:{measurement_index}"
+                )
+                game_id, torch_seed = _derive_game_identity(
+                    args.seed,
+                    measurement_index,
+                    role,
+                )
+                learner_color = "W" if within_opponent % 2 == 0 else "B"
+                opponent_color = "B" if learner_color == "W" else "W"
+                with SanmillTrainingGame(
+                    sanmill_installation,
+                    seed=torch_seed,
+                ) as measurement_game:
+                    if opponent_source == "fixed_model_anchor":
+                        measurement_opponent: Any = measurement_anchor_opponent
+                    else:
+                        measurement_opponent = SanmillTrainingOpponent(
+                            measurement_game,
+                            node_budget=args.measurement_sanmill_node_budget,
+                            depth=args.sanmill_search_depth,
+                        )
+                    result = _rollout(
+                        model=model,
+                        device=device,
+                        start_board=BoardState.new_game(),
+                        learner_color=learner_color,
+                        opponent=measurement_opponent,
+                        opp_color=opponent_color,
+                        sentinel=sentinel,
+                        value_net=value_net,
+                        temperature=args.measurement_temperature,
+                        max_ply=args.max_ply,
+                        record_branches=False,
+                        branch_every=0,
+                        retry_ply=0,
+                        lookahead_advisor=measurement_lookahead_advisor,
+                        game_difficulty=1,
+                        human_db=human_db,
+                        specialist_db=measurement_specialist_read_db,
+                        malom_db=db,
+                        deep_game=False,
+                        torch_generator=_game_torch_generator(torch_seed),
+                        sanmill_game=measurement_game,
+                        persist_rollout_evidence=False,
+                        mill_bonus_mode=args.mill_bonus_mode,
+                        malom_policy_aux_coef=args.malom_policy_aux_coef,
+                        malom_policy_aux_mode=args.malom_policy_aux_mode,
+                    )
+                rows.append(
+                    {
+                        "schema_version": "nmm.development-anchor-measurement.v1",
+                        "game_id": game_id,
+                        "measurement_index": measurement_index,
+                        "measurement_batch": measurement_batch_count,
+                        "training_game_count": game_count,
+                        "optimizer_update_count": update_count,
+                        "anchor_game_count": args.measurement_anchor_game,
+                        "anchor_update_count": measurement_anchor_update_count,
+                        "anchor_checkpoint_id": measurement_anchor_checkpoint_id,
+                        "post_anchor_update_count": update_delta,
+                        "candidate_checkpoint": str(candidate_checkpoint),
+                        "candidate_checkpoint_id": candidate_checkpoint_id,
+                        "opponent_source": opponent_source,
+                        "sanmill_node_budget": (
+                            args.measurement_sanmill_node_budget
+                            if opponent_source == "sanmill_fixed_node"
+                            else None
+                        ),
+                        "learner_color": learner_color,
+                        "temperature": args.measurement_temperature,
+                        "no_update": True,
+                        **_development_measurement_metrics(result),
+                    }
+                )
+                measurement_game_count += 1
+        with measurement_log_path.open("a", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, sort_keys=True) + "\n")
+        print(
+            "[s_gen_v2] Development measurement batch "
+            f"{measurement_batch_count} completed at update {update_count} "
+            f"({len(rows)} no-update games)"
+        )
+
+    while (
+        game_count < segment_stop_game
+        and (
+            optimizer_update_bound is None
+            or update_count < optimizer_update_bound
+        )
+    ):
         batch_count += 1
         temperature = _compute_temperature(
             game_count, args.max_games, args.temp_start
@@ -3320,6 +3561,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 if _imitation_data is not None:
                     _imitation_mix_step(model, device, _imitation_data, opt)
 
+            _capture_measurement_anchor_if_due()
+            _run_development_measurements_if_due()
+
             # ── Periodic log + checkpoint ──────────────────────────────────────
             if game_count % args.log_every == 0 and diag_buffer:
                 recent_h     = list(win_history_heuristic)
@@ -3476,7 +3720,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             break
 
     # ── Final flush ────────────────────────────────────────────────────────────
-    if ep_steps:
+    if ep_steps and (
+        optimizer_update_bound is None or update_count < optimizer_update_bound
+    ):
         final_batch_steps = len(ep_steps)
         update_diagnostics = {}
         update_result = _update_if_ready(
@@ -3516,6 +3762,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     + "\n"
                 )
             ep_steps.clear()
+            _run_development_measurements_if_due()
         else:
             print(
                 f"[s_gen_v2] Preserving {final_batch_steps} pending steps; "
@@ -3526,6 +3773,25 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             for d in diag_buffer:
                 f.write(json.dumps(asdict(d)) + "\n")
         diag_buffer.clear()
+
+    if args.measurement_anchor_game is not None:
+        if measurement_anchor_opponent is None:
+            raise RuntimeError("development measurement anchor was not captured")
+        expected_batches = (
+            optimizer_update_bound - measurement_anchor_update_count
+        ) // args.measurement_every_updates
+        expected_games = (
+            expected_batches * args.measurement_games_per_opponent * 2
+        )
+        if (
+            measurement_batch_count != expected_batches
+            or measurement_game_count != expected_games
+        ):
+            raise RuntimeError(
+                "development measurement schedule is incomplete: "
+                f"batches={measurement_batch_count}/{expected_batches}, "
+                f"games={measurement_game_count}/{expected_games}"
+            )
 
     _save_runtime_checkpoint(out_dir / "latest.pt", role="latest", reason="final")
     print(f"\n[s_gen_v2] Done. Games: {game_count}  Best win rate: {best_win_rate:.3f}")
@@ -3737,6 +4003,52 @@ def _build_argument_parser() -> argparse.ArgumentParser:
             "overrides game_count + --segment-games so mid-segment exact-resume "
             "still ends on the managed schedule bound."
         ),
+    )
+    p.add_argument(
+        "--optimizer-update-bound",
+        type=int,
+        default=None,
+        help=(
+            "Optional absolute optimizer update_count ceiling. It is intended "
+            "for bounded diagnostics with warm-start and imitation updates "
+            "disabled; --segment-stop-game remains the game safety ceiling."
+        ),
+    )
+    p.add_argument(
+        "--measurement-anchor-game",
+        type=int,
+        default=None,
+        help="Training game at which to freeze a development-only measurement anchor",
+    )
+    p.add_argument(
+        "--measurement-anchor-expected-update-count",
+        type=int,
+        default=None,
+        help="Expected update_count at anchor capture; mismatch stops fail closed",
+    )
+    p.add_argument(
+        "--measurement-every-updates",
+        type=int,
+        default=None,
+        help="Run no-update development measurements at this post-anchor cadence",
+    )
+    p.add_argument(
+        "--measurement-games-per-opponent",
+        type=int,
+        default=None,
+        help="Balanced no-update games per fixed measurement opponent and checkpoint",
+    )
+    p.add_argument(
+        "--measurement-sanmill-node-budget",
+        type=int,
+        default=None,
+        help="Fixed-node Sanmill budget for development measurements",
+    )
+    p.add_argument(
+        "--measurement-temperature",
+        type=_finite_positive_float,
+        default=None,
+        help="Fixed candidate sampling temperature for development measurements",
     )
     p.add_argument("--seed",                type=int,   default=42)
     p.add_argument("--lr",                  type=float, default=LR)

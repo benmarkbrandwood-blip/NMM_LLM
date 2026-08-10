@@ -68,6 +68,43 @@ _DYNAMIC_TRAINER_OPTIONS = frozenset(
 )
 
 
+def _optional_positive_trainer_arg(
+    args: tuple[str, ...], option: str
+) -> int | None:
+    """Return one optional positive integer from immutable trainer args."""
+    matches = [index for index, value in enumerate(args) if value == option]
+    if not matches:
+        return None
+    if len(matches) != 1 or matches[0] + 1 >= len(args):
+        raise ManagedContractError(f"{option} must appear exactly once with a value")
+    raw = args[matches[0] + 1]
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise ManagedContractError(f"{option} must be a positive integer") from exc
+    if value <= 0:
+        raise ManagedContractError(f"{option} must be a positive integer")
+    return value
+
+
+def _optimizer_update_bound(plan: ManagedPlan) -> int | None:
+    return _optional_positive_trainer_arg(
+        plan.common_trainer_args, "--optimizer-update-bound"
+    )
+
+
+def _plan_completion_reached(
+    plan: ManagedPlan,
+    *,
+    completed_games: int,
+    completed_updates: int | None,
+) -> bool:
+    update_bound = _optimizer_update_bound(plan)
+    if update_bound is None:
+        return completed_games >= plan.game_bound
+    return completed_updates is not None and completed_updates >= update_bound
+
+
 class ManagedContractError(RuntimeError):
     """Raised when a managed plan, authorization, or segment is unsafe."""
 
@@ -354,6 +391,7 @@ class ManagedPlan:
                 "common_trainer_args contains controller-owned options: "
                 + ", ".join(forbidden)
             )
+        _optional_positive_trainer_arg(args, "--optimizer-update-bound")
         object.__setattr__(self, "common_trainer_args", args)
         for field in (
             "allow_safe_exact_resume",
@@ -613,6 +651,11 @@ def managed_status(
     completed_games = (
         int(completed[-1].details["completed_games"]) if completed else 0
     )
+    completed_updates = (
+        int(completed[-1].details["completed_updates"])
+        if completed and completed[-1].details.get("completed_updates") is not None
+        else None
+    )
     elapsed_seconds = sum(
         float(event.details.get("elapsed_seconds", 0.0)) for event in completed
     )
@@ -628,9 +671,17 @@ def managed_status(
     last = ledger_events[-1]
     needs_product_decision = False
     decision = None
-    if completed_games >= plan.game_bound or last.event_type == "managed_plan_completed":
+    if _plan_completion_reached(
+        plan,
+        completed_games=completed_games,
+        completed_updates=completed_updates,
+    ) or last.event_type == "managed_plan_completed":
         state = "completed"
-        summary = "The authorized training plan reached its game bound."
+        summary = (
+            "The authorized training plan reached its optimizer-update bound."
+            if _optimizer_update_bound(plan) is not None
+            else "The authorized training plan reached its game bound."
+        )
     elif last.reason_code == "wall_time_limit":
         state = "resource_limit_reached"
         summary = "The authorized wall-time envelope is exhausted."
@@ -652,19 +703,27 @@ def managed_status(
         state = "ready_to_run"
         summary = "The plan is authorized and the next safe segment may run."
 
+    progress: dict[str, Any] = {
+        "completed_games": completed_games,
+        "max_games": plan.game_bound,
+        "schedule_max_games": plan.max_games,
+        "completed_segments": len(completed),
+        "elapsed_hours": round(elapsed_seconds / 3600.0, 4),
+        "max_wall_hours": plan.max_wall_hours,
+    }
+    if _optimizer_update_bound(plan) is not None:
+        progress.update(
+            {
+                "completed_optimizer_updates": completed_updates,
+                "optimizer_update_bound": _optimizer_update_bound(plan),
+            }
+        )
     return {
         "state": state,
         "summary": summary,
         "needs_product_decision": needs_product_decision,
         "product_decision": decision,
-        "progress": {
-            "completed_games": completed_games,
-            "max_games": plan.game_bound,
-            "schedule_max_games": plan.max_games,
-            "completed_segments": len(completed),
-            "elapsed_hours": round(elapsed_seconds / 3600.0, 4),
-            "max_wall_hours": plan.max_wall_hours,
-        },
+        "progress": progress,
         "technical": {
             "plan_id": plan.plan_id,
             "plan_sha256": plan.plan_sha256,
@@ -1434,14 +1493,35 @@ def _inspect_completed_segment(
     if descriptor.config_sha256 != plan.resume_config_sha256:
         raise ManagedContractError("segment checkpoint semantics differ")
     completed_games = int(envelope.payload.trainer_state["game_count"])
+    completed_updates = int(envelope.payload.trainer_state["update_count"])
     expected_games = min(
         previous_completed_games + plan.segment_games,
         plan.game_bound,
     )
-    if completed_games != expected_games:
-        raise ManagedContractError(
-            "segment checkpoint game count does not match the bounded schedule"
-        )
+    update_bound = _optimizer_update_bound(plan)
+    if update_bound is None:
+        if completed_games != expected_games:
+            raise ManagedContractError(
+                "segment checkpoint game count does not match the bounded schedule"
+            )
+    else:
+        if completed_updates > update_bound:
+            raise ManagedContractError(
+                "segment checkpoint exceeded the optimizer-update bound"
+            )
+        if completed_updates == update_bound:
+            if not previous_completed_games < completed_games <= expected_games:
+                raise ManagedContractError(
+                    "optimizer-bounded segment game count is outside its safety ceiling"
+                )
+        elif completed_games != expected_games:
+            raise ManagedContractError(
+                "segment stopped before its game ceiling and optimizer-update bound"
+            )
+        elif completed_games >= plan.game_bound:
+            raise ManagedContractError(
+                "optimizer-update bound was not reached before the game ceiling"
+            )
     return completed_games, checkpoint
 
 
@@ -1735,7 +1815,17 @@ def run_next_segment(
         if completed_events
         else 0
     )
-    if previous_completed_games >= plan.game_bound:
+    previous_completed_updates = (
+        int(completed_events[-1].details["completed_updates"])
+        if completed_events
+        and completed_events[-1].details.get("completed_updates") is not None
+        else None
+    )
+    if _plan_completion_reached(
+        plan,
+        completed_games=previous_completed_games,
+        completed_updates=previous_completed_updates,
+    ):
         return managed_status(plan_path, authorization_path)
     elapsed_seconds = sum(
         float(event.details.get("elapsed_seconds", 0.0))
@@ -1950,6 +2040,13 @@ def run_next_segment(
                 },
             )
             raise ManagedContractError("managed segment evidence is invalid") from exc
+        completed_updates = None
+        if _optimizer_update_bound(plan) is not None:
+            completed_updates = int(
+                load_checkpoint(checkpoint, map_location="cpu").payload.trainer_state[
+                    "update_count"
+                ]
+            )
         policy_health: dict[str, Any] | None = None
         if plan.policy_health is not None:
             try:
@@ -2020,17 +2117,25 @@ def run_next_segment(
                 "segment_index": segment_index,
                 "run_id": _segment_run_id(plan, segment_index),
                 "completed_games": completed_games,
+                "completed_updates": completed_updates,
                 "checkpoint": str(checkpoint.resolve(strict=False)),
                 "elapsed_seconds": elapsed,
                 "policy_health": policy_health,
             },
         )
-        if completed_games >= plan.game_bound:
+        if _plan_completion_reached(
+            plan,
+            completed_games=completed_games,
+            completed_updates=completed_updates,
+        ):
             _append_controller_event(
                 plan,
                 status="completed",
                 event_type="managed_plan_completed",
-                details={"completed_games": completed_games},
+                details={
+                    "completed_games": completed_games,
+                    "completed_updates": completed_updates,
+                },
             )
         return managed_status(plan_path, authorization_path)
     finally:

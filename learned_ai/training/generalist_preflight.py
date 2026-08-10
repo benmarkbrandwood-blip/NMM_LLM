@@ -287,6 +287,108 @@ def validate_generalist_configuration(args: Any) -> None:
             f"update_every must be at least {MIN_UPDATE_STEPS} steps"
         )
 
+    optimizer_update_bound = getattr(args, "optimizer_update_bound", None)
+    if optimizer_update_bound is not None:
+        _positive_integer(
+            optimizer_update_bound,
+            field="optimizer_update_bound",
+        )
+        if not (
+            args.no_s1a_warmstart
+            and args.no_imitation_mix
+            and args.no_s1b_refresher
+        ):
+            raise PreflightConfigurationError(
+                "optimizer_update_bound requires all auxiliary optimizer steps "
+                "to be disabled"
+            )
+
+    measurement_fields = {
+        "measurement_anchor_game": getattr(args, "measurement_anchor_game", None),
+        "measurement_anchor_expected_update_count": getattr(
+            args, "measurement_anchor_expected_update_count", None
+        ),
+        "measurement_every_updates": getattr(
+            args, "measurement_every_updates", None
+        ),
+        "measurement_games_per_opponent": getattr(
+            args, "measurement_games_per_opponent", None
+        ),
+        "measurement_sanmill_node_budget": getattr(
+            args, "measurement_sanmill_node_budget", None
+        ),
+        "measurement_temperature": getattr(args, "measurement_temperature", None),
+    }
+    configured_measurement = [
+        name for name, value in measurement_fields.items() if value is not None
+    ]
+    if configured_measurement and len(configured_measurement) != len(measurement_fields):
+        raise PreflightConfigurationError(
+            "development measurement anchor options must be specified together"
+        )
+    if configured_measurement:
+        for field in (
+            "measurement_anchor_game",
+            "measurement_anchor_expected_update_count",
+            "measurement_every_updates",
+            "measurement_games_per_opponent",
+            "measurement_sanmill_node_budget",
+        ):
+            _positive_integer(measurement_fields[field], field=field)
+        if measurement_fields["measurement_games_per_opponent"] % 2:
+            raise PreflightConfigurationError(
+                "measurement_games_per_opponent must be even for color balance"
+            )
+        if measurement_fields["measurement_anchor_game"] >= args.max_games:
+            raise PreflightConfigurationError(
+                "measurement_anchor_game must be below max_games"
+            )
+        measurement_temperature = _finite_number(
+            measurement_fields["measurement_temperature"],
+            field="measurement_temperature",
+        )
+        if measurement_temperature <= 0:
+            raise PreflightConfigurationError(
+                "measurement_temperature must be greater than zero"
+            )
+        if optimizer_update_bound is None:
+            raise PreflightConfigurationError(
+                "development measurement requires optimizer_update_bound"
+            )
+        anchor_updates = measurement_fields[
+            "measurement_anchor_expected_update_count"
+        ]
+        cadence = measurement_fields["measurement_every_updates"]
+        if optimizer_update_bound <= anchor_updates:
+            raise PreflightConfigurationError(
+                "optimizer_update_bound must exceed the anchor update count"
+            )
+        if (optimizer_update_bound - anchor_updates) % cadence:
+            raise PreflightConfigurationError(
+                "post-anchor optimizer updates must be divisible by the "
+                "measurement cadence"
+            )
+        if args.start_mode != "fresh":
+            raise PreflightConfigurationError(
+                "development measurement anchor runs must start fresh"
+            )
+        if not args.minimal_rollouts or args.batch_games != 1:
+            raise PreflightConfigurationError(
+                "development measurement requires minimal sequential rollouts"
+            )
+        if args.max_branches_per_game != 0:
+            raise PreflightConfigurationError(
+                "development measurement requires branch rollouts disabled"
+            )
+        if args.referee_engine != "sanmill":
+            raise PreflightConfigurationError(
+                "development measurement requires the strict Sanmill referee"
+            )
+        if args.ppo:
+            raise PreflightConfigurationError(
+                "development measurement requires one-step A2C optimizer updates"
+            )
+
     for field in ("lr", "temp_start", "s1b_refresher_lr"):
         if _finite_number(getattr(args, field), field=field) <= 0:
             raise PreflightConfigurationError(f"{field} must be greater than zero")

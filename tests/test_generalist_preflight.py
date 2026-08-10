@@ -333,6 +333,72 @@ def test_configuration_requires_paired_fail_closed_sanmill_controls(
         validate_generalist_configuration(args)
 
 
+def _enable_development_measurement_contract(args) -> None:
+    args.no_s1b_refresher = True
+    args.optimizer_update_bound = 34
+    args.measurement_anchor_game = 50
+    args.measurement_anchor_expected_update_count = 18
+    args.measurement_every_updates = 4
+    args.measurement_games_per_opponent = 8
+    args.measurement_sanmill_node_budget = 1_000
+    args.measurement_temperature = 0.2
+
+
+def test_configuration_accepts_controlled_development_measurement(
+    tmp_path: Path,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    _enable_development_measurement_contract(args)
+    args.max_games = 150
+
+    validate_generalist_configuration(args)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (
+            lambda args: setattr(args, "measurement_temperature", None),
+            "must be specified together",
+        ),
+        (
+            lambda args: setattr(args, "no_s1b_refresher", False),
+            "auxiliary optimizer steps",
+        ),
+        (
+            lambda args: setattr(args, "optimizer_update_bound", 33),
+            "divisible by the measurement cadence",
+        ),
+        (
+            lambda args: setattr(args, "measurement_games_per_opponent", 7),
+            "must be even for color balance",
+        ),
+        (
+            lambda args: setattr(args, "ppo", True),
+            "one-step A2C optimizer updates",
+        ),
+        (
+            lambda args: setattr(args, "start_mode", "exact-resume"),
+            "must start fresh",
+        ),
+    ],
+)
+def test_configuration_rejects_ambiguous_development_measurement(
+    tmp_path: Path,
+    mutation,
+    message: str,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _enable_sanmill_contract(args, tmp_path / "runtime")
+    _enable_development_measurement_contract(args)
+    args.max_games = 150
+    mutation(args)
+
+    with pytest.raises(PreflightConfigurationError, match=message):
+        validate_generalist_configuration(args)
+
+
 def test_sanmill_smoke_preflight_binds_runtime_identity(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

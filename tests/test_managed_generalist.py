@@ -34,7 +34,11 @@ from learned_ai.training.managed_generalist import (
 )
 
 
-def _managed_checkpoint_payload(game_count: int) -> CheckpointPayload:
+def _managed_checkpoint_payload(
+    game_count: int,
+    *,
+    update_count: int = 0,
+) -> CheckpointPayload:
     return CheckpointPayload(
         model_state={},
         optimizer_state=None,
@@ -44,7 +48,7 @@ def _managed_checkpoint_payload(game_count: int) -> CheckpointPayload:
         trainer_state={
             "game_count": game_count,
             "batch_count": game_count,
-            "update_count": 0,
+            "update_count": update_count,
             "difficulty": 1,
             "temperature": 0.8,
             "rolling_metrics": {},
@@ -517,6 +521,83 @@ def test_supervisor_stops_at_completion_bound_not_schedule_horizon(
         "elapsed_hours": 0.0,
         "max_wall_hours": 12.0,
     }
+    assert second_status["state"] == "completed"
+
+
+def test_supervisor_stops_at_optimizer_update_bound_before_game_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    base = _plan(tmp_path)
+    plan = replace(
+        base,
+        common_trainer_args=(
+            *base.common_trainer_args,
+            "--optimizer-update-bound",
+            "34",
+        ),
+    )
+    plan_path = tmp_path / "control" / "plan.json"
+    authorization_path = tmp_path / "control" / "authorization.json"
+    publish_managed_plan(plan_path, plan)
+    authorize_plan(
+        plan_path,
+        authorization_path,
+        authorized_by="product-owner",
+        decision_note="Approve one optimizer-bounded diagnostic segment.",
+        authorized_at_utc="2026-07-20T12:05:00Z",
+    )
+    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    checkpoint = tmp_path / "optimizer-bounded-latest.pt"
+    descriptor = CheckpointDescriptor(
+        checkpoint_id="managed-v4-test-segment-0001:checkpoint:1",
+        run_id="managed-v4-test-segment-0001",
+        experiment_id=plan.experiment_id,
+        parent_checkpoint_id=None,
+        role="latest",
+        save_reason="optimizer-update-bound",
+        created_at_utc="2026-07-20T12:10:00Z",
+        config_sha256=plan.resume_config_sha256,
+        feature_schema_version="test",
+        label_schema_version="sector-corrected-v1",
+        database_schema_versions={"specialist_db": "sector-corrected-v1"},
+        asset_identities={"specialist_db": "d" * 64},
+        implementation={"trainer": "test"},
+    )
+    save_checkpoint(
+        checkpoint,
+        descriptor,
+        _managed_checkpoint_payload(87, update_count=34),
+        previous_copies=0,
+    )
+    monkeypatch.setattr(
+        managed,
+        "_inspect_completed_segment",
+        lambda *_args, **_kwargs: (87, checkpoint),
+    )
+    calls: list[list[str]] = []
+
+    def runner(command, **_kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+    second_status = run_next_segment(
+        plan_path,
+        authorization_path,
+        runner=runner,
+        python_executable="python",
+    )
+
+    assert len(calls) == 1
+    assert status["state"] == "completed"
+    assert status["progress"]["completed_games"] == 87
+    assert status["progress"]["completed_optimizer_updates"] == 34
+    assert status["progress"]["optimizer_update_bound"] == 34
     assert second_status["state"] == "completed"
 
 
