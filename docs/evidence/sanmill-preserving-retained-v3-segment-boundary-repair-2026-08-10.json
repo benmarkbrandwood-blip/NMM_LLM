@@ -1,0 +1,34 @@
+{
+  "schema_version": "nmm.managed-technical-recovery.v1",
+  "plan_sha256": "e7fccb1ad174e59b4ccdd71b34b11f180e77b23c985f50716f2acabfeb88ed65",
+  "failed_event_sha256": "360acb209b4e7e1056400d319cd2dea11ea33cd8ed03b42899e2e89497f9244b",
+  "failed_segment_index": 2,
+  "failure_code": "unclean-specialist-db-close",
+  "source_commit": "3f400135c833f49de6700f1ab9c246cca9ab25f7",
+  "tested_repair_commit": "1133df563ca323f512caa8bd5bc7b4561ba5b846",
+  "reproduction": {
+    "result": "reproduced-and-fixed",
+    "scope": "segment 2 exact-resume preflight before any segment 2 output or game",
+    "segment_1_completed_games": 250,
+    "segment_1_checkpoint_sha256": "a507e1a9eb54128ad581f21f096b60c7ad9f701a89159ca687f01c241b19ac03",
+    "checkpoint_specialist_db_sha256": "e30db9b5ba86f106a9f7e1ea3b16dd1bc0238a5a5d364dcfcfaa838364325f5a",
+    "live_specialist_db_sha256": "e30db9b5ba86f106a9f7e1ea3b16dd1bc0238a5a5d364dcfcfaa838364325f5a",
+    "wal_size_bytes": 0,
+    "shm_size_bytes": 32768,
+    "segment_2_output_existed": false,
+    "preflight_errors": [
+      "immutable SpecialistDB has SQLite sidecars",
+      "SpecialistDB content identity has changed"
+    ],
+    "cause": "The trainer checkpointed the main database but did not explicitly close the writable SpecialistDB before process exit. The zero-byte WAL and SHM made the next immutable preflight fail closed even though the main database matched the parent checkpoint."
+  },
+  "verification": [
+    "Focused red reproduction: two launch lifecycle tests failed because WAL and SHM remained while the database object was retained.",
+    "Focused green verification: tests/test_generalist_launch.py passed 6 tests after explicit finally cleanup.",
+    "Managed recovery verification: manager, launch, and preflight suites passed 65 tests, including a changed-database negative case.",
+    "Expanded trainer, manager, checkpoint, exact-resume, referee, reward, and policy-health scope passed 310 tests.",
+    "Required Malom, DB-teacher, and label-provenance scope passed 103 tests and 498 subtests.",
+    "Ruff passed for managed_generalist.py and its focused recovery and launch tests."
+  ],
+  "claim_boundary": "Technical exact-resume recovery only. The completed 250-game segment and unchanged SpecialistDB may be preserved; this evidence does not establish learning quality, playing strength, promotion, publication, or held-out evaluation."
+}
