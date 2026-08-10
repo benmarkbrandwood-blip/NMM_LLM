@@ -748,7 +748,7 @@ def inspect_source_readiness(
         state = "source_ready_for_local_preparation"
     unresolved: list[str] = []
     if not source["published"]:
-        unresolved.append("publish the frozen analyzer source to origin/dev")
+        unresolved.append("publish the exact frozen preparation source to origin/dev")
     if not targets["absent"]:
         unresolved.append("quarantine pre-existing preparation targets")
     if not unresolved:
