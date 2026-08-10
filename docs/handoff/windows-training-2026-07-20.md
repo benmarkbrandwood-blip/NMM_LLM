@@ -2,6 +2,56 @@
 
 ## Executive Summary
 
+### Latest state: retained v3 completion and SpecialistDB isolation
+
+The seed-58 `managed-sanmill-preserving-retained-v3-seed58` run is complete
+and frozen as evidence. It reached 5,000 games in 20 accepted segments and
+1.732867 active hours. Its final checkpoint SHA-256 is
+`28e8af274f4fc9dd7e00ce4f7be884c855354218c796888f1c1ab81a4cdc9fa7`,
+and its final SpecialistDB main-file SHA-256 is
+`82d7fbcd897be2493ee40b40a44aa7cd941c95ff538b4f9bf21e2977cd4a8abe`.
+The final 200 games were 0 wins, 199 draws and 1 loss. This is a retained
+research baseline and diagnostic observation, not promotion, strength, or
+trap-learning evidence. See the
+[completion evidence](../evidence/sanmill-preserving-retained-v3-result-2026-08-10.md).
+
+A first no-update SpecialistDB audit found no usable coverage on the fixed
+phase corpus and is retained as negative coverage evidence only. A second
+candidate-blind audit replayed the frozen 12-ply source histories, selected all
+100 states with usable empirical support under a preregistered rule, and only
+then loaded the completed checkpoint. It found three argmax changes when
+empirical reads were suppressed, mean scheduled-temperature total variation
+about 0.0174, and no Malom preserving-to-downgrading crossing. The result is a
+small material mechanism effect, not evidence that empirical reads caused the
+late draw mass.
+
+Commits `98ef28d` and `9e9b8da` add and propagate explicit `full` versus
+`theoretical-only` SpecialistDB training reads. Both modes preserve the same
+writable database route. Per-rollout diagnostics count queries, available
+theoretical and empirical evidence, returned projections and suppressed
+empirical reads; counters are isolated per worker thread. The selected mode is
+bound in the run manifest and managed trainer command.
+
+The next bounded mechanism experiment is frozen in
+[`specialist-db-training-read-calibration-v1.md`](../experiments/specialist-db-training-read-calibration-v1.md),
+with plan identity
+`032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772`.
+It pairs `full` and `theoretical-only` across fresh seeds 61, 62 and 63, one
+250-game segment per arm, no more than 1,500 games or three active hours. It
+holds Sanmill work, persistence, reward, temperature, opponent mix and all
+optional networks fixed. Its source audit state is
+`implementation_complete_needs_publication`; all six arms have zero authorized
+segments, and the result analyzer must still be implemented and frozen before
+any launch authorization.
+
+The completed SpecialistDB main file itself remains byte-identical. An early
+non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
+beside that historical database. They were not deleted. All accepted policy
+audits instead used an ignored, sidecar-free byte-identical snapshot named
+`specialist_db.sanmill_preserving_retained_v3.seed58.audit_snapshot.sqlite`.
+Do not treat the sidecars as new training data or delete them without an
+explicit, recoverable cleanup decision.
+
 The repository is usable on the Windows 11 host and the downloaded databases
 and existing model artifacts are in their intended locations. The focused
 Malom/provenance and current trainer-contract suites are green. The 7 August
@@ -1860,12 +1910,14 @@ the current successor in this order:
     off in the next baseline. Any KL-constrained teacher or safe-action
     sampler requires a separate contract and is not a prerequisite for that
     baseline.
-17. Prepare the frozen seed-58 Sanmill-preserving retained-v3 baseline. Keep
-    `malom-preserving-only`, policy auxiliary off, downgrade penalty off, and
-    every other v2 training choice unchanged. Do not reuse or resume any
-    completed arm. The prior 64-start held-out corpus and 29-state development
-    corpus are exposed; neither may decide v3 promotion. Launch only after the
-    exact managed-plan readiness identity receives product authorization.
+17. Preserve the completed seed-58 Sanmill-preserving retained-v3 baseline,
+    its 5,000-game lineage, checkpoint, database, completion evidence and
+    consumed authorization. Do not resume or promote it. Preserve both
+    SpecialistDB mechanism audits, distinguishing the first zero-coverage
+    result from the second coverage-positive material result. The next safe
+    work is publication and source audit of the frozen three-seed read-mode
+    calibration, followed by pre-result analyzer implementation. No arm is
+    authorized.
 
 The previously executed isolated smoke command was:
 
@@ -1955,14 +2007,14 @@ promoted.
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
-grant, and the no-update batch-capture grant are also consumed. Safe work now
-is limited to preserving the completed normalized calibration and
-target-response evidence and preparing the frozen seed-58 successor's new
-isolated database, immutable managed plan, tests, and readiness audit.
-The superseded preliminary plans are already preserved in recoverable
-quarantine. No normalized arm, additional calibration, long training job,
-promotion/publication, protocol change or history rewrite is authorized by
-this handover.
+grant, the no-update batch-capture grant, and the retained-v3 grant are also
+consumed. Safe work now is limited to publishing the completed retained-v3 and
+SpecialistDB audit chain, implementing the frozen read-calibration result
+analyzer, and producing authorization-free plans and preflights from a clean
+published tip. The superseded preliminary plans are already preserved in
+recoverable quarantine. No read-calibration arm, additional calibration,
+long training job, promotion/publication, protocol change or history rewrite
+is authorized by this handover.
 
 ## Reference Material
 
