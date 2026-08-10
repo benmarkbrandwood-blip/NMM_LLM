@@ -32,19 +32,31 @@ theoretical and empirical evidence, returned projections and suppressed
 empirical reads; counters are isolated per worker thread. The selected mode is
 bound in the run manifest and managed trainer command.
 
-The next bounded mechanism experiment is frozen in
-[`specialist-db-training-read-calibration-v1.md`](../experiments/specialist-db-training-read-calibration-v1.md),
-with plan identity
-`36a1feb6bc9e403890f7c3b6b6f3444a97a9cd721272b760a2b25d0f8091459b`.
-It pairs `full` and `theoretical-only` across fresh seeds 61, 62 and 63, one
-250-game segment per arm, no more than 1,500 games or three active hours. It
-holds Sanmill work, persistence, reward, temperature, opponent mix and all
-optional networks fixed. Result-analyzer commit `39f2cf0` and handover commit
-`a5d683d` are published on `origin/dev`. A post-publication source audit at
-`a5d683d` returned `source_ready_for_local_preparation` with identity
-`da31ec0e`; all six preparation targets were absent. The owner has authorized
-only creation and review of the six immutable plans and preflights. All six
-arms still have zero authorized segments, and no trainer may be started.
+The three-seed SpecialistDB read-mode calibration subsequently completed once
+under readiness identity
+`ee68e2d90d069bd65643d0e02ecb4c408fb522a35d6e19bd6246b1cb1b640b6f`.
+All six arms reached exactly 250 games, for 1,500 games and 405 optimizer
+updates in total. The immutable result identity is
+`90da60538e782c85b5871e35eec4895e44fe76003309b3ad13c417c8868f86de`;
+its file SHA-256 is
+`e8a8f3aac6076697b9a31c7532880976f4222801d002f988d5f65bf78c8344e9`.
+No read mode was selected. The run is mechanism evidence only and does not
+authorize held-out evaluation or retained training.
+
+The follow-up diagnosis found that every arm refreshed its frozen target and
+changed its learning rate at the same game-50 boundary. Local commit
+`0d9f7b8` adds explicit historical-adaptive versus fixed learning-rate modes,
+without changing the historical default. Commit `00cddd2` records the
+observed pre/post W/D/L evidence and competing explanations. Commit `d450d50`
+freezes a two-seed, two-by-two paired diagnostic under plan identity
+`94f6381a40ab86401cb0e957677dd3a21dde01ed9ffd4c69b3fa252b21787e58`.
+It independently varies target refresh at game 50 and fixed versus adaptive
+learning rate, requires byte-identical same-seed games 1-50, and analyzes only
+games 51-100 for factor effects. The full ceiling is 800 games and two active
+hours. Source readiness identity `0eab813b90b4ff8be66d40b52b4168d36297fe65b30644cecdef50b71f1c10a7`
+reports `implementation_complete_needs_publication`: the three commits are
+local, all preparation targets are absent, and no plan, preflight,
+authorization, game, held-out match or long run has been created.
 
 The completed SpecialistDB main file itself remains byte-identical. An early
 non-immutable audit check created a zero-byte `-wal` and a 32,768-byte `-shm`
@@ -1916,15 +1928,19 @@ the current successor in this order:
     its 5,000-game lineage, checkpoint, database, completion evidence and
     consumed authorization. Do not resume or promote it. Preserve both
     SpecialistDB mechanism audits, distinguishing the first zero-coverage
-    result from the second coverage-positive material result. The three-seed
-    read-mode calibration now binds result analyzer and publisher hashes under
-    plan identity `36a1feb6`. Analyzer/preparation implementation commit
-    `39f2cf0` and handover commit `a5d683d` are published. The post-publication
-    source audit at `a5d683d` has identity `da31ec0e` and state
-    `source_ready_for_local_preparation`; it confirmed that all six targets
-    were absent and created no plan, database, authorization or trainer
-    output. The owner has authorized authorization-free generation and review
-    of exactly six plans and preflights. No arm is authorized.
+    result from the second coverage-positive material result. Preserve the
+    completed three-seed read-mode calibration, result identity `90da6053`,
+    all six consumed arm grants and its null selection. Its game-50 target
+    refresh and learning-rate change were coupled, so do not use that result
+    to assign causality to either mechanism.
+18. Publish local commits `0d9f7b8`, `00cddd2` and `d450d50` by ordinary
+    fast-forward before preparing their successor. Then repeat the source
+    audit from `dev == origin/dev`. If it passes, preparation may create only
+    the eight authorization-free plans and preflights in the frozen two-seed
+    2x2 target-refresh/LR diagnostic. Review those artifacts against plan
+    identity `94f6381a`. Do not authorize or run any arm without a later
+    explicit grant. Held-out evaluation and long training remain blocked
+    until this diagnostic is completed and interpreted under its frozen rule.
 
 The previously executed isolated smoke command was:
 
@@ -2014,14 +2030,14 @@ promoted.
 The managed plan and its Stage-0 evaluation are complete, and that older
 evaluation's authorization is consumed. The retained-v2 held-out grant, the
 six-arm downgrade-penalty grant, the four-arm policy-auxiliary calibration
-grant, the no-update batch-capture grant, and the retained-v3 grant are also
-consumed. Safe work now is limited to publishing the completed retained-v3 and
-SpecialistDB audit chain and producing authorization-free plans and preflights
-from a clean published tip after this handover correction is published. The
-superseded preliminary plans are already preserved in recoverable quarantine.
-No read-calibration arm, additional calibration, long training job, model
-promotion/publication, protocol change or history rewrite is authorized by
-this handover.
+grant, the no-update batch-capture grant, the retained-v3 grant and all six
+SpecialistDB read-calibration grants are also consumed. Safe work now is
+limited to publishing the three local target-refresh/LR commits, repeating the
+source audit from that clean published tip and, only after it passes,
+generating the eight authorization-free paired-diagnostic plans and
+preflights. No diagnostic arm, held-out match, additional calibration, long
+training job, model promotion/publication, protocol change or history rewrite
+is authorized by this handover.
 
 ## Reference Material
 
