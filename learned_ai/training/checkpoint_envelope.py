@@ -25,7 +25,16 @@ from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha
 
 
 CHECKPOINT_SCHEMA = "nmm.checkpoint-envelope.v2"
-CHECKPOINT_ROLES = frozenset({"latest", "best_train", "candidate", "accepted"})
+CHECKPOINT_ROLES = frozenset(
+    {
+        "latest",
+        "best_train",
+        "candidate",
+        "accepted",
+        "development_measurement_anchor",
+        "development_measurement_candidate",
+    }
+)
 CHECKPOINT_START_MODES = frozenset({"fresh", "weights-only", "exact-resume"})
 
 _MAGIC = b"NMMCKP2\n"

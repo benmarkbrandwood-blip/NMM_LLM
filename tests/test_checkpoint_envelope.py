@@ -99,6 +99,28 @@ def test_checkpoint_round_trip_preserves_complete_state(tmp_path: Path) -> None:
     assert payload_size == loaded.payload_size
 
 
+@pytest.mark.parametrize(
+    "role",
+    ["development_measurement_anchor", "development_measurement_candidate"],
+)
+def test_checkpoint_round_trip_preserves_development_measurement_role(
+    tmp_path: Path,
+    role: str,
+) -> None:
+    model = torch.nn.Linear(3, 2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    path = tmp_path / f"{role}.pt"
+
+    save_checkpoint(path, _descriptor(role=role), _payload(model, optimizer))
+
+    assert load_checkpoint(path).descriptor.role == role
+
+
+def test_checkpoint_rejects_unknown_role() -> None:
+    with pytest.raises(CheckpointFormatError, match="unsupported checkpoint role"):
+        _descriptor(role="development_measurement_unknown")
+
+
 def test_checkpoint_detects_payload_tampering(tmp_path: Path) -> None:
     model = torch.nn.Linear(2, 1)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
