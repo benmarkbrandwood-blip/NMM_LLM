@@ -145,8 +145,9 @@ def inspect_completed_prefix(
     paths_config: Path,
     source_commit: str,
 ) -> CompletedPrefix:
-    """Fail closed unless the shared prefix is a completed game-50 fork."""
+    """Fail closed unless the shared prefix reached its frozen fork."""
     prefix, _arms = _seed_prefix_and_arms(contract, seed)
+    fork_game = int(contract["common_training_contract"]["target_refresh_fork_game"])
     control_dir = _repository_path(
         root, prefix["control_dir"], field="prefix control"
     )
@@ -169,7 +170,7 @@ def inspect_completed_prefix(
     progress = status.get("progress", {})
     if (
         status.get("state") != "completed"
-        or progress.get("completed_games") != 50
+        or progress.get("completed_games") != fork_game
         or progress.get("completed_segments") != 1
         or status.get("technical", {}).get("authorization_error") is not None
     ):
@@ -204,7 +205,7 @@ def inspect_completed_prefix(
     )
     expected_fork = {
         "schema_version": "nmm.target-refresh-fork-state.v1",
-        "fork_game": 50,
+        "fork_game": fork_game,
         "captured": True,
         "treatment": None,
         "post_fork_transition_origin": None,
@@ -213,7 +214,7 @@ def inspect_completed_prefix(
         descriptor.role != "target_refresh_fork"
         or descriptor.experiment_id != prefix["experiment_id"]
         or descriptor.config_sha256 != plan.resume_config_sha256
-        or checkpoint.payload.trainer_state["game_count"] != 50
+        or checkpoint.payload.trainer_state["game_count"] != fork_game
         or fork_state != expected_fork
     ):
         raise TargetRefreshEqualTransitionError(
@@ -262,7 +263,7 @@ def build_arm_prepare_command(
     """Build one no-launch manager command for a completed-prefix arm."""
     common = contract["common_training_contract"]
     resources = contract["resources"]
-    return [
+    command = [
         python_executable,
         str(root / "scripts/manage_generalist_run.py"),
         "prepare",
@@ -323,6 +324,16 @@ def build_arm_prepare_command(
         "--post-fork-transition-bound",
         str(resources["scientific_post_fork_transitions_per_arm"]),
     ]
+    if common.get("temperature_schedule_axis", "global-games") != "global-games":
+        command.extend(
+            (
+                "--temperature-schedule-axis",
+                str(common["temperature_schedule_axis"]),
+                "--post-fork-temperature-anneal-transitions",
+                str(common["post_fork_temperature_anneal_transitions"]),
+            )
+        )
+    return command
 
 
 def build_seed_arm_prepare_commands(
@@ -430,6 +441,7 @@ def _assert_arm_plan(
     source_checkpoint: CheckpointEnvelope,
 ) -> Any:
     resources = contract["resources"]
+    common = contract["common_training_contract"]
     expected = {
         "plan_id": arm["plan_id"],
         "objective": f"{contract['objective']}; arm={arm['arm_id']}",
@@ -439,7 +451,7 @@ def _assert_arm_plan(
             _repository_path(root, arm["control_dir"], field="arm control")
         ),
         "paths_config": str(paths_config),
-        "max_games": 5_000,
+        "max_games": common["max_games_schedule"],
         "completion_game_bound": resources["arm_absolute_game_count_ceiling"],
         "segment_games": resources["arm_post_fork_game_execution_ceiling"],
         "max_wall_hours": resources["arm_active_wall_hours"],
@@ -461,7 +473,7 @@ def _assert_arm_plan(
         or initial.checkpoint_id != branch.descriptor.checkpoint_id
         or initial.checkpoint_role != "target_refresh_fork"
         or initial.parent_run_id != source_checkpoint.descriptor.run_id
-        or initial.completed_games != 50
+        or initial.completed_games != common["target_refresh_fork_game"]
         or branch.payload_sha256 != source_checkpoint.payload_sha256
     ):
         raise TargetRefreshEqualTransitionError(
@@ -470,12 +482,14 @@ def _assert_arm_plan(
     args = _trainer_args(plan)
     expected_args = {
         "seed": arm["seed"],
-        "target_refresh_fork_game": 50,
+        "target_refresh_fork_game": common["target_refresh_fork_game"],
         "target_refresh_fork_treatment": arm["condition"],
-        "post_fork_transition_bound": 8192,
+        "post_fork_transition_bound": resources[
+            "scientific_post_fork_transitions_per_arm"
+        ],
         "exact_transition_batches": True,
         "lr_adaptation_mode": "fixed",
-        "update_target_every": 50,
+        "update_target_every": common["target_refresh_fork_game"],
         "specialist_read_mode": "theoretical-only",
         "mill_bonus_mode": "malom-preserving-only",
         "malom_policy_aux_coef": 0.0,
@@ -490,6 +504,12 @@ def _assert_arm_plan(
         "no_s1b_refresher": True,
         "no_opening_forcing": True,
         "ppo": False,
+        "temperature_schedule_axis": common.get(
+            "temperature_schedule_axis", "global-games"
+        ),
+        "post_fork_temperature_anneal_transitions": common.get(
+            "post_fork_temperature_anneal_transitions"
+        ),
     }
     for field, value in expected_args.items():
         if getattr(args, field) != value:
@@ -722,7 +742,9 @@ def prepare_seed_arms(
             expected_source_config_sha256=completed.plan.resume_config_sha256,
             target_resume_config_sha256=target_config,
             expected_experiment_id=arm["experiment_id"],
-            expected_game_count=50,
+            expected_game_count=contract["common_training_contract"][
+                "target_refresh_fork_game"
+            ],
             expected_specialist_db_sha256=clone["sha256"],
             target_experiment_digest=target_digest,
         )
@@ -861,10 +883,18 @@ def prepare_seed_arms(
             ),
         },
         "resource_envelope": {
-            "maximum_games_per_arm_after_prefix": 550,
-            "absolute_game_ceiling": 600,
-            "post_fork_transition_bound": 8192,
-            "maximum_active_wall_hours_per_arm": 0.875,
+            "maximum_games_per_arm_after_prefix": contract["resources"][
+                "arm_post_fork_game_execution_ceiling"
+            ],
+            "absolute_game_ceiling": contract["resources"][
+                "arm_absolute_game_count_ceiling"
+            ],
+            "post_fork_transition_bound": contract["resources"][
+                "scientific_post_fork_transitions_per_arm"
+            ],
+            "maximum_active_wall_hours_per_arm": contract["resources"][
+                "arm_active_wall_hours"
+            ],
         },
         "claim_boundary": contract["claim_boundary"],
         "unresolved_decisions": [

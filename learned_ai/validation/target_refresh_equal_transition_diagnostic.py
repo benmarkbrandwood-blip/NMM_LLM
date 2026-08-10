@@ -28,6 +28,9 @@ from scripts import train_s_gen_v2 as trainer
 
 
 CONTRACT_SCHEMA = "nmm.target-refresh-equal-transition-diagnostic-plan.v1"
+SCHEDULE_ISOLATION_CONTRACT_SCHEMA = (
+    "nmm.target-refresh-equal-transition-diagnostic-plan.v2"
+)
 SOURCE_READINESS_SCHEMA = (
     "nmm.target-refresh-equal-transition-source-readiness.v1"
 )
@@ -122,10 +125,24 @@ def _ordered_arms(contract: Mapping[str, Any]) -> list[dict[str, Any]]:
     return sorted(contract["arms"], key=lambda item: int(item["launch_order"]))
 
 
+def _contract_seeds(contract: Mapping[str, Any]) -> tuple[int, ...]:
+    raw = contract.get("pairing", {}).get("seeds")
+    if (
+        not isinstance(raw, list)
+        or len(raw) != 3
+        or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in raw)
+        or any(seed < 0 for seed in raw)
+        or len(set(raw)) != len(raw)
+    ):
+        raise TargetRefreshEqualTransitionError("contract seed set differs")
+    return tuple(raw)
+
+
 def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
     """Load and fully validate the staged three-prefix, six-arm contract."""
     contract = _strict_json(Path(path))
-    if contract.get("schema_version") != CONTRACT_SCHEMA:
+    schema = contract.get("schema_version")
+    if schema not in {CONTRACT_SCHEMA, SCHEDULE_ISOLATION_CONTRACT_SCHEMA}:
         raise TargetRefreshEqualTransitionError("contract schema differs")
     identity = contract.get("plan_identity")
     body = {key: value for key, value in contract.items() if key != "plan_identity"}
@@ -145,28 +162,25 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
 
     prefixes = contract.get("prefixes")
     arms = contract.get("arms")
-    if not isinstance(prefixes, list) or len(prefixes) != 3:
+    seeds = _contract_seeds(contract)
+    if not isinstance(prefixes, list) or len(prefixes) != len(seeds):
         raise TargetRefreshEqualTransitionError("prefix count differs")
-    if not isinstance(arms, list) or len(arms) != 6:
+    if not isinstance(arms, list) or len(arms) != 2 * len(seeds):
         raise TargetRefreshEqualTransitionError("arm count differs")
     if [(item.get("seed"), item.get("launch_order")) for item in prefixes] != [
-        (64, 1),
-        (65, 4),
-        (66, 7),
+        (seed, 1 + 3 * index) for index, seed in enumerate(seeds)
     ]:
         raise TargetRefreshEqualTransitionError("prefix order differs")
     observed_cells = [
         (item.get("seed"), item.get("condition"), item.get("launch_order"))
         for item in arms
     ]
-    if observed_cells != [
-        (64, "refresh-once", 2),
-        (64, "no-refresh", 3),
-        (65, "refresh-once", 5),
-        (65, "no-refresh", 6),
-        (66, "refresh-once", 8),
-        (66, "no-refresh", 9),
-    ]:
+    expected_cells = [
+        (seed, condition, 2 + 3 * index + condition_index)
+        for index, seed in enumerate(seeds)
+        for condition_index, condition in enumerate(EXPECTED_CONDITIONS)
+    ]
+    if observed_cells != expected_cells:
         raise TargetRefreshEqualTransitionError("arm order differs")
     for field in ("control_dir", "plan_id", "specialist_db"):
         values = [item[field] for item in [*prefixes, *arms]]
@@ -174,7 +188,7 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
             raise TargetRefreshEqualTransitionError(
                 f"sequence field is not unique: {field}"
             )
-    for seed in EXPECTED_SEEDS:
+    for seed in seeds:
         prefix = next(item for item in prefixes if item["seed"] == seed)
         seed_arms = [item for item in arms if item["seed"] == seed]
         if any(
@@ -203,7 +217,7 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
     common = contract.get("common_training_contract", {})
     resources = contract.get("resources", {})
     measurement = contract.get("measurement_contract", {})
-    if (
+    base_values_differ = (
         common.get("algorithm") != "A2C"
         or common.get("exact_transition_batch_size") != 64
         or common.get("target_refresh_fork_game") != 50
@@ -216,8 +230,35 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
         or resources.get("scientific_post_fork_transitions_total") != 49_152
         or resources.get("maximum_contract_training_games_total") != 3_600
         or resources.get("maximum_active_wall_hours_total") != 6.0
-    ):
+    )
+    if base_values_differ:
         raise TargetRefreshEqualTransitionError("frozen scientific values differ")
+    if schema == CONTRACT_SCHEMA:
+        if (
+            common.get("sanmill_node_ladder")
+            != [1_000, 5_000, 25_000, 100_000, 500_000]
+            or common.get("fixed_resource_stage_games")
+            != [500, 500, 500, 1_000, 2_500]
+            or common.get("temperature_schedule_axis", "global-games")
+            != "global-games"
+            or common.get("post_fork_temperature_anneal_transitions")
+            is not None
+        ):
+            raise TargetRefreshEqualTransitionError(
+                "legacy equal-transition schedule differs"
+            )
+    else:
+        if (
+            common.get("sanmill_node_ladder") != [1_000]
+            or common.get("fixed_resource_stage_games") != [5_000]
+            or common.get("temperature_schedule_axis")
+            != "post-fork-transitions"
+            or common.get("post_fork_temperature_anneal_transitions")
+            != 106_304
+        ):
+            raise TargetRefreshEqualTransitionError(
+                "schedule-isolation controls differ"
+            )
     if contract.get("preparation_stages", {}).get("current_stage") != (
         "source_and_prefix_plan_preparation_only"
     ):
@@ -490,7 +531,7 @@ def _command_semantics(command: Sequence[str]) -> str:
 def validate_prefix_prepare_commands(
     contract: Mapping[str, Any], commands: Sequence[Sequence[str]]
 ) -> None:
-    if len(commands) != 3:
+    if len(commands) != len(_contract_seeds(contract)):
         raise TargetRefreshEqualTransitionError("prefix command count differs")
     semantics: set[str] = set()
     for prefix, command in zip(
@@ -502,7 +543,8 @@ def validate_prefix_prepare_commands(
         if (
             args.seed != prefix["seed"]
             or not args.exact_transition_batches
-            or args.target_refresh_fork_game != 50
+            or args.target_refresh_fork_game
+            != contract["common_training_contract"]["target_refresh_fork_game"]
             or args.target_refresh_fork_treatment != "capture"
             or args.post_fork_transition_bound is not None
             or not args.no_exact_resume
@@ -524,6 +566,8 @@ def _assert_prefix_plan(
     paths_config: Path,
     source_commit: str,
 ) -> Any:
+    common = contract["common_training_contract"]
+    resources = contract["resources"]
     expected = {
         "plan_id": prefix["plan_id"],
         "objective": f"{contract['objective']}; shared-prefix seed={prefix['seed']}",
@@ -533,10 +577,10 @@ def _assert_prefix_plan(
             _repository_path(root, prefix["control_dir"], field="control_dir")
         ),
         "paths_config": str(paths_config),
-        "max_games": 5_000,
-        "completion_game_bound": 50,
-        "segment_games": 50,
-        "max_wall_hours": 0.25,
+        "max_games": common["max_games_schedule"],
+        "completion_game_bound": resources["prefix_game_count"],
+        "segment_games": resources["prefix_game_count"],
+        "max_wall_hours": resources["prefix_active_wall_hours"],
         "allow_safe_exact_resume": False,
         "publication_allowed": False,
         "promotion_allowed": False,
@@ -552,18 +596,20 @@ def _assert_prefix_plan(
     expected_args = {
         "seed": prefix["seed"],
         "experiment_id": prefix["experiment_id"],
-        "max_games": 5_000,
-        "max_ply": 120,
-        "max_ply_branch": 120,
-        "self_play_ratio": 0.60,
-        "update_target_every": 50,
+        "max_games": common["max_games_schedule"],
+        "max_ply": common["max_logical_plies"],
+        "max_ply_branch": common["max_logical_plies"],
+        "self_play_ratio": common["frozen_target_ratio"],
+        "update_target_every": common["target_refresh_fork_game"],
         "lr_adaptation_mode": "fixed",
         "specialist_read_mode": "theoretical-only",
         "mill_bonus_mode": "malom-preserving-only",
         "exact_transition_batches": True,
-        "target_refresh_fork_game": 50,
+        "target_refresh_fork_game": common["target_refresh_fork_game"],
         "target_refresh_fork_treatment": "capture",
         "post_fork_transition_bound": None,
+        "temperature_schedule_axis": "global-games",
+        "post_fork_temperature_anneal_transitions": None,
         "minimal_rollouts": True,
         "no_recovery": True,
         "no_sentinel": True,
@@ -653,7 +699,7 @@ def inspect_source_readiness(
         "preparation_targets": targets,
         "prefix_prepare_commands": commands,
         "deferred_arm_plans": {
-            "count": 6,
+            "count": len(contract["arms"]),
             "reason": (
                 "each arm must bind the real game-50 fork checkpoint and a "
                 "closed byte-identical clone of its prefix SpecialistDB"
@@ -810,7 +856,7 @@ def prepare_prefix_plans(
         "prefixes": prefix_records,
         "arms": {
             "prepared": False,
-            "count": 6,
+            "count": len(contract["arms"]),
             "gate": (
                 "complete and audit each prefix before cloning its closed "
                 "SpecialistDB and binding the real fork checkpoint"

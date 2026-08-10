@@ -48,7 +48,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--prepare-seed-arms",
         type=int,
-        choices=(64, 65, 66),
         help=(
             "prepare two same-seed arms only after its prefix completed; "
             "never starts training"

@@ -10,6 +10,7 @@ import pytest
 from learned_ai.training.generalist_preflight import resume_config_sha256
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_equal_transition_diagnostic import (
+    SCHEDULE_ISOLATION_CONTRACT_SCHEMA,
     TargetRefreshEqualTransitionError,
     build_prefix_prepare_commands,
     load_equal_transition_contract,
@@ -24,6 +25,43 @@ CONTRACT = ROOT / (
     "docs/experiments/"
     "sanmill-target-refresh-equal-transition-diagnostic-v1.json"
 )
+
+
+def _write_schedule_isolation_contract(tmp_path: Path) -> Path:
+    contract = json.loads(CONTRACT.read_text(encoding="utf-8"))
+    seed_map = {64: 67, 65: 68, 66: 69}
+    contract["schema_version"] = SCHEDULE_ISOLATION_CONTRACT_SCHEMA
+    contract["pairing"]["seeds"] = [67, 68, 69]
+    common = contract["common_training_contract"]
+    common["sanmill_node_ladder"] = [1000]
+    common["fixed_resource_stage_games"] = [5000]
+    common["temperature_schedule_axis"] = "post-fork-transitions"
+    common["post_fork_temperature_anneal_transitions"] = 106304
+    for record in [*contract["prefixes"], *contract["arms"]]:
+        old_seed = int(record["seed"])
+        new_seed = seed_map[old_seed]
+        record["seed"] = new_seed
+        for field in (
+            "arm_id",
+            "control_dir",
+            "experiment_id",
+            "plan_id",
+            "prefix_specialist_db",
+            "resume_checkpoint",
+            "specialist_db",
+        ):
+            if field not in record:
+                continue
+            record[field] = (
+                record[field]
+                .replace(f"seed{old_seed}", f"seed{new_seed}")
+                .replace(f"s{old_seed}", f"s{new_seed}")
+            )
+    body = {key: value for key, value in contract.items() if key != "plan_identity"}
+    contract["plan_identity"] = canonical_sha256(body)
+    path = tmp_path / "schedule-isolation-contract.json"
+    path.write_text(json.dumps(contract), encoding="utf-8")
+    return path
 
 
 def test_tracked_equal_transition_contract_is_self_consistent() -> None:
@@ -143,5 +181,70 @@ def test_contract_requires_exact_frozen_transition_boundaries(tmp_path: Path) ->
     with pytest.raises(
         TargetRefreshEqualTransitionError,
         match="scientific values differ",
+    ):
+        load_equal_transition_contract(path)
+
+
+def test_schedule_isolation_contract_freezes_transition_indexed_controls(
+    tmp_path: Path,
+) -> None:
+    contract = load_equal_transition_contract(
+        _write_schedule_isolation_contract(tmp_path)
+    )
+
+    assert contract["pairing"]["seeds"] == [67, 68, 69]
+    assert [prefix["seed"] for prefix in contract["prefixes"]] == [67, 68, 69]
+    common = contract["common_training_contract"]
+    assert common["sanmill_node_ladder"] == [1000]
+    assert common["fixed_resource_stage_games"] == [5000]
+    assert common["temperature_schedule_axis"] == "post-fork-transitions"
+    assert common["post_fork_temperature_anneal_transitions"] == 106304
+
+
+def test_schedule_isolation_prefix_keeps_common_global_temperature(
+    tmp_path: Path,
+) -> None:
+    contract = load_equal_transition_contract(
+        _write_schedule_isolation_contract(tmp_path)
+    )
+    paths_config = tmp_path / "training_paths.local.json"
+    paths_config.write_text(
+        json.dumps({"sanmill_training_checkout": str(tmp_path)}),
+        encoding="utf-8",
+    )
+    commands = build_prefix_prepare_commands(
+        root=ROOT,
+        contract=contract,
+        paths_config=paths_config,
+        python_executable="python",
+    )
+
+    validate_prefix_prepare_commands(contract, commands)
+    for expected_seed, command in zip((67, 68, 69), commands, strict=True):
+        parsed = manager._build_parser().parse_args(command[2:])
+        assert parsed.seed == expected_seed
+        assert parsed.sanmill_node_ladder == "1000"
+        assert parsed.sanmill_stage_games == "5000"
+        common_args = manager._common_trainer_args(parsed, paths_config)
+        args = trainer._build_argument_parser().parse_args(
+            ["--preflight", "long-run", *common_args]
+        )
+        assert args.temperature_schedule_axis == "global-games"
+        assert args.post_fork_temperature_anneal_transitions is None
+
+
+def test_schedule_isolation_tampering_fails_closed(tmp_path: Path) -> None:
+    path = _write_schedule_isolation_contract(tmp_path)
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    contract["common_training_contract"][
+        "post_fork_temperature_anneal_transitions"
+    ] = 106303
+    body = {key: value for key, value in contract.items() if key != "plan_identity"}
+    contract["plan_identity"] = canonical_sha256(body)
+    path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(
+        TargetRefreshEqualTransitionError,
+        match="schedule-isolation controls differ",
     ):
         load_equal_transition_contract(path)
