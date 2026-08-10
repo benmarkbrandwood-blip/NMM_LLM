@@ -19,6 +19,7 @@ from learned_ai.training.checkpoint_envelope import (
     capture_rng_state,
     inspect_checkpoint,
     load_checkpoint,
+    rebind_checkpoint_descriptor,
     restore_rng_state,
     save_checkpoint,
     verify_checkpoint_compatibility,
@@ -97,6 +98,39 @@ def test_checkpoint_round_trip_preserves_complete_state(tmp_path: Path) -> None:
     assert inspected == loaded.descriptor
     assert payload_hash == loaded.payload_sha256
     assert payload_size == loaded.payload_size
+
+
+def test_descriptor_rebind_preserves_exact_payload_bytes(tmp_path: Path) -> None:
+    model = torch.nn.Linear(3, 2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    source = tmp_path / "source.pt"
+    destination = tmp_path / "branch.pt"
+    source_descriptor = _descriptor()
+    branch_descriptor = replace(
+        source_descriptor,
+        checkpoint_id="checkpoint-branch",
+        parent_checkpoint_id=source_descriptor.checkpoint_id,
+        config_sha256="b" * 64,
+    )
+    save_checkpoint(source, source_descriptor, _payload(model, optimizer))
+    source_envelope = load_checkpoint(source)
+
+    rebind_checkpoint_descriptor(source, destination, branch_descriptor)
+
+    branch = load_checkpoint(destination)
+    assert branch.descriptor == branch_descriptor
+    assert branch.payload_sha256 == source_envelope.payload_sha256
+    assert branch.payload_size == source_envelope.payload_size
+
+
+def test_descriptor_rebind_rejects_in_place_rewrite(tmp_path: Path) -> None:
+    model = torch.nn.Linear(3, 2)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    source = tmp_path / "source.pt"
+    save_checkpoint(source, _descriptor(), _payload(model, optimizer))
+
+    with pytest.raises(ValueError, match="must differ"):
+        rebind_checkpoint_descriptor(source, source, _descriptor())
 
 
 @pytest.mark.parametrize(

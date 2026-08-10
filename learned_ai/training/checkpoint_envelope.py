@@ -613,3 +613,59 @@ def save_checkpoint(
         for temporary in (payload_temp, envelope_temp):
             if temporary.exists():
                 temporary.unlink()
+
+
+def rebind_checkpoint_descriptor(
+    source: str | Path,
+    destination: str | Path,
+    descriptor: CheckpointDescriptor,
+    *,
+    previous_copies: int = 0,
+) -> None:
+    """Publish a new descriptor while preserving source payload bytes exactly."""
+    if isinstance(previous_copies, bool) or not isinstance(previous_copies, int):
+        raise ValueError("previous_copies must be a non-negative integer")
+    if previous_copies < 0:
+        raise ValueError("previous_copies must be a non-negative integer")
+    source_path = Path(source).resolve(strict=True)
+    target = Path(destination).resolve(strict=False)
+    if source_path == target:
+        raise ValueError("source and destination checkpoints must differ")
+    if descriptor.role == "accepted" and target.exists():
+        raise FileExistsError(f"accepted checkpoint already exists: {target}")
+
+    _source_descriptor, payload_hash, payload_size = inspect_checkpoint(source_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    token = uuid4().hex
+    envelope_temp = target.with_name(f".{target.name}.{token}.tmp")
+    header = {
+        "schema_version": CHECKPOINT_SCHEMA,
+        "descriptor": descriptor.to_dict(),
+        "descriptor_sha256": canonical_sha256(descriptor.to_dict()),
+        "payload_sha256": payload_hash,
+        "payload_size": payload_size,
+    }
+    header_bytes = canonical_json_bytes(header)
+    try:
+        with source_path.open("rb") as source_handle:
+            _read_header(source_handle)
+            with envelope_temp.open("xb") as output:
+                output.write(_PREFIX.pack(_MAGIC, len(header_bytes)))
+                output.write(header_bytes)
+                shutil.copyfileobj(source_handle, output, length=1024 * 1024)
+                output.flush()
+                os.fsync(output.fileno())
+        loaded = load_checkpoint(envelope_temp)
+        if (
+            loaded.descriptor != descriptor
+            or loaded.payload_sha256 != payload_hash
+            or loaded.payload_size != payload_size
+        ):
+            raise CheckpointIntegrityError(
+                "descriptor rebind changed checkpoint payload identity"
+            )
+        _rotate_verified_target(target, previous_copies)
+        os.replace(envelope_temp, target)
+    finally:
+        if envelope_temp.exists():
+            envelope_temp.unlink()
