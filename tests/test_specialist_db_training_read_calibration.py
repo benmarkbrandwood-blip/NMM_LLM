@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
@@ -33,7 +34,7 @@ def test_loader_accepts_the_frozen_three_seed_pairing() -> None:
     contract = load_specialist_read_calibration_contract(CONTRACT_PATH)
 
     assert contract["plan_identity"] == (
-        "032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772"
+        "36a1feb6bc9e403890f7c3b6b6f3444a97a9cd721272b760a2b25d0f8091459b"
     )
     assert [(arm["seed"], arm["specialist_read_mode"]) for arm in contract["arms"]] == [
         (61, "full"),
@@ -44,6 +45,16 @@ def test_loader_accepts_the_frozen_three_seed_pairing() -> None:
         (63, "theoretical-only"),
     ]
     assert contract["authorization"]["launch_authorized"] is False
+
+
+def test_frozen_result_implementation_hashes_match_repository_bytes() -> None:
+    contract = load_specialist_read_calibration_contract(CONTRACT_PATH)
+
+    for record in contract["analysis"]["result_implementation"].values():
+        if not isinstance(record, dict):
+            continue
+        path = ROOT / record["path"]
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == record["sha256"]
 
 
 def test_loader_rejects_identity_tampering(tmp_path: Path) -> None:
@@ -67,6 +78,19 @@ def test_loader_rejects_a_second_training_factor_after_rehash(
     with pytest.raises(
         SpecialistReadCalibrationError,
         match="outside the allowlist",
+    ):
+        load_specialist_read_calibration_contract(changed)
+
+
+def test_loader_requires_a_frozen_result_implementation(tmp_path: Path) -> None:
+    contract = copy.deepcopy(load_specialist_read_calibration_contract(CONTRACT_PATH))
+    del contract["analysis"]["result_implementation"]
+    changed = tmp_path / "changed.json"
+    _write_with_identity(changed, contract)
+
+    with pytest.raises(
+        SpecialistReadCalibrationError,
+        match="result implementation contract differs",
     ):
         load_specialist_read_calibration_contract(changed)
 

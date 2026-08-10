@@ -26,6 +26,18 @@
         "role": "candidate-blind coverage-positive placement mechanism corpus; inspected development evidence, not held-out strength evidence"
       }
     ],
+    "policy_health_gate": {
+      "audit_script": "tools/audit_generalist_policy_health.py",
+      "audit_script_sha256": "21d3b41df43bbbdf62883bc4ba8f16bba3bd5135831a9746e022706bc3ba1d70",
+      "corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+      "corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+      "critical_states": 29,
+      "device": "auto",
+      "minimum_candidate_preserving_minus_downgrading_logit_margin": -0.1,
+      "minimum_candidate_preserving_rate": 0.5,
+      "required_direct_signal_preserving_rate": 1.0,
+      "role": "segment-boundary development safety gate; not held-out validation or strength evidence"
+    },
     "per_class_reports": [
       "seed and read mode",
       "board phase",
@@ -41,7 +53,18 @@
       "exact selected-action Malom downgrade rate by phase and opponent source",
       "W/D/L by opponent source and learner colour",
       "repetition, fifty-move, max-ply, material-loss, and blocked-loss rates"
-    ]
+    ],
+    "result_implementation": {
+      "module": {
+        "path": "learned_ai/evaluation/specialist_db_training_read_calibration_result.py",
+        "sha256": "9069eeac090147e751df7104808c850d14c06cc85c0a36fd0c1790c49ff9bf15"
+      },
+      "publisher": {
+        "path": "scripts/report_specialist_db_training_read_calibration.py",
+        "sha256": "28acbbbe46fdc7b618e0cc9cc6fe713efd98c96ad2e2aaa40be7682a5ecfa4d2"
+      },
+      "result_schema": "nmm.specialist-db-training-read-calibration-result.v1"
+    }
   },
   "arms": [
     {
@@ -235,7 +258,7 @@
     "single_changed_training_factor": "specialist_read_mode",
     "single_process_at_a_time": true
   },
-  "plan_identity": "032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772",
+  "plan_identity": "36a1feb6bc9e403890f7c3b6b6f3444a97a9cd721272b760a2b25d0f8091459b",
   "resources": {
     "active_wall_hours_per_arm": 0.5,
     "completed_games_per_arm": 250,

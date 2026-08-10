@@ -6,7 +6,7 @@ Machine-readable contract:
 [`specialist-db-training-read-calibration-v1.json`](specialist-db-training-read-calibration-v1.json)
 
 Plan identity:
-`032c2647b9211dd1292220c92431206097838c79beef582c5bd98e48fc85b772`
+`36a1feb6bc9e403890f7c3b6b6f3444a97a9cd721272b760a2b25d0f8091459b`
 
 This is a bounded three-seed mechanism calibration. It is not held-out
 validation, playing-strength evidence, a trap-learning experiment, a promotion
@@ -173,6 +173,17 @@ disable all SpecialistDB projections so the measured difference belongs to
 learned weights rather than a live database read. Scratch reconstruction is
 paired by seed. Report total variation, argmax changes, entropy, Malom
 preserving mass and policy-health classes.
+
+The frozen result implementation is
+`learned_ai/evaluation/specialist_db_training_read_calibration_result.py`;
+its immutable publisher is
+`scripts/report_specialist_db_training_read_calibration.py`. The machine-
+readable contract binds both file hashes and the result schema. The endpoint
+route uses one same-seed reconstructed scratch network as the frozen-target
+feature source for both arms, passes no SpecialistDB to the encoder, and then
+compares the two learned policies on both fixed development corpora. This
+prevents post-training database contents or arm-specific target features from
+being mistaken for a policy-weight effect.
 
 ## Frozen decision boundary
 
