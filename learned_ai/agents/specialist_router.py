@@ -27,6 +27,7 @@ the classical coordinator.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -318,27 +319,52 @@ def load_generalist(
         ckpt_dir = root / "learned_ai" / "checkpoints" / "scaffolded"
 
     # Allow the user to swap the generalist checkpoint without editing this
-    # file: `data/training_paths.local.json` optionally provides
-    # `generalist_output_dir` (points at the folder containing best.pt) or a
-    # more explicit `generalist_checkpoint` (absolute path to a .pt file).
+    # file. Preferred source is `data/settings.json` (user-editable via the
+    # Tools page), which may provide `generalist_checkpoint` (absolute or
+    # repo-relative path to a .pt file) or `generalist_output_dir` (folder
+    # containing best.pt). Falls back to `data/training_paths.local.json`
+    # for backward compatibility, then to the hardcoded s_gen_v2 default.
     gen_path: Optional[Path] = None
+    import json as _json
+
+    def _resolve(explicit: str, folder: str) -> Optional[Path]:
+        # If `explicit` has directory separators or is absolute, treat it as
+        # a full path. Otherwise treat it as a filename inside `folder`
+        # (defaulting to "best.pt" when explicit is empty).
+        if explicit and (os.sep in explicit or "/" in explicit or Path(explicit).is_absolute()):
+            p = Path(explicit)
+            return p if p.is_absolute() else (root / p)
+        if folder:
+            p = Path(folder)
+            if not p.is_absolute():
+                p = root / p
+            return p / (explicit or "best.pt")
+        if explicit:
+            p = Path(explicit)
+            return p if p.is_absolute() else (root / p)
+        return None
+
     try:
-        import json as _json
-        _paths_file = root / "data" / "training_paths.local.json"
-        if _paths_file.exists():
-            _paths = _json.loads(_paths_file.read_text())
-            _explicit = _paths.get("generalist_checkpoint")
-            if _explicit:
-                gen_path = Path(_explicit)
-                if not gen_path.is_absolute():
-                    gen_path = root / gen_path
-            elif _paths.get("generalist_output_dir"):
-                _folder = Path(_paths["generalist_output_dir"])
-                if not _folder.is_absolute():
-                    _folder = root / _folder
-                gen_path = _folder / "best.pt"
+        _settings_file = root / "data" / "settings.json"
+        if _settings_file.exists():
+            _settings = _json.loads(_settings_file.read_text())
+            gen_path = _resolve(
+                _settings.get("generalist_checkpoint", "") or "",
+                _settings.get("generalist_output_dir", "") or "",
+            )
     except Exception:
         gen_path = None
+    if gen_path is None:
+        try:
+            _paths_file = root / "data" / "training_paths.local.json"
+            if _paths_file.exists():
+                _paths = _json.loads(_paths_file.read_text())
+                gen_path = _resolve(
+                    _paths.get("generalist_checkpoint", "") or "",
+                    _paths.get("generalist_output_dir", "") or "",
+                )
+        except Exception:
+            gen_path = None
     if gen_path is None:
         gen_path = ckpt_dir / "s_gen_v2" / "best.pt"
     log.info("GeneralistAgent: checkpoint path = %s", gen_path)
