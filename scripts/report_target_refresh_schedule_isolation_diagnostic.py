@@ -112,7 +112,15 @@ EXPECTED_POLICY_CORPUS_SHA256 = (
 )
 _POST_TRAINING_ANALYSIS_PATHS = frozenset(
     {
+        "docs/evidence/target-refresh-schedule-isolation-"
+        "diagnostic-v2-attempt-001-failure-2026-08-11.md",
+        "docs/experiments/sanmill-target-refresh-schedule-isolation-"
+        "analysis-recovery-v1.json",
+        "docs/experiments/sanmill-target-refresh-schedule-isolation-"
+        "analysis-recovery-v1.md",
         "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
+        "scripts/run_target_refresh_schedule_isolation_analysis_recovery.py",
+        "tests/test_target_refresh_schedule_isolation_analysis_recovery.py",
         "tests/test_target_refresh_schedule_isolation_report.py",
     }
 )
