@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from learned_ai.evaluation.common_anchor_policy_distribution import (
@@ -171,12 +171,23 @@ def classify_transition_policy_divergence(
     by_seed_boundary: Mapping[str, Mapping[str, Mapping[str, Any]]],
     *,
     thresholds: Mapping[str, float] = DEFAULT_DIVERGENCE_THRESHOLDS,
+    seeds: Sequence[int] = EXPECTED_SEEDS,
 ) -> dict[str, Any]:
     """Apply the predeclared three-seed, two-boundary persistence gate."""
-    expected_seed_keys = {str(seed) for seed in EXPECTED_SEEDS}
+    if (
+        len(seeds) != 3
+        or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds)
+        or any(seed < 0 for seed in seeds)
+        or len(set(seeds)) != len(seeds)
+    ):
+        raise TargetRefreshEqualTransitionResultError(
+            "result requires three unique nonnegative seeds"
+        )
+    normalized_seeds = tuple(seeds)
+    expected_seed_keys = {str(seed) for seed in normalized_seeds}
     if set(by_seed_boundary) != expected_seed_keys:
         raise TargetRefreshEqualTransitionResultError(
-            "result must contain exactly seeds 64, 65 and 66"
+            "result seed cells differ"
         )
     required_thresholds = set(DEFAULT_DIVERGENCE_THRESHOLDS)
     if set(thresholds) != required_thresholds:
@@ -267,6 +278,7 @@ def classify_transition_policy_divergence(
         "material_confirmation_boundary": MATERIAL_CONFIRMATION_BOUNDARY,
         "final_boundary": FINAL_BOUNDARY,
         "minimum_persistent_material_seeds": 2,
+        "seeds": list(normalized_seeds),
         "persistent_material_seeds": persistent_material_seeds,
         "final_only_material_seeds": final_only_material_seeds,
         "by_seed": seed_audits,

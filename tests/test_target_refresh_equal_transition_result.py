@@ -107,3 +107,19 @@ def test_missing_seed_or_boundary_fails_closed() -> None:
         match="transition boundaries differ",
     ):
         classify_transition_policy_divergence(matrix)
+
+
+def test_fresh_three_seed_set_uses_same_frozen_rule() -> None:
+    seeds = (67, 68, 69)
+    matrix = {
+        str(seed): {
+            str(boundary): _summary(js=1e-6, tv=1e-4, malom=1e-4)
+            for boundary in EXPECTED_BOUNDARIES
+        }
+        for seed in seeds
+    }
+
+    decision = classify_transition_policy_divergence(matrix, seeds=seeds)
+
+    assert decision["classification"] == "near_identical"
+    assert decision["seeds"] == [67, 68, 69]
