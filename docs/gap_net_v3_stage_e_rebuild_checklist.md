@@ -158,11 +158,11 @@ Pending — depend on a D4-on trained model:
 
 - [ ] `tests/test_gap_v3_symmetry_invariance.py` — inference invariance under D4 to within 1e-3.
 
-### Promotion-gate freeze (before running Stage E)
+### Promotion-gate freeze (before running Stage E) — 🟡 STRUCTURE LANDED, NUMBERS PENDING USER REVIEW (Batch 5)
 
-- [ ] Update `docs/gap_net_v3_plan.md` §16 wording to match Decision 3A reference-based framing.
-- [ ] Add per-band thresholds.
-- [ ] Explicitly note teacher-fidelity is not empirical validation.
+- [x] Update `docs/gap_net_v3_plan.md` §16 wording to match Decision 3A reference-based framing.
+- [x] Add per-band thresholds — **structure landed** (Gate 1 `X_A[b, c]` ≥ 30 % vs uniform; Gate 2 `X_B[b, c]` ≤ 20 % vs teacher, both per-(band × component)).  **Numeric values are initial drafts**; user reviews before Stage E run.
+- [x] Explicitly note teacher-fidelity is not empirical validation (bolded under "Separately reported" in the Stage E cell).
 
 ## Current position (2026-08-11)
 
