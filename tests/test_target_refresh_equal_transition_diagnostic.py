@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
+from learned_ai.validation import target_refresh_equal_transition_diagnostic as diagnostic
 from learned_ai.training.generalist_preflight import resume_config_sha256
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_equal_transition_diagnostic import (
@@ -77,6 +79,16 @@ def _write_schedule_isolation_contract(tmp_path: Path) -> Path:
         "minimum_aggregate_score_effect": 1.0 / 12.0,
         "minimum_per_seed_score_effect": 1.0 / 24.0,
         "minimum_supporting_seeds": 2,
+    }
+    contract["lineage"]["main_review"] = {
+        "cherry_picks_selected": [],
+        "evidence": {
+            "path": "docs/evidence/test-main-review.md",
+            "sha256": "1" * 64,
+        },
+        "independent_dev_changes": [],
+        "reason": "synthetic schedule-isolation test contract",
+        "reviewed_tip": "2" * 40,
     }
     for record in [*contract["prefixes"], *contract["arms"]]:
         old_seed = int(record["seed"])
@@ -289,3 +301,74 @@ def test_schedule_isolation_tampering_fails_closed(tmp_path: Path) -> None:
         match="schedule-isolation controls differ",
     ):
         load_equal_transition_contract(path)
+
+
+def test_schedule_isolation_requires_bound_main_review_evidence(
+    tmp_path: Path,
+) -> None:
+    path = _write_schedule_isolation_contract(tmp_path)
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    del contract["lineage"]["main_review"]["evidence"]
+    body = {key: value for key, value in contract.items() if key != "plan_identity"}
+    contract["plan_identity"] = canonical_sha256(body)
+    path.write_text(json.dumps(contract), encoding="utf-8")
+
+    with pytest.raises(
+        TargetRefreshEqualTransitionError,
+        match="main review evidence",
+    ):
+        load_equal_transition_contract(path)
+
+
+def test_source_audit_requires_independent_dev_change_ancestor(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    head = "a" * 40
+    origin_main = "b" * 40
+    required_dev_commit = "c" * 40
+    reviewed_main_commit = "d" * 40
+    outputs = {
+        ("branch", "--show-current"): "dev",
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "origin/dev"): head,
+        ("rev-parse", "origin/main"): origin_main,
+        (
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ): "",
+    }
+    monkeypatch.setattr(
+        diagnostic,
+        "_git_output",
+        lambda _root, *arguments: outputs[arguments],
+    )
+
+    def fake_run(arguments, **_kwargs):
+        if arguments[-2:] == [required_dev_commit, head]:
+            return SimpleNamespace(returncode=1)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(diagnostic.subprocess, "run", fake_run)
+    contract = {
+        "lineage": {
+            "main_review": {
+                "reviewed_tip": origin_main,
+                "independent_dev_changes": [
+                    {
+                        "dev_commit": required_dev_commit,
+                        "main_commit": reviewed_main_commit,
+                        "reason": "test",
+                    }
+                ],
+            },
+            "required_implementation_commits": [],
+        }
+    }
+
+    with pytest.raises(
+        TargetRefreshEqualTransitionError,
+        match="independent dev change is absent",
+    ):
+        diagnostic._inspect_source(tmp_path, contract)

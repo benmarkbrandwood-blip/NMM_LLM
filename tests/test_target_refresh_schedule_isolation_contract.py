@@ -17,7 +17,7 @@ CONTRACT = ROOT / (
     "sanmill-target-refresh-schedule-isolation-diagnostic-v2.json"
 )
 EXPECTED_PLAN_IDENTITY = (
-    "9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05"
+    "1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe"
 )
 
 
@@ -43,6 +43,13 @@ def test_published_schedule_isolation_contract_is_frozen() -> None:
         "promotion_allowed": False,
         "publication_allowed": False,
     }
+    main_review = contract["lineage"]["main_review"]
+    assert main_review["reviewed_tip"] == (
+        "0cfb651424d089908988f48129fe3ab3de5b010e"
+    )
+    assert main_review["cherry_picks_selected"] == []
+    evidence = main_review["evidence"]
+    assert _sha256(ROOT / evidence["path"]) == evidence["sha256"]
 
 
 def test_published_schedule_isolation_implementation_hashes_match() -> None:
@@ -64,4 +71,3 @@ def test_published_schedule_isolation_outcome_grid_is_non_training() -> None:
     assert outcome["optimizer_updates"] == 0
     assert outcome["training_games"] == 0
     assert outcome["writes_training_data"] is False
-

@@ -114,6 +114,14 @@ def _strict_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def _is_lower_hex(value: object, *, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
 def _sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -337,6 +345,45 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
         "source_and_prefix_plan_preparation_only"
     ):
         raise TargetRefreshEqualTransitionError("preparation stage differs")
+    if schema == SCHEDULE_ISOLATION_CONTRACT_SCHEMA:
+        main_review = contract.get("lineage", {}).get("main_review")
+        if not isinstance(main_review, dict):
+            raise TargetRefreshEqualTransitionError("main review differs")
+        evidence = main_review.get("evidence")
+        if (
+            not isinstance(evidence, dict)
+            or not isinstance(evidence.get("path"), str)
+            or not evidence["path"]
+            or not _is_lower_hex(evidence.get("sha256"), length=64)
+        ):
+            raise TargetRefreshEqualTransitionError(
+                "main review evidence differs"
+            )
+        if not _is_lower_hex(main_review.get("reviewed_tip"), length=40):
+            raise TargetRefreshEqualTransitionError("main review tip differs")
+        if not isinstance(main_review.get("cherry_picks_selected"), list):
+            raise TargetRefreshEqualTransitionError(
+                "main review cherry-pick record differs"
+            )
+        independent = main_review.get("independent_dev_changes")
+        if not isinstance(independent, list):
+            raise TargetRefreshEqualTransitionError(
+                "independent dev change record differs"
+            )
+        observed_dev_commits: set[str] = set()
+        for change in independent:
+            if (
+                not isinstance(change, dict)
+                or not _is_lower_hex(change.get("dev_commit"), length=40)
+                or not _is_lower_hex(change.get("main_commit"), length=40)
+                or not isinstance(change.get("reason"), str)
+                or not change["reason"]
+                or change["dev_commit"] in observed_dev_commits
+            ):
+                raise TargetRefreshEqualTransitionError(
+                    "independent dev change record differs"
+                )
+            observed_dev_commits.add(change["dev_commit"])
     return contract
 
 
@@ -367,6 +414,31 @@ def _inspect_source(root: Path, contract: Mapping[str, Any]) -> dict[str, Any]:
         if result.returncode != 0:
             raise TargetRefreshEqualTransitionError(
                 f"required implementation commit is absent: {commit}"
+            )
+    for change in contract["lineage"]["main_review"].get(
+        "independent_dev_changes", []
+    ):
+        dev_commit = change["dev_commit"]
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", dev_commit, head],
+            cwd=root,
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise TargetRefreshEqualTransitionError(
+                f"independent dev change is absent: {dev_commit}"
+            )
+        main_commit = change["main_commit"]
+        result = subprocess.run(
+            ["git", "merge-base", "--is-ancestor", main_commit, origin_main],
+            cwd=root,
+            check=False,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            raise TargetRefreshEqualTransitionError(
+                f"reviewed main change is absent: {main_commit}"
             )
     return {
         "branch": branch,
@@ -400,6 +472,9 @@ def _inspect_tracked_inputs(
         outcome = contract["measurement_contract"]["outcome_measurement"]
         inputs.update(
             {
+                "main_review_evidence": contract["lineage"]["main_review"][
+                    "evidence"
+                ],
                 "fixed_replay_corpus": {
                     "path": outcome["fixed_replay_corpus"],
                     "sha256": outcome["fixed_replay_corpus_sha256"],

@@ -6,10 +6,19 @@ Machine-readable contract:
 [`sanmill-target-refresh-schedule-isolation-diagnostic-v2.json`](sanmill-target-refresh-schedule-isolation-diagnostic-v2.json)
 
 Plan identity:
-`9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05`
+`1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe`
 
 This is a development mechanism experiment. It does not authorize execution,
 does not choose a retained model, and is not held-out strength evidence.
+
+The earlier unlaunched identity
+`9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05`
+is preserved in Git history but is superseded. The scientific design and
+resource envelope did not change. The current identity only refreshes the
+source lineage after reviewing `origin/main` through `0cfb651`, binding the
+[review evidence](../evidence/origin-main-training-review-2026-08-11.md), and
+recording the independently tested UTF-8 portability repair. No `main`
+training or gameplay commit was imported.
 
 ## Observed facts
 

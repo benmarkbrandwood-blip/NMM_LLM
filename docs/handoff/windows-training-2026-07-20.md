@@ -123,6 +123,24 @@ stratum. Preserve the full
 No held-out evaluation, promotion, model publication, successor training, or
 long run is authorized by the completed diagnostic.
 
+The schedule-isolation v2 successor is now frozen but unlaunched under plan
+identity
+`1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe`.
+It retains three fresh shared prefixes and six paired arms, fixes Sanmill at
+1,000 nodes, indexes temperature by consumed learner transitions, and adds a
+candidate-blind 288-game common-anchor development measurement. Its one-shot
+parent runner binds the product-facing readiness identity, exact aggregate
+resources, fixed CPU analysis route, child authorizations and no-overwrite
+records. The previous unlaunched identity `9c806830` is superseded only because
+the source-lineage review advanced to `origin/main` commit `0cfb651`; no
+scientific or resource decision changed. The
+[main review](../evidence/origin-main-training-review-2026-08-11.md) keeps the
+GapNet v3 ledger and HMPN split chain at fatal stop, records the valid NaN fix
+as irrelevant to the disabled-GapNet experiment, and records the independent
+UTF-8 portability repair. Fresh ignored databases, plans and readiness
+evidence must be created only after this source is published. No execution
+authorization exists yet.
+
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
 equal-transition sequence. The Agent recorded each leaf authorization as
@@ -2107,6 +2125,17 @@ the current successor in this order:
     start long training. The next design must isolate the game-count-indexed
     temperature and Sanmill resource schedules before another target-refresh
     setting can be considered.
+25. Preserve the unlaunched
+    [schedule-isolation v2 contract](../experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.md),
+    plan identity `1a86e158`, and its reviewed `origin/main` lineage through
+    `0cfb651`. The one-shot runner has been hardened to bind both the external
+    sequence readiness and internal managed readiness, reconcile all prefix,
+    arm, transition, active-hour and no-update-game bounds, and publish
+    one-shot records exclusively. After ordinary publication, regenerate all
+    ignored source readiness, fresh database copies, managed plans and final
+    sequence preflight. Do not reuse the superseded `9c806830` plan or any
+    stale readiness identity. Execution still requires one parent product
+    grant for the exact sequence readiness; it must not become per-arm prompts.
 
 The previously executed isolated smoke command was:
 
@@ -2202,10 +2231,11 @@ SpecialistDB read-calibration grants, all eight target-refresh/LR grants and
 all attempt-003 grants are also consumed. The equal-transition sequence has
 completed all three prefixes and all six paired arms once. Its immutable
 result is `inconclusive_late_onset`, and its delegated leaf authorizations are
-consumed. A schedule-isolation successor is recommended but is not yet a
-frozen or authorized experiment. No held-out match, additional calibration,
-long training, model promotion/publication, protocol change, resource
-expansion, or history rewrite is authorized by that sequence. Ordinary
+consumed. The schedule-isolation successor is frozen under plan identity
+`1a86e158` but remains unlaunched and unauthorized; its prior `9c806830`
+identity is superseded. No held-out match, additional calibration, long
+training, model promotion/publication, protocol change, resource expansion, or
+history rewrite is authorized by that sequence. Ordinary
 verified fast-forward pushes of Codex-created `dev` commits are separately
 authorized under the standing Git grant recorded in the executive summary;
 all other Git history operations remain outside it.

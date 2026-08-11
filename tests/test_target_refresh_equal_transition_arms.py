@@ -80,6 +80,16 @@ def _write_schedule_isolation_contract(tmp_path: Path) -> Path:
         "minimum_per_seed_score_effect": 1.0 / 24.0,
         "minimum_supporting_seeds": 2,
     }
+    contract["lineage"]["main_review"] = {
+        "cherry_picks_selected": [],
+        "evidence": {
+            "path": "docs/evidence/test-main-review.md",
+            "sha256": "1" * 64,
+        },
+        "independent_dev_changes": [],
+        "reason": "synthetic schedule-isolation test contract",
+        "reviewed_tip": "2" * 40,
+    }
     for record in [*contract["prefixes"], *contract["arms"]]:
         old_seed = int(record["seed"])
         new_seed = seed_map[old_seed]

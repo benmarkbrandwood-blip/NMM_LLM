@@ -193,8 +193,19 @@
   "lineage": {
     "main_review": {
       "cherry_picks_selected": [],
-      "reason": "origin/main contains no equivalent exact-transition, transition-temperature, fixed-node, candidate-blind replay target-refresh diagnostic; recent GapNet v3 work is outside this experiment",
-      "reviewed_tip": "728ddad9f1d7f95fae75a351669d39cd117b1259"
+      "evidence": {
+        "path": "docs/evidence/origin-main-training-review-2026-08-11.md",
+        "sha256": "8e5990b66477f9d4edb7ee61f0368ca99f41f7d2308d6b0218d3a719b3977403"
+      },
+      "independent_dev_changes": [
+        {
+          "dev_commit": "2e89365654a83f0114cd2a86b4812f1bb3f86ddd",
+          "main_commit": "4853296432f6093042c6cdf6f86ceaa9d3c1f5f3",
+          "reason": "adopt the locale-independent UTF-8 read with an independent focused regression; no main training or gameplay code imported"
+        }
+      ],
+      "reason": "origin/main through the reviewed tip contains no equivalent exact-transition, transition-indexed-temperature, fixed-node, candidate-blind replay target-refresh diagnostic; its GapNet v3 ledger and HMPN split chain remain blocked for production and are outside this disabled-GapNet experiment",
+      "reviewed_tip": "0cfb651424d089908988f48129fe3ab3de5b010e"
     },
     "required_implementation_commits": [
       "bd3e5ce30c1646828f63bc496b721cef57086b05",
@@ -284,7 +295,7 @@
     ],
     "single_process_at_a_time": true
   },
-  "plan_identity": "9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05",
+  "plan_identity": "1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe",
   "prefixes": [
     {
       "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix",
