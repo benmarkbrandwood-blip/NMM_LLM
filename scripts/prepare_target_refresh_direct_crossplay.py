@@ -70,6 +70,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _probe_direct_crossplay_human_db(path: Path) -> dict[str, Any]:
+    """Probe the same immutable HumanDB main-file view used at runtime."""
+    return _probe_human_db(path, immutable=True)
+
+
 def _relative(path: Path) -> str:
     try:
         return path.resolve().relative_to(ROOT).as_posix()
@@ -291,7 +296,7 @@ def build_readiness(
     settings = _strict_json(paths_config_path.resolve())
     human_path = _resolve_setting(settings, "human_db_path")
     malom_path = _resolve_setting(settings, "malom_db_path")
-    human_report = _probe_human_db(human_path)
+    human_report = _probe_direct_crossplay_human_db(human_path)
     if (
         human_report.get("error")
         or human_report.get("identity") != data["human_db_identity"]

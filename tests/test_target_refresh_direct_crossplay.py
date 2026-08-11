@@ -21,6 +21,7 @@ from scripts.run_target_refresh_direct_crossplay import (
     _validate_authorization,
     build_authorization,
 )
+from scripts import prepare_target_refresh_direct_crossplay as preparer
 
 
 SHA = "a" * 64
@@ -299,6 +300,23 @@ def test_authorization_is_closed_and_bound_to_readiness(tmp_path) -> None:
     path.write_text(__import__("json").dumps(authorization), encoding="utf-8")
     with pytest.raises(DirectCrossplayError, match="authorization differs"):
         _validate_authorization(path, plan=plan, readiness_identity=SHA)
+
+
+def test_readiness_probes_the_runtime_immutable_human_db_view(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    path = tmp_path / "human.sqlite"
+    observed: list[tuple[Any, bool]] = []
+
+    def fake_probe(value, *, immutable=False):
+        observed.append((value, immutable))
+        return {"identity": SHA}
+
+    monkeypatch.setattr(preparer, "_probe_human_db", fake_probe)
+
+    assert preparer._probe_direct_crossplay_human_db(path) == {"identity": SHA}
+    assert observed == [(path, True)]
 
 
 class _AscendingPolicy(torch.nn.Module):

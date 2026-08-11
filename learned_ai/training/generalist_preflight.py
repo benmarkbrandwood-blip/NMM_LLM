@@ -969,8 +969,12 @@ def _probe_specialist_db(path: Path) -> dict[str, Any]:
         connection.close()
 
 
-def _probe_human_db(path: Path) -> dict[str, Any]:
-    connection, report = _probe_sqlite(path)
+def _probe_human_db(
+    path: Path,
+    *,
+    immutable: bool = False,
+) -> dict[str, Any]:
+    connection, report = _probe_sqlite(path, immutable=immutable)
     if connection is None:
         return report
     try:

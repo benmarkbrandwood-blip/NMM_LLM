@@ -77,6 +77,19 @@ def _write_human_db(path: Path) -> None:
     connection.close()
 
 
+def test_human_db_probe_supports_an_immutable_main_file_read(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "human.sqlite"
+    _write_human_db(path)
+
+    report = preflight_module._probe_human_db(path, immutable=True)
+
+    assert report["quick_check"] == "ok"
+    assert report["malom_columns_policy"] == "masked_historical_labels"
+    assert report["trust"] == "empirical_frequencies_and_outcomes"
+
+
 def _write_malom(path: Path) -> None:
     path.mkdir()
     (path / "std.secval").write_text(
