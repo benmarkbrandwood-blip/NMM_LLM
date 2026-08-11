@@ -1,7 +1,7 @@
 {
   "schema_version": "nmm.target-refresh-direct-crossplay-plan.v1",
   "objective": "Measure whether the late refresh-once versus no-refresh policy separation has a direct paired game consequence when both frozen policies play each other and Sanmill acts only as the strict portable referee.",
-  "plan_identity": "20718008e7d7e92ec0db87580dfeaec4c24ce21215a03f4891adab8e8d67d112",
+  "plan_identity": "c7a03214c8efdc7d55f36dab658da8fc57e71fe5b99038806753e7e851fc4e05",
   "source": {
     "schedule_contract_path": "docs/experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.json",
     "schedule_contract_sha256": "64d035ccaedcaddc1b4331503c1873cea3f8582c7f4b4c740aa7d460e4d15c0c",
@@ -13,11 +13,11 @@
     "analysis_source_commit": "6be069da0bed11664f7f4037d72cd5ba887b6cab"
   },
   "implementation": {
-    "commit": "f8783a39da85c9efe9dd0fc3de8fdb2bc5bb1095",
+    "commit": "f0d7ba72a5f191d38cf0fe61dff9bcef16b95f2b",
     "module_path": "learned_ai/evaluation/target_refresh_direct_crossplay.py",
     "module_sha256": "f65289bab908e94c26ba847632af25622395b4ba2ebd9dc0fcae59469d40c8ce",
     "prepare_path": "scripts/prepare_target_refresh_direct_crossplay.py",
-    "prepare_sha256": "8892803ff86fa161e42d9edab0e3ecaad8eb217e2837893efa81bc3ddc55ab7a",
+    "prepare_sha256": "50b8515112b2c2bbd6b06abe70b2cd27ecbc4405d50c411ee869c0b678b09ccd",
     "runner_path": "scripts/run_target_refresh_direct_crossplay.py",
     "runner_sha256": "0b027d76829b35f450f467e8499212f6dd9ddb7a872c9e29214870c61dee3cd1"
   },
