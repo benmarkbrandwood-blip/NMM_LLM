@@ -17,6 +17,7 @@ from learned_ai.evaluation.target_refresh_direct_crossplay import (
 )
 from learned_ai.training.run_contract import canonical_sha256
 from scripts.run_target_refresh_direct_crossplay import (
+    _build_policy_generators,
     _sample_policy_move,
     _validate_authorization,
     build_authorization,
@@ -343,3 +344,26 @@ def test_policy_sampling_is_reproducible_for_a_fixed_stream() -> None:
         temperature=0.2,
     )
     assert move_a == move_b
+
+
+def test_policy_generators_use_the_closed_schedule_seed_fields() -> None:
+    scheduled = build_direct_crossplay_schedule(_plan())[0]
+    generators = _build_policy_generators(scheduled)
+
+    for colour, field in (
+        ("W", "policy_seed_white"),
+        ("B", "policy_seed_black"),
+    ):
+        expected = torch.Generator(device="cpu")
+        expected.manual_seed(scheduled[field])
+        assert torch.rand((), generator=generators[colour]).item() == torch.rand(
+            (), generator=expected
+        ).item()
+
+    malformed = dict(scheduled)
+    malformed["policy_seed_w"] = malformed.pop("policy_seed_white")
+    with pytest.raises(
+        DirectCrossplayError,
+        match="policy_seed_white is absent or invalid",
+    ):
+        _build_policy_generators(malformed)

@@ -228,6 +228,23 @@ def record_authorization(
     return authorization
 
 
+def _build_policy_generators(
+    scheduled: Mapping[str, Any],
+) -> dict[str, torch.Generator]:
+    generators: dict[str, torch.Generator] = {}
+    for colour, field in (
+        ("W", "policy_seed_white"),
+        ("B", "policy_seed_black"),
+    ):
+        seed = scheduled.get(field)
+        if isinstance(seed, bool) or not isinstance(seed, int):
+            raise DirectCrossplayError(f"{field} is absent or invalid")
+        generator = torch.Generator(device="cpu")
+        generator.manual_seed(seed)
+        generators[colour] = generator
+    return generators
+
+
 def _sample_policy_move(
     *,
     board: BoardState,
@@ -286,11 +303,7 @@ def _run_game(
     installation: Any,
     plan: Mapping[str, Any],
 ) -> dict[str, Any]:
-    generators: dict[str, torch.Generator] = {}
-    for colour in ("W", "B"):
-        generator = torch.Generator(device="cpu")
-        generator.manual_seed(int(scheduled[f"policy_seed_{colour.lower()}"]))
-        generators[colour] = generator
+    generators = _build_policy_generators(scheduled)
     colour_condition = {
         str(scheduled["no_refresh_colour"]): "no-refresh",
         str(scheduled["refresh_once_colour"]): "refresh-once",
