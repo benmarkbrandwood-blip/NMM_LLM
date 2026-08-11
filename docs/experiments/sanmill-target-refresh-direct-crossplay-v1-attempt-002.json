@@ -1,0 +1,273 @@
+{
+  "schema_version": "nmm.target-refresh-direct-crossplay-plan.v1",
+  "objective": "Measure whether the late refresh-once versus no-refresh policy separation has a direct paired game consequence when both frozen policies play each other and Sanmill acts only as the strict portable referee, after attempt-001 stopped before its first game on the corrected schedule-seed field boundary.",
+  "plan_identity": "4b0a873020b1ee157f01578d2565b9ff27917ee2f15fc00128e0ae91a6ead56f",
+  "source": {
+    "schedule_contract_path": "docs/experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.json",
+    "schedule_contract_sha256": "64d035ccaedcaddc1b4331503c1873cea3f8582c7f4b4c740aa7d460e4d15c0c",
+    "schedule_plan_identity": "0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b",
+    "source_result_path": "out/target-refresh-schedule-isolation-diagnostic-v2/result.json",
+    "source_result_sha256": "34fcf6f2f1354e734b4a58eccaf041c036a5c96518a8a2430d033f05d713edbf",
+    "source_result_identity": "a438148928abd8bc1fe6f410c9aebd8e310b5c112d514f2df4d452e26800b65c",
+    "training_source_commit": "49defb8a79d07a19c035ca6c1f23f266ae5ed2b2",
+    "analysis_source_commit": "6be069da0bed11664f7f4037d72cd5ba887b6cab"
+  },
+  "implementation": {
+    "commit": "2db2f945becbf2da0c208547ae624f53778274dd",
+    "module_path": "learned_ai/evaluation/target_refresh_direct_crossplay.py",
+    "module_sha256": "f65289bab908e94c26ba847632af25622395b4ba2ebd9dc0fcae59469d40c8ce",
+    "prepare_path": "scripts/prepare_target_refresh_direct_crossplay.py",
+    "prepare_sha256": "50b8515112b2c2bbd6b06abe70b2cd27ecbc4405d50c411ee869c0b678b09ccd",
+    "runner_path": "scripts/run_target_refresh_direct_crossplay.py",
+    "runner_sha256": "60691653b4c17a5ea4422ae51d16427f38a0aae14758e8b1fa41e33c5aeaed91"
+  },
+  "data_contract": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_malom_policy": "masked_historical_labels",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "policy_corpus_path": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+    "policy_corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+    "replay_corpus_path": "docs/experiments/dev-v4-phase-replay-development-corpus-v1.json",
+    "replay_corpus_sha256": "9637efaae21074eefb4fab9e22550f5729999b30d03ed469dc88cf75aae07c2f",
+    "replay_corpus_identity": "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4",
+    "replay_audit_path": "docs/evidence/phase-replay-development-corpus-sanmill-audit-2026-08-11.json",
+    "replay_audit_sha256": "4634ba61a4e43c0b6d80a80c882aea5ca985b9bc8923e7895b39bf8ad557e42e",
+    "replay_audit_identity": "9d4c54270c6e66dd9e16b4dae5af9291b1fea6d1385856650e71119dc4c0dbbf"
+  },
+  "checkpoint_contract": {
+    "post_fork_consumed_transitions": 8192,
+    "anchors": [
+      {
+        "seed": 67,
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix/segments/segment-0001/target-refresh-fork.pt",
+        "file_sha256": "55093500b6b08f614b6c83f387addb2d0c897204d44b0c90fe82b0da03f049e0",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s67-prefix-segment-0001:checkpoint:00000002",
+        "payload_sha256": "2cd9f9e6a4181df57f21d3cbf52fd95eb01b2203c88ff51b1f1ec372e6aa7339",
+        "model_state_sha256": "40a1b8d219ea8574c88d8dca5b07700253f3dbf25b88b2b6e241ee987dee4f36",
+        "game_count": 50,
+        "update_count": 18,
+        "optimizer_consumed_transition_count": 1152,
+        "pending_transition_count": 54
+      },
+      {
+        "seed": 68,
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-prefix/segments/segment-0001/target-refresh-fork.pt",
+        "file_sha256": "7911a3da6ab261af4c18e040c2b958ae81e491524b426469a456de3089e965e4",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s68-prefix-segment-0001:checkpoint:00000002",
+        "payload_sha256": "41be2e35527ddf3335d8e1cc06a8a8ef8fffebea167fc7b085a8ef002a325632",
+        "model_state_sha256": "6d422f12db820e428545bf66606c2755c4c571dc1b4810c225dd96997c1881c9",
+        "game_count": 50,
+        "update_count": 22,
+        "optimizer_consumed_transition_count": 1408,
+        "pending_transition_count": 17
+      },
+      {
+        "seed": 69,
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-prefix/segments/segment-0001/target-refresh-fork.pt",
+        "file_sha256": "1a4271ef12c8d8269ff62324bbeba30e220ec69c05f25f8d91e312e1e153d5ca",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s69-prefix-segment-0001:checkpoint:00000002",
+        "payload_sha256": "0a0237675b72c9b9badfaf5c6d7e9f9eab9f830e2e8dca7fbd2e375982358597",
+        "model_state_sha256": "b60ebde423c567583d9eabd5aa3ee3e50ccafbd47e085fc62551c59bfd3786b3",
+        "game_count": 50,
+        "update_count": 15,
+        "optimizer_consumed_transition_count": 960,
+        "pending_transition_count": 12
+      }
+    ],
+    "candidates": [
+      {
+        "seed": 67,
+        "condition": "refresh-once",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-refresh-once/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "8935a4a58347fe1c22a903efc6ea2aafaffb160d777b72a124b3544f143aec99",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s67-refresh-once-segment-0001:checkpoint:00000014",
+        "model_state_sha256": "56ed06c250a51ab9534e8a226de6925236b13f938bcd47befdef072d46b8ca1d",
+        "game_count": 560,
+        "update_count": 146,
+        "optimizer_consumed_transition_count": 9344,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 12,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s67-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "a4a8f685595822ac6147aa244ad1b2ed4e807f95298107723decc53c35d7fa0d",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      },
+      {
+        "seed": 67,
+        "condition": "no-refresh",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-no-refresh/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "71cbcffa005b7f1312df5bc206b1391cb846229595c3e336e841aff4bb5a4c02",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s67-no-refresh-segment-0001:checkpoint:00000011",
+        "model_state_sha256": "4a898ace6c258476548105ae775d20231960891a16ce37121fdf7cee81cb1fb5",
+        "game_count": 439,
+        "update_count": 146,
+        "optimizer_consumed_transition_count": 9344,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 20,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s67-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "a4a8f685595822ac6147aa244ad1b2ed4e807f95298107723decc53c35d7fa0d",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      },
+      {
+        "seed": 68,
+        "condition": "refresh-once",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-refresh-once/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "1cd430aba7aed812ae085d283ed446d638417ac3497dd83b02ee8a6d0def7915",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s68-refresh-once-segment-0001:checkpoint:00000014",
+        "model_state_sha256": "af012f5ef23216664b6f3eb45a25619def4c6de193017662f52ede979098f7dd",
+        "game_count": 562,
+        "update_count": 150,
+        "optimizer_consumed_transition_count": 9600,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 19,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s68-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "414f9067bda3af51412d395b1b53f9c4975a2884dba32b5264abae11a90de59a",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      },
+      {
+        "seed": 68,
+        "condition": "no-refresh",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-no-refresh/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "1af1437271a749529ed18d7e4665a33a3c202e50eee6bc6f8ff254b9b27244b5",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s68-no-refresh-segment-0001:checkpoint:00000009",
+        "model_state_sha256": "4e50b2d1afe3f7a71da84320f99e30a8330b7dd1afd63dfe289c8b91b90f9b8c",
+        "game_count": 327,
+        "update_count": 150,
+        "optimizer_consumed_transition_count": 9600,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 40,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s68-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "414f9067bda3af51412d395b1b53f9c4975a2884dba32b5264abae11a90de59a",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      },
+      {
+        "seed": 69,
+        "condition": "refresh-once",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-refresh-once/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "b99ae4e871d720aa34a8b8106b4ac9058c69cd32b509bca4f87216d4ed8f6c08",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s69-refresh-once-segment-0001:checkpoint:00000014",
+        "model_state_sha256": "85408a3a2a94afccb7166da2b6abd9ec141cea3aa1c101b893c8b2b9bfc6e4f7",
+        "game_count": 576,
+        "update_count": 143,
+        "optimizer_consumed_transition_count": 9152,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 4,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s69-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "4c35c9b15bd0cb40c8d95b3daa6df31288d4a693555198b47c1d46625ca65b97",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      },
+      {
+        "seed": 69,
+        "condition": "no-refresh",
+        "path": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-no-refresh/segments/segment-0001/transition-00008192.pt",
+        "file_sha256": "d5b6c960930f646143f2969d28951b2de67dfb660bc72e8fa3af197587725871",
+        "checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s69-no-refresh-segment-0001:checkpoint:00000013",
+        "model_state_sha256": "000c4f12489a3cd2dcb9d5a81ff4d80bef5dd016ab2a6864ae786feeaf5f0dac",
+        "game_count": 518,
+        "update_count": 143,
+        "optimizer_consumed_transition_count": 9152,
+        "post_fork_consumed_transition_count": 8192,
+        "pending_transition_count": 17,
+        "fork_checkpoint_id": "managed-target-refresh-schedule-isolation-v2-s69-prefix-segment-0001:checkpoint:00000002",
+        "immutable_asset_identities": {
+          "human_db": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+          "malom_tablebase": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+          "mif_suite_1_0": "sha256:dde89416bf5251cdc445ebdb9b92a899f58ec3930d1d8077ae26f1cb1a084499",
+          "sanmill_training_runtime": "4c35c9b15bd0cb40c8d95b3daa6df31288d4a693555198b47c1d46625ca65b97",
+          "training_ruleset": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a"
+        }
+      }
+    ]
+  },
+  "measurement_contract": {
+    "device": "cpu",
+    "policy_selection": "training-policy-sampling",
+    "temperature": 0.2,
+    "shared_game50_anchor_features": true,
+    "sanmill_role": "strict-portable-referee-only",
+    "record_indices": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    "replicates_per_start": 4,
+    "colour_swap": true,
+    "common_random_streams_by_colour": true,
+    "max_post_start_logical_plies": 120,
+    "max_ply_disposition": "development-draw-with-flag",
+    "conditions": ["refresh-once", "no-refresh"],
+    "seeds": [67, 68, 69],
+    "expected_pairs": 144,
+    "expected_games": 288
+  },
+  "decision_contract": {
+    "contrast": "no-refresh minus refresh-once",
+    "minimum_aggregate_pair_score_effect": 0.08333333333333333,
+    "minimum_per_seed_pair_score_effect": 0.08333333333333333,
+    "minimum_supporting_seeds": 2,
+    "maximum_opposite_seed_effect": 0.041666666666666664,
+    "maximum_truncation_rate": 0.25,
+    "result_classes": [
+      "material_no_refresh_direct_effect",
+      "material_refresh_once_direct_effect",
+      "no_material_direct_effect",
+      "inconclusive_truncation"
+    ],
+    "automatic_long_run_selection": false
+  },
+  "resource_envelope": {
+    "training_games": 0,
+    "optimizer_updates": 0,
+    "database_writes": 0,
+    "checkpoint_writes": 0,
+    "no_update_games": 288,
+    "maximum_active_wall_hours": 2.0
+  },
+  "output_contract": {
+    "readiness": "out/target-refresh-direct-crossplay-v1-attempt-002/readiness.json",
+    "authorization": "out/target-refresh-direct-crossplay-v1-attempt-002/authorization.json",
+    "launch": "out/target-refresh-direct-crossplay-v1-attempt-002/launch.json",
+    "ledger": "out/target-refresh-direct-crossplay-v1-attempt-002/game-ledger.jsonl",
+    "result": "out/target-refresh-direct-crossplay-v1-attempt-002/result.json",
+    "completion": "out/target-refresh-direct-crossplay-v1-attempt-002/completion.json",
+    "failure": "out/target-refresh-direct-crossplay-v1-attempt-002/failure.json"
+  },
+  "claim_boundary": "This is paired development evidence about a direct game consequence between two frozen training conditions. It is not held-out strength, promotion, publication, or authorization for long training.",
+  "stop_conditions": [
+    "any plan, source, implementation, corpus, database, checkpoint, or referee identity mismatch",
+    "any non-finite or structurally invalid policy output",
+    "any Sanmill and local-rule legality, history, terminal, or winner mismatch",
+    "any pre-existing one-shot output or partial prior attempt",
+    "any read-only HumanDB or Malom observation change",
+    "any incomplete or malformed game ledger",
+    "the two-hour active wall-time bound is reached"
+  ],
+  "prohibited_operations": [
+    "training-or-optimizer-update",
+    "database-or-checkpoint-write",
+    "automatic-retry-or-extension",
+    "held-out-evaluation",
+    "model-promotion-or-publication",
+    "long-training-launch"
+  ]
+}
