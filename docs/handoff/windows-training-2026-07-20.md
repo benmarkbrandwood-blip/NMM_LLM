@@ -178,6 +178,20 @@ candidate as White. No target-refresh condition is selected. Preserve the
 The recovery authorization is consumed and gives no held-out, promotion,
 publication or long-training authority.
 
+The subsequently authorized target-refresh direct cross-play attempt 001
+failed closed before its first game. Source commit `b25fe33`, plan identity
+`c7a03214`, readiness identity `6da0b4ac` and authorization identity
+`5485baf7` were valid, but the runner requested `policy_seed_w` while the
+closed schedule correctly provided `policy_seed_white`. The canonical ledger
+is empty; no policy action, logical ply, training game, optimizer update,
+database write or checkpoint write occurred. No result or completion record
+exists, all read-only identities remained unchanged, and no process remained.
+The authorization is consumed and does not permit a retry. Preserve the
+[failure evidence](../evidence/target-refresh-direct-crossplay-attempt-001-failure-2026-08-12.md).
+A successor must fix and test the closed seed-field mapping, use isolated
+attempt-002 output paths, publish a new immutable plan and readiness identity,
+and receive new explicit product authorization.
+
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
 equal-transition sequence. The Agent recorded each leaf authorization as
@@ -2180,6 +2194,15 @@ the current successor in this order:
     held-out evaluation, promote, publish, or start long training from this
     result. A direct paired no-update successor needs a new immutable contract,
     readiness record, and one bounded product authorisation.
+26. Preserve target-refresh direct cross-play attempt 001 under source
+    `b25fe33`, readiness `6da0b4ac` and the
+    [failure record](../evidence/target-refresh-direct-crossplay-attempt-001-failure-2026-08-12.md).
+    It failed before ordinal zero because the runner used an abbreviated seed
+    field that does not exist in the closed schedule. Its ledger has zero rows,
+    all data and checkpoint observations remained unchanged, and its one-run
+    authorization is consumed. Do not overwrite or resume its output. A fixed
+    attempt 002 requires new output, plan and readiness identities plus a new
+    explicit product authorization.
 
 The previously executed isolated smoke command was:
 
