@@ -1,0 +1,381 @@
+{
+  "analysis": {
+    "classification": {
+      "final_near_identical_requires_all_seeds": true,
+      "material_confirmation_boundary": 4096,
+      "materially_diverged_requires_persistent_seeds": 2,
+      "thresholds": {
+        "material_min_all_mean_js_nats": 0.005,
+        "material_min_all_mean_total_variation": 0.05,
+        "material_min_phase_mean_abs_malom_preserving_mass_delta": 0.05,
+        "near_identical_max_phase_mean_abs_malom_preserving_mass_delta": 0.02,
+        "near_identical_max_phase_mean_js_nats": 0.0005,
+        "near_identical_max_phase_mean_total_variation": 0.02
+      },
+      "top1_is_interpretive_not_a_standalone_gate": true
+    },
+    "outcome_classification": {
+      "maximum_opposite_malom_mass_effect": 0.05,
+      "maximum_opposite_phase_effect": 0.25,
+      "maximum_truncation_rate_increase": 0.1,
+      "minimum_aggregate_score_effect": 0.08333333333333333,
+      "minimum_per_seed_score_effect": 0.041666666666666664,
+      "minimum_supporting_seeds": 2
+    },
+    "result_implementation": {
+      "module": {
+        "path": "learned_ai/evaluation/target_refresh_schedule_isolation_result.py",
+        "sha256": "121ff189eedcee8eb5aea8090c83a478be92dd5b98ae8ea01e2a49a506dde554"
+      },
+      "publisher": {
+        "path": "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
+        "sha256": "7e8bd6300dbe0bb45c5c644c63598dd8c7853745469a0416378f36605099c257"
+      },
+      "result_schema": "nmm.target-refresh-schedule-isolation-result.v1"
+    }
+  },
+  "arms": [
+    {
+      "arm_id": "seed67-refresh-once",
+      "condition": "refresh-once",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-refresh-once",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s67",
+      "launch_order": 2,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s67-refresh-once",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s67.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 67,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s67.refresh_once.sqlite"
+    },
+    {
+      "arm_id": "seed67-no-refresh",
+      "condition": "no-refresh",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-no-refresh",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s67",
+      "launch_order": 3,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s67-no-refresh",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s67.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 67,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s67.no_refresh.sqlite"
+    },
+    {
+      "arm_id": "seed68-refresh-once",
+      "condition": "refresh-once",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-refresh-once",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s68",
+      "launch_order": 5,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s68-refresh-once",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s68.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 68,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s68.refresh_once.sqlite"
+    },
+    {
+      "arm_id": "seed68-no-refresh",
+      "condition": "no-refresh",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-no-refresh",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s68",
+      "launch_order": 6,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s68-no-refresh",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s68.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 68,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s68.no_refresh.sqlite"
+    },
+    {
+      "arm_id": "seed69-refresh-once",
+      "condition": "refresh-once",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-refresh-once",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s69",
+      "launch_order": 8,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s69-refresh-once",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s69.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 69,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s69.refresh_once.sqlite"
+    },
+    {
+      "arm_id": "seed69-no-refresh",
+      "condition": "no-refresh",
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-no-refresh",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s69",
+      "launch_order": 9,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s69-no-refresh",
+      "prefix_specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s69.prefix.sqlite",
+      "resume_checkpoint": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-prefix/segments/segment-0001/target-refresh-fork.pt",
+      "seed": 69,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s69.no_refresh.sqlite"
+    }
+  ],
+  "authorization": {
+    "arm_segments_authorized": 0,
+    "launch_authorized": false,
+    "prefix_segments_authorized": 0,
+    "promotion_allowed": false,
+    "publication_allowed": false
+  },
+  "claim_boundary": "Three-seed one-time target-refresh mechanism evidence on fixed policy features and candidate-blind replay starts only; not held-out strength, trap learning, promotion, publication, retained-run or long-run evidence.",
+  "common_training_contract": {
+    "algorithm": "A2C",
+    "batch_games": 1,
+    "branches": false,
+    "curriculum_advance_policy": "fixed-resource",
+    "entropy_coefficient": 0.01,
+    "exact_transition_batch_size": 64,
+    "fixed_resource_stage_games": [
+      5000
+    ],
+    "frozen_target_ratio": 0.6,
+    "gamma_td": 0.99,
+    "learning_rate": 0.0001,
+    "learning_rate_mode": "fixed",
+    "log_every_games": 50,
+    "malom_policy_aux_coefficient": 0.0,
+    "malom_policy_aux_mode": "fixed",
+    "max_games_schedule": 5000,
+    "max_logical_plies": 120,
+    "mill_bonus_mode": "malom-preserving-only",
+    "minimal_rollouts": true,
+    "no_final_undersized_flush": true,
+    "post_fork_temperature_anneal_transitions": 106304,
+    "recovery": false,
+    "sanmill_node_ladder": [
+      1000
+    ],
+    "sanmill_search_ratio": 0.4,
+    "sim_ply_depth": 5,
+    "specialist_read_mode": "theoretical-only",
+    "target_refresh_fork_game": 50,
+    "temperature_end": 0.2,
+    "temperature_end_progress": 0.8,
+    "temperature_schedule_axis": "post-fork-transitions",
+    "temperature_schedule_coordinate": "FIFO learner-transition ordinal after the shared fork; every generated learner transition is assigned temperature from its eventual consumed order, and pending overflow beyond the 8192-transition boundary is excluded",
+    "temperature_schedule_origin": "the global-game schedule temperature at the completed game-50 shared fork",
+    "temperature_start": 0.9
+  },
+  "components": {
+    "gap_net": false,
+    "human_db_frequencies_and_outcomes": true,
+    "human_db_malom_columns": false,
+    "imitation_mix": false,
+    "imitation_warm_start": false,
+    "malom_policy_auxiliary": false,
+    "malom_tablebase": true,
+    "opening_forcing": false,
+    "ppo": false,
+    "s1b_refresher": false,
+    "sentinel": false,
+    "specialist_db": true,
+    "value_net": false
+  },
+  "data_contract": {
+    "arm_clone_policy": "after a prefix closes, clone that exact prefix SpecialistDB separately to both arm paths; verify byte identity before either arm starts",
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_main_file_sha256": "d8e22da38273f7c26eb76803ae91fc3fae711f508383ffbe3096c2946912b440",
+    "human_db_use": "frequencies and empirical outcomes only; unversioned Malom columns masked",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "prefix_specialist_db_policy": "copy the exact closed template once to each seed prefix; never share a writable database between seeds",
+    "specialist_db_initial_template": {
+      "byte_length": 45056,
+      "label_version": "sector-corrected-v1",
+      "path": "data/specialist_db.mill_bonus_ablation_v1.template.sqlite",
+      "positions": 0,
+      "preferred_plays": 0,
+      "quick_check": "ok",
+      "sha256": "5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d",
+      "sidecars": "absent",
+      "winning_lines": 0
+    }
+  },
+  "experiment_family_id": "sanmill-target-refresh-schedule-isolation-diagnostic-v2",
+  "hypothesis": "a single frozen-target refresh at the shared game-50 boundary causes a persistent policy-distribution difference and a same-direction paired development-outcome effect after schedule isolation",
+  "lineage": {
+    "main_review": {
+      "cherry_picks_selected": [],
+      "reason": "origin/main contains no equivalent exact-transition, transition-temperature, fixed-node, candidate-blind replay target-refresh diagnostic; recent GapNet v3 work is outside this experiment",
+      "reviewed_tip": "728ddad9f1d7f95fae75a351669d39cd117b1259"
+    },
+    "required_implementation_commits": [
+      "bd3e5ce30c1646828f63bc496b721cef57086b05",
+      "8adefba401ee9fc6e0350e422cdc3324f259cc3f",
+      "4ca4f0391ba49e0935cf504344f92523bb612b6d",
+      "3cf4a191e9b7311c04292de724fa97d2ec1dc8ff",
+      "c9fc4fc1b7dcd7f5f87c3ba82d71680d94605033",
+      "c88b0f2a3346daba887e2f6b6d7edbe6a4e3d9df",
+      "dc83439c40def79ae150f7eb752709f174054aef",
+      "9195328d263f609a98110896480d125042666665",
+      "723ea25e5c0997124c1b01ce7e0ea96a8082605a",
+      "123387b29332d61ed838ab048dce613b5e5899d0",
+      "635178621f336dd0c02ea84b53fd3b4b08c10aec",
+      "782190782214a84c28d1f11c88c9ae996ee6e912",
+      "56a36053ec337e1ae58ecea221554a8c42d51154",
+      "f73d8d96c601895727c9216b1f82562a6854729b"
+    ],
+    "shared_prefix_per_seed": true,
+    "treatment_arms_exact_resume_from_shared_prefix": true
+  },
+  "measurement_contract": {
+    "fixed_feature_matrix_per_seed": true,
+    "fixed_phase_corpus": "docs/experiments/dev-v4-phase-covered-corpus-v1.json",
+    "fixed_phase_corpus_sha256": "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e",
+    "optimizer_updates": 0,
+    "outcome_measurement": {
+      "candidate_colors": [
+        "W",
+        "B"
+      ],
+      "common_random_numbers_within_pairs": true,
+      "fixed_replay_corpus": "docs/experiments/dev-v4-phase-replay-development-corpus-v1.json",
+      "fixed_replay_corpus_identity": "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4",
+      "fixed_replay_corpus_sha256": "9637efaae21074eefb4fab9e22550f5729999b30d03ed469dc88cf75aae07c2f",
+      "games_per_checkpoint_condition_seed": 24,
+      "held_out": false,
+      "max_post_start_logical_plies": 120,
+      "opponent": "common-game-50-anchor",
+      "optimizer_updates": 0,
+      "sampling_temperature": 0.2,
+      "strict_replay_audit": "docs/evidence/phase-replay-development-corpus-sanmill-audit-2026-08-11.json",
+      "strict_replay_audit_identity": "9d4c54270c6e66dd9e16b4dae5af9291b1fea6d1385856650e71119dc4c0dbbf",
+      "strict_replay_audit_sha256": "4634ba61a4e43c0b6d80a80c882aea5ca985b9bc8923e7895b39bf8ad557e42e",
+      "total_games": 288,
+      "training_games": 0,
+      "transition_boundaries": [
+        4096,
+        8192
+      ],
+      "writes_training_data": false
+    },
+    "state_weighting": "each of 64 positions has equal weight",
+    "temperatures": [
+      1.0,
+      0.2
+    ],
+    "training_games": 0,
+    "transition_boundaries": [
+      1024,
+      2048,
+      4096,
+      8192
+    ],
+    "writes_training_data": false
+  },
+  "objective": "isolate one target-network refresh while matching exact post-fork optimizer-consumed transitions, per-transition temperature exposure, and fixed Sanmill node work",
+  "pairing": {
+    "arm_difference_allowlist": [
+      "arm_id",
+      "condition",
+      "control_dir",
+      "launch_order",
+      "plan_id",
+      "specialist_db"
+    ],
+    "conditions": [
+      "refresh-once",
+      "no-refresh"
+    ],
+    "no_later_target_refresh": true,
+    "same_fork_checkpoint_within_seed": true,
+    "same_prefix_specialist_db_snapshot_within_seed": true,
+    "seeds": [
+      67,
+      68,
+      69
+    ],
+    "single_process_at_a_time": true
+  },
+  "plan_identity": "9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05",
+  "prefixes": [
+    {
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s67",
+      "launch_order": 1,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s67-prefix",
+      "seed": 67,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s67.prefix.sqlite"
+    },
+    {
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed68-prefix",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s68",
+      "launch_order": 4,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s68-prefix",
+      "seed": 68,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s68.prefix.sqlite"
+    },
+    {
+      "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed69-prefix",
+      "experiment_id": "dev-v4-target-refresh-schedule-isolation-v2-s69",
+      "launch_order": 7,
+      "plan_id": "managed-target-refresh-schedule-isolation-v2-s69-prefix",
+      "seed": 69,
+      "specialist_db": "data/specialist_db.target_refresh_schedule_isolation_v2.s69.prefix.sqlite"
+    }
+  ],
+  "preparation_stages": {
+    "arm_stage": "only after the corresponding prefix completes, audit its explicit untreated fork checkpoint and closed SpecialistDB, clone the database byte-identically, publish payload-preserving descriptor-rebound checkpoints, and generate two authorization-free arm plans and preflights",
+    "current_stage": "source_and_prefix_plan_preparation_only",
+    "prefix_stage": "prepare three fresh unauthorized prefix plans and preflights; do not launch",
+    "result_stage": "after all six arms complete exactly once, run the frozen no-update policy and 288-game candidate-blind replay publisher; do not promote, publish a model, run held-out, or start long training"
+  },
+  "resources": {
+    "arm_absolute_game_count_ceiling": 600,
+    "arm_active_wall_hours": 0.875,
+    "arm_post_fork_game_execution_ceiling": 550,
+    "development_measurement_optimizer_updates": 0,
+    "development_measurement_training_writes": false,
+    "maximum_active_wall_hours_total": 6.0,
+    "maximum_actual_training_games_total": 3450,
+    "maximum_contract_training_games_total": 3600,
+    "maximum_development_measurement_games_total": 288,
+    "no_automatic_extension_retry_resume_or_training": true,
+    "prefix_active_wall_hours": 0.25,
+    "prefix_game_count": 50,
+    "scientific_post_fork_transitions_per_arm": 8192,
+    "scientific_post_fork_transitions_total": 49152
+  },
+  "rules_and_runtime": {
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.target-refresh-equal-transition-diagnostic-plan.v2",
+  "source_evidence": {
+    "common_anchor_policy_distribution": {
+      "path": "docs/evidence/target-refresh-common-anchor-policy-distribution-2026-08-10.md",
+      "sha256": "68e2ec216ee0ffe28dbe4013dca135393bcf069dd92856b60014ef43ca134997"
+    },
+    "predecessor_equal_transition_result": {
+      "path": "docs/evidence/target-refresh-equal-transition-diagnostic-result-2026-08-11.md",
+      "sha256": "688ad8607e98a15267f3f534bd5b60946b383117b02844a4dd7bf83d72712d21"
+    }
+  },
+  "status": "designed_unlaunched_needs_publication",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_held_out": false,
+    "automatic_promotion": false,
+    "automatic_resume_or_retry": false,
+    "continue_after_any_unit_failure": false,
+    "stop_on": [
+      "identity or source drift",
+      "fork or treatment mismatch",
+      "transition overrun or missing pending queue",
+      "duplicate-control mismatch",
+      "non-finite state",
+      "SpecialistDB clone or Malom-label drift",
+      "Sanmill error or checkpoint corruption",
+      "feature or legal-action identity mismatch",
+      "resource envelope reached",
+      "paired transition-temperature exposure differs",
+      "training Sanmill node budget differs from 1000",
+      "replay corpus or strict audit identity drift",
+      "candidate-blind paired measurement grid incomplete"
+    ]
+  }
+}
