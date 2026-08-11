@@ -44,6 +44,13 @@ from ai.value_net import _INPUT_DIM  # noqa: E402
 N_BANDS = 3
 FEAT_DIM_WITH_BAND = _INPUT_DIM + N_BANDS
 
+# Batch 3b (docs/gap_net_v3_stage_e_rebuild_checklist.md): the v3 teacher
+# retrain lands under a separately-named artefact so the current v2 candidate
+# stays intact as the exploratory comparison.
+_V2_TEACHER_OUTPUT = Path("data/human_move_policy_net_v2_candidate.npz")
+_V3_TEACHER_OUTPUT = Path("data/human_move_policy_net_v3_teacher_candidate.npz")
+_SESSION_LEDGER_SPLIT_SCHEME = "session_ledger_strict_single_tier"
+
 
 # ── Provenance ──────────────────────────────────────────────────────────────
 
@@ -54,6 +61,39 @@ def _git_head() -> Optional[str]:
         ).strip()
     except Exception:
         return None
+
+
+# ── Session-ledger safety helpers (Batch 3b) ────────────────────────────────
+
+def _peek_dataset_provenance(dataset_dir: Path) -> dict:
+    """Return the dataset's provenance dict without loading the memmap."""
+    meta_path = dataset_dir / "metadata.npz"
+    if not meta_path.exists():
+        return {}
+    d = np.load(meta_path, allow_pickle=True)
+    if "provenance" not in d.files:
+        return {}
+    raw = d["provenance"].item()
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8")
+    return json.loads(raw)
+
+
+def _guard_output_path(output: Path, dataset_provenance: dict) -> None:
+    """Refuse to overwrite the v2 teacher when training on a session-ledger dataset.
+
+    Trigger: dataset provenance records split_scheme == 'session_ledger_strict_single_tier'.
+    Blocked target: data/human_move_policy_net_v2_candidate.npz.  Other outputs are
+    allowed — the guard only protects the v2 filename.
+    """
+    if dataset_provenance.get("split_scheme") != _SESSION_LEDGER_SPLIT_SCHEME:
+        return
+    if output.resolve() == (_ROOT / _V2_TEACHER_OUTPUT).resolve():
+        raise SystemExit(
+            f"[hbn] Refusing to overwrite v2 teacher at {_V2_TEACHER_OUTPUT} "
+            f"when training on a session-ledger-isolated dataset.  Use e.g. "
+            f"--output {_V3_TEACHER_OUTPUT}."
+        )
 
 
 # ── Dataset loader ──────────────────────────────────────────────────────────
@@ -300,6 +340,17 @@ def train(args: argparse.Namespace) -> dict:
         "n_bands":                    int(N_BANDS),
         "elo_band_config_name":       ds.provenance["elo_band_config_name"],
         "training_objective":         "count_weighted_ce",
+        # Surface session-ledger identity at the top level (Batch 3b) so the
+        # ledger's SHA + manifest hash are one grep away — otherwise buried
+        # inside dataset_provenance.  Only populated when the dataset was
+        # extracted with --session-ledger.
+        "dataset_split_scheme":                 ds.provenance.get("split_scheme"),
+        "session_ledger_sha256":                ds.provenance.get("session_ledger_sha256"),
+        "session_ledger_files_manifest_sha256": ds.provenance.get(
+            "session_ledger_files_manifest_sha256"
+        ),
+        "session_ledger_version":               ds.provenance.get("session_ledger_version"),
+        "session_index_sha256":                 ds.provenance.get("session_index_sha256"),
         "hparams": {
             "lr":               args.lr,
             "dropout":          args.dropout,
@@ -333,6 +384,12 @@ def main() -> int:
     p.add_argument("--grad-clip",   type=float, default=1.0)
     p.add_argument("--seed",        type=int,   default=42)
     args = p.parse_args()
+
+    # Batch 3b guard: refuse overwriting v2 teacher when the dataset was
+    # extracted with the session-ledger scheme.  Peek at dataset provenance
+    # without loading the full memmap.
+    dataset_prov = _peek_dataset_provenance(args.dataset_dir)
+    _guard_output_path(args.output, dataset_prov)
 
     if args.output.exists():
         print(f"[hbn] WARNING: {args.output} exists and will be overwritten.")
