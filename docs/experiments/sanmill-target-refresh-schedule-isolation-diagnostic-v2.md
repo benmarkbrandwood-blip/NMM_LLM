@@ -6,7 +6,7 @@ Machine-readable contract:
 [`sanmill-target-refresh-schedule-isolation-diagnostic-v2.json`](sanmill-target-refresh-schedule-isolation-diagnostic-v2.json)
 
 Plan identity:
-`1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe`
+`0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b`
 
 This is a development mechanism experiment. It does not authorize execution,
 does not choose a retained model, and is not held-out strength evidence.
@@ -15,10 +15,15 @@ The earlier unlaunched identity
 `9c8068308d9f74623555371e789ba12a0138a3eb895f0aa379184e8380a39b05`
 is preserved in Git history but is superseded. The scientific design and
 resource envelope did not change. The current identity only refreshes the
-source lineage after reviewing `origin/main` through `0cfb651`, binding the
+source lineage after reviewing `origin/main` through `028ef8e`, binding the
 [review evidence](../evidence/origin-main-training-review-2026-08-11.md), and
 recording the independently tested UTF-8 portability repair. No `main`
 training or gameplay commit was imported.
+
+The reviewed main tip is an ancestry boundary. Readiness fails if that commit
+is no longer an ancestor of `origin/main`, while ordinary fast-forward
+descendants are reported by exact current tip and unreviewed-commit count
+rather than invalidating this frozen experiment by themselves.
 
 ## Observed facts
 
@@ -148,6 +153,22 @@ The contract contains zero launch, segment, promotion, and publication
 authority. Preparation may create only fresh database copies, authorization-
 free managed plans, preflights, and readiness evidence. A later bounded launch
 requires the experiment's separate execution gate.
+
+On 11 August 2026 the product owner replied “同意” to the exact one-shot parent
+grant presented for this experiment: at most 3,600 contract games, 3,450
+actual training games, 49,152 post-fork consumed transitions, six active
+training hours, and the fixed 288-game no-update development grid, with no
+retry, recovery, resume, extension, held-out work, promotion, publication, or
+long-training fallback. The grant was not consumed because a final fetch
+advanced `origin/main` before the authorization record was written. Under the
+repository standing-delegation rule, it remains valid for this same experiment
+family after a source-lineage-only identity refresh, provided the scientific
+design, resource envelope, claim boundary, stop rules, and prohibited actions
+remain byte-equivalent. The regenerated parent authorization must still bind
+the current technical readiness just in time. The canonical delegated product
+scope (the contract excluding only `plan_identity` and `lineage`) is frozen as
+`a92e87bebe87e1a287be37c95c0974cafde662703ee05436a2c30b7d9584211a`;
+the previous approved contract and this lineage refresh have that same digest.
 
 ## One-shot parent execution
 

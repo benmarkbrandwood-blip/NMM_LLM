@@ -3,11 +3,11 @@
 ## Scope and verdict
 
 This review covers the linear `origin/main` range
-`728ddad9f1d7f95fae75a351669d39cd117b1259..0cfb651424d089908988f48129fe3ab3de5b010e`.
+`728ddad9f1d7f95fae75a351669d39cd117b1259..028ef8e7b38a04cc076e2d714854fcc13177d0df`.
 It was performed before refreshing the unlaunched schedule-isolation v2
 contract. No merge, cherry-pick, or history rewrite was used.
 
-The range contains seven commits:
+The range contains eleven commits:
 
 | Commit | Subject | Disposition on `dev` |
 | --- | --- | --- |
@@ -18,12 +18,17 @@ The range contains seven commits:
 | `ec567b29ebccbf4fc9182beb08e23280255cb099` | Add an HMPN session-ledger extraction mode | Do not adopt or run; the recorded ledger is not the source of the applied split |
 | `9efe0ba91d34266aff0684d0ddcc2e57ec336a74` | Add an HMPN trainer ledger guard | Useful overwrite warning, but it inherits the unbound dataset identity |
 | `0cfb651424d089908988f48129fe3ab3de5b010e` | Mark GapNet Batch 3a/3b progress | Do not treat the completion claims as readiness evidence |
+| `fa859c9bc5e910a464638bb92b7723ef8749b6d5` | Configure a Generalist checkpoint in tracked UI settings | Do not import; it binds a transient `main` checkpoint and bypasses the local training-path boundary |
+| `2881a85b1ebcad1222b017efcd118045cec48902` | Change UI difficulty and humanlike defaults | Product/UI-only; irrelevant to the frozen training experiment |
+| `c64774a0c84a6d498f42108d70331dc7d182bc6f` | Load legacy checkpoints under PyTorch 2.6 | Do not import as written; its unconditional unsafe-pickle fallback lacks an explicit trust gate |
+| `028ef8e7b38a04cc076e2d714854fcc13177d0df` | Add NumPy 2.x dtype safe globals | The allowlist improvement is useful, but the now-debug-only unsafe fallback remains unacceptable |
 
 The verdict for the current schedule-isolation experiment is **no relevant
 training implementation to import**. GapNet and the human move policy teacher
-remain disabled by contract. The UTF-8 change is an independent general
-portability repair and does not alter the experiment's gameplay, optimizer,
-data, or schedule semantics.
+remain disabled by contract. The Generalist settings and legacy-loader changes
+are serving/UI changes and are not used by the managed trainer. The UTF-8
+change is an independent general portability repair and does not alter the
+experiment's gameplay, optimizer, data, or schedule semantics.
 
 The verdict for the `main` GapNet v3 production data chain remains **fatal
 stop**: do not generate or consume a canonical production ledger or HMPN v3
@@ -136,6 +141,41 @@ forces the optional guide path, verifies the explicit encoding, and parses
 non-ASCII text. The focused regression passes. This is not a cherry-pick and
 does not import `main` gameplay or training code.
 
+### Generalist UI settings and legacy checkpoint loading
+
+Commit `fa859c9` makes tracked `data/settings.json` take precedence over the
+ignored machine-local training paths and commits a concrete
+`s_gen_v2c/repetition_penalty_2_fixed/best.pt` selection. That checkpoint is a
+transient exploratory `main` artifact, not a frozen baseline or an approved
+`dev` lineage. Moving its location into tracked UI preferences also weakens
+the existing separation between portable repository defaults and
+machine-local checkpoint provenance.
+
+Commit `2881a85` only changes interactive UI defaults. It has no bearing on
+the managed trainer, fixed Sanmill opponent, or no-update measurement.
+
+Commit `c64774a` addresses a real PyTorch 2.6 compatibility symptom for legacy
+pickle checkpoints. It first allowlists several NumPy reconstruction globals,
+then catches every safe-load exception and retries with
+`weights_only=False`. The retry can execute arbitrary pickle code from any
+checkpoint path selected through the new settings route. A warning is not an
+explicit trust decision, and the fallback is not restricted by an approved
+SHA-256, provenance record, or legacy-only command-line opt-in.
+
+Current retained `dev` checkpoints use the independently verified checkpoint
+envelope path, and the schedule-isolation trainer does not call
+`specialist_router.load_generalist()`. Therefore this compatibility issue does
+not block the bounded diagnostic. If legacy serving compatibility is needed
+later, convert a known-hash local checkpoint to the envelope format or require
+an explicit trusted-legacy opt-in; do not silently disable PyTorch's safe
+loader for arbitrary configured files.
+
+Commit `028ef8e` broadens the safe allowlist to NumPy 2.x dtype classes, which
+can reduce the need for unsafe fallback on known modern checkpoints. It does
+not remove or gate `weights_only=False`; instead it lowers the fallback log
+from warning to debug. This makes an unsafe load less visible without creating
+the missing trust boundary, so the overall disposition is unchanged.
+
 ## Hypotheses
 
 1. A production ledger or HMPN dataset built by the reviewed chain can bind a
@@ -144,9 +184,10 @@ does not import `main` gameplay or training code.
 2. A teacher trained from that dataset could report session-isolated
    train/validation/test provenance even when its masks were generated by an
    unrelated or partial index.
-3. The seven reviewed commits have no causal bearing on the target-refresh
+3. The eleven reviewed commits have no causal bearing on the target-refresh
    schedule-isolation contrast because that experiment disables GapNet,
-   imitation, Sentinel, ValueNet, and the HMPN teacher path.
+   imitation, Sentinel, ValueNet, and the HMPN teacher path, and it does not
+   resolve its training checkpoint through the interactive Generalist router.
 
 ## Supporting evidence
 
@@ -161,6 +202,8 @@ does not import `main` gameplay or training code.
   mismatch in the ledger builder.
 - The schedule-isolation machine contract explicitly disables GapNet,
   Sentinel, ValueNet, imitation, and warm start.
+- Its managed training commands bind their own fresh checkpoint lineage and
+  never read `data/settings.json` or call `load_generalist()`.
 - No reviewed `main` commit implements the exact-transition,
   transition-indexed-temperature, fixed-node, common-anchor outcome design.
 
@@ -178,6 +221,9 @@ does not import `main` gameplay or training code.
   failures out.
 - The UTF-8 regression proves the read contract, not behavior of an untracked
   phase guide or any LLM-assisted playing-strength effect.
+- The PyTorch change may make Ben's trusted local exploratory checkpoint load
+  successfully. This review does not dispute that compatibility benefit; it
+  rejects the absence of an enforceable trust boundary in the fallback.
 
 ## Next validation work
 
@@ -194,8 +240,22 @@ run.
 This work is owned by `main` and is not a prerequisite for the disabled-GapNet
 Generalist diagnostic.
 
+For legacy Generalist serving, keep portable settings free of a selected
+transient checkpoint. Resolve approved model bundles through an explicit local
+deployment configuration, and require either an envelope or a separately
+audited known-hash legacy-conversion step before any unsafe pickle load.
+
 For `dev`, update only the schedule-isolation lineage to this reviewed main
 tip, keep `cherry_picks_selected` empty, bind this evidence by SHA-256, and
 regenerate all ignored readiness and database artifacts from the next clean,
 published `dev` commit. No candidate, training result, or strength claim was
 used in this source review.
+
+The readiness gate treats this reviewed tip as an ancestry boundary, not as a
+requirement that a moving remote branch remain byte-for-byte at the same tip.
+A later fast-forward descendant is recorded with its exact current
+`origin/main` identity and the number of unreviewed descendant commits. A
+rewrite that makes this reviewed tip cease to be an ancestor still fails
+closed. New descendant commits remain subject to the separate periodic review;
+this rule prevents unrelated UI or documentation commits from mutating an
+otherwise frozen experiment contract.

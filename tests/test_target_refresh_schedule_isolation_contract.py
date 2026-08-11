@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_equal_transition_diagnostic import (
     SCHEDULE_ISOLATION_CONTRACT_SCHEMA,
     load_equal_transition_contract,
@@ -17,7 +18,10 @@ CONTRACT = ROOT / (
     "sanmill-target-refresh-schedule-isolation-diagnostic-v2.json"
 )
 EXPECTED_PLAN_IDENTITY = (
-    "1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe"
+    "0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b"
+)
+EXPECTED_DELEGATED_SCOPE_IDENTITY = (
+    "a92e87bebe87e1a287be37c95c0974cafde662703ee05436a2c30b7d9584211a"
 )
 
 
@@ -45,7 +49,7 @@ def test_published_schedule_isolation_contract_is_frozen() -> None:
     }
     main_review = contract["lineage"]["main_review"]
     assert main_review["reviewed_tip"] == (
-        "0cfb651424d089908988f48129fe3ab3de5b010e"
+        "028ef8e7b38a04cc076e2d714854fcc13177d0df"
     )
     assert main_review["cherry_picks_selected"] == []
     evidence = main_review["evidence"]
@@ -59,6 +63,17 @@ def test_published_schedule_isolation_implementation_hashes_match() -> None:
     for component in ("module", "publisher"):
         record = implementation[component]
         assert _sha256(ROOT / record["path"]) == record["sha256"]
+
+
+def test_product_delegation_scope_is_unchanged_by_lineage_refresh() -> None:
+    contract = load_equal_transition_contract(CONTRACT)
+    delegated_scope = {
+        key: value
+        for key, value in contract.items()
+        if key not in {"plan_identity", "lineage"}
+    }
+
+    assert canonical_sha256(delegated_scope) == EXPECTED_DELEGATED_SCOPE_IDENTITY
 
 
 def test_published_schedule_isolation_outcome_grid_is_non_training() -> None:

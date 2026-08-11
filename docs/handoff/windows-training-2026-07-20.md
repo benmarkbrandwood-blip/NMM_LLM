@@ -125,21 +125,43 @@ long run is authorized by the completed diagnostic.
 
 The schedule-isolation v2 successor is now frozen but unlaunched under plan
 identity
-`1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe`.
+`0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b`.
 It retains three fresh shared prefixes and six paired arms, fixes Sanmill at
 1,000 nodes, indexes temperature by consumed learner transitions, and adds a
 candidate-blind 288-game common-anchor development measurement. Its one-shot
 parent runner binds the product-facing readiness identity, exact aggregate
 resources, fixed CPU analysis route, child authorizations and no-overwrite
-records. The previous unlaunched identity `9c806830` is superseded only because
-the source-lineage review advanced to `origin/main` commit `0cfb651`; no
-scientific or resource decision changed. The
+records. The previous published identities `1a86e158` and `9c806830` are
+superseded only because the source-lineage review advanced to `origin/main`
+commit `028ef8e`; no scientific or resource decision changed. The
 [main review](../evidence/origin-main-training-review-2026-08-11.md) keeps the
 GapNet v3 ledger and HMPN split chain at fatal stop, records the valid NaN fix
-as irrelevant to the disabled-GapNet experiment, and records the independent
-UTF-8 portability repair. Fresh ignored databases, plans and readiness
-evidence must be created only after this source is published. No execution
-authorization exists yet.
+as irrelevant to the disabled-GapNet experiment, rejects the unsafe legacy
+pickle fallback and transient UI checkpoint selection, and records the
+independent UTF-8 portability repair. Fresh ignored databases, plans and
+readiness evidence must be created only after this source is published.
+Readiness now requires the reviewed main tip to remain an ancestor and reports
+any later fast-forward descendants separately; unrelated remote movement no
+longer forces the frozen scientific contract to acquire a new identity.
+
+After technical readiness `e5ed9054` was presented, the product owner replied
+“同意” to the exact one-shot parent grant: at most 3,600 contract games, 3,450
+actual training games, 49,152 post-fork transitions, six active training
+hours, and the fixed 288-game no-update development grid, with no retry,
+recovery, resume, extension, held-out work, promotion, publication, or
+long-training fallback. No authorization file or launch marker was written
+before the final fetch advanced `origin/main`, so the grant is
+unconsumed. It remains a standing parent delegation for the same experiment
+family after a source-lineage-only rebind, provided a machine comparison proves
+that the scientific design, resources, claim boundary, stop rules and
+prohibited operations did not change. The Agent may bind the regenerated
+current readiness just in time without another product prompt.
+The canonical delegated product scope, computed from the entire contract after
+excluding only `plan_identity` and `lineage`, is
+`a92e87bebe87e1a287be37c95c0974cafde662703ee05436a2c30b7d9584211a`
+for both the approved `1a86e158` contract and the current source-only refresh.
+A focused contract test freezes this digest; any scientific, resource,
+measurement, stop-rule, or prohibited-operation change invalidates the grant.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2127,8 +2149,8 @@ the current successor in this order:
     setting can be considered.
 25. Preserve the unlaunched
     [schedule-isolation v2 contract](../experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.md),
-    plan identity `1a86e158`, and its reviewed `origin/main` lineage through
-    `0cfb651`. The one-shot runner has been hardened to bind both the external
+    plan identity `0580389b`, and its reviewed `origin/main` lineage through
+    `028ef8e`. The one-shot runner has been hardened to bind both the external
     sequence readiness and internal managed readiness, reconcile all prefix,
     arm, transition, active-hour and no-update-game bounds, and publish
     one-shot records exclusively. After ordinary publication, regenerate all
@@ -2232,8 +2254,9 @@ all attempt-003 grants are also consumed. The equal-transition sequence has
 completed all three prefixes and all six paired arms once. Its immutable
 result is `inconclusive_late_onset`, and its delegated leaf authorizations are
 consumed. The schedule-isolation successor is frozen under plan identity
-`1a86e158` but remains unlaunched and unauthorized; its prior `9c806830`
-identity is superseded. No held-out match, additional calibration, long
+`0580389b` and has one unconsumed standing parent grant; its prior `1a86e158`
+and `9c806830` identities are superseded. No held-out match, additional
+calibration, long
 training, model promotion/publication, protocol change, resource expansion, or
 history rewrite is authorized by that sequence. Ordinary
 verified fast-forward pushes of Codex-created `dev` commits are separately

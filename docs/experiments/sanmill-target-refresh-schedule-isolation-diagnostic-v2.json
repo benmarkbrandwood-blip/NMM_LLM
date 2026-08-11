@@ -195,7 +195,7 @@
       "cherry_picks_selected": [],
       "evidence": {
         "path": "docs/evidence/origin-main-training-review-2026-08-11.md",
-        "sha256": "8e5990b66477f9d4edb7ee61f0368ca99f41f7d2308d6b0218d3a719b3977403"
+        "sha256": "1de7f44ea255ff3b27ea8dc13ed37bec143c8f92194eb4c7ff3d6f6345f62795"
       },
       "independent_dev_changes": [
         {
@@ -204,8 +204,8 @@
           "reason": "adopt the locale-independent UTF-8 read with an independent focused regression; no main training or gameplay code imported"
         }
       ],
-      "reason": "origin/main through the reviewed tip contains no equivalent exact-transition, transition-indexed-temperature, fixed-node, candidate-blind replay target-refresh diagnostic; its GapNet v3 ledger and HMPN split chain remain blocked for production and are outside this disabled-GapNet experiment",
-      "reviewed_tip": "0cfb651424d089908988f48129fe3ab3de5b010e"
+      "reason": "origin/main through the reviewed tip contains no equivalent exact-transition, transition-indexed-temperature, fixed-node, candidate-blind replay target-refresh diagnostic; its GapNet v3 ledger and HMPN split chain remain blocked for production, while its UI checkpoint selection and unsafe legacy-load fallback are outside this managed disabled-GapNet experiment",
+      "reviewed_tip": "028ef8e7b38a04cc076e2d714854fcc13177d0df"
     },
     "required_implementation_commits": [
       "bd3e5ce30c1646828f63bc496b721cef57086b05",
@@ -221,7 +221,8 @@
       "635178621f336dd0c02ea84b53fd3b4b08c10aec",
       "782190782214a84c28d1f11c88c9ae996ee6e912",
       "56a36053ec337e1ae58ecea221554a8c42d51154",
-      "f73d8d96c601895727c9216b1f82562a6854729b"
+      "f73d8d96c601895727c9216b1f82562a6854729b",
+      "f87db8f0cc2a4bf44a95c2020cdbc31fe7118c52"
     ],
     "shared_prefix_per_seed": true,
     "treatment_arms_exact_resume_from_shared_prefix": true
@@ -295,7 +296,7 @@
     ],
     "single_process_at_a_time": true
   },
-  "plan_identity": "1a86e15836a0dc0c8afe4578c710117f43d03b50910a593434d86e7e195668fe",
+  "plan_identity": "0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b",
   "prefixes": [
     {
       "control_dir": "out/target-refresh-schedule-isolation-diagnostic-v2/seed67-prefix",
