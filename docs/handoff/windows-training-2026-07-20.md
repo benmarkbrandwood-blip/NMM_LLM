@@ -123,8 +123,7 @@ stratum. Preserve the full
 No held-out evaluation, promotion, model publication, successor training, or
 long run is authorized by the completed diagnostic.
 
-The schedule-isolation v2 successor is now frozen but unlaunched under plan
-identity
+The schedule-isolation v2 successor was frozen under plan identity
 `0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b`.
 It retains three fresh shared prefixes and six paired arms, fixes Sanmill at
 1,000 nodes, indexes temperature by consumed learner transitions, and adds a
@@ -139,10 +138,10 @@ GapNet v3 ledger and HMPN split chain at fatal stop, records the valid NaN fix
 as irrelevant to the disabled-GapNet experiment, rejects the unsafe legacy
 pickle fallback and transient UI checkpoint selection, and records the
 independent UTF-8 portability repair. Fresh ignored databases, plans and
-readiness evidence must be created only after this source is published.
-Readiness now requires the reviewed main tip to remain an ancestor and reports
-any later fast-forward descendants separately; unrelated remote movement no
-longer forces the frozen scientific contract to acquire a new identity.
+readiness evidence were created only after this source was published.
+Readiness required the reviewed main tip to remain an ancestor and reported
+later fast-forward descendants separately; unrelated remote movement did not
+change the frozen scientific contract.
 
 After technical readiness `e5ed9054` was presented, the product owner replied
 “同意” to the exact one-shot parent grant: at most 3,600 contract games, 3,450
@@ -150,18 +149,34 @@ actual training games, 49,152 post-fork transitions, six active training
 hours, and the fixed 288-game no-update development grid, with no retry,
 recovery, resume, extension, held-out work, promotion, publication, or
 long-training fallback. No authorization file or launch marker was written
-before the final fetch advanced `origin/main`, so the grant is
-unconsumed. It remains a standing parent delegation for the same experiment
-family after a source-lineage-only rebind, provided a machine comparison proves
-that the scientific design, resources, claim boundary, stop rules and
-prohibited operations did not change. The Agent may bind the regenerated
-current readiness just in time without another product prompt.
+before the final fetch advanced `origin/main`, so it was initially unconsumed.
+After a source-lineage-only rebind proved that the scientific design,
+resources, claim boundary, stop rules and prohibited operations had not
+changed, the owner authorised and the Agent executed the sequence once. The
+six arms completed, but the publisher failed closed on valid uniformly CRLF
+Windows JSONL before any development game. That training launch and all child
+authorisations are consumed.
 The canonical delegated product scope, computed from the entire contract after
 excluding only `plan_identity` and `lineage`, is
 `a92e87bebe87e1a287be37c95c0974cafde662703ee05436a2c30b7d9584211a`
 for both the approved `1a86e158` contract and the current source-only refresh.
 A focused contract test freezes this digest; any scientific, resource,
 measurement, stop-rule, or prohibited-operation change invalidates the grant.
+
+The separately authorised analysis recovery then completed the missing 288
+CPU no-update development games once under readiness identity `034ed820`.
+It performed zero training games, optimizer updates, database writes and
+checkpoint writes. Raw result identity `a4381489` classifies the common-anchor
+outcome effect as `no_material_paired_outcome_effect`; the full-action policy
+comparison is `inconclusive_late_onset`. The aggregate score contrast is zero
+at 4,096 transitions and `+0.04167` for no refresh at 8,192, below the frozen
+`0.08333` effect gate. Seeds 67 and 68 show material policy separation only at
+the final boundary, while seed 69 remains below every material threshold. The
+common Sanmill measurement is severely floor-limited, particularly with the
+candidate as White. No target-refresh condition is selected. Preserve the
+[result evidence](../evidence/target-refresh-schedule-isolation-diagnostic-v2-result-2026-08-11.md).
+The recovery authorization is consumed and gives no held-out, promotion,
+publication or long-training authority.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2147,17 +2162,24 @@ the current successor in this order:
     start long training. The next design must isolate the game-count-indexed
     temperature and Sanmill resource schedules before another target-refresh
     setting can be considered.
-25. Preserve the unlaunched
+25. Preserve the completed
     [schedule-isolation v2 contract](../experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.md),
     plan identity `0580389b`, and its reviewed `origin/main` lineage through
-    `028ef8e`. The one-shot runner has been hardened to bind both the external
-    sequence readiness and internal managed readiness, reconcile all prefix,
-    arm, transition, active-hour and no-update-game bounds, and publish
-    one-shot records exclusively. After ordinary publication, regenerate all
-    ignored source readiness, fresh database copies, managed plans and final
-    sequence preflight. Do not reuse the superseded `9c806830` plan or any
-    stale readiness identity. Execution still requires one parent product
-    grant for the exact sequence readiness; it must not become per-arm prompts.
+    `028ef8e`. All three shared prefixes and six arms completed once: 2,832
+    distinct training games, 49,152 post-fork transitions and 0.4824 active
+    hours. The first publisher failed closed on uniformly CRLF-framed Windows
+    JSONL before any of the 288 development games. The separately authorised
+    [analysis recovery](../experiments/sanmill-target-refresh-schedule-isolation-analysis-recovery-v1.md)
+    then completed all 288 CPU no-update games once under readiness identity
+    `034ed820`, with zero optimizer, database or checkpoint writes. Result
+    identity `a4381489` classifies the paired outcome effect as
+    `no_material_paired_outcome_effect` and policy separation as
+    `inconclusive_late_onset`; no condition is selected. Preserve the
+    [result evidence](../evidence/target-refresh-schedule-isolation-diagnostic-v2-result-2026-08-11.md).
+    All sequence and recovery grants are consumed. Do not retry, extend, run
+    held-out evaluation, promote, publish, or start long training from this
+    result. A direct paired no-update successor needs a new immutable contract,
+    readiness record, and one bounded product authorisation.
 
 The previously executed isolated smoke command was:
 
@@ -2253,10 +2275,12 @@ SpecialistDB read-calibration grants, all eight target-refresh/LR grants and
 all attempt-003 grants are also consumed. The equal-transition sequence has
 completed all three prefixes and all six paired arms once. Its immutable
 result is `inconclusive_late_onset`, and its delegated leaf authorizations are
-consumed. The schedule-isolation successor is frozen under plan identity
-`0580389b` and has one unconsumed standing parent grant; its prior `1a86e158`
-and `9c806830` identities are superseded. No held-out match, additional
-calibration, long
+consumed. The schedule-isolation successor completed once under plan identity
+`0580389b`; its analysis recovery also completed once, and every associated
+grant is consumed. Its outcome classifier is
+`no_material_paired_outcome_effect`, its policy classifier is
+`inconclusive_late_onset`, and no condition is selected. No held-out match,
+additional calibration, long
 training, model promotion/publication, protocol change, resource expansion, or
 history rewrite is authorized by that sequence. Ordinary
 verified fast-forward pushes of Codex-created `dev` commits are separately
