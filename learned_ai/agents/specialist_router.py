@@ -49,12 +49,12 @@ def _move_key(mv: dict) -> tuple:
 
 
 def _numpy_safe_globals() -> list:
-    """Return numpy globals that older checkpoints may pickle.
+    """Return numpy globals that checkpoints may pickle.
 
     PyTorch 2.6 flipped `torch.load(weights_only=...)` to True by default,
-    which rejects arbitrary globals. Checkpoints saved with earlier stacks
-    routinely include numpy scalars/arrays whose unpicklers live at these
-    fully-qualified paths — allowlisting them lets safe loading succeed.
+    which rejects arbitrary globals. Checkpoints saved with numpy scalars,
+    arrays, or numpy 2.x dtype classes need these types allowlisted so safe
+    loading succeeds.
     """
     import numpy as _np
     out: list = []
@@ -75,6 +75,15 @@ def _numpy_safe_globals() -> list:
                 break
         if obj is not None:
             out.append(obj)
+    try:
+        import numpy.dtypes as _nd
+        for name in dir(_nd):
+            if name.endswith("DType"):
+                cls = getattr(_nd, name, None)
+                if cls is not None:
+                    out.append(cls)
+    except Exception:
+        pass
     return out
 
 
@@ -93,11 +102,7 @@ def _load_spec_model(path: Path):
                 with torch.serialization.safe_globals(_numpy_safe_globals()):
                     ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
             except Exception as _we:
-                log.warning(
-                    "Specialist load: safe torch.load failed at %s (%s); "
-                    "retrying with weights_only=False for trusted local checkpoint",
-                    path, _we,
-                )
+                log.debug("safe torch.load failed at %s (%s); falling back to weights_only=False", path, _we)
                 ckpt = torch.load(str(path), map_location="cpu", weights_only=False)
             cfg = ckpt.get("model_config", {})
             state = ckpt.get("model") or ckpt
