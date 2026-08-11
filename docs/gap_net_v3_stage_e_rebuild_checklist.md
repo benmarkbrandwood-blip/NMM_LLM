@@ -42,17 +42,24 @@ OOF would not provide strict session-level OOF.
 
 ## Rebuild plan
 
-### Step 0 — Frozen shared session ledger
+### Step 0 — Frozen shared session ledger — ✅ TOOL LANDED (Batch 3a, commit 6d61d40)
 
 **Must land before Stage D extractor rewrite AND HumanMovePolicyNet retrain.**
 
-- [ ] Freeze the JSONL source manifest: enumerate every game file in `data/human_games/`
-      with its SHA-256, mtime and byte size.  Record as `data/gap_v3_session_ledger.json`.
-- [ ] Frozen split seed: adopt `b"gap_v3_session_split_v1"` (or user-approved value).
-- [ ] Compute per-session `game_level_split(session_id)` under that seed.  Record
-      `session_id → split_tier` and per-session SHA-256 hash for the tie-break rule.
-- [ ] This ledger is the single source of truth for both the teacher retrain (Decision 6B)
-      and the GapNet Stage D extractor.  Neither may compute its own split independently.
+- [x] Freeze the JSONL source manifest: `tools/build_gap_v3_session_ledger.py` records
+      per-file SHA-256, size, mtime, and `n_games` for every JSONL under `--games-dir`.
+      Output: `data/gap_v3_session_ledger.json`.
+- [x] Split seed: uses `learned_ai.data.human_db_split.game_level_split()` unchanged,
+      recorded in ledger provenance as `split_function` + `split_manifest_version`.
+- [x] Per-session records include `session_hash = sha256(session_id)` for owning-tier
+      tie-break, and `split = game_level_split(session_id)`.
+- [x] Deterministic scan order + first-occurrence rule for duplicate session_ids.
+- [x] `files_manifest_sha256` captures source identity (single hash of the sorted
+      `(rel_path, sha256, size_bytes)` triples).
+- [x] Ledger consumers (Batch 3b, Batch 4) verify this hash and refuse mismatches.
+- [ ] **Full ledger run not yet executed.**  Smoke run passed on 20 files (5.6 s);
+      full-scan cost ~7.6 h due to double file read (SHA + JSONL) — single-pass
+      optimisation deferred until we're ready to run the full ledger.
 
 ### Stage D redo — extraction rewrite
 
@@ -79,18 +86,33 @@ OOF would not provide strict session-level OOF.
   - [ ] Output directory: `data/gap_net_v3_dataset_v2/`.
   - [ ] **Coverage floor:** if final emission falls below X% of the state-key-split dataset's row count (X to be frozen with user before run), **halt and report** actual per-(band, phase) counts.  Do NOT fall back to mixed aggregates silently.
 
-### Stage D-a — HumanMovePolicyNet retrain (Decision 6B)
+### Stage D-a — HumanMovePolicyNet retrain (Decision 6B) — 🟡 TOOLING DONE, RUN PENDING (Batch 3b, commits ec567b2 + 9efe0ba)
 
-- [ ] Rebuild the teacher's training dataset using the frozen session ledger:
-  - [ ] Include only positions reached by **train-tier sessions** under the ledger.
-  - [ ] State_keys appearing in val/test-tier sessions are dropped from the teacher training pool.  Keep an eval subset for the teacher's own diagnostic gates.
+- [x] Rebuild the teacher's training dataset using the frozen session ledger:
+  - [x] `tools/extract_human_move_policy_dataset.py --session-ledger PATH --session-index PATH`
+        switches split scheme to strict single-tier session isolation.
+  - [x] State_keys appearing in val/test-tier sessions are dropped from the training pool
+        (mask must equal exactly `0b001`/`0b010`/`0b100`; mixed and uncovered dropped).
+  - [x] Guard: refuses to overwrite the v2 dataset at `data/human_move_policy_dataset/`
+        when `--session-ledger` is set.
+  - [x] Provenance records `session_ledger_sha256`, `session_ledger_files_manifest_sha256`,
+        `session_index_sha256`, `session_split_disposition`.
+- [x] Trainer safety guard (`tools/train_human_move_policy_net.py`):
+  - [x] `_peek_dataset_provenance` inspects `split_scheme` before starting training.
+  - [x] `_guard_output_path` refuses to overwrite `data/human_move_policy_net_v2_candidate.npz`
+        when the dataset was extracted with the session-ledger scheme.
+  - [x] Surfaces `dataset_split_scheme`, `session_ledger_sha256`,
+        `session_ledger_files_manifest_sha256`, `session_ledger_version`,
+        `session_index_sha256` at the top level of the trained `.npz`'s provenance.
 - [ ] **Readiness checkpoint before launching the ~18 h teacher training run:**
       report train / val / test **state, event, band, phase counts** to the user.  This is a
       gate, not authorisation — the user reviews the counts before green-lighting the run.
-- [ ] Train under an explicitly separate output name (proposed: `data/human_move_policy_net_v3_teacher_candidate.npz`).  Do not overwrite `data/human_move_policy_net_v2_candidate.npz`.
-- [ ] Record the frozen session ledger SHA + JSONL manifest SHA + split seed in the new teacher's `.npz` provenance.
+- [ ] Train under `data/human_move_policy_net_v3_teacher_candidate.npz` (guard enforces
+      this; v2 candidate stays untouched).
+- [ ] Record the frozen session ledger SHA + JSONL manifest SHA + split seed in the new
+      teacher's `.npz` provenance (auto-surfaced from dataset provenance chain).
 
-### Stage E redo — training rewrite
+### Stage E redo — training rewrite — ✅ DONE (commits 728ddad + 0e0224b)
 
 - [x] Rewrite `tools/train_gap_net_v3.py`:
   - [x] 79 board features + 3 band one-hot → 82 input.
@@ -107,24 +129,30 @@ OOF would not provide strict session-level OOF.
 
 ### Tests
 
-Existing (prepared, unstaged, 23 assertions passing locally):
+Landed to date — 62/62 assertions pass locally:
 
-- [x] `tests/test_gap_v3_band_onehot.py` — band one-hot at feature dims 79–81.
-- [x] `tests/test_gap_v3_three_head.py` — 3 output heads, save/load roundtrip against tiny synthetic model.
-- [x] `tests/test_gap_v3_gate_formulas.py` — hand-computed gate MSEs.
-- [x] `tests/test_gap_v3_fail_closed.py` — `_load_split` refuses non-finite targets.
-- [x] `tests/test_gap_v3_d4_flag.py` — D4 augmentation permutes only board block.
-- [x] `tests/test_gap_v3_no_zero_default.py` — missing Malom never becomes 0 (per plan §14 no-zero-default contract).
+Stage E trainer coverage (commits 728ddad + 0e0224b):
+- [x] `tests/test_gap_v3_band_onehot.py` — band one-hot at feature dims 79–81 (4).
+- [x] `tests/test_gap_v3_three_head.py` — 3 output heads, save/load roundtrip (3).
+- [x] `tests/test_gap_v3_gate_formulas.py` — hand-computed gate MSEs (5).
+- [x] `tests/test_gap_v3_fail_closed.py` — model + uniform targets strict-finite; only empirical may hold NaN (8; expanded from 6 after Codex Blocker 1 fix).
+- [x] `tests/test_gap_v3_d4_flag.py` — D4 augmentation permutes only board block (5).
+- [x] `tests/test_gap_v3_no_zero_default.py` — missing Malom never becomes 0 (6).
 
-Pending — write against synthetic data (no full training required, per user 2026-08-06):
+Session ledger + HMPN retrain coverage (Batch 3a + 3b):
+- [x] `tests/test_gap_v3_session_ledger.py` — ledger determinism, session-hash correctness, manifest hash sensitivity, duplicate handling (12).
+- [x] `tests/test_gap_v3_hmpn_session_split.py` — strict single-tier rule, no-train-leakage invariant, disposition counts, `_load_state_key_masks` SHA/length checks, `_guard_output_dir` on default v2 dataset path (10).
+- [x] `tests/test_gap_v3_hmpn_trainer_ledger_guard.py` — `_peek_dataset_provenance`, `_guard_output_path` blocks/allows across all (split_scheme × output_path) combinations (9).
+
+Pending — write against synthetic data (no full training required):
 
 - [ ] `tests/test_gap_v3_provenance.py` — required provenance fields present under a synthetic save.
 - [ ] `tests/test_gap_v3_provenance_roundtrip.py` — save/load preserves every provenance field.
 
-Pending — depend on extractor rewrite:
+Pending — depend on Stage D GapNet extractor rewrite (Batch 4):
 
-- [ ] `tests/test_gap_v3_session_split_isolation.py` — no val/test session events leak into train aggregation.
-- [ ] `tests/test_gap_v3_owning_tier_rule.py` — multi-tier state assignment picks smallest-hash session's tier and discards other-tier events.
+- [ ] `tests/test_gap_v3_session_split_isolation.py` — end-to-end: no val/test session events leak into GapNet Stage D train aggregation.
+- [ ] `tests/test_gap_v3_owning_tier_rule.py` — multi-tier state_key assignment picks smallest-hash session's tier and discards other-tier events.
 
 Pending — depend on a D4-on trained model:
 
@@ -136,13 +164,36 @@ Pending — depend on a D4-on trained model:
 - [ ] Add per-band thresholds.
 - [ ] Explicitly note teacher-fidelity is not empirical validation.
 
+## Current position (2026-08-11)
+
+Batch progress:
+- ✅ Batch 3a — session ledger builder + 12 tests (commit `6d61d40`).
+- ✅ Batch 3b — HMPN extractor + trainer session-ledger flags + guards + 19 tests (commits `ec567b2` + `9efe0ba`).
+- ⏳ Batch 3c — HMPN plan doc (`docs/human_move_policy_net_plan.md`) amendment describing v3 teacher retrain pipeline.  Not yet started.
+- ⏳ Batch 4 — Stage D GapNet extractor rewrite consuming the session ledger + session-isolation tests.
+- ⏳ Batch 5 — Promotion-gate freeze (per-band thresholds in `docs/gap_net_v3_plan.md` §16).
+- ⏸️ Batch 6 — Results (blocked on runs; runs blocked on readiness checkpoints and user authorisation).
+
+Runs pending user authorisation:
+- Full session-ledger run (`build_gap_v3_session_ledger.py`, ~7.6 h estimated; may want single-pass optimisation first).
+- HMPN v3 teacher retrain (~18 h) — readiness checkpoint required before launch.
+- GapNet v3 Stage D re-extraction (Batch 4 must land first) — coverage floor gate.
+- GapNet v3 Stage E training run — promotion gate wording must be frozen first (Batch 5).
+
 ## Progress log
 
 - 2026-08-06 — Codex review of `d1df6de`; user locked Decisions 1–5.
 - 2026-08-06 — Checklist created; Decision 6 open.
-- 2026-08-06 — `tools/train_gap_net_v3.py` rewritten for new spec (unstaged).
-- 2026-08-06 — Five focused tests drafted, passing (unstaged).
-- 2026-08-06 — User corrected 6A premise (HMPN v2 trained via `three_way_split(state_key)`, not sessions); Decision 6 locked to 6B.  Multi-tier rule tightened; A/B/C target discipline corrected (unavailable → abstain row, not NaN); coverage floor + readiness checkpoint added; no-zero-default regression added to tests batch.
+- 2026-08-06 — `tools/train_gap_net_v3.py` rewritten for new spec (commit `728ddad`).  Five focused tests drafted, passing.
+- 2026-08-06 — User corrected 6A premise (HMPN v2 trained via `three_way_split(state_key)`, not sessions); Decision 6 locked to 6B.  Multi-tier rule tightened; A/B/C target discipline corrected (unavailable → abstain row, not NaN); coverage floor + readiness checkpoint added; no-zero-default regression added.  Checklist committed as `2f36d69`.
+- 2026-08-06 — Batch 3a session ledger builder + 12 tests committed as `6d61d40`.  Smoke run on 20 JSONL files passed in 5.6 s.
+- 2026-08-11 — Codex review of `728ddad` found two blockers:
+    - Blocker 1: `_load_split` accepted NaN in `targets.f32.bin` and `targets_uniform.f32.bin`.  Fixed to require strict-finite (only `targets_empirical` may hold NaN).  Fail-closed tests inverted + expanded 6 → 8 assertions.  Commit `0e0224b`.
+    - Blocker 2: `docs/gap_net_v3_plan.md` still specified 79→128→64→32→4 / four heads and marked old state-key-split Stage D as ✅ PASSED.  Reconciled with a Corrections preamble + inline SUPERSEDED markers on §11.1 and §16 Stage D/E rows.  Commit `2a152af`.
+- 2026-08-11 — Windows locale portability fix: `ai/mills_llm.py` reads `phase_strategy.md` with explicit `encoding="utf-8"`.  Predates our commits, flagged by Codex as non-blocking.  Commit `4853296`.
+- 2026-08-11 — Batch 3b extractor: `--session-ledger` flag, strict single-tier rule, `_load_state_key_masks`, `_apply_session_ledger_split`, `_guard_output_dir` + 10 tests.  Commit `ec567b2`.
+- 2026-08-11 — Batch 3b trainer: `_peek_dataset_provenance`, `_guard_output_path`, session-ledger identity surfaced at top-level provenance + 9 tests.  Commit `9efe0ba`.
+- 2026-08-11 — Checklist updated with current-position section + progress log entries.
 
 ## Reversion
 
