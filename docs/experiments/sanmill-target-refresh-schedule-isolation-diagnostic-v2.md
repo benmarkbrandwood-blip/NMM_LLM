@@ -140,3 +140,25 @@ authority. Preparation may create only fresh database copies, authorization-
 free managed plans, preflights, and readiness evidence. A later bounded launch
 requires the experiment's separate execution gate.
 
+## One-shot parent execution
+
+The operational entry point is
+`scripts/run_target_refresh_schedule_isolation_sequence.py`. Its preflight
+revalidates the exact published source, contract and readiness identities,
+fresh prefix plans and databases, absent leaf authorizations, absent segment
+outputs, and absent deferred arm and result targets.
+
+An explicit parent product decision is recorded separately as
+`nmm.target-refresh-schedule-isolation-sequence-authorization.v1`. The grant
+binds the plan and readiness identities, source commit, aggregate game,
+transition, measurement and wall-time limits, exact launch order, claim
+boundary, permitted operations and prohibited actions. It is consumed when
+the one parent launch attempt starts.
+
+Within that single attempt, the runner may record each exact child plan as
+`product-owner-delegated-agent` immediately before use. It executes one prefix,
+prepares only that seed's real fork-derived arms, executes those two arms, and
+then proceeds to the next seed. The result publisher runs only after all nine
+managed plans complete. The first exception stops the sequence and writes a
+failure record; there is no retry, recovery, resume, extension, held-out run,
+promotion, publication or long-training fallback.
