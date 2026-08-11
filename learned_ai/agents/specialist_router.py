@@ -48,6 +48,36 @@ def _move_key(mv: dict) -> tuple:
     return (mv.get("from"), mv.get("to"), mv.get("capture"))
 
 
+def _numpy_safe_globals() -> list:
+    """Return numpy globals that older checkpoints may pickle.
+
+    PyTorch 2.6 flipped `torch.load(weights_only=...)` to True by default,
+    which rejects arbitrary globals. Checkpoints saved with earlier stacks
+    routinely include numpy scalars/arrays whose unpicklers live at these
+    fully-qualified paths — allowlisting them lets safe loading succeed.
+    """
+    import numpy as _np
+    out: list = []
+    for attr_path in (
+        "core.multiarray._reconstruct",
+        "core.multiarray.scalar",
+        "ndarray",
+        "dtype",
+        "int8", "int16", "int32", "int64",
+        "uint8", "uint16", "uint32", "uint64",
+        "float16", "float32", "float64",
+        "bool_",
+    ):
+        obj = _np
+        for part in attr_path.split("."):
+            obj = getattr(obj, part, None)
+            if obj is None:
+                break
+        if obj is not None:
+            out.append(obj)
+    return out
+
+
 def _load_spec_model(path: Path):
     """Load a ScaffoldedPolicyNet checkpoint. Returns (model, cfg) or (None, {})."""
     if not path.exists():
@@ -59,7 +89,16 @@ def _load_spec_model(path: Path):
             cfg = dict(envelope.payload.trainer_state["model_config"])
             state = envelope.payload.model_state
         else:
-            ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
+            try:
+                with torch.serialization.safe_globals(_numpy_safe_globals()):
+                    ckpt = torch.load(str(path), map_location="cpu", weights_only=True)
+            except Exception as _we:
+                log.warning(
+                    "Specialist load: safe torch.load failed at %s (%s); "
+                    "retrying with weights_only=False for trusted local checkpoint",
+                    path, _we,
+                )
+                ckpt = torch.load(str(path), map_location="cpu", weights_only=False)
             cfg = ckpt.get("model_config", {})
             state = ckpt.get("model") or ckpt
         model = ScaffoldedPolicyNet.from_config(cfg)
