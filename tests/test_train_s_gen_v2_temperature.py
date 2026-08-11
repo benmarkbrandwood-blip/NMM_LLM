@@ -16,6 +16,7 @@ from scripts.train_s_gen_v2 import (
     _compute_training_temperature,
     _finite_positive_float,
     _policy_distribution,
+    _resolve_rollout_behaviour_temperature,
 )
 
 
@@ -80,6 +81,32 @@ def test_post_fork_temperature_depends_on_transitions_not_game_count():
 
     assert first == pytest.approx(second)
     assert first == pytest.approx(0.8379808850090307)
+
+
+def test_rollout_temperature_schedule_uses_each_transition_ordinal():
+    def schedule(index: int) -> float:
+        return 0.9 - 0.01 * index
+
+    assert _resolve_rollout_behaviour_temperature(
+        default_temperature=0.5,
+        learner_transition_index=0,
+        schedule=schedule,
+    ) == pytest.approx(0.9)
+    assert _resolve_rollout_behaviour_temperature(
+        default_temperature=0.5,
+        learner_transition_index=7,
+        schedule=schedule,
+    ) == pytest.approx(0.83)
+
+
+@pytest.mark.parametrize("value", [0.0, -0.1, float("nan"), float("inf")])
+def test_rollout_temperature_schedule_fails_closed(value):
+    with pytest.raises(ValueError, match="finite and positive"):
+        _resolve_rollout_behaviour_temperature(
+            default_temperature=0.9,
+            learner_transition_index=0,
+            schedule=lambda _index: value,
+        )
 
 
 @pytest.mark.parametrize(

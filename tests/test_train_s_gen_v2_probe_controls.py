@@ -184,6 +184,24 @@ def test_rollout_marks_successor_value_as_opponent_perspective(monkeypatch) -> N
     assert result.trajectory[0].bootstrap_perspective == "opponent"
 
 
+def test_rollout_applies_transition_specific_behaviour_temperature(
+    monkeypatch,
+) -> None:
+    move = {"from": None, "to": "a7", "capture": None}
+    monkeypatch.setattr(
+        trainer,
+        "encode_position_with_lookahead",
+        lambda *_args, **_kwargs: _encoded(move),
+    )
+
+    result = _one_ply_rollout(
+        persist_rollout_evidence=False,
+        behaviour_temperature_schedule=lambda index: 0.37 + index,
+    )
+
+    assert result.trajectory[0].behaviour_temperature == pytest.approx(0.37)
+
+
 def test_deep_route_restores_simulation_depth_after_exception(monkeypatch) -> None:
     advisor = SimpleNamespace(_sim_ply_depth=5, _ply_depth=12)
 

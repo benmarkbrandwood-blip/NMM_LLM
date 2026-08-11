@@ -1348,6 +1348,32 @@ def _compute_training_temperature(
     )
 
 
+def _resolve_rollout_behaviour_temperature(
+    *,
+    default_temperature: float,
+    learner_transition_index: int,
+    schedule: Optional[Callable[[int], float]],
+) -> float:
+    """Resolve and validate one learner transition's behaviour temperature."""
+    if (
+        isinstance(learner_transition_index, bool)
+        or not isinstance(learner_transition_index, int)
+        or learner_transition_index < 0
+    ):
+        raise ValueError("learner transition index must be non-negative")
+    value = (
+        default_temperature
+        if schedule is None
+        else schedule(learner_transition_index)
+    )
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("behaviour temperature must be numeric")
+    result = float(value)
+    if not math.isfinite(result) or result <= 0.0:
+        raise ValueError("behaviour temperature must be finite and positive")
+    return result
+
+
 def _apply_learning_rate_mode(
     opt: torch.optim.Optimizer,
     *,
@@ -1887,6 +1913,7 @@ def _rollout(
     mill_bonus_mode: str = "legacy-unconditional",
     malom_policy_aux_coef: float = 0.0,
     malom_policy_aux_mode: str = "fixed",
+    behaviour_temperature_schedule: Optional[Callable[[int], float]] = None,
 ) -> RolloutResult:
     """Run one production rollout with optional additive probe controls."""
     snapshot = getattr(specialist_db, "snapshot_stats", None)
@@ -1924,6 +1951,7 @@ def _rollout(
             mill_bonus_mode=mill_bonus_mode,
             malom_policy_aux_coef=malom_policy_aux_coef,
             malom_policy_aux_mode=malom_policy_aux_mode,
+            behaviour_temperature_schedule=behaviour_temperature_schedule,
         )
     specialist_after = snapshot() if callable(snapshot) else None
     result.specialist_read_stats = specialist_read_stats_delta(
@@ -1962,6 +1990,7 @@ def _rollout_impl(
     mill_bonus_mode: str = "legacy-unconditional",
     malom_policy_aux_coef: float = 0.0,
     malom_policy_aux_mode: str = "fixed",
+    behaviour_temperature_schedule: Optional[Callable[[int], float]] = None,
 ) -> RolloutResult:
     board                   = start_board
     ply                     = 0
@@ -2053,12 +2082,20 @@ def _rollout_impl(
                 break
 
             with _timed_rollout_stage(timing_observer, "learner_policy"):
+                behaviour_temperature = _resolve_rollout_behaviour_temperature(
+                    default_temperature=temperature,
+                    learner_transition_index=learner_move_count,
+                    schedule=behaviour_temperature_schedule,
+                )
                 feat_t = torch.tensor(
                     enc.feat_matrix, dtype=torch.float32
                 ).to(device)
                 with torch.no_grad():
                     logits = model.policy_logits(feat_t)
-                    log_probs, probs = _policy_distribution(logits, temperature)
+                    log_probs, probs = _policy_distribution(
+                        logits,
+                        behaviour_temperature,
+                    )
                     entropy = float((-(probs * log_probs).sum()).item())
 
                     forced_idx = None
@@ -2210,7 +2247,7 @@ def _rollout_impl(
                 next_move_features=next_mf,
                 next_value_input=next_vi,
                 done=terminal_next,
-                behaviour_temperature=temperature,
+                behaviour_temperature=behaviour_temperature,
                 bootstrap_perspective="opponent",
                 malom_preserving_mask=(
                     None
@@ -2497,12 +2534,20 @@ def _build_game_diag(
             for _, quality in known_quality_steps
         ]
     )
+    observed_temperatures = [
+        float(step.behaviour_temperature) for step in result.trajectory
+    ]
+    logged_temperature = (
+        _safe_mean(observed_temperatures)
+        if observed_temperatures
+        else temperature
+    )
     return GameDiag(
         game_id=game_id,
         game=game_count,
         difficulty=difficulty,
         learner_color=learner_color,
-        temperature=round(temperature, 4),
+        temperature=round(logged_temperature, 4),
         outcome=float(result.outcome),
         win_rate_200=round(win_rate, 4),
         ply=int(result.ply),
@@ -3146,6 +3191,38 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
             raise RuntimeError("post-fork consumed-transition count is negative")
         return consumed
 
+    def _post_fork_generated_transition_count() -> Optional[int]:
+        consumed = _post_fork_consumed_transition_count()
+        if consumed is None:
+            return None
+        generated = consumed + len(ep_steps)
+        if generated < consumed:
+            raise RuntimeError("post-fork generated-transition count is invalid")
+        return generated
+
+    def _post_fork_rollout_temperature_schedule(
+        start_transition: int,
+    ) -> Callable[[int], float]:
+        if args.temperature_schedule_axis != "post-fork-transitions":
+            raise RuntimeError("transition temperature schedule is not active")
+        if args.post_fork_temperature_anneal_transitions is None:
+            raise RuntimeError("transition temperature horizon is missing")
+
+        def schedule(learner_transition_index: int) -> float:
+            return _compute_post_fork_temperature(
+                post_fork_consumed_transitions=(
+                    start_transition + learner_transition_index
+                ),
+                fork_game=args.target_refresh_fork_game,
+                max_games=args.max_games,
+                temp_start=args.temp_start,
+                anneal_transitions=(
+                    args.post_fork_temperature_anneal_transitions
+                ),
+            )
+
+        return schedule
+
     def _post_fork_transition_bound_reached() -> bool:
         if args.post_fork_transition_bound is None:
             return False
@@ -3370,13 +3447,19 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
     ):
         batch_count += 1
         post_fork_consumed = _post_fork_consumed_transition_count()
+        post_fork_generated = _post_fork_generated_transition_count()
         try:
             temperature = _compute_training_temperature(
                 schedule_axis=args.temperature_schedule_axis,
                 game_count=game_count,
                 max_games=args.max_games,
                 temp_start=args.temp_start,
-                post_fork_consumed_transitions=post_fork_consumed,
+                post_fork_consumed_transitions=(
+                    post_fork_generated
+                    if args.temperature_schedule_axis
+                    == "post-fork-transitions"
+                    else post_fork_consumed
+                ),
                 fork_game=args.target_refresh_fork_game,
                 anneal_transitions=(
                     args.post_fork_temperature_anneal_transitions
@@ -3503,6 +3586,16 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 actual_opponent: Any,
                 sanmill_game: Optional[SanmillTrainingGame],
             ) -> RolloutResult:
+                behaviour_temperature_schedule = None
+                if args.temperature_schedule_axis == "post-fork-transitions":
+                    start_transition = _post_fork_generated_transition_count()
+                    if start_transition is None:
+                        raise RuntimeError(
+                            "post-fork generated-transition origin is missing"
+                        )
+                    behaviour_temperature_schedule = (
+                        _post_fork_rollout_temperature_schedule(start_transition)
+                    )
                 return _rollout(
                     model=model,
                     device=device,
@@ -3529,6 +3622,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     mill_bonus_mode=args.mill_bonus_mode,
                     malom_policy_aux_coef=args.malom_policy_aux_coef,
                     malom_policy_aux_mode=args.malom_policy_aux_mode,
+                    behaviour_temperature_schedule=(
+                        behaviour_temperature_schedule
+                    ),
                 )
 
             if sanmill_installation is None:
@@ -3897,12 +3993,29 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                     "lr": float(opt.param_groups[0]["lr"]),
                     "temperature": float(temperature),
                     "temperature_schedule_axis": args.temperature_schedule_axis,
+                    "behaviour_temperature_min": min(
+                        float(step.behaviour_temperature)
+                        for step in update_steps
+                    ),
+                    "behaviour_temperature_mean": _safe_mean(
+                        [
+                            float(step.behaviour_temperature)
+                            for step in update_steps
+                        ]
+                    ),
+                    "behaviour_temperature_max": max(
+                        float(step.behaviour_temperature)
+                        for step in update_steps
+                    ),
                     "batch_steps": batch_steps,
                     "optimizer_consumed_transition_count": (
                         optimizer_consumed_transition_count
                     ),
                     "post_fork_consumed_transition_count": (
                         _post_fork_consumed_transition_count()
+                    ),
+                    "post_fork_generated_transition_count": (
+                        _post_fork_generated_transition_count()
                     ),
                     "generated_transition_count": (
                         optimizer_consumed_transition_count + len(ep_steps)
@@ -4487,8 +4600,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         default="global-games",
         help=(
             "Anneal temperature by historical global game count or, for a "
-            "controlled target-refresh treatment arm, by exact consumed "
-            "transitions after the fork"
+            "controlled target-refresh treatment arm, by each learner "
+            "transition's exact generated ordinal after the fork"
         ),
     )
     p.add_argument(

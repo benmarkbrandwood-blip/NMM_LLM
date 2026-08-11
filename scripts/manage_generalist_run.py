@@ -447,7 +447,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--temperature-schedule-axis",
         choices=("global-games", "post-fork-transitions"),
         default="global-games",
-        help="Temperature schedule coordinate used by the trainer",
+        help=(
+            "Temperature schedule coordinate; the post-fork mode binds each "
+            "learner action to its exact generated transition ordinal"
+        ),
     )
     prepare.add_argument(
         "--post-fork-temperature-anneal-transitions",
