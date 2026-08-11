@@ -27,6 +27,11 @@ def _plan() -> dict:
             "contract": {"path": "contract.json"},
             "readiness": {"path": "readiness.json"},
         },
+        "control_files": {
+            "authorization": "out/authorization.json",
+            "readiness": "out/readiness.json",
+        },
+        "local_inputs": {"paths_config": "data/training_paths.local.json"},
         "outputs": {
             "development_ledger": "out/ledger.jsonl",
             "development_result": "out/result.json",
@@ -96,3 +101,17 @@ def test_resource_envelope_cannot_expand(tmp_path: Path) -> None:
 
     with pytest.raises(recovery.AnalysisRecoveryError, match="resource envelope"):
         recovery.load_recovery_plan(path)
+
+
+def test_control_paths_cannot_be_redirected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = _plan()
+    monkeypatch.setattr(recovery, "ROOT", tmp_path)
+
+    with pytest.raises(recovery.AnalysisRecoveryError, match="path differs"):
+        recovery._require_control_path(
+            plan,
+            name="readiness",
+            observed=tmp_path / "out/elsewhere.json",
+        )

@@ -294,6 +294,17 @@ def _output_paths(plan: Mapping[str, Any]) -> dict[str, Path]:
     }
 
 
+def _require_control_path(
+    plan: Mapping[str, Any], *, name: str, observed: Path
+) -> Path:
+    expected = _inside_root(
+        plan["control_files"][name], field=f"{name} control file"
+    )
+    if observed.resolve(strict=False) != expected:
+        raise AnalysisRecoveryError(f"{name} control path differs")
+    return expected
+
+
 def build_readiness_body(
     *, plan_path: Path, plan: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -335,6 +346,7 @@ def build_readiness_body(
 def prepare_readiness(*, plan_path: Path, readiness_path: Path) -> dict[str, Any]:
     plan_path = plan_path.resolve(strict=True)
     plan = load_recovery_plan(plan_path)
+    _require_control_path(plan, name="readiness", observed=readiness_path)
     body = build_readiness_body(plan_path=plan_path, plan=plan)
     readiness = {**body, "readiness_identity": canonical_sha256(body)}
     _publish_exclusive(readiness_path, readiness)
@@ -407,6 +419,10 @@ def record_authorization(
 ) -> dict[str, Any]:
     plan_path = plan_path.resolve(strict=True)
     plan = load_recovery_plan(plan_path)
+    _require_control_path(plan, name="readiness", observed=readiness_path)
+    _require_control_path(
+        plan, name="authorization", observed=authorization_path
+    )
     _, readiness_identity = _validate_readiness(
         plan_path=plan_path,
         plan=plan,
@@ -459,7 +475,7 @@ def _reporter_command(plan: Mapping[str, Any]) -> list[str]:
         "--readiness",
         str(ROOT / parent_readiness),
         "--paths-config",
-        str(ROOT / "data/training_paths.local.json"),
+        str(ROOT / plan["local_inputs"]["paths_config"]),
         "--ledger",
         str(ROOT / outputs["development_ledger"]),
         "--output",
@@ -481,6 +497,10 @@ def launch_once(
         raise AnalysisRecoveryError("analysis recovery run id is required")
     plan_path = plan_path.resolve(strict=True)
     plan = load_recovery_plan(plan_path)
+    _require_control_path(plan, name="readiness", observed=readiness_path)
+    _require_control_path(
+        plan, name="authorization", observed=authorization_path
+    )
     readiness, readiness_identity = _validate_readiness(
         plan_path=plan_path,
         plan=plan,
@@ -657,7 +677,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 expected_readiness_identity=args.expected_readiness_identity,
                 run_id=args.run_id,
             )
-    except (AnalysisRecoveryError, OSError, RuntimeError) as exc:
+    except (
+        AnalysisRecoveryError,
+        OSError,
+        RuntimeError,
+        subprocess.SubprocessError,
+    ) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
