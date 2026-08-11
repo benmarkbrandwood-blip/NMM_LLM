@@ -1,0 +1,113 @@
+{
+  "analysis_implementation": {
+    "minimum_commit": "d88503426e7423bed9503b3f859188f28ebce739",
+    "publisher": {
+      "path": "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
+      "sha256": "f9cecb777eeaec592fca999fc4cf54d1ad0a0e16dec0c83437286bd4a2b04ffb"
+    },
+    "runner": {
+      "path": "scripts/run_target_refresh_schedule_isolation_analysis_recovery.py",
+      "sha256": "d111d99cea585c71def71f75cc215f7e2671533b3e5d462803431484ea1baa47"
+    }
+  },
+  "claim_boundary": "One analysis-only recovery of the candidate-blind 288-game development measurement for the already completed schedule-isolation v2 checkpoints; not a training retry, held-out strength result, promotion, publication, retained-run decision or long-run authorization.",
+  "completed_training": {
+    "actual_training_games_total": 2832,
+    "arm_absolute_game_counts": [
+      560,
+      439,
+      562,
+      327,
+      576,
+      518
+    ],
+    "arm_contract_games_total": 2982,
+    "managed_active_hours_total": 0.4824,
+    "maximum_managed_active_hours": 6.0,
+    "post_fork_transitions_per_arm": [
+      8192,
+      8192,
+      8192,
+      8192,
+      8192,
+      8192
+    ],
+    "post_fork_transitions_total": 49152,
+    "prefix_training_games": 150,
+    "training_game_limits_passed": true
+  },
+  "control_files": {
+    "authorization": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery-authorization.json",
+    "readiness": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery-readiness.json"
+  },
+  "local_inputs": {
+    "paths_config": "data/training_paths.local.json"
+  },
+  "objective": "Complete the development-only policy and paired outcome analysis that did not start because the original result reader rejected homogeneous Windows CRLF JSONL framing.",
+  "outputs": {
+    "completion": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery-completion.json",
+    "development_ledger": "out/target-refresh-schedule-isolation-diagnostic-v2/development-outcome-ledger.jsonl",
+    "development_result": "out/target-refresh-schedule-isolation-diagnostic-v2/result.json",
+    "failure": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery-failure.json",
+    "launch": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery-launch.json",
+    "stderr_log": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery.stderr.log",
+    "stdout_log": "out/target-refresh-schedule-isolation-diagnostic-v2/analysis-recovery.stdout.log"
+  },
+  "parent_attempt": {
+    "authorization": {
+      "identity": "0616dedad9bf4e876381788f699aedee9cad1224019d30650dd08b49bd7b44ad",
+      "path": "out/target-refresh-schedule-isolation-diagnostic-v2/sequence-authorization.json",
+      "sha256": "a2775db8f4377e286cb05912a7a74be3bebf64c7407afc6443f987818814da51"
+    },
+    "contract": {
+      "identity": "0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b",
+      "path": "docs/experiments/sanmill-target-refresh-schedule-isolation-diagnostic-v2.json",
+      "sha256": "64d035ccaedcaddc1b4331503c1873cea3f8582c7f4b4c740aa7d460e4d15c0c"
+    },
+    "failure": {
+      "identity": "a4aa91bb25a23040c93aeed1166b8290b653b3d4181b682e8222afb3018c9ec5",
+      "path": "out/target-refresh-schedule-isolation-diagnostic-v2/sequence-failure.json",
+      "sha256": "242327943f7a20521d2ee969f2999f3f594933300e770b66a8451aeea8767a8b"
+    },
+    "launch": {
+      "identity": "4346a846d86d5609e7557b3b06e54cb0aa148a3770825d306d09551bd44804e8",
+      "path": "out/target-refresh-schedule-isolation-diagnostic-v2/sequence-launch.json",
+      "sha256": "25f205e1ec5b75219211ae60e0b26b660a7b55affc1f637027d7811827b1a13c"
+    },
+    "readiness": {
+      "identity": "d600bfdf66ce87d790f35ca4373690cfb35900585ca8e29187a3ea40b73eee3f",
+      "path": "out/target-refresh-schedule-isolation-diagnostic-v2/readiness.json",
+      "sha256": "370a571b3e2a280d87e27d6167e6471ab0c8602e87c661daad39c80abaf58621"
+    },
+    "run_id": "schedule-isolation-v2-2026-08-11-attempt-001",
+    "training_source_commit": "49defb8a79d07a19c035ca6c1f23f266ae5ed2b2"
+  },
+  "plan_identity": "5525c54ea58e860a82a78eebbc6541de6e42eaf77da405f966b4eb724590aa0c",
+  "resource_envelope": {
+    "candidate_models_loaded": true,
+    "checkpoint_writes": 0,
+    "database_writes": 0,
+    "maximum_active_wall_hours": 5.5,
+    "no_update_development_games": 288,
+    "optimizer_updates": 0,
+    "training_games": 0
+  },
+  "schema_version": "nmm.target-refresh-schedule-isolation-analysis-recovery-plan.v1",
+  "status": "designed_unlaunched_needs_authorization",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_held_out": false,
+    "automatic_long_training": false,
+    "automatic_promotion_or_publication": false,
+    "automatic_retry_or_recovery": false,
+    "stop_on": [
+      "source or artifact identity drift",
+      "training resource or schedule mismatch",
+      "database, rules or replay identity drift",
+      "candidate checkpoint corruption",
+      "Sanmill or non-finite runtime error",
+      "development measurement grid incomplete",
+      "active wall-time ceiling reached"
+    ]
+  }
+}
