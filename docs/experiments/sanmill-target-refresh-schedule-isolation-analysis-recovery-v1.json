@@ -3,7 +3,7 @@
     "minimum_commit": "d88503426e7423bed9503b3f859188f28ebce739",
     "publisher": {
       "path": "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
-      "sha256": "f9cecb777eeaec592fca999fc4cf54d1ad0a0e16dec0c83437286bd4a2b04ffb"
+      "sha256": "8ecb62e7f97bd1730471db32486e19d135cbbabbeea4ca7ca393561e1c7f13f6"
     },
     "runner": {
       "path": "scripts/run_target_refresh_schedule_isolation_analysis_recovery.py",
@@ -82,7 +82,7 @@
     "run_id": "schedule-isolation-v2-2026-08-11-attempt-001",
     "training_source_commit": "49defb8a79d07a19c035ca6c1f23f266ae5ed2b2"
   },
-  "plan_identity": "5525c54ea58e860a82a78eebbc6541de6e42eaf77da405f966b4eb724590aa0c",
+  "plan_identity": "41981a6648afb807c0d30c593670e04b264ef3736d3617def01ca9b11f1bf527",
   "resource_envelope": {
     "candidate_models_loaded": true,
     "checkpoint_writes": 0,

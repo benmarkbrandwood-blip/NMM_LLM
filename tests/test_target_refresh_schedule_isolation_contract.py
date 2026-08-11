@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 from learned_ai.training.run_contract import canonical_sha256
@@ -16,6 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / (
     "docs/experiments/"
     "sanmill-target-refresh-schedule-isolation-diagnostic-v2.json"
+)
+RECOVERY_CONTRACT = ROOT / (
+    "docs/experiments/"
+    "sanmill-target-refresh-schedule-isolation-analysis-recovery-v1.json"
 )
 EXPECTED_PLAN_IDENTITY = (
     "0580389b3d696df9859ac9e7aea6c4b478bf6e791b7e27bf780d2a6e02db5b0b"
@@ -56,13 +61,26 @@ def test_published_schedule_isolation_contract_is_frozen() -> None:
     assert _sha256(ROOT / evidence["path"]) == evidence["sha256"]
 
 
-def test_published_schedule_isolation_implementation_hashes_match() -> None:
+def test_frozen_training_and_executed_analysis_implementation_hashes_match() -> None:
     contract = load_equal_transition_contract(CONTRACT)
     implementation = contract["analysis"]["result_implementation"]
+    recovery = json.loads(RECOVERY_CONTRACT.read_text(encoding="utf-8"))
 
-    for component in ("module", "publisher"):
-        record = implementation[component]
-        assert _sha256(ROOT / record["path"]) == record["sha256"]
+    module = implementation["module"]
+    frozen_publisher = implementation["publisher"]
+    executed_publisher = recovery["analysis_implementation"]["publisher"]
+
+    assert _sha256(ROOT / module["path"]) == module["sha256"]
+    assert recovery["parent_attempt"]["contract"] == {
+        "identity": EXPECTED_PLAN_IDENTITY,
+        "path": CONTRACT.relative_to(ROOT).as_posix(),
+        "sha256": _sha256(CONTRACT),
+    }
+    assert _sha256(ROOT / executed_publisher["path"]) == executed_publisher[
+        "sha256"
+    ]
+    assert frozen_publisher["path"] == executed_publisher["path"]
+    assert frozen_publisher["sha256"] != executed_publisher["sha256"]
 
 
 def test_product_delegation_scope_is_unchanged_by_lineage_refresh() -> None:

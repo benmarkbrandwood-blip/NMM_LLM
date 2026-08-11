@@ -3,7 +3,7 @@
 The machine-readable contract is
 [`sanmill-target-refresh-schedule-isolation-analysis-recovery-v1.json`](sanmill-target-refresh-schedule-isolation-analysis-recovery-v1.json).
 Its immutable plan identity is
-`5525c54ea58e860a82a78eebbc6541de6e42eaf77da405f966b4eb724590aa0c`.
+`41981a6648afb807c0d30c593670e04b264ef3736d3617def01ca9b11f1bf527`.
 
 ## Purpose
 
@@ -63,4 +63,3 @@ and failure hashes, and the completed game/transition/resource accounting.
 
 Current state: `designed_unlaunched_needs_authorization`. Creating this plan or
 running preflight does not itself start analysis.
-

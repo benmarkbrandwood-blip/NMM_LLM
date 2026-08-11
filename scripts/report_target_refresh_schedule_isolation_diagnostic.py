@@ -121,6 +121,7 @@ _POST_TRAINING_ANALYSIS_PATHS = frozenset(
         "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
         "scripts/run_target_refresh_schedule_isolation_analysis_recovery.py",
         "tests/test_target_refresh_schedule_isolation_analysis_recovery.py",
+        "tests/test_target_refresh_schedule_isolation_contract.py",
         "tests/test_target_refresh_schedule_isolation_report.py",
     }
 )
