@@ -117,13 +117,31 @@ class ScheduleIsolationReportError(RuntimeError):
 
 def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
+    framing: str | None = None
     try:
         with path.open(encoding="utf-8", newline="") as handle:
             for line_number, line in enumerate(handle, 1):
-                if not line.endswith("\n") or "\r" in line:
+                if line.endswith("\r\n"):
+                    observed_framing = "\r\n"
+                    payload = line[:-2]
+                elif line.endswith("\n"):
+                    observed_framing = "\n"
+                    payload = line[:-1]
+                else:
                     raise ScheduleIsolationReportError(
                         f"JSONL framing differs: {path}:{line_number}"
                     )
+                if framing is None:
+                    framing = observed_framing
+                if (
+                    observed_framing != framing
+                    or "\r" in payload
+                    or "\n" in payload
+                ):
+                    raise ScheduleIsolationReportError(
+                        f"JSONL framing differs: {path}:{line_number}"
+                    )
+
                 def reject_duplicate_keys(
                     pairs: list[tuple[str, Any]],
                 ) -> dict[str, Any]:
@@ -137,7 +155,7 @@ def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
                     return value
 
                 value = json.loads(
-                    line,
+                    payload,
                     object_pairs_hook=reject_duplicate_keys,
                     parse_constant=lambda token: (_ for _ in ()).throw(
                         ScheduleIsolationReportError(

@@ -20,6 +20,35 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     )
 
 
+def test_strict_jsonl_accepts_uniform_windows_crlf(tmp_path: Path) -> None:
+    path = tmp_path / "windows.jsonl"
+    path.write_bytes(b'{"value": 1}\r\n{"value": 2}\r\n')
+
+    assert report._strict_jsonl(path) == [{"value": 1}, {"value": 2}]
+
+
+def test_strict_jsonl_rejects_mixed_line_framing(tmp_path: Path) -> None:
+    path = tmp_path / "mixed.jsonl"
+    path.write_bytes(b'{"value": 1}\r\n{"value": 2}\n')
+
+    with pytest.raises(
+        report.ScheduleIsolationReportError,
+        match="JSONL framing differs",
+    ):
+        report._strict_jsonl(path)
+
+
+def test_strict_jsonl_rejects_missing_final_newline(tmp_path: Path) -> None:
+    path = tmp_path / "unterminated.jsonl"
+    path.write_bytes(b'{"value": 1}')
+
+    with pytest.raises(
+        report.ScheduleIsolationReportError,
+        match="JSONL framing differs",
+    ):
+        report._strict_jsonl(path)
+
+
 def _arm_grid(tmp_path: Path) -> dict:
     arms = {}
     for seed in (67, 68, 69):
