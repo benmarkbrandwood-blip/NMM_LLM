@@ -333,6 +333,7 @@ def test_source_audit_requires_independent_dev_change_ancestor(
         ("rev-parse", "HEAD"): head,
         ("rev-parse", "origin/dev"): head,
         ("rev-parse", "origin/main"): origin_main,
+        ("rev-list", "--count", f"{origin_main}..{origin_main}"): "0",
         (
             "status",
             "--porcelain=v1",
@@ -370,5 +371,96 @@ def test_source_audit_requires_independent_dev_change_ancestor(
     with pytest.raises(
         TargetRefreshEqualTransitionError,
         match="independent dev change is absent",
+    ):
+        diagnostic._inspect_source(tmp_path, contract)
+
+
+def test_source_audit_accepts_and_reports_unreviewed_main_descendants(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    head = "a" * 40
+    reviewed_tip = "b" * 40
+    origin_main = "c" * 40
+    outputs = {
+        ("branch", "--show-current"): "dev",
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "origin/dev"): head,
+        ("rev-parse", "origin/main"): origin_main,
+        ("rev-list", "--count", f"{reviewed_tip}..{origin_main}"): "3",
+        (
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ): "",
+    }
+    monkeypatch.setattr(
+        diagnostic,
+        "_git_output",
+        lambda _root, *arguments: outputs[arguments],
+    )
+    monkeypatch.setattr(
+        diagnostic.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0),
+    )
+    contract = {
+        "lineage": {
+            "main_review": {
+                "reviewed_tip": reviewed_tip,
+                "independent_dev_changes": [],
+            },
+            "required_implementation_commits": [],
+        }
+    }
+
+    source = diagnostic._inspect_source(tmp_path, contract)
+
+    assert source["origin_main"] == origin_main
+    assert source["origin_main_reviewed_tip"] == reviewed_tip
+    assert source["origin_main_unreviewed_commits"] == 3
+
+
+def test_source_audit_rejects_rewritten_reviewed_main_lineage(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    head = "a" * 40
+    reviewed_tip = "b" * 40
+    origin_main = "c" * 40
+    outputs = {
+        ("branch", "--show-current"): "dev",
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "origin/dev"): head,
+        ("rev-parse", "origin/main"): origin_main,
+        (
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ): "",
+    }
+    monkeypatch.setattr(
+        diagnostic,
+        "_git_output",
+        lambda _root, *arguments: outputs[arguments],
+    )
+    monkeypatch.setattr(
+        diagnostic.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1),
+    )
+    contract = {
+        "lineage": {
+            "main_review": {
+                "reviewed_tip": reviewed_tip,
+                "independent_dev_changes": [],
+            },
+            "required_implementation_commits": [],
+        }
+    }
+
+    with pytest.raises(
+        TargetRefreshEqualTransitionError,
+        match="reviewed origin/main tip is no longer an ancestor",
     ):
         diagnostic._inspect_source(tmp_path, contract)

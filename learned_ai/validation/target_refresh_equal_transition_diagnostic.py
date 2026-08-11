@@ -402,8 +402,38 @@ def _inspect_source(root: Path, contract: Mapping[str, Any]) -> dict[str, Any]:
         raise TargetRefreshEqualTransitionError("source audit requires dev")
     if status:
         raise TargetRefreshEqualTransitionError("source audit requires a clean worktree")
-    if origin_main != contract["lineage"]["main_review"]["reviewed_tip"]:
-        raise TargetRefreshEqualTransitionError("origin/main moved after review")
+    reviewed_main_tip = contract["lineage"]["main_review"]["reviewed_tip"]
+    reviewed_ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", reviewed_main_tip, origin_main],
+        cwd=root,
+        check=False,
+        capture_output=True,
+    )
+    if reviewed_ancestor.returncode == 1:
+        raise TargetRefreshEqualTransitionError(
+            "reviewed origin/main tip is no longer an ancestor"
+        )
+    if reviewed_ancestor.returncode != 0:
+        raise TargetRefreshEqualTransitionError(
+            "Git audit failed: merge-base --is-ancestor "
+            f"{reviewed_main_tip} {origin_main}"
+        )
+    unreviewed_text = _git_output(
+        root,
+        "rev-list",
+        "--count",
+        f"{reviewed_main_tip}..{origin_main}",
+    )
+    try:
+        unreviewed_commits = int(unreviewed_text)
+    except ValueError as exc:
+        raise TargetRefreshEqualTransitionError(
+            "origin/main review gap is not an integer"
+        ) from exc
+    if unreviewed_commits < 0:
+        raise TargetRefreshEqualTransitionError(
+            "origin/main review gap is negative"
+        )
     for commit in contract["lineage"]["required_implementation_commits"]:
         result = subprocess.run(
             ["git", "merge-base", "--is-ancestor", commit, head],
@@ -445,6 +475,8 @@ def _inspect_source(root: Path, contract: Mapping[str, Any]) -> dict[str, Any]:
         "head": head,
         "origin_dev": origin_dev,
         "origin_main": origin_main,
+        "origin_main_reviewed_tip": reviewed_main_tip,
+        "origin_main_unreviewed_commits": unreviewed_commits,
         "published": head == origin_dev,
         "tracked_clean": True,
     }
