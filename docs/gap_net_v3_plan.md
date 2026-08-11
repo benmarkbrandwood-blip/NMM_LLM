@@ -18,6 +18,33 @@ I also found several internal conflicts in the current GapNet plan:
 I therefore agree with the thin-slice recommendation, with one adjustment: I would keep W→D, W→L and D→L as three separate outputs rather than collapsing every downgrade into one binary component.
 
 
+## Corrections (2026-08-11) — authoritative overrides
+
+Codex review of commits `d1df6de` and `728ddad` (2026-08-06 / 2026-08-11)
+identified plan/implementation contract gaps that superseded several statements
+below.  The **authoritative** design for the Stage D+E rebuild lives in
+[`docs/gap_net_v3_stage_e_rebuild_checklist.md`](gap_net_v3_stage_e_rebuild_checklist.md).
+Where this document conflicts, the checklist wins.  Corrections below are
+cross-linked; the older prose is retained for context but must not be treated
+as the current spec.
+
+| Item | Old (this doc) | Corrected (checklist) |
+|------|----------------|-----------------------|
+| Architecture (§11.1) | `79 → 128 → 64 → 32 → 4` — no band one-hot | `82 → 128 → 64 → 32 → 3` — 79 board + 3-way Elo-band one-hot, Component D dropped |
+| Output heads (§8.1, §8.2, §10.1) | Four heads / length-4 target vector | Three heads (A: class_downgrade, B: wdl_utility_loss, C: ordinal_rank_loss) |
+| Component D (§5.3, §11, D-4) | Retained separately as high-risk head | Dropped for `regret_v1`; may return under a future regret version |
+| Session-level split (§8.4) | State-key hash split | Session-level split from a frozen shared session ledger (`data/gap_v3_session_ledger.json`) with strict single-tier owning rule |
+| HumanMovePolicyNet teacher | Reuse `human_move_policy_net_v2_candidate.npz` | Retrain on training-session data only; separately named artefact; retain v2 untouched |
+| Fail-closed target discipline | `NaN where R_v unavailable` | Unavailable R_v abstains the row entirely; `targets.f32.bin` and `targets_uniform.f32.bin` must be fully finite; only `targets_empirical.f32.bin` may contain NaN (support-sentinel) |
+| D4 augmentation (§11.2) | Mandatory during training | Opt-in via `--d4-augmentation {on,off}`, default off; D4-invariance gate applies only to a D4-on trained model |
+| Stage E gate (§16) | Model MSE ≥30 % over uniform, ≥10 % over empirical | On high-support rows, empirical G_v is the *reference*; candidate / teacher / uniform MSE are all measured against it.  Teacher-fidelity and mean-predictor reported separately.  Per-band thresholds pending. |
+| Stage D result (§16) | Marked ✅ PASSED (2026-08-06) | **SUPERSEDED** — dataset is state-key-split and leaky; retained only as exploratory / pipeline evidence; not used for Stage E training |
+
+Individual §16 gate rows and §11.1 architecture line carry inline SUPERSEDED
+markers below.  All other statements in this document remain in force unless
+listed above.
+
+
 ## 1. Purpose and non-goals
 
 **Purpose.**  Specify how to build a signal that predicts, for each position and each opposing-player profile, **how much objective quality** **that player is expected to concede through their next move**, and document the gates that must close before this signal is (a) trusted by any search algorithm at play time or (b) used as an input feature, auxiliary target, or bounded reward term in gen 3 training.
@@ -564,6 +591,8 @@ Owning document to author when this experiment is authorised: a separate `gap_n
 
 The current shared 79-feature encoding (`ai/value_net.board_to_features`) is the baseline input; the four regret-component heads sit on top.  The baseline model is `79 → 128 → 64 → 32 → 4` (input dim = 79 for the state — no band one-hot in the baseline; band is applied at target computation time via §7).
 
+> **SUPERSEDED 2026-08-11** — Baseline is now `82 → 128 → 64 → 32 → 3` with 79 board features + 3-way Elo-band one-hot, and Component D dropped for `regret_v1`.  See Corrections table at top of document and `docs/gap_net_v3_stage_e_rebuild_checklist.md` §Locked decisions 2A, 4A.
+
 **This shape is not declared permanent.**  It is retained for comparability with HumanMovePolicyNet, ValueNet, and the current GapNet.  Ablations against alternative encoders are permitted in subsequent revisions.
 
 ### 11.2 Symmetry augmentation + invariance tests
@@ -680,8 +709,8 @@ Every stage produces a discrete artefact.  Every artefact is committed alongsid
 | Stage A tests | All pass; golden corpus has ≥ 3 rows per category in §6.1 |
 | Stage B eval (HumanMovePolicyNet Phase 4b) | Event-weighted NLL ≤ uniform-baseline − 20 % relative in every band; ECE ≤ 0.05 in every band after temperature scaling; split integrity: 0 val keys in train (supersedes OOD rate < 10 % threshold) | ✅ **PASSED** (2026-08-01, `gap_v3_prerequisite_eval_V2.json`).  ✅ NLL: 31–34 % per band (31.4 / 34.2 / 34.3 % lower/mid/upper).  ✅ ECE: 0.037/0.028/0.022 lower/mid/upper at T*=0.7674 (all ≤ 0.05).  ✅ Split integrity: 0 val keys in train (OOD = 100 % by construction in v2 split — threshold superseded).  ✅ Zero skips: 0 inference / 0 board / 0 legal-count / 0 zero-target.  Formal degrade cal: n=2,617 fully-labelled samples (macro pred P(degrade) 0.0051 vs obs 0.0054; macro WDL-severity 0.0026 vs obs 0.0027; fly formal n=0).  Diagnostic (n=376,037, labelled-subset only, `diagnostic_only: true`): macro pred P(degrade) 0.0676 vs obs 0.0692, macro WDL-severity 0.0351 vs obs 0.0360 — well aligned.  Old underprediction claim (1.87 % vs 4.98 %) superseded by V2 matched macro/micro degrade calibration. |
 | Stage C direct `G_v` | Sanity: `G_v_wdl_utility_loss` is monotonic decreasing in Elo band (upper \< middle \< lower) | ✅ **PASSED** (2026-08-04, `gap_v3_direct_gv.parquet`).  ✅ Monotone: upper 0.0307 \< middle 0.0401 \< lower 0.0766.  8,013 rows emitted; 1 abstained (n\_legal=1); 0 null G\_v components.  min\_support=25; per-component fail-closed; Component D always null (regret\_v1). |
-| Stage D extraction | Coverage ≥ 60 % of `moves_elo_bins`-eligible `(state_key, band)` samples; `abstained.jsonl` reasons summable | ✅ **PASSED** (2026-08-06, 7,951 s).  n\_emitted=2,550,799; coverage=**100 %** (gate ≥ 60 %) ✅.  coverage\_of\_total\_pairs=99.44 %; abstained=14,284.  Band split: lower 421,184 / middle 924,108 / upper 1,205,507.  Train/val/test: 2,040,986 / 254,107 / 255,706.  ph\_source: model 2,542,786 / hybrid 8,013.  Output: `data/gap_net_v3_dataset/`. |
-| Stage E training | Per-component held-out MSE improves over: (a) uniform-`P_h` baseline by ≥ 30 % relative, (b) empirical-`P_h` baseline (where support permits) by ≥ 10 % relative |
+| Stage D extraction | Coverage ≥ 60 % of `moves_elo_bins`-eligible `(state_key, band)` samples; `abstained.jsonl` reasons summable | ⚠️ **SUPERSEDED 2026-08-11** — dataset is state-key-split and leaky; retained only as pipeline evidence, NOT used for Stage E training.  Rebuild via session-level split per `docs/gap_net_v3_stage_e_rebuild_checklist.md` §Stage D redo.  Original result recorded: ✅ **PASSED** (2026-08-06, 7,951 s).  n\_emitted=2,550,799; coverage=**100 %** (gate ≥ 60 %) ✅.  coverage\_of\_total\_pairs=99.44 %; abstained=14,284.  Band split: lower 421,184 / middle 924,108 / upper 1,205,507.  Train/val/test: 2,040,986 / 254,107 / 255,706.  ph\_source: model 2,542,786 / hybrid 8,013.  Output: `data/gap_net_v3_dataset/`. |
+| Stage E training | Per-component held-out MSE improves over: (a) uniform-`P_h` baseline by ≥ 30 % relative, (b) empirical-`P_h` baseline (where support permits) by ≥ 10 % relative | ⚠️ **REVISED 2026-08-11** — On high-support rows, empirical G_v is the *reference*.  Candidate / teacher / uniform MSE are all measured against it.  Teacher-fidelity and mean-predictor reported separately.  Per-band thresholds to be frozen with user before Stage E run.  See `docs/gap_net_v3_stage_e_rebuild_checklist.md` §Locked decision 3A. |
 | Stage F test-set | Same thresholds on the untouched test partition |
 | Stage F symmetry | D4-invariance test tolerance ≤ 1e-3 across held-out positions |
 | Stage G shadow mode | Zero move-sequence divergences on a 100-game seeded batch |
