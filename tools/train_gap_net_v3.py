@@ -139,15 +139,26 @@ def _load_split(dataset_dir: Path, split_val: int) -> dict:
     emp_arr   = _mm("targets_empirical.f32.bin", _N_HEADS)[idx].copy()
     band_arr  = meta["band_idx"][idx].astype(np.int64)
 
-    for name, arr in (("targets", tgt_arr),
-                      ("targets_uniform", unif_arr),
-                      ("targets_empirical", emp_arr)):
-        m = ~np.isnan(arr)
-        if m.any() and not np.isfinite(arr[m]).all():
+    # Fail-closed A/B/C target discipline
+    # (docs/gap_net_v3_stage_e_rebuild_checklist.md, Stage D redo):
+    # model + uniform targets must be FULLY finite — no NaN, no ±inf.
+    # Unavailable R_v abstains the row at extract time; it never emits NaN.
+    # Only targets_empirical may contain NaN, as the 'support < min_support'
+    # sentinel — its non-NaN entries must still be finite.
+    for name, arr in (("targets", tgt_arr), ("targets_uniform", unif_arr)):
+        if not np.isfinite(arr).all():
             raise ValueError(
-                f"[gap_net_v3] non-finite non-NaN values found in {name} "
-                f"(split={split_val}) — extractor produced invalid targets"
+                f"[gap_net_v3] non-finite value(s) (NaN or ±inf) found in "
+                f"{name} (split={split_val}) — A/B/C targets must be fully "
+                f"finite; unavailable R_v must abstain the row, never emit NaN"
             )
+    emp_non_nan = ~np.isnan(emp_arr)
+    if emp_non_nan.any() and not np.isfinite(emp_arr[emp_non_nan]).all():
+        raise ValueError(
+            f"[gap_net_v3] ±inf value(s) found in targets_empirical "
+            f"(split={split_val}) — NaN is the only permitted non-finite "
+            f"sentinel"
+        )
 
     return {
         "board":   torch.from_numpy(board_arr),

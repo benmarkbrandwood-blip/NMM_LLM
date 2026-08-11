@@ -93,15 +93,44 @@ def test_neg_inf_rejected(trainer, tmp_path):
         trainer._load_split(tmp_path, split_val=0)
 
 
-def test_nan_targets_allowed(trainer, tmp_path):
-    """NaN is the sentinel for 'unavailable' and MUST be allowed."""
+def test_nan_in_primary_targets_rejected(trainer, tmp_path):
+    """A/B/C model targets must be fully finite.  Codex review 2026-08-11.
+
+    Unavailable R_v must abstain the row at extract time; if a NaN reaches the
+    trainer's targets.f32.bin, the loader must fail closed.
+    """
     _write_synthetic_dataset(tmp_path)
-    # Directly patch some NaNs into targets after clean write
     tgts = np.memmap(
         str(tmp_path / "targets.f32.bin"),
         dtype="float32", mode="r+", shape=(8, 3),
     )
     tgts[3, 1] = np.nan
     tgts.flush()
+    with pytest.raises(ValueError, match="targets"):
+        trainer._load_split(tmp_path, split_val=0)
+
+
+def test_nan_in_uniform_rejected(trainer, tmp_path):
+    """targets_uniform must also be fully finite (same discipline as targets)."""
+    _write_synthetic_dataset(tmp_path)
+    unif = np.memmap(
+        str(tmp_path / "targets_uniform.f32.bin"),
+        dtype="float32", mode="r+", shape=(8, 3),
+    )
+    unif[2, 0] = np.nan
+    unif.flush()
+    with pytest.raises(ValueError, match="targets_uniform"):
+        trainer._load_split(tmp_path, split_val=0)
+
+
+def test_nan_in_empirical_allowed(trainer, tmp_path):
+    """targets_empirical is the ONLY file where NaN is permitted (support sentinel)."""
+    _write_synthetic_dataset(tmp_path)
+    emp = np.memmap(
+        str(tmp_path / "targets_empirical.f32.bin"),
+        dtype="float32", mode="r+", shape=(8, 3),
+    )
+    emp[5, 2] = np.nan
+    emp.flush()
     result = trainer._load_split(tmp_path, split_val=0)
-    assert bool(np.isnan(result["y_model"][3, 1].item()))
+    assert bool(np.isnan(result["y_emp"][5, 2].item()))
