@@ -387,20 +387,40 @@ def _load_runtime(
             int(item["seed"]): item
             for item in plan["checkpoint_contract"]["anchors"]
         }
+        candidates_by_cell = {
+            (int(item["seed"]), str(item["condition"])): item
+            for item in plan["checkpoint_contract"]["candidates"]
+        }
         for seed in plan["measurement_contract"]["seeds"]:
-            anchor_envelope, _ = _load_fork(prefixes[seed])
+            anchor_envelope, anchor_record = _load_fork(prefixes[seed])
+            expected_anchor = {
+                key: value
+                for key, value in anchor_by_seed[seed].items()
+                if key != "seed"
+            }
+            if anchor_record != expected_anchor:
+                raise DirectCrossplayError(
+                    f"loaded anchor checkpoint differs for seed {seed}"
+                )
             anchor_model = _load_policy(anchor_envelope, device=torch.device("cpu"))
-            models, _ = _load_candidate_pair(
+            models, candidate_records = _load_candidate_pair(
                 arms,
                 seed=seed,
                 boundary=8192,
-                fork_record={
-                    key: value
-                    for key, value in anchor_by_seed[seed].items()
-                    if key != "seed"
-                },
+                fork_record=expected_anchor,
                 device=torch.device("cpu"),
             )
+            for condition in ("refresh-once", "no-refresh"):
+                expected_candidate = {
+                    key: value
+                    for key, value in candidates_by_cell[(seed, condition)].items()
+                    if key not in {"seed", "condition"}
+                }
+                if candidate_records[condition] != expected_candidate:
+                    raise DirectCrossplayError(
+                        "loaded candidate checkpoint differs for "
+                        f"seed {seed}, {condition}"
+                    )
             models_by_seed[seed] = {
                 "refresh-once": models["refresh"],
                 "no-refresh": models["no-refresh"],
