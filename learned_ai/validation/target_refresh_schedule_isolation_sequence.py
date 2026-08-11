@@ -9,9 +9,7 @@ from typing import Any
 from learned_ai.training.run_contract import canonical_sha256
 
 
-AUTHORIZATION_SCHEMA = (
-    "nmm.target-refresh-schedule-isolation-sequence-authorization.v1"
-)
+AUTHORIZATION_SCHEMA = "nmm.target-refresh-schedule-isolation-sequence-authorization.v2"
 READINESS_SCHEMA = "nmm.target-refresh-equal-transition-readiness.v1"
 SEQUENCE_STEP_SCHEMA = "nmm.target-refresh-schedule-isolation-step.v1"
 AUTHORIZED_BY = "product-owner"
@@ -34,6 +32,7 @@ PROHIBITED_OPERATIONS = (
     "long-training-launch",
 )
 EXPIRY = "consumed when the one parent launch attempt starts or owner revokes"
+DEVELOPMENT_ANALYSIS_DEVICE = "cpu"
 
 
 class ScheduleIsolationSequenceError(RuntimeError):
@@ -177,11 +176,16 @@ def build_sequence_authorization(
     *,
     contract: Mapping[str, Any],
     readiness: Mapping[str, Any],
+    sequence_readiness_identity: str,
     decision_note: str,
     authorized_at_utc: str,
 ) -> dict[str, Any]:
     """Build a structured parent grant after an explicit product decision."""
     readiness_identity = validate_readiness_identity(readiness)
+    sequence_identity = _require_identity(
+        sequence_readiness_identity,
+        field="sequence readiness identity",
+    )
     if not isinstance(decision_note, str) or not decision_note.strip():
         raise ScheduleIsolationSequenceError("decision note is required")
     if not isinstance(authorized_at_utc, str) or not authorized_at_utc.endswith("Z"):
@@ -204,8 +208,10 @@ def build_sequence_authorization(
         "experiment_family_id": contract["experiment_family_id"],
         "objective": contract["objective"],
         "plan_identity": plan_identity,
-        "readiness_identity": readiness_identity,
+        "managed_readiness_identity": readiness_identity,
+        "sequence_readiness_identity": sequence_identity,
         "source_commit": source_commit,
+        "development_analysis_device": DEVELOPMENT_ANALYSIS_DEVICE,
         "resource_envelope": _authorization_limits(contract),
         "launch_order": [step.to_dict() for step in build_sequence_steps(contract)],
         "permitted_operations": list(PERMITTED_OPERATIONS),
@@ -222,11 +228,13 @@ def validate_sequence_authorization(
     *,
     contract: Mapping[str, Any],
     readiness: Mapping[str, Any],
+    sequence_readiness_identity: str,
 ) -> str:
     """Validate a grant against current immutable plan and readiness inputs."""
     expected = build_sequence_authorization(
         contract=contract,
         readiness=readiness,
+        sequence_readiness_identity=sequence_readiness_identity,
         decision_note=str(authorization.get("decision_note", "")),
         authorized_at_utc=str(authorization.get("authorized_at_utc", "")),
     )
@@ -268,6 +276,7 @@ __all__ = [
     "AUTHORIZATION_SCHEMA",
     "AUTHORIZED_BY",
     "DELEGATED_OPERATOR",
+    "DEVELOPMENT_ANALYSIS_DEVICE",
     "EXPIRY",
     "PERMITTED_OPERATIONS",
     "PROHIBITED_OPERATIONS",

@@ -149,11 +149,15 @@ fresh prefix plans and databases, absent leaf authorizations, absent segment
 outputs, and absent deferred arm and result targets.
 
 An explicit parent product decision is recorded separately as
-`nmm.target-refresh-schedule-isolation-sequence-authorization.v1`. The grant
-binds the plan and readiness identities, source commit, aggregate game,
+`nmm.target-refresh-schedule-isolation-sequence-authorization.v2`. The grant
+binds the exact product-facing sequence readiness identity as well as the
+underlying managed readiness, plan identity, source commit, aggregate game,
 transition, measurement and wall-time limits, exact launch order, claim
-boundary, permitted operations and prohibited actions. It is consumed when
-the one parent launch attempt starts.
+boundary, permitted operations and prohibited actions. The development
+publisher is fixed to CPU. As defined above, the six active hours apply to the
+three prefixes and six training arms; the no-update analysis remains bounded
+separately by its exact 288-game grid. The grant is consumed when the one
+parent launch attempt starts.
 
 Within that single attempt, the runner may record each exact child plan as
 `product-owner-delegated-agent` immediately before use. It executes one prefix,
@@ -162,3 +166,9 @@ then proceeds to the next seed. The result publisher runs only after all nine
 managed plans complete. The first exception stops the sequence and writes a
 failure record; there is no retry, recovery, resume, extension, held-out run,
 promotion, publication or long-training fallback.
+
+The parent reconciles all three 50-game prefixes, all six absolute arm game
+counts, actual post-fork game execution, and exactly 49,152 consumed learner
+transitions before the 288-game no-update publisher may run. Authorization,
+launch, failure and result records use exclusive creation and cannot overwrite
+an existing one-shot record.
