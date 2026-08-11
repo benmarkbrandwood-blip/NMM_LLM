@@ -12,6 +12,7 @@ from learned_ai.evaluation.phase_replay_development_corpus import (
     CORPUS_ID,
     PhaseReplayCorpusError,
     group_action_tokens,
+    replay_record_into_sanmill_game,
     select_replayable_phase_entries,
     validate_phase_replay_development_corpus,
     validate_phase_replay_sanmill_audit,
@@ -95,6 +96,27 @@ def test_committed_replay_corpus_is_legal_and_source_bound() -> None:
         "movement": 4,
         "flying": 4,
     }
+
+
+def test_shared_strict_replay_entry_reaches_record_state() -> None:
+    record = _replay_payload()["records"][0]
+
+    class FakeGame:
+        def __init__(self) -> None:
+            self.board = None
+            self.state = type("State", (), {"terminal": False})()
+
+        def apply_nmm_move(self, board, move) -> None:
+            assert self.board is None or board == self.board
+            self.board = board.apply_move(move)
+
+        def assert_current_board(self, board) -> None:
+            assert board == self.board
+
+    game = FakeGame()
+    board = replay_record_into_sanmill_game(record, game)
+
+    assert board.to_fen_string() == record["fen"]
 
 
 def test_history_tampering_fails_even_with_refreshed_identities() -> None:

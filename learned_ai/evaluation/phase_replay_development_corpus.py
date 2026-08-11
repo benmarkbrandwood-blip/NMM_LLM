@@ -175,6 +175,40 @@ def replay_logical_turns(turns: Sequence[Sequence[str]]) -> BoardState:
     return board
 
 
+def replay_record_into_sanmill_game(
+    record: Mapping[str, Any],
+    game: SanmillTrainingGame,
+) -> BoardState:
+    """Replay one corpus record through local and strict Sanmill rules."""
+    turns = record.get("logical_turns")
+    if not isinstance(turns, Sequence) or isinstance(turns, (str, bytes)):
+        raise PhaseReplayCorpusError("replay record logical turns are absent")
+    board = BoardState.new_game()
+    for logical_ply, actions in enumerate(turns, 1):
+        if not isinstance(actions, Sequence) or isinstance(actions, (str, bytes)):
+            raise PhaseReplayCorpusError(
+                f"logical ply {logical_ply} is not an action sequence"
+            )
+        expected = tuple(str(action) for action in actions)
+        matches = [
+            move
+            for move in get_all_legal_moves(board)
+            if nmm_move_actions(move) == expected
+        ]
+        if len(matches) != 1:
+            raise PhaseReplayCorpusError(
+                f"logical ply {logical_ply} has {len(matches)} matching legal moves"
+            )
+        game.apply_nmm_move(board, matches[0])
+        board = board.apply_move(matches[0])
+    game.assert_current_board(board)
+    if board.to_fen_string() != record.get("fen"):
+        raise PhaseReplayCorpusError("strict replay does not reach record FEN")
+    if game.state.terminal:
+        raise PhaseReplayCorpusError("strict referee makes replay record terminal")
+    return board
+
+
 def _fixture_history(
     fixture: Mapping[str, Any],
     entry: Mapping[str, Any],
@@ -457,26 +491,8 @@ def audit_phase_replays_with_sanmill(
     for _pass_index in range(repeat_passes):
         observations: list[dict[str, Any]] = []
         for record in payload["records"]:
-            board = BoardState.new_game()
             with SanmillTrainingGame(installation, seed=42) as game:
-                for actions in record["logical_turns"]:
-                    expected = tuple(actions)
-                    matches = [
-                        move
-                        for move in get_all_legal_moves(board)
-                        if nmm_move_actions(move) == expected
-                    ]
-                    if len(matches) != 1:
-                        raise PhaseReplayCorpusError(
-                            "strict replay no longer has one legal move"
-                        )
-                    game.apply_nmm_move(board, matches[0])
-                    board = board.apply_move(matches[0])
-                game.assert_current_board(board)
-                if game.state.terminal:
-                    raise PhaseReplayCorpusError(
-                        "strict referee makes a development start terminal"
-                    )
+                board = replay_record_into_sanmill_game(record, game)
                 observations.append(
                     {
                         "record_index": record["record_index"],
