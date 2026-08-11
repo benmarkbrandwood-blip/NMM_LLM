@@ -39,6 +39,47 @@ def _write_schedule_isolation_contract(tmp_path: Path) -> Path:
     common["fixed_resource_stage_games"] = [5000]
     common["temperature_schedule_axis"] = "post-fork-transitions"
     common["post_fork_temperature_anneal_transitions"] = 106304
+    contract["measurement_contract"]["outcome_measurement"] = {
+        "candidate_colors": ["W", "B"],
+        "common_random_numbers_within_pairs": True,
+        "fixed_replay_corpus": (
+            "docs/experiments/dev-v4-phase-replay-development-corpus-v1.json"
+        ),
+        "fixed_replay_corpus_identity": (
+            "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4"
+        ),
+        "fixed_replay_corpus_sha256": (
+            "9637efaae21074eefb4fab9e22550f5729999b30d03ed469dc88cf75aae07c2f"
+        ),
+        "games_per_checkpoint_condition_seed": 24,
+        "held_out": False,
+        "max_post_start_logical_plies": 120,
+        "opponent": "common-game-50-anchor",
+        "optimizer_updates": 0,
+        "sampling_temperature": 0.2,
+        "strict_replay_audit": (
+            "docs/evidence/"
+            "phase-replay-development-corpus-sanmill-audit-2026-08-11.json"
+        ),
+        "strict_replay_audit_identity": (
+            "9d4c54270c6e66dd9e16b4dae5af9291b1fea6d1385856650e71119dc4c0dbbf"
+        ),
+        "strict_replay_audit_sha256": (
+            "4634ba61a4e43c0b6d80a80c882aea5ca985b9bc8923e7895b39bf8ad557e42e"
+        ),
+        "total_games": 288,
+        "training_games": 0,
+        "transition_boundaries": [4096, 8192],
+        "writes_training_data": False,
+    }
+    contract["analysis"]["outcome_classification"] = {
+        "maximum_opposite_malom_mass_effect": 0.05,
+        "maximum_opposite_phase_effect": 0.25,
+        "maximum_truncation_rate_increase": 0.1,
+        "minimum_aggregate_score_effect": 1.0 / 12.0,
+        "minimum_per_seed_score_effect": 1.0 / 24.0,
+        "minimum_supporting_seeds": 2,
+    }
     for record in [*contract["prefixes"], *contract["arms"]]:
         old_seed = int(record["seed"])
         new_seed = seed_map[old_seed]

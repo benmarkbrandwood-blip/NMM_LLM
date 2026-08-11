@@ -13,6 +13,18 @@ from typing import Any
 
 from learned_ai.training.managed_generalist import ManagedPlan, load_managed_plan
 from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
+from learned_ai.evaluation.target_refresh_schedule_isolation_result import (
+    CANDIDATE_COLORS,
+    MAX_POST_START_LOGICAL_PLIES,
+    MAXIMUM_OPPOSITE_MALOM_MASS_EFFECT,
+    MAXIMUM_OPPOSITE_PHASE_EFFECT,
+    MAXIMUM_TRUNCATION_RATE_INCREASE,
+    MINIMUM_AGGREGATE_SCORE_EFFECT,
+    MINIMUM_PER_SEED_SCORE_EFFECT,
+    MINIMUM_SUPPORTING_SEEDS,
+    OUTCOME_BOUNDARIES,
+    PRIMARY_TEMPERATURE,
+)
 from learned_ai.validation.mill_bonus_ablation_readiness import (
     PRODUCT_AUTHORIZATION_DECISION,
     _build_fresh_preflight_command,
@@ -48,6 +60,25 @@ DEFAULT_REPORT = Path(
 EXPECTED_SEEDS = (64, 65, 66)
 EXPECTED_CONDITIONS = ("refresh-once", "no-refresh")
 EXPECTED_BOUNDARIES = (1024, 2048, 4096, 8192)
+EXPECTED_REPLAY_CORPUS_PATH = (
+    "docs/experiments/dev-v4-phase-replay-development-corpus-v1.json"
+)
+EXPECTED_REPLAY_CORPUS_SHA256 = (
+    "9637efaae21074eefb4fab9e22550f5729999b30d03ed469dc88cf75aae07c2f"
+)
+EXPECTED_REPLAY_CORPUS_IDENTITY = (
+    "ca4b410dd2913933d3ecbd8672fe274ea4a2f8ad42db3f039dabfa52af196aa4"
+)
+EXPECTED_REPLAY_AUDIT_PATH = (
+    "docs/evidence/"
+    "phase-replay-development-corpus-sanmill-audit-2026-08-11.json"
+)
+EXPECTED_REPLAY_AUDIT_SHA256 = (
+    "4634ba61a4e43c0b6d80a80c882aea5ca985b9bc8923e7895b39bf8ad557e42e"
+)
+EXPECTED_REPLAY_AUDIT_IDENTITY = (
+    "9d4c54270c6e66dd9e16b4dae5af9291b1fea6d1385856650e71119dc4c0dbbf"
+)
 
 
 class TargetRefreshEqualTransitionError(RuntimeError):
@@ -259,6 +290,49 @@ def load_equal_transition_contract(path: str | Path) -> dict[str, Any]:
             raise TargetRefreshEqualTransitionError(
                 "schedule-isolation controls differ"
             )
+        outcome = measurement.get("outcome_measurement", {})
+        expected_outcome = {
+            "candidate_colors": list(CANDIDATE_COLORS),
+            "common_random_numbers_within_pairs": True,
+            "fixed_replay_corpus": EXPECTED_REPLAY_CORPUS_PATH,
+            "fixed_replay_corpus_identity": EXPECTED_REPLAY_CORPUS_IDENTITY,
+            "fixed_replay_corpus_sha256": EXPECTED_REPLAY_CORPUS_SHA256,
+            "games_per_checkpoint_condition_seed": 24,
+            "held_out": False,
+            "max_post_start_logical_plies": MAX_POST_START_LOGICAL_PLIES,
+            "opponent": "common-game-50-anchor",
+            "optimizer_updates": 0,
+            "sampling_temperature": PRIMARY_TEMPERATURE,
+            "strict_replay_audit": EXPECTED_REPLAY_AUDIT_PATH,
+            "strict_replay_audit_identity": EXPECTED_REPLAY_AUDIT_IDENTITY,
+            "strict_replay_audit_sha256": EXPECTED_REPLAY_AUDIT_SHA256,
+            "total_games": 288,
+            "training_games": 0,
+            "transition_boundaries": list(OUTCOME_BOUNDARIES),
+            "writes_training_data": False,
+        }
+        if outcome != expected_outcome:
+            raise TargetRefreshEqualTransitionError(
+                "schedule-isolation outcome measurement differs"
+            )
+        expected_outcome_thresholds = {
+            "maximum_opposite_malom_mass_effect": (
+                MAXIMUM_OPPOSITE_MALOM_MASS_EFFECT
+            ),
+            "maximum_opposite_phase_effect": MAXIMUM_OPPOSITE_PHASE_EFFECT,
+            "maximum_truncation_rate_increase": (
+                MAXIMUM_TRUNCATION_RATE_INCREASE
+            ),
+            "minimum_aggregate_score_effect": MINIMUM_AGGREGATE_SCORE_EFFECT,
+            "minimum_per_seed_score_effect": MINIMUM_PER_SEED_SCORE_EFFECT,
+            "minimum_supporting_seeds": MINIMUM_SUPPORTING_SEEDS,
+        }
+        if contract.get("analysis", {}).get(
+            "outcome_classification"
+        ) != expected_outcome_thresholds:
+            raise TargetRefreshEqualTransitionError(
+                "schedule-isolation outcome thresholds differ"
+            )
     if contract.get("preparation_stages", {}).get("current_stage") != (
         "source_and_prefix_plan_preparation_only"
     ):
@@ -322,6 +396,20 @@ def _inspect_tracked_inputs(
             ],
         },
     }
+    if contract.get("schema_version") == SCHEDULE_ISOLATION_CONTRACT_SCHEMA:
+        outcome = contract["measurement_contract"]["outcome_measurement"]
+        inputs.update(
+            {
+                "fixed_replay_corpus": {
+                    "path": outcome["fixed_replay_corpus"],
+                    "sha256": outcome["fixed_replay_corpus_sha256"],
+                },
+                "strict_replay_audit": {
+                    "path": outcome["strict_replay_audit"],
+                    "sha256": outcome["strict_replay_audit_sha256"],
+                },
+            }
+        )
     for name, expected in inputs.items():
         path = _repository_path(root, expected["path"], field=name)
         if not path.is_file() or not _is_tracked(root, path):
