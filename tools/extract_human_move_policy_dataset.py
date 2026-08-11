@@ -67,6 +67,15 @@ EXTRACT_VERSION = "2"
 # sample_split int8 encoding: 0=train, 1=val, 2=test (v2 three-way split).
 _SPLIT_TO_INT8: dict[str, int] = {"train": 0, "val": 1, "test": 2}
 
+# game_split_mask bit encoding (per tools/build_session_index.py).
+_MASK_TRAIN = 0b001
+_MASK_VAL   = 0b010
+_MASK_TEST  = 0b100
+
+# Refuse to overwrite v2 dataset when --session-ledger is provided.
+_V2_OUTPUT_DIR = Path("data/human_move_policy_dataset")
+_V3_SUGGESTED_OUTPUT_DIR = Path("data/human_move_policy_dataset_v3_session")
+
 
 # ── Move-notation helper (matches build_human_db_sha.py convention) ─────────
 
@@ -131,6 +140,99 @@ def _fetch_band_counts_for_state(
     return dict(out)
 
 
+# ── Session-ledger split helpers (Batch 3b, gap_v3_stage_e_rebuild_checklist) ─
+
+def _guard_output_dir(output_dir: Path, session_ledger_path: Optional[Path]) -> None:
+    """Refuse to overwrite the v2 dataset when --session-ledger is provided.
+
+    The v3 session-isolated dataset is a separate artefact; it must not clobber
+    the v2 candidate that the current HumanMovePolicyNet was trained on.
+    """
+    if session_ledger_path is None:
+        return
+    if output_dir.resolve() == (_ROOT / _V2_OUTPUT_DIR).resolve():
+        raise SystemExit(
+            f"[extract] Refusing to overwrite v2 dataset at {_V2_OUTPUT_DIR} "
+            f"when --session-ledger is set.  Use e.g. "
+            f"--output-dir {_V3_SUGGESTED_OUTPUT_DIR}."
+        )
+
+
+def _load_state_key_masks(
+    session_index_path: Path,
+) -> tuple[dict[str, int], dict]:
+    """Load state_key → game_split_mask (uint8) from a session_index.npz.
+
+    Reads the index's provenance to find its associated metadata.npz (which
+    holds the state_keys array in the same order as game_split_mask), verifies
+    that metadata.npz's SHA-256 matches the recorded value, and returns
+    (dict[state_key → mask], session_index_provenance).
+    """
+    if not session_index_path.exists():
+        raise FileNotFoundError(f"session_index not found: {session_index_path}")
+    idx = np.load(str(session_index_path), allow_pickle=True)
+    prov = json.loads(str(idx["provenance"]))
+    game_mask = idx["game_split_mask"]
+
+    meta_dir = Path(prov["dataset_dir"])
+    if not meta_dir.is_absolute():
+        meta_dir = _ROOT / meta_dir
+    meta_path = meta_dir / "metadata.npz"
+    actual_sha = _sha256_file(meta_path)
+    expected_sha = prov.get("dataset_meta_sha256")
+    if expected_sha and actual_sha != expected_sha:
+        raise ValueError(
+            f"session_index references metadata.npz with sha {expected_sha}, "
+            f"but current file at {meta_path} has sha {actual_sha}"
+        )
+
+    meta = np.load(str(meta_path), allow_pickle=True)
+    state_keys = meta["state_keys"]
+    if len(state_keys) != len(game_mask):
+        raise ValueError(
+            f"session_index game_split_mask length {len(game_mask)} does not "
+            f"match referenced metadata.npz state_keys length {len(state_keys)}"
+        )
+    lookup = {str(sk): int(m) for sk, m in zip(state_keys, game_mask)}
+    return lookup, prov
+
+
+def _apply_session_ledger_split(
+    state_key_to_mask: dict[str, int],
+) -> tuple[dict[str, str], dict[str, int]]:
+    """Assign each state_key to a strict-single-tier split.
+
+    Strict rule (Codex review 2026-08-06 / user Decision 2026-08-11):
+    a state_key is kept only if every session that reached it belongs to the
+    same tier.  Mixed-tier state_keys are dropped from all splits so no
+    train sample corresponds to a state_key that was also seen by a val or
+    test session.
+
+    Returns:
+        kept: dict[state_key → 'train' | 'val' | 'test']
+        disposition_counts: {'strict_train', 'strict_val', 'strict_test',
+                             'mixed_tier', 'uncovered'}
+    """
+    kept: dict[str, str] = {}
+    counts = {"strict_train": 0, "strict_val": 0, "strict_test": 0,
+              "mixed_tier": 0, "uncovered": 0}
+    for sk, mask in state_key_to_mask.items():
+        if mask == _MASK_TRAIN:
+            kept[sk] = "train"
+            counts["strict_train"] += 1
+        elif mask == _MASK_VAL:
+            kept[sk] = "val"
+            counts["strict_val"] += 1
+        elif mask == _MASK_TEST:
+            kept[sk] = "test"
+            counts["strict_test"] += 1
+        elif mask == 0:
+            counts["uncovered"] += 1
+        else:
+            counts["mixed_tier"] += 1
+    return kept, counts
+
+
 # ── Extraction ──────────────────────────────────────────────────────────────
 
 _BAND_TO_IDX = {"lower": 0, "middle": 1, "upper": 2}
@@ -141,10 +243,37 @@ def extract(
     output_dir: Path,
     limit_state_keys: Optional[int] = None,
     val_fraction: float = DEFAULT_VAL_FRACTION,
+    session_ledger_path: Optional[Path] = None,
+    session_index_path: Optional[Path] = None,
 ) -> dict:
     if not db_path.exists():
         raise FileNotFoundError(f"Candidate DB not found: {db_path}")
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── Session-ledger split scheme (Batch 3b) ──────────────────────────────
+    sk_to_split: Optional[dict[str, str]] = None
+    disposition:  Optional[dict[str, int]] = None
+    ledger:       Optional[dict]           = None
+    index_prov:   Optional[dict]           = None
+    if session_ledger_path is not None:
+        if session_index_path is None:
+            raise ValueError("--session-ledger requires --session-index")
+        if not session_ledger_path.exists():
+            raise FileNotFoundError(f"session_ledger not found: {session_ledger_path}")
+        with session_ledger_path.open("r", encoding="utf-8") as f:
+            ledger = json.load(f)
+        sk_to_mask, index_prov = _load_state_key_masks(session_index_path)
+        sk_to_split, disposition = _apply_session_ledger_split(sk_to_mask)
+        print(f"[extract] Session-ledger split scheme active "
+              f"(files_manifest={ledger.get('files_manifest_sha256', '?')[:16]}…)")
+        print(f"[extract]   strict_train={disposition['strict_train']:,}  "
+              f"strict_val={disposition['strict_val']:,}  "
+              f"strict_test={disposition['strict_test']:,}  "
+              f"mixed_tier_dropped={disposition['mixed_tier']:,}  "
+              f"uncovered_dropped={disposition['uncovered']:,}")
+        split_scheme = "session_ledger_strict_single_tier"
+    else:
+        split_scheme = "state_key_three_way"
 
     t0 = time.time()
     conn = sqlite3.connect(str(db_path))
@@ -154,6 +283,13 @@ def extract(
     print(f"[extract] Enumerating state_keys in {db_path}")
     state_keys = _fetch_state_keys(conn, limit_state_keys)
     print(f"[extract] {len(state_keys):,} candidate state_keys")
+
+    if sk_to_split is not None:
+        before = len(state_keys)
+        state_keys = [sk for sk in state_keys if sk in sk_to_split]
+        print(f"[extract] Session-ledger filter: "
+              f"{len(state_keys):,}/{before:,} state_keys retained "
+              f"({before - len(state_keys):,} not in strict-single-tier set)")
 
     # Reconstruct boards, enumerate legal moves, compute successor features
     # in memory (feature bank is memmap'd so we write incrementally).
@@ -252,7 +388,10 @@ def extract(
         if state_unmatched_hit:
             unmatched_notation_states += 1
 
-        split_label = three_way_split(state_key)
+        if sk_to_split is not None:
+            split_label = sk_to_split[state_key]      # filtered above; always present
+        else:
+            split_label = three_way_split(state_key)
         for band, obs in per_band.items():
             targets = np.zeros(legal_count, dtype=np.int32)
             for nt, cnt in obs.items():
@@ -314,8 +453,19 @@ def extract(
         "unmatched_notation_states":        int(unmatched_notation_states),
         "skipped_bad_state_key":            int(skipped_bad_state_key),
         "skipped_no_legal_moves":           int(skipped_no_legal_moves),
+        "split_scheme":                     split_scheme,
         "elapsed_seconds":                  round(time.time() - t0, 1),
     }
+    if session_ledger_path is not None:
+        provenance.update({
+            "session_ledger_path":                  str(session_ledger_path),
+            "session_ledger_sha256":                _sha256_file(session_ledger_path),
+            "session_ledger_files_manifest_sha256": ledger.get("files_manifest_sha256"),
+            "session_ledger_version":               ledger.get("ledger_version"),
+            "session_index_path":                   str(session_index_path),
+            "session_index_sha256":                 _sha256_file(session_index_path),
+            "session_split_disposition":            disposition,
+        })
 
     metadata_path = output_dir / "metadata.npz"
     np.savez(
@@ -357,13 +507,26 @@ def main() -> int:
                    help="Legacy parameter kept for backward compat; v2 uses "
                         "three_way_split (5%% test / 15%% val / 80%% train) "
                         "regardless of this value.")
+    p.add_argument("--session-ledger", type=Path, default=None,
+                   help="Path to data/gap_v3_session_ledger.json.  When provided, "
+                        "the split scheme switches from three_way_split(state_key) "
+                        "to strict single-tier session assignment: a state_key is "
+                        "kept only if every session that reached it belongs to the "
+                        "same tier (train/val/test).")
+    p.add_argument("--session-index", type=Path,
+                   default=Path("data/human_move_policy_session_index.npz"),
+                   help="session_index.npz supplying game_split_mask per state_key. "
+                        "Only used when --session-ledger is provided.")
     args = p.parse_args()
 
     if not (0.0 < args.val_fraction < 1.0):
         raise SystemExit("--val-fraction must be in (0, 1).")
+    _guard_output_dir(args.output_dir, args.session_ledger)
     prov = extract(args.db, args.output_dir,
                    limit_state_keys=args.limit_state_keys,
-                   val_fraction=args.val_fraction)
+                   val_fraction=args.val_fraction,
+                   session_ledger_path=args.session_ledger,
+                   session_index_path=args.session_index if args.session_ledger else None)
     (args.output_dir / "provenance.json").write_text(
         json.dumps(prov, indent=2), encoding="utf-8"
     )
