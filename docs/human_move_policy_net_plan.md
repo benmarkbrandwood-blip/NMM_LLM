@@ -29,6 +29,22 @@ closed.
   green.  Marks Phase 2 §2.2 and Phase 3 sections COMPLETE; Phase 4
   eval script implemented.  Phase 5 (GapNet v2 consumption) remains
   out of scope.
+- **rev 5** (2026-08-11 / -12) — Phase 5 renamed and repurposed as
+  the **v3 teacher retrain** driven by GapNet v3 Decision 6B (see
+  `docs/gap_net_v3_stage_e_rebuild_checklist.md`).  Codex found that
+  the v2 candidate was trained under `three_way_split(state_key)`,
+  which does not provide session-level out-of-fold guarantees for the
+  P_h teacher signal used by GapNet.  Phase 5 adds a session-isolated
+  retrain pipeline that shares one frozen session ledger, source
+  manifest, and split seed with the GapNet Stage D extractor.  The v2
+  candidate `data/human_move_policy_net_v2_candidate.npz` is retained
+  untouched as an exploratory comparison — the v3 teacher lands under
+  `data/human_move_policy_net_v3_teacher_candidate.npz`.  Tooling
+  (session ledger builder, extractor `--session-ledger` flag, trainer
+  safety guard) landed in commits `6d61d40`, `ec567b2`, and `9efe0ba`;
+  the retrain run itself is gated by a readiness checkpoint and has
+  not yet been executed.  The original "Phase 5 (GapNet v2 consumption)"
+  is dropped as GapNet v2 is superseded by v3.
 
 ## Contrast with HumanPrefNet — corrected
 
@@ -542,6 +558,150 @@ positions appear in session index.
 - ❌ ECE gate: 0.174–0.177 per band after T\*=1.0 scaling (threshold: ≤ 0.05).
   Gate threshold must be revised — see note above.
 - ✅ Abstention / OOD: 0 abstentions.
+
+## Phase 5 — v3 teacher retrain (session-isolated, for GapNet v3)
+
+**Motivation.**  GapNet v3 (Decision 6B in
+`docs/gap_net_v3_stage_e_rebuild_checklist.md`) uses `P_h(m | state, band)`
+from this network as its **teacher signal** when computing training targets
+for `G_v(state, band)`.  If the teacher was itself trained on the same
+state_keys that GapNet later evaluates against, the teacher signal on those
+"held-out" GapNet val/test positions is not out-of-fold — it was seen
+during training.  Codex flagged this in review of GapNet commit `728ddad`:
+
+> the HumanMovePolicyNet used to generate P_h must not have trained on the
+> held-out GapNet sessions or states.
+
+The v2 candidate was trained under `three_way_split(state_key)` (§3.6 above),
+which does not provide session-level cleanliness.  Phase 5 addresses this by
+retraining the teacher with strict single-tier session isolation.
+
+**The v2 candidate is not replaced.**  `data/human_move_policy_net_v2_candidate.npz`
+stays intact as an exploratory-comparison baseline.  The v3 teacher lands
+under the separately-named `data/human_move_policy_net_v3_teacher_candidate.npz`.
+Both `.npz`s can be loaded by the same `ai/human_move_policy_advisor.py`.
+
+### 5.1 Frozen shared session ledger (Batch 3a — LANDED, commit `6d61d40`)
+
+The session ledger is the single source of truth for session→split assignments,
+shared with the GapNet Stage D extractor.  Neither the teacher retrain nor the
+GapNet extractor may compute its own split independently.
+
+`tools/build_gap_v3_session_ledger.py` produces
+`data/gap_v3_session_ledger.json` recording:
+
+- Per-file SHA-256, size, mtime, and game count for every JSONL under
+  `data/human_games/`.
+- Per-session `{session_id, session_hash=sha256(session_id), split, source_file}`,
+  where `split = game_level_split(session_id)` (unchanged from
+  `learned_ai.data.human_db_split`).
+- `files_manifest_sha256` — a single hash of the sorted
+  `(rel_path, sha256, size_bytes)` triples that captures source identity.
+- Deterministic iteration and first-occurrence rule for duplicate session_ids.
+
+12 regression assertions land in `tests/test_gap_v3_session_ledger.py`.
+
+**Cost.**  Full-scan estimate ~7.6 h due to double file read (SHA + JSONL).
+Smoke run on 20 files passes in 5.6 s.  Single-pass optimisation deferred until
+the full ledger run is authorised.
+
+### 5.2 Session-isolated dataset extraction (Batch 3b — LANDED, commit `ec567b2`)
+
+`tools/extract_human_move_policy_dataset.py --session-ledger PATH --session-index PATH`
+switches the split scheme from `three_way_split(state_key)` to strict single-tier
+session isolation:
+
+```
+mask == 0b001 → include in TRAIN (state_key reached only by train-tier sessions)
+mask == 0b010 → include in VAL   (state_key reached only by val-tier sessions)
+mask == 0b100 → include in TEST  (state_key reached only by test-tier sessions)
+any other mask → DROP (mixed-tier or uncovered)
+```
+
+Mixed-tier and uncovered state_keys are counted in
+`session_split_disposition` per (`strict_train`, `strict_val`, `strict_test`,
+`mixed_tier`, `uncovered`) and recorded in provenance.
+
+Safety guards:
+
+- Refuses to overwrite the v2 dataset directory `data/human_move_policy_dataset/`
+  when `--session-ledger` is set; suggests
+  `data/human_move_policy_dataset_v3_session/` instead.
+- Verifies the session_index's referenced `metadata.npz` SHA-256 matches the
+  currently on-disk file — refuses on mismatch to catch stale indexes.
+- Verifies `game_split_mask` length agrees with `state_keys` length.
+
+10 regression assertions land in `tests/test_gap_v3_hmpn_session_split.py`
+(strict rule per mask value, no-train-leakage invariant, disposition sum,
+SHA/length mismatch rejection, guard behaviours).
+
+### 5.3 Session-aware trainer (Batch 3b — LANDED, commit `9efe0ba`)
+
+`tools/train_human_move_policy_net.py` is unchanged in loss / optimiser /
+architecture (still §3.5's 82 → 128 → 64 → 32 → 1 MLP with count-weighted
+cross-entropy).  Two safety additions only:
+
+- `_peek_dataset_provenance(dataset_dir)`: reads `metadata.npz` provenance
+  without loading the memmap so `main()` can inspect `split_scheme` before
+  starting training.
+- `_guard_output_path(output, dataset_provenance)`: refuses to overwrite
+  `data/human_move_policy_net_v2_candidate.npz` when the dataset was
+  extracted with the session-ledger scheme.  Suggests the v3 filename.
+  Any non-v2 output path is allowed — the guard only protects the v2
+  filename.
+- Session-ledger identity fields surfaced at the top level of the trained
+  `.npz`'s provenance:  `dataset_split_scheme`, `session_ledger_sha256`,
+  `session_ledger_files_manifest_sha256`, `session_ledger_version`,
+  `session_index_sha256`.
+
+9 regression assertions land in `tests/test_gap_v3_hmpn_trainer_ledger_guard.py`.
+
+### 5.4 End-to-end pipeline (not yet run)
+
+```
+# Step 1 — build the frozen session ledger (~7.6 h, single-pass optimisation
+# deferred until authorised).  Shared with GapNet Stage D extractor.
+.venv/bin/python tools/build_gap_v3_session_ledger.py \\
+    --games-dir data/human_games \\
+    --output    data/gap_v3_session_ledger.json
+
+# Step 2 — extract the session-isolated teacher training dataset.
+.venv/bin/python tools/extract_human_move_policy_dataset.py \\
+    --db             data/human_db_candidate.sqlite \\
+    --session-ledger data/gap_v3_session_ledger.json \\
+    --session-index  data/human_move_policy_session_index.npz \\
+    --output-dir     data/human_move_policy_dataset_v3_session
+
+# Readiness checkpoint — user reviews train / val / test state, event,
+# band, phase counts before the ~18 h training run is authorised.
+
+# Step 3 — train the v3 teacher candidate.
+.venv/bin/python tools/train_human_move_policy_net.py \\
+    --dataset-dir data/human_move_policy_dataset_v3_session \\
+    --output      data/human_move_policy_net_v3_teacher_candidate.npz
+```
+
+### 5.5 Phase 5 gates (must pass before v3 teacher is trusted by GapNet)
+
+Draft — thresholds to be reviewed with the user before the retrain runs.
+
+| Gate | Threshold |
+|------|-----------|
+| Session-isolation invariant | Zero state_keys in the training pool have `game_split_mask & 0b110 != 0` (asserted at extract time, provenance records `session_split_disposition`). |
+| Training pool size | `n_state_keys_train` ≥ target-TBD relative to v2 candidate (checklist coverage-floor concept applies here too — quantify before authorising the run). |
+| Event-weighted NLL | Within a documented tolerance of the v2 candidate's held-out NLL; explicit target TBD.  Retraining on a smaller pool may lose 1–3 % NLL and still be the right trade for session-clean OOB. |
+| ECE (calibration) | ≤ v2 candidate's ECE + a documented tolerance; explicit target TBD.  Same reasoning as NLL. |
+| Provenance chain | `.npz` records `dataset_split_scheme = session_ledger_strict_single_tier`, `session_ledger_sha256`, `session_ledger_files_manifest_sha256` matching the frozen ledger; asserted by a future provenance regression test. |
+| Compatibility | Loads under existing `ai/human_move_policy_advisor.py` without code changes (same architecture). |
+
+### 5.6 Rollback
+
+- Reversion base: any commit up to and including `2f36d69` predates Batch 3.
+- The v2 candidate is not overwritten regardless of Phase 5 outcome.
+- If the v3 teacher fails a gate, GapNet Stage D can either fall back to the v2
+  candidate (documented state-key-split leakage) or delay Stage D until a
+  re-authored Phase 5 iteration lands.  This choice is made in the GapNet plan,
+  not here.
 
 ## Regret — deferred to GapNet plan (reviewer §11)
 
