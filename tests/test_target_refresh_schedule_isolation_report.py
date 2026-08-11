@@ -49,6 +49,83 @@ def test_strict_jsonl_rejects_missing_final_newline(tmp_path: Path) -> None:
         report._strict_jsonl(path)
 
 
+def test_analysis_source_accepts_exact_training_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "head": commit,
+            "analysis_head": commit,
+            "origin_dev": commit,
+        },
+    )
+
+    source = report._inspect_analysis_source(expected)
+
+    assert source["post_training_analysis_paths"] == []
+
+
+def test_analysis_source_accepts_published_reporter_only_descendant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    analysis_head = "b" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "head": commit,
+            "analysis_head": analysis_head,
+            "origin_dev": analysis_head,
+        },
+    )
+    monkeypatch.setattr(
+        report,
+        "_git_output",
+        lambda *arguments: (
+            "scripts/report_target_refresh_schedule_isolation_diagnostic.py\n"
+            "tests/test_target_refresh_schedule_isolation_report.py"
+        ),
+    )
+
+    source = report._inspect_analysis_source(expected)
+
+    assert source["post_training_analysis_paths"] == [
+        "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
+        "tests/test_target_refresh_schedule_isolation_report.py",
+    ]
+
+
+def test_analysis_source_rejects_non_analysis_descendant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    analysis_head = "b" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "head": commit,
+            "analysis_head": analysis_head,
+            "origin_dev": analysis_head,
+        },
+    )
+    monkeypatch.setattr(
+        report,
+        "_git_output",
+        lambda *arguments: "scripts/train_s_gen_v2.py",
+    )
+
+    with pytest.raises(
+        report.ScheduleIsolationReportError,
+        match="post-training source changes are not analysis-only",
+    ):
+        report._inspect_analysis_source(expected)
+
+
 def _arm_grid(tmp_path: Path) -> dict:
     arms = {}
     for seed in (67, 68, 69):

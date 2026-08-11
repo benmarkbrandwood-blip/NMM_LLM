@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import math
+import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -109,10 +110,53 @@ DEFAULT_OUTPUT = ROOT / (
 EXPECTED_POLICY_CORPUS_SHA256 = (
     "cf3c069cd1bb786236172eb28672bbed12886d771977c8c61e99501caa715d2e"
 )
+_POST_TRAINING_ANALYSIS_PATHS = frozenset(
+    {
+        "scripts/report_target_refresh_schedule_isolation_diagnostic.py",
+        "tests/test_target_refresh_schedule_isolation_report.py",
+    }
+)
 
 
 class ScheduleIsolationReportError(RuntimeError):
     """Raised when immutable successor evidence cannot be established."""
+
+
+def _git_output(*arguments: str) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", *arguments], cwd=ROOT, text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ScheduleIsolationReportError("Git evidence audit failed") from exc
+
+
+def _inspect_analysis_source(expected_training_commit: str) -> dict[str, Any]:
+    """Allow a published descendant only when every change is analysis-only."""
+    source = _git_identity(expected_training_commit)
+    analysis_head = str(source["analysis_head"])
+    changed_paths: list[str] = []
+    if analysis_head != expected_training_commit:
+        changed_paths = sorted(
+            path
+            for path in _git_output(
+                "diff",
+                "--name-only",
+                f"{expected_training_commit}..{analysis_head}",
+                "--",
+            ).splitlines()
+            if path
+        )
+        if not changed_paths or not set(changed_paths).issubset(
+            _POST_TRAINING_ANALYSIS_PATHS
+        ):
+            raise ScheduleIsolationReportError(
+                "post-training source changes are not analysis-only"
+            )
+    return {
+        **source,
+        "post_training_analysis_paths": changed_paths,
+    }
 
 
 def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -460,7 +504,7 @@ def main(argv: list[str] | None = None) -> int:
         raise ScheduleIsolationReportError("result requires the v2 contract")
     seeds = tuple(int(seed) for seed in contract["pairing"]["seeds"])
     readiness = _validate_readiness(paths["readiness"], contract=contract)
-    source = _git_identity(str(readiness["source"]["head"]))
+    source = _inspect_analysis_source(str(readiness["source"]["head"]))
 
     if _sha256_file(paths["policy_corpus"]) != EXPECTED_POLICY_CORPUS_SHA256:
         raise ScheduleIsolationReportError("fixed policy corpus identity differs")
@@ -714,6 +758,15 @@ def main(argv: list[str] | None = None) -> int:
                 "path": _relative(paths["readiness"]),
                 "sha256": _sha256_file(paths["readiness"]),
                 "readiness_identity": readiness["readiness_identity"],
+            },
+            "result_implementation": {
+                "frozen_contract_record": contract["analysis"][
+                    "result_implementation"
+                ],
+                "executed_publisher": {
+                    "path": _relative(Path(__file__)),
+                    "sha256": _sha256_file(Path(__file__)),
+                },
             },
             "policy_corpus": {
                 "path": _relative(paths["policy_corpus"]),
