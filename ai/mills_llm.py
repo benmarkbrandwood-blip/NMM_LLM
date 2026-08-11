@@ -17,7 +17,7 @@ _MAX_HISTORY = 16
 _PHASE_STRATEGY: dict[str, str] = {}
 _phase_strategy_path = pathlib.Path(__file__).parent.parent / "docs" / "phase_strategy.md"
 if _phase_strategy_path.exists():
-    _raw = _phase_strategy_path.read_text()
+    _raw = _phase_strategy_path.read_text(encoding="utf-8")
     for _sec in re.split(r'\n(?=## Phase )', _raw):
         _m = re.match(r'## Phase ([A-D])', _sec)
         if _m:
