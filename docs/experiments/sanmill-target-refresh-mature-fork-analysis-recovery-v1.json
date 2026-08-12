@@ -1,0 +1,127 @@
+{
+  "analysis_implementation": {
+    "minimum_commit": "da2d88c7ea109a7dab84712405c16f47f2c797ae",
+    "publisher": {
+      "path": "scripts/report_target_refresh_mature_fork_diagnostic.py",
+      "sha256": "a9d6809a0071b4bcabdb9750ba7ed8ef1d755c7f3e239041f420f842826f88e4"
+    },
+    "runner": {
+      "path": "scripts/run_target_refresh_mature_fork_analysis_recovery.py",
+      "sha256": "7eb7d53363ac33e3fd887792baf1e64dd85d79c65de8835661a21034589b464b"
+    }
+  },
+  "claim_boundary": "One analysis-only recovery of the candidate-blind policy-distribution and 288-game development measurements for the six already completed mature target-refresh attempt-002 arms; not a training retry or resume, held-out strength result, promotion, publication, retained-run selection, or long-training authorization.",
+  "completed_artifact_identity": "c186b7b02e2b012e6e899fe48429a388def6f94a640118faac273fb3a60fe49d",
+  "completed_training": {
+    "managed_active_hours_total": 0.40299999999999997,
+    "post_mature_fork_transitions_per_arm": [
+      8192,
+      8192,
+      8192,
+      8192,
+      8192,
+      8192
+    ],
+    "post_mature_fork_transitions_total": 49152,
+    "training_games_per_arm": [
+      513,
+      329,
+      475,
+      271,
+      504,
+      437
+    ],
+    "training_games_total": 2529,
+    "training_resource_limits_passed": true
+  },
+  "control_files": {
+    "authorization": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/authorization.json",
+    "readiness": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/readiness.json"
+  },
+  "local_inputs": {
+    "malom_manifest": "data/manifests/malom-sector-corrected-v1.json",
+    "paths_config": "data/training_paths.local.json"
+  },
+  "objective": "Complete the development-only policy and paired direct-crossplay analysis that did not start after all six mature target-refresh training arms completed.",
+  "outputs": {
+    "completion": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/completion.json",
+    "development_ledger": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/development-direct-crossplay-ledger.jsonl",
+    "development_result": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/result.json",
+    "failure": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/failure.json",
+    "launch": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/launch.json",
+    "stderr_log": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/stderr.log",
+    "stdout_log": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002-analysis-recovery-v1/stdout.log"
+  },
+  "parent_attempt": {
+    "authorization": {
+      "identity": "181a8e883d70102e516c2319ea0329372e27d6b087b2bc7c86aad3570ec3e375",
+      "path": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/sequence-authorization.json",
+      "sha256": "a1ad302ba9a7f3f048ef92e0f3db7735a2f7fdd4e39f83657da29f0f4477d7f9"
+    },
+    "contract": {
+      "identity": "442c170177b5a8b867b14db31e62b16219fc3ee65ae1fac804842e493c35089d",
+      "path": "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.json",
+      "sha256": "7ad384d8869a9897c0ca377608786f9aaab2dd87c3cc12b32ea464662838d82c"
+    },
+    "failure": {
+      "identity": "d4e13fbaaef4df8ea6002e4c783208f017887226b86dfb4c7a8e13816995620e",
+      "path": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/sequence-failure.json",
+      "sha256": "f40336ddc4a84125467def28532543e4b8ed823e4b13dcddcb2bb95898761c45"
+    },
+    "launch": {
+      "identity": "34dd77f553fcf4ec82ba1365e95f74cdb9520a6d23ea4139cd5d5c71d111d749",
+      "path": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/sequence-launch.json",
+      "sha256": "d8f6709a8833d89dc0370107d4e4057462593efdde16a222212fc715fc81871c"
+    },
+    "readiness": {
+      "identity": "d2860ae09980d6eb9aa87d0f81d0a93b634f3f7725220b7392ee8c6eca7282b7",
+      "path": "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/readiness.json",
+      "sha256": "05fc8f34a9316bb7167dd1751baaab3eee79b2e5872a349ac0e30fcde8dd8a15"
+    },
+    "run_id": "mature-target-refresh-attempt-002-20260812T045901Z",
+    "training_source_commit": "e7ff859923c067251c3feb08fe7aee6fff59116d"
+  },
+  "plan_identity": "70fb522b863ceb583b393697a11894540ce3ab5c5764b6aa8e892ebb7cc451e6",
+  "resource_envelope": {
+    "candidate_models_loaded": true,
+    "checkpoint_writes": 0,
+    "database_writes": 0,
+    "maximum_active_wall_hours": 3.5,
+    "no_update_development_games": 288,
+    "optimizer_updates": 0,
+    "training_games": 0
+  },
+  "rules_and_data": {
+    "human_db_identity": "8662e3331210893495aef38c0cb774bd387e508ac8b859261a78b43b74184d31",
+    "human_db_malom_policy": "masked_historical_labels",
+    "malom_manifest_identity": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "mif_release_commit": "a0a0f21cff5d6fbde045cd1482e416b92e0dc45a",
+    "mif_suite_jcs_sha256": "81a5feabc281bfc4f830addabc2c6846d1f191bbbcf04e548f04b35dd358ae6f",
+    "mif_tag": "mif-suite-1.0",
+    "rules_semantic_digest": "sha256:52f6ad24a0b95f68c1a7fd6b35b52550abce48c36d1686d155e497cdcad31f6a",
+    "ruleset": "nmm-training-core@2",
+    "sanmill_binary_sha256": "5fbf3cba4d5994fd92029713c355f0ab016683fe71cc066eca65ac515c124619",
+    "sanmill_commit": "a6623f88959f7453594df274fbe1f128af7ff55e",
+    "sanmill_strict_referee_semantic_digest": "sha256:1b2b88cf1f6a6904696d45e2707bd55559ac47e6991edd99a95a8d6cac0b1a94",
+    "sanmill_tree": "17b9b0fd51ee8dac54c0454a6935978a47d19e0c"
+  },
+  "schema_version": "nmm.target-refresh-mature-fork-analysis-recovery-plan.v1",
+  "status": "designed_unlaunched_needs_authorization",
+  "stop_rules": {
+    "automatic_extension": false,
+    "automatic_held_out": false,
+    "automatic_long_training": false,
+    "automatic_promotion_or_publication": false,
+    "automatic_retry_or_recovery": false,
+    "stop_on": [
+      "parent contract, readiness, authorization, launch, or failure identity drift",
+      "completed checkpoint, log, policy-health, plan, database, or controller artifact drift",
+      "post-training source change outside the explicit analysis-only allowlist",
+      "HumanDB, Malom, MIF, rules, Sanmill, policy corpus, replay corpus, or replay audit identity drift",
+      "candidate checkpoint corruption or non-finite analysis state",
+      "Sanmill legality, history, terminal, winner, or strict-referee error",
+      "development ledger incomplete or malformed",
+      "active wall-time ceiling reached"
+    ]
+  }
+}

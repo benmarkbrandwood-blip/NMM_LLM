@@ -243,7 +243,10 @@ selected. Preserve the
 The original launch and all child authorizations are consumed. Do not retry or
 resume training. A corrected publisher may be used only through a separately
 frozen, zero-training analysis-recovery plan with a new readiness identity and
-explicit one-shot launch authority.
+explicit one-shot launch authority. That
+[analysis-recovery plan](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v1.md)
+is now frozen under identity `70fb522b`; it permits no training and has not
+been preflighted, authorized or launched.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2285,8 +2288,9 @@ the current successor in this order:
     [failure record](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
     Do not retry or resume the training sequence. Repair the publisher's
     reference-input policy, then prepare a new zero-training analysis-only
-    contract and readiness record; launching that successor requires a new
-    explicit one-shot product authorization.
+    contract and readiness record. The resulting recovery contract is frozen
+    under plan identity `70fb522b`; launching it still requires a new readiness
+    identity and explicit one-shot product authorization.
 
 The previously executed isolated smoke command was:
 

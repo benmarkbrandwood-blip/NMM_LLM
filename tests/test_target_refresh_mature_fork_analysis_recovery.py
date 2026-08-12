@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -61,6 +63,25 @@ def test_recovery_plan_requires_canonical_identity(tmp_path: Path) -> None:
         match="identity differs",
     ):
         recovery.load_recovery_plan(path)
+
+
+def test_repository_recovery_plan_freezes_published_implementation() -> None:
+    plan = recovery.load_recovery_plan(recovery.DEFAULT_PLAN)
+
+    assert plan["plan_identity"] == (
+        "70fb522b863ceb583b393697a11894540ce3ab5c5764b6aa8e892ebb7cc451e6"
+    )
+    assert plan["completed_artifact_identity"] == (
+        "c186b7b02e2b012e6e899fe48429a388def6f94a640118faac273fb3a60fe49d"
+    )
+    commit = plan["analysis_implementation"]["minimum_commit"]
+    for name in ("publisher", "runner"):
+        record = plan["analysis_implementation"][name]
+        frozen = subprocess.check_output(
+            ["git", "show", f"{commit}:{record['path']}"],
+            cwd=recovery.ROOT,
+        )
+        assert hashlib.sha256(frozen).hexdigest() == record["sha256"]
 
 
 def test_authorization_is_exactly_plan_and_readiness_bound() -> None:
