@@ -93,3 +93,61 @@ def test_generated_authority_json_remains_canonical_only(tmp_path: Path) -> None
         match="JSON is not canonical",
     ):
         report._strict_json(path)
+
+
+def test_analysis_source_accepts_reporter_only_descendant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    analysis_head = "b" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "training_head": commit,
+            "analysis_head": analysis_head,
+            "origin_dev": analysis_head,
+        },
+    )
+    monkeypatch.setattr(
+        report,
+        "_git_output",
+        lambda *arguments: (
+            "scripts/report_target_refresh_mature_fork_diagnostic.py\n"
+            "tests/test_target_refresh_mature_fork_report.py"
+        ),
+    )
+
+    source = report._inspect_analysis_source(expected)
+
+    assert source["post_training_analysis_paths"] == [
+        "scripts/report_target_refresh_mature_fork_diagnostic.py",
+        "tests/test_target_refresh_mature_fork_report.py",
+    ]
+
+
+def test_analysis_source_rejects_training_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    analysis_head = "b" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "training_head": commit,
+            "analysis_head": analysis_head,
+            "origin_dev": analysis_head,
+        },
+    )
+    monkeypatch.setattr(
+        report,
+        "_git_output",
+        lambda *arguments: "scripts/train_s_gen_v2.py",
+    )
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="post-training source changes are not analysis-only",
+    ):
+        report._inspect_analysis_source(expected)

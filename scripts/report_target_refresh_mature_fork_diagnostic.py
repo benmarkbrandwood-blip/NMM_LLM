@@ -101,6 +101,22 @@ DEFAULT_LEDGER = ROOT / (
 DEFAULT_OUTPUT = ROOT / (
     "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/result.json"
 )
+_POST_TRAINING_ANALYSIS_PATHS = frozenset(
+    {
+        "docs/evidence/target-refresh-mature-fork-diagnostic-"
+        "attempt-002-failure-2026-08-12.md",
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v1.json",
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v1.md",
+        "docs/handoff/windows-training-2026-07-20.md",
+        "scripts/report_target_refresh_mature_fork_diagnostic.py",
+        "scripts/run_target_refresh_mature_fork_analysis_recovery.py",
+        "tests/test_target_refresh_mature_fork_analysis_recovery.py",
+        "tests/test_target_refresh_mature_fork_diagnostic.py",
+        "tests/test_target_refresh_mature_fork_report.py",
+    }
+)
 
 
 class MatureTargetRefreshReportError(RuntimeError):
@@ -186,30 +202,74 @@ def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def _git_source(expected: str) -> dict[str, Any]:
-    def output(*arguments: str) -> str:
-        try:
-            return subprocess.check_output(
-                ["git", *arguments], cwd=ROOT, text=True
-            ).strip()
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise MatureTargetRefreshReportError("Git audit failed") from exc
+def _git_output(*arguments: str) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", *arguments], cwd=ROOT, text=True
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise MatureTargetRefreshReportError("Git audit failed") from exc
 
-    head = output("rev-parse", "HEAD")
-    origin = output("rev-parse", "origin/dev")
-    branch = output("branch", "--show-current")
-    dirty = output("status", "--porcelain=v1", "--untracked-files=no")
-    if head != expected or origin != expected or branch != "dev" or dirty:
+
+def _git_identity(expected_training_commit: str) -> dict[str, Any]:
+    head = _git_output("rev-parse", "HEAD")
+    origin = _git_output("rev-parse", "origin/dev")
+    branch = _git_output("branch", "--show-current")
+    dirty = _git_output("status", "--porcelain=v1", "--untracked-files=no")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", expected_training_commit, head],
+        cwd=ROOT,
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if head != origin or branch != "dev" or dirty or ancestor.returncode != 0:
         raise MatureTargetRefreshReportError(
-            "result requires the exact clean published training source"
+            "result requires a clean published descendant of the training source"
         )
     return {
         "branch": branch,
-        "head": head,
+        "training_head": expected_training_commit,
+        "analysis_head": head,
         "origin_dev": origin,
         "tracked_clean": True,
         "published": True,
+        "training_source_is_ancestor": True,
     }
+
+
+def _git_source(expected: str) -> dict[str, Any]:
+    source = _git_identity(expected)
+    if source["analysis_head"] != expected:
+        raise MatureTargetRefreshReportError(
+            "result requires the exact clean published training source"
+        )
+    return {**source, "post_training_analysis_paths": []}
+
+
+def _inspect_analysis_source(expected_training_commit: str) -> dict[str, Any]:
+    """Permit only published, explicitly analysis-only descendant changes."""
+    source = _git_identity(expected_training_commit)
+    analysis_head = str(source["analysis_head"])
+    changed_paths: list[str] = []
+    if analysis_head != expected_training_commit:
+        changed_paths = sorted(
+            path
+            for path in _git_output(
+                "diff",
+                "--name-only",
+                f"{expected_training_commit}..{analysis_head}",
+                "--",
+            ).splitlines()
+            if path
+        )
+        if not changed_paths or not set(changed_paths).issubset(
+            _POST_TRAINING_ANALYSIS_PATHS
+        ):
+            raise MatureTargetRefreshReportError(
+                "post-training source changes are not analysis-only"
+            )
+    return {**source, "post_training_analysis_paths": changed_paths}
 
 
 def _validate_readiness(
@@ -720,6 +780,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--device", choices=("cpu",), default="cpu")
+    parser.add_argument("--allow-published-analysis-descendant", action="store_true")
     return parser
 
 
@@ -755,7 +816,11 @@ def main(argv: list[str] | None = None) -> int:
     contract = load_contract(paths["contract"])
     readiness = _strict_json(paths["readiness"])
     readiness_identity = _validate_readiness(readiness, contract=contract)
-    source_git = _git_source(str(readiness["source"]["head"]))
+    source_git = (
+        _inspect_analysis_source(str(readiness["source"]["head"]))
+        if args.allow_published_analysis_descendant
+        else _git_source(str(readiness["source"]["head"]))
+    )
 
     policy_contract = contract["measurement_contract"]["policy_distribution"]
     direct_contract = contract["measurement_contract"]["direct_crossplay"]
