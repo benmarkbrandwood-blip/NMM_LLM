@@ -60,6 +60,9 @@ from scripts.analyze_common_anchor_policy_distribution import (  # noqa: E402
 from scripts.prepare_target_refresh_direct_crossplay import (  # noqa: E402
     DEFAULT_MALOM_MANIFEST,
     DEFAULT_PATHS_CONFIG,
+    _SQLITE_SIDECAR_POLICY,
+    _stable_read_only_observations,
+    _volatile_sqlite_sidecar_observations,
     build_readiness,
     validate_readiness,
 )
@@ -530,10 +533,11 @@ def launch_once(
     human_db: HumanDB | None = None
     malom: ExternalSolvedDB | None = None
     try:
-        before = _read_only_observations(
+        full_before = _read_only_observations(
             human_db_path=_resolve_setting(_strict_json(paths_config_path), "human_db_path"),
             malom_path=_resolve_setting(_strict_json(paths_config_path), "malom_db_path"),
         )
+        before = _stable_read_only_observations(full_before)
         (
             installation,
             human_db,
@@ -589,15 +593,21 @@ def launch_once(
                 },
             }
         )
-        after = _read_only_observations(
+        full_after = _read_only_observations(
             human_db_path=_resolve_setting(_strict_json(paths_config_path), "human_db_path"),
             malom_path=_resolve_setting(_strict_json(paths_config_path), "malom_db_path"),
         )
+        after = _stable_read_only_observations(full_after)
         if after != before:
             raise DirectCrossplayError("read-only source observations changed")
         result_without_identity["read_only_observations"] = {
             "before": before,
             "after": after,
+            "sqlite_sidecar_policy": _SQLITE_SIDECAR_POLICY,
+            "volatile_sqlite_sidecars": {
+                "before": _volatile_sqlite_sidecar_observations(full_before),
+                "after": _volatile_sqlite_sidecar_observations(full_after),
+            },
         }
         result = {
             **result_without_identity,

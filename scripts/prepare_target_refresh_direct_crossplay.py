@@ -61,6 +61,12 @@ DEFAULT_PATHS_CONFIG = ROOT / "data/training_paths.local.json"
 DEFAULT_MALOM_MANIFEST = ROOT / "data/manifests/malom-sector-corrected-v1.json"
 DEFAULT_OUTPUT = ROOT / "out/target-refresh-direct-crossplay-v1/readiness.json"
 
+_SQLITE_SIDECAR_POLICY = (
+    "HumanDB is opened with immutable=1, so WAL/SHM files are outside the "
+    "experiment's runtime view. Their volatile metadata is excluded from "
+    "readiness identity and source-drift decisions."
+)
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -73,6 +79,35 @@ def _sha256(path: Path) -> str:
 def _probe_direct_crossplay_human_db(path: Path) -> dict[str, Any]:
     """Probe the same immutable HumanDB main-file view used at runtime."""
     return _probe_human_db(path, immutable=True)
+
+
+def _stable_read_only_observations(
+    observations: dict[str, Any],
+) -> dict[str, Any]:
+    """Return only files that belong to the immutable experiment view.
+
+    SQLite readers or an unrelated database owner may update ``-shm`` mtime
+    without changing the main-file snapshot consumed here. Binding that
+    volatile metadata made an otherwise valid readiness artifact expire after
+    an unrelated reader opened HumanDB. Main-file and Malom drift remain
+    fail-closed and are already backed by their stronger semantic identities.
+    """
+    required = ("human_db_main", "malom_std_secval")
+    if any(key not in observations for key in required):
+        raise DirectCrossplayError("stable read-only observation is incomplete")
+    return {
+        key: dict(observations[key])
+        for key in required
+    }
+
+
+def _volatile_sqlite_sidecar_observations(
+    observations: dict[str, Any],
+) -> dict[str, Any]:
+    required = ("human_db_wal", "human_db_shm")
+    if any(key not in observations for key in required):
+        raise DirectCrossplayError("SQLite sidecar observation is incomplete")
+    return {key: dict(observations[key]) for key in required}
 
 
 def _relative(path: Path) -> str:
@@ -319,7 +354,7 @@ def build_readiness(
         raise DirectCrossplayError("Malom tablebase identity differs")
 
     installation = load_local_installation(paths_config_path.resolve())
-    before = _read_only_observations(
+    full_before = _read_only_observations(
         human_db_path=human_path,
         malom_path=malom_path,
     )
@@ -335,10 +370,12 @@ def build_readiness(
             "initial_history_sha256": game.state.history_sha256,
         }
     checkpoints = _validate_checkpoints(plan, schedule_contract, source_result)
-    after = _read_only_observations(
+    full_after = _read_only_observations(
         human_db_path=human_path,
         malom_path=malom_path,
     )
+    before = _stable_read_only_observations(full_before)
+    after = _stable_read_only_observations(full_after)
     if before != after:
         raise DirectCrossplayError("read-only source observations changed")
 
@@ -370,7 +407,11 @@ def build_readiness(
             "malom_manifest_identity": manifest.manifest_sha256,
             "replay_corpus_identity": replay_corpus["corpus_identity"],
             "replay_audit_identity": replay_audit["audit_identity"],
-            "read_only_observations": {"before": before, "after": after},
+            "read_only_observations": {
+                "before": before,
+                "after": after,
+                "sqlite_sidecar_policy": _SQLITE_SIDECAR_POLICY,
+            },
         },
         "referee": referee,
         "checkpoints": checkpoints,

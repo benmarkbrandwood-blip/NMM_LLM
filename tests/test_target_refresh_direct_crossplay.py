@@ -320,6 +320,53 @@ def test_readiness_probes_the_runtime_immutable_human_db_view(
     assert observed == [(path, True)]
 
 
+def test_stable_source_observation_excludes_volatile_sqlite_sidecars() -> None:
+    first = {
+        "human_db_main": {"exists": True, "size": 100, "modified_ns": 10},
+        "human_db_wal": {"exists": True, "size": 20, "modified_ns": 11},
+        "human_db_shm": {"exists": True, "size": 30, "modified_ns": 12},
+        "malom_std_secval": {
+            "exists": True,
+            "size": 200,
+            "modified_ns": 20,
+        },
+    }
+    second = copy.deepcopy(first)
+    second["human_db_wal"]["modified_ns"] = 101
+    second["human_db_shm"]["modified_ns"] = 102
+
+    stable_first = preparer._stable_read_only_observations(first)
+    stable_second = preparer._stable_read_only_observations(second)
+
+    assert stable_first == stable_second
+    assert set(stable_first) == {"human_db_main", "malom_std_secval"}
+    assert canonical_sha256(stable_first) == canonical_sha256(stable_second)
+    assert preparer._volatile_sqlite_sidecar_observations(first) != (
+        preparer._volatile_sqlite_sidecar_observations(second)
+    )
+
+
+def test_stable_source_observation_keeps_main_and_malom_fail_closed() -> None:
+    observation = {
+        "human_db_main": {"exists": True, "size": 100, "modified_ns": 10},
+        "human_db_wal": {"exists": False},
+        "human_db_shm": {"exists": False},
+        "malom_std_secval": {
+            "exists": True,
+            "size": 200,
+            "modified_ns": 20,
+        },
+    }
+    main_changed = copy.deepcopy(observation)
+    main_changed["human_db_main"]["modified_ns"] += 1
+    malom_changed = copy.deepcopy(observation)
+    malom_changed["malom_std_secval"]["size"] += 1
+
+    baseline = preparer._stable_read_only_observations(observation)
+    assert baseline != preparer._stable_read_only_observations(main_changed)
+    assert baseline != preparer._stable_read_only_observations(malom_changed)
+
+
 class _AscendingPolicy(torch.nn.Module):
     def policy_logits(self, features: torch.Tensor) -> torch.Tensor:
         return torch.arange(features.shape[0], dtype=torch.float32)
