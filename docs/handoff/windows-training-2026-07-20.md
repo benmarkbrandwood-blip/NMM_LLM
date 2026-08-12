@@ -1,8 +1,8 @@
-# Windows Training Handover — 20 July 2026 (updated 11 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 12 August 2026)
 
 ## Executive Summary
 
-### Latest state: equal-transition result is inconclusive; redesign required
+### Latest state: early target refresh is harmful; later cadence unresolved
 
 The seed-58 `managed-sanmill-preserving-retained-v3-seed58` run is complete
 and frozen as evidence. It reached 5,000 games in 20 accepted segments and
@@ -191,6 +191,28 @@ The authorization is consumed and does not permit a retry. Preserve the
 A successor must fix and test the closed seed-field mapping, use isolated
 attempt-002 output paths, publish a new immutable plan and readiness identity,
 and receive new explicit product authorization.
+
+The corrected attempt-003 direct cross-play subsequently completed once under
+plan identity `2f1665e5`, readiness identity `9fd354a7`, and authorization
+identity `3175570e`. It consumed 288 CPU no-update games as 144 colour-swapped
+pairs across seeds 67, 68 and 69 and placement, movement and flying starts.
+There were no training games, optimizer updates, database writes or checkpoint
+writes. The no-refresh condition scored `178 W / 12 D / 98 L`; its paired
+mean score effect over refresh-once was `+0.2777778`. All three seeds and all
+three phases supported the same direction, while nine max-ply truncations gave
+a safe `0.03125` truncation rate. The frozen classifier returned
+`material_no_refresh_direct_effect`.
+
+This is evidence that refreshing the frozen target at the original game-50
+boundary was harmful under the tested schedule. It is not evidence that a
+target should remain stale forever, and it does not select a retained setting.
+The next discriminating experiment must fork each mature no-refresh checkpoint
+at 8,192 post-fork transitions, refresh once only in the treatment arm, and
+hold subsequent transition exposure, temperature sequence and 1,000-node
+Sanmill work equal. Preserve the
+[attempt-003 result evidence](../evidence/target-refresh-direct-crossplay-attempt-003-result-2026-08-12.md).
+Its evidence identity is `9a5df62d`. No held-out evaluation, long training,
+promotion or publication is authorized by this result.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2203,6 +2225,16 @@ the current successor in this order:
     authorization is consumed. Do not overwrite or resume its output. A fixed
     attempt 002 requires new output, plan and readiness identities plus a new
     explicit product authorization.
+27. Preserve completed target-refresh direct cross-play attempt 003 under
+    plan identity `2f1665e5`, readiness identity `9fd354a7`, authorization
+    identity `3175570e`, launch identity `7f696aef`, and completion identity
+    `fedd31a4`. The independently republished evidence identity is
+    `9a5df62d`. Its three-seed and three-phase result supports a material
+    no-refresh direct effect at the original game-50 boundary, but does not
+    select permanent no-refresh. The next design must test one refresh from a
+    mature common fork with equal post-fork optimizer exposure and fixed
+    schedules. Do not reinterpret this development corpus as held-out
+    strength or use it to authorize promotion, publication or long training.
 
 The previously executed isolated smoke command was:
 
