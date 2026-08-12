@@ -23,53 +23,35 @@ record is in
 [the attempt-002 failure evidence](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
 There is no result, ledger or completion record for that attempt.
 
-The publisher and Windows JSONL handling were corrected and pushed with focused
-regression tests. The separate, zero-training recovery plan is frozen under
-plan identity `70fb522b863ceb583b393697a11894540ce3ab5c5764b6aa8e892ebb7cc451e6`
-and is described in
-[the recovery plan](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v1.md).
-Its scope is exactly 288 CPU no-update development games over the six already
-completed arms; it allows zero training games, zero optimizer updates, zero
-database writes and zero checkpoint writes, with a 3.5-hour additional wall
-limit. It is not held-out strength evaluation, promotion, publication, or
-long-training authorization.
+The first zero-training analysis recovery was then explicitly authorized and
+launched once. It failed closed before its first development game because the
+publisher incorrectly required one-shot mature-fork provenance fields to
+remain in ordinary post-fork checkpoint implementation metadata. It wrote no
+ledger, result or completion record. The authorization is consumed. Preserve
+the exact identities and diagnosis in
+[the recovery-v1 failure record](../evidence/target-refresh-mature-fork-analysis-recovery-v1-failure-2026-08-13.md).
 
-A complete preflight passed for the final published `dev` commit. Readiness is
-bound to that exact source identity. The ignored `readiness.json` is therefore
-usable only after checking that its `source.analysis_head`,
-`source.origin_dev`, and `tracked_clean` fields still match the current clean
-published branch and that `launch_authorized` is `false`. The preflight command
-fails closed when that file already exists; it must not be overwritten. If any
-tracked source changes after preflight, first move the old readiness file to a
-timestamped ignored archive under the same `out/` directory, then run
-preflight once and use only the newly reported identity. Do not copy a
-readiness identity into a tracked document or make another tracked change
-after preflight.
+Corrective commit `763f20c` compares stable implementation identity while
+continuing to validate treatment, transition, configuration, source-checkpoint
+and trainer-state lineage. It also makes recovery preflight read and validate
+all 12 candidate checkpoints before another authorization can be requested.
+A read-only post-fix audit passed all 12 with identity `d3c7e0dd`. This is a
+publisher/preflight correction only; it changes no gameplay or training state
+and does not revive the consumed authorization.
 
 ### Remaining work for the next operator
 
-1. Confirm a clean published `dev`. Inspect the existing ignored readiness
-   first; if it is bound to that exact `HEAD == origin/dev`, it is the current
-   preflight result. Only when it is absent or source-bound to an older commit
-   archive it and run the recovery preflight:
-
-   ```powershell
-   .\.venv\Scripts\python.exe scripts\run_target_refresh_mature_fork_analysis_recovery.py --preflight
-   ```
-
-2. Product authorization is still required. The authorization must name the
-   readiness identity just produced and must be limited to one zero-training
-   recovery: 288 CPU no-update games, at most 3.5 active hours, no retry,
-   resume, extension, held-out evaluation, promotion, publication, or long
-   training.
-
-3. After that decision is recorded, create the plan-bound authorization and
-   launch exactly once with a unique run ID. The script consumes the exclusive
-   launch marker before analysis starts. If any identity, source, artifact,
-   output, resource, or policy-health check differs, stop and preserve the
-   fail-closed record; do not repair in place or reuse the output namespace.
-
-4. Review the resulting policy-distribution and direct-crossplay evidence
+1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
+   overwrite, repair in place, or reuse its output namespace.
+2. Freeze and publish a successor analysis-only contract with new plan,
+   control, output and authorization identities. Its scope must remain 288 CPU
+   no-update games and 3.5 active hours, with no training or mutable data.
+3. Run its strengthened preflight from clean published `dev`; it must validate
+   all 12 candidate checkpoints before returning product-ready status.
+4. Obtain one new explicit product authorization bound to the new readiness.
+   A successor plan or passing preflight does not reuse the consumed v1 grant.
+5. If authorized, launch exactly once and stop on any mismatch. Review the
+   resulting policy-distribution and direct-crossplay evidence
    separately by seed, phase, colour and termination reason. A recovery result
    does not select a retained training setting. Only after this analysis is
    complete may a new, separately frozen long-run design be considered; long

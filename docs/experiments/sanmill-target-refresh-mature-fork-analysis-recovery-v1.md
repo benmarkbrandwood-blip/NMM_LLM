@@ -76,26 +76,22 @@ duplicate keys, non-finite values, and non-object rows remain fatal.
 5. Any anomaly writes a fail-closed recovery failure. No automatic retry,
    recovery, held-out run, promotion, publication, or long training follows.
 
-Current tracked state: `frozen_unlaunched_needs_authorization`. A complete
-preflight has passed, but readiness binds the exact current published HEAD.
-The authoritative launch identity therefore belongs only in the ignored
-machine-local `readiness.json` generated after the last tracked change; copying
-it into this document would move HEAD and invalidate it. Neither this plan nor
-preflight authorizes the 288 development games. The recovery script refuses to
-overwrite an existing ignored readiness file. An operator must inspect the
-existing file when it matches the current clean `dev`; after any source change,
-move the old file to a timestamped ignored archive before generating a fresh
-preflight.
+Current tracked state: `consumed_failed_closed_before_development_games`. The
+product owner authorized one launch against readiness identity `3e6a9db8`.
+The publisher rejected the first legal candidate checkpoint before any direct
+development game because it applied an invalid implementation-metadata
+invariant. Failure identity `c4e73033` and its complete diagnosis are preserved
+in the
+[recovery-v1 failure record](../evidence/target-refresh-mature-fork-analysis-recovery-v1-failure-2026-08-13.md).
+This plan and authorization must not be reused.
 
 ## Handoff state
 
-The parent attempt is consumed and failed closed after all six training arms,
-before the first analysis game. The recovery implementation has been fixed,
-tested and published. A receiving operator must run `--preflight` against the
-latest clean published `dev`, obtain one explicit product authorization bound
-to that resulting readiness identity, and then use `--record-authorization`
-followed by `--launch once` exactly once. The recovery remains zero-training:
-288 CPU no-update games, no optimizer/database/checkpoint writes, and a
-maximum of 3.5 additional active hours. Any mismatch or anomaly is terminal;
-there is no automatic retry, resume, extension, held-out evaluation,
-promotion, publication or long-training continuation.
+The parent attempt and this first analysis recovery are both consumed. The
+candidate-identity predicate was corrected in commit `763f20c`, and recovery
+preflight now validates all 12 candidate checkpoints before product
+authorization. A successor requires a new immutable plan and isolated output
+namespace, a final clean published preflight, and a new explicit product
+authorization. Its scientific schedule and resource ceiling must remain
+unchanged. There is no automatic retry, resume, extension, held-out
+evaluation, promotion, publication or long-training continuation.
