@@ -5,11 +5,13 @@
 ## Transfer checkpoint — 12 August 2026
 
 This section is the current handoff checkpoint and takes precedence over older
-historical wording below. The repository root is this directory; the tracked
-worktree is clean, `dev` and `origin/dev` both point to
-`4c1b30489e263cdc8c07ecb15bc4c5d1769b1092`, and `origin/main` remains at the
+historical wording below. The repository root is this directory. At handoff
+publication the tracked worktree was clean and `dev` was synchronized with
+`origin/dev`; a receiving operator must verify the exact current values with
+`git rev-parse HEAD` and `git rev-parse origin/dev` rather than relying on a
+copied SHA in prose. At the latest review, `origin/main` remained at the
 already reviewed `bc2b87a2e21fad3c86cd417e3d5f6e2b81879066`. Ben's monitored
-training thread has no newer training-related message or main-branch commit.
+training thread had no newer training-related message or main-branch commit.
 
 The latest authorized mature target-refresh attempt is consumed and must not be
 restarted. Its six training arms all completed and passed policy health: 2,529
