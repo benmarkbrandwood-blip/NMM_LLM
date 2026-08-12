@@ -70,7 +70,34 @@ control, while two supporting seeds were required. Only seed 67 also retained
 a material policy-distribution trigger at both 4,096 and 8,192 transitions.
 Neither target condition is selected. Preserve the
 [recovery-v2 result evidence](../evidence/target-refresh-mature-fork-analysis-recovery-v2-result-2026-08-13.md).
-Current verdict: `needs_decision` for any new objective or resource envelope.
+
+The smallest independent replication successor is now frozen in the
+[mature-fork replication v1 contract](../experiments/sanmill-target-refresh-mature-fork-replication-v1.md).
+Commit `d380958` generalized the mature-fork tooling and added the
+preregistered cross-cohort gate; commit `1e88081` published plan identity
+`8071e4a0` to `origin/dev`. The plan reuses the untested mature-boundary
+`no-refresh` checkpoints for disjoint seeds 64, 65 and 66, each at exactly
+8,192 post-game-50 consumed transitions. Seed 64 uses a byte-identical closed
+database snapshot because its historical zero-byte WAL and 32,768-byte SHM
+sidecar must remain untouched. Seeds 65 and 66 already have closed source
+databases. Every input is `sector-corrected-v1` and bound by file identity.
+
+Clean synchronized `dev` at `1e88081` prepared six authorization-free child
+plans and preflights. Readiness identity is `a4d9fd63`; readiness file SHA-256
+is `6995cd6a`. The parent sequence preflight reports
+`ready_for_one_parent_product_authorization` / `needs_decision`, with all six
+policy-health gates present, zero child authorization files and zero segment
+directories. The frozen aggregate ceiling is 3,600 training games, 49,152
+consumed transitions, four active hours, 172,800,000 requested Sanmill node
+ceilings and 288 no-update development games. There is no retry, recovery,
+resume, extension, held-out evaluation, promotion, publication, retained run
+or long-training fallback. Verification passed 133 expanded focused tests and
+the required Malom/DB/provenance set with 103 tests plus 498 subtests.
+
+Current verdict: the replication sequence is technically ready for exactly
+one aggregate product decision. It is not authorized and is not
+`ready_for_long_run`; the result gate explicitly sets
+`automatic_long_run_selection=false`.
 
 ### Remaining work for the next operator
 
@@ -82,11 +109,14 @@ Current verdict: `needs_decision` for any new objective or resource envelope.
 3. Preserve the `no_material_direct_effect` result and null selection. Do not
    choose stale control from seed 67 alone or lower the frozen threshold after
    observing the result.
-4. Do not start held-out evaluation, promotion, publication, or long training
-   from this development evidence. If target cadence remains an objective,
-   freeze one aggregate successor decision with new independent seeds and a
-   bounded resource envelope; do not ask for repeated per-seed or per-arm
-   approvals inside any later valid standing delegation.
+4. If the product owner authorizes plan identity `8071e4a0`, record that one
+   parent decision once and derive the six just-in-time child authorizations in
+   frozen launch order. Do not request per-seed or per-arm approvals. Any drift
+   or arm failure consumes/closes the attempt; do not retry it automatically.
+5. Do not start held-out evaluation, promotion, publication, retained training
+   or long training from this development evidence. Even a replicated result
+   is only a cadence input to a separately frozen retained plan and separate
+   launch decision.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
