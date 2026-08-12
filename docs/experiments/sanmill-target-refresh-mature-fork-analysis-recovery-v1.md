@@ -82,3 +82,16 @@ The authoritative launch identity therefore belongs only in the ignored
 machine-local `readiness.json` generated after the last tracked change; copying
 it into this document would move HEAD and invalidate it. Neither this plan nor
 preflight authorizes the 288 development games.
+
+## Handoff state
+
+The parent attempt is consumed and failed closed after all six training arms,
+before the first analysis game. The recovery implementation has been fixed,
+tested and published. A receiving operator must run `--preflight` against the
+latest clean published `dev`, obtain one explicit product authorization bound
+to that resulting readiness identity, and then use `--record-authorization`
+followed by `--launch once` exactly once. The recovery remains zero-training:
+288 CPU no-update games, no optimizer/database/checkpoint writes, and a
+maximum of 3.5 additional active hours. Any mismatch or anomaly is terminal;
+there is no automatic retry, resume, extension, held-out evaluation,
+promotion, publication or long-training continuation.

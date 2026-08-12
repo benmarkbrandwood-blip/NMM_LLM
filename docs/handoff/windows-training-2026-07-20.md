@@ -2,6 +2,73 @@
 
 ## Executive Summary
 
+## Transfer checkpoint — 12 August 2026
+
+This section is the current handoff checkpoint and takes precedence over older
+historical wording below. The repository root is this directory; the tracked
+worktree is clean, `dev` and `origin/dev` both point to
+`4c1b30489e263cdc8c07ecb15bc4c5d1769b1092`, and `origin/main` remains at the
+already reviewed `bc2b87a2e21fad3c86cd417e3d5f6e2b81879066`. Ben's monitored
+training thread has no newer training-related message or main-branch commit.
+
+The latest authorized mature target-refresh attempt is consumed and must not be
+restarted. Its six training arms all completed and passed policy health: 2,529
+new games, 49,152 post-fork transitions and 768 A2C updates. The result
+publisher then failed closed before any development measurement game because
+it incorrectly required canonical-minified JSON for a frozen pretty-printed
+reference corpus. The failure identity is `d4e13fba`; the complete failure
+record is in
+[the attempt-002 failure evidence](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
+There is no result, ledger or completion record for that attempt.
+
+The publisher and Windows JSONL handling were corrected and pushed with focused
+regression tests. The separate, zero-training recovery plan is frozen under
+plan identity `70fb522b863ceb583b393697a11894540ce3ab5c5764b6aa8e892ebb7cc451e6`
+and is described in
+[the recovery plan](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v1.md).
+Its scope is exactly 288 CPU no-update development games over the six already
+completed arms; it allows zero training games, zero optimizer updates, zero
+database writes and zero checkpoint writes, with a 3.5-hour additional wall
+limit. It is not held-out strength evaluation, promotion, publication, or
+long-training authorization.
+
+A complete preflight passed before this handoff update, but readiness is bound
+to the exact published `dev` commit. This documentation commit therefore makes
+the previous machine-local readiness identity historical. After this commit is
+published, regenerate the ignored `readiness.json` and use only the newly
+reported identity for any authorization. Do not copy that identity into a
+tracked document or make another tracked change after preflight.
+
+### Remaining work for the next operator
+
+1. Confirm a clean published `dev` and run the recovery preflight:
+
+   ```powershell
+   .\.venv\Scripts\python.exe scripts\run_target_refresh_mature_fork_analysis_recovery.py --preflight
+   ```
+
+2. Product authorization is still required. The authorization must name the
+   readiness identity just produced and must be limited to one zero-training
+   recovery: 288 CPU no-update games, at most 3.5 active hours, no retry,
+   resume, extension, held-out evaluation, promotion, publication, or long
+   training.
+
+3. After that decision is recorded, create the plan-bound authorization and
+   launch exactly once with a unique run ID. The script consumes the exclusive
+   launch marker before analysis starts. If any identity, source, artifact,
+   output, resource, or policy-health check differs, stop and preserve the
+   fail-closed record; do not repair in place or reuse the output namespace.
+
+4. Review the resulting policy-distribution and direct-crossplay evidence
+   separately by seed, phase, colour and termination reason. A recovery result
+   does not select a retained training setting. Only after this analysis is
+   complete may a new, separately frozen long-run design be considered; long
+   training still needs its own explicit product authorization.
+
+No candidate-vs-baseline held-out match, model promotion, publication, or long
+training is currently authorized. Historical ignored artifacts under `out/`
+are evidence inputs and must not be deleted, overwritten, or relabelled.
+
 ### Latest state: early target refresh is harmful; later cadence unresolved
 
 The seed-58 `managed-sanmill-preserving-retained-v3-seed58` run is complete
@@ -2296,12 +2363,11 @@ the current successor in this order:
     reference-input and Windows JSONL policies were corrected with focused
     regression tests. The resulting zero-training analysis-only recovery is
     frozen under plan identity `70fb522b`. A full preflight passed at published
-    commit `b3854a7`; its readiness identity `45662e3a` is historical after the
-    later status-only descendant. Regenerate the ignored readiness against the
-    latest clean published `dev` before launch. Its exact identity belongs in
-    that machine-local control file, because committing it would move HEAD and
-    invalidate it again. Launching still requires explicit one-shot product
-    authorization.
+    source, but readiness is bound to the exact published HEAD. Regenerate the
+    ignored readiness against the latest clean published `dev` before launch;
+    its exact identity belongs only in that machine-local control file, because
+    committing it would move HEAD and invalidate it again. Launching still
+    requires explicit one-shot product authorization.
 
 The previously executed isolated smoke command was:
 
