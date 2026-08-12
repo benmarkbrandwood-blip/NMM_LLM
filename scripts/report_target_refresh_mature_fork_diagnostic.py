@@ -118,6 +118,11 @@ _POST_TRAINING_ANALYSIS_PATHS = frozenset(
     }
 )
 
+_TRANSIENT_FORK_IMPLEMENTATION_PREFIXES = (
+    "mature_target_refresh_",
+    "target_refresh_branch_",
+)
+
 
 class MatureTargetRefreshReportError(RuntimeError):
     """Raised when mature target-refresh evidence is incomplete."""
@@ -435,11 +440,9 @@ def _load_candidate_pair(
         state = envelope.payload.trainer_state
         recovery = state.get("recovery_state", {})
         fork = recovery.get("target_refresh_fork_state", {})
-        expected_implementation = {
-            key: value
-            for key, value in branch_envelope.descriptor.implementation.items()
-            if not key.startswith("target_refresh_branch_")
-        }
+        expected_implementation = _candidate_runtime_implementation(
+            branch_envelope.descriptor.implementation
+        )
         origin = fork.get("post_fork_transition_origin")
         consumed = recovery.get("optimizer_consumed_transition_count")
         if (
@@ -500,6 +503,24 @@ def _load_candidate_pair(
             "immutable_asset_identities": current_assets,
         }
     return models, records
+
+
+def _candidate_runtime_implementation(
+    branch_implementation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Return stable runtime identity expected after a fork branch is loaded.
+
+    The initial branch envelope carries one-time provenance describing both
+    the mature fork capture and the selected branch treatment. Ordinary
+    trainer checkpoints preserve those semantics in trainer recovery state
+    and source-checkpoint lineage, while their implementation mapping returns
+    to the stable managed-run identity.
+    """
+    return {
+        key: value
+        for key, value in branch_implementation.items()
+        if not key.startswith(_TRANSIENT_FORK_IMPLEMENTATION_PREFIXES)
+    }
 
 
 def _training_outcome(row: Mapping[str, Any]) -> str:

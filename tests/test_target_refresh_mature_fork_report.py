@@ -146,6 +146,22 @@ def test_generated_authority_json_remains_canonical_only(tmp_path: Path) -> None
         report._strict_json(path)
 
 
+def test_candidate_runtime_implementation_drops_only_fork_provenance() -> None:
+    branch = {
+        "framework": "pytorch",
+        "experiment_digest": "stable",
+        "mature_target_refresh_fork_kind": "mature-target-refresh-fork-v1",
+        "mature_target_refresh_source_checkpoint_id": "source",
+        "target_refresh_branch_kind": "target-refresh-fork-v1",
+        "target_refresh_branch_treatment": "refresh-once",
+    }
+
+    assert report._candidate_runtime_implementation(branch) == {
+        "framework": "pytorch",
+        "experiment_digest": "stable",
+    }
+
+
 def test_analysis_source_accepts_reporter_only_descendant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

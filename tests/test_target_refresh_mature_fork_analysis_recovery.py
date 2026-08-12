@@ -294,3 +294,53 @@ def test_completed_artifact_manifest_rejects_database_sidecar(
             contract=contract,
             failure=failure,
         )
+
+
+def test_candidate_semantics_audit_covers_all_pairs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contract = {
+        "sources": [{"seed": seed} for seed in (67, 68, 69)],
+        "arms": [
+            {"seed": seed, "condition": condition}
+            for seed in (67, 68, 69)
+            for condition in ("refresh-mature", "stale-control")
+        ],
+    }
+    readiness = {
+        "seeds": [
+            {"seed": seed, "arms": [{"condition": "refresh-mature"}]}
+            for seed in (67, 68, 69)
+        ]
+    }
+    monkeypatch.setattr(
+        recovery.reporter,
+        "_load_common_fork",
+        lambda **kwargs: (object(), {"checkpoint_id": f"fork-{kwargs['source']['seed']}"}),
+    )
+
+    calls: list[tuple[int, int]] = []
+
+    def load_pair(**kwargs):
+        calls.append((kwargs["seed"], kwargs["boundary"]))
+        return {}, {
+            "refresh-mature": {"checkpoint_id": "refresh"},
+            "stale-control": {"checkpoint_id": "stale"},
+        }
+
+    monkeypatch.setattr(recovery.reporter, "_load_candidate_pair", load_pair)
+
+    audit = recovery._audit_candidate_semantics(
+        contract=contract,
+        readiness=readiness,
+    )
+
+    assert calls == [
+        (seed, boundary)
+        for seed in (67, 68, 69)
+        for boundary in recovery.reporter.POLICY_BOUNDARIES
+    ]
+    assert len(audit["candidate_pairs"]) == 6
+    body = dict(audit)
+    identity = body.pop("audit_identity")
+    assert identity == canonical_sha256(body)

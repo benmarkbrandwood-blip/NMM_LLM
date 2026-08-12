@@ -283,7 +283,13 @@ def build_completed_artifact_manifest(
 
 def _validate_parent_artifacts(
     plan: Mapping[str, Any],
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
     parent = plan["parent_attempt"]
     contract_path, _ = _artifact(parent["contract"], field="parent contract")
     contract = load_contract(contract_path)
@@ -359,7 +365,44 @@ def _validate_parent_artifacts(
     training_audit = reporter._audit_training(
         arms=reporter._arm_map(contract), contract=contract
     )
-    return contract, resources, manifest, training_audit
+    return contract, resources, manifest, training_audit, readiness
+
+
+def _audit_candidate_semantics(
+    *, contract: Mapping[str, Any], readiness: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate every candidate envelope before a one-shot launch is allowed."""
+    arms = reporter._arm_map(contract)
+    sources = reporter._source_map(contract)
+    readiness_seeds = reporter._readiness_seed_map(readiness)
+    rows: list[dict[str, Any]] = []
+    for seed in sorted(sources):
+        _, common_record = reporter._load_common_fork(
+            source=sources[seed],
+            arm=arms[(seed, "refresh-mature")],
+            readiness_seed=readiness_seeds[seed],
+        )
+        for boundary in reporter.POLICY_BOUNDARIES:
+            _, records = reporter._load_candidate_pair(
+                arms=arms,
+                readiness_seed=readiness_seeds[seed],
+                seed=seed,
+                boundary=boundary,
+                common_record=common_record,
+                device=reporter.torch.device("cpu"),
+            )
+            rows.append(
+                {
+                    "seed": seed,
+                    "post_mature_fork_consumed_transitions": boundary,
+                    "checkpoints": records,
+                }
+            )
+    body = {
+        "schema_version": "nmm.target-refresh-mature-fork-candidate-audit.v1",
+        "candidate_pairs": rows,
+    }
+    return {**body, "audit_identity": canonical_sha256(body)}
 
 
 def _validate_implementation(plan: Mapping[str, Any]) -> dict[str, Any]:
@@ -482,7 +525,12 @@ def build_readiness_body(
     plan: Mapping[str, Any],
     allow_authorization: bool = False,
 ) -> dict[str, Any]:
-    contract, resources, manifest, training_audit = _validate_parent_artifacts(plan)
+    contract, resources, manifest, training_audit, parent_readiness = (
+        _validate_parent_artifacts(plan)
+    )
+    candidate_audit = _audit_candidate_semantics(
+        contract=contract, readiness=parent_readiness
+    )
     source = _validate_implementation(plan)
     dependencies = _validate_local_dependencies(plan)
     outputs = _output_paths(plan)
@@ -519,6 +567,10 @@ def build_readiness_body(
             "arm_count": len(manifest["arms"]),
         },
         "training_audit_identity": canonical_sha256(training_audit),
+        "candidate_semantics_audit": {
+            "identity": candidate_audit["audit_identity"],
+            "pair_count": len(candidate_audit["candidate_pairs"]),
+        },
         "local_dependencies": dependencies,
         "resource_envelope": plan["resource_envelope"],
         "claim_boundary": plan["claim_boundary"],
