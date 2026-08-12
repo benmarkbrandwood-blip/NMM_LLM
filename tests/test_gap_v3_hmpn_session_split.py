@@ -94,11 +94,14 @@ def _write_synthetic_index(
     state_keys: list[str],
     masks: list[int],
     referenced_meta_sha: str | None = None,
+    ledger_sha256: str | None = None,
+    ledger_files_manifest_sha256: str | None = None,
 ) -> tuple[Path, Path]:
     """Write a synthetic metadata.npz + session_index.npz pair.
 
-    If referenced_meta_sha is None, uses the actual sha (agreement case).
-    Otherwise writes the given sha into the index provenance (mismatch case).
+    ledger_sha256 / ledger_files_manifest_sha256: when provided, embedded in
+    the index provenance to simulate a P1-A ledger-bound index.  Omit for the
+    legacy (unbound) case.
     """
     meta_dir = tmp_path / "hmpn_ds"
     meta_dir.mkdir(exist_ok=True)
@@ -111,10 +114,14 @@ def _write_synthetic_index(
     actual_sha = hashlib.sha256(meta_path.read_bytes()).hexdigest()
 
     idx_path = tmp_path / "session_index.npz"
-    prov = {
+    prov: dict = {
         "dataset_dir":         str(meta_dir),
         "dataset_meta_sha256": referenced_meta_sha if referenced_meta_sha else actual_sha,
     }
+    if ledger_sha256 is not None:
+        prov["ledger_sha256"] = ledger_sha256
+    if ledger_files_manifest_sha256 is not None:
+        prov["ledger_files_manifest_sha256"] = ledger_files_manifest_sha256
     np.savez(
         str(idx_path),
         game_split_mask=np.array(masks, dtype=np.uint8),
@@ -124,7 +131,35 @@ def _write_synthetic_index(
     return idx_path, meta_path
 
 
+def _write_synthetic_ledger(
+    tmp_path: Path,
+    filename: str = "ledger.json",
+    files_manifest_sha256: str = "b" * 64,
+    is_partial: bool = False,
+    strict: bool = True,
+    n_malformed_lines: int = 0,
+    n_sessions: int = 1,
+) -> Path:
+    ledger = {
+        "ledger_version":            "gap_v3_session_ledger_v1",
+        "is_partial":                is_partial,
+        "strict":                    strict,
+        "n_malformed_lines":         n_malformed_lines,
+        "n_sessions":                n_sessions,
+        "files_manifest_sha256":     files_manifest_sha256,
+        "sessions": [
+            {"session_id": "s", "session_hash": "abc", "split": "train",
+             "source_file": "s.jsonl", "session_source": "record"}
+        ],
+        "files": [],
+    }
+    path = tmp_path / filename
+    path.write_text(json.dumps(ledger), encoding="utf-8")
+    return path
+
+
 def test_load_masks_returns_state_key_to_mask(extractor, tmp_path):
+    """Legacy path (no ledger_path arg) still works for unbound indexes."""
     idx_path, _ = _write_synthetic_index(
         tmp_path,
         state_keys=["sk1", "sk2", "sk3"],
@@ -173,6 +208,72 @@ def test_load_masks_length_mismatch_rejected(extractor, tmp_path):
 def test_load_masks_missing_file(extractor, tmp_path):
     with pytest.raises(FileNotFoundError):
         extractor._load_state_key_masks(tmp_path / "does_not_exist.npz")
+
+
+# ── P1-A ledger binding tests (Codex 2026-08-12) ─────────────────────────────
+
+def test_load_masks_rejects_unbound_index_when_ledger_supplied(extractor, tmp_path):
+    """P1-A: an index built without --session-ledger must not be paired with a ledger."""
+    idx_path, _ = _write_synthetic_index(
+        tmp_path, state_keys=["sk1"], masks=[0b001],
+    )
+    ledger_path = _write_synthetic_ledger(tmp_path)
+    with pytest.raises(ValueError, match="not built with --session-ledger"):
+        extractor._load_state_key_masks(idx_path, session_ledger_path=ledger_path)
+
+
+def test_load_masks_rejects_ledger_sha_mismatch(extractor, tmp_path):
+    """P1-A: index recorded ledger_sha256 must match current ledger's sha."""
+    idx_path, _ = _write_synthetic_index(
+        tmp_path, state_keys=["sk1"], masks=[0b001],
+        ledger_sha256="deadbeef" * 8,   # wrong sha
+        ledger_files_manifest_sha256="b" * 64,
+    )
+    ledger_path = _write_synthetic_ledger(tmp_path)
+    with pytest.raises(ValueError, match="ledger sha"):
+        extractor._load_state_key_masks(idx_path, session_ledger_path=ledger_path)
+
+
+def test_load_masks_rejects_manifest_sha_mismatch(extractor, tmp_path):
+    """P1-A: index recorded ledger_files_manifest_sha256 must match ledger."""
+    ledger_path = _write_synthetic_ledger(tmp_path, files_manifest_sha256="b" * 64)
+    ledger_sha = hashlib.sha256(ledger_path.read_bytes()).hexdigest()
+    idx_path, _ = _write_synthetic_index(
+        tmp_path, state_keys=["sk1"], masks=[0b001],
+        ledger_sha256=ledger_sha,
+        ledger_files_manifest_sha256="c" * 64,   # doesn't match ledger's b*64
+    )
+    with pytest.raises(ValueError, match="files_manifest_sha256"):
+        extractor._load_state_key_masks(idx_path, session_ledger_path=ledger_path)
+
+
+def test_load_masks_rejects_partial_ledger(extractor, tmp_path):
+    """P1-A: partial ledger (is_partial=True) refused by default."""
+    ledger_path = _write_synthetic_ledger(tmp_path, is_partial=True)
+    ledger_sha = hashlib.sha256(ledger_path.read_bytes()).hexdigest()
+    idx_path, _ = _write_synthetic_index(
+        tmp_path, state_keys=["sk1"], masks=[0b001],
+        ledger_sha256=ledger_sha,
+        ledger_files_manifest_sha256="b" * 64,
+    )
+    with pytest.raises(ValueError, match="partial"):
+        extractor._load_state_key_masks(idx_path, session_ledger_path=ledger_path)
+
+
+def test_load_masks_accepts_bound_matching_pair(extractor, tmp_path):
+    """P1-A: happy path — ledger and index in agreement."""
+    ledger_path = _write_synthetic_ledger(tmp_path, files_manifest_sha256="b" * 64)
+    ledger_sha = hashlib.sha256(ledger_path.read_bytes()).hexdigest()
+    idx_path, _ = _write_synthetic_index(
+        tmp_path, state_keys=["sk1", "sk2"], masks=[0b001, 0b010],
+        ledger_sha256=ledger_sha,
+        ledger_files_manifest_sha256="b" * 64,
+    )
+    lookup, prov = extractor._load_state_key_masks(
+        idx_path, session_ledger_path=ledger_path,
+    )
+    assert lookup == {"sk1": 0b001, "sk2": 0b010}
+    assert prov["ledger_sha256"] == ledger_sha
 
 
 # ── _guard_output_dir tests ──────────────────────────────────────────────────

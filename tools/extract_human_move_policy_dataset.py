@@ -160,13 +160,21 @@ def _guard_output_dir(output_dir: Path, session_ledger_path: Optional[Path]) -> 
 
 def _load_state_key_masks(
     session_index_path: Path,
+    session_ledger_path: Optional[Path] = None,
+    allow_partial_ledger: bool = False,
 ) -> tuple[dict[str, int], dict]:
     """Load state_key → game_split_mask (uint8) from a session_index.npz.
 
-    Reads the index's provenance to find its associated metadata.npz (which
-    holds the state_keys array in the same order as game_split_mask), verifies
-    that metadata.npz's SHA-256 matches the recorded value, and returns
-    (dict[state_key → mask], session_index_provenance).
+    Codex P1-A (2026-08-12): when session_ledger_path is provided (Batch 3b
+    flow), the index MUST have been built with --session-ledger and cryptographically
+    bound.  We verify:
+      - Ledger passes _verify_ledger_complete (not partial unless allowed;
+        strict; no tolerated malformed lines; non-empty).
+      - Index provenance's ledger_sha256 matches sha256(session_ledger_path).
+      - Index provenance's ledger_files_manifest_sha256 matches ledger's
+        recorded files_manifest_sha256.
+
+    Returns (dict[state_key → mask], session_index_provenance).
     """
     if not session_index_path.exists():
         raise FileNotFoundError(f"session_index not found: {session_index_path}")
@@ -174,6 +182,44 @@ def _load_state_key_masks(
     prov = json.loads(str(idx["provenance"]))
     game_mask = idx["game_split_mask"]
 
+    # ── Codex P1-A binding verification ────────────────────────────────────
+    if session_ledger_path is not None:
+        from tools.build_gap_v3_session_ledger import (           # noqa: E402
+            LedgerBuildError, _verify_ledger_complete,
+        )
+        try:
+            ledger = _verify_ledger_complete(
+                session_ledger_path, allow_partial=allow_partial_ledger,
+            )
+        except LedgerBuildError as e:
+            raise ValueError(
+                f"session_ledger verification failed for {session_ledger_path}: {e}"
+            ) from e
+        ledger_sha = _sha256_file(session_ledger_path)
+
+        idx_ledger_sha = prov.get("ledger_sha256")
+        if idx_ledger_sha is None:
+            raise ValueError(
+                f"session_index at {session_index_path} was not built with "
+                f"--session-ledger (no ledger_sha256 in provenance).  Rebuild "
+                f"the session_index against the ledger: "
+                f"`tools/build_session_index.py --session-ledger {session_ledger_path}`."
+            )
+        if idx_ledger_sha != ledger_sha:
+            raise ValueError(
+                f"session_index was built against ledger sha {idx_ledger_sha}, "
+                f"but the current --session-ledger has sha {ledger_sha}.  "
+                f"Rebuild the session_index against the current ledger."
+            )
+        idx_manifest = prov.get("ledger_files_manifest_sha256")
+        ledger_manifest = ledger.get("files_manifest_sha256")
+        if idx_manifest != ledger_manifest:
+            raise ValueError(
+                f"session_index and session_ledger disagree on files_manifest_sha256: "
+                f"index={idx_manifest}  ledger={ledger_manifest}."
+            )
+
+    # ── Metadata.npz sha check (unchanged) ─────────────────────────────────
     meta_dir = Path(prov["dataset_dir"])
     if not meta_dir.is_absolute():
         meta_dir = _ROOT / meta_dir
@@ -260,9 +306,12 @@ def extract(
             raise ValueError("--session-ledger requires --session-index")
         if not session_ledger_path.exists():
             raise FileNotFoundError(f"session_ledger not found: {session_ledger_path}")
+        # Codex P1-A: verify (index, ledger) binding before proceeding.
+        sk_to_mask, index_prov = _load_state_key_masks(
+            session_index_path, session_ledger_path=session_ledger_path,
+        )
         with session_ledger_path.open("r", encoding="utf-8") as f:
             ledger = json.load(f)
-        sk_to_mask, index_prov = _load_state_key_masks(session_index_path)
         sk_to_split, disposition = _apply_session_ledger_split(sk_to_mask)
         print(f"[extract] Session-ledger split scheme active "
               f"(files_manifest={ledger.get('files_manifest_sha256', '?')[:16]}…)")
