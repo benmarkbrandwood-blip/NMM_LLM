@@ -1,6 +1,6 @@
 # Target-refresh direct cross-play v1 attempt 003
 
-Status: `designed_unlaunched_needs_readiness`
+Status: `completed_once_material_no_refresh_direct_effect`
 
 This is a fresh one-shot successor to
 [attempt 002](sanmill-target-refresh-direct-crossplay-v1-attempt-002.md).
@@ -69,3 +69,30 @@ product authorization bound to that new readiness identity. An anomaly
 consumes the launch and fails closed; there is no automatic retry, recovery,
 extension, held-out evaluation, promotion, publication or long-training
 fallback.
+
+## Completed result
+
+The product owner authorized the unchanged three-seed, 288-game CPU scope on
+12 August 2026. The supplied readiness identity referred to consumed
+attempt-001 rather than current attempt-003. Because the requested objective,
+workload and boundaries were otherwise exact, the operator recorded the
+identity correction in a fresh authorization instead of changing the
+scientific contract. Attempt-003 then completed once under readiness identity
+`9fd354a793711ff925239a5f548b415134373d74d468ddf5961aead029cf3265`
+and authorization identity
+`3175570e24a063d222a4d2f83ce8f145adb6f246163d6740f32b1754de8b1f30`.
+
+All 288 no-update games completed in about 0.049 active hours. The no-refresh
+condition produced `178 W / 12 D / 98 L`, with a paired mean score effect of
+`+0.2777778` over refresh-once. All three seeds and all three phases supported
+the no-refresh direction. The truncation rate was `0.03125`, below the frozen
+invalidation limit. The result was therefore classified
+`material_no_refresh_direct_effect`.
+
+The result does not select permanent no-refresh or authorize long training.
+The next discriminating test is a mature-boundary fork: refresh the target
+once from each seed's mature no-refresh checkpoint in the treatment arm,
+leave it stale in the control arm, and hold all post-fork optimizer exposure
+and measurement work equal. The frozen evidence and complete interpretation
+are recorded in
+[the attempt-003 result](../evidence/target-refresh-direct-crossplay-attempt-003-result-2026-08-12.md).
