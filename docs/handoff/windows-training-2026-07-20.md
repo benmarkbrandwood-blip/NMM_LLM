@@ -214,6 +214,21 @@ Sanmill work equal. Preserve the
 Its evidence identity is `9a5df62d`. No held-out evaluation, long training,
 promotion or publication is authorized by this result.
 
+The first source-only preparation for the mature-fork successor was rejected
+before authorization because all six generated plans had
+`policy_health=null`, contradicting the contract's fail-closed policy-health
+gate. Readiness identity `32df3a5b` and all associated ignored preparation
+artefacts were moved intact to
+`out/quarantine/target-refresh-mature-fork-diagnostic-v1-missing-policy-health-2026-08-12/`.
+No authorization, segment, training game, optimizer update, database write or
+checkpoint write occurred. Commits `d1c8b4c`, `2cace43` and `c6e0689` enforce
+the gate, add the bounded sequence/result pipeline, and isolate successor
+paths. Commit `40b85e6` freezes
+[attempt 002](../experiments/sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.md)
+under plan identity `442c1701`. It is a design contract only: preparation,
+readiness review and one aggregate product authorization remain required
+before launch.
+
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
 equal-transition sequence. The Agent recorded each leaf authorization as
@@ -2235,6 +2250,15 @@ the current successor in this order:
     mature common fork with equal post-fork optimizer exposure and fixed
     schedules. Do not reinterpret this development corpus as held-out
     strength or use it to authorize promotion, publication or long training.
+28. Preserve mature-fork preparation attempt 001 under invalid readiness
+    identity `32df3a5b` in its quarantine directory. It had no authorization
+    and executed no training. Do not repair, authorize, overwrite or relabel
+    it. Use only the isolated
+    [attempt-002 contract](../experiments/sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.md),
+    plan identity `442c1701`, frozen at commit `40b85e6`. Its corrected plans
+    must carry the exact policy-health gate and pass final preflight before a
+    single aggregate launch decision is requested. This preparation has not
+    yet been run and has no launch authority.
 
 The previously executed isolated smoke command was:
 
@@ -2335,7 +2359,7 @@ consumed. The schedule-isolation successor completed once under plan identity
 grant is consumed. Its outcome classifier is
 `no_material_paired_outcome_effect`, its policy classifier is
 `inconclusive_late_onset`, and no condition is selected. No held-out match,
-additional calibration, long
+additional calibration, mature-fork diagnostic, long
 training, model promotion/publication, protocol change, resource expansion, or
 history rewrite is authorized by that sequence. Ordinary
 verified fast-forward pushes of Codex-created `dev` commits are separately
