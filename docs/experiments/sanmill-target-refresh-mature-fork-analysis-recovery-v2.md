@@ -2,12 +2,24 @@
 
 ## Status and purpose
 
-Status: `designed_unlaunched_needs_publication_and_authorization`
+Status: `completed_once_no_material_direct_effect`
 
 The machine-readable contract is
 [`sanmill-target-refresh-mature-fork-analysis-recovery-v2.json`](sanmill-target-refresh-mature-fork-analysis-recovery-v2.json).
 Its plan identity is
 `32158846cb3e3903589663465d6217ed546442eee617e0aa5fe94defe45feb25`.
+
+The one-shot recovery completed on 13 August 2026 under readiness identity
+`13e25cd5fb0552dd171b3f736e42841c1222bb627f08447abbb8a77bb7031fab`.
+It produced 288 no-update development games, result identity
+`5e7bb7bf0505d1f3a2b43f50572e1ed9de8861114a25193490e34533f4dafd61`,
+and classification `no_material_direct_effect`. It performed no training,
+optimizer, database, or checkpoint write. Neither condition is selected, and
+the authorization is consumed. Preserve the full
+[result evidence](../evidence/target-refresh-mature-fork-analysis-recovery-v2-result-2026-08-13.md).
+
+The remaining sections preserve the exact prelaunch contract and are not a
+new launch instruction.
 
 Recovery v1 consumed its one-shot authorization and failed closed before the
 first development game. It incorrectly required transient mature-fork capture

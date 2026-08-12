@@ -42,42 +42,51 @@ and does not revive the consumed authorization.
 The isolated successor is frozen in
 [recovery v2](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v2.md)
 under plan identity `32158846`. It keeps the same scientific and resource
-contract, uses a new output namespace, and remains unlaunched. Commit
+contract and uses a new output namespace. At that checkpoint it remained
+unlaunched. Commit
 `360c878` published the exact recovery-v2 contract and implementation to
 `origin/dev`. A final clean preflight at that published commit passed all 12
 candidate checkpoints, recorded candidate-audit identity `d3c7e0dd`, and
 returned `ready_for_product_authorization` under readiness identity
 `fcd38c2f`. The readiness file SHA-256 is `6edca20a`. No authorization,
-launch, development game, result, ledger or completion record exists for v2.
+launch, development game, result, ledger or completion record existed for v2.
+The following paragraphs record the subsequent execution and supersede that
+pre-handover state.
 
-That readiness is now historical evidence rather than a launch control. It is
-bound to analysis HEAD `360c878`, while this handover update necessarily
-creates a later HEAD. Do not edit or reuse it. Preserve a byte-identical copy
-outside the active v2 output namespace, remove the historical control from
-that otherwise-unused namespace, and regenerate readiness only after this
-handover commit is published and `dev == origin/dev` is clean. The resulting
-identity, not `fcd38c2f`, is the only one that may be named by a future product
-authorization. Current verdict: `needs_decision`.
+The historical readiness was preserved byte-for-byte in ignored quarantine,
+with unchanged SHA-256 `6edca20a`. After this handover commit was ordinarily
+published, clean synchronized `dev` at `77e5d7c` regenerated readiness identity
+`13e25cd5`. The product owner authorized exactly that 288-game/3.5-hour
+zero-training recovery and requested no repeated prompts for technical steps
+inside the authorized contract. The run completed once in 0.047169 active
+hours, with zero training, optimizer, database, or checkpoint writes. Its
+288-row ledger SHA-256 is `f0d35417`, result identity is `5e7bb7bf`, and the
+predeclared classification is `no_material_direct_effect`.
+
+The paired `refresh-mature minus stale-control` mean effect was `-0.076389`,
+just below the frozen `-0.083333` material threshold. Seed effects were
+`-0.229167`, `+0.010417`, and `-0.010417`; only seed 67 supported stale
+control, while two supporting seeds were required. Only seed 67 also retained
+a material policy-distribution trigger at both 4,096 and 8,192 transitions.
+Neither target condition is selected. Preserve the
+[recovery-v2 result evidence](../evidence/target-refresh-mature-fork-analysis-recovery-v2-result-2026-08-13.md).
+Current verdict: `needs_decision` for any new objective or resource envelope.
 
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
    overwrite, repair in place, or reuse its output namespace.
-2. Publish this handover-only commit by ordinary fast-forward, then verify the
-   exact branch graph, a clean tracked worktree and `dev == origin/dev`.
-3. Preserve the historical v2 readiness byte-for-byte outside its active
-   namespace, restore that namespace to absent, and rerun the documented
-   strengthened preflight. It must validate all 12 candidate checkpoints and
-   bind the final clean published HEAD.
-4. Obtain one new explicit product authorization bound to that newly generated
-   readiness identity and the exact 288-game/3.5-hour zero-training envelope.
-   A successor plan or passing preflight does not reuse the consumed v1 grant.
-5. If authorized, launch exactly once and stop on any mismatch. Review the
-   resulting policy-distribution and direct-crossplay evidence
-   separately by seed, phase, colour and termination reason. A recovery result
-   does not select a retained training setting. Only after this analysis is
-   complete may a new, separately frozen long-run design be considered; long
-   training still needs its own explicit product authorization.
+2. Preserve the completed recovery-v2 readiness, authorization, launch,
+   288-row ledger, result, completion and logs under their recorded identities.
+   Do not rerun, extend, repair in place, or reuse its consumed authorization.
+3. Preserve the `no_material_direct_effect` result and null selection. Do not
+   choose stale control from seed 67 alone or lower the frozen threshold after
+   observing the result.
+4. Do not start held-out evaluation, promotion, publication, or long training
+   from this development evidence. If target cadence remains an objective,
+   freeze one aggregate successor decision with new independent seeds and a
+   bounded resource envelope; do not ask for repeated per-seed or per-arm
+   approvals inside any later valid standing delegation.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
@@ -2381,19 +2390,28 @@ the current successor in this order:
     optimizer, database or checkpoint state and produced no ledger, result or
     completion record. Its authorization is consumed; preserve the
     [recovery-v1 failure record](../evidence/target-refresh-mature-fork-analysis-recovery-v1-failure-2026-08-13.md).
-30. Preserve the unlaunched
+30. Preserve the historical prelaunch state of the
     [recovery-v2 contract](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v2.md),
     plan identity `32158846`, published with its implementation at commit
     `360c878`. The post-fix read-only audit and final published-source preflight
     both validated all 12 candidate checkpoints under candidate-audit identity
     `d3c7e0dd`. The pre-handover readiness identity `fcd38c2f` and file SHA-256
-    `6edca20a` are historical evidence only because this handover commit changes
-    the analysis HEAD. No v2 authorization or launch exists. After this commit
-    is ordinarily published and the branch is clean and synchronized, preserve
-    the historical readiness outside the active namespace and rerun preflight
-    there from an absent namespace. Only the newly generated readiness may be
-    authorized. Do not launch held-out evaluation, promote, publish a model or
-    start long training from this recovery.
+    `6edca20a` are historical evidence only because the earlier handover commit
+    changed the analysis HEAD. At that checkpoint no v2 authorization or launch
+    existed. The historical readiness was subsequently preserved outside the
+    active namespace and the preflight was rerun from an absent namespace; item
+    31 records the resulting one-shot execution.
+31. Recovery v2 subsequently completed exactly once under readiness identity
+    `13e25cd5`, authorization identity `c02f2ffd`, launch identity `988c6bd1`,
+    and completion identity `38363fd3`. Its 288-row ledger SHA-256 is
+    `f0d35417`; result identity `5e7bb7bf` classifies the direct effect as
+    `no_material_direct_effect`. The aggregate refresh-minus-stale effect was
+    `-0.076389`, but only seed 67 crossed the stale-support threshold and only
+    seed 67 had persistent material policy separation. No condition is
+    selected. Preserve the
+    [result evidence](../evidence/target-refresh-mature-fork-analysis-recovery-v2-result-2026-08-13.md),
+    do not rerun or extend this consumed recovery, and do not infer held-out
+    strength, promotion, publication, or long-training authority from it.
 
 The previously executed isolated smoke command was:
 
