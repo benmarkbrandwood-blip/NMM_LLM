@@ -212,15 +212,171 @@ def test_file_entry_records_sha_size_mtime_count(builder, tmp_path):
     assert len(entry["sha256"]) == 64  # SHA-256 hex
 
 
-def test_empty_games_dir_produces_zero_sessions(builder, tmp_path):
+def test_empty_games_dir_fails_closed(builder, tmp_path):
+    """Codex P1-B: refuse to write an empty ledger for a directory with no JSONL files."""
     games_dir = tmp_path / "games"
     games_dir.mkdir()
 
     out = tmp_path / "ledger.json"
-    builder.build(games_dir, out)
+    with pytest.raises(builder.LedgerBuildError, match="No .* files"):
+        builder.build(games_dir, out)
+    assert not out.exists()
+
+
+# ── P1-B hardening regressions (Codex 2026-08-12) ────────────────────────────
+
+def test_limit_files_marks_partial(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    for i in range(5):
+        _write_jsonl_game(games_dir / f"g_{i}.jsonl", f"s_{i}")
+
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out, limit_files=2)
 
     ledger = json.loads(out.read_text())
-    assert ledger["n_jsonl_files"] == 0
-    assert ledger["n_sessions"] == 0
-    assert ledger["files"] == []
-    assert ledger["sessions"] == []
+    assert ledger["is_partial"] is True
+    assert ledger["limit_files_arg"] == 2
+
+
+def test_full_scan_marks_not_partial(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    ledger = json.loads(out.read_text())
+    assert ledger["is_partial"] is False
+    assert ledger["limit_files_arg"] is None
+
+
+def test_malformed_json_fails_closed_by_default(builder, tmp_path):
+    """Codex P1-B: strict mode (default) refuses malformed JSON."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    (games_dir / "g.jsonl").write_text("this is not json\n", encoding="utf-8")
+
+    out = tmp_path / "ledger.json"
+    with pytest.raises(builder.LedgerBuildError, match="Malformed JSON"):
+        builder.build(games_dir, out)
+
+
+def test_malformed_json_tolerated_in_non_strict(builder, tmp_path):
+    """strict=False records malformed count in provenance without aborting."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    good = json.dumps({"session_id": "s_good", "moves": []})
+    (games_dir / "g.jsonl").write_text(
+        f"{good}\nnot json\n{good}\n", encoding="utf-8",
+    )
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out, strict=False)
+    ledger = json.loads(out.read_text())
+    assert ledger["strict"] is False
+    assert ledger["n_malformed_lines"] == 1
+
+
+def test_no_valid_sessions_fails_closed(builder, tmp_path):
+    """Codex P1-B: refuse to write a ledger with zero sessions."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    # File exists but contains only blank lines
+    (games_dir / "empty.jsonl").write_text("\n\n\n", encoding="utf-8")
+
+    out = tmp_path / "ledger.json"
+    with pytest.raises(builder.LedgerBuildError, match="No valid sessions"):
+        builder.build(games_dir, out)
+
+
+def test_no_clobber_refuses_existing_output(builder, tmp_path):
+    """Codex P1-B: refuse to overwrite existing output unless force=True."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    # Second build without force must refuse
+    with pytest.raises(builder.LedgerBuildError, match="Refusing to overwrite"):
+        builder.build(games_dir, out)
+
+
+def test_force_overrides_no_clobber(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    original_size = out.stat().st_size
+    # Add a second game and rebuild with force
+    _write_jsonl_game(games_dir / "g2.jsonl", "s2")
+    builder.build(games_dir, out, force=True)
+    ledger = json.loads(out.read_text())
+    assert ledger["n_sessions"] == 2
+
+
+def test_atomic_publish_leaves_no_tmp_on_success(builder, tmp_path):
+    """After a successful build, no leftover .tmp sibling exists."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    tmp_sibling = out.with_suffix(out.suffix + ".tmp")
+    assert not tmp_sibling.exists()
+    assert out.exists()
+
+
+def test_provenance_includes_p1b_fields(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    ledger = json.loads(out.read_text())
+    for key in ("is_partial", "limit_files_arg", "strict", "n_malformed_lines"):
+        assert key in ledger
+
+
+# ── _verify_ledger_complete tests ────────────────────────────────────────────
+
+def test_verify_ledger_complete_accepts_clean_ledger(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_jsonl_game(games_dir / "g.jsonl", "s")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out)
+    result = builder._verify_ledger_complete(out)
+    assert result["n_sessions"] == 1
+
+
+def test_verify_ledger_complete_rejects_partial(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    for i in range(5):
+        _write_jsonl_game(games_dir / f"g_{i}.jsonl", f"s_{i}")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out, limit_files=2)
+    with pytest.raises(builder.LedgerBuildError, match="partial"):
+        builder._verify_ledger_complete(out)
+
+
+def test_verify_ledger_complete_allow_partial_overrides(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    for i in range(5):
+        _write_jsonl_game(games_dir / f"g_{i}.jsonl", f"s_{i}")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out, limit_files=2)
+    result = builder._verify_ledger_complete(out, allow_partial=True)
+    assert result["is_partial"] is True
+
+
+def test_verify_ledger_complete_rejects_non_strict(builder, tmp_path):
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    good = json.dumps({"session_id": "s", "moves": []})
+    (games_dir / "g.jsonl").write_text(f"{good}\nbad\n", encoding="utf-8")
+    out = tmp_path / "ledger.json"
+    builder.build(games_dir, out, strict=False)
+    with pytest.raises(builder.LedgerBuildError, match="strict=False|malformed"):
+        builder._verify_ledger_complete(out)
