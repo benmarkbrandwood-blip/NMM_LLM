@@ -81,7 +81,11 @@ preflight has passed, but readiness binds the exact current published HEAD.
 The authoritative launch identity therefore belongs only in the ignored
 machine-local `readiness.json` generated after the last tracked change; copying
 it into this document would move HEAD and invalidate it. Neither this plan nor
-preflight authorizes the 288 development games.
+preflight authorizes the 288 development games. The recovery script refuses to
+overwrite an existing ignored readiness file. An operator must inspect the
+existing file when it matches the current clean `dev`; after any source change,
+move the old file to a timestamped ignored archive before generating a fresh
+preflight.
 
 ## Handoff state
 

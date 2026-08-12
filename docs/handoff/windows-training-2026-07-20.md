@@ -34,16 +34,24 @@ database writes and zero checkpoint writes, with a 3.5-hour additional wall
 limit. It is not held-out strength evaluation, promotion, publication, or
 long-training authorization.
 
-A complete preflight passed before this handoff update, but readiness is bound
-to the exact published `dev` commit. This documentation commit therefore makes
-the previous machine-local readiness identity historical. After this commit is
-published, regenerate the ignored `readiness.json` and use only the newly
-reported identity for any authorization. Do not copy that identity into a
-tracked document or make another tracked change after preflight.
+A complete preflight passed for the final published `dev` commit. Readiness is
+bound to that exact source identity. The ignored `readiness.json` is therefore
+usable only after checking that its `source.analysis_head`,
+`source.origin_dev`, and `tracked_clean` fields still match the current clean
+published branch and that `launch_authorized` is `false`. The preflight command
+fails closed when that file already exists; it must not be overwritten. If any
+tracked source changes after preflight, first move the old readiness file to a
+timestamped ignored archive under the same `out/` directory, then run
+preflight once and use only the newly reported identity. Do not copy a
+readiness identity into a tracked document or make another tracked change
+after preflight.
 
 ### Remaining work for the next operator
 
-1. Confirm a clean published `dev` and run the recovery preflight:
+1. Confirm a clean published `dev`. Inspect the existing ignored readiness
+   first; if it is bound to that exact `HEAD == origin/dev`, it is the current
+   preflight result. Only when it is absent or source-bound to an older commit
+   archive it and run the recovery preflight:
 
    ```powershell
    .\.venv\Scripts\python.exe scripts\run_target_refresh_mature_fork_analysis_recovery.py --preflight
