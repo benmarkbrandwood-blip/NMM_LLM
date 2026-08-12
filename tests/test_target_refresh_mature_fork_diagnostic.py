@@ -141,6 +141,8 @@ def test_command_isolates_only_target_treatment_and_paths(tmp_path: Path) -> Non
         )
         assert command[command.index("--sanmill-node-ladder") + 1] == "1000"
         assert command[command.index("--completion-game-bound") + 1] == "967"
+        assert command.count("--policy-health-gate") == 1
+        assert command[command.index("--policy-health-device") + 1] == "auto"
 
 
 def test_contract_rejects_resource_or_temperature_drift() -> None:

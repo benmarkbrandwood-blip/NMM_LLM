@@ -311,6 +311,9 @@ def build_arm_prepare_command(
         common["specialist_read_mode"],
         "--specialist-db",
         str(_repository_path(root, arm["specialist_db"], field="arm database")),
+        "--policy-health-gate",
+        "--policy-health-device",
+        "auto",
         "--exact-transition-batches",
         "--target-refresh-fork-game",
         str(game_count),
@@ -356,6 +359,34 @@ def _immutable_assets(checkpoint: Any) -> dict[str, str]:
             "source checkpoint lacks an immutable experiment asset"
         )
     return {name: str(available[name]) for name in required}
+
+
+def _validated_policy_health_gate(plan: Any) -> dict[str, Any]:
+    gate = plan.policy_health
+    expected_corpus = manager.DEFAULT_POLICY_HEALTH_CORPUS.resolve(strict=True)
+    expected_audit = manager.DEFAULT_POLICY_HEALTH_AUDIT.resolve(strict=True)
+    if gate is None:
+        raise MatureTargetRefreshDiagnosticError(
+            "managed plan omitted the required policy-health gate"
+        )
+    observed = gate.to_dict()
+    expected = {
+        "schema_version": "nmm.managed-policy-health-gate.v1",
+        "corpus_path": str(expected_corpus),
+        "corpus_sha256": manager.DEFAULT_POLICY_HEALTH_CORPUS_SHA256,
+        "audit_script_path": str(expected_audit),
+        "audit_script_sha256": _sha256_file(expected_audit),
+        "exact_critical_states": 29,
+        "required_direct_preserving_rate": 1.0,
+        "min_candidate_preserving_rate": 0.5,
+        "min_candidate_logit_margin": -0.1,
+        "device": "auto",
+    }
+    if observed != expected:
+        raise MatureTargetRefreshDiagnosticError(
+            "managed plan policy-health gate differs"
+        )
+    return observed
 
 
 def _target_experiment_digest(
@@ -606,6 +637,7 @@ def prepare_mature_fork_diagnostic(
             )
             plan_path = control_dir / "plan.json"
             plan = load_managed_plan(plan_path)
+            policy_health = _validated_policy_health_gate(plan)
             if (
                 plan.resume_config_sha256 != target_config
                 or plan.git_commit != source_git["head"]
@@ -651,6 +683,7 @@ def prepare_mature_fork_diagnostic(
                         "sha256": _sha256_file(preflight_path),
                         "verdict": preflight["verdict"],
                     },
+                    "policy_health": policy_health,
                     "authorization_present": False,
                     "segment_output_present": False,
                 }
