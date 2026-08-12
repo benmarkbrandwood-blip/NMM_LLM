@@ -76,8 +76,9 @@ duplicate keys, non-finite values, and non-object rows remain fatal.
 5. Any anomaly writes a fail-closed recovery failure. No automatic retry,
    recovery, held-out run, promotion, publication, or long training follows.
 
-Current state: `preflight_passed_unlaunched_needs_authorization`. The final
-preflight at published `dev` commit
-`b3854a78d072524589656cd3a3a29eb4291efc57` produced readiness identity
-`45662e3a7170bf43de095b180e0096a063556fd7fb3c08da8c8bb3282538c034`.
-Neither this plan nor preflight authorizes the 288 development games.
+Current tracked state: `frozen_unlaunched_needs_authorization`. A complete
+preflight has passed, but readiness binds the exact current published HEAD.
+The authoritative launch identity therefore belongs only in the ignored
+machine-local `readiness.json` generated after the last tracked change; copying
+it into this document would move HEAD and invalidate it. Neither this plan nor
+preflight authorizes the 288 development games.

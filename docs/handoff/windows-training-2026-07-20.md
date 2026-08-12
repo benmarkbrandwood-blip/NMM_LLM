@@ -245,9 +245,14 @@ resume training. A corrected publisher may be used only through a separately
 frozen, zero-training analysis-recovery plan with a new readiness identity and
 explicit one-shot launch authority. That
 [analysis-recovery plan](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v1.md)
-is frozen under identity `70fb522b`. Its final preflight passed at published
-`dev` commit `b3854a7`, producing readiness identity `45662e3a`. It permits no
-training and has not been authorized or launched.
+is frozen under identity `70fb522b`. A full preflight passed at published
+`dev` commit `b3854a7`, establishing that the recovery is technically viable.
+Readiness binds the exact current published HEAD, so the corresponding
+machine-local identity `45662e3a` became historical when this status was later
+committed. Before authorization, regenerate the ignored readiness file against
+the latest clean published `dev`; do not copy that self-invalidating identity
+back into tracked status prose. The recovery permits no training and has not
+been authorized or launched.
 
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
@@ -2290,9 +2295,13 @@ the current successor in this order:
     Do not retry or resume the training sequence. The publisher's
     reference-input and Windows JSONL policies were corrected with focused
     regression tests. The resulting zero-training analysis-only recovery is
-    frozen under plan identity `70fb522b` and passed final preflight under
-    readiness identity `45662e3a` at published commit `b3854a7`. Launching it
-    still requires explicit one-shot product authorization.
+    frozen under plan identity `70fb522b`. A full preflight passed at published
+    commit `b3854a7`; its readiness identity `45662e3a` is historical after the
+    later status-only descendant. Regenerate the ignored readiness against the
+    latest clean published `dev` before launch. Its exact identity belongs in
+    that machine-local control file, because committing it would move HEAD and
+    invalidate it again. Launching still requires explicit one-shot product
+    authorization.
 
 The previously executed isolated smoke command was:
 
