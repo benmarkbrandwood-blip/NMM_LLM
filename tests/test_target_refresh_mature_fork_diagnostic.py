@@ -12,6 +12,7 @@ from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
     TRAINER_TREATMENT,
     _preflight_experiment_digest_matches,
     build_arm_prepare_command,
+    load_contract,
     validate_contract,
 )
 
@@ -175,3 +176,20 @@ def test_preflight_digest_comparison_does_not_double_prefix() -> None:
     assert not _preflight_experiment_digest_matches(
         {"experimentDigest": "sha256:" + expected}, expected
     )
+
+
+def test_repository_mature_fork_contract_is_canonical_and_valid() -> None:
+    root = Path(__file__).resolve().parents[1]
+    contract = load_contract(
+        root
+        / "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1.json"
+    )
+
+    assert contract["plan_identity"] == (
+        "7a0bd214c353d67bf52d3fb5c8d8c2184f4e6c647d49910a117539415cb2c0c0"
+    )
+    assert [source["game_count"] for source in contract["sources"]] == [
+        439,
+        327,
+        518,
+    ]
