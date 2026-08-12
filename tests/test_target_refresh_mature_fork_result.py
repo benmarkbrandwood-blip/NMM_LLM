@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import copy
 
+import pytest
+
 from learned_ai.evaluation.target_refresh_mature_fork_result import (
     LEDGER_SCHEMA,
+    MatureTargetRefreshResultError,
     build_direct_crossplay_schedule,
     classify_mature_policy_divergence,
+    classify_mature_replication,
     decide_mature_result,
     summarize_direct_crossplay,
 )
@@ -164,3 +168,97 @@ def test_direct_schedule_uses_the_contract_seed_cohort() -> None:
 
     assert sorted({row["seed"] for row in schedule}) == [64, 65, 66]
     assert len(schedule) == 288
+
+
+def _direct_summary(
+    *,
+    effects: dict[str, float],
+    mean: float,
+    classification: str,
+    truncation_rate: float = 0.05,
+) -> dict:
+    return {
+        "games": 288,
+        "pairs": 144,
+        "paired": {"mean_score_effect": mean, "seed_effects": effects},
+        "decision": {
+            "classification": classification,
+            "truncation_rate": truncation_rate,
+        },
+    }
+
+
+def _replication_thresholds() -> dict:
+    return {
+        "minimum_replication_aggregate_pair_score_effect": 1 / 12,
+        "minimum_pooled_pair_score_effect": 1 / 12,
+        "minimum_per_seed_pair_score_effect": 1 / 12,
+        "minimum_replication_supporting_seeds": 2,
+        "minimum_pooled_supporting_seeds": 3,
+        "maximum_pooled_opposite_seeds": 1,
+        "maximum_pooled_truncation_rate": 0.25,
+    }
+
+
+def test_replication_gate_selects_only_a_pooled_cross_cohort_effect() -> None:
+    decision = classify_mature_replication(
+        prior_direct_crossplay=_direct_summary(
+            effects={
+                "67": -0.2291666667,
+                "68": 0.0104166667,
+                "69": -0.0104166667,
+            },
+            mean=-0.0763888889,
+            classification="no_material_direct_effect",
+        ),
+        replication_direct_crossplay=_direct_summary(
+            effects={"64": -0.15, "65": -0.14, "66": -0.13},
+            mean=-0.14,
+            classification="material_stale_target_direct_effect",
+        ),
+        thresholds=_replication_thresholds(),
+    )
+
+    assert decision["classification"] == ("replicated_material_stale_target_effect")
+    assert decision["selected_successor_condition"] == "stale-control"
+    assert decision["automatic_long_run_selection"] is False
+    assert decision["supporting_seeds"] == ["64", "65", "66", "67"]
+
+
+def test_replication_gate_preserves_no_selection_without_replication() -> None:
+    decision = classify_mature_replication(
+        prior_direct_crossplay=_direct_summary(
+            effects={"67": -0.23, "68": 0.01, "69": -0.01},
+            mean=-0.076,
+            classification="no_material_direct_effect",
+        ),
+        replication_direct_crossplay=_direct_summary(
+            effects={"64": -0.02, "65": 0.01, "66": 0.0},
+            mean=-0.003,
+            classification="no_material_direct_effect",
+        ),
+        thresholds=_replication_thresholds(),
+    )
+
+    assert decision["classification"] == "no_replicated_material_effect"
+    assert decision["selected_successor_condition"] is None
+
+
+def test_replication_gate_rejects_overlapping_seed_cohorts() -> None:
+    with pytest.raises(
+        MatureTargetRefreshResultError,
+        match="replication seed cohorts overlap",
+    ):
+        classify_mature_replication(
+            prior_direct_crossplay=_direct_summary(
+                effects={"64": -0.2, "68": 0.0, "69": 0.0},
+                mean=-0.0666666667,
+                classification="no_material_direct_effect",
+            ),
+            replication_direct_crossplay=_direct_summary(
+                effects={"64": -0.15, "65": -0.14, "66": -0.13},
+                mean=-0.14,
+                classification="material_stale_target_direct_effect",
+            ),
+            thresholds=_replication_thresholds(),
+        )

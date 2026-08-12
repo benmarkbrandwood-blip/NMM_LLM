@@ -38,6 +38,7 @@ from learned_ai.evaluation.target_refresh_mature_fork_result import (  # noqa: E
     RESULT_SCHEMA,
     build_direct_crossplay_schedule,
     classify_mature_policy_divergence,
+    classify_mature_replication,
     decide_mature_result,
     summarize_direct_crossplay,
 )
@@ -166,6 +167,52 @@ def _strict_json(path: Path) -> dict[str, Any]:
     ):
         raise MatureTargetRefreshReportError(f"JSON is not canonical: {path}")
     return value
+
+
+def _load_prior_mature_result(
+    contract: Mapping[str, Any],
+) -> tuple[dict[str, Any], Mapping[str, Any]]:
+    source = contract.get("source_evidence", {}).get("prior_mature_cohort_result")
+    if not isinstance(source, Mapping):
+        raise MatureTargetRefreshReportError("prior mature result binding is absent")
+    raw_path = source.get("path")
+    if not isinstance(raw_path, str) or not raw_path:
+        raise MatureTargetRefreshReportError("prior mature result path differs")
+    try:
+        path = (ROOT / raw_path).resolve(strict=True)
+    except (FileNotFoundError, OSError) as exc:
+        raise MatureTargetRefreshReportError(
+            "prior mature result path differs"
+        ) from exc
+    relative = _relative(path)
+    if relative != raw_path or _sha256_file(path) != source.get("sha256"):
+        raise MatureTargetRefreshReportError("prior mature result identity differs")
+    result = _strict_json(path)
+    body = dict(result)
+    observed_identity = body.pop("result_identity", None)
+    direct = result.get("direct_crossplay")
+    contract_identity = result.get("identities", {}).get("contract", {}).get(
+        "plan_identity"
+    )
+    if (
+        observed_identity != source.get("result_identity")
+        or observed_identity != canonical_sha256(body)
+        or contract_identity != source.get("plan_identity")
+        or not isinstance(direct, Mapping)
+        or direct.get("summary_identity") != source.get("direct_summary_identity")
+        or sorted(direct.get("paired", {}).get("seed_effects", {}))
+        != [str(seed) for seed in source.get("seeds", [])]
+    ):
+        raise MatureTargetRefreshReportError("prior mature result content differs")
+    binding = {
+        "path": relative,
+        "sha256": source["sha256"],
+        "result_identity": observed_identity,
+        "plan_identity": contract_identity,
+        "direct_summary_identity": direct["summary_identity"],
+        "seeds": list(source["seeds"]),
+    }
+    return binding, direct
 
 
 def _read_json_object(path: Path) -> dict[str, Any]:
@@ -1067,6 +1114,18 @@ def main(argv: list[str] | None = None) -> int:
         policy_decision=policy_decision,
         direct_crossplay=direct_summary,
     )
+    replication_decision = None
+    prior_result_binding = None
+    replication_thresholds = contract["measurement_contract"].get(
+        "replication_decision_thresholds"
+    )
+    if replication_thresholds is not None:
+        prior_result_binding, prior_direct = _load_prior_mature_result(contract)
+        replication_decision = classify_mature_replication(
+            prior_direct_crossplay=prior_direct,
+            replication_direct_crossplay=direct_summary,
+            thresholds=replication_thresholds,
+        )
     ledger_bytes = b"".join(canonical_json_bytes(row) + b"\n" for row in direct_rows)
     ledger_sha256 = hashlib.sha256(ledger_bytes).hexdigest()
     report_core = {
@@ -1151,6 +1210,11 @@ def main(argv: list[str] | None = None) -> int:
         },
         "claim_boundary": contract["claim_boundary"],
     }
+    if prior_result_binding is not None and replication_decision is not None:
+        report_core["identities"]["prior_mature_cohort_result"] = (
+            prior_result_binding
+        )
+        report_core["replication_decision"] = replication_decision
     report = {**report_core, "result_identity": canonical_sha256(report_core)}
     _write_outputs(
         ledger=paths["ledger"], rows=direct_rows, output=paths["output"], report=report
@@ -1162,7 +1226,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"report={_relative(paths['output'])}")
     print(f"report_sha256={_sha256_file(paths['output'])}")
     print(f"result_identity={report['result_identity']}")
-    print(f"classification={combined['classification']}")
+    final_classification = (
+        replication_decision["classification"]
+        if replication_decision is not None
+        else combined["classification"]
+    )
+    print(f"classification={final_classification}")
     return 0
 
 

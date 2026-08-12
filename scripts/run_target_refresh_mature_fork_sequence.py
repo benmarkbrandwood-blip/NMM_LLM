@@ -537,7 +537,10 @@ def launch_sequence(
                 "path": str(result_path),
                 "sha256": _sha256_file(result_path),
                 "result_identity": result["result_identity"],
-                "classification": result["decision"]["classification"],
+                "classification": result.get(
+                    "replication_decision", result["decision"]
+                )["classification"],
+                "cohort_classification": result["decision"]["classification"],
                 "training_resource_audit": training_resources,
                 "no_update_games": 288,
             },

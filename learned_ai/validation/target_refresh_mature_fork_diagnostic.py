@@ -42,6 +42,15 @@ PLAN_SCHEMA = "nmm.target-refresh-mature-fork-diagnostic-plan.v1"
 READINESS_SCHEMA = "nmm.target-refresh-mature-fork-diagnostic-readiness.v1"
 EXPECTED_SEEDS = (67, 68, 69)
 EXPECTED_CONDITIONS = ("refresh-mature", "stale-control")
+REPLICATION_DECISION_THRESHOLDS = {
+    "minimum_replication_aggregate_pair_score_effect": 1 / 12,
+    "minimum_pooled_pair_score_effect": 1 / 12,
+    "minimum_per_seed_pair_score_effect": 1 / 12,
+    "minimum_replication_supporting_seeds": 2,
+    "minimum_pooled_supporting_seeds": 3,
+    "maximum_pooled_opposite_seeds": 1,
+    "maximum_pooled_truncation_rate": 0.25,
+}
 TRAINER_TREATMENT = {
     "refresh-mature": "refresh-once",
     "stale-control": "no-refresh",
@@ -136,6 +145,47 @@ def _repository_path(root: Path, value: Any, *, field: str) -> Path:
     return resolved
 
 
+def inspect_prior_mature_result(
+    root: Path, contract: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    """Verify the completed prior cohort before preparing replication arms."""
+    if contract_seeds(contract) == EXPECTED_SEEDS:
+        return None
+    source = contract["source_evidence"]["prior_mature_cohort_result"]
+    path = _repository_path(root, source["path"], field="prior mature result")
+    if not path.is_file() or _sha256_file(path) != source["sha256"]:
+        raise MatureTargetRefreshDiagnosticError(
+            "prior mature cohort result identity differs"
+        )
+    result = _strict_json(path)
+    body = dict(result)
+    identity = body.pop("result_identity", None)
+    direct = result.get("direct_crossplay")
+    contract_identity = (
+        result.get("identities", {}).get("contract", {}).get("plan_identity")
+    )
+    if (
+        identity != source["result_identity"]
+        or identity != canonical_sha256(body)
+        or contract_identity != source["plan_identity"]
+        or not isinstance(direct, Mapping)
+        or direct.get("summary_identity") != source["direct_summary_identity"]
+        or sorted(direct.get("paired", {}).get("seed_effects", {}))
+        != [str(seed) for seed in source["seeds"]]
+    ):
+        raise MatureTargetRefreshDiagnosticError(
+            "prior mature cohort result content differs"
+        )
+    return {
+        "path": source["path"],
+        "sha256": source["sha256"],
+        "result_identity": identity,
+        "plan_identity": contract_identity,
+        "direct_summary_identity": direct["summary_identity"],
+        "seeds": list(source["seeds"]),
+    }
+
+
 def validate_contract(value: Mapping[str, Any]) -> dict[str, Any]:
     contract = dict(value)
     if contract.get("schema_version") != PLAN_SCHEMA:
@@ -183,6 +233,38 @@ def validate_contract(value: Mapping[str, Any]) -> dict[str, Any]:
         raise MatureTargetRefreshDiagnosticError("resource envelope differs")
     if contract.get("authorization", {}).get("launch_authorized") is not False:
         raise MatureTargetRefreshDiagnosticError("plan unexpectedly authorizes launch")
+    if seeds != EXPECTED_SEEDS:
+        thresholds = contract.get("measurement_contract", {}).get(
+            "replication_decision_thresholds"
+        )
+        if thresholds != REPLICATION_DECISION_THRESHOLDS:
+            raise MatureTargetRefreshDiagnosticError(
+                "replication decision thresholds differ"
+            )
+        prior = contract.get("source_evidence", {}).get("prior_mature_cohort_result")
+        identity_fields = (
+            "sha256",
+            "result_identity",
+            "plan_identity",
+            "direct_summary_identity",
+        )
+        if (
+            not isinstance(prior, Mapping)
+            or prior.get("seeds") != list(EXPECTED_SEEDS)
+            or not isinstance(prior.get("path"), str)
+            or not prior["path"]
+            or any(
+                not isinstance(prior.get(field), str)
+                or len(prior[field]) != 64
+                or any(
+                    character not in "0123456789abcdef" for character in prior[field]
+                )
+                for field in identity_fields
+            )
+        ):
+            raise MatureTargetRefreshDiagnosticError(
+                "prior mature cohort binding differs"
+            )
     return contract
 
 
@@ -515,6 +597,7 @@ def prepare_mature_fork_diagnostic(
     source_git = _git_source(
         root, contract["lineage"]["required_implementation_commit"]
     )
+    prior_mature_result = inspect_prior_mature_result(root, contract)
     generated_paths = [readiness_path]
     for source in contract["sources"]:
         generated_paths.append(
@@ -728,6 +811,8 @@ def prepare_mature_fork_diagnostic(
             "authorize this six-arm sequence once in frozen launch order",
         ],
     }
+    if prior_mature_result is not None:
+        body["prior_mature_cohort_result"] = prior_mature_result
     readiness = {**body, "readiness_identity": canonical_sha256(body)}
     readiness_path.parent.mkdir(parents=True, exist_ok=True)
     readiness_path.write_bytes(canonical_json_bytes(readiness) + b"\n")
@@ -742,11 +827,13 @@ __all__ = [
     "EXPECTED_SEEDS",
     "MatureTargetRefreshDiagnosticError",
     "PLAN_SCHEMA",
+    "REPLICATION_DECISION_THRESHOLDS",
     "READINESS_SCHEMA",
     "TRAINER_TREATMENT",
     "_preflight_experiment_digest_matches",
     "build_arm_prepare_command",
     "contract_seeds",
+    "inspect_prior_mature_result",
     "load_contract",
     "prepare_mature_fork_diagnostic",
     "validate_contract",

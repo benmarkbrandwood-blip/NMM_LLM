@@ -7,16 +7,18 @@ from pathlib import Path
 
 import pytest
 
-from learned_ai.training.run_contract import canonical_sha256
+from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
 from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
     DEFAULT_CONTRACT,
     DEFAULT_READINESS,
     PLAN_SCHEMA,
+    REPLICATION_DECISION_THRESHOLDS,
     MatureTargetRefreshDiagnosticError,
     TRAINER_TREATMENT,
     _preflight_experiment_digest_matches,
     build_arm_prepare_command,
     contract_seeds,
+    inspect_prior_mature_result,
     load_contract,
     validate_contract,
 )
@@ -133,11 +135,60 @@ def test_contract_accepts_a_separately_frozen_three_seed_cohort() -> None:
     for arm, (seed, condition) in zip(contract["arms"], cells, strict=True):
         arm["seed"] = seed
         arm["condition"] = condition
+    contract["measurement_contract"]["replication_decision_thresholds"] = copy.deepcopy(
+        REPLICATION_DECISION_THRESHOLDS
+    )
+    contract["source_evidence"]["prior_mature_cohort_result"] = {
+        "path": "out/prior/result.json",
+        "sha256": SHA,
+        "result_identity": SHA,
+        "plan_identity": SHA,
+        "direct_summary_identity": SHA,
+        "seeds": [67, 68, 69],
+    }
     contract["plan_identity"] = canonical_sha256(
         {key: value for key, value in contract.items() if key != "plan_identity"}
     )
 
     assert contract_seeds(validate_contract(contract)) == (64, 65, 66)
+
+
+def test_replication_preparation_binds_the_completed_prior_result(
+    tmp_path: Path,
+) -> None:
+    prior_body = {
+        "schema_version": "nmm.target-refresh-mature-fork-result.v1",
+        "identities": {"contract": {"plan_identity": SHA}},
+        "direct_crossplay": {
+            "summary_identity": SHA,
+            "paired": {"seed_effects": {"67": -0.2, "68": 0.0, "69": 0.0}},
+        },
+    }
+    prior = {
+        **prior_body,
+        "result_identity": canonical_sha256(prior_body),
+    }
+    path = tmp_path / "out/prior/result.json"
+    path.parent.mkdir(parents=True)
+    path.write_bytes(canonical_json_bytes(prior) + b"\n")
+    contract = {
+        "sources": [{"seed": seed} for seed in (64, 65, 66)],
+        "source_evidence": {
+            "prior_mature_cohort_result": {
+                "path": "out/prior/result.json",
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "result_identity": prior["result_identity"],
+                "plan_identity": SHA,
+                "direct_summary_identity": SHA,
+                "seeds": [67, 68, 69],
+            }
+        },
+    }
+
+    observed = inspect_prior_mature_result(tmp_path, contract)
+
+    assert observed is not None
+    assert observed["result_identity"] == prior["result_identity"]
 
 
 def test_command_isolates_only_target_treatment_and_paths(tmp_path: Path) -> None:

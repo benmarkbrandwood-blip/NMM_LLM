@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
@@ -471,6 +472,175 @@ def decide_mature_result(
     }
 
 
+def classify_mature_replication(
+    *,
+    prior_direct_crossplay: Mapping[str, Any],
+    replication_direct_crossplay: Mapping[str, Any],
+    thresholds: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Join two disjoint three-seed cohorts under a frozen replication gate."""
+    required_thresholds = {
+        "minimum_replication_aggregate_pair_score_effect",
+        "minimum_pooled_pair_score_effect",
+        "minimum_per_seed_pair_score_effect",
+        "minimum_replication_supporting_seeds",
+        "minimum_pooled_supporting_seeds",
+        "maximum_pooled_opposite_seeds",
+        "maximum_pooled_truncation_rate",
+    }
+    if set(thresholds) != required_thresholds:
+        raise MatureTargetRefreshResultError("replication thresholds differ")
+
+    def cohort(value: Mapping[str, Any], *, label: str) -> dict[str, Any]:
+        paired = value.get("paired")
+        decision = value.get("decision")
+        if not isinstance(paired, Mapping) or not isinstance(decision, Mapping):
+            raise MatureTargetRefreshResultError(f"{label} direct summary differs")
+        raw_effects = paired.get("seed_effects")
+        if not isinstance(raw_effects, Mapping) or len(raw_effects) != 3:
+            raise MatureTargetRefreshResultError(f"{label} direct seed effects differ")
+        effects: dict[str, float] = {}
+        for seed, effect in raw_effects.items():
+            try:
+                numeric_seed = int(seed)
+                numeric_effect = float(effect)
+            except (TypeError, ValueError) as exc:
+                raise MatureTargetRefreshResultError(
+                    f"{label} direct seed effects differ"
+                ) from exc
+            if str(numeric_seed) != str(seed) or numeric_seed < 0:
+                raise MatureTargetRefreshResultError(
+                    f"{label} direct seed effects differ"
+                )
+            if not math.isfinite(numeric_effect) or not -1.0 <= numeric_effect <= 1.0:
+                raise MatureTargetRefreshResultError(
+                    f"{label} direct seed effects differ"
+                )
+            effects[str(numeric_seed)] = numeric_effect
+        games = value.get("games")
+        pairs = value.get("pairs")
+        effect = paired.get("mean_score_effect")
+        truncation_rate = decision.get("truncation_rate")
+        if (
+            games != 288
+            or pairs != 144
+            or isinstance(effect, bool)
+            or not isinstance(effect, (int, float))
+            or not math.isfinite(float(effect))
+            or not -1.0 <= float(effect) <= 1.0
+            or isinstance(truncation_rate, bool)
+            or not isinstance(truncation_rate, (int, float))
+            or not math.isfinite(float(truncation_rate))
+            or not 0.0 <= float(truncation_rate) <= 1.0
+        ):
+            raise MatureTargetRefreshResultError(f"{label} direct summary differs")
+        return {
+            "classification": str(decision.get("classification")),
+            "effect": float(effect),
+            "seed_effects": effects,
+            "games": games,
+            "pairs": pairs,
+            "truncation_rate": float(truncation_rate),
+        }
+
+    prior = cohort(prior_direct_crossplay, label="prior cohort")
+    replication = cohort(
+        replication_direct_crossplay,
+        label="replication cohort",
+    )
+    if set(prior["seed_effects"]) & set(replication["seed_effects"]):
+        raise MatureTargetRefreshResultError("replication seed cohorts overlap")
+
+    material_classes = {
+        "material_mature_refresh_direct_effect": (1, "refresh-mature"),
+        "material_stale_target_direct_effect": (-1, "stale-control"),
+    }
+    direction_record = material_classes.get(replication["classification"])
+    all_effects = {**prior["seed_effects"], **replication["seed_effects"]}
+    pooled_pairs = prior["pairs"] + replication["pairs"]
+    pooled_games = prior["games"] + replication["games"]
+    pooled_effect = (
+        prior["effect"] * prior["pairs"] + replication["effect"] * replication["pairs"]
+    ) / pooled_pairs
+    pooled_truncation_rate = (
+        prior["truncation_rate"] * prior["games"]
+        + replication["truncation_rate"] * replication["games"]
+    ) / pooled_games
+    seed_gate = float(thresholds["minimum_per_seed_pair_score_effect"])
+    supporting: list[str] = []
+    opposite: list[str] = []
+    selected: str | None = None
+    if direction_record is not None:
+        direction, candidate = direction_record
+        supporting = sorted(
+            [
+                seed
+                for seed, effect in all_effects.items()
+                if direction * effect >= seed_gate
+            ],
+            key=int,
+        )
+        opposite = sorted(
+            [
+                seed
+                for seed, effect in all_effects.items()
+                if direction * effect <= -seed_gate
+            ],
+            key=int,
+        )
+        replication_support = sum(
+            direction * effect >= seed_gate
+            for effect in replication["seed_effects"].values()
+        )
+        replication_passed = direction * replication["effect"] >= float(
+            thresholds["minimum_replication_aggregate_pair_score_effect"]
+        ) and replication_support >= int(
+            thresholds["minimum_replication_supporting_seeds"]
+        )
+        pooled_passed = (
+            direction * pooled_effect
+            >= float(thresholds["minimum_pooled_pair_score_effect"])
+            and len(supporting) >= int(thresholds["minimum_pooled_supporting_seeds"])
+            and len(opposite) <= int(thresholds["maximum_pooled_opposite_seeds"])
+            and pooled_truncation_rate
+            <= float(thresholds["maximum_pooled_truncation_rate"])
+        )
+        if replication_passed and pooled_passed:
+            selected = candidate
+
+    if pooled_truncation_rate > float(thresholds["maximum_pooled_truncation_rate"]):
+        classification = "inconclusive_replication_truncation"
+    elif selected == "refresh-mature":
+        classification = "replicated_material_mature_refresh_effect"
+    elif selected == "stale-control":
+        classification = "replicated_material_stale_target_effect"
+    else:
+        classification = "no_replicated_material_effect"
+    report = {
+        "classification": classification,
+        "selected_successor_condition": selected,
+        "cohort_seed_sets": {
+            "prior": sorted(prior["seed_effects"], key=int),
+            "replication": sorted(replication["seed_effects"], key=int),
+        },
+        "cohort_mean_score_effects": {
+            "prior": prior["effect"],
+            "replication": replication["effect"],
+        },
+        "pooled_mean_score_effect": pooled_effect,
+        "pooled_truncation_rate": pooled_truncation_rate,
+        "pooled_seed_effects": all_effects,
+        "supporting_seeds": supporting,
+        "opposite_seeds": opposite,
+        "thresholds": dict(thresholds),
+        "automatic_long_run_selection": False,
+        "selection_scope": (
+            "target-cadence input for a separately frozen retained plan only"
+        ),
+    }
+    return {**report, "decision_identity": canonical_sha256(report)}
+
+
 __all__ = [
     "EXPECTED_CONDITIONS",
     "EXPECTED_GAMES",
@@ -481,6 +651,7 @@ __all__ = [
     "MatureTargetRefreshResultError",
     "RESULT_SCHEMA",
     "build_direct_crossplay_schedule",
+    "classify_mature_replication",
     "classify_mature_policy_divergence",
     "decide_mature_result",
     "summarize_direct_crossplay",
