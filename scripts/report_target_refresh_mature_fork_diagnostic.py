@@ -150,6 +150,15 @@ def _read_json_object(path: Path) -> dict[str, Any]:
     return value
 
 
+def _read_hash_bound_json_object(
+    path: Path, *, expected_sha256: str, label: str
+) -> dict[str, Any]:
+    """Load a frozen reference object after proving its exact byte identity."""
+    if _sha256_file(path) != expected_sha256:
+        raise MatureTargetRefreshReportError(f"{label} identity differs")
+    return _read_json_object(path)
+
+
 def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
     try:
         raw_lines = path.read_bytes().splitlines(keepends=True)
@@ -750,19 +759,25 @@ def main(argv: list[str] | None = None) -> int:
 
     policy_contract = contract["measurement_contract"]["policy_distribution"]
     direct_contract = contract["measurement_contract"]["direct_crossplay"]
-    if _sha256_file(paths["policy_corpus"]) != policy_contract["fixed_corpus_sha256"]:
-        raise MatureTargetRefreshReportError("policy corpus identity differs")
-    policy_corpus = _strict_json(paths["policy_corpus"])
+    policy_corpus = _read_hash_bound_json_object(
+        paths["policy_corpus"],
+        expected_sha256=str(policy_contract["fixed_corpus_sha256"]),
+        label="policy corpus",
+    )
     validate_phase_corpus(policy_corpus)
-    if _sha256_file(paths["replay_corpus"]) != direct_contract["replay_corpus_sha256"]:
-        raise MatureTargetRefreshReportError("replay corpus file differs")
-    replay_corpus = _strict_json(paths["replay_corpus"])
+    replay_corpus = _read_hash_bound_json_object(
+        paths["replay_corpus"],
+        expected_sha256=str(direct_contract["replay_corpus_sha256"]),
+        label="replay corpus",
+    )
     validate_phase_replay_development_corpus(replay_corpus)
     if replay_corpus["corpus_identity"] != direct_contract["replay_corpus_identity"]:
         raise MatureTargetRefreshReportError("replay corpus identity differs")
-    if _sha256_file(paths["replay_audit"]) != direct_contract["replay_audit_sha256"]:
-        raise MatureTargetRefreshReportError("replay audit file differs")
-    replay_audit = _strict_json(paths["replay_audit"])
+    replay_audit = _read_hash_bound_json_object(
+        paths["replay_audit"],
+        expected_sha256=str(direct_contract["replay_audit_sha256"]),
+        label="replay audit",
+    )
     validate_phase_replay_sanmill_audit(replay_audit, corpus=replay_corpus)
     if replay_audit["audit_identity"] != direct_contract["replay_audit_identity"]:
         raise MatureTargetRefreshReportError("replay audit identity differs")

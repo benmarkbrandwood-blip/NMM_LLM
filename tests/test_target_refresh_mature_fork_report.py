@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 from scripts import report_target_refresh_mature_fork_diagnostic as report
 from scripts import train_s_gen_v2 as trainer
 
@@ -32,3 +37,59 @@ def test_training_summary_keeps_raw_strata_and_partial_final_block() -> None:
     blocks = summary["fixed_blocks_up_to_50_games"]
     assert [block["games"] for block in blocks] == [50, 1]
     assert [block["complete_50_game_window"] for block in blocks] == [True, False]
+
+
+def test_frozen_hash_bound_reference_inputs_accept_their_tracked_format() -> None:
+    contract = report.load_contract(report.DEFAULT_CONTRACT)
+    policy_contract = contract["measurement_contract"]["policy_distribution"]
+    direct_contract = contract["measurement_contract"]["direct_crossplay"]
+
+    policy_corpus = report._read_hash_bound_json_object(
+        report.DEFAULT_POLICY_CORPUS,
+        expected_sha256=policy_contract["fixed_corpus_sha256"],
+        label="policy corpus",
+    )
+    report.validate_phase_corpus(policy_corpus)
+
+    replay_corpus = report._read_hash_bound_json_object(
+        report.DEFAULT_REPLAY_CORPUS,
+        expected_sha256=direct_contract["replay_corpus_sha256"],
+        label="replay corpus",
+    )
+    report.validate_phase_replay_development_corpus(replay_corpus)
+
+    replay_audit = report._read_hash_bound_json_object(
+        report.DEFAULT_REPLAY_AUDIT,
+        expected_sha256=direct_contract["replay_audit_sha256"],
+        label="replay audit",
+    )
+    report.validate_phase_replay_sanmill_audit(
+        replay_audit,
+        corpus=replay_corpus,
+    )
+
+
+def test_hash_bound_reference_input_rejects_byte_drift(tmp_path: Path) -> None:
+    path = tmp_path / "reference.json"
+    path.write_text('{"value": 1}\n', encoding="utf-8")
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="policy corpus identity differs",
+    ):
+        report._read_hash_bound_json_object(
+            path,
+            expected_sha256="0" * 64,
+            label="policy corpus",
+        )
+
+
+def test_generated_authority_json_remains_canonical_only(tmp_path: Path) -> None:
+    path = tmp_path / "readiness.json"
+    path.write_text(json.dumps({"value": 1}, indent=2) + "\n", encoding="utf-8")
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="JSON is not canonical",
+    ):
+        report._strict_json(path)

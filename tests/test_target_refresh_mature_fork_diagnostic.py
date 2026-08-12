@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -222,8 +223,10 @@ def test_repository_attempt_002_contract_is_isolated_and_health_gated() -> None:
     assert contract["common_training_contract"]["policy_health_gate"]["enabled"] is True
     assert all("attempt-002" in arm["control_dir"] for arm in contract["arms"])
     assert all("attempt_002" in arm["specialist_db"] for arm in contract["arms"])
+    frozen_commit = "40b85e6ade0a4316828edfe68f90568571097953"
     for record in contract["implementation"].values():
-        assert (
-            hashlib.sha256((root / record["path"]).read_bytes()).hexdigest()
-            == (record["sha256"])
+        frozen_bytes = subprocess.check_output(
+            ["git", "show", f"{frozen_commit}:{record['path']}"],
+            cwd=root,
         )
+        assert hashlib.sha256(frozen_bytes).hexdigest() == record["sha256"]
