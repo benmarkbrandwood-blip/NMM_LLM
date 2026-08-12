@@ -9,6 +9,7 @@ from typing import Any
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
     READINESS_SCHEMA,
+    contract_seeds,
 )
 
 
@@ -99,7 +100,7 @@ def build_sequence_steps(contract: Mapping[str, Any]) -> tuple[SequenceStep, ...
     )
     expected = [
         (seed, condition)
-        for seed in (67, 68, 69)
+        for seed in contract_seeds(contract)
         for condition in ("refresh-mature", "stale-control")
     ]
     if [(step.seed, step.condition) for step in steps] != expected or [

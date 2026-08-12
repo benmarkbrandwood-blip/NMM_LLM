@@ -60,6 +60,7 @@ from learned_ai.validation.sanmill_node_calibration import (  # noqa: E402
 from learned_ai.validation.target_refresh_mature_fork_diagnostic import (  # noqa: E402
     READINESS_SCHEMA,
     TRAINER_TREATMENT,
+    contract_seeds,
     load_contract,
 )
 from scripts import train_s_gen_v2 as trainer  # noqa: E402
@@ -609,7 +610,7 @@ def _audit_training(
     expected_counts = list(range(64, 8192 + 1, 64))
     report: dict[str, Any] = {}
     requested_sanmill_nodes = 0
-    for seed in (67, 68, 69):
+    for seed in contract_seeds(contract):
         projections: dict[str, list[dict[str, Any]]] = {}
         seed_report: dict[str, Any] = {}
         for condition in ("refresh-mature", "stale-control"):
@@ -958,7 +959,7 @@ def main(argv: list[str] | None = None) -> int:
     seed_reports: dict[str, Any] = {}
     direct_rows: list[dict[str, Any]] = []
     try:
-        for seed in (67, 68, 69):
+        for seed in contract_seeds(contract):
             common, common_record = _load_common_fork(
                 source=sources[seed],
                 arm=arms[(seed, "refresh-mature")],

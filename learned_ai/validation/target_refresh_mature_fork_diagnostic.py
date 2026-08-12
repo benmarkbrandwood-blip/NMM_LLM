@@ -59,6 +59,24 @@ class MatureTargetRefreshDiagnosticError(RuntimeError):
     """Raised when the mature target-refresh diagnostic is not reproducible."""
 
 
+def contract_seeds(contract: Mapping[str, Any]) -> tuple[int, ...]:
+    """Return the three prospectively ordered seeds frozen by a contract."""
+    sources = contract.get("sources")
+    if not isinstance(sources, list) or len(sources) != 3:
+        raise MatureTargetRefreshDiagnosticError("plan source seeds differ")
+    seeds: list[int] = []
+    for source in sources:
+        if not isinstance(source, Mapping):
+            raise MatureTargetRefreshDiagnosticError("plan source seeds differ")
+        seed = source.get("seed")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise MatureTargetRefreshDiagnosticError("plan source seeds differ")
+        seeds.append(seed)
+    if len(set(seeds)) != len(seeds):
+        raise MatureTargetRefreshDiagnosticError("plan source seeds differ")
+    return tuple(seeds)
+
+
 def _sha256_file(path: Path) -> str:
     import hashlib
 
@@ -129,12 +147,9 @@ def validate_contract(value: Mapping[str, Any]) -> dict[str, Any]:
     arms = contract.get("arms")
     if not isinstance(sources, list) or not isinstance(arms, list):
         raise MatureTargetRefreshDiagnosticError("plan sources or arms are absent")
-    if [item.get("seed") for item in sources] != list(EXPECTED_SEEDS):
-        raise MatureTargetRefreshDiagnosticError("plan source seeds differ")
+    seeds = contract_seeds(contract)
     expected_arms = [
-        (seed, condition)
-        for seed in EXPECTED_SEEDS
-        for condition in EXPECTED_CONDITIONS
+        (seed, condition) for seed in seeds for condition in EXPECTED_CONDITIONS
     ]
     if [(item.get("seed"), item.get("condition")) for item in arms] != expected_arms:
         raise MatureTargetRefreshDiagnosticError("plan arm order differs")
@@ -731,6 +746,7 @@ __all__ = [
     "TRAINER_TREATMENT",
     "_preflight_experiment_digest_matches",
     "build_arm_prepare_command",
+    "contract_seeds",
     "load_contract",
     "prepare_mature_fork_diagnostic",
     "validate_contract",

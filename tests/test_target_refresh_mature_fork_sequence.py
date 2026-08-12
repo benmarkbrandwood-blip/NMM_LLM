@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from scripts import run_target_refresh_mature_fork_sequence as runner
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
     READINESS_SCHEMA,
@@ -32,6 +33,7 @@ def _contract() -> dict:
     return {
         "objective": "test one mature refresh",
         "plan_identity": "a" * 64,
+        "sources": [{"seed": seed} for seed in (67, 68, 69)],
         "arms": arms,
         "resources": {
             "maximum_training_games_total": 3600,
@@ -70,6 +72,50 @@ def test_sequence_order_is_frozen() -> None:
         (69, "stale-control"),
     ]
     assert steps[-1].kind == "publish-development-result"
+
+
+def test_sequence_order_follows_the_frozen_contract_cohort() -> None:
+    contract = _contract()
+    for source, seed in zip(contract["sources"], (64, 65, 66), strict=True):
+        source["seed"] = seed
+    cells = (
+        (seed, condition)
+        for seed in (64, 65, 66)
+        for condition in ("refresh-mature", "stale-control")
+    )
+    for arm, (seed, condition) in zip(contract["arms"], cells, strict=True):
+        arm["seed"] = seed
+        arm["condition"] = condition
+
+    assert [
+        (step.seed, step.condition) for step in build_sequence_steps(contract)[:-1]
+    ] == [
+        (64, "refresh-mature"),
+        (64, "stale-control"),
+        (65, "refresh-mature"),
+        (65, "stale-control"),
+        (66, "refresh-mature"),
+        (66, "stale-control"),
+    ]
+
+
+def test_sequence_outputs_are_derived_from_the_contract() -> None:
+    prefix = "out/target-refresh-mature-fork-replication-v1"
+    contract = {
+        "result_outputs": {
+            "authorization": f"{prefix}/sequence-authorization.json",
+            "launch": f"{prefix}/sequence-launch.json",
+            "completion": f"{prefix}/sequence-completion.json",
+            "failure": f"{prefix}/sequence-failure.json",
+            "ledger": f"{prefix}/development-direct-crossplay-ledger.jsonl",
+            "result": f"{prefix}/result.json",
+        }
+    }
+
+    outputs = runner._contract_output_paths(contract)
+
+    assert outputs["result"] == (runner.ROOT / prefix / "result.json").resolve()
+    assert len(set(outputs.values())) == 6
 
 
 def test_parent_authorization_binds_readiness_and_full_resource_envelope() -> None:

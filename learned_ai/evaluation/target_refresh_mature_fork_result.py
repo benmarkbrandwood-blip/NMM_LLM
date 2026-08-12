@@ -33,6 +33,37 @@ class MatureTargetRefreshResultError(RuntimeError):
     """Raised when mature target-refresh result evidence is incomplete."""
 
 
+def _contract_seeds(contract: Mapping[str, Any]) -> tuple[int, ...]:
+    sources = contract.get("sources")
+    if not isinstance(sources, list) or len(sources) != 3:
+        raise MatureTargetRefreshResultError("direct cross-play seed cells differ")
+    seeds: list[int] = []
+    for source in sources:
+        if not isinstance(source, Mapping):
+            raise MatureTargetRefreshResultError("direct cross-play seed cells differ")
+        seed = source.get("seed")
+        if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+            raise MatureTargetRefreshResultError("direct cross-play seed cells differ")
+        seeds.append(seed)
+    if len(set(seeds)) != 3:
+        raise MatureTargetRefreshResultError("direct cross-play seed cells differ")
+    return tuple(seeds)
+
+
+def _policy_seeds(
+    by_seed_boundary: Mapping[str, Mapping[str, Mapping[str, Any]]],
+) -> tuple[int, ...]:
+    if len(by_seed_boundary) != 3:
+        raise MatureTargetRefreshResultError("policy seed cells differ")
+    try:
+        seeds = tuple(sorted(int(seed) for seed in by_seed_boundary))
+    except (TypeError, ValueError) as exc:
+        raise MatureTargetRefreshResultError("policy seed cells differ") from exc
+    if any(str(seed) not in by_seed_boundary or seed < 0 for seed in seeds):
+        raise MatureTargetRefreshResultError("policy seed cells differ")
+    return seeds
+
+
 def _derived_seed(plan_identity: str, payload: Mapping[str, Any]) -> int:
     digest = hashlib.sha256(
         canonical_json_bytes({"plan_identity": plan_identity, **payload})
@@ -61,7 +92,7 @@ def build_direct_crossplay_schedule(
     rows: list[dict[str, Any]] = []
     pair_index = 0
     ordinal = 0
-    for seed in EXPECTED_SEEDS:
+    for seed in _contract_seeds(contract):
         for record_index in EXPECTED_RECORD_INDICES:
             for replicate in range(EXPECTED_REPLICATES):
                 pair_core = {
@@ -249,6 +280,7 @@ def summarize_direct_crossplay(
     effect = sum(item["refresh_mature_minus_stale_pair_score"] for item in pairs) / len(
         pairs
     )
+    seeds = _contract_seeds(contract)
     seed_effects = {
         str(seed): sum(
             item["refresh_mature_minus_stale_pair_score"]
@@ -256,7 +288,7 @@ def summarize_direct_crossplay(
             if item["seed"] == seed
         )
         / sum(item["seed"] == seed for item in pairs)
-        for seed in EXPECTED_SEEDS
+        for seed in seeds
     }
     phase_effects = {
         phase: sum(
@@ -310,7 +342,7 @@ def summarize_direct_crossplay(
         "overall_refresh_mature": _aggregate(rows),
         "by_seed": {
             str(seed): _aggregate([row for row in rows if row["seed"] == seed])
-            for seed in EXPECTED_SEEDS
+            for seed in seeds
         },
         "by_phase": {
             phase: _aggregate([row for row in rows if row["phase"] == phase])
@@ -362,12 +394,11 @@ def classify_mature_policy_divergence(
     thresholds: Mapping[str, float] = DEFAULT_DIVERGENCE_THRESHOLDS,
 ) -> dict[str, Any]:
     """Apply the frozen 4,096-to-8,192 persistence gate to three seeds."""
-    if set(by_seed_boundary) != {str(seed) for seed in EXPECTED_SEEDS}:
-        raise MatureTargetRefreshResultError("policy seed cells differ")
+    seeds = _policy_seeds(by_seed_boundary)
     if set(thresholds) != set(DEFAULT_DIVERGENCE_THRESHOLDS):
         raise MatureTargetRefreshResultError("policy thresholds differ")
     seed_audits: dict[str, Any] = {}
-    for seed in EXPECTED_SEEDS:
+    for seed in seeds:
         boundaries = by_seed_boundary[str(seed)]
         if set(boundaries) != {str(value) for value in POLICY_BOUNDARIES}:
             raise MatureTargetRefreshResultError(

@@ -16,6 +16,7 @@ from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
     TRAINER_TREATMENT,
     _preflight_experiment_digest_matches,
     build_arm_prepare_command,
+    contract_seeds,
     load_contract,
     validate_contract,
 )
@@ -118,6 +119,25 @@ def test_contract_is_closed_and_requires_six_ordered_arms() -> None:
     )
     with pytest.raises(MatureTargetRefreshDiagnosticError, match="arm order"):
         validate_contract(tampered)
+
+
+def test_contract_accepts_a_separately_frozen_three_seed_cohort() -> None:
+    contract = _contract()
+    for source, seed in zip(contract["sources"], (64, 65, 66), strict=True):
+        source["seed"] = seed
+    cells = (
+        (seed, condition)
+        for seed in (64, 65, 66)
+        for condition in ("refresh-mature", "stale-control")
+    )
+    for arm, (seed, condition) in zip(contract["arms"], cells, strict=True):
+        arm["seed"] = seed
+        arm["condition"] = condition
+    contract["plan_identity"] = canonical_sha256(
+        {key: value for key, value in contract.items() if key != "plan_identity"}
+    )
+
+    assert contract_seeds(validate_contract(contract)) == (64, 65, 66)
 
 
 def test_command_isolates_only_target_treatment_and_paths(tmp_path: Path) -> None:

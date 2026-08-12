@@ -97,11 +97,25 @@ def test_successor_recovery_plan_is_isolated_and_hash_bound() -> None:
     )
     assert "analysis-recovery-v2" in plan["control_files"]["readiness"]
     assert "analysis-recovery-v2" in plan["outputs"]["failure"]
+    commit = subprocess.check_output(
+        [
+            "git",
+            "log",
+            "-1",
+            "--format=%H",
+            "--",
+            path.relative_to(recovery.ROOT).as_posix(),
+        ],
+        cwd=recovery.ROOT,
+        text=True,
+    ).strip()
     for name in ("publisher", "runner"):
         record = plan["analysis_implementation"][name]
-        assert recovery._sha256_file(recovery.ROOT / record["path"]) == record[
-            "sha256"
-        ]
+        frozen = subprocess.check_output(
+            ["git", "show", f"{commit}:{record['path']}"],
+            cwd=recovery.ROOT,
+        )
+        assert hashlib.sha256(frozen).hexdigest() == record["sha256"]
 
 
 def test_authorization_is_exactly_plan_and_readiness_bound() -> None:

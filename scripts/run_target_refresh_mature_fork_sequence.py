@@ -87,6 +87,36 @@ def _inside_root(value: str | Path, *, field: str) -> Path:
     return resolved
 
 
+def _contract_output_paths(contract: Mapping[str, Any]) -> dict[str, Path]:
+    outputs = contract.get("result_outputs")
+    required = ("authorization", "launch", "completion", "failure", "ledger", "result")
+    if not isinstance(outputs, Mapping) or any(
+        not isinstance(outputs.get(name), str) or not outputs[name] for name in required
+    ):
+        raise MatureTargetRefreshSequenceError("contract result outputs differ")
+    resolved = {
+        name: _inside_root(outputs[name], field=f"contract {name} output")
+        for name in required
+    }
+    if len(set(resolved.values())) != len(resolved):
+        raise MatureTargetRefreshSequenceError("contract result outputs overlap")
+    return resolved
+
+
+def _bind_output_path(
+    supplied: Path | None,
+    *,
+    expected: Path,
+    field: str,
+) -> Path:
+    if supplied is None:
+        return expected
+    resolved = _inside_root(supplied, field=field)
+    if resolved != expected:
+        raise MatureTargetRefreshSequenceError(f"{field} differs from contract")
+    return resolved
+
+
 def _strict_json(path: Path) -> dict[str, Any]:
     try:
         raw = path.read_bytes()
@@ -162,13 +192,34 @@ def inspect_readiness(
     *,
     contract_path: Path,
     readiness_path: Path,
-    authorization_path: Path = DEFAULT_AUTHORIZATION,
-    launch_path: Path = DEFAULT_LAUNCH,
-    completion_path: Path = DEFAULT_COMPLETION,
-    failure_path: Path = DEFAULT_FAILURE,
+    authorization_path: Path | None = None,
+    launch_path: Path | None = None,
+    completion_path: Path | None = None,
+    failure_path: Path | None = None,
     allow_authorization: bool = False,
 ) -> dict[str, Any]:
     contract = load_contract(contract_path.resolve(strict=True))
+    outputs = _contract_output_paths(contract)
+    authorization_path = _bind_output_path(
+        authorization_path,
+        expected=outputs["authorization"],
+        field="sequence authorization output",
+    )
+    launch_path = _bind_output_path(
+        launch_path,
+        expected=outputs["launch"],
+        field="sequence launch output",
+    )
+    completion_path = _bind_output_path(
+        completion_path,
+        expected=outputs["completion"],
+        field="sequence completion output",
+    )
+    failure_path = _bind_output_path(
+        failure_path,
+        expected=outputs["failure"],
+        field="sequence failure output",
+    )
     readiness = _strict_json(readiness_path.resolve(strict=True))
     readiness_identity = validate_readiness_identity(readiness)
     if readiness["contract"]["plan_identity"] != contract["plan_identity"] or readiness[
@@ -361,12 +412,46 @@ def launch_sequence(
     expected_readiness_identity: str,
     paths_config: Path,
     run_id: str,
-    launch_path: Path = DEFAULT_LAUNCH,
-    completion_path: Path = DEFAULT_COMPLETION,
-    failure_path: Path = DEFAULT_FAILURE,
+    launch_path: Path | None = None,
+    completion_path: Path | None = None,
+    failure_path: Path | None = None,
+    ledger_path: Path | None = None,
+    result_path: Path | None = None,
 ) -> dict[str, Any]:
     if not run_id.strip():
         raise MatureTargetRefreshSequenceError("run id is required")
+    contract = load_contract(contract_path)
+    outputs = _contract_output_paths(contract)
+    authorization_path = _bind_output_path(
+        authorization_path,
+        expected=outputs["authorization"],
+        field="sequence authorization output",
+    )
+    launch_path = _bind_output_path(
+        launch_path,
+        expected=outputs["launch"],
+        field="sequence launch output",
+    )
+    completion_path = _bind_output_path(
+        completion_path,
+        expected=outputs["completion"],
+        field="sequence completion output",
+    )
+    failure_path = _bind_output_path(
+        failure_path,
+        expected=outputs["failure"],
+        field="sequence failure output",
+    )
+    ledger_path = _bind_output_path(
+        ledger_path,
+        expected=outputs["ledger"],
+        field="development ledger output",
+    )
+    result_path = _bind_output_path(
+        result_path,
+        expected=outputs["result"],
+        field="development result output",
+    )
     inspect_readiness(
         contract_path=contract_path,
         readiness_path=readiness_path,
@@ -376,7 +461,6 @@ def launch_sequence(
         failure_path=failure_path,
         allow_authorization=True,
     )
-    contract = load_contract(contract_path)
     readiness = _strict_json(readiness_path)
     authorization = _strict_json(authorization_path)
     parent_identity = validate_sequence_authorization(
@@ -429,16 +513,16 @@ def launch_sequence(
                 "--paths-config",
                 str(paths_config),
                 "--ledger",
-                str(reporter.DEFAULT_LEDGER),
+                str(ledger_path),
                 "--output",
-                str(reporter.DEFAULT_OUTPUT),
+                str(result_path),
                 "--device",
                 "cpu",
             ]
         )
         if result_code != 0:
             raise MatureTargetRefreshSequenceError("development reporter failed")
-        result = _strict_json(reporter.DEFAULT_OUTPUT)
+        result = _strict_json(result_path)
         if (
             result["scope"]["no_update_development_games"] != 288
             or result["scope"]["training_games"] != 0
@@ -450,8 +534,8 @@ def launch_sequence(
         record = {
             **step.to_dict(),
             "result": {
-                "path": str(reporter.DEFAULT_OUTPUT),
-                "sha256": _sha256_file(reporter.DEFAULT_OUTPUT),
+                "path": str(result_path),
+                "sha256": _sha256_file(result_path),
                 "result_identity": result["result_identity"],
                 "classification": result["decision"]["classification"],
                 "training_resource_audit": training_resources,
@@ -524,7 +608,7 @@ def _parser() -> argparse.ArgumentParser:
     action.add_argument("--launch", choices=("once",))
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--readiness", type=Path, default=DEFAULT_READINESS)
-    parser.add_argument("--authorization", type=Path, default=DEFAULT_AUTHORIZATION)
+    parser.add_argument("--authorization", type=Path)
     parser.add_argument("--paths-config", type=Path, default=DEFAULT_PATHS_CONFIG)
     parser.add_argument("--expected-readiness-identity")
     parser.add_argument("--decision-note")
@@ -536,7 +620,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     contract = args.contract.resolve()
     readiness = args.readiness.resolve()
-    authorization = args.authorization.resolve()
+    authorization = args.authorization.resolve() if args.authorization else None
     if args.preflight:
         result = inspect_readiness(
             contract_path=contract,
@@ -551,7 +635,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = record_authorization(
             contract_path=contract,
             readiness_path=readiness,
-            authorization_path=authorization,
+            authorization_path=(
+                authorization
+                if authorization is not None
+                else _contract_output_paths(load_contract(contract))["authorization"]
+            ),
             expected_readiness_identity=args.expected_readiness_identity,
             decision_note=args.decision_note,
         )
@@ -563,7 +651,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         result = launch_sequence(
             contract_path=contract,
             readiness_path=readiness,
-            authorization_path=authorization,
+            authorization_path=(
+                authorization
+                if authorization is not None
+                else _contract_output_paths(load_contract(contract))["authorization"]
+            ),
             expected_readiness_identity=args.expected_readiness_identity,
             paths_config=args.paths_config.resolve(strict=True),
             run_id=args.run_id,

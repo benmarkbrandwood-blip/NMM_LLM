@@ -14,6 +14,7 @@ from learned_ai.evaluation.target_refresh_mature_fork_result import (
 def _contract() -> dict:
     return {
         "plan_identity": "a" * 64,
+        "sources": [{"seed": seed} for seed in (67, 68, 69)],
         "measurement_contract": {
             "direct_crossplay": {
                 "record_indices": list(range(1, 13)),
@@ -153,3 +154,13 @@ def test_policy_divergence_requires_two_persistent_mature_seeds() -> None:
 
     assert decision["supporting_seeds"] == ["67", "68"]
     assert decision["materially_diverged_with_persistence"] is True
+
+
+def test_direct_schedule_uses_the_contract_seed_cohort() -> None:
+    contract = _contract()
+    contract["sources"] = [{"seed": seed} for seed in (64, 65, 66)]
+
+    schedule = build_direct_crossplay_schedule(contract)
+
+    assert sorted({row["seed"] for row in schedule}) == [64, 65, 66]
+    assert len(schedule) == 288
