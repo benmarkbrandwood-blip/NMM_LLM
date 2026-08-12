@@ -7,6 +7,8 @@ import pytest
 
 from learned_ai.training.run_contract import canonical_sha256
 from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
+    DEFAULT_CONTRACT,
+    DEFAULT_READINESS,
     PLAN_SCHEMA,
     MatureTargetRefreshDiagnosticError,
     TRAINER_TREATMENT,
@@ -18,6 +20,11 @@ from learned_ai.validation.target_refresh_mature_fork_diagnostic import (
 
 
 SHA = "a" * 64
+
+
+def test_attempt_002_uses_fresh_default_paths() -> None:
+    assert DEFAULT_CONTRACT.name.endswith("attempt-002.json")
+    assert "attempt-002" in DEFAULT_READINESS.as_posix()
 
 
 def _contract() -> dict:
@@ -128,11 +135,13 @@ def test_command_isolates_only_target_treatment_and_paths(tmp_path: Path) -> Non
                 python_executable="python",
             )
         )
-    assert commands[0][commands[0].index("--target-refresh-fork-treatment") + 1] == (
-        TRAINER_TREATMENT["refresh-mature"]
+    assert (
+        commands[0][commands[0].index("--target-refresh-fork-treatment") + 1]
+        == (TRAINER_TREATMENT["refresh-mature"])
     )
-    assert commands[1][commands[1].index("--target-refresh-fork-treatment") + 1] == (
-        TRAINER_TREATMENT["stale-control"]
+    assert (
+        commands[1][commands[1].index("--target-refresh-fork-treatment") + 1]
+        == (TRAINER_TREATMENT["stale-control"])
     )
     for command in commands:
         assert command[command.index("--post-fork-transition-bound") + 1] == "8192"
@@ -183,8 +192,7 @@ def test_preflight_digest_comparison_does_not_double_prefix() -> None:
 def test_repository_mature_fork_contract_is_canonical_and_valid() -> None:
     root = Path(__file__).resolve().parents[1]
     contract = load_contract(
-        root
-        / "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1.json"
+        root / "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1.json"
     )
 
     assert contract["plan_identity"] == (

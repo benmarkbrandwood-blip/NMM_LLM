@@ -47,11 +47,11 @@ TRAINER_TREATMENT = {
     "stale-control": "no-refresh",
 }
 DEFAULT_CONTRACT = Path(
-    "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1.json"
+    "docs/experiments/sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.json"
 )
 DEFAULT_PATHS_CONFIG = Path("data/training_paths.local.json")
 DEFAULT_READINESS = Path(
-    "out/target-refresh-mature-fork-diagnostic-v1/readiness.json"
+    "out/target-refresh-mature-fork-diagnostic-v1-attempt-002/readiness.json"
 )
 
 
@@ -88,13 +88,9 @@ def _strict_json(path: Path) -> dict[str, Any]:
             )
         value = json.loads(raw, object_pairs_hook=reject_duplicates)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise MatureTargetRefreshDiagnosticError(
-            f"cannot read {path.name}"
-        ) from exc
+        raise MatureTargetRefreshDiagnosticError(f"cannot read {path.name}") from exc
     if not isinstance(value, dict) or raw != canonical_json_bytes(value) + b"\n":
-        raise MatureTargetRefreshDiagnosticError(
-            f"{path.name} is not canonical JSON"
-        )
+        raise MatureTargetRefreshDiagnosticError(f"{path.name} is not canonical JSON")
     return value
 
 
@@ -232,9 +228,7 @@ def _source_state(root: Path, source: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _arm_for(
-    contract: Mapping[str, Any], seed: int, condition: str
-) -> dict[str, Any]:
+def _arm_for(contract: Mapping[str, Any], seed: int, condition: str) -> dict[str, Any]:
     matches = [
         dict(item)
         for item in contract["arms"]
@@ -402,9 +396,7 @@ def _target_experiment_digest(
         git_commit=source_commit,
         resume_config_sha256=config_sha256,
         immutable_assets=_immutable_assets(checkpoint),
-        ruleset=load_trainer_ruleset(
-            root / "data/rulesets/nmm-training-core@2.json"
-        ),
+        ruleset=load_trainer_ruleset(root / "data/rulesets/nmm-training-core@2.json"),
     )
 
 
@@ -429,11 +421,14 @@ def _git_source(root: Path, required_commit: str) -> dict[str, Any]:
     branch = run("branch", "--show-current")
     dirty = bool(run("status", "--porcelain"))
     origin = run("rev-parse", "origin/dev")
-    required_is_ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", required_commit, head],
-        cwd=root,
-        check=False,
-    ).returncode == 0
+    required_is_ancestor = (
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", required_commit, head],
+            cwd=root,
+            check=False,
+        ).returncode
+        == 0
+    )
     if branch != "dev" or dirty or head != origin or not required_is_ancestor:
         raise MatureTargetRefreshDiagnosticError(
             "preparation requires clean published dev with implementation ancestry"
@@ -528,7 +523,9 @@ def prepare_mature_fork_diagnostic(
     for source in contract["sources"]:
         seed = int(source["seed"])
         inspected = _source_state(root, source)
-        arms = [_arm_for(contract, seed, condition) for condition in EXPECTED_CONDITIONS]
+        arms = [
+            _arm_for(contract, seed, condition) for condition in EXPECTED_CONDITIONS
+        ]
         branch_paths = {
             arm["condition"]: _repository_path(
                 root,
@@ -593,16 +590,14 @@ def prepare_mature_fork_diagnostic(
             target_resume_config_sha256=common_config,
             target_experiment_id=arms[0]["experiment_id"],
             target_experiment_digest=common_digest,
-            target_run_id=f"target-refresh-mature-fork-v1-s{seed}-common-fork",
+            target_run_id=(f"{readiness_path.parent.name}-s{seed}-common-fork"),
             temperature_origin=contract["common_training_contract"][
                 "temperature_origin"
             ],
         )
         arm_records: list[dict[str, Any]] = []
         for arm, command in zip(arms, commands, strict=True):
-            db_path = _repository_path(
-                root, arm["specialist_db"], field="arm database"
-            )
+            db_path = _repository_path(root, arm["specialist_db"], field="arm database")
             db_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(inspected["specialist_db_path"], db_path)
             clone = _inspect_closed_specialist_database(db_path)
@@ -648,9 +643,7 @@ def prepare_mature_fork_diagnostic(
             ):
                 raise MatureTargetRefreshDiagnosticError("managed plan differs")
             preflight_result = _run_checked(
-                _build_preflight_command(
-                    root, plan, branch_paths[arm["condition"]]
-                ),
+                _build_preflight_command(root, plan, branch_paths[arm["condition"]]),
                 root=root,
                 runner=runner,
                 accepted_return_codes=(2,),
@@ -661,9 +654,7 @@ def prepare_mature_fork_diagnostic(
                 or preflight.get("errors") != []
                 or preflight.get("unresolved_decisions")
                 != [PRODUCT_AUTHORIZATION_DECISION]
-                or not _preflight_experiment_digest_matches(
-                    preflight, target_digest
-                )
+                or not _preflight_experiment_digest_matches(preflight, target_digest)
             ):
                 raise MatureTargetRefreshDiagnosticError("arm preflight differs")
             preflight_path = control_dir / "preflight.json"
@@ -689,8 +680,7 @@ def prepare_mature_fork_diagnostic(
                 }
             )
         payloads = {
-            item["branch_checkpoint"]["branch_payload_sha256"]
-            for item in arm_records
+            item["branch_checkpoint"]["branch_payload_sha256"] for item in arm_records
         }
         if len(payloads) != 1:
             raise MatureTargetRefreshDiagnosticError("pair payloads differ")
