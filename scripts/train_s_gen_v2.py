@@ -1297,6 +1297,7 @@ def _compute_post_fork_temperature(
     max_games: int,
     temp_start: float,
     anneal_transitions: int,
+    temperature_origin: Optional[float] = None,
 ) -> float:
     """Anneal from the global fork boundary using consumed transitions only."""
     if (
@@ -1311,7 +1312,14 @@ def _compute_post_fork_temperature(
         or anneal_transitions <= 0
     ):
         raise ValueError("temperature anneal transition count must be positive")
-    fork_temperature = _compute_temperature(fork_game, max_games, temp_start)
+    if temperature_origin is None:
+        fork_temperature = _compute_temperature(fork_game, max_games, temp_start)
+    else:
+        fork_temperature = float(temperature_origin)
+        if not math.isfinite(fork_temperature) or fork_temperature <= 0.0:
+            raise ValueError(
+                "post-fork temperature origin must be finite and positive"
+            )
     progress = min(1.0, post_fork_consumed_transitions / anneal_transitions)
     return float(
         fork_temperature - (fork_temperature - TEMP_END) * progress
@@ -1327,6 +1335,7 @@ def _compute_training_temperature(
     post_fork_consumed_transitions: Optional[int] = None,
     fork_game: Optional[int] = None,
     anneal_transitions: Optional[int] = None,
+    post_fork_temperature_origin: Optional[float] = None,
 ) -> float:
     """Resolve the configured temperature coordinate without hidden fallback."""
     if schedule_axis == "global-games":
@@ -1345,6 +1354,7 @@ def _compute_training_temperature(
         max_games=max_games,
         temp_start=temp_start,
         anneal_transitions=anneal_transitions,
+        temperature_origin=post_fork_temperature_origin,
     )
 
 
@@ -3219,6 +3229,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 anneal_transitions=(
                     args.post_fork_temperature_anneal_transitions
                 ),
+                temperature_origin=args.post_fork_temperature_origin,
             )
 
         return schedule
@@ -3463,6 +3474,9 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                 fork_game=args.target_refresh_fork_game,
                 anneal_transitions=(
                     args.post_fork_temperature_anneal_transitions
+                ),
+                post_fork_temperature_origin=(
+                    args.post_fork_temperature_origin
                 ),
             )
         except ValueError as exc:
@@ -4611,6 +4625,17 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Positive transition horizon used only by "
             "--temperature-schedule-axis post-fork-transitions"
+        ),
+    )
+    p.add_argument(
+        "--post-fork-temperature-origin",
+        type=_finite_positive_float,
+        default=None,
+        help=(
+            "Optional explicit temperature at transition ordinal zero. It is "
+            "valid only with --temperature-schedule-axis "
+            "post-fork-transitions and prevents a mature diagnostic fork from "
+            "recomputing its starting temperature from game_count."
         ),
     )
     p.add_argument("--log-every",           type=int,   default=LOG_EVERY)

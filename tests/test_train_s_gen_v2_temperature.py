@@ -83,6 +83,35 @@ def test_post_fork_temperature_depends_on_transitions_not_game_count():
     assert first == pytest.approx(0.8379808850090307)
 
 
+def test_post_fork_temperature_can_preserve_a_mature_origin():
+    first = _compute_training_temperature(
+        schedule_axis="post-fork-transitions",
+        game_count=327,
+        max_games=5_000,
+        temp_start=0.90,
+        post_fork_consumed_transitions=0,
+        fork_game=327,
+        anneal_transitions=98_112,
+        post_fork_temperature_origin=0.838,
+    )
+    second = _compute_training_temperature(
+        schedule_axis="post-fork-transitions",
+        game_count=518,
+        max_games=5_000,
+        temp_start=0.90,
+        post_fork_consumed_transitions=4_096,
+        fork_game=518,
+        anneal_transitions=98_112,
+        post_fork_temperature_origin=0.838,
+    )
+
+    assert first == pytest.approx(0.838)
+    assert second < first
+    assert second == pytest.approx(
+        0.838 - (0.838 - TEMP_END) * (4_096 / 98_112)
+    )
+
+
 def test_rollout_temperature_schedule_uses_each_transition_ordinal():
     def schedule(index: int) -> float:
         return 0.9 - 0.01 * index
@@ -123,6 +152,19 @@ def test_post_fork_temperature_rejects_invalid_transition_schedule(
             max_games=5_000,
             temp_start=0.90,
             anneal_transitions=anneal,
+        )
+
+
+@pytest.mark.parametrize("origin", [0.0, -0.1, float("nan"), float("inf")])
+def test_post_fork_temperature_rejects_invalid_explicit_origin(origin):
+    with pytest.raises(ValueError, match="temperature origin"):
+        _compute_post_fork_temperature(
+            post_fork_consumed_transitions=0,
+            fork_game=50,
+            max_games=5_000,
+            temp_start=0.90,
+            anneal_transitions=106_304,
+            temperature_origin=origin,
         )
 
 

@@ -230,6 +230,13 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
                 str(args.post_fork_temperature_anneal_transitions),
             )
         )
+    if args.post_fork_temperature_origin is not None:
+        common_args.extend(
+            (
+                "--post-fork-temperature-origin",
+                str(args.post_fork_temperature_origin),
+            )
+        )
     return common_args
 
 
@@ -457,6 +464,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Transition horizon for a post-fork temperature schedule",
+    )
+    prepare.add_argument(
+        "--post-fork-temperature-origin",
+        type=float,
+        default=None,
+        help="Explicit temperature at the mature post-fork origin",
     )
     prepare.add_argument("--measurement-anchor-game", type=int, default=None)
     prepare.add_argument(

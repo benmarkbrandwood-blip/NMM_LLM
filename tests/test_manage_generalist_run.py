@@ -147,6 +147,8 @@ def test_common_args_bind_post_fork_temperature_schedule(tmp_path) -> None:
             "post-fork-transitions",
             "--post-fork-temperature-anneal-transitions",
             "106304",
+            "--post-fork-temperature-origin",
+            "0.838",
         ]
     )
 
@@ -158,6 +160,9 @@ def test_common_args_bind_post_fork_temperature_schedule(tmp_path) -> None:
     assert common[
         common.index("--post-fork-temperature-anneal-transitions") + 1
     ] == "106304"
+    assert common[common.index("--post-fork-temperature-origin") + 1] == (
+        "0.838"
+    )
 
 
 @pytest.mark.parametrize("value", ["-0.1", "nan", "inf"])

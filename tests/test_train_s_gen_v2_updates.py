@@ -502,6 +502,15 @@ def test_post_fork_temperature_schedule_is_resume_semantic(tmp_path) -> None:
         alternate
     )
 
+    explicit = _equal_transition_fork_args(tmp_path, treatment="refresh-once")
+    explicit.temperature_schedule_axis = "post-fork-transitions"
+    explicit.post_fork_temperature_anneal_transitions = 106_304
+    explicit.post_fork_temperature_origin = 0.838
+    trainer.validate_generalist_configuration(explicit)
+    assert trainer.resume_config_sha256(refresh) != trainer.resume_config_sha256(
+        explicit
+    )
+
 
 @pytest.mark.parametrize(
     ("treatment", "axis", "anneal", "message"),
@@ -544,6 +553,19 @@ def test_configuration_rejects_invalid_post_fork_temperature_schedule(
     args.post_fork_temperature_anneal_transitions = anneal
 
     with pytest.raises(PreflightConfigurationError, match=message):
+        trainer.validate_generalist_configuration(args)
+
+
+@pytest.mark.parametrize("origin", [0.19, 0.91, float("nan")])
+def test_configuration_rejects_invalid_post_fork_temperature_origin(
+    tmp_path, origin
+) -> None:
+    args = _equal_transition_fork_args(tmp_path, treatment="refresh-once")
+    args.temperature_schedule_axis = "post-fork-transitions"
+    args.post_fork_temperature_anneal_transitions = 106_304
+    args.post_fork_temperature_origin = origin
+
+    with pytest.raises(PreflightConfigurationError, match="temperature_origin"):
         trainer.validate_generalist_configuration(args)
 
 

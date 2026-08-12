@@ -389,10 +389,20 @@ def validate_generalist_configuration(args: Any) -> None:
         "post_fork_temperature_anneal_transitions",
         None,
     )
+    temperature_origin = getattr(
+        args,
+        "post_fork_temperature_origin",
+        None,
+    )
     if temperature_axis == "global-games":
         if temperature_anneal_transitions is not None:
             raise PreflightConfigurationError(
                 "post_fork_temperature_anneal_transitions is only valid with "
+                "post-fork-transitions"
+            )
+        if temperature_origin is not None:
+            raise PreflightConfigurationError(
+                "post_fork_temperature_origin is only valid with "
                 "post-fork-transitions"
             )
     elif temperature_axis == "post-fork-transitions":
@@ -415,6 +425,16 @@ def validate_generalist_configuration(args: Any) -> None:
                 "post_fork_temperature_anneal_transitions must cover "
                 "post_fork_transition_bound"
             )
+        if temperature_origin is not None:
+            origin = _finite_number(
+                temperature_origin,
+                field="post_fork_temperature_origin",
+            )
+            if origin < 0.2 or origin > args.temp_start:
+                raise PreflightConfigurationError(
+                    "post_fork_temperature_origin must be between the "
+                    "terminal and configured start temperatures"
+                )
     else:
         raise PreflightConfigurationError("temperature_schedule_axis is unsupported")
 
@@ -1214,6 +1234,10 @@ def resolved_resume_config(args: Any) -> dict[str, Any]:
     if raw.get("temperature_schedule_axis", "global-games") == "global-games":
         raw.pop("temperature_schedule_axis", None)
         raw.pop("post_fork_temperature_anneal_transitions", None)
+        raw.pop("post_fork_temperature_origin", None)
+    elif raw.get("post_fork_temperature_origin") is None:
+        # Preserve the resume identity of existing post-fork diagnostics.
+        raw.pop("post_fork_temperature_origin", None)
     if raw.get("target_refresh_fork_game") is None:
         raw.pop("target_refresh_fork_game", None)
     return json.loads(canonical_json_bytes(raw))
