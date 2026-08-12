@@ -176,29 +176,62 @@ def _read_hash_bound_json_object(
 
 
 def _strict_jsonl(path: Path) -> list[dict[str, Any]]:
-    try:
-        raw_lines = path.read_bytes().splitlines(keepends=True)
-    except OSError as exc:
-        raise MatureTargetRefreshReportError(f"cannot read JSONL: {path}") from exc
-    if not raw_lines:
-        raise MatureTargetRefreshReportError(f"JSONL is empty: {path}")
     rows: list[dict[str, Any]] = []
-    for line_number, raw in enumerate(raw_lines, 1):
-        if not raw.endswith(b"\n") or b"\r" in raw:
-            raise MatureTargetRefreshReportError(
-                f"JSONL framing differs: {path}:{line_number}"
-            )
-        try:
-            value = json.loads(raw)
-        except (UnicodeError, json.JSONDecodeError) as exc:
-            raise MatureTargetRefreshReportError(
-                f"invalid JSONL row: {path}:{line_number}"
-            ) from exc
-        if not isinstance(value, dict):
-            raise MatureTargetRefreshReportError(
-                f"JSONL row is not an object: {path}:{line_number}"
-            )
-        rows.append(value)
+    framing: str | None = None
+    try:
+        with path.open(encoding="utf-8", newline="") as handle:
+            for line_number, line in enumerate(handle, 1):
+                if line.endswith("\r\n"):
+                    observed_framing = "\r\n"
+                    payload = line[:-2]
+                elif line.endswith("\n"):
+                    observed_framing = "\n"
+                    payload = line[:-1]
+                else:
+                    raise MatureTargetRefreshReportError(
+                        f"JSONL framing differs: {path}:{line_number}"
+                    )
+                if framing is None:
+                    framing = observed_framing
+                if (
+                    observed_framing != framing
+                    or "\r" in payload
+                    or "\n" in payload
+                ):
+                    raise MatureTargetRefreshReportError(
+                        f"JSONL framing differs: {path}:{line_number}"
+                    )
+
+                def reject_duplicate_keys(
+                    pairs: list[tuple[str, Any]],
+                ) -> dict[str, Any]:
+                    value: dict[str, Any] = {}
+                    for key, item in pairs:
+                        if key in value:
+                            raise MatureTargetRefreshReportError(
+                                f"duplicate JSON key: {path}:{line_number}:{key}"
+                            )
+                        value[key] = item
+                    return value
+
+                value = json.loads(
+                    payload,
+                    object_pairs_hook=reject_duplicate_keys,
+                    parse_constant=lambda token: (_ for _ in ()).throw(
+                        MatureTargetRefreshReportError(
+                            f"non-finite JSON value: {path}:{line_number}:{token}"
+                        )
+                    ),
+                )
+                if not isinstance(value, dict):
+                    raise MatureTargetRefreshReportError(
+                        f"JSONL row is not an object: {path}:{line_number}"
+                    )
+                rows.append(value)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise MatureTargetRefreshReportError(f"cannot read JSONL: {path}") from exc
+    if not rows:
+        raise MatureTargetRefreshReportError(f"JSONL is empty: {path}")
     return rows
 
 

@@ -39,6 +39,57 @@ def test_training_summary_keeps_raw_strata_and_partial_final_block() -> None:
     assert [block["complete_50_game_window"] for block in blocks] == [True, False]
 
 
+def test_strict_jsonl_accepts_uniform_windows_crlf(tmp_path: Path) -> None:
+    path = tmp_path / "windows.jsonl"
+    path.write_bytes(b'{"value": 1}\r\n{"value": 2}\r\n')
+
+    assert report._strict_jsonl(path) == [{"value": 1}, {"value": 2}]
+
+
+def test_strict_jsonl_rejects_mixed_line_framing(tmp_path: Path) -> None:
+    path = tmp_path / "mixed.jsonl"
+    path.write_bytes(b'{"value": 1}\r\n{"value": 2}\n')
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="JSONL framing differs",
+    ):
+        report._strict_jsonl(path)
+
+
+def test_strict_jsonl_rejects_missing_final_newline(tmp_path: Path) -> None:
+    path = tmp_path / "unterminated.jsonl"
+    path.write_bytes(b'{"value": 1}')
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="JSONL framing differs",
+    ):
+        report._strict_jsonl(path)
+
+
+def test_strict_jsonl_rejects_duplicate_keys(tmp_path: Path) -> None:
+    path = tmp_path / "duplicate.jsonl"
+    path.write_bytes(b'{"value": 1, "value": 2}\n')
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="duplicate JSON key",
+    ):
+        report._strict_jsonl(path)
+
+
+def test_strict_jsonl_rejects_non_finite_values(tmp_path: Path) -> None:
+    path = tmp_path / "non-finite.jsonl"
+    path.write_bytes(b'{"value": NaN}\n')
+
+    with pytest.raises(
+        report.MatureTargetRefreshReportError,
+        match="non-finite JSON value",
+    ):
+        report._strict_jsonl(path)
+
+
 def test_frozen_hash_bound_reference_inputs_accept_their_tracked_format() -> None:
     contract = report.load_contract(report.DEFAULT_CONTRACT)
     policy_contract = contract["measurement_contract"]["policy_distribution"]
