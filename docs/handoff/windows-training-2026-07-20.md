@@ -229,6 +229,22 @@ under plan identity `442c1701`. It is a design contract only: preparation,
 readiness review and one aggregate product authorization remain required
 before launch.
 
+The corrected mature-fork attempt 002 was subsequently prepared and launched
+once under readiness identity `d2860ae0` and authorization identity
+`181a8e88`. All six arms completed and passed policy health, consuming 2,529
+new training games, exactly 49,152 optimizer transitions, 768 A2C updates and
+about 0.403 active hours. The parent publisher then failed closed before the
+first of 288 CPU development games because it imposed canonical-minified JSON
+framing on a frozen, exact-hash, pretty-printed policy corpus. The replay
+corpus and replay audit share that intentional presentation format. No result,
+ledger or completion record exists, so no mature-refresh condition has been
+selected. Preserve the
+[attempt-002 failure evidence](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
+The original launch and all child authorizations are consumed. Do not retry or
+resume training. A corrected publisher may be used only through a separately
+frozen, zero-training analysis-recovery plan with a new readiness identity and
+explicit one-shot launch authority.
+
 On 11 August 2026 the product owner explicitly delegated just-in-time launch
 authorization for the remaining bounded plans in this already frozen
 equal-transition sequence. The Agent recorded each leaf authorization as
@@ -2257,8 +2273,20 @@ the current successor in this order:
     [attempt-002 contract](../experiments/sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.md),
     plan identity `442c1701`, frozen at commit `40b85e6`. Its corrected plans
     must carry the exact policy-health gate and pass final preflight before a
-    single aggregate launch decision is requested. This preparation has not
-    yet been run and has no launch authority.
+    single aggregate launch decision is requested. This invalid preparation
+    remains unlaunched and has no launch authority.
+29. Preserve mature-fork attempt 002 under readiness identity `d2860ae0`,
+    authorization identity `181a8e88`, launch identity `34dd77f5`, and failure
+    identity `d4e13fba`. All six arms completed once and passed policy health,
+    for 2,529 new training games, 49,152 transitions and 768 updates. The
+    result publisher rejected the exact-hash, pretty-printed policy corpus
+    before loading candidates for analysis or starting any of the 288 CPU
+    games. The launch and child grants are consumed. Preserve the
+    [failure record](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
+    Do not retry or resume the training sequence. Repair the publisher's
+    reference-input policy, then prepare a new zero-training analysis-only
+    contract and readiness record; launching that successor requires a new
+    explicit one-shot product authorization.
 
 The previously executed isolated smoke command was:
 
@@ -2359,7 +2387,7 @@ consumed. The schedule-isolation successor completed once under plan identity
 grant is consumed. Its outcome classifier is
 `no_material_paired_outcome_effect`, its policy classifier is
 `inconclusive_late_onset`, and no condition is selected. No held-out match,
-additional calibration, mature-fork diagnostic, long
+additional calibration, mature-fork training retry, long
 training, model promotion/publication, protocol change, resource expansion, or
 history rewrite is authorized by that sequence. Ordinary
 verified fast-forward pushes of Codex-created `dev` commits are separately
