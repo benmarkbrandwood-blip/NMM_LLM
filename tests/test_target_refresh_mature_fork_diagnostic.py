@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -203,3 +204,26 @@ def test_repository_mature_fork_contract_is_canonical_and_valid() -> None:
         327,
         518,
     ]
+
+
+def test_repository_attempt_002_contract_is_isolated_and_health_gated() -> None:
+    root = Path(__file__).resolve().parents[1]
+    contract = load_contract(
+        root / "docs/experiments/"
+        "sanmill-target-refresh-mature-fork-diagnostic-v1-attempt-002.json"
+    )
+
+    assert contract["plan_identity"] == (
+        "442c170177b5a8b867b14db31e62b16219fc3ee65ae1fac804842e493c35089d"
+    )
+    assert contract["supersedes"]["readiness_identity"] == (
+        "32df3a5beb1e5bb71c83ceca13647ad735d0c5c67c65b80a29b5201ff186534f"
+    )
+    assert contract["common_training_contract"]["policy_health_gate"]["enabled"] is True
+    assert all("attempt-002" in arm["control_dir"] for arm in contract["arms"])
+    assert all("attempt_002" in arm["specialist_db"] for arm in contract["arms"])
+    for record in contract["implementation"].values():
+        assert (
+            hashlib.sha256((root / record["path"]).read_bytes()).hexdigest()
+            == (record["sha256"])
+        )
