@@ -1,8 +1,8 @@
-# Windows Training Handover — 20 July 2026 (updated 12 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 13 August 2026)
 
 ## Executive Summary
 
-## Transfer checkpoint — 12 August 2026
+## Transfer checkpoint — 13 August 2026
 
 This section is the current handoff checkpoint and takes precedence over older
 historical wording below. The repository root is this directory. At handoff
@@ -42,19 +42,35 @@ and does not revive the consumed authorization.
 The isolated successor is frozen in
 [recovery v2](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v2.md)
 under plan identity `32158846`. It keeps the same scientific and resource
-contract, uses a new output namespace, and remains unlaunched. Publication and
-a final clean preflight come before any new product authorization.
+contract, uses a new output namespace, and remains unlaunched. Commit
+`360c878` published the exact recovery-v2 contract and implementation to
+`origin/dev`. A final clean preflight at that published commit passed all 12
+candidate checkpoints, recorded candidate-audit identity `d3c7e0dd`, and
+returned `ready_for_product_authorization` under readiness identity
+`fcd38c2f`. The readiness file SHA-256 is `6edca20a`. No authorization,
+launch, development game, result, ledger or completion record exists for v2.
+
+That readiness is now historical evidence rather than a launch control. It is
+bound to analysis HEAD `360c878`, while this handover update necessarily
+creates a later HEAD. Do not edit or reuse it. Preserve a byte-identical copy
+outside the active v2 output namespace, remove the historical control from
+that otherwise-unused namespace, and regenerate readiness only after this
+handover commit is published and `dev == origin/dev` is clean. The resulting
+identity, not `fcd38c2f`, is the only one that may be named by a future product
+authorization. Current verdict: `needs_decision`.
 
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
    overwrite, repair in place, or reuse its output namespace.
-2. Publish the already frozen recovery-v2 contract and exact implementation by
-   ordinary fast-forward. Its new plan, control, output and authorization
-   identities must remain unchanged.
-3. Run its strengthened preflight from clean published `dev`; it must validate
-   all 12 candidate checkpoints before returning product-ready status.
-4. Obtain one new explicit product authorization bound to the new readiness.
+2. Publish this handover-only commit by ordinary fast-forward, then verify the
+   exact branch graph, a clean tracked worktree and `dev == origin/dev`.
+3. Preserve the historical v2 readiness byte-for-byte outside its active
+   namespace, restore that namespace to absent, and rerun the documented
+   strengthened preflight. It must validate all 12 candidate checkpoints and
+   bind the final clean published HEAD.
+4. Obtain one new explicit product authorization bound to that newly generated
+   readiness identity and the exact 288-game/3.5-hour zero-training envelope.
    A successor plan or passing preflight does not reuse the consumed v1 grant.
 5. If authorized, launch exactly once and stop on any mismatch. Review the
    resulting policy-distribution and direct-crossplay evidence
@@ -2359,13 +2375,25 @@ the current successor in this order:
     [failure record](../evidence/target-refresh-mature-fork-diagnostic-attempt-002-failure-2026-08-12.md).
     Do not retry or resume the training sequence. The publisher's
     reference-input and Windows JSONL policies were corrected with focused
-    regression tests. The resulting zero-training analysis-only recovery is
-    frozen under plan identity `70fb522b`. A full preflight passed at published
-    source, but readiness is bound to the exact published HEAD. Regenerate the
-    ignored readiness against the latest clean published `dev` before launch;
-    its exact identity belongs only in that machine-local control file, because
-    committing it would move HEAD and invalidate it again. Launching still
-    requires explicit one-shot product authorization.
+    regression tests. Recovery v1, plan identity `70fb522b`, was authorized and
+    launched once but failed before its first development game because its
+    publisher rejected valid post-fork implementation metadata. It wrote no
+    optimizer, database or checkpoint state and produced no ledger, result or
+    completion record. Its authorization is consumed; preserve the
+    [recovery-v1 failure record](../evidence/target-refresh-mature-fork-analysis-recovery-v1-failure-2026-08-13.md).
+30. Preserve the unlaunched
+    [recovery-v2 contract](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v2.md),
+    plan identity `32158846`, published with its implementation at commit
+    `360c878`. The post-fix read-only audit and final published-source preflight
+    both validated all 12 candidate checkpoints under candidate-audit identity
+    `d3c7e0dd`. The pre-handover readiness identity `fcd38c2f` and file SHA-256
+    `6edca20a` are historical evidence only because this handover commit changes
+    the analysis HEAD. No v2 authorization or launch exists. After this commit
+    is ordinarily published and the branch is clean and synchronized, preserve
+    the historical readiness outside the active namespace and rerun preflight
+    there from an absent namespace. Only the newly generated readiness may be
+    authorized. Do not launch held-out evaluation, promote, publish a model or
+    start long training from this recovery.
 
 The previously executed isolated smoke command was:
 
