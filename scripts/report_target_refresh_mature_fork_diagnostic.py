@@ -105,10 +105,16 @@ _POST_TRAINING_ANALYSIS_PATHS = frozenset(
     {
         "docs/evidence/target-refresh-mature-fork-diagnostic-"
         "attempt-002-failure-2026-08-12.md",
+        "docs/evidence/target-refresh-mature-fork-analysis-recovery-"
+        "v1-failure-2026-08-13.md",
         "docs/experiments/sanmill-target-refresh-mature-fork-"
         "analysis-recovery-v1.json",
         "docs/experiments/sanmill-target-refresh-mature-fork-"
         "analysis-recovery-v1.md",
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v2.json",
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v2.md",
         "docs/handoff/windows-training-2026-07-20.md",
         "scripts/report_target_refresh_mature_fork_diagnostic.py",
         "scripts/run_target_refresh_mature_fork_analysis_recovery.py",

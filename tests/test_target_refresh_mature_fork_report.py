@@ -193,6 +193,35 @@ def test_analysis_source_accepts_reporter_only_descendant(
     ]
 
 
+def test_analysis_source_accepts_isolated_successor_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected = "a" * 40
+    analysis_head = "b" * 40
+    monkeypatch.setattr(
+        report,
+        "_git_identity",
+        lambda commit: {
+            "training_head": commit,
+            "analysis_head": analysis_head,
+            "origin_dev": analysis_head,
+        },
+    )
+    paths = (
+        "docs/evidence/target-refresh-mature-fork-analysis-recovery-"
+        "v1-failure-2026-08-13.md\n"
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v2.json\n"
+        "docs/experiments/sanmill-target-refresh-mature-fork-"
+        "analysis-recovery-v2.md"
+    )
+    monkeypatch.setattr(report, "_git_output", lambda *arguments: paths)
+
+    source = report._inspect_analysis_source(expected)
+
+    assert len(source["post_training_analysis_paths"]) == 3
+
+
 def test_analysis_source_rejects_training_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -39,13 +39,19 @@ A read-only post-fix audit passed all 12 with identity `d3c7e0dd`. This is a
 publisher/preflight correction only; it changes no gameplay or training state
 and does not revive the consumed authorization.
 
+The isolated successor is frozen in
+[recovery v2](../experiments/sanmill-target-refresh-mature-fork-analysis-recovery-v2.md)
+under plan identity `32158846`. It keeps the same scientific and resource
+contract, uses a new output namespace, and remains unlaunched. Publication and
+a final clean preflight come before any new product authorization.
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
    overwrite, repair in place, or reuse its output namespace.
-2. Freeze and publish a successor analysis-only contract with new plan,
-   control, output and authorization identities. Its scope must remain 288 CPU
-   no-update games and 3.5 active hours, with no training or mutable data.
+2. Publish the already frozen recovery-v2 contract and exact implementation by
+   ordinary fast-forward. Its new plan, control, output and authorization
+   identities must remain unchanged.
 3. Run its strengthened preflight from clean published `dev`; it must validate
    all 12 candidate checkpoints before returning product-ready status.
 4. Obtain one new explicit product authorization bound to the new readiness.

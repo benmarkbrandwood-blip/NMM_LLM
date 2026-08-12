@@ -84,6 +84,26 @@ def test_repository_recovery_plan_freezes_published_implementation() -> None:
         assert hashlib.sha256(frozen).hexdigest() == record["sha256"]
 
 
+def test_successor_recovery_plan_is_isolated_and_hash_bound() -> None:
+    path = (
+        recovery.ROOT
+        / "docs/experiments/"
+        "sanmill-target-refresh-mature-fork-analysis-recovery-v2.json"
+    )
+    plan = recovery.load_recovery_plan(path)
+
+    assert plan["plan_identity"] == (
+        "32158846cb3e3903589663465d6217ed546442eee617e0aa5fe94defe45feb25"
+    )
+    assert "analysis-recovery-v2" in plan["control_files"]["readiness"]
+    assert "analysis-recovery-v2" in plan["outputs"]["failure"]
+    for name in ("publisher", "runner"):
+        record = plan["analysis_implementation"][name]
+        assert recovery._sha256_file(recovery.ROOT / record["path"]) == record[
+            "sha256"
+        ]
+
+
 def test_authorization_is_exactly_plan_and_readiness_bound() -> None:
     plan = _plan()
     authorization = recovery.build_authorization(
