@@ -1,6 +1,6 @@
 # Mature target-refresh fork replication v1, attempt 002
 
-Status: `designed_unlaunched_needs_publication`
+Status: `completed_once_no_replicated_material_effect`
 
 Plan identity:
 `85ad0b99093bc7e81ac6057b92abd8a38cafdc03893b6b46c760dffd3fa5acca`
@@ -94,3 +94,32 @@ authorization-free preparation must be generated once at that exact commit.
 No later tracked commit may be added before the parent decision and any
 authorized execution complete. The plan itself grants zero launch authority.
 
+## Completed result
+
+The product owner approved the exact one-shot parent plan in the working
+conversation and directed the Agent not to request separate seed, arm, or
+analysis approvals. The delegated operator recorded readiness identity
+`7088c1f5b030ca5e39397400e4c252a033dedc6e3ec5e06a2fd7c0e8e1028af0`
+and authorization identity
+`b7384d76b9b906720263b0a8c3d566b8525f57e2118918d85626931afff5d571`.
+The sequence completed once; its authorization is consumed.
+
+All six arms passed policy health and stopped at exactly 8,192 post-fork
+transitions. They used 2,324 new training games, 768 optimizer updates and
+0.3861 managed active hours. The 288-game no-update direct comparison then
+completed without checkpoint or database writes.
+
+The replication cohort favoured `refresh-mature` by `+0.1215278`, with seeds
+64 and 65 meeting the per-seed support boundary. The prior cohort favoured
+stale control by `-0.0763889`. Their pooled six-seed effect was only
+`+0.0225694`, with two rather than the required three supporting seeds. The
+frozen final classification is `no_replicated_material_effect`; no target
+condition was selected and no long run was authorized.
+
+Preserve the complete
+[result evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md),
+result identity
+`8559fa7b5720f3b3a2b8b41743ada612a89aef8d37ad191fa2737d4673185142`,
+and completion identity
+`94648404b20a4aba78b2eecc7e53096336f3c0c55c8bdf22ad8fe355a5831d37`.
+Do not rerun, resume, extend, overwrite, or relabel this attempt.

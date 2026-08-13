@@ -111,6 +111,26 @@ authoritative machine-local state after preparation. It grants no authority
 and is not `ready_for_long_run`; the result gate explicitly sets
 `automatic_long_run_selection=false`.
 
+That prelaunch state is now historical. At clean synchronized source
+`8179e8e`, attempt 002 was prepared under readiness identity `7088c1f5` and
+authorized once under parent identity `b7384d76`. The product owner approved
+the exact parent grant and directed the Agent not to ask separately for seeds,
+arms, or the included analysis. All six arms completed and passed policy
+health, consuming 2,324 new training games, exactly 49,152 post-fork
+transitions, 768 A2C updates, and 0.3861 managed active hours. The sequence
+then completed all 288 no-update development games without checkpoint or
+database writes. Completion identity is `94648404`; result identity is
+`8559fa7b`; result file SHA-256 is `0197ca41`. No failure record exists.
+
+The disjoint seeds 64--66 cohort favoured `refresh-mature` by `+0.121528`,
+with seed effects `+0.322917`, `+0.083333`, and `-0.041667`. The independent
+seeds 67--69 cohort had favoured stale control by `-0.076389`. Their pooled
+six-seed effect was only `+0.022569`, below `1/12`, and only seeds 64 and 65
+met the supporting-seed boundary rather than the required three. The frozen
+classification is `no_replicated_material_effect`, with no selected successor
+condition and `automatic_long_run_selection=false`. Preserve the
+[replication result evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -121,15 +141,14 @@ and is not `ready_for_long_run`; the result gate explicitly sets
 3. Preserve the `no_material_direct_effect` result and null selection. Do not
    choose stale control from seed 67 alone or lower the frozen threshold after
    observing the result.
-4. After final zero-training preparation, if the product owner authorizes plan
-   identity `85ad0b99`, record that one parent decision once and derive the six
-   just-in-time child authorizations in frozen launch order. Do not request
-   per-seed or per-arm approvals. Any drift or arm failure consumes/closes the
-   attempt; do not retry it automatically.
-5. Do not start held-out evaluation, promotion, publication, retained training
-   or long training from this development evidence. Even a replicated result
-   is only a cadence input to a separately frozen retained plan and separate
-   launch decision.
+4. Preserve replication attempt 002 under readiness identity `7088c1f5`,
+   authorization identity `b7384d76`, launch identity `c71c2ccb`, completion
+   identity `94648404`, and result identity `8559fa7b`. Its grant is consumed;
+   do not rerun, resume, extend, overwrite, or relabel it.
+5. Preserve the null pooled cadence selection. A next retained run may be
+   designed as a new research baseline, but its target schedule must be stated
+   as a new plan choice rather than attributed to this result. Freeze and
+   verify that plan separately before any long-training launch decision.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
@@ -2455,6 +2474,19 @@ the current successor in this order:
     [result evidence](../evidence/target-refresh-mature-fork-analysis-recovery-v2-result-2026-08-13.md),
     do not rerun or extend this consumed recovery, and do not infer held-out
     strength, promotion, publication, or long-training authority from it.
+32. Mature-fork replication attempt 002 subsequently completed exactly once
+    under readiness identity `7088c1f5`, authorization identity `b7384d76`,
+    launch identity `c71c2ccb`, and completion identity `94648404`. Its six
+    arms used 2,324 new games, 49,152 post-fork transitions and 768 updates;
+    every policy-health gate passed. The 288-row no-update ledger SHA-256 is
+    `e6036cae`; result identity `8559fa7b` classifies the pooled six-seed
+    evidence as `no_replicated_material_effect`. The replication cohort
+    favoured refresh, the prior cohort favoured stale control, and the pooled
+    `+0.022569` effect did not meet the `1/12` or three-supporting-seed gates.
+    No cadence is selected. Preserve the
+    [replication evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md)
+    and do not rerun, resume, extend, promote, publish, or infer long-training
+    authority from the consumed sequence.
 
 The previously executed isolated smoke command was:
 
