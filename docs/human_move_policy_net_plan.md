@@ -698,10 +698,20 @@ Draft — thresholds to be reviewed with the user before the retrain runs.
 
 - Reversion base: any commit up to and including `2f36d69` predates Batch 3.
 - The v2 candidate is not overwritten regardless of Phase 5 outcome.
-- If the v3 teacher fails a gate, GapNet Stage D can either fall back to the v2
-  candidate (documented state-key-split leakage) or delay Stage D until a
-  re-authored Phase 5 iteration lands.  This choice is made in the GapNet plan,
-  not here.
+- **v2 candidate is NOT a valid fallback for Stage D.**  Codex review 2026-08-12
+  reminded us that Decision 6A (reuse v2 candidate) is off the table because
+  the v2 candidate was trained under `three_way_split(state_key)`, which
+  provides neither session-level nor state-key-level cleanliness against
+  GapNet's held-out slices.  Consequently:
+    * `data/human_move_policy_net_v2_candidate.npz` is retained solely as an
+      **exploratory comparison** — any provenance record referring to it must
+      label it as such.
+    * If the v3 teacher fails a Phase 5 gate, GapNet Stage D **must delay**
+      until a re-authored Phase 5 iteration produces a clean teacher.  Falling
+      back to v2 would silently reintroduce the leakage the whole rebuild was
+      designed to eliminate.
+    * Any Stage D or Stage E promotion evidence generated using v2 as the
+      teacher is inadmissible for the checklist's promotion gates.
 
 ## Regret — deferred to GapNet plan (reviewer §11)
 
