@@ -7,10 +7,10 @@ playing-strength test, a refresh-cadence causal experiment, or authority to
 play any game. The machine-readable
 [plan](sanmill-retained-v3-v4-passivity-diagnostic-v1.json) is frozen at
 identity
-`bb99571690ab4fcf2009bf5c2f3dc8ca39eb5b0e2842551e96a1f6041505d1d8`,
+`4281cdbd40374bcd3ff20429a759598382bf2ce1cbe27bde85ee1acacb328b8d`,
 file SHA-256
-`c651469a1cbe533f4269e9adaf8f4018b18ee56deff08a913699740b30746b07`,
-and published evaluator implementation commit `82c665022789570d3165fe0d4b6366f90abc5663`.
+`e6d9c6dcf724af6e83eab61f47077408b45ea869c2a8c0e39f54ed344d86007d`,
+and evaluator implementation commit `361d99a43a9ca549b6f4594d8cb5c26a23d5dd54`.
 A separate product-owner grant must bind that exact plan identity, file and
 resource envelope before a development-corpus game may start.
 
@@ -185,8 +185,8 @@ requires a separately powered, newly exposure-audited held-out contract.
 | Prospective process evaluator | implemented and unit tested |
 | Live web report and metric help | implemented and JavaScript-checked |
 | Focused and mandatory provenance tests | 55 focused passed; 103 tests / 498 subtests provenance passed |
-| Clean published implementation source | `dev == origin/dev == 82c6650` when the plan was frozen |
-| Machine-readable plan identity | `bb995716...` |
+| Clean published implementation source | implementation `361d99a` awaits ordinary publication with this amended plan |
+| Machine-readable plan identity | `4281cdbd...` |
 | Separate product authorization | absent |
 
 Verdict: `needs_decision` until the frozen plan is itself published, a final

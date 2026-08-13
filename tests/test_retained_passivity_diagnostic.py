@@ -237,10 +237,10 @@ def test_schedule_pairs_candidates_adjacent_with_same_start_and_colour(spec) -> 
 def test_frozen_plan_binds_process_estimand_resources_and_claim_boundary() -> None:
     plan = runner.load_plan(runner.DEFAULT_PLAN)
     assert plan["plan_identity"] == (
-        "bb99571690ab4fcf2009bf5c2f3dc8ca39eb5b0e2842551e96a1f6041505d1d8"
+        "4281cdbd40374bcd3ff20429a759598382bf2ce1cbe27bde85ee1acacb328b8d"
     )
     assert plan["implementation"]["commit"] == (
-        "82c665022789570d3165fe0d4b6366f90abc5663"
+        "361d99a43a9ca549b6f4594d8cb5c26a23d5dd54"
     )
     assert plan["workload"] == {
         "automatic_retry_or_recovery": False,

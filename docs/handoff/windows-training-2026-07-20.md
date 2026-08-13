@@ -2631,10 +2631,11 @@ the current successor in this order:
     state, history-free Malom context, conditional move-value coverage, rules
     terminations and incomplete safety caps. Its two exact route bundles have
     been exported and CPU verified. The evaluator and help-bearing web report
-    are published at implementation commit `82c6650`; 55 focused tests and the
-    mandatory 103-test / 498-subtest provenance suite passed. The machine plan
-    is frozen at identity `bb995716`, but no product authorization or
-    diagnostic game exists yet. Do not reuse the attempt-003 training grant.
+    were introduced at `82c6650`. A preflight-report/launch-gate hardening fix
+    at `361d99a` removes raw corpus bodies from readiness and makes skipped
+    tests or prefix replay non-runnable. The amended machine plan is frozen at
+    identity `4281cdbd`; no product authorization or diagnostic game exists
+    yet. Do not reuse the attempt-003 training grant.
 
 The previously executed isolated smoke command was:
 
