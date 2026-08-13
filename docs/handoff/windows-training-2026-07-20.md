@@ -2622,6 +2622,17 @@ the current successor in this order:
     descriptive, and its grant covers no held-out work. The next evaluator
     must be prospectively instrumented because the training rows do not retain
     cap states or strict rule history.
+34. The next source-only branch is the
+    [retained-v3/v4 passivity diagnostic](../experiments/sanmill-retained-v3-v4-passivity-diagnostic-v1.md).
+    It reuses the 64-start corpus explicitly as non-held-out development data,
+    pairs the two named final routes within each start/colour unit, and makes
+    strict-referee survival beyond total logical ply 120 its primary process
+    metric. The prospective ledger also preserves the full ply-120 referee
+    state, history-free Malom context, conditional move-value coverage, rules
+    terminations and incomplete safety caps. Its two exact route bundles have
+    been exported and CPU verified. The implementation and web report are
+    under test; no machine-readable final plan, product authorization or
+    diagnostic game exists yet. Do not reuse the attempt-003 training grant.
 
 The previously executed isolated smoke command was:
 
