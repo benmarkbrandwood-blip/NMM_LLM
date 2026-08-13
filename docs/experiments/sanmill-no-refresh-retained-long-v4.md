@@ -1,10 +1,10 @@
 # Sanmill no-refresh retained long v4
 
-Status: `failed_closed_attempt_002_never_retry_or_resume`
+Status: `designed_unlaunched_attempt_003`
 
-Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-002`
+Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-003`
 
-Plan ID: `managed-sanmill-no-refresh-retained-v4-seed70-attempt-002`
+Plan ID: `managed-sanmill-no-refresh-retained-v4-seed70-attempt-003`
 
 This document freezes a fresh 5,000-game research baseline that suppresses
 all periodic frozen-target refreshes. It does not authorize launch, held-out
@@ -39,6 +39,14 @@ database, readiness and authorization identities. Reusing seed 70 for a fresh
 successor does not resume attempt 002 because no checkpoint was retained, but
 it still requires a new lineage and a new product decision.
 
+Attempt 003 is that fresh successor. Commit `cde6a5e` snapshots the legacy
+non-exact transition batch before clearing the pending queue and adds a focused
+regression that preserves all batch temperatures after the original queue is
+cleared. Attempt 003 retains the scientific configuration and seed 70 but uses
+new experiment, plan, control, template, writable database, readiness and
+authorization identities. It must be prepared only from the final clean
+published source; this document still grants no launch authority.
+
 ## Objective and evidence boundary
 
 The completed seed-58 preserving-retained v3 baseline refreshed its frozen
@@ -70,7 +78,7 @@ byte-for-byte trajectory-parity proof against the v3 executable.
 Attempt 002 permits no scientific conclusion about no-refresh training because
 it produced no accepted checkpoint or segment. For a separately prepared
 successor, the allowed conclusion remains limited to the health and outcome of
-one fresh no-refresh baseline under that successor's source, plus later
+one fresh no-refresh baseline under the attempt-003 source, plus later
 held-out performance of its frozen candidate if separately authorized. A
 difference from v3 cannot be attributed solely to target refresh, seed, or any
 other single factor. Training W/D/L, the 29-state policy-health gate,
@@ -163,20 +171,21 @@ Control and output directory:
 
 ```text
 learned_ai/checkpoints/scaffolded/s_gen_v2_sanmill_refereed/
-managed-sanmill-no-refresh-retained-v4-seed70-attempt-002
+managed-sanmill-no-refresh-retained-v4-seed70-attempt-003
 ```
 
 SpecialistDB:
 
 ```text
-data/specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_002.sqlite
+data/specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_003.sqlite
 ```
 
 Both targets must be absent before preparation. Copy the database once from
 the closed snapshot
-`data/specialist_db.no_refresh_retained_v4.attempt_002.template.sqlite`.
-The snapshot was copied byte-for-byte from the already closed attempt-001
-runtime database, not opened through a writable SQLite connection, and has no
+`data/specialist_db.no_refresh_retained_v4.attempt_003.template.sqlite`.
+The snapshot is a byte-for-byte copy of the closed attempt-002 template, which
+was copied from the already closed attempt-001 runtime database. It was not
+opened through a writable SQLite connection and has no
 WAL, SHM or rollback-journal sidecar. The snapshot and fresh copy must be
 45,056 bytes with SHA-256
 `5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`,
@@ -187,7 +196,7 @@ sidecar.
 The older
 `data/specialist_db.mill_bonus_ablation_v1.template.sqlite` currently has an
 empty WAL and a non-empty SHM sidecar. It is preserved untouched as historical
-local state and is not an attempt-002 input. Its sidecars must not be deleted
+local state and is not an attempt-003 input. Its sidecars must not be deleted
 to make a readiness check pass.
 
 These machine-local artefacts remain ignored. They must not be committed,
@@ -232,7 +241,10 @@ separately proven and explicitly covered semantics-identical recovery applies.
 ## Current-source execution evidence
 
 No additional counted smoke is required merely to exercise the no-refresh
-switch. At the same trainer implementation used by this successor, replication
+switch. The attempt-002 failure was an evidence-buffer alias, and the focused
+regression now proves that clearing the legacy pending queue cannot erase the
+snapshot used for behaviour-temperature logging. At the same underlying
+trainer route used by this successor, replication
 attempt 002 completed three `stale-control` arms with no subsequent target
 refresh. Each consumed exactly 8,192 transitions in 128 finite A2C updates and
 passed the identical policy-health gate. The paired plan also proved that the
@@ -252,11 +264,11 @@ both isolated targets are absent and creating the exact empty database:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py prepare `
-  --control-dir learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
-  --plan-id managed-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
+  --control-dir learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003 `
+  --plan-id managed-sanmill-no-refresh-retained-v4-seed70-attempt-003 `
   --max-wall-hours 12 `
   --objective "fresh no-refresh retained research baseline after the pooled mature-refresh null result" `
-  --experiment-id dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
+  --experiment-id dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-003 `
   --seed 70 `
   --max-games 5000 --segment-games 250 --max-ply 120 `
   --engine-profile sanmill-fixed-resource --self-play-ratio 0.60 `
@@ -267,7 +279,7 @@ both isolated targets are absent and creating the exact empty database:
   --mill-bonus-mode malom-preserving-only `
   --malom-policy-aux-mode fixed --malom-policy-aux-coef 0.0 `
   --specialist-read-mode full `
-  --specialist-db data\specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_002.sqlite `
+  --specialist-db data\specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_003.sqlite `
   --policy-health-gate --policy-health-device auto
 ```
 
@@ -306,7 +318,7 @@ database and dependency identities, and a canonical readiness identity:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\generate_managed_generalist_readiness.py generate `
-  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\plan.json `
+  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003\plan.json `
   --experiment-document docs\experiments\sanmill-no-refresh-retained-long-v4.md `
   --reviewed-main 40da3ddfced972c418541665ec739b3752edcd1f
 ```
@@ -316,7 +328,7 @@ launching training:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\generate_managed_generalist_readiness.py verify `
-  --readiness learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\technical-readiness.json
+  --readiness learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003\technical-readiness.json
 ```
 
 Technical readiness and launch authority are reported separately. This
@@ -332,8 +344,8 @@ reviewed supervisor route is:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py run-authorized `
-  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\plan.json `
-  --authorization learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\authorization.json
+  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003\plan.json `
+  --authorization learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003\authorization.json
 ```
 
 Do not launch this command from the document alone.

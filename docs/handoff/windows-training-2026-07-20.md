@@ -163,6 +163,15 @@ and new experiment, plan, control, database, readiness and authorization
 identities. It may retain seed 70 as a fresh seed because no checkpoint was
 written, but it is not a resume or recovery of attempt 002.
 
+Commit `cde6a5e` fixes the failure without changing optimizer or gameplay
+semantics: the legacy non-exact A2C route now takes a shallow snapshot of its
+pending step list before clearing the lineage-owned queue. The focused update
+tests pass 30/30 and include the exact queue-clear regression. Attempt 003 is
+the new unlaunched successor in the same experiment document. It retains seed
+70 and the frozen scientific configuration but requires new control, template,
+writable database, plan, readiness and authorization identities after the
+final contract commit is published.
+
 The v4 comparison to retained v3 is source-confounded as well as
 seed-confounded: v3 ran at `3f400135`, before later trainer, manager and
 preflight hardening and before the current explicit read/LR mode interfaces.
@@ -191,10 +200,10 @@ difference from v3 may be attributed solely to target refresh.
 7. Preserve no-refresh retained-v4 attempt 002, its consumed authorization,
    failed event chains, logs and mutated database. Do not retry, resume, repair
    in place or reuse any of them.
-8. Test and publish the non-exact update-batch aliasing correction. Only then
-   define a fresh attempt 003 with new control and database paths, generate its
-   ignored plan and canonical readiness bundle at the final clean source, and
-   request one product decision bound to those new identities.
+8. Preserve correction commit `cde6a5e` and the attempt-003 contract. Publish
+   the final tracked source, create its closed template and fresh writable
+   database, generate the ignored plan and canonical readiness bundle, and
+   only then request one product decision bound to the new identities.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
