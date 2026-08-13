@@ -1,17 +1,18 @@
 # Retained-v3/v4 phase-process corpus readiness — 13 August 2026
 
-Status: `plan_frozen_locally_source_readiness_and_evaluation_authority_absent`
+Status: `source_ready_0ff79e39_evaluation_authority_absent`
 
-Technical-readiness verdict: `not_ready`
+Technical-readiness verdict: `ready_for_authorization`
 
 The source corpus, successor-owned inputs, evaluator core, fail-closed runner
-and immutable machine-readable plan are ready locally. The plan still must be
-committed and published before the full source preflight can produce its final
-readiness identity, and no product authorization exists. Route bundles were
-opened only for identity verification and deterministic synthetic canaries
-after corpus membership was frozen. No corpus policy move, game, Sanmill
-evaluation search, training step, optimizer update, database mutation or
-checkpoint mutation occurred in this preparation.
+and immutable machine-readable plan are technically ready on clean published
+`dev`. Two complete preflights produced identical source readiness
+`0ff79e398233c7ed9fcdec4cc5cd406837330140a3c1cec720e11eaa274ae365`.
+No product authorization exists, so the overall verdict remains
+`needs_decision`. Route bundles were opened only for identity verification and
+deterministic synthetic canaries after corpus membership was frozen. No corpus
+policy move, game, Sanmill evaluation search, training step, optimizer update,
+database mutation or checkpoint mutation occurred in this preparation.
 
 ## Observed facts
 
@@ -42,7 +43,8 @@ The remaining 39 starts are non-terminal under the pinned current referee.
 | Evaluator core | variable replay, relative 108-ply snapshot, canonical ledger, start clustering and live web implemented at `f8070d1` | exact source support | pass |
 | Successor inputs | snapshot identity `b35ecc06`; both bundles identity-equal; both DBs byte-equal, read-only and sidecar-free | no completed-plan runtime path reuse | pass |
 | Fail-closed runner | stable source-readiness binding, non-skippable tests/history replay, semantic fail-close and host-interruption exact suffix resume | exact controller | pass |
-| Machine plan | identity `7dfd8e32`, 156 games, two active hours, implementation `32e8843` | canonical plan, not authority | pass locally; publish pending |
+| Machine plan | identity `4c85ff33`, 156 games, two active hours, implementation `5a318a0`, plan commit `117a5be` | canonical published plan, not authority | pass |
+| Full source preflight | two equal source identities `0ff79e39`; ten technical gates pass; zero corpus candidate moves and zero games | stable technical evidence before authority | pass |
 | Launch authority | none | plan-bound product authorization | absent |
 
 The accepted corpus has 18 placement, 14 movement and seven flying starts;
@@ -64,9 +66,11 @@ properties of a deterministic source pool, not a population sample.
 | Successor input snapshot identity | `b35ecc061e53a35e227c69ff886a7c6534e707bd124abdbe13acbbf9647f48ac` |
 | Successor input manifest SHA-256 | `cda9456e0234a9532ddfb1b90e3a78bb6a35ef788c0eddfca607e9f33cb1942a` |
 | Evaluator core commit | `f8070d125844635bde8095079cbe3ea5d36e99dd` |
-| Runner gate commit | `32e8843b791ea0ebbf149b5ad4ccfb96ad13318f` |
-| Frozen machine plan identity | `7dfd8e32451a43acaddf1d8bc654c560779a96e60029aecb22d34cfbe7d8c367` |
-| Frozen machine plan file SHA-256 | `fad47ecaf0b6de0edc4e323a926e65a5cbaf24a77bdb38f760c3f75939d364b9` |
+| Stable readiness implementation commit | `5a318a063b561b12bafe5e72e44ff6fdc9426f1e` |
+| Frozen machine plan identity | `4c85ff3362927db9b63014e0c91022a5d169d19efa4aa85b3a643febd0ce3256` |
+| Frozen machine plan file SHA-256 | `09245e5f66af3d18ba2818d1dfac70b4c7eec8d63c9388d501b32846dfccf9d3` |
+| Frozen machine plan commit | `117a5be8086af04ba0b311f44a23cdc9804a7284` |
+| Source readiness identity | `0ff79e398233c7ed9fcdec4cc5cd406837330140a3c1cec720e11eaa274ae365` |
 
 The tracked artifact is
 [the phase-process corpus](../experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json).
@@ -125,13 +129,13 @@ start, matching the prior 12-to-120 observation window.
 
 ## Next validation
 
-Commit and fast-forward publish the frozen plan. Then run the full fresh
-preflight against the still-absent runtime targets. The technical gate set must
-include the exact successor input manifest, both candidate routes and DBs,
-Sanmill's deterministic canary, all 39 fresh-process history replays, focused
-tests, mandatory provenance tests, Ruff and process ownership. If and only if
-all non-authority gates pass, record the resulting stable source-readiness
-identity and ask the product owner once for the bounded 156-game grant.
+Obtain one explicit product authorization bound exactly to machine plan
+`4c85ff33...` and source readiness `0ff79e39...`. Only then may the controller
+materialize its ignored authorization/spec/launch evidence and open the first
+game. The grant must preserve the frozen 156-game/two-active-hour envelope,
+host-interruption-only exact missing-suffix resume, and every prohibition in
+the machine plan. A semantics failure remains terminal; it is not permission
+to retry, recover or expand.
 
 The reviewed source-only command was:
 
@@ -139,4 +143,5 @@ The reviewed source-only command was:
 .\.venv\Scripts\python.exe tools\freeze_retained_phase_process_corpus.py
 .\.venv\Scripts\python.exe tools\prepare_retained_phase_process_inputs.py prepare
 .\.venv\Scripts\python.exe tools\freeze_retained_phase_process_plan.py
+.\.venv\Scripts\python.exe scripts\run_retained_phase_process_generalization.py preflight
 ```

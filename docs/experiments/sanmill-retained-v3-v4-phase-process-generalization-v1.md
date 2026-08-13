@@ -1,6 +1,6 @@
 # Retained-v3/v4 phase-process generalization v1
 
-Status: `frozen_plan_7dfd8e32_awaiting_source_readiness_and_product_authorization`
+Status: `source_ready_0ff79e39_awaiting_product_authorization`
 
 This is the recommended successor design after the completed reused-corpus
 passivity diagnostic. It authorizes no evaluation game, policy decision,
@@ -10,11 +10,17 @@ owned byte-exact snapshots and deterministic synthetic canaries.
 
 The canonical [machine plan](sanmill-retained-v3-v4-phase-process-generalization-v1.json)
 has identity
-`7dfd8e32451a43acaddf1d8bc654c560779a96e60029aecb22d34cfbe7d8c367`
+`4c85ff3362927db9b63014e0c91022a5d169d19efa4aa85b3a643febd0ce3256`
 and file SHA-256
-`fad47ecaf0b6de0edc4e323a926e65a5cbaf24a77bdb38f760c3f75939d364b9`.
-It binds implementation commit `32e8843b791ea0ebbf149b5ad4ccfb96ad13318f`.
+`09245e5f66af3d18ba2818d1dfac70b4c7eec8d63c9388d501b32846dfccf9d3`.
+It binds implementation commit `5a318a063b561b12bafe5e72e44ff6fdc9426f1e`
+and is tracked by plan commit `117a5be8086af04ba0b311f44a23cdc9804a7284`.
 It is not an authorization.
+
+The earlier unlaunched identity `7dfd8e32...` was superseded before any
+authorization or runtime artifact existed. The only reason was to bind the
+plan to the readiness-identity hardening that rejects post-plan runtime-code
+changes while allowing the four named status documents to record evidence.
 
 ## Objective and claim boundary
 
@@ -128,6 +134,22 @@ incomplete caps are never converted into draws.
 - no automatic retry, semantic recovery, resource extension or result-based
   early stop.
 
+## Source readiness
+
+Two complete fresh preflights on published clean `dev` produced the same
+source-readiness identity
+`0ff79e398233c7ed9fcdec4cc5cd406837330140a3c1cec720e11eaa274ae365`.
+All ten technical gates passed: repository and plan, absent fresh outputs,
+successor inputs, corpus and schedule, both candidate routes, pinned Sanmill,
+all 39 strict history replays, process ownership, focused tests, mandatory
+Malom/DB/provenance tests and Ruff. The only failed gate was the deliberately
+separate product authorization.
+
+Both preflights requested zero corpus candidate moves and played zero games.
+The HumanDB loader's warning that its unversioned historical Malom columns are
+disabled is expected and consistent with the frozen data contract; corrected
+Malom labels come only from the separately identified tablebase.
+
 ## Remaining launch gates
 
 1. Completed: create and byte-audit successor-owned, sidecar-free, read-only
@@ -136,13 +158,13 @@ incomplete caps are never converted into draws.
 2. Completed at source commit `f8070d1`: implement variable-history replay,
    the relative 108-ply horizon, start-clustered reporting, live partial
    recomputation and the required web explanations.
-3. Completed at commits `60bb10e`, `728fa25` and `32e8843`: implement the
+3. Completed at commits `60bb10e`, `728fa25`, `32e8843` and `5a318a0`:
+   implement the
    fail-closed runner, exact missing-suffix resume, identity-bound zero-game
-   safe-capture/full-order follow-up, and non-skippable plan-freezer tests.
-4. Completed locally: freeze the canonical machine plan as identity
-   `7dfd8e32`. Commit and fast-forward publish the plan, then run the full
-   focused, mandatory Malom/DB/provenance, candidate, Sanmill and 39-history
-   gates to produce one stable source-readiness identity.
+   safe-capture/full-order follow-up, non-skippable plan-freezer tests, and a
+   stable source identity that fails on post-plan runtime changes.
+4. Completed and published: freeze machine plan `4c85ff33` at plan commit
+   `117a5be`; run every technical gate twice and obtain stable source readiness
+   `0ff79e39`.
 5. Obtain one explicit product authorization bound to that plan and source-
-   readiness identity before opening the first game.
    readiness identity before opening the first game.
