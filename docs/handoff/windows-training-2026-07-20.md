@@ -212,16 +212,15 @@ colours inside each of 64 independent starts: v4-minus-v3 was `+1.171875pp`,
 with interval `[-0.8492pp, +3.1929pp]`. Preserve the
 [completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
 
-Source and evaluator-core preparation for the recommended process-
-generalization successor is now complete. The frozen phase-process corpus has
-identity `3be3d76c`, 39
-starts (18 placement / 14 movement / 7 flying), zero exact or `ring16` overlap
+The phase-process generalization successor is now complete. The frozen corpus
+has identity `3be3d76c`, 39 starts (18 placement / 14 movement / 7 flying),
+zero exact or `ring16` overlap
 with the previous 64 openings, and zero D4 start-state hits in HumanDB or
 either candidate SpecialistDB. Two strict replay passes agreed; source entries
 29, 31 and 32 were excluded because the current referee reaches threefold at
-ply 142 before those requested states. No policy move or game was played. The
-comparable primary window is 108 post-start logical plies because the frozen
-histories begin at plies 7–178. The evaluator core and live web were committed
+ply 142 before those requested states. Preparation requested no policy move or
+game. The comparable primary window was 108 post-start logical plies because
+the frozen histories begin at plies 7–178. The evaluator core and live web were committed
 at `f8070d1`. Successor-owned, read-only route and sidecar-free DB copies have
 snapshot identity `b35ecc06`. The fail-closed runner and zero-game mechanism
 audit are implemented. The first unlaunched plan identity `7dfd8e32` was
@@ -230,10 +229,15 @@ without invalidating itself. The published 156-game/two-hour machine plan is
 now identity `4c85ff33`, file SHA `09245e5f`, over implementation `5a318a0`
 and plan commit `117a5be`. Two complete preflights passed all ten technical
 gates with stable source readiness `0ff79e39`; zero corpus candidate moves and
-zero games were requested. The only absent gate is exact product
-authorization, and no runtime JSON other than the input manifest exists.
-Preserve the
-[source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md).
+zero games were requested during readiness. Direct authorization identity
+`ceedd13a` was then consumed by launch `82782019`. All 156 games completed once
+in 399.619311 active seconds; all reached strict rules terminals and none hit
+the safety cap. The start-clustered v4-minus-v3 survival difference was
+`-2.5641pp`, interval `[-6.0707pp, +0.9425pp]`, decision `inconclusive`. This
+does not reproduce the prior reused-opening-corpus direction and does not
+establish the opposite direction. Preserve the
+[source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md)
+and [completion evidence](../evidence/sanmill-retained-v3-v4-phase-process-generalization-v1-result-2026-08-14.md).
 
 ### Remaining work for the next operator
 
@@ -2683,19 +2687,22 @@ the current successor in this order:
     ledger and reports. Do not rerun, extend or relabel them held out. A
     successor requires a new objective, corpus, immutable plan, resource
     envelope, readiness and authority.
-35. Preserve the retained-v3/v4 phase-process corpus under
+35. Preserve the completed retained-v3/v4 phase-process result under corpus
     identity `3be3d76c`, records identity `8fdf3adf`, strict replay audit
-    `6f65dc3d` and exposure audit `f9b2ebb1`. It has 39 accepted starts and no
-    candidate result. The draft successor uses a relative 108-ply window and
-    156 games. Its evaluator core/live web is at `f8070d1`, identity-equal
+    `6f65dc3d`, exposure audit `f9b2ebb1` and completed result identity
+    `6007af18`.
+    The successor used a relative 108-ply window and 156 games. Its
+    evaluator core/live web is at `f8070d1`, identity-equal
     successor-owned inputs are frozen under snapshot identity `b35ecc06`, and
     its fail-closed runner/mechanism audit is bound by published machine plan
     `4c85ff33` over implementation `5a318a0` and plan commit `117a5be`. Stable
     source readiness `0ff79e39` passed all technical gates twice with zero
-    corpus candidate moves and zero games. No product authorization, runtime
-    spec or launch grant exists. Do not reuse or modify the plan-`035c68f8`
-    route/database paths, and do not launch without a grant bound to both the
-    full plan and source-readiness identities.
+    corpus candidate moves and zero games. Direct authorization `ceedd13a`,
+    runtime spec `bb349a96`, launch `82782019` and completion `48ac2ad4` are
+    consumed. The primary result is `inconclusive`, not held out and not a
+    strength, refresh-causal or equivalence result. Preserve the ledger and
+    reports; do not rerun, resume, extend or relabel them. Any successor needs
+    a new objective, corpus, frozen plan, readiness and explicit authority.
 
 The previously executed isolated smoke command was:
 

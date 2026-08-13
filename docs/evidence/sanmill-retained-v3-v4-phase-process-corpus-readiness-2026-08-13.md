@@ -1,18 +1,19 @@
 # Retained-v3/v4 phase-process corpus readiness — 13 August 2026
 
-Status: `source_ready_0ff79e39_evaluation_authority_absent`
+Status: `completed_evaluation_from_source_readiness_0ff79e39`
 
-Technical-readiness verdict: `ready_for_authorization`
+Current verdict: `completed_evaluation_needs_decision`
 
 The source corpus, successor-owned inputs, evaluator core, fail-closed runner
-and immutable machine-readable plan are technically ready on clean published
+and immutable machine-readable plan were technically ready on clean published
 `dev`. Two complete preflights produced identical source readiness
 `0ff79e398233c7ed9fcdec4cc5cd406837330140a3c1cec720e11eaa274ae365`.
-No product authorization exists, so the overall verdict remains
-`needs_decision`. Route bundles were opened only for identity verification and
-deterministic synthetic canaries after corpus membership was frozen. No corpus
-policy move, game, Sanmill evaluation search, training step, optimizer update,
-database mutation or checkpoint mutation occurred in this preparation.
+At this readiness capture no product authorization existed. Direct authority
+was subsequently bound to that exact source identity and plan `4c85ff33`, and
+the 156-game evaluation completed once. See the
+[completion evidence](sanmill-retained-v3-v4-phase-process-generalization-v1-result-2026-08-14.md).
+The preparation itself requested no corpus policy move, game, Sanmill search,
+training step, optimizer update, database mutation or checkpoint mutation.
 
 ## Observed facts
 
@@ -45,7 +46,7 @@ The remaining 39 starts are non-terminal under the pinned current referee.
 | Fail-closed runner | stable source-readiness binding, non-skippable tests/history replay, semantic fail-close and host-interruption exact suffix resume | exact controller | pass |
 | Machine plan | identity `4c85ff33`, 156 games, two active hours, implementation `5a318a0`, plan commit `117a5be` | canonical published plan, not authority | pass |
 | Full source preflight | two equal source identities `0ff79e39`; ten technical gates pass; zero corpus candidate moves and zero games | stable technical evidence before authority | pass |
-| Launch authority | none | plan-bound product authorization | absent |
+| Launch authority | absent at source-readiness capture; subsequently supplied and consumed as `ceedd13a...` | plan-bound product authorization | historically absent; completed later |
 
 The accepted corpus has 18 placement, 14 movement and seven flying starts;
 22 have White to move and 17 Black. Source-history lengths range from 7 to
@@ -71,6 +72,9 @@ properties of a deterministic source pool, not a population sample.
 | Frozen machine plan file SHA-256 | `09245e5f66af3d18ba2818d1dfac70b4c7eec8d63c9388d501b32846dfccf9d3` |
 | Frozen machine plan commit | `117a5be8086af04ba0b311f44a23cdc9804a7284` |
 | Source readiness identity | `0ff79e398233c7ed9fcdec4cc5cd406837330140a3c1cec720e11eaa274ae365` |
+| Post-authorization readiness | `aeea1625ce38607aea4c08a0c0f363ba0c1d29c7584d4f498f562b6300f58677` |
+| Runtime spec identity | `bb349a96df3e8445d3687c7c24dc474fe595d63aa890085ed6c6b2a94574fe72` |
+| Result / completion identities | `6007af186b9a7ce908416f4578ebc31c0c19fc27733c32ed44751bb39cc3c812` / `48ac2ad4c6abc79b69c7de597ad46a5197949b4dcdee1f962e621d1be2fc57c8` |
 
 The tracked artifact is
 [the phase-process corpus](../experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json).
@@ -127,17 +131,17 @@ start, matching the prior 12-to-120 observation window.
 - V3 and v4 still differ in seed, source, target age and accumulated database;
   a confirmation would remain descriptive and non-causal.
 
-## Next validation
+## Completion reconciliation
 
-Obtain one explicit product authorization bound exactly to machine plan
-`4c85ff33...` and source readiness `0ff79e39...`. Only then may the controller
-materialize its ignored authorization/spec/launch evidence and open the first
-game. The grant must preserve the frozen 156-game/two-active-hour envelope,
-host-interruption-only exact missing-suffix resume, and every prohibition in
-the machine plan. A semantics failure remains terminal; it is not permission
-to retry, recover or expand.
+The requested direct authorization was supplied, consumed when the first game
+opened, and not reused. All 156 games reached strict rules terminals in
+399.619311 active seconds; no host interruption, retry, semantic recovery,
+extension, training or update occurred. The predeclared primary decision was
+`inconclusive`: v4-minus-v3 survival was `-2.5641pp`, interval
+`[-6.0707pp, +0.9425pp]`. No further game or training is authorized. Preserve
+the frozen machine plan and completed runtime under their recorded identities.
 
-The reviewed source-only command was:
+The reviewed source-only commands were:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\freeze_retained_phase_process_corpus.py

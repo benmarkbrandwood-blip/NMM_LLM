@@ -1,12 +1,13 @@
 # Retained-v3/v4 phase-process generalization v1
 
-Status: `source_ready_0ff79e39_awaiting_product_authorization`
+Status: `completed_inconclusive_process_generalization_not_held_out`
 
-This is the recommended successor design after the completed reused-corpus
-passivity diagnostic. It authorizes no evaluation game, policy decision,
-training, update, database or checkpoint mutation, promotion, publication or
-release. Candidate artefacts have now been opened only to verify successor-
-owned byte-exact snapshots and deterministic synthetic canaries.
+This frozen successor design was executed once after direct product authority
+was bound to its exact plan and source-readiness identities. It authorizes no
+further evaluation game, policy decision, training, update, database or
+checkpoint mutation, promotion, publication or release. Preserve the
+[completion evidence](../evidence/sanmill-retained-v3-v4-phase-process-generalization-v1-result-2026-08-14.md)
+and the consumed ignored runtime namespace.
 
 The canonical [machine plan](sanmill-retained-v3-v4-phase-process-generalization-v1.json)
 has identity
@@ -150,7 +151,7 @@ The HumanDB loader's warning that its unversioned historical Malom columns are
 disabled is expected and consistent with the frozen data contract; corrected
 Malom labels come only from the separately identified tablebase.
 
-## Remaining launch gates
+## Execution and completion
 
 1. Completed: create and byte-audit successor-owned, sidecar-free, read-only
    copies of both exact route bundles and SpecialistDB snapshots without
@@ -166,5 +167,18 @@ Malom labels come only from the separately identified tablebase.
 4. Completed and published: freeze machine plan `4c85ff33` at plan commit
    `117a5be`; run every technical gate twice and obtain stable source readiness
    `0ff79e39`.
-5. Obtain one explicit product authorization bound to that plan and source-
-   readiness identity before opening the first game.
+5. Completed: direct product authorization was bound to plan `4c85ff33` and
+   source readiness `0ff79e39`; post-authorization readiness was `aeea1625`,
+   authorization identity `ceedd13a`, and launch identity `82782019`.
+6. Completed once: all 156 games reached strict rules terminals in 399.619311
+   active seconds, with no retry, resume, recovery, extension, training or
+   update. Runtime spec identity is `bb349a96`, primary result identity
+   `6007af18`, mechanism result identity `afcdff21`, and completion identity
+   `48ac2ad4`.
+
+The predeclared start-clustered v4-minus-v3 108-post-start-ply survival
+difference was `-2.5641pp`, interval `[-6.0707pp, +0.9425pp]`, half-width
+`3.5066pp`, and decision `inconclusive`. This does not reproduce the earlier
+development-corpus direction and does not establish the opposite direction.
+It is neither held-out nor a strength, refresh-causal or equivalence result.
+No extension or successor launch follows from it.
