@@ -223,9 +223,11 @@ ply 142 before those requested states. No policy move or game was played. The
 comparable primary window is 108 post-start logical plies because the frozen
 histories begin at plies 7–178. The evaluator core and live web were committed
 at `f8070d1`. Successor-owned, read-only route and sidecar-free DB copies have
-snapshot identity `b35ecc06`. The draft workload is 156 games and two active
-hours, but the fail-closed runner, machine plan, readiness and authorization
-remain absent. Preserve the
+snapshot identity `b35ecc06`. The fail-closed runner and zero-game mechanism
+audit are implemented, and the 156-game/two-hour machine plan is frozen as
+identity `7dfd8e32` over implementation `32e8843`. The plan still needs a
+tracked published commit and full source preflight; no readiness identity or
+authorization exists. Preserve the
 [source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md).
 
 ### Remaining work for the next operator
@@ -2680,9 +2682,11 @@ the current successor in this order:
     identity `3be3d76c`, records identity `8fdf3adf`, strict replay audit
     `6f65dc3d` and exposure audit `f9b2ebb1`. It has 39 accepted starts and no
     candidate result. The draft successor uses a relative 108-ply window and
-    156 games. Its evaluator core/live web is at `f8070d1`, and identity-equal
-    successor-owned inputs are frozen under snapshot identity `b35ecc06`.
-    No fail-closed runner, machine-readable plan, readiness or launch grant
+    156 games. Its evaluator core/live web is at `f8070d1`, identity-equal
+    successor-owned inputs are frozen under snapshot identity `b35ecc06`, and
+    its fail-closed runner/mechanism audit is bound by machine plan `7dfd8e32`
+    over implementation `32e8843`. The plan is locally frozen but not yet
+    published or source-preflighted; no readiness identity or launch grant
     exists. Do not reuse or modify the plan-`035c68f8` route/database paths.
 
 The previously executed isolated smoke command was:

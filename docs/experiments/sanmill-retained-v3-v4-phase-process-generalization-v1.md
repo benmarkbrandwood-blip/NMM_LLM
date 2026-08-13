@@ -1,13 +1,20 @@
 # Retained-v3/v4 phase-process generalization v1
 
-Status: `draft_source_inputs_and_evaluator_core_ready_runner_plan_readiness_and_authority_absent`
+Status: `frozen_plan_7dfd8e32_awaiting_source_readiness_and_product_authorization`
 
 This is the recommended successor design after the completed reused-corpus
 passivity diagnostic. It authorizes no evaluation game, policy decision,
 training, update, database or checkpoint mutation, promotion, publication or
 release. Candidate artefacts have now been opened only to verify successor-
-owned byte-exact snapshots. The machine-readable plan is intentionally absent
-until the runtime can execute this contract exactly.
+owned byte-exact snapshots and deterministic synthetic canaries.
+
+The canonical [machine plan](sanmill-retained-v3-v4-phase-process-generalization-v1.json)
+has identity
+`7dfd8e32451a43acaddf1d8bc654c560779a96e60029aecb22d34cfbe7d8c367`
+and file SHA-256
+`fad47ecaf0b6de0edc4e323a926e65a5cbaf24a77bdb38f760c3f75939d364b9`.
+It binds implementation commit `32e8843b791ea0ebbf149b5ad4ccfb96ad13318f`.
+It is not an authorization.
 
 ## Objective and claim boundary
 
@@ -38,7 +45,7 @@ phase development measurement and has zero exact/D4 overlap with the previous
 SpecialistDB at the frozen start. The full source audit is in the
 [readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md).
 
-## Proposed immutable protocol
+## Frozen immutable protocol
 
 | Field | Required value |
 | --- | --- |
@@ -110,7 +117,7 @@ denominator. Help text must state that continuation survival is not a draw or
 strength measure, Malom is history-free, the corpus is not held out, and
 incomplete caps are never converted into draws.
 
-## Proposed resource envelope
+## Frozen resource envelope
 
 - at most 156 games;
 - at most two active evaluator hours;
@@ -121,7 +128,7 @@ incomplete caps are never converted into draws.
 - no automatic retry, semantic recovery, resource extension or result-based
   early stop.
 
-## Remaining freeze gates
+## Remaining launch gates
 
 1. Completed: create and byte-audit successor-owned, sidecar-free, read-only
    copies of both exact route bundles and SpecialistDB snapshots without
@@ -129,11 +136,13 @@ incomplete caps are never converted into draws.
 2. Completed at source commit `f8070d1`: implement variable-history replay,
    the relative 108-ply horizon, start-clustered reporting, live partial
    recomputation and the required web explanations.
-3. Implement the fail-closed runner, exact missing-suffix resume and the
-   identity-bound zero-game safe-capture/full-order follow-up over the new
-   ledger. Add focused runner, authorization and strict-history gates.
-4. Run all focused checks plus the mandatory Malom/DB/provenance gate, freeze
-   one machine-readable plan at a clean published implementation commit, and
-   produce final source readiness against fresh ignored runtime targets.
-5. Obtain one explicit product authorization bound to that exact plan and
+3. Completed at commits `60bb10e`, `728fa25` and `32e8843`: implement the
+   fail-closed runner, exact missing-suffix resume, identity-bound zero-game
+   safe-capture/full-order follow-up, and non-skippable plan-freezer tests.
+4. Completed locally: freeze the canonical machine plan as identity
+   `7dfd8e32`. Commit and fast-forward publish the plan, then run the full
+   focused, mandatory Malom/DB/provenance, candidate, Sanmill and 39-history
+   gates to produce one stable source-readiness identity.
+5. Obtain one explicit product authorization bound to that plan and source-
+   readiness identity before opening the first game.
    readiness identity before opening the first game.

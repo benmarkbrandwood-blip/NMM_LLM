@@ -1,15 +1,17 @@
 # Retained-v3/v4 phase-process corpus readiness — 13 August 2026
 
-Status: `source_corpus_inputs_and_evaluator_core_ready_no_evaluation_authority`
+Status: `plan_frozen_locally_source_readiness_and_evaluation_authority_absent`
 
 Technical-readiness verdict: `not_ready`
 
-The source corpus, successor-owned inputs and evaluator core are ready, but the
-fail-closed runner, immutable machine-readable plan, final readiness identity
-and product authorization do not yet exist. Route bundles were opened only
-for identity verification after corpus membership was frozen. No policy move,
-game, search, training step, optimizer update, database mutation or checkpoint
-mutation occurred in this preparation.
+The source corpus, successor-owned inputs, evaluator core, fail-closed runner
+and immutable machine-readable plan are ready locally. The plan still must be
+committed and published before the full source preflight can produce its final
+readiness identity, and no product authorization exists. Route bundles were
+opened only for identity verification and deterministic synthetic canaries
+after corpus membership was frozen. No corpus policy move, game, Sanmill
+evaluation search, training step, optimizer update, database mutation or
+checkpoint mutation occurred in this preparation.
 
 ## Observed facts
 
@@ -39,7 +41,8 @@ The remaining 39 starts are non-terminal under the pinned current referee.
 | Candidate database side effects | both sidecar-free snapshots remained sidecar-free | read-only | pass |
 | Evaluator core | variable replay, relative 108-ply snapshot, canonical ledger, start clustering and live web implemented at `f8070d1` | exact source support | pass |
 | Successor inputs | snapshot identity `b35ecc06`; both bundles identity-equal; both DBs byte-equal, read-only and sidecar-free | no completed-plan runtime path reuse | pass |
-| Fail-closed runner | no successor CLI/controller yet | preflight, exact suffix resume and launch gates | absent |
+| Fail-closed runner | stable source-readiness binding, non-skippable tests/history replay, semantic fail-close and host-interruption exact suffix resume | exact controller | pass |
+| Machine plan | identity `7dfd8e32`, 156 games, two active hours, implementation `32e8843` | canonical plan, not authority | pass locally; publish pending |
 | Launch authority | none | plan-bound product authorization | absent |
 
 The accepted corpus has 18 placement, 14 movement and seven flying starts;
@@ -61,6 +64,9 @@ properties of a deterministic source pool, not a population sample.
 | Successor input snapshot identity | `b35ecc061e53a35e227c69ff886a7c6534e707bd124abdbe13acbbf9647f48ac` |
 | Successor input manifest SHA-256 | `cda9456e0234a9532ddfb1b90e3a78bb6a35ef788c0eddfca607e9f33cb1942a` |
 | Evaluator core commit | `f8070d125844635bde8095079cbe3ea5d36e99dd` |
+| Runner gate commit | `32e8843b791ea0ebbf149b5ad4ccfb96ad13318f` |
+| Frozen machine plan identity | `7dfd8e32451a43acaddf1d8bc654c560779a96e60029aecb22d34cfbe7d8c367` |
+| Frozen machine plan file SHA-256 | `fad47ecaf0b6de0edc4e323a926e65a5cbaf24a77bdb38f760c3f75939d364b9` |
 
 The tracked artifact is
 [the phase-process corpus](../experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json).
@@ -119,18 +125,18 @@ start, matching the prior 12-to-120 observation window.
 
 ## Next validation
 
-Implement the successor fail-closed controller around the committed evaluator
-core. It must bind the successor input manifest, audit every variable strict
-history without loading a policy, forbid skipped tests at launch, and allow
-only an explicitly authorized same-spec missing-suffix resume after host
-interruption. Complete-result safe-capture and full-order reports must be
-identity-bound zero-game reanalyses of the new ledger. Only after focused
-tests, the mandatory provenance gate, immutable plan and readiness identity
-pass may the product owner be asked once to authorize the bounded 156-game
-run.
+Commit and fast-forward publish the frozen plan. Then run the full fresh
+preflight against the still-absent runtime targets. The technical gate set must
+include the exact successor input manifest, both candidate routes and DBs,
+Sanmill's deterministic canary, all 39 fresh-process history replays, focused
+tests, mandatory provenance tests, Ruff and process ownership. If and only if
+all non-authority gates pass, record the resulting stable source-readiness
+identity and ask the product owner once for the bounded 156-game grant.
 
 The reviewed source-only command was:
 
 ```powershell
 .\.venv\Scripts\python.exe tools\freeze_retained_phase_process_corpus.py
+.\.venv\Scripts\python.exe tools\prepare_retained_phase_process_inputs.py prepare
+.\.venv\Scripts\python.exe tools\freeze_retained_phase_process_plan.py
 ```
