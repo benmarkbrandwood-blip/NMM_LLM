@@ -451,6 +451,33 @@ def test_web_payload_recomputes_partial_ledger(tmp_path, spec) -> None:
     assert payload["status"] == "running"
     assert payload["report"]["completed_games"] == 1
     assert payload["report"]["paired"]["matched_units_complete"] == 0
+    assert payload["safe_progress"] is None
+
+
+def test_web_payload_reads_identity_bound_safe_progress_report(tmp_path, spec) -> None:
+    runner.write_new_canonical(tmp_path / "spec.json", spec)
+    record = _synthetic_record(spec, 0, None, survives=False, length=30)
+    diagnostic.append_game_record(tmp_path / "games.jsonl", record, must_create=True)
+    body = {
+        "schema_version": "nmm.retained-safe-progress-audit-result.v1",
+        "by_candidate": {},
+        "paired": {},
+    }
+    safe = {**body, "result_identity": canonical_sha256(body)}
+    runner.write_new_canonical(tmp_path / "safe-progress-report.json", safe)
+    payload = web.build_payload(tmp_path)
+    assert payload["safe_progress"] == safe
+
+
+def test_web_payload_rejects_tampered_safe_progress_report(tmp_path, spec) -> None:
+    runner.write_new_canonical(tmp_path / "spec.json", spec)
+    body = {
+        "schema_version": "nmm.retained-safe-progress-audit-result.v1",
+        "result_identity": "0" * 64,
+    }
+    runner.write_new_canonical(tmp_path / "safe-progress-report.json", body)
+    with pytest.raises(ValueError, match="identity differs"):
+        web.build_payload(tmp_path)
 
 
 def test_authorization_builder_binds_exact_resource_and_prohibitions(

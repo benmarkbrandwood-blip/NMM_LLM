@@ -20,6 +20,7 @@ from learned_ai.evaluation.retained_passivity_diagnostic import (  # noqa: E402
     EXPECTED_GAMES,
     recompute_diagnostic,
 )
+from learned_ai.training.run_contract import canonical_sha256  # noqa: E402
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -161,6 +162,17 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
         else "running"
     )
     report["status"] = status
+    safe_progress_path = root / "safe-progress-report.json"
+    safe_progress = None
+    if safe_progress_path.is_file():
+        safe_progress = _read_json(safe_progress_path)
+        safe_body = {
+            key: value
+            for key, value in safe_progress.items()
+            if key != "result_identity"
+        }
+        if canonical_sha256(safe_body) != safe_progress.get("result_identity"):
+            raise ValueError("safe-progress report identity differs")
     return {
         "available": True,
         "status": status,
@@ -179,6 +191,7 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
             "plan_identity": spec["plan"]["identity"],
             "implementation_commit": spec["implementation"]["commit"],
         },
+        "safe_progress": safe_progress,
     }
 
 
@@ -203,12 +216,15 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const card=(k,v,d)=>`<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="d">${d}</div></div>`;
 function bar(label,value,klass=''){const w=value==null?0:Math.max(0,Math.min(100,value*100));return `<div class="barrow"><span>${label}</span><div class="track"><div class="fill ${klass}" style="width:${w}%"></div></div><b>${pct(value)}</b></div>`}
 function decisionText(d){return ({pending:'等待完整配对',inconclusive:'区间跨 0：不确定',inconclusive_precision:'精度不足：不确定',v4_higher_120_ply_survival:'v4 的 120 手存活率更高',v3_higher_120_ply_survival:'v3 的 120 手存活率更高'})[d]||d}
+function safeDecision(d){return ({pending:'等待完整审计',insufficient_safe_capture_opportunities:'安全吃子机会不足',inconclusive_precision:'精度不足',inconclusive:'未发现方向性差异',v4_higher_missed_safe_capture_share:'v4 每候选回合错过保值吃子机会的比例更高',v3_higher_missed_safe_capture_share:'v3 每候选回合错过保值吃子机会的比例更高'})[d]||d}
+function safeProgress(s){if(!s)return `<div class="panel"><h2>安全推进机会审计</h2><p class="help">零游戏审计尚未生成。网页不会根据原始吃子率推测“是否有保值吃子机会”。</p></div>`;const a=s.by_candidate[C.v3],b=s.by_candidate[C.v4],x=a.all_candidate_turns,y=b.all_candidate_turns,x120=a.after_ply_120_candidate_turns,y120=b.after_ply_120_candidate_turns,p=s.paired.primary_missed_safe_capture_share_v4_minus_v3,iv=p.interval||[null,null];return `<div class="panel"><h2>安全推进机会（零游戏复算）</h2><p class="help">“安全吃子机会”只表示至少一个完整合法吃子动作保持当前 Malom 粗 W/D/L，并会重置无吃子计数；它不是最佳着、棋力标签或 refresh 因果证据。主指标是每局错过机会的候选回合数 / 该局全部候选回合，因此同时包含机会暴露与选择结果；机会内选择率另列。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>实际吃子率</th><th>保值吃子机会</th><th>机会内选择率</th><th>错过/候选回合</th><th>120 后错过</th></tr></thead><tbody><tr><td>v3</td><td>${intval(x.candidate_turns)}</td><td>${pct(x.chosen_capture_rate)}</td><td>${intval(x.safe_capture_opportunity_turns)}</td><td>${pct(x.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(x.missed_safe_capture_share_per_candidate_turn)}</td><td>${x120.missed_safe_capture_turns} / ${x120.safe_capture_opportunity_turns}</td></tr><tr><td>v4</td><td>${intval(y.candidate_turns)}</td><td>${pct(y.chosen_capture_rate)}</td><td>${intval(y.safe_capture_opportunity_turns)}</td><td>${pct(y.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(y.missed_safe_capture_share_per_candidate_turn)}</td><td>${y120.missed_safe_capture_turns} / ${y120.safe_capture_opportunity_turns}</td></tr></tbody></table><p class="help"><b>${esc(safeDecision(p.decision))}</b>；配对差 v4−v3 ${pct(p.mean)}，工程区间 ${pct(iv[0])} … ${pct(iv[1])}。分母和 query coverage 保留在报告中。</p></div><div class="panel"><h2>棋盘重访（次级）</h2><p class="help">棋盘重访仅检查固定前缀末局面及其后的审计后缀中，本地 BoardState FEN 是否已出现；“可避免”要求存在另一个 Malom W/D/L 保值且在该范围内未见过的合法后继。它不包含前缀内部局面，不等于严格三次重复，也不能替代完整历史裁判。</p><table><thead><tr><th>候选</th><th>重访率</th><th>可避免重访/候选回合</th><th>120 后重访率</th><th>120 后可避免</th></tr></thead><tbody><tr><td>v3</td><td>${pct(x.chosen_board_revisit_rate)}</td><td>${pct(x.avoidable_board_revisit_share_per_candidate_turn)}</td><td>${pct(x120.chosen_board_revisit_rate)}</td><td>${intval(x120.avoidable_board_revisit_turns)}</td></tr><tr><td>v4</td><td>${pct(y.chosen_board_revisit_rate)}</td><td>${pct(y.avoidable_board_revisit_share_per_candidate_turn)}</td><td>${pct(y120.chosen_board_revisit_rate)}</td><td>${intval(y120.avoidable_board_revisit_turns)}</td></tr></tbody></table></div>`}
 function render(p){const app=document.getElementById('app');if(!p.available){app.innerHTML=`<div class="empty"><div class="panel"><h1>v3/v4 被动性诊断</h1><p class="sub">${esc(p.message)}</p><div class="notice">这不是错误：没有精确授权前，网页只显示“未启动”，不会放置空结果或推测值。</div></div></div>`;return}
 const r=p.report,v3=r.by_candidate[C.v3],v4=r.by_candidate[C.v4],pr=r.paired.primary_horizon_survival_v4_minus_v3,iv=pr.interval||[null,null],active=p.progress.active_seconds;
 app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 被动性诊断</h1><div class="sub">${esc(p.identities.diagnostic_id)} · <span class="badge">${esc(p.status)}</span></div>
 <div class="notice"><b>开发诊断，不是棋力评测。</b> 语料已使用；结果只能描述两个命名 final route 在固定语料上的过程差异，不能归因为 refresh、不能晋级或发布模型。</div>
 <div class="grid">${card('完成进度',`${p.progress.completed_games} / ${p.progress.expected_games}`,p.progress.current_stage?`game ${Number(p.progress.current_game_ordinal)+1} · ${p.progress.current_stage} ply ${p.progress.current_stage_ply}`:'当前无在途对局')}${card('完整匹配单元',`${r.paired.matched_units_complete} / ${r.paired.matched_units_expected}`,'同一起点、同一候选颜色，v3/v4 各一局')}${card('主差值 v4 − v3',pct(pr.mean),iv[0]==null?'等待配对':`工程区间 ${pct(iv[0])} … ${pct(iv[1])}`)}${card('主判决',decisionText(pr.decision),`区间半宽 ${pct(pr.half_width)}；上限 10.0%`)}${card('v3: 120 手仍在进行',pct(v3.horizon_120.survival_rate),`${v3.horizon_120.survived} / ${v3.games} 局`)}${card('v4: 120 手仍在进行',pct(v4.horizon_120.survival_rate),`${v4.horizon_120.survived} / ${v4.games} 局`)}${card('活动用时',active==null?'—':num(active/60,1)+' min','只计 evaluator active time；上限 2 h')}${card('报告状态',esc(r.status),r.result_identity?`result ${esc(r.result_identity.slice(0,12))}`:'实时从账本复算')}</div>
 <div class="panel"><h2>120 手 horizon survival</h2><p class="help">严格裁判在总第 120 个完整逻辑回合之后仍未终局。它不是和棋，也不预判这局最终结果；恰好对应训练日志中被 120 手上限截断的过程事件。</p><div class="bars">${bar('retained-v3',v3.horizon_120.survival_rate)}${bar('no-refresh-v4',v4.horizon_120.survival_rate,'v4')}</div></div>
+${safeProgress(p.safe_progress)}
 <div class="two"><div class="panel"><h2>对局长度</h2><p class="help">总逻辑手数包含固定 12 手前缀。1,536 post-prefix 是安全上限；命中时记 incomplete，不算和棋。</p><table><thead><tr><th>候选</th><th>支持</th><th>均值</th><th>中位</th><th>P90</th><th>最大</th></tr></thead><tbody><tr><td>v3</td><td>${v3.lengths.support}</td><td>${num(v3.lengths.mean_total_logical_plies,1)}</td><td>${num(v3.lengths.median_total_logical_plies,0)}</td><td>${num(v3.lengths.p90_total_logical_plies,0)}</td><td>${intval(v3.lengths.max_total_logical_plies)}</td></tr><tr><td>v4</td><td>${v4.lengths.support}</td><td>${num(v4.lengths.mean_total_logical_plies,1)}</td><td>${num(v4.lengths.median_total_logical_plies,0)}</td><td>${num(v4.lengths.p90_total_logical_plies,0)}</td><td>${intval(v4.lengths.max_total_logical_plies)}</td></tr></tbody></table></div>
 <div class="panel"><h2>Malom move 过程</h2><p class="help">保值率的分母仅是可查询的候选回合；query coverage 单独显示。Malom 不含重复/无吃子历史，因此不能代替严格裁判。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>覆盖率</th><th>保值率*</th><th>降级率*</th></tr></thead><tbody><tr><td>v3</td><td>${intval(v3.candidate_malom_moves.candidate_turns)}</td><td>${pct(v3.candidate_malom_moves.query_coverage)}</td><td>${pct(v3.candidate_malom_moves.preserving_rate_given_queryable)}</td><td>${pct(v3.candidate_malom_moves.downgrade_rate_given_queryable)}</td></tr><tr><td>v4</td><td>${intval(v4.candidate_malom_moves.candidate_turns)}</td><td>${pct(v4.candidate_malom_moves.query_coverage)}</td><td>${pct(v4.candidate_malom_moves.preserving_rate_given_queryable)}</td><td>${pct(v4.candidate_malom_moves.downgrade_rate_given_queryable)}</td></tr></tbody></table></div></div>
 <div class="two"><div class="panel"><h2>第 120 手 Malom 理论 W/D/L</h2><p class="help">只对仍在进行且可查询的快照，从候选视角投影；这是 history-free 理论棋盘值，不是实际终局裁定。</p><table><thead><tr><th>候选</th><th>快照</th><th>可查询</th><th>W</th><th>D</th><th>L</th></tr></thead><tbody>${[v3,v4].map((x,i)=>`<tr><td>${i?'v4':'v3'}</td><td>${x.malom_at_ply_120_candidate_perspective.snapshot_support}</td><td>${x.malom_at_ply_120_candidate_perspective.queryable}</td><td>${x.malom_at_ply_120_candidate_perspective.wins}</td><td>${x.malom_at_ply_120_candidate_perspective.draws}</td><td>${x.malom_at_ply_120_candidate_perspective.losses}</td></tr>`).join('')}</tbody></table></div>
