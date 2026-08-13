@@ -87,3 +87,12 @@ def test_dashboard_exposes_source_and_termination_kpis_with_help() -> None:
     assert 'data-i18n="tableMaxPly"' in monitor.HTML
     assert "sourceRecent: {" in monitor.HTML
     assert "terminationSplit: {" in monitor.HTML
+
+
+def test_dashboard_orders_outcome_bars_as_win_draw_loss() -> None:
+    assert "const OUTCOME_BAR_ORDER=Object.freeze(['win','draw','loss']);" in monitor.HTML
+    assert (
+        "bars('outcomeBars',data.counts.outcomes,"
+        "{win:COLORS.blue,draw:COLORS.yellow,loss:COLORS.magenta},"
+        "OUTCOME_BAR_ORDER);"
+    ) in monitor.HTML

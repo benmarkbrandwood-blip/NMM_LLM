@@ -1159,6 +1159,7 @@ HTML = r"""<!doctype html>
 </aside>
 <script>
 const COLORS = {blue:'#56b4e9',green:'#009e73',orange:'#e69f00',red:'#cc79a7',violet:'#b794f4',cyan:'#00d5e7',yellow:'#f0e442',magenta:'#cc79a7',gpu:'#00d5e7',vram:'#ff9f43'};
+const OUTCOME_BAR_ORDER=Object.freeze(['win','draw','loss']);
 const NODE_TIMING_MS = Object.freeze({1000:[0.21,0.30],5000:[0.63,0.80],25000:[2.44,2.85],100000:[9.91,11.34],500000:[52.85,60.77]});
 const I18N = {
   zh: {
@@ -1396,7 +1397,7 @@ function stackedAreaChart(id,rows,specs,markers=[],xDomain=null){
   let lx=pad.l;for(const spec of specs){c.fillStyle=spec.color;c.fillRect(lx,pad.t-17,10,6);c.fillStyle='#c8d5e6';const label=valueLabel(spec.key);c.fillText(label,lx+14,pad.t-12);lx+=c.measureText(label).width+34;if(lx>w-120){lx=pad.l;}}drawObservedBadge(c,w,pad);
 }
 
-function bars(id,values,colors={}){const host=document.getElementById(id),entries=Object.entries(values||{});host.replaceChildren();
+function bars(id,values,colors={},preferredOrder=[]){const host=document.getElementById(id),source=values||{},preferred=new Set(preferredOrder),names=[...preferredOrder.filter(name=>Object.hasOwn(source,name)),...Object.keys(source).filter(name=>!preferred.has(name))],entries=names.map(name=>[name,source[name]]);host.replaceChildren();
   if(!entries.length){host.textContent=t('noData');host.className='muted';return;}host.className='bars';const max=Math.max(1,...entries.map(([,v])=>Number(v)||0));
   for(const [name,value] of entries){const row=document.createElement('div');row.className='bar-row';const label=document.createElement('span');label.textContent=valueLabel(name);const track=document.createElement('div');track.className='bar-track';const fill=document.createElement('div');fill.className='bar-fill';fill.style.width=`${100*Number(value)/max}%`;fill.style.background=colors[name]||COLORS.blue;track.append(fill);const count=document.createElement('span');count.textContent=integer(value);count.style.textAlign='right';row.append(label,track,count);host.append(row);}}
 
@@ -1434,7 +1435,7 @@ function render(data){lastData=data;const s=data.state,l=data.latest,g=data.gpu|
   lineChart('depthChart',data.series.games,[{key:'ply_smooth50',label:t('chart.ply'),color:COLORS.blue,width:2.3}],null,markers,10,sharedGameDomain);
   lineChart('gpuChart',g.series||[],[{key:'gpuUtilPct',label:t('chart.gpuUtil'),color:COLORS.gpu,width:2.4},{key:'memoryUtilPct',label:t('chart.vramUtil'),color:COLORS.vram,dash:[8,5],width:2.4}],[0,100],markers,null,sharedGameDomain);
   const terminationSpecs=[{key:'win_fewer_than_three',color:'#56b4e9'},{key:'win_no_legal_moves',color:'#0072b2'},{key:'draw_repetition',color:'#f0e442'},{key:'draw_no_progress',color:'#e69f00'},{key:'max_ply_truncation',color:'#8f9fb3'},{key:'lose_no_legal_moves',color:'#cc79a7'},{key:'lose_fewer_than_three',color:'#d55e00'},{key:'other',color:'#b794f4'}].filter(spec=>(data.series.terminations50||[]).some(row=>Number(row[spec.key])>0));stackedAreaChart('terminationChart',data.series.terminations50||[],terminationSpecs,markers,sharedGameDomain);
-  renderOutcomeTables(data);bars('terminationBars',data.counts.terminations);bars('outcomeBars',data.counts.outcomes,{win:COLORS.blue,draw:COLORS.yellow,loss:COLORS.magenta});bars('opponentBars',data.counts.opponents,{'vs_frozen':COLORS.blue,'vs_sanmill':COLORS.orange});
+  renderOutcomeTables(data);bars('terminationBars',data.counts.terminations);bars('outcomeBars',data.counts.outcomes,{win:COLORS.blue,draw:COLORS.yellow,loss:COLORS.magenta},OUTCOME_BAR_ORDER);bars('opponentBars',data.counts.opponents,{'vs_frozen':COLORS.blue,'vs_sanmill':COLORS.orange});
   const tbody=document.getElementById('segmentRows');tbody.replaceChildren();for(const seg of [...data.segments].reverse()){const tr=document.createElement('tr');for(const value of [seg.name,seg.firstGame??'—',seg.lastGame??'—',seg.gameRows,seg.updateRows,seg.checkpoint?t('yes'):'—']){const td=document.createElement('td');td.textContent=value;tr.append(td);}tbody.append(tr);}
   const warningHost=document.getElementById('warnings');warningHost.replaceChildren();if(data.warnings.length){const grouped=new Map();for(const warning of data.warnings){const translated=translateWarning(warning);grouped.set(translated,(grouped.get(translated)||0)+1);}for(const [warning,count] of grouped){const div=document.createElement('div');div.className='warning';div.textContent=count>1?`${warning} × ${integer(count)}`:warning;warningHost.append(div);}}else warningHost.textContent=t('none');
   const locale=currentLanguage==='zh'?'zh-CN':'en-US';document.getElementById('refresh').textContent=`${t('updatedAt')} ${new Date(data.generatedAt).toLocaleString(locale)} · ${t('malformedTail')} ${integer(data.counts.malformedLinesIgnored)}`;
