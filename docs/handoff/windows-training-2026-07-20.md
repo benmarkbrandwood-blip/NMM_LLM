@@ -166,11 +166,25 @@ written, but it is not a resume or recovery of attempt 002.
 Commit `cde6a5e` fixes the failure without changing optimizer or gameplay
 semantics: the legacy non-exact A2C route now takes a shallow snapshot of its
 pending step list before clearing the lineage-owned queue. The focused update
-tests pass 30/30 and include the exact queue-clear regression. Attempt 003 is
-the new unlaunched successor in the same experiment document. It retains seed
-70 and the frozen scientific configuration but requires new control, template,
-writable database, plan, readiness and authorization identities after the
-final contract commit is published.
+tests pass 30/30 and include the exact queue-clear regression. Attempt 003 was
+then prepared from clean synchronized source `662fe160` under plan identity
+`1702726f` and readiness identity `77cc65ad`. The product owner authorized the
+exact 5,000-game, 12-active-hour plan once.
+
+Attempt 003 completed all 5,000 games and 20 policy-gated segments in 1.9478
+active hours without retry or recovery. Target age advanced exactly from 1 to
+5,000, so the no-refresh treatment executed. The authorization is consumed.
+The final checkpoint file SHA-256 is `295b268e`; its verified payload is
+`ed7932bc`. The final SpecialistDB main-file SHA-256 is `3d69d1ac`, with
+242,006 positions and 4,185 winning lines.
+
+The mixed 69.32% logged score is not a strength result. The frozen initial
+target arm was `2,721 W / 259 D / 0 L`, while the Sanmill arm was
+`23 W / 1,185 D / 812 L`. At 500,000 nodes, 605 of 1,051 Sanmill games hit the
+120-ply cap. The trainer manifest records `rolling_win=40`, so the dashboard's
+legacy `win_rate_200` field represented 40 mixed games; the final 67.5% is 27
+wins in 40, not a 200-game KPI. Preserve the
+[attempt-003 result evidence](../evidence/sanmill-no-refresh-retained-v4-attempt-003-result-2026-08-13.md).
 
 The v4 comparison to retained v3 is source-confounded as well as
 seed-confounded: v3 ran at `3f400135`, before later trainer, manager and
@@ -200,10 +214,17 @@ difference from v3 may be attributed solely to target refresh.
 7. Preserve no-refresh retained-v4 attempt 002, its consumed authorization,
    failed event chains, logs and mutated database. Do not retry, resume, repair
    in place or reuse any of them.
-8. Preserve correction commit `cde6a5e` and the attempt-003 contract. Publish
-   the final tracked source, create its closed template and fresh writable
-   database, generate the ignored plan and canonical readiness bundle, and
-   only then request one product decision bound to the new identities.
+8. Preserve completed attempt 003 under plan identity `1702726f`, readiness
+   identity `77cc65ad`, source `662fe160`, all 20 accepted segment directories,
+   final checkpoint, database, controller ledger and consumed authorization.
+   Do not rerun, resume, extend, overwrite, promote or publish it.
+9. Keep the next v3/v4 work at `needs_decision`. First freeze whether the
+   objective is passivity/mechanism diagnosis or playing-strength relation,
+   then add a paired power/precision analysis, prospective ply-120 state
+   capture, a strict safety cap, disjoint corpus/exposure audit and a tested
+   no-update evaluator. A 16-game pilot is too small to estimate the observed
+   2--4% decisive-game rate, and process metrics cannot replace W/D/L for a
+   strength claim. No evaluation game is authorized yet.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
@@ -1926,6 +1947,23 @@ record the log path, refresh interval, checkpoint cadence, stop criteria, and
 who or what will inspect stalled games, non-finite losses, recovery loops, and
 database growth.
 
+The richer managed-run dashboard is now version controlled at
+`tools/serve_managed_training_monitor.py`. Point it at one exact control
+directory; for completed no-refresh attempt 003 the loopback command is:
+
+```powershell
+.\.venv\Scripts\python.exe tools\serve_managed_training_monitor.py `
+  --control-dir learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003 `
+  --host 127.0.0.1 --port 8765
+```
+
+It reads the real rolling window from every segment manifest, separates the
+frozen and Sanmill source windows, and reports rules draws apart from max-ply
+truncations. Its bilingual help labels mixed-source win rate as a training
+diagnostic rather than strength evidence. The server is read-only with respect
+to trainer evidence; only whole-device GPU telemetry is appended beneath the
+selected run's ignored `local-monitor` directory.
+
 ## Deferred and Conditional Work from the Original Notes
 
 - Direct "learn traps" training is not implemented. The v5 plan defines fixed
@@ -2542,22 +2580,23 @@ the current successor in this order:
     [replication evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md)
     and do not rerun, resume, extend, promote, publish, or infer long-training
     authority from the consumed sequence.
-33. The next retained research design is frozen in
+33. The retained research design is recorded in
     [Sanmill no-refresh retained long v4](../experiments/sanmill-no-refresh-retained-long-v4.md).
-    It uses fresh seed 70, a fresh empty SpecialistDB, the retained-v3
+    It used fresh seed 70, a fresh empty SpecialistDB, the retained-v3
     configuration, and `target-refresh-every=5001` to test permanent
-    no-refresh without claiming that the pooled null selected it. The bounded
-    plan is 5,000 games, 250-game segments and 12 active hours. Preparation
+    no-refresh without claiming that the pooled null selected it. Preparation
     attempt 001 at `f1a8974a` is unlaunched, invalidated and permanently
     non-authorizable because its readiness provenance was incomplete. Preserve
     it under the identities in the
     [attempt-001 disposition](../evidence/sanmill-no-refresh-retained-v4-preparation-attempt-001-2026-08-13.md).
-    Attempt 002 reuses still-unused seed 70 under new experiment, plan, control
-    and database identities. It is also source-confounded relative to retained
-    v3, so later between-run differences are descriptive rather than a causal
-    cadence estimate. Publish the generic readiness generator and final design
-    first, then prepare and audit attempt 002 at that exact clean synchronized
-    source; do not insert another tracked commit after preparation.
+    Attempt 002 failed before an accepted checkpoint and consumed its grant.
+    Attempt 003 then completed 5,000 games and 20 segments at source `662fe160`
+    under plan identity `1702726f` and readiness identity `77cc65ad`. Preserve
+    the [result evidence](../evidence/sanmill-no-refresh-retained-v4-attempt-003-result-2026-08-13.md).
+    Its source- and seed-confounded comparison with retained v3 remains
+    descriptive, and its grant covers no held-out work. The next evaluator
+    must be prospectively instrumented because the training rows do not retain
+    cap states or strict rule history.
 
 The previously executed isolated smoke command was:
 

@@ -1,14 +1,15 @@
 # Sanmill no-refresh retained long v4
 
-Status: `designed_unlaunched_attempt_003`
+Status: `attempt_003_completed_not_promoted`
 
 Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-003`
 
 Plan ID: `managed-sanmill-no-refresh-retained-v4-seed70-attempt-003`
 
-This document freezes a fresh 5,000-game research baseline that suppresses
-all periodic frozen-target refreshes. It does not authorize launch, held-out
-evaluation, promotion, or publication.
+This document froze a fresh 5,000-game research baseline that suppresses all
+periodic frozen-target refreshes. Attempt 003 was later authorized once and
+completed. Its authorization is consumed. This document does not authorize a
+rerun, resume, held-out evaluation, promotion or publication.
 
 ## Preparation attempts
 
@@ -44,8 +45,31 @@ non-exact transition batch before clearing the pending queue and adds a focused
 regression that preserves all batch temperatures after the original queue is
 cleared. Attempt 003 retains the scientific configuration and seed 70 but uses
 new experiment, plan, control, template, writable database, readiness and
-authorization identities. It must be prepared only from the final clean
-published source; this document still grants no launch authority.
+authorization identities. It was prepared from clean published source
+`662fe160`, authorized under plan identity `1702726f` and readiness identity
+`77cc65ad`, and completed without retry or recovery.
+
+## Attempt-003 completion result
+
+The controller reached 5,000/5,000 games and 20/20 accepted segments in
+1.9478 active hours. The target age advanced exactly from 1 to 5,000, proving
+that no refresh occurred. All updates were finite and all 20 policy-health
+gates passed.
+
+The aggregate 69.32% logged score is not a strength result. The frozen initial
+target arm was `2,721 W / 259 D / 0 L`; the Sanmill arm was only
+`23 W / 1,185 D / 812 L`. At the 500,000-node stage, 605 of 1,051 Sanmill
+games ended at the 120-ply cap. Rules draws and cap truncations therefore
+remain separate, and all opponent windows must be source-local.
+
+The exact identities, checkpoint/database evidence, corrected window
+semantics, descriptive v3 comparison, counterevidence and next launch gate are
+in the
+[attempt-003 result record](../evidence/sanmill-no-refresh-retained-v4-attempt-003-result-2026-08-13.md).
+The result does not show that no-refresh caused better play, avoided
+instability or deserves promotion. A later v3/v4 comparison first needs a
+frozen objective, power/precision analysis, prospective cap-state capture,
+tested evaluator, new corpus audit and separate authority.
 
 ## Objective and evidence boundary
 
@@ -259,6 +283,9 @@ or as a multi-seed long-run effect.
 
 ## Managed-plan preparation
 
+Historical execution record only: this preparation was completed at source
+`662fe160`. Do not regenerate, overwrite or re-authorize the consumed plan.
+
 Run only from the final clean published source commit, after verifying that
 both isolated targets are absent and creating the exact empty database:
 
@@ -289,6 +316,10 @@ freeze the exact source commit, objective, fresh lineage, 5,000-game and
 policy-health gate. It must keep publication and promotion disabled.
 
 ## Final technical readiness gate and evidence bundle
+
+Historical execution record only: the gate passed under readiness identity
+`77cc65ad9814daacd13221b26ffe3a022fd9d60948dd00a6502a4f0aea42dd31`.
+Later source changes do not revive or rebind that consumed readiness.
 
 Before reporting that technical gates passed with verdict `needs_decision`:
 
@@ -339,6 +370,9 @@ per-segment approval prompts.
 
 ## Reviewed launch route
 
+Historical execution record only: the command below was launched once under
+the exact attempt-003 authorization and reached completion.
+
 After the exact plan is technically ready and separately authorized, the only
 reviewed supervisor route is:
 
@@ -348,4 +382,5 @@ reviewed supervisor route is:
   --authorization learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-003\authorization.json
 ```
 
-Do not launch this command from the document alone.
+The authorization is consumed. Do not launch, resume or recreate this command
+from the document.
