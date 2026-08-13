@@ -228,6 +228,66 @@ def _mse_where(pred: np.ndarray, ref: np.ndarray, mask: np.ndarray) -> float:
     return float(np.mean((pred[mask] - ref[mask]) ** 2))
 
 
+def _evaluate_cell_verdict(
+    candidate_mse: float,
+    reference_mse: float,
+    n_high_support: int,
+    x: float,
+    direction: str,             # "min_improvement" (gate 1) | "max_tolerance" (gate 2)
+    min_n_high_support: int,
+    min_denominator: float,
+) -> tuple[str, dict]:
+    """Return (verdict, detail) for one Gate × (band × component) cell.
+
+    Verdicts (Codex P2-A, 2026-08-12):
+      - "PASS"                              — gate satisfied.
+      - "FAIL"                              — finite metrics, gate violated.
+      - "SKIP_INSUFFICIENT_SUPPORT"         — n_high_support < min_n_high_support.
+      - "SKIP_DEGENERATE_DENOMINATOR"       — |reference_mse| < min_denominator.
+      - "SKIP_NON_FINITE"                   — candidate or reference MSE is NaN
+                                              (empty mask), a diagnostic gap.
+      - "FAIL_DIVERGED"                     — candidate or reference MSE is ±inf
+                                              (training divergence).
+    """
+    if n_high_support < min_n_high_support:
+        return "SKIP_INSUFFICIENT_SUPPORT", {
+            "reason": f"n_high_support {n_high_support} < min_n_high_support {min_n_high_support}",
+        }
+    if not np.isfinite(candidate_mse) or not np.isfinite(reference_mse):
+        # NaN → skip (no data); ±inf → fail-closed (diverged).
+        if np.isnan(candidate_mse) or np.isnan(reference_mse):
+            return "SKIP_NON_FINITE", {
+                "candidate_mse": candidate_mse, "reference_mse": reference_mse,
+            }
+        return "FAIL_DIVERGED", {
+            "candidate_mse": candidate_mse, "reference_mse": reference_mse,
+        }
+    if abs(reference_mse) < min_denominator:
+        return "SKIP_DEGENERATE_DENOMINATOR", {
+            "reference_mse": reference_mse, "min_denominator": min_denominator,
+        }
+
+    if direction == "min_improvement":
+        # Gate 1: candidate ≤ (1 − x) × reference
+        threshold = (1.0 - x) * reference_mse
+        passed = candidate_mse <= threshold
+        margin_pct = (reference_mse - candidate_mse) / reference_mse * 100.0
+    elif direction == "max_tolerance":
+        # Gate 2: candidate ≤ (1 + x) × reference
+        threshold = (1.0 + x) * reference_mse
+        passed = candidate_mse <= threshold
+        margin_pct = (reference_mse - candidate_mse) / reference_mse * 100.0
+    else:
+        raise ValueError(f"unknown direction: {direction!r}")
+
+    return ("PASS" if passed else "FAIL"), {
+        "threshold_mse":  float(threshold),
+        "margin_pct":     float(margin_pct),
+        "candidate_mse":  float(candidate_mse),
+        "reference_mse":  float(reference_mse),
+    }
+
+
 def _report_gate(
     val_pred:  np.ndarray,  # (N, 3)
     y_model:   np.ndarray,  # (N, 3) model-P_h-derived G_v (training target)
@@ -235,28 +295,50 @@ def _report_gate(
     y_emp:     np.ndarray,  # (N, 3) empirical G_v (NaN where support insufficient)
     band_idx:  np.ndarray,  # (N,)   band 0=lower, 1=middle, 2=upper
     tr_means:  np.ndarray,  # (3,)   training-target mean per component
-) -> list[dict]:
-    """Compute Stage E gate metrics per component per band.
+    x_a:                float = 0.30,
+    x_b:                float = 0.20,
+    min_n_high_support: int   = 100,
+    min_denominator:    float = 1e-9,
+) -> tuple[list[dict], dict]:
+    """Compute Stage E gate metrics per component per band with executable verdicts.
 
-    Reference framing (Decision 3, 2026-08-06):
+    Codex P2-A hardening (2026-08-12): the gate returns pass/fail per cell
+    (band × component) alongside the raw MSE values.  Overall verdict is
+    "PASS" iff every non-skipped cell in both gates passes.
+
+    Reference framing (Decision 3A, 2026-08-06):
       - High-support rows (empirical present): empirical G_v is the reference.
         Report candidate / teacher / uniform MSE against empirical.
       - Model-only rows: candidate vs. teacher target is teacher-fidelity — not
         empirical validation.  Reported separately.
       - Mean-predictor baseline (predict train mean of teacher target) reported
         against teacher target across all valid rows.
+
+    Gates (per band × per component):
+      Gate 1 (beat uniform): candidate_vs_emp ≤ (1 − x_a) × uniform_vs_emp
+      Gate 2 (track teacher): candidate_vs_emp ≤ (1 + x_b) × teacher_vs_emp
+
+    Returns:
+      results:  list[per-component dict with per_band verdict info]
+      summary:  overall verdict + thresholds + failing/insufficient cell lists
     """
-    results = []
+    results:  list[dict] = []
+    failing_cells:      list[dict] = []
+    insufficient_cells: list[dict] = []
+    n_pass = n_fail = n_insufficient = n_degenerate = n_non_finite = n_diverged = 0
+
     for c in range(_N_HEADS):
         comp_result = {"component": _COMP_NAMES[c], "per_band": {}}
         for b in range(_N_BANDS):
             in_band = (band_idx == b)
             valid_model = in_band & ~np.isnan(y_model[:, c])
             valid_emp   = valid_model & ~np.isnan(y_emp[:, c])
+            n_valid          = int(valid_model.sum())
+            n_high_support   = int(valid_emp.sum())
 
             row: dict = {
-                "n_valid":         int(valid_model.sum()),
-                "n_high_support":  int(valid_emp.sum()),
+                "n_valid":         n_valid,
+                "n_high_support":  n_high_support,
                 "candidate_teacher_fidelity_mse":
                     _mse_where(val_pred[:, c], y_model[:, c], valid_model),
                 "mean_predictor_vs_teacher_mse":
@@ -266,24 +348,112 @@ def _report_gate(
                     ),
             }
 
-            if valid_emp.any():
-                candidate_vs_emp = _mse_where(val_pred[:, c], y_emp[:, c], valid_emp)
-                teacher_vs_emp   = _mse_where(y_model[:, c],  y_emp[:, c], valid_emp)
-                uniform_vs_emp   = _mse_where(y_unif[:, c],   y_emp[:, c], valid_emp)
-                row.update({
-                    "candidate_vs_empirical_mse": candidate_vs_emp,
-                    "teacher_vs_empirical_mse":   teacher_vs_emp,
-                    "uniform_vs_empirical_mse":   uniform_vs_emp,
-                    "improve_vs_uniform_pct":
-                        (uniform_vs_emp - candidate_vs_emp) / uniform_vs_emp * 100
-                        if uniform_vs_emp > 0 else float("nan"),
-                    "improve_vs_teacher_pct":
-                        (teacher_vs_emp - candidate_vs_emp) / teacher_vs_emp * 100
-                        if teacher_vs_emp > 0 else float("nan"),
+            candidate_vs_emp = _mse_where(val_pred[:, c], y_emp[:, c], valid_emp)
+            teacher_vs_emp   = _mse_where(y_model[:, c],  y_emp[:, c], valid_emp)
+            uniform_vs_emp   = _mse_where(y_unif[:, c],   y_emp[:, c], valid_emp)
+            row.update({
+                "candidate_vs_empirical_mse": candidate_vs_emp,
+                "teacher_vs_empirical_mse":   teacher_vs_emp,
+                "uniform_vs_empirical_mse":   uniform_vs_emp,
+            })
+
+            gate1_verdict, gate1_detail = _evaluate_cell_verdict(
+                candidate_vs_emp, uniform_vs_emp, n_high_support,
+                x=x_a, direction="min_improvement",
+                min_n_high_support=min_n_high_support,
+                min_denominator=min_denominator,
+            )
+            gate2_verdict, gate2_detail = _evaluate_cell_verdict(
+                candidate_vs_emp, teacher_vs_emp, n_high_support,
+                x=x_b, direction="max_tolerance",
+                min_n_high_support=min_n_high_support,
+                min_denominator=min_denominator,
+            )
+            row["gate_1_verdict"] = gate1_verdict
+            row["gate_1_detail"]  = gate1_detail
+            row["gate_2_verdict"] = gate2_verdict
+            row["gate_2_detail"]  = gate2_detail
+
+            # Cell verdict = PASS iff both gates PASS.  Any FAIL / FAIL_DIVERGED
+            # → cell FAIL.  Otherwise (all SKIP_* variants) → SKIP.
+            cell_verdict = _combine_gate_verdicts(gate1_verdict, gate2_verdict)
+            row["cell_verdict"] = cell_verdict
+
+            band_name = _BAND_NAMES[b]
+            comp_name = _COMP_NAMES[c]
+            if cell_verdict == "PASS":
+                n_pass += 1
+            elif cell_verdict.startswith("FAIL"):
+                n_fail += 1
+                failing_cells.append({
+                    "band": band_name, "component": comp_name,
+                    "gate_1": gate1_verdict, "gate_2": gate2_verdict,
+                    "candidate_mse": candidate_vs_emp,
+                    "teacher_mse":   teacher_vs_emp,
+                    "uniform_mse":   uniform_vs_emp,
+                    "n_high_support": n_high_support,
                 })
-            comp_result["per_band"][_BAND_NAMES[b]] = row
+            else:
+                # SKIP_INSUFFICIENT_SUPPORT / SKIP_DEGENERATE_DENOMINATOR / SKIP_NON_FINITE
+                if "INSUFFICIENT" in cell_verdict:
+                    n_insufficient += 1
+                elif "DEGENERATE" in cell_verdict:
+                    n_degenerate += 1
+                elif "NON_FINITE" in cell_verdict:
+                    n_non_finite += 1
+                insufficient_cells.append({
+                    "band": band_name, "component": comp_name,
+                    "cell_verdict": cell_verdict,
+                    "n_high_support": n_high_support,
+                })
+
+            comp_result["per_band"][band_name] = row
         results.append(comp_result)
-    return results
+
+    total_cells = _N_HEADS * _N_BANDS
+    all_pass    = (n_fail == 0) and (n_pass > 0)
+    summary = {
+        "overall_verdict":              "PASS" if all_pass else "FAIL" if n_fail > 0 else "INSUFFICIENT_SUPPORT",
+        "n_cells_total":                total_cells,
+        "n_cells_pass":                 n_pass,
+        "n_cells_fail":                 n_fail,
+        "n_cells_skip_insufficient":    n_insufficient,
+        "n_cells_skip_degenerate":      n_degenerate,
+        "n_cells_skip_non_finite":      n_non_finite,
+        "failing_cells":                failing_cells,
+        "skipped_cells":                insufficient_cells,
+        "thresholds": {
+            "x_a":                x_a,
+            "x_b":                x_b,
+            "min_n_high_support": min_n_high_support,
+            "min_denominator":    min_denominator,
+            "gate_1_formula":     "MSE(candidate,emp) ≤ (1 − x_a) × MSE(uniform,emp)",
+            "gate_2_formula":     "MSE(candidate,emp) ≤ (1 + x_b) × MSE(teacher,emp)",
+        },
+    }
+    return results, summary
+
+
+def _combine_gate_verdicts(g1: str, g2: str) -> str:
+    """Combine two gate verdicts into a cell verdict.
+
+    Any FAIL_DIVERGED → cell FAIL_DIVERGED (highest precedence).
+    Any FAIL → cell FAIL.
+    Otherwise both must PASS.  If either is a SKIP variant, cell inherits it.
+    """
+    if "FAIL_DIVERGED" in (g1, g2):
+        return "FAIL_DIVERGED"
+    if "FAIL" in (g1, g2):
+        return "FAIL"
+    if g1 == "PASS" and g2 == "PASS":
+        return "PASS"
+    # Both are some SKIP_* variant.  Prefer more informative one:
+    #   INSUFFICIENT_SUPPORT > DEGENERATE_DENOMINATOR > NON_FINITE
+    if any("INSUFFICIENT_SUPPORT" in v for v in (g1, g2)):
+        return "SKIP_INSUFFICIENT_SUPPORT"
+    if any("DEGENERATE_DENOMINATOR" in v for v in (g1, g2)):
+        return "SKIP_DEGENERATE_DENOMINATOR"
+    return "SKIP_NON_FINITE"
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -301,6 +471,18 @@ def main() -> None:
     p.add_argument("--seed",         type=int,   default=42)
     p.add_argument("--d4-augmentation", choices=("on", "off"), default="off",
                    help="Random D4 board symmetry per batch sample (§11.2 ablation)")
+    # ── Stage E gate thresholds (Codex P2-A, 2026-08-12) ────────────────────
+    p.add_argument("--stage-e-x-a", type=float, default=0.30,
+                   help="Gate 1 uniform-improvement threshold X_A (default 30 %%). "
+                        "Draft per §16; user reviews before Stage E run.")
+    p.add_argument("--stage-e-x-b", type=float, default=0.20,
+                   help="Gate 2 teacher-tolerance threshold X_B (default 20 %%). "
+                        "Draft per §16.")
+    p.add_argument("--stage-e-min-high-support", type=int, default=100,
+                   help="Minimum n_high_support per (band × component) cell for "
+                        "gate evaluation.  Cells below → SKIP_INSUFFICIENT_SUPPORT.")
+    p.add_argument("--stage-e-min-denominator", type=float, default=1e-9,
+                   help="Minimum reference-MSE magnitude; below → SKIP_DEGENERATE_DENOMINATOR.")
     args = p.parse_args()
 
     torch.manual_seed(args.seed)
@@ -418,15 +600,19 @@ def main() -> None:
     with torch.no_grad():
         val_pred_np = _forward_chunked(model, X_va).cpu().numpy()
 
-    gate_results = _report_gate(
+    gate_results, gate_summary = _report_gate(
         val_pred_np,
         va["y_model"].numpy(),
         va["y_unif"].numpy(),
         va["y_emp"].numpy(),
         va["band"].numpy(),
         np.array(tr_means_list, dtype=np.float64),
+        x_a=args.stage_e_x_a,
+        x_b=args.stage_e_x_b,
+        min_n_high_support=args.stage_e_min_high_support,
+        min_denominator=args.stage_e_min_denominator,
     )
-    print("[gap_net_v3] Stage E gate summary (§16 revised 2026-08-06):")
+    print("[gap_net_v3] Stage E gate summary (§16 revised 2026-08-12):")
     for comp in gate_results:
         print(f"  Component {comp['component']}:")
         for band, row in comp["per_band"].items():
@@ -435,12 +621,18 @@ def main() -> None:
                     f"teacher_fidelity={row['candidate_teacher_fidelity_mse']:.6f}  "
                     f"mean_pred={row['mean_predictor_vs_teacher_mse']:.6f}")
             print(base)
-            if row.get("candidate_vs_empirical_mse") is not None:
-                print(f"      vs empirical  → candidate={row['candidate_vs_empirical_mse']:.6f}  "
-                      f"teacher={row['teacher_vs_empirical_mse']:.6f}  "
-                      f"uniform={row['uniform_vs_empirical_mse']:.6f}")
-                print(f"      improve       vs uniform={row['improve_vs_uniform_pct']:+.1f}%  "
-                      f"vs teacher={row['improve_vs_teacher_pct']:+.1f}%")
+            print(f"      vs empirical  → candidate={row['candidate_vs_empirical_mse']}  "
+                  f"teacher={row['teacher_vs_empirical_mse']}  "
+                  f"uniform={row['uniform_vs_empirical_mse']}")
+            print(f"      gate_1={row['gate_1_verdict']}  "
+                  f"gate_2={row['gate_2_verdict']}  "
+                  f"cell={row['cell_verdict']}")
+    print(f"[gap_net_v3] OVERALL VERDICT: {gate_summary['overall_verdict']}  "
+          f"pass={gate_summary['n_cells_pass']}  "
+          f"fail={gate_summary['n_cells_fail']}  "
+          f"skip_insufficient={gate_summary['n_cells_skip_insufficient']}  "
+          f"skip_degenerate={gate_summary['n_cells_skip_degenerate']}  "
+          f"skip_non_finite={gate_summary['n_cells_skip_non_finite']}")
 
     provenance = {
         "model":                   "gap_net_v3_candidate",
@@ -465,6 +657,7 @@ def main() -> None:
         "d4_augmentation":         args.d4_augmentation,
         "tr_means":                tr_means_list,
         "gate_results":            gate_results,
+        "gate_summary":            gate_summary,
         "git_commit":              _git_commit(),
         "built_at":                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
