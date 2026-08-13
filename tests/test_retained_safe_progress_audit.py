@@ -9,6 +9,7 @@ from game.rules import get_all_legal_moves
 from learned_ai.evaluation.retained_safe_progress_audit import (
     classify_candidate_turn,
 )
+from scripts.run_retained_safe_progress_audit import DEFAULT_PLAN, load_audit_plan
 
 
 class _AllDrawMalom:
@@ -122,3 +123,22 @@ def test_recorded_malom_delta_must_replay() -> None:
             malom=_AllDrawMalom(),
             recorded_delta=-1.0,
         )
+
+
+def test_frozen_plan_binds_completed_source_and_zero_game_workload() -> None:
+    plan = load_audit_plan(DEFAULT_PLAN)
+    assert plan["plan_identity"] == (
+        "3338ba5979db20d89d81bf4408d2fa1eeef098eefb6d854ef56d707ad268fb73"
+    )
+    assert plan["source"]["result_identity"] == (
+        "d250f03d72b535c0249bdf0ada7d5a75d91f7fcc44e8926c4f6dfba35d2e63d0"
+    )
+    assert plan["source"]["files"]["ledger"]["sha256"] == (
+        "c064f29d77cedd42a9ef405ec44dbbda045b47be31092e952568cecb5d49b562"
+    )
+    assert plan["workload"] == {
+        "new_games": 0,
+        "model_updates": 0,
+        "database_writes": 0,
+        "checkpoint_writes": 0,
+    }
