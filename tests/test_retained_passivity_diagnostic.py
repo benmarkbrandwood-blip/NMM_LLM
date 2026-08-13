@@ -417,6 +417,7 @@ def test_web_payload_does_not_invent_metrics_before_launch(tmp_path) -> None:
     assert "history-free" in web.HTML
     assert "query coverage" in web.HTML
     assert "不能归因" in web.HTML
+    assert "起点层配对得分精度" in web.HTML
 
 
 def test_embedded_web_javascript_parses_with_node() -> None:
@@ -453,6 +454,40 @@ def test_web_payload_recomputes_partial_ledger(tmp_path, spec) -> None:
     assert payload["report"]["paired"]["matched_units_complete"] == 0
     assert payload["safe_progress"] is None
     assert payload["oracle_order"] is None
+    assert payload["score_precision_by_start"]["start_units_complete"] == 0
+
+
+def test_start_level_score_precision_clusters_both_colours() -> None:
+    records = []
+    for start, colour_differences in {
+        "start-1": {"W": 0.5, "B": 0.0},
+        "start-2": {"W": -0.5, "B": 0.0},
+    }.items():
+        for colour, difference in colour_differences.items():
+            records.extend(
+                [
+                    {
+                        "source_core_id": start,
+                        "candidate_color": colour,
+                        "candidate_id": diagnostic.EXPECTED_CANDIDATES[0],
+                        "candidate_score": 0.5,
+                        "termination_class": "rules_terminal",
+                    },
+                    {
+                        "source_core_id": start,
+                        "candidate_color": colour,
+                        "candidate_id": diagnostic.EXPECTED_CANDIDATES[1],
+                        "candidate_score": 0.5 + difference,
+                        "termination_class": "rules_terminal",
+                    },
+                ]
+            )
+    summary = web._start_level_score_precision(records)
+    assert summary["matched_colour_units_rules_terminal"] == 4
+    assert summary["start_units_complete"] == 2
+    assert summary["mean"] == 0.0
+    assert summary["distribution"] == {"-0.25": 1, "0.25": 1}
+    assert summary["strength_claim_allowed"] is False
 
 
 def test_web_payload_reads_identity_bound_safe_progress_report(tmp_path, spec) -> None:

@@ -792,12 +792,12 @@ def _paired_comparison(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def recompute_diagnostic(
+def summarize_diagnostic_records(
     spec: Mapping[str, Any],
-    ledger_path: str | Path,
+    records: Sequence[Mapping[str, Any]],
+    tail: str | None,
 ) -> dict[str, Any]:
-    """Recompute partial or complete web/report summaries from the ledger."""
-    records, tail = load_game_ledger(spec, ledger_path)
+    """Build the canonical diagnostic summary from validated ledger records."""
     grouped = {
         candidate_id: [
             record for record in records if record["candidate_id"] == candidate_id
@@ -853,6 +853,15 @@ def recompute_diagnostic(
         },
     }
     return {**body, "result_identity": canonical_sha256(body)}
+
+
+def recompute_diagnostic(
+    spec: Mapping[str, Any],
+    ledger_path: str | Path,
+) -> dict[str, Any]:
+    """Recompute partial or complete web/report summaries from the ledger."""
+    records, tail = load_game_ledger(spec, ledger_path)
+    return summarize_diagnostic_records(spec, records, tail)
 
 
 def sha256_file(path: str | Path) -> str:
