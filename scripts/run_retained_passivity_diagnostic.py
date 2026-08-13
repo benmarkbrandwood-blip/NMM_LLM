@@ -847,6 +847,9 @@ def build_readiness_report(
         "exact reused 64-start corpus and adjacent 256-game schedule",
         lambda: _corpus_record(plan, paths),
     )
+    if corpus_result is not None:
+        # The record list is an internal replay input, never readiness evidence.
+        gates[-1]["observed"] = corpus_result[0]
     _gate(
         gates,
         "candidates",
@@ -938,6 +941,36 @@ def _raise_competing(processes: list[dict[str, Any]]) -> None:
         "competing trainer/evaluator processes exist: "
         + ", ".join(str(item["pid"]) for item in processes)
     )
+
+
+def require_launch_ready(readiness: Mapping[str, Any]) -> None:
+    """Require the complete, non-skipped launch gate set exactly once."""
+    if readiness.get("ready") is not True or readiness.get("verdict") != (
+        "ready_for_long_run"
+    ):
+        raise RetainedPassivityDiagnosticError("diagnostic readiness did not pass")
+    gates = readiness.get("gates")
+    if not isinstance(gates, list):
+        raise RetainedPassivityDiagnosticError("diagnostic readiness gates are absent")
+    required = {
+        "repository",
+        "plan",
+        "authorization",
+        "outputs",
+        "corpus",
+        "candidates",
+        "sanmill",
+        "prefix_replay",
+        "process_ownership",
+        "tests",
+    }
+    observed = [gate.get("gate") for gate in gates if isinstance(gate, Mapping)]
+    if set(observed) != required or len(observed) != len(required):
+        raise RetainedPassivityDiagnosticError(
+            "diagnostic launch readiness has skipped or duplicate gates"
+        )
+    if any(gate.get("result") != "pass" for gate in gates):
+        raise RetainedPassivityDiagnosticError("diagnostic launch gate did not pass")
 
 
 def _build_spec(
@@ -1066,10 +1099,7 @@ def run_once(
     resume: bool,
     game_factory: Callable[..., Any] = SanmillTrainingGame,
 ) -> dict[str, Any]:
-    if readiness.get("ready") is not True or readiness.get("verdict") != (
-        "ready_for_long_run"
-    ):
-        raise RetainedPassivityDiagnosticError("diagnostic readiness did not pass")
+    require_launch_ready(readiness)
     authorization = _load_authorization(plan, paths)
     _corpus_observation, corpus_records = _corpus_record(plan, paths)
     if resume:
@@ -1250,6 +1280,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command in {"run", "resume"} and not args.launch:
             raise RetainedPassivityDiagnosticError(
                 "run requires the explicit --launch flag"
+            )
+        if args.command in {"run", "resume"} and (
+            args.skip_tests or args.skip_prefix_audit
+        ):
+            raise RetainedPassivityDiagnosticError(
+                "launch cannot skip tests or the 64-prefix replay audit"
             )
         plan, paths = _load_context(args)
         if args.command in {"preflight", "preflight-resume"}:

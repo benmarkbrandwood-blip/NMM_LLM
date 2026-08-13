@@ -476,6 +476,50 @@ def test_authorization_builder_binds_exact_resource_and_prohibitions(
     assert authorization["authorization_identity"] == canonical_sha256(body)
 
 
+def test_launch_readiness_rejects_a_skipped_gate_set() -> None:
+    readiness = {
+        "ready": True,
+        "verdict": "ready_for_long_run",
+        "gates": [
+            {"gate": gate, "result": "pass"}
+            for gate in (
+                "repository",
+                "plan",
+                "authorization",
+                "outputs",
+                "corpus",
+                "candidates",
+                "sanmill",
+                "process_ownership",
+            )
+        ],
+    }
+    with pytest.raises(
+        diagnostic.RetainedPassivityDiagnosticError,
+        match="skipped or duplicate gates",
+    ):
+        runner.require_launch_ready(readiness)
+
+
+def test_cli_launch_cannot_skip_tests_or_prefix_audit() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/run_retained_passivity_diagnostic.py",
+            "--skip-tests",
+            "run",
+            "--launch",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 2
+    assert "cannot skip tests" in result.stderr
+
+
 def test_cli_never_launches_without_explicit_flag() -> None:
     result = subprocess.run(
         [sys.executable, "scripts/run_retained_passivity_diagnostic.py", "run"],
