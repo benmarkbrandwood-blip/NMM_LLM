@@ -131,6 +131,17 @@ classification is `no_replicated_material_effect`, with no selected successor
 condition and `automatic_long_run_selection=false`. Preserve the
 [replication result evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md).
 
+The next retained research plan is frozen in
+[Sanmill no-refresh retained long v4](../experiments/sanmill-no-refresh-retained-long-v4.md).
+It does not reinterpret the pooled null as a selected cadence. It instead
+tests a new permanent no-refresh hypothesis from fresh random state at unused
+seed 70, with `target-refresh-every=5001`. All retained-v3 reward, component,
+opponent, fixed-node curriculum, max-ply, segmentation, monitoring, 5,000-game
+and 12-hour choices remain fixed. The source-only document is unlaunched and
+grants no training authority. Final preparation must occur only after this
+document is published at a clean synchronized tip, using a fresh empty
+database and absent output path.
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -147,8 +158,10 @@ condition and `automatic_long_run_selection=false`. Preserve the
    do not rerun, resume, extend, overwrite, or relabel it.
 5. Preserve the null pooled cadence selection. A next retained run may be
    designed as a new research baseline, but its target schedule must be stated
-   as a new plan choice rather than attributed to this result. Freeze and
-   verify that plan separately before any long-training launch decision.
+   as a new plan choice rather than attributed to this result. The resulting
+   no-refresh retained-v4 plan is now frozen; publish it, prepare its ignored
+   plan and fresh database only at the final source, then complete its technical
+   readiness audit without launching long training.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`
@@ -2487,6 +2500,15 @@ the current successor in this order:
     [replication evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md)
     and do not rerun, resume, extend, promote, publish, or infer long-training
     authority from the consumed sequence.
+33. The next retained research design is frozen in
+    [Sanmill no-refresh retained long v4](../experiments/sanmill-no-refresh-retained-long-v4.md).
+    It uses fresh seed 70, a fresh empty SpecialistDB, the retained-v3
+    configuration, and `target-refresh-every=5001` to test permanent
+    no-refresh without claiming that the pooled null selected it. The bounded
+    plan is 5,000 games, 250-game segments and 12 active hours. It remains
+    unlaunched and has no authorization. Publish the final design first, then
+    prepare and audit the ignored plan at that exact clean synchronized source;
+    do not insert another tracked commit after preparation.
 
 The previously executed isolated smoke command was:
 
