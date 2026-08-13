@@ -14,6 +14,7 @@ from learned_ai.evaluation.retained_oracle_order_audit import (
     _summarise_counts,
     classify_candidate_turn,
 )
+from scripts.run_retained_oracle_order_audit import DEFAULT_PLAN, load_audit_plan
 
 
 def _key(move: Mapping[str, object]) -> tuple[object, object, object]:
@@ -261,3 +262,22 @@ def test_paired_decision_uses_per_game_normalised_regret_difference() -> None:
     assert primary["support"] == 128
     assert primary["mean"] == pytest.approx(0.1)
     assert primary["decision"] == "v4_higher_full_order_regret"
+
+
+def test_frozen_plan_binds_prior_audit_and_zero_game_workload() -> None:
+    plan = load_audit_plan(DEFAULT_PLAN)
+    assert plan["plan_identity"] == (
+        "95e1d5e6640765e14852b9dfc3f2793bf72ee583bc95fc0a3bd1512acb36d23d"
+    )
+    assert plan["safe_progress_source"]["result_identity"] == (
+        "b60eaf6392d55e520b5a2a493ce7dd8961c05e811a7fd3cbb5375735fe312fea"
+    )
+    assert plan["source"]["files"]["ledger"]["sha256"] == (
+        "c064f29d77cedd42a9ef405ec44dbbda045b47be31092e952568cecb5d49b562"
+    )
+    assert plan["workload"] == {
+        "new_games": 0,
+        "model_updates": 0,
+        "database_writes": 0,
+        "checkpoint_writes": 0,
+    }
