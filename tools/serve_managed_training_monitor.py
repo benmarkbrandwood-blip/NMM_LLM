@@ -1273,7 +1273,7 @@ const I18N = {
     tableGameRows:'对局行', tableUpdates:'更新', tableCheckpoint:'Checkpoint', tableSource:'来源', tableGames:'局数', tableWins:'胜', tableDraws:'和', tableRuleDraws:'规则和棋', tableMaxPly:'max-ply', tableLosses:'负', tableScoreRate:'得分率', tableLevel:'级别', tableNodes:'节点上限', tableSearchTime:'参考毫秒（中位 / P90）', referenceSearch:'参考搜索', none:'无',
     footer:'只读监控面板 · 每 5 秒刷新 · 仅显示观测与冻结计划，不绘制预测', observedEvidenceKey:'曲线和条形：仅已观测日志/遥测', planBoundaryKey:'虚线与上限：冻结计划边界，不是预测', helpPurpose:'作用', helpRead:'怎么看',
     helpExpected:'常见情况（非预测）', helpWatch:'需要注意', helpButton:'查看说明', closeHelp:'关闭说明',
-    noData:'暂无数据', observedOnly:'仅观测', controllerConfirmed:'控制器确认', loggedRows:'日志点', limit:'上限',
+    noData:'暂无数据', controllerConfirmed:'控制器确认', loggedRows:'日志点', limit:'上限',
     temperature:'温度', best:'最佳', game:'局', gamesUnit:'局', level:'级别', nodes:'节点', scoreRate:'得分率', winRate:'胜率', sourceSample:'来源样本', trainingDiagnosticOnly:'混合来源训练诊断，不是棋力 KPI', frozenShort:'冻结臂', sanmillShort:'Sanmill', fullWindow:'完整 200 局窗口', updatedAt:'更新于', malformedTail:'忽略损坏尾行',
     loadFailed:'读取失败', yes:'是', online:'控制器在线', offline:'控制器离线', controllerExited:'控制器已正常退出', noInfrastructureStop:'无基础设施停止信号', healthIssueCount:'项需检查', learnerWhite:'执白', learnerBlack:'执黑', allSources:'全部来源', noTrainingGpuTelemetry:'无训练期遥测', postTrainingGpuSamplesIgnored:'已忽略训练窗口外样本', sampleCount:'样本数',
     healthStates:{healthy:'正常',complete:'完整完成',warning:'需注意',stop:'停止信号'},
@@ -1299,7 +1299,7 @@ const I18N = {
     tableGameRows:'Game rows', tableUpdates:'Updates', tableCheckpoint:'Checkpoint', tableSource:'Source', tableGames:'Games', tableWins:'Wins', tableDraws:'Draws', tableRuleDraws:'Rules draws', tableMaxPly:'max-ply', tableLosses:'Losses', tableScoreRate:'Score rate', tableLevel:'Level', tableNodes:'Node ceiling', tableSearchTime:'Reference ms (median / P90)', referenceSearch:'reference search', none:'None',
     footer:'Read-only monitor · refreshes every 5 seconds · observed data and frozen plan only; no forecast', observedEvidenceKey:'Lines and bars: observed logs/telemetry only', planBoundaryKey:'Dashed markers and limits: frozen plan boundaries, not forecasts', helpPurpose:'Purpose', helpRead:'How to read it',
     helpExpected:'Typical pattern (not a forecast)', helpWatch:'Watch for', helpButton:'Show explanation', closeHelp:'Close explanation',
-    noData:'No data', observedOnly:'OBSERVED', controllerConfirmed:'Controller confirmed', loggedRows:'logged points', limit:'limit',
+    noData:'No data', controllerConfirmed:'Controller confirmed', loggedRows:'logged points', limit:'limit',
     temperature:'temperature', best:'best', game:'game', gamesUnit:'games', level:'level', nodes:'nodes', scoreRate:'score rate', winRate:'win rate', sourceSample:'source sample', trainingDiagnosticOnly:'mixed-source training diagnostic, not a strength KPI', frozenShort:'frozen', sanmillShort:'Sanmill', fullWindow:'full 200-game window', updatedAt:'Updated', malformedTail:'malformed tail lines ignored',
     loadFailed:'Read failed', yes:'yes', online:'controller online', offline:'controller offline', controllerExited:'controller exited normally', noInfrastructureStop:'no infrastructure stop signal', healthIssueCount:'items need review', learnerWhite:'learner White', learnerBlack:'learner Black', allSources:'all sources', noTrainingGpuTelemetry:'No training-window telemetry', postTrainingGpuSamplesIgnored:'samples outside training windows ignored', sampleCount:'samples',
     healthStates:{healthy:'healthy',complete:'complete',warning:'warning',stop:'stop signal'},
@@ -1460,7 +1460,6 @@ function closeHelp(){const panel=document.getElementById('helpPanel');panel.hidd
 function setLanguage(language){if(!Object.hasOwn(I18N,language))return;currentLanguage=language;localStorage.setItem('nmm-monitor-language',language);applyStaticTranslations();if(lastData)render(lastData);}
 
 function drawMarkers(c,markers,X,xmin,xmax,pad,h){for(const marker of markers||[]){const game=Number(marker.game);if(!Number.isFinite(game)||game<xmin||game>xmax)continue;c.save();c.strokeStyle=marker.color;c.lineWidth=1;c.setLineDash(marker.dash||[4,4]);c.beginPath();c.moveTo(X(game),pad.t);c.lineTo(X(game),h-pad.b);c.stroke();c.restore();}}
-function drawObservedBadge(c,w,pad){const label=t('observedOnly');c.save();c.font='10px system-ui';const width=c.measureText(label).width+12;const x=w-pad.r-width,y=pad.t+5;c.fillStyle='rgba(7,17,31,.82)';c.fillRect(x,y,width,18);c.strokeStyle='#3b5777';c.strokeRect(x+.5,y+.5,width-1,17);c.fillStyle='#bcd7f8';c.fillText(label,x+6,y+12);c.restore();}
 function niceStep(range,target=5){if(!Number.isFinite(range)||range<=0)return 1;const rough=range/target,power=10**Math.floor(Math.log10(rough)),fraction=rough/power;return (fraction<=1?1:fraction<=2?2:fraction<=5?5:10)*power;}
 function axisNumber(value,step){if(step>=1)return integer(value);const digits=Math.max(1,Math.min(4,-Math.floor(Math.log10(step))));return num(value,digits);}
 function drawYAxisLabel(c,label,x,y){c.save();c.textAlign='right';c.fillText(label,x,y);c.restore();}
@@ -1480,7 +1479,7 @@ function lineChart(id,rows,specs,fixedDomain=null,markers=[],tickStep=null,xDoma
   drawMarkers(c,markers,X,xmin,xmax,pad,h);
   c.fillText(integer(xmin),pad.l,h-7);const xmaxText=integer(xmax);c.fillText(xmaxText,w-pad.r-c.measureText(xmaxText).width,h-7);
   let lx=pad.l;for(const s of specs){c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();c.moveTo(lx,pad.t-15);c.lineTo(lx+11,pad.t-15);c.stroke();c.restore();c.fillStyle='#c8d5e6';c.fillText(s.label,lx+15,pad.t-12);lx+=c.measureText(s.label).width+37;
-    c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();let started=false,previousPy=null;for(const r of rows){const x=finiteNumber(r.game),y=finiteNumber(r[s.key]);if(x===null||y===null){started=false;previousPy=null;continue;}const px=X(x),py=Y(y);if(!started){c.moveTo(px,py);started=true;}else{if(s.stepped)c.lineTo(px,previousPy);c.lineTo(px,py);}previousPy=py;}c.stroke();c.restore();}drawObservedBadge(c,w,pad);
+    c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();let started=false,previousPy=null;for(const r of rows){const x=finiteNumber(r.game),y=finiteNumber(r[s.key]);if(x===null||y===null){started=false;previousPy=null;continue;}const px=X(x),py=Y(y);if(!started){c.moveTo(px,py);started=true;}else{if(s.stepped)c.lineTo(px,previousPy);c.lineTo(px,py);}previousPy=py;}c.stroke();c.restore();}
 }
 
 function stackedAreaChart(id,rows,specs,markers=[],xDomain=null){
@@ -1494,7 +1493,7 @@ function stackedAreaChart(id,rows,specs,markers=[],xDomain=null){
   for(let i=0;i<=4;i++){const y=pad.t+i*(h-pad.t-pad.b)/4;c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();drawYAxisLabel(c,`${100-i*25}%`,pad.l-8,y+4);}
   const cumulative=new Array(rows.length).fill(0);for(const spec of specs){c.beginPath();for(let i=0;i<rows.length;i++){const top=cumulative[i]+(Number(rows[i][spec.key])||0);const x=X(Number(rows[i].game)),y=Y(top);if(i===0)c.moveTo(x,y);else c.lineTo(x,y);}for(let i=rows.length-1;i>=0;i--)c.lineTo(X(Number(rows[i].game)),Y(cumulative[i]));c.closePath();c.fillStyle=spec.color;c.globalAlpha=.72;c.fill();c.globalAlpha=1;for(let i=0;i<rows.length;i++)cumulative[i]+=Number(rows[i][spec.key])||0;}
   drawMarkers(c,markers,X,xmin,xmax,pad,h);c.fillStyle='#91a4bd';c.fillText(integer(xmin),pad.l,h-7);const xmaxText=integer(xmax);c.fillText(xmaxText,w-pad.r-c.measureText(xmaxText).width,h-7);
-  let lx=pad.l;for(const spec of specs){c.fillStyle=spec.color;c.fillRect(lx,pad.t-17,10,6);c.fillStyle='#c8d5e6';const label=valueLabel(spec.key);c.fillText(label,lx+14,pad.t-12);lx+=c.measureText(label).width+34;if(lx>w-120){lx=pad.l;}}drawObservedBadge(c,w,pad);
+  let lx=pad.l;for(const spec of specs){c.fillStyle=spec.color;c.fillRect(lx,pad.t-17,10,6);c.fillStyle='#c8d5e6';const label=valueLabel(spec.key);c.fillText(label,lx+14,pad.t-12);lx+=c.measureText(label).width+34;if(lx>w-120){lx=pad.l;}}
 }
 
 function bars(id,values,colors={},preferredOrder=[]){const host=document.getElementById(id),source=values||{},preferred=new Set(preferredOrder),names=[...preferredOrder.filter(name=>Object.hasOwn(source,name)),...Object.keys(source).filter(name=>!preferred.has(name))],entries=names.map(name=>[name,source[name]]);host.replaceChildren();

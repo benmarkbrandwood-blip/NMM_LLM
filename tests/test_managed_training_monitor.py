@@ -236,3 +236,10 @@ def test_chart_y_axis_labels_share_a_right_aligned_numeric_edge() -> None:
     assert "c.textAlign='right'" in monitor.HTML
     assert "drawYAxisLabel(c,label,pad.l-8,y+4)" in monitor.HTML
     assert "drawYAxisLabel(c,`${100-i*25}%`,pad.l-8,y+4)" in monitor.HTML
+
+
+def test_observation_scope_is_declared_once_above_the_charts() -> None:
+    assert monitor.HTML.count('data-i18n="observedEvidenceKey"') == 1
+    assert 'data-i18n="planBoundaryKey"' in monitor.HTML
+    assert "function drawObservedBadge" not in monitor.HTML
+    assert "observedOnly:" not in monitor.HTML
