@@ -1463,6 +1463,7 @@ function drawMarkers(c,markers,X,xmin,xmax,pad,h){for(const marker of markers||[
 function drawObservedBadge(c,w,pad){const label=t('observedOnly');c.save();c.font='10px system-ui';const width=c.measureText(label).width+12;const x=w-pad.r-width,y=pad.t+5;c.fillStyle='rgba(7,17,31,.82)';c.fillRect(x,y,width,18);c.strokeStyle='#3b5777';c.strokeRect(x+.5,y+.5,width-1,17);c.fillStyle='#bcd7f8';c.fillText(label,x+6,y+12);c.restore();}
 function niceStep(range,target=5){if(!Number.isFinite(range)||range<=0)return 1;const rough=range/target,power=10**Math.floor(Math.log10(rough)),fraction=rough/power;return (fraction<=1?1:fraction<=2?2:fraction<=5?5:10)*power;}
 function axisNumber(value,step){if(step>=1)return integer(value);const digits=Math.max(1,Math.min(4,-Math.floor(Math.log10(step))));return num(value,digits);}
+function drawYAxisLabel(c,label,x,y){c.save();c.textAlign='right';c.fillText(label,x,y);c.restore();}
 
 function lineChart(id,rows,specs,fixedDomain=null,markers=[],tickStep=null,xDomain=null){
   const canvas=document.getElementById(id),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;
@@ -1475,7 +1476,7 @@ function lineChart(id,rows,specs,fixedDomain=null,markers=[],tickStep=null,xDoma
   let autoStep=null;if(tickStep&&!fixedDomain){ymin=0;ymax=Math.max(tickStep,Math.ceil(ymax/tickStep)*tickStep);}else if(!fixedDomain){if(ymax===ymin){const d=Math.max(Math.abs(ymax)*.1,1e-6);ymax+=d;ymin-=d;}autoStep=niceStep(ymax-ymin);ymin=Math.floor(ymin/autoStep)*autoStep;ymax=Math.ceil(ymax/autoStep)*autoStep;}
   const X=x=>pad.l+(x-xmin)/(xmax-xmin)*(w-pad.l-pad.r),Y=y=>h-pad.b-(y-ymin)/(ymax-ymin)*(h-pad.t-pad.b);
   c.font='11px system-ui';c.strokeStyle='#23344a';c.fillStyle='#91a4bd';c.lineWidth=1;
-  const effectiveStep=tickStep||autoStep;const tickCount=effectiveStep?Math.max(1,Math.round((ymax-ymin)/effectiveStep)):4;for(let i=0;i<=tickCount;i++){const y=pad.t+i*(h-pad.t-pad.b)/tickCount;c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();const val=ymax-i*(ymax-ymin)/tickCount;const label=fixedDomain&&ymax===1?`${Math.round(val*100)}%`:fixedDomain&&ymax===100?`${Math.round(val)}%`:axisNumber(val,effectiveStep||(ymax-ymin)/tickCount);c.fillText(label,4,y+4);}
+  const effectiveStep=tickStep||autoStep;const tickCount=effectiveStep?Math.max(1,Math.round((ymax-ymin)/effectiveStep)):4;for(let i=0;i<=tickCount;i++){const y=pad.t+i*(h-pad.t-pad.b)/tickCount;c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();const val=ymax-i*(ymax-ymin)/tickCount;const label=fixedDomain&&ymax===1?`${Math.round(val*100)}%`:fixedDomain&&ymax===100?`${Math.round(val)}%`:axisNumber(val,effectiveStep||(ymax-ymin)/tickCount);drawYAxisLabel(c,label,pad.l-8,y+4);}
   drawMarkers(c,markers,X,xmin,xmax,pad,h);
   c.fillText(integer(xmin),pad.l,h-7);const xmaxText=integer(xmax);c.fillText(xmaxText,w-pad.r-c.measureText(xmaxText).width,h-7);
   let lx=pad.l;for(const s of specs){c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();c.moveTo(lx,pad.t-15);c.lineTo(lx+11,pad.t-15);c.stroke();c.restore();c.fillStyle='#c8d5e6';c.fillText(s.label,lx+15,pad.t-12);lx+=c.measureText(s.label).width+37;
@@ -1490,7 +1491,7 @@ function stackedAreaChart(id,rows,specs,markers=[],xDomain=null){
   let xmin=xDomain?xDomain[0]:Math.min(...rows.map(r=>Number(r.game))),xmax=xDomain?xDomain[1]:Math.max(...rows.map(r=>Number(r.game)));if(xmax===xmin)xmax=xmin+1;
   const X=x=>pad.l+(x-xmin)/(xmax-xmin)*(w-pad.l-pad.r),Y=y=>h-pad.b-y*(h-pad.t-pad.b);
   c.font='11px system-ui';c.strokeStyle='#23344a';c.fillStyle='#91a4bd';c.lineWidth=1;
-  for(let i=0;i<=4;i++){const y=pad.t+i*(h-pad.t-pad.b)/4;c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();c.fillText(`${100-i*25}%`,4,y+4);}
+  for(let i=0;i<=4;i++){const y=pad.t+i*(h-pad.t-pad.b)/4;c.beginPath();c.moveTo(pad.l,y);c.lineTo(w-pad.r,y);c.stroke();drawYAxisLabel(c,`${100-i*25}%`,pad.l-8,y+4);}
   const cumulative=new Array(rows.length).fill(0);for(const spec of specs){c.beginPath();for(let i=0;i<rows.length;i++){const top=cumulative[i]+(Number(rows[i][spec.key])||0);const x=X(Number(rows[i].game)),y=Y(top);if(i===0)c.moveTo(x,y);else c.lineTo(x,y);}for(let i=rows.length-1;i>=0;i--)c.lineTo(X(Number(rows[i].game)),Y(cumulative[i]));c.closePath();c.fillStyle=spec.color;c.globalAlpha=.72;c.fill();c.globalAlpha=1;for(let i=0;i<rows.length;i++)cumulative[i]+=Number(rows[i][spec.key])||0;}
   drawMarkers(c,markers,X,xmin,xmax,pad,h);c.fillStyle='#91a4bd';c.fillText(integer(xmin),pad.l,h-7);const xmaxText=integer(xmax);c.fillText(xmaxText,w-pad.r-c.measureText(xmaxText).width,h-7);
   let lx=pad.l;for(const spec of specs){c.fillStyle=spec.color;c.fillRect(lx,pad.t-17,10,6);c.fillStyle='#c8d5e6';const label=valueLabel(spec.key);c.fillText(label,lx+14,pad.t-12);lx+=c.measureText(label).width+34;if(lx>w-120){lx=pad.l;}}drawObservedBadge(c,w,pad);

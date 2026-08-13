@@ -1975,7 +1975,9 @@ win/draw/loss order. Learning rate is rendered from the raw executed value as a
 step function with an explicit change-point note, not as a 50-game moving
 average. For no-refresh attempt 003, the evidence is `1e-4` through game 50 and
 `5e-5` from game 51 onward; the former diagonal `0.93 -> 0.50` display was a
-visualisation artefact caused by smoothing that one discrete change.
+visualisation artefact caused by smoothing that one discrete change. Canvas
+y-axis tick labels share one fixed right edge, so a negative sign extends left
+without shifting the numeric value relative to positive ticks.
 
 No-refresh attempt 003 has no valid training-window GPU telemetry: it completed
 at `2026-08-13T06:49:14Z`, while the first local monitor sample was collected at

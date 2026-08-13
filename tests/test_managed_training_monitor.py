@@ -229,3 +229,10 @@ def test_dashboard_labels_gpu_as_training_window_whole_device_telemetry() -> Non
     assert "panelGpu:'训练期间 GPU 与显存遥测（整卡）'" in monitor.HTML
     assert 'data-i18n="gpuTrainingNote"' in monitor.HTML
     assert "excludedOutsideTrainingWindow" in monitor.HTML
+
+
+def test_chart_y_axis_labels_share_a_right_aligned_numeric_edge() -> None:
+    assert "function drawYAxisLabel(c,label,x,y)" in monitor.HTML
+    assert "c.textAlign='right'" in monitor.HTML
+    assert "drawYAxisLabel(c,label,pad.l-8,y+4)" in monitor.HTML
+    assert "drawYAxisLabel(c,`${100-i*25}%`,pad.l-8,y+4)" in monitor.HTML
