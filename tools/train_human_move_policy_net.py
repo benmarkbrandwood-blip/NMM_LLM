@@ -26,6 +26,7 @@ Usage
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -39,6 +40,19 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from ai.value_net import _INPUT_DIM  # noqa: E402
+
+
+def _sha256_file(path: Path, chunk: int = 1 << 20) -> Optional[str]:
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        while True:
+            b = f.read(chunk)
+            if not b:
+                break
+            h.update(b)
+    return h.hexdigest()
 
 
 N_BANDS = 3
@@ -79,21 +93,108 @@ def _peek_dataset_provenance(dataset_dir: Path) -> dict:
     return json.loads(raw)
 
 
-def _guard_output_path(output: Path, dataset_provenance: dict) -> None:
-    """Refuse to overwrite the v2 teacher when training on a session-ledger dataset.
+def _guard_output_path(
+    output: Path,
+    dataset_provenance: dict,
+    session_ledger_path: Optional[Path] = None,
+    force: bool = False,
+) -> None:
+    """Guard the trainer output path (Codex P1-C hardened 2026-08-12).
 
-    Trigger: dataset provenance records split_scheme == 'session_ledger_strict_single_tier'.
-    Blocked target: data/human_move_policy_net_v2_candidate.npz.  Other outputs are
-    allowed — the guard only protects the v2 filename.
+    Rules enforced:
+      (a) No-clobber: refuse existing output unless force=True.
+      (b) V2 filename refused when dataset is session-ledger-isolated
+          (retained from Batch 3b).
+      (c) V3 filename requires the dataset to have been extracted with
+          split_scheme=session_ledger_strict_single_tier.  Legacy or
+          missing provenance is refused.
+      (d) When the dataset claims split_scheme=session_ledger_strict_single_tier,
+          --session-ledger PATH is required.  We call _verify_ledger_complete
+          on it, then verify the ledger's SHA-256 and files_manifest_sha256
+          match the values recorded in the dataset's provenance.  Any
+          mismatch or missing field fails closed.
     """
-    if dataset_provenance.get("split_scheme") != _SESSION_LEDGER_SPLIT_SCHEME:
-        return
-    if output.resolve() == (_ROOT / _V2_TEACHER_OUTPUT).resolve():
+    # (a) No-clobber ─────────────────────────────────────────────────────────
+    if output.exists() and not force:
+        raise SystemExit(
+            f"[hbn] Refusing to overwrite existing {output}.  "
+            f"Pass --force to override."
+        )
+
+    scheme = dataset_provenance.get("split_scheme")
+    is_session_ledger = scheme == _SESSION_LEDGER_SPLIT_SCHEME
+
+    v2_absolute = (_ROOT / _V2_TEACHER_OUTPUT).resolve()
+    v3_absolute = (_ROOT / _V3_TEACHER_OUTPUT).resolve()
+    output_absolute = output.resolve()
+
+    # (c) V3 filename requires session-ledger dataset ────────────────────────
+    if output_absolute == v3_absolute and not is_session_ledger:
+        raise SystemExit(
+            f"[hbn] Output {_V3_TEACHER_OUTPUT} is reserved for the v3 teacher "
+            f"trained on a session-ledger-isolated dataset.  Current dataset "
+            f"split_scheme={scheme!r} (must be {_SESSION_LEDGER_SPLIT_SCHEME!r}).  "
+            f"Legacy / missing provenance is refused (Codex P1-C)."
+        )
+
+    # (b) V2 filename refused for session-ledger dataset ─────────────────────
+    if output_absolute == v2_absolute and is_session_ledger:
         raise SystemExit(
             f"[hbn] Refusing to overwrite v2 teacher at {_V2_TEACHER_OUTPUT} "
             f"when training on a session-ledger-isolated dataset.  Use e.g. "
             f"--output {_V3_TEACHER_OUTPUT}."
         )
+
+    # (d) Session-ledger dataset must provide --session-ledger and verify ────
+    if is_session_ledger:
+        if session_ledger_path is None:
+            raise SystemExit(
+                f"[hbn] Dataset was extracted with split_scheme="
+                f"{_SESSION_LEDGER_SPLIT_SCHEME!r}.  --session-ledger PATH is "
+                f"required so we can verify ledger identity against the "
+                f"dataset's recorded values (Codex P1-C)."
+            )
+        if not session_ledger_path.exists():
+            raise SystemExit(
+                f"[hbn] --session-ledger not found: {session_ledger_path}"
+            )
+        # Import lazily so unit tests that mock these paths don't need Malom etc.
+        from tools.build_gap_v3_session_ledger import (        # noqa: E402
+            LedgerBuildError, _verify_ledger_complete,
+        )
+        try:
+            ledger = _verify_ledger_complete(session_ledger_path)
+        except LedgerBuildError as e:
+            raise SystemExit(
+                f"[hbn] --session-ledger verification failed: {e}"
+            ) from e
+
+        expected_sha = dataset_provenance.get("session_ledger_sha256")
+        if expected_sha is None:
+            raise SystemExit(
+                f"[hbn] Dataset claims split_scheme="
+                f"{_SESSION_LEDGER_SPLIT_SCHEME!r} but has no "
+                f"session_ledger_sha256 in provenance.  Legacy / missing "
+                f"provenance is refused (Codex P1-C)."
+            )
+        actual_sha = _sha256_file(session_ledger_path)
+        if actual_sha != expected_sha:
+            raise SystemExit(
+                f"[hbn] Ledger SHA mismatch: --session-ledger has sha "
+                f"{actual_sha}, but dataset was extracted against sha "
+                f"{expected_sha}.  Use the same ledger that produced the "
+                f"dataset (Codex P1-C)."
+            )
+        expected_manifest = dataset_provenance.get(
+            "session_ledger_files_manifest_sha256"
+        )
+        actual_manifest = ledger.get("files_manifest_sha256")
+        if actual_manifest != expected_manifest:
+            raise SystemExit(
+                f"[hbn] files_manifest_sha256 mismatch: --session-ledger has "
+                f"{actual_manifest}, dataset recorded {expected_manifest} "
+                f"(Codex P1-C)."
+            )
 
 
 # ── Dataset loader ──────────────────────────────────────────────────────────
@@ -383,16 +484,25 @@ def main() -> int:
                    help="Number of (position, band) samples per gradient step.")
     p.add_argument("--grad-clip",   type=float, default=1.0)
     p.add_argument("--seed",        type=int,   default=42)
+    p.add_argument("--session-ledger", type=Path, default=None,
+                   help="Path to the session ledger used to extract the dataset.  "
+                        "REQUIRED when the dataset was extracted with "
+                        "split_scheme=session_ledger_strict_single_tier "
+                        "(Codex P1-C, 2026-08-12).")
+    p.add_argument("--force", action="store_true",
+                   help="Overwrite existing --output.  Default refuses no-clobber "
+                        "(Codex P1-C).")
     args = p.parse_args()
 
-    # Batch 3b guard: refuse overwriting v2 teacher when the dataset was
-    # extracted with the session-ledger scheme.  Peek at dataset provenance
-    # without loading the full memmap.
+    # Batch 3b + P1-C guard: peek at dataset provenance without loading
+    # the memmap, verify no-clobber / v2-v3 filenames / ledger identity.
     dataset_prov = _peek_dataset_provenance(args.dataset_dir)
-    _guard_output_path(args.output, dataset_prov)
+    _guard_output_path(
+        args.output, dataset_prov,
+        session_ledger_path=args.session_ledger,
+        force=args.force,
+    )
 
-    if args.output.exists():
-        print(f"[hbn] WARNING: {args.output} exists and will be overwritten.")
     prov = train(args)
     (args.output.with_suffix(args.output.suffix + ".provenance.json")).write_text(
         json.dumps(prov, indent=2, default=str), encoding="utf-8"
