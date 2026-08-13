@@ -36,16 +36,22 @@ def _paths(tmp_path: Path) -> SimpleNamespace:
 
 
 def _patch_technical_gates(monkeypatch) -> None:
+    repository = {
+        "branch": "dev",
+        "head": "h" * 40,
+        "tree": "t" * 40,
+        "upstream_commit": "h" * 40,
+        "published": True,
+        "tracked_worktree": "clean",
+        "implementation_commit_is_ancestor": True,
+        "plan_commit": "c" * 40,
+        "post_plan_runtime_files_unchanged": True,
+        "post_plan_status_documents_only": True,
+    }
     monkeypatch.setattr(
         runner,
         "_repository_record",
-        lambda plan, paths: {
-            "branch": "dev",
-            "head": "h" * 40,
-            "tree": "t" * 40,
-            "upstream_commit": "h" * 40,
-            "published": True,
-        },
+        lambda plan, paths: dict(repository),
     )
     monkeypatch.setattr(
         runner,
@@ -77,6 +83,108 @@ def _patch_technical_gates(monkeypatch) -> None:
     )
     monkeypatch.setattr(runner, "_competing_processes", lambda: [])
     monkeypatch.setattr(runner, "_test_record", lambda: {"tests": "pass"})
+
+
+def _patch_repository_commands(monkeypatch, *, changed: str) -> None:
+    monkeypatch.setattr(
+        runner,
+        "_base_repository_record",
+        lambda plan, paths: {
+            "branch": "dev",
+            "head": "h" * 40,
+            "tree": "t" * 40,
+            "upstream_commit": "h" * 40,
+            "published": True,
+            "tracked_worktree": "clean",
+            "implementation_commit_is_ancestor": True,
+        },
+    )
+    monkeypatch.setattr(
+        runner,
+        "_git",
+        lambda *arguments: (
+            "c" * 40 if arguments[0] == "log" else changed
+        ),
+    )
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(returncode=0),
+    )
+
+
+def test_repository_record_allows_only_post_plan_status_documents(
+    monkeypatch,
+) -> None:
+    changed = "\n".join(sorted(runner.POST_PLAN_STATUS_DOCUMENTS))
+    _patch_repository_commands(monkeypatch, changed=changed)
+    paths = SimpleNamespace(plan=runner.DEFAULT_PLAN)
+
+    observed = runner._repository_record(_plan(), paths)
+
+    assert observed["plan_commit"] == "c" * 40
+    assert observed["post_plan_runtime_files_unchanged"] is True
+    assert observed["post_plan_status_documents_only"] is True
+
+
+def test_repository_record_rejects_post_plan_runtime_change(monkeypatch) -> None:
+    _patch_repository_commands(
+        monkeypatch,
+        changed="scripts/run_retained_phase_process_generalization.py",
+    )
+    paths = SimpleNamespace(plan=runner.DEFAULT_PLAN)
+
+    with pytest.raises(
+        RetainedPhaseProcessError,
+        match="runtime-affecting files changed after the frozen plan",
+    ):
+        runner._repository_record(_plan(), paths)
+
+
+def test_source_readiness_ignores_post_plan_status_commit_identity(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    _patch_technical_gates(monkeypatch)
+    plan = _plan()
+    paths = _paths(tmp_path)
+    paths.plan.write_bytes(b"{}")
+    first = runner.build_readiness_report(
+        plan,
+        paths,
+        resume=False,
+        run_tests=True,
+        audit_histories=False,
+    )
+
+    monkeypatch.setattr(
+        runner,
+        "_repository_record",
+        lambda plan, paths: {
+            "branch": "dev",
+            "head": "n" * 40,
+            "tree": "u" * 40,
+            "upstream_commit": "n" * 40,
+            "published": True,
+            "tracked_worktree": "clean",
+            "implementation_commit_is_ancestor": True,
+            "plan_commit": "c" * 40,
+            "post_plan_runtime_files_unchanged": True,
+            "post_plan_status_documents_only": True,
+        },
+    )
+    second = runner.build_readiness_report(
+        plan,
+        paths,
+        resume=False,
+        run_tests=True,
+        audit_histories=False,
+    )
+
+    assert second["source_readiness_identity"] == first[
+        "source_readiness_identity"
+    ]
+    assert second["readiness_identity"] != first["readiness_identity"]
 
 
 def test_source_readiness_is_stable_when_authorization_is_added(

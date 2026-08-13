@@ -66,7 +66,7 @@ from scripts.run_retained_passivity_diagnostic import (  # noqa: E402
     _local_path,
     _output_record as _base_output_record,
     _repo_path,
-    _repository_record,
+    _repository_record as _base_repository_record,
     _sanmill_record,
     _strict_json,
     _assert_ignored,
@@ -93,6 +93,14 @@ LAUNCH_SCHEMA = "nmm.retained-phase-process-generalization-launch.v1"
 PROGRESS_SCHEMA = "nmm.retained-phase-process-generalization-progress.v1"
 FAILURE_SCHEMA = "nmm.retained-phase-process-generalization-failure.v1"
 COMPLETION_SCHEMA = "nmm.retained-phase-process-generalization-completion.v1"
+POST_PLAN_STATUS_DOCUMENTS = {
+    "docs/evidence/"
+    "sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md",
+    "docs/experiments/"
+    "sanmill-retained-v3-v4-phase-process-generalization-v1.md",
+    "docs/handoff/windows-training-2026-07-20.md",
+    "docs/local-training-layout.md",
+}
 
 
 def sha256_file(path: str | Path) -> str:
@@ -112,6 +120,81 @@ def _output_record(paths: DiagnosticPaths, *, resume: bool) -> dict[str, Any]:
             "phase-process mechanism report already exists"
         )
     return {**result, "mechanism_report": "absent"}
+
+
+def _repository_record(
+    plan: Mapping[str, Any],
+    paths: DiagnosticPaths,
+) -> dict[str, Any]:
+    observed = _base_repository_record(plan, paths)
+    relative_plan = paths.plan.relative_to(_ROOT).as_posix()
+    plan_commit = str(
+        _git("log", "-1", "--format=%H", "--", relative_plan)
+    )
+    if len(plan_commit) != 40:
+        raise RetainedPhaseProcessError("tracked plan commit is absent")
+    try:
+        subprocess.run(
+            ["git", "merge-base", "--is-ancestor", plan_commit, "HEAD"],
+            cwd=_ROOT,
+            check=True,
+            capture_output=True,
+        )
+    except subprocess.CalledProcessError as exc:
+        raise RetainedPhaseProcessError(
+            "tracked plan commit is not an ancestor"
+        ) from exc
+    changed = {
+        line
+        for line in str(
+            _git("diff", "--name-only", f"{plan_commit}..HEAD", "--")
+        ).splitlines()
+        if line
+    }
+    unexpected = sorted(changed - POST_PLAN_STATUS_DOCUMENTS)
+    if unexpected:
+        raise RetainedPhaseProcessError(
+            "runtime-affecting files changed after the frozen plan: "
+            + ", ".join(unexpected)
+        )
+    return {
+        **observed,
+        "plan_commit": plan_commit,
+        "post_plan_runtime_files_unchanged": True,
+        "post_plan_status_documents_only": True,
+    }
+
+
+def _source_gate_view(gates: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    stable = []
+    for gate in gates:
+        item = dict(gate)
+        if gate.get("gate") == "repository" and gate.get("result") == "pass":
+            observed = gate.get("observed")
+            if not isinstance(observed, Mapping):
+                raise RetainedPhaseProcessError(
+                    "repository source-readiness evidence is absent"
+                )
+            fields = (
+                "branch",
+                "plan_commit",
+                "published",
+                "tracked_worktree",
+                "implementation_commit_is_ancestor",
+                "post_plan_runtime_files_unchanged",
+                "post_plan_status_documents_only",
+            )
+            missing = [field for field in fields if field not in observed]
+            if missing:
+                raise RetainedPhaseProcessError(
+                    "repository source-readiness evidence is incomplete: "
+                    + ", ".join(missing)
+                )
+            item["observed"] = {
+                field: observed[field] for field in fields
+            }
+        stable.append(item)
+    return stable
 
 
 def load_plan(path: str | Path) -> dict[str, Any]:
@@ -759,7 +842,7 @@ def build_readiness_report(
         "diagnostic_id": plan["diagnostic_id"],
         "plan_identity": plan["plan_identity"],
         "mode": "resume" if resume else "fresh",
-        "gates": technical,
+        "gates": _source_gate_view(technical),
         "technically_ready": technical_ready,
         "verdict": "ready_for_authorization" if technical_ready else "fatal_stop",
     }
