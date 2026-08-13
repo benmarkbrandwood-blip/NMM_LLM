@@ -136,7 +136,7 @@ classification is `no_replicated_material_effect`, with no selected successor
 condition and `automatic_long_run_selection=false`. Preserve the
 [replication result evidence](../evidence/target-refresh-mature-fork-replication-v1-attempt-002-result-2026-08-13.md).
 
-The next retained research plan is frozen in
+The next retained research plan was frozen in
 [Sanmill no-refresh retained long v4](../experiments/sanmill-no-refresh-retained-long-v4.md).
 It does not reinterpret the pooled null as a selected cadence. It instead
 tests a new permanent no-refresh hypothesis from fresh random state at unused
@@ -147,10 +147,21 @@ grants no training authority. Preparation attempt 001 at source `f1a8974a`
 never received authorization and produced zero games. It is now preserved as
 `invalidated_unlaunched_never_authorize`; see the
 [attempt-001 disposition](../evidence/sanmill-no-refresh-retained-v4-preparation-attempt-001-2026-08-13.md).
-Attempt 002 keeps unused seed 70 but uses new experiment, plan, control and
-database identities. Final preparation must occur only after the readiness
-generator and corrected document are published at a clean synchronized tip,
-using the closed attempt-002 snapshot and an absent output path.
+Attempt 002 kept seed 70 with new experiment, plan, control and database
+identities. At clean synchronized source `12ecd934`, plan identity `2a59a93f`
+and readiness identity `a6cd2cd1` passed independent review. The product owner
+authorized that exact 5,000-game/12-hour plan once. Segment 0001 passed its
+launch preflight and then failed closed before an accepted checkpoint or
+segment because the legacy A2C update path cleared an aliased batch before
+calculating its behaviour-temperature evidence. The controller stopped on
+exit code 1 and did not retry. Preserve the consumed authorization, failed
+control directory and mutated 188-position SpecialistDB; see the
+[attempt-002 failure evidence](../evidence/sanmill-no-refresh-retained-v4-attempt-002-failure-2026-08-13.md).
+
+Attempt 002 has no no-refresh result. A successor requires a tested source fix
+and new experiment, plan, control, database, readiness and authorization
+identities. It may retain seed 70 as a fresh seed because no checkpoint was
+written, but it is not a resume or recovery of attempt 002.
 
 The v4 comparison to retained v3 is source-confounded as well as
 seed-confounded: v3 ran at `3f400135`, before later trainer, manager and
@@ -176,11 +187,14 @@ difference from v3 may be attributed solely to target refresh.
    designed as a new research baseline, but its target schedule must be stated
    as a new plan choice rather than attributed to this result.
 6. Preserve no-refresh retained-v4 preparation attempt 001 byte-for-byte and
-   never authorize it. Publish the generic readiness generator and attempt-002
-   contract, copy the closed snapshot to the new writable database, prepare the
-   new ignored plan, run the real first-segment preflight, persist its raw JSON
-   and command, verify the canonical readiness bundle, and only then request
-   one product decision bound to the new plan and readiness identities.
+   never authorize it.
+7. Preserve no-refresh retained-v4 attempt 002, its consumed authorization,
+   failed event chains, logs and mutated database. Do not retry, resume, repair
+   in place or reuse any of them.
+8. Test and publish the non-exact update-batch aliasing correction. Only then
+   define a fresh attempt 003 with new control and database paths, generate its
+   ignored plan and canonical readiness bundle at the final clean source, and
+   request one product decision bound to those new identities.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`

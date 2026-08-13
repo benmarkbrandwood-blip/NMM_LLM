@@ -1,6 +1,6 @@
 # Sanmill no-refresh retained long v4
 
-Status: `designed_unlaunched_attempt_002`
+Status: `failed_closed_attempt_002_never_retry_or_resume`
 
 Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-002`
 
@@ -24,12 +24,20 @@ Its existing plan, ledger, readiness narrative, database and disposition must
 remain byte-for-byte historical evidence; they must not be authorized,
 launched, resumed, overwritten, relabelled, or reused.
 
-Attempt 002 uses the same unused seed 70 but new experiment, plan, control and
-database identities. Reusing the seed does not resume attempt 001 because no
-model, optimizer, transition or game was ever created. Machine-local plan,
-command, raw preflight and canonical readiness files generated after the final
-source commit own the current preparation state; this tracked document alone
-never grants launch authority.
+Attempt 002 used the same unused seed 70 with new experiment, plan, control and
+database identities. It was authorized once under plan identity `2a59a93f`
+and readiness identity `a6cd2cd1`, then failed closed in segment 0001 before an
+accepted checkpoint or segment. A legacy full-queue A2C batch was cleared
+before its behaviour-temperature evidence was calculated, causing `min()` to
+receive an empty iterable. Its database contains partial first-rollout writes,
+its authorization is consumed, and the entire namespace must remain preserved
+and must never be retried, resumed, overwritten or reused. See the
+[attempt-002 failure evidence](../evidence/sanmill-no-refresh-retained-v4-attempt-002-failure-2026-08-13.md).
+
+Any successor must use a tested correction plus new experiment, plan, control,
+database, readiness and authorization identities. Reusing seed 70 for a fresh
+successor does not resume attempt 002 because no checkpoint was retained, but
+it still requires a new lineage and a new product decision.
 
 ## Objective and evidence boundary
 
@@ -59,14 +67,16 @@ hardening. Focused tests show that `full` and
 and current-source stale-control arms exercise the new route, but there is no
 byte-for-byte trajectory-parity proof against the v3 executable.
 
-The allowed conclusion is therefore limited to the health and outcome of a
-fresh no-refresh baseline under the attempt-002 source, plus later held-out
-performance of its frozen candidate if separately authorized. A difference
-from v3 cannot be attributed solely to target refresh, seed, or any other
-single factor. Training W/D/L, the 29-state policy-health gate, repetition,
-max-ply truncation, and late-window curves remain development diagnostics. A
-candidate produced here requires a separately frozen held-out evaluation
-before any strength or promotion claim.
+Attempt 002 permits no scientific conclusion about no-refresh training because
+it produced no accepted checkpoint or segment. For a separately prepared
+successor, the allowed conclusion remains limited to the health and outcome of
+one fresh no-refresh baseline under that successor's source, plus later
+held-out performance of its frozen candidate if separately authorized. A
+difference from v3 cannot be attributed solely to target refresh, seed, or any
+other single factor. Training W/D/L, the 29-state policy-health gate,
+repetition, max-ply truncation, and late-window curves remain development
+diagnostics. Any candidate requires a separately frozen held-out evaluation
+before a strength or promotion claim.
 
 ## Frozen lineage
 
