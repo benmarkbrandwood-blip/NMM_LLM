@@ -2,8 +2,9 @@
 
 The dashboard never imports trainer code, opens SQLite, or modifies
 trainer-owned evidence. Every request re-reads immutable contracts and
-append-only JSONL evidence from disk. Host GPU samples are written only beneath
-the selected run's ``local-monitor`` directory.
+append-only JSONL evidence from disk. Host GPU samples are written beneath the
+selected run's ``local-monitor`` directory only during controller-confirmed
+managed training windows.
 """
 
 from __future__ import annotations
@@ -589,15 +590,75 @@ def _health_status(
     }
 
 
-def _gpu_status(control_dir: Path, observed_game: int) -> dict[str, Any]:
-    """Sample the host's CUDA device without touching the training process."""
+def _managed_training_windows(
+    events: list[dict[str, Any]],
+) -> list[tuple[datetime, datetime | None]]:
+    """Return managed-segment activity windows from the controller ledger."""
+    windows: list[tuple[datetime, datetime | None]] = []
+    active_start: datetime | None = None
+    for event in events:
+        event_type = str(event.get("event_type") or "")
+        event_at = _timestamp(event.get("timestamp_utc"))
+        if event_at is None:
+            continue
+        if event_type == "managed_segment_started":
+            if active_start is not None and event_at >= active_start:
+                windows.append((active_start, event_at))
+            active_start = event_at
+            continue
+        closes_training_window = event_type in {
+            "managed_segment_completed",
+            "managed_segment_interrupted",
+            "managed_plan_completed",
+        } or any(token in event_type for token in ("failed", "stopped"))
+        if (
+            active_start is not None
+            and closes_training_window
+            and event_at >= active_start
+        ):
+            windows.append((active_start, event_at))
+            active_start = None
+    if active_start is not None:
+        windows.append((active_start, None))
+    return windows
+
+
+def _gpu_rows_in_training_windows(
+    rows: list[dict[str, Any]],
+    training_windows: list[tuple[datetime, datetime | None]],
+) -> list[dict[str, Any]]:
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        sample_at = _timestamp(row.get("timestampUtc"))
+        if sample_at is None:
+            continue
+        if any(
+            sample_at >= start and (end is None or sample_at <= end)
+            for start, end in training_windows
+        ):
+            result.append(row)
+    return result
+
+
+def _gpu_status(
+    control_dir: Path,
+    observed_game: int,
+    *,
+    training_windows: list[tuple[datetime, datetime | None]],
+    sampling_active: bool,
+) -> dict[str, Any]:
+    """Collect whole-device telemetry only during managed training windows."""
     global _GPU_LAST_SAMPLE_MONOTONIC
 
     telemetry_path = control_dir / "local-monitor" / "gpu-telemetry.jsonl"
     sample_error: str | None = None
     now_monotonic = time.monotonic()
     with _GPU_SAMPLE_LOCK:
-        if now_monotonic - _GPU_LAST_SAMPLE_MONOTONIC >= GPU_SAMPLE_INTERVAL_SECONDS:
+        if (
+            sampling_active
+            and now_monotonic - _GPU_LAST_SAMPLE_MONOTONIC
+            >= GPU_SAMPLE_INTERVAL_SECONDS
+        ):
             try:
                 completed = subprocess.run(
                     [
@@ -632,6 +693,7 @@ def _gpu_status(control_dir: Path, observed_game: int) -> dict[str, Any]:
                     "memoryUtilPct": (
                         100.0 * memory_used / memory_total if memory_total else 0.0
                     ),
+                    "telemetryScope": "managed-training-window-whole-device",
                 }
                 telemetry_path.parent.mkdir(parents=True, exist_ok=True)
                 with telemetry_path.open("a", encoding="utf-8") as handle:
@@ -642,15 +704,19 @@ def _gpu_status(control_dir: Path, observed_game: int) -> dict[str, Any]:
 
         rows, malformed = _read_jsonl(telemetry_path)
 
-    latest = rows[-1] if rows else {}
+    training_rows = _gpu_rows_in_training_windows(rows, training_windows)
+    latest = training_rows[-1] if training_rows else {}
     return {
-        "available": bool(rows),
+        "available": bool(training_rows),
         "sampleIntervalSeconds": GPU_SAMPLE_INTERVAL_SECONDS,
-        "scope": "whole-device",
+        "scope": "managed-training-window-whole-device",
+        "samplingActive": sampling_active,
         "sampleError": sample_error,
         "malformedLinesIgnored": malformed,
+        "sampleCount": len(training_rows),
+        "excludedOutsideTrainingWindow": len(rows) - len(training_rows),
         "latest": latest,
-        "series": _downsample(rows),
+        "series": _downsample(training_rows),
     }
 
 
@@ -844,6 +910,7 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
         opponents[str(row.get("game_type") or "unknown")] += 1
 
     pid = _lock_pid(control_dir)
+    controller_alive = _process_exists(pid)
     stderr_path = control_dir / "supervisor.stderr.log"
     warnings = [
         _redact_warning(line)
@@ -868,7 +935,12 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
     sampled_games = _downsample(chart_games)
     sampled_updates = _downsample(updates)
     progress = (100.0 * observed_game / max_games) if max_games else 0.0
-    gpu = _gpu_status(control_dir, observed_game)
+    gpu = _gpu_status(
+        control_dir,
+        observed_game,
+        training_windows=_managed_training_windows(events),
+        sampling_active=state == "running" and controller_alive,
+    )
     segment_markers = sorted(
         {
             int(event.get("details", {}).get("completed_games", 0))
@@ -906,7 +978,6 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
     authorization_matches = authorization.get("plan_sha256") == plan.get(
         "plan_sha256"
     )
-    controller_alive = _process_exists(pid)
     opponent_outcomes = _opponent_outcomes(games, plan)
     health = _health_status(
         state=state,
@@ -925,7 +996,7 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
     )
 
     return {
-        "schema": "nmm-local-training-monitor-v2",
+        "schema": "nmm-local-training-monitor-v3",
         "generatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "identity": {
             "planId": plan.get("plan_id"),
@@ -1147,7 +1218,7 @@ HTML = r"""<!doctype html>
     <div class="card"><div class="card-head"><div class="label" data-i18n="cardLatestUpdate">最近更新</div><button type="button" class="help-button" data-help-key="latestUpdate">?</button></div><div id="update" class="value">—</div><div id="loss" class="sub">—</div></div>
     <div class="card"><div class="card-head"><div class="label" data-i18n="cardSegments">分段</div><button type="button" class="help-button" data-help-key="segments">?</button></div><div id="segments" class="value">—</div><div id="segmentsSub" class="sub">—</div></div>
     <div class="card"><div class="card-head"><div class="label" data-i18n="cardActiveTime">Active time</div><button type="button" class="help-button" data-help-key="activeTime">?</button></div><div id="hours" class="value">—</div><div id="hoursSub" class="sub">—</div></div>
-    <div class="card"><div class="card-head"><div class="label" data-i18n="cardGpu">GPU</div><button type="button" class="help-button" data-help-key="gpuCard">?</button></div><div id="gpuCurrent" class="value">—</div><div id="gpuMemory" class="sub">—</div></div>
+    <div class="card"><div class="card-head"><div class="label" data-i18n="cardGpu">训练期 GPU 遥测</div><button type="button" class="help-button" data-help-key="gpuCard">?</button></div><div id="gpuCurrent" class="value">—</div><div id="gpuMemory" class="sub">—</div></div>
     <div class="card"><div class="card-head"><div class="label" data-i18n="cardComponents">实验开关</div><button type="button" class="help-button" data-help-key="components">?</button></div><div id="components" class="value">—</div><div id="componentsSub" class="sub">—</div></div>
   </section>
   <div class="progress"><div id="progressBar"></div></div>
@@ -1167,7 +1238,7 @@ HTML = r"""<!doctype html>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelLr">Learning rate × 10⁴（实际值·阶梯）</h2><button type="button" class="help-button" data-help-key="learningRate">?</button></div><div id="lrChartNote" class="table-note">原始执行值；阶梯线不做平滑或线性插值。</div><canvas id="lrChart"></canvas></div>
     <div class="panel wide"><div class="panel-head"><h2 data-i18n="panelTerminationTrend">终止原因构成（滚动 50 局）</h2><button type="button" class="help-button" data-help-key="terminationTrend">?</button></div><canvas id="terminationChart"></canvas></div>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelTerminations">终止原因</h2><button type="button" class="help-button" data-help-key="terminations">?</button></div><div id="terminationBars" class="bars"></div></div>
-    <div class="panel"><div class="panel-head"><h2 data-i18n="panelGpu">GPU 与显存占用率</h2><button type="button" class="help-button" data-help-key="gpuTrend">?</button></div><canvas id="gpuChart"></canvas></div>
+    <div class="panel"><div class="panel-head"><h2 data-i18n="panelGpu">训练期间 GPU 与显存遥测（整卡）</h2><button type="button" class="help-button" data-help-key="gpuTrend">?</button></div><div class="table-note" data-i18n="gpuTrainingNote">仅接受受管分段运行窗口内的整卡样本；不是训练进程独占读数。</div><canvas id="gpuChart"></canvas></div>
     <div class="panel wide"><div class="panel-head"><h2 data-i18n="panelSegmentEvidence">分段证据</h2><button type="button" class="help-button" data-help-key="segmentEvidence">?</button></div><div style="overflow:auto"><table><thead><tr><th data-i18n="tableSegment">分段</th><th data-i18n="tableFirstGame">首局</th><th data-i18n="tableLastGame">末局</th><th data-i18n="tableGameRows">对局行</th><th data-i18n="tableUpdates">更新</th><th data-i18n="tableCheckpoint">Checkpoint</th></tr></thead><tbody id="segmentRows"></tbody></table></div></div>
     <div class="panel wide"><div class="panel-head"><h2 data-i18n="panelWarnings">警告（只读）</h2><button type="button" class="help-button" data-help-key="warnings">?</button></div><div id="warnings" class="muted" data-i18n="none">无</div></div>
   </section>
@@ -1193,9 +1264,9 @@ const I18N = {
     documentTitle:'NMM_LLM 训练监控', pageTitle:'NMM_LLM · Generalist 受管训练',
     identityLoading:'正在读取计划身份…', connecting:'连接中', languageLabel:'界面语言', exportPng:'导出 PNG', exportFailed:'PNG 导出失败',
     cardHealth:'训练健康度', cardGames:'观测局数', cardSegments:'分段', cardActiveTime:'活跃运行时间', cardDifficulty:'节点级别',
-    cardFrozenRecent:'冻结臂 · 最近 200 来源局', cardSanmillRecent:'Sanmill · 最近 200 来源局', cardTrainingWindow:'混合训练窗口', cardRuleDraws:'规则和棋', cardMaxPly:'max-ply 截断', cardLatestUpdate:'最近更新', cardGpu:'GPU', cardComponents:'实验开关', panelWinTrend:'按对手来源的 200 局得分率趋势',
+    cardFrozenRecent:'冻结臂 · 最近 200 来源局', cardSanmillRecent:'Sanmill · 最近 200 来源局', cardTrainingWindow:'混合训练窗口', cardRuleDraws:'规则和棋', cardMaxPly:'max-ply 截断', cardLatestUpdate:'最近更新', cardGpu:'训练期 GPU 遥测', cardComponents:'实验开关', panelWinTrend:'按对手来源的 200 局得分率趋势',
     panelTop1:'策略、启发式与 Malom Top-1（50 局平滑）', panelExploration:'温度与选择概率',
-    panelLosses:'Policy / Value loss', panelEntropy:'Entropy（50 局平滑）', panelRewards:'奖励信号（50 局平滑）', panelLr:'Learning rate × 10⁴（实际值·阶梯）', lrChartNote:'原始执行值；阶梯线不做平滑或线性插值。', panelDifficultyPly:'对局长度（50 局平均）', panelGpu:'GPU 与显存占用率', panelTerminationTrend:'终止原因构成（滚动 50 局）', panelTerminations:'终止原因',
+    panelLosses:'Policy / Value loss', panelEntropy:'Entropy（50 局平滑）', panelRewards:'奖励信号（50 局平滑）', panelLr:'Learning rate × 10⁴（实际值·阶梯）', lrChartNote:'原始执行值；阶梯线不做平滑或线性插值。', panelDifficultyPly:'对局长度（50 局平均）', panelGpu:'训练期间 GPU 与显存遥测（整卡）', gpuTrainingNote:'仅接受受管分段运行窗口内的整卡样本；不是训练进程独占读数。', panelTerminationTrend:'终止原因构成（滚动 50 局）', panelTerminations:'终止原因',
     panelOpponentOutcomes:'按对手来源的胜 / 和 / 负', opponentOutcomeNote:'规则和棋与 max-ply 截断分别计数；得分率仅为训练诊断。', sanmillByLevel:'Sanmill 按节点档位', nodeTimingNote:'参考搜索耗时为本机持久进程的校准中位数 / P90，仅包含 Sanmill 搜索。',
     panelOutcomes:'全部胜 / 和 / 负', panelOpponents:'对手来源', panelSegmentEvidence:'分段证据',
     panelWarnings:'警告（只读）', tableSegment:'分段', tableFirstGame:'首局', tableLastGame:'末局',
@@ -1204,7 +1275,7 @@ const I18N = {
     helpExpected:'常见情况（非预测）', helpWatch:'需要注意', helpButton:'查看说明', closeHelp:'关闭说明',
     noData:'暂无数据', observedOnly:'仅观测', controllerConfirmed:'控制器确认', loggedRows:'日志点', limit:'上限',
     temperature:'温度', best:'最佳', game:'局', gamesUnit:'局', level:'级别', nodes:'节点', scoreRate:'得分率', winRate:'胜率', sourceSample:'来源样本', trainingDiagnosticOnly:'混合来源训练诊断，不是棋力 KPI', frozenShort:'冻结臂', sanmillShort:'Sanmill', fullWindow:'完整 200 局窗口', updatedAt:'更新于', malformedTail:'忽略损坏尾行',
-    loadFailed:'读取失败', yes:'是', online:'控制器在线', offline:'控制器离线', controllerExited:'控制器已正常退出', noInfrastructureStop:'无基础设施停止信号', healthIssueCount:'项需检查', learnerWhite:'执白', learnerBlack:'执黑', allSources:'全部来源',
+    loadFailed:'读取失败', yes:'是', online:'控制器在线', offline:'控制器离线', controllerExited:'控制器已正常退出', noInfrastructureStop:'无基础设施停止信号', healthIssueCount:'项需检查', learnerWhite:'执白', learnerBlack:'执黑', allSources:'全部来源', noTrainingGpuTelemetry:'无训练期遥测', postTrainingGpuSamplesIgnored:'已忽略训练窗口外样本', sampleCount:'样本数',
     healthStates:{healthy:'正常',complete:'完整完成',warning:'需注意',stop:'停止信号'},
     states:{running:'运行中',between_segments:'分段交接中',completed:'已完成',complete:'已完成',stopped:'已停止',failed:'失败',unknown:'未知'},
     chart:{win200:'200 局胜率',draw200:'200 局和棋率',best:'最佳',frozenScore200:'冻结模型得分率',sanmillScore200:'Sanmill 得分率',policy:'策略',heuristic:'启发式',malom:'Malom',
@@ -1219,9 +1290,9 @@ const I18N = {
     documentTitle:'NMM_LLM Training Monitor', pageTitle:'NMM_LLM · Managed Generalist Training',
     identityLoading:'Reading plan identity…', connecting:'Connecting', languageLabel:'Interface language', exportPng:'Export PNG', exportFailed:'PNG export failed',
     cardHealth:'Training health', cardGames:'Observed games', cardSegments:'Segments', cardActiveTime:'Active time', cardDifficulty:'Node level',
-    cardFrozenRecent:'Frozen arm · latest 200 source games', cardSanmillRecent:'Sanmill · latest 200 source games', cardTrainingWindow:'Mixed training window', cardRuleDraws:'Rules draws', cardMaxPly:'max-ply truncations', cardLatestUpdate:'Latest update', cardGpu:'GPU', cardComponents:'Experiment switches', panelWinTrend:'200-game score-rate trend by opponent source',
+    cardFrozenRecent:'Frozen arm · latest 200 source games', cardSanmillRecent:'Sanmill · latest 200 source games', cardTrainingWindow:'Mixed training window', cardRuleDraws:'Rules draws', cardMaxPly:'max-ply truncations', cardLatestUpdate:'Latest update', cardGpu:'Training-window GPU telemetry', cardComponents:'Experiment switches', panelWinTrend:'200-game score-rate trend by opponent source',
     panelTop1:'Policy, heuristic, and Malom Top-1 (50-game smoothed)', panelExploration:'Temperature and chosen probability',
-    panelLosses:'Policy / Value loss', panelEntropy:'Entropy (50-game smoothed)', panelRewards:'Reward signals (50-game smoothed)', panelLr:'Learning rate × 10⁴ (actual steps)', lrChartNote:'Actual executed values; step line with no smoothing or linear interpolation.', panelDifficultyPly:'Game length (50-game mean)', panelGpu:'GPU and VRAM utilization', panelTerminationTrend:'Termination mix (rolling 50 games)', panelTerminations:'Termination reasons',
+    panelLosses:'Policy / Value loss', panelEntropy:'Entropy (50-game smoothed)', panelRewards:'Reward signals (50-game smoothed)', panelLr:'Learning rate × 10⁴ (actual steps)', lrChartNote:'Actual executed values; step line with no smoothing or linear interpolation.', panelDifficultyPly:'Game length (50-game mean)', panelGpu:'Training-window GPU and VRAM telemetry (whole device)', gpuTrainingNote:'Only whole-device samples inside managed segment activity windows are accepted; this is not process-exclusive usage.', panelTerminationTrend:'Termination mix (rolling 50 games)', panelTerminations:'Termination reasons',
     panelOpponentOutcomes:'Wins / draws / losses by opponent source', opponentOutcomeNote:'Rules draws and max-ply truncations are counted separately; score rate is a training diagnostic only.', sanmillByLevel:'Sanmill by node level', nodeTimingNote:'Reference search time is this host’s warm-process calibration median / P90 and includes Sanmill search only.',
     panelOutcomes:'All wins / draws / losses', panelOpponents:'Opponent mix', panelSegmentEvidence:'Segment evidence',
     panelWarnings:'Warnings (read only)', tableSegment:'Segment', tableFirstGame:'First game', tableLastGame:'Last game',
@@ -1230,7 +1301,7 @@ const I18N = {
     helpExpected:'Typical pattern (not a forecast)', helpWatch:'Watch for', helpButton:'Show explanation', closeHelp:'Close explanation',
     noData:'No data', observedOnly:'OBSERVED', controllerConfirmed:'Controller confirmed', loggedRows:'logged points', limit:'limit',
     temperature:'temperature', best:'best', game:'game', gamesUnit:'games', level:'level', nodes:'nodes', scoreRate:'score rate', winRate:'win rate', sourceSample:'source sample', trainingDiagnosticOnly:'mixed-source training diagnostic, not a strength KPI', frozenShort:'frozen', sanmillShort:'Sanmill', fullWindow:'full 200-game window', updatedAt:'Updated', malformedTail:'malformed tail lines ignored',
-    loadFailed:'Read failed', yes:'yes', online:'controller online', offline:'controller offline', controllerExited:'controller exited normally', noInfrastructureStop:'no infrastructure stop signal', healthIssueCount:'items need review', learnerWhite:'learner White', learnerBlack:'learner Black', allSources:'all sources',
+    loadFailed:'Read failed', yes:'yes', online:'controller online', offline:'controller offline', controllerExited:'controller exited normally', noInfrastructureStop:'no infrastructure stop signal', healthIssueCount:'items need review', learnerWhite:'learner White', learnerBlack:'learner Black', allSources:'all sources', noTrainingGpuTelemetry:'No training-window telemetry', postTrainingGpuSamplesIgnored:'samples outside training windows ignored', sampleCount:'samples',
     healthStates:{healthy:'healthy',complete:'complete',warning:'warning',stop:'stop signal'},
     states:{running:'running',between_segments:'between segments',completed:'completed',complete:'completed',stopped:'stopped',failed:'failed',unknown:'unknown'},
     chart:{win200:'win 200',draw200:'draw 200',best:'best',frozenScore200:'frozen-model score',sanmillScore200:'Sanmill score',policy:'policy',heuristic:'heuristic',malom:'Malom',temperature:'temperature',
@@ -1317,12 +1388,12 @@ const HELP = {
     en:{title:'Game length',purpose:'Shows mean rollout logical plies over a full 50-game window; it is hidden before game 50.',read:'The y-axis starts at zero with integer 10-ply ticks. Blue vertical dashes are frozen-plan node-transition boundaries, not a difficulty curve or future forecast.',expected:'Game length varies with positions and its distribution may change after a node-level transition.',watch:'Many games pinned to the 120-ply truncation ceiling, unexplained resume-boundary jumps, or suddenly identical lengths.'}
   },
   gpuCard: {
-    zh:{title:'当前 GPU 状态',purpose:'显示 NVIDIA 设备 0 的即时 GPU 利用率，以及整张显卡的已用/总显存。',read:'主数字是最近采样的 GPU 利用率；副标题把 nvidia-smi 的 MiB 按 1024 换算为易读 GB，并保留占比。它是整张设备读数，可能包含其他程序，不等于训练进程独占值。',expected:'神经网络更新会形成短峰；Sanmill CPU 搜索和环境推进期间 GPU 较低是正常的。显存通常较稳定。',watch:'训练仍在更新但 GPU 长期为 0、显存突然大幅增加或逼近 100%、采样停止，或 NVIDIA 查询错误。'},
-    en:{title:'Current GPU status',purpose:'Shows instantaneous utilization for NVIDIA device 0 and used/total memory for the whole device.',read:'The main value is the latest GPU sample. The subtitle converts nvidia-smi MiB using 1024 into readable GB and retains percentage. Whole-device readings may include other applications and are not process-exclusive.',expected:'Neural-network updates produce short peaks, while CPU-side Sanmill search and environment work can leave GPU utilization low. VRAM should usually be stable.',watch:'GPU staying at zero while updates continue, a sudden VRAM rise or near-exhaustion, stalled samples, or NVIDIA query errors.'}
+    zh:{title:'训练期 GPU 遥测',purpose:'显示受管训练分段运行窗口内最近一条 NVIDIA 设备 0 整卡样本，而不是查看网页时的实时负载。',read:'主数字是最近训练期样本的 GPU 利用率；副标题显示整卡显存和训练期样本数。整卡读数可能包含其他程序，不等于训练进程独占值。本次运行若未在训练时采集，就明确显示“无训练期遥测”，不能事后重建。',expected:'神经网络更新会形成短峰；Sanmill CPU 搜索和环境推进期间 GPU 较低是正常的。显存通常较稳定。',watch:'缺失不等于 0%。训练仍在更新但 GPU 长期为 0、显存突然大幅增加或逼近 100%、训练期采样停止，或 NVIDIA 查询错误。'},
+    en:{title:'Training-window GPU telemetry',purpose:'Shows the latest whole-device NVIDIA device 0 sample recorded inside a managed training segment, not the live load when the page is viewed.',read:'The headline is the latest training-window GPU utilization; the subtitle shows whole-device VRAM and training-window sample count. Other applications may contribute, so this is not process-exclusive. If the run was not sampled during training, it says no telemetry instead of reconstructing it afterward.',expected:'Neural-network updates produce short peaks, while CPU-side Sanmill search and environment work can leave GPU utilization low. VRAM should usually be stable.',watch:'Missing does not mean 0%. Watch for zero utilization while updates continue, sudden or near-full VRAM, stopped in-window sampling, or NVIDIA query errors.'}
   },
   gpuTrend: {
-    zh:{title:'GPU 与显存占用率',purpose:'每 5 秒采样一次整张 NVIDIA 设备，把已观测 GPU 与显存占用率按全局局号绘图。',read:'纵轴均为 0–100%；青色实线是 GPU 计算利用率，橙色虚线是显存占用率，颜色和线型均不同。横轴是采样时已观测局号，同一局可有多个点；没有预测线。',expected:'GPU 通常呈脉冲状，因为规则推进和 Sanmill 搜索主要在 CPU；显存线应较平稳，分段交接时可短暂变化。',watch:'持续 100% 且训练停滞、显存不断爬升、分段后基线永久抬高、非有限值或遥测停止。'},
-    en:{title:'GPU and VRAM utilization',purpose:'Samples the whole NVIDIA device every five seconds and plots observed GPU and VRAM utilization against global game.',read:'Both use a 0–100% axis. Cyan solid is compute utilization; orange dashed is VRAM utilization, so color and line style both distinguish them. Multiple samples may share a game index. No forecast is plotted.',expected:'GPU is usually bursty because rules and Sanmill search are CPU-side. VRAM should be comparatively stable, with brief changes around segment hand-off.',watch:'Sustained 100% with stalled training, steadily rising VRAM, a permanent post-resume memory step, non-finite values, or telemetry that stops updating.'}
+    zh:{title:'训练期间 GPU 与显存遥测（整卡）',purpose:'仅在控制器确认受管训练分段正在运行时每 5 秒采样整张 NVIDIA 设备，并按当时的全局局号绘图。',read:'纵轴均为 0–100%；青色实线是整卡 GPU 计算利用率，橙色虚线是整卡显存占用率。训练窗口外的实时样本会被忽略；若没有训练期样本，图保持无数据。该遥测不能归因到单个进程。',expected:'GPU 通常呈脉冲状，因为规则推进和 Sanmill 搜索主要在 CPU；显存线应较平稳，分段交接期间不采样。',watch:'不要把训练后实时负载解释成训练负载。关注训练期间持续 100% 且训练停滞、显存不断爬升、非有限值或遥测停止。'},
+    en:{title:'Training-window GPU and VRAM telemetry (whole device)',purpose:'Samples the whole NVIDIA device every five seconds only while the controller confirms a managed training segment is running, and plots it against the then-observed global game.',read:'Both use a 0–100% axis. Cyan is whole-device compute utilization and orange dashed is whole-device VRAM utilization. Live samples outside training windows are ignored; the chart stays empty when no in-window evidence exists. The data is not attributable to one process.',expected:'GPU is usually bursty because rules and Sanmill search are CPU-side. VRAM should be comparatively stable; no samples are taken between segments.',watch:'Never interpret post-training live load as training load. Watch for sustained 100% with stalled training, steadily rising VRAM, non-finite values, or in-window telemetry stopping.'}
   },
   terminationTrend: {
     zh:{title:'终止原因构成',purpose:'以滚动 50 局百分比堆叠图显示胜负原因、规则和棋和 120-ply 截断如何随训练变化。',read:'仅在积满完整 50 局后绘制；每个时点各颜色合计为 100%。规则重复和棋与 max-ply 截断严格分开；截断不是棋规和棋。',expected:'构成可随模型和节点档位变化，但合法原因应可解释，截断不应长期占主导。',watch:'截断比例持续上升、未知原因增多、某合法类别无解释消失，或与累计终止条形图对不上。'},
@@ -1450,7 +1521,7 @@ function render(data){lastData=data;const s=data.state,l=data.latest,g=data.gpu|
   document.getElementById('ruleDraws').textContent=`${integer(overall.ruleDraw)} · ${pct(totalGames?Number(overall.ruleDraw)/totalGames:null)}`;document.getElementById('ruleDrawsSub').textContent=`${t('frozenShort')} ${integer(frozenOverall.ruleDraw)} · ${t('sanmillShort')} ${integer(sanmillOverall.ruleDraw)}`;
   document.getElementById('maxPly').textContent=`${integer(overall.maxPly)} · ${pct(totalGames?Number(overall.maxPly)/totalGames:null)}`;document.getElementById('maxPlySub').textContent=`${t('frozenShort')} ${integer(frozenOverall.maxPly)} · ${t('sanmillShort')} ${integer(sanmillOverall.maxPly)}`;
   document.getElementById('update').textContent=`${t('game')} ${integer(l.updateGame)}`;document.getElementById('loss').textContent=`P ${num(l.policyLoss,3)} · V ${num(l.valueLoss,3)}`;
-  document.getElementById('gpuCurrent').textContent=g.available?`${num(gl.gpuUtilPct,0)}%`:'—';document.getElementById('gpuMemory').textContent=g.available?`${num(finiteNumber(gl.memoryUsedMiB)/1024,1)} / ${num(finiteNumber(gl.memoryTotalMiB)/1024,1)} GB · ${num(gl.memoryUtilPct,1)}%`:'nvidia-smi —';
+  document.getElementById('gpuCurrent').textContent=g.available?`${num(gl.gpuUtilPct,0)}%`:t('noTrainingGpuTelemetry');document.getElementById('gpuMemory').textContent=g.available?`${num(finiteNumber(gl.memoryUsedMiB)/1024,1)} / ${num(finiteNumber(gl.memoryTotalMiB)/1024,1)} GB · ${num(gl.memoryUtilPct,1)}% · ${t('sampleCount')} ${integer(g.sampleCount)}`:`${t('postTrainingGpuSamplesIgnored')} ${integer(g.excludedOutsideTrainingWindow)}`;
   document.getElementById('components').textContent=currentLanguage==='zh'?'哨兵网络（Sentinel）：关':'Sentinel OFF';document.getElementById('componentsSub').textContent=currentLanguage==='zh'?'恢复机制：关 · 固定资源课程':'Recovery OFF · fixed-resource';
   document.getElementById('progressBar').style.width=`${Math.max(0,Math.min(100,Number(s.progressPct)||0))}%`;
   lineChart('winChart',data.series.games,[{key:'vs_frozen_score_rate_200',label:t('chart.frozenScore200'),color:COLORS.blue,width:2.4},{key:'vs_sanmill_score_rate_200',label:t('chart.sanmillScore200'),color:COLORS.orange,dash:[8,5],width:2.4}],[0,1],markers,null,sharedGameDomain);

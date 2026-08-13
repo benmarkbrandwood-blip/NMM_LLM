@@ -1963,8 +1963,11 @@ It reads the real rolling window from every segment manifest, separates the
 frozen and Sanmill source windows, and reports rules draws apart from max-ply
 truncations. Its bilingual help labels mixed-source win rate as a training
 diagnostic rather than strength evidence. The server is read-only with respect
-to trainer evidence; only whole-device GPU telemetry is appended beneath the
-selected run's ignored `local-monitor` directory.
+to trainer evidence. Whole-device GPU telemetry is appended beneath the
+selected run's ignored `local-monitor` directory only while a managed segment
+is actively running; samples outside controller-led training windows are never
+presented as training utilisation, and the data remains whole-device rather
+than process-exclusive.
 
 Dashboard categorical order and control-value plots must not inherit incidental
 log ordering or smoothing. Aggregate outcomes are rendered in fixed
@@ -1973,6 +1976,13 @@ step function with an explicit change-point note, not as a 50-game moving
 average. For no-refresh attempt 003, the evidence is `1e-4` through game 50 and
 `5e-5` from game 51 onward; the former diagonal `0.93 -> 0.50` display was a
 visualisation artefact caused by smoothing that one discrete change.
+
+No-refresh attempt 003 has no valid training-window GPU telemetry: it completed
+at `2026-08-13T06:49:14Z`, while the first local monitor sample was collected at
+`2026-08-13T07:31:34Z`. The dashboard therefore reports the training GPU metric
+as unavailable and excludes those later live whole-device samples. Do not
+reinterpret missing historical telemetry as zero utilisation or backfill it
+from post-run observation.
 
 ## Deferred and Conditional Work from the Original Notes
 

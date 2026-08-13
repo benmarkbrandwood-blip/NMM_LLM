@@ -118,3 +118,114 @@ def test_dashboard_renders_learning_rate_as_actual_steps() -> None:
     assert "lineChart('lrChart',data.series.learningRate||[]" in monitor.HTML
     assert "stepped:true" in monitor.HTML
     assert "learningRateNote(data.series.learningRate||[])" in monitor.HTML
+
+
+def test_gpu_telemetry_keeps_only_managed_training_window_samples(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events = [
+        {
+            "event_type": "managed_segment_started",
+            "timestamp_utc": "2026-08-13T04:52:00Z",
+        },
+        {
+            "event_type": "managed_segment_completed",
+            "timestamp_utc": "2026-08-13T04:57:00Z",
+        },
+    ]
+    windows = monitor._managed_training_windows(events)
+    telemetry_path = tmp_path / "local-monitor" / "gpu-telemetry.jsonl"
+    telemetry_path.parent.mkdir()
+    rows = [
+        {
+            "game": 100,
+            "timestampUtc": "2026-08-13T04:55:00Z",
+            "gpuUtilPct": 75.0,
+            "memoryUtilPct": 20.0,
+        },
+        {
+            "game": 250,
+            "timestampUtc": "2026-08-13T05:10:00Z",
+            "gpuUtilPct": 5.0,
+            "memoryUtilPct": 30.0,
+        },
+    ]
+    telemetry_path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    def unexpected_sample(*args: object, **kwargs: object) -> object:
+        raise AssertionError("completed runs must not sample the live GPU")
+
+    monkeypatch.setattr(monitor.subprocess, "run", unexpected_sample)
+    status = monitor._gpu_status(
+        tmp_path,
+        250,
+        training_windows=windows,
+        sampling_active=False,
+    )
+
+    assert status["available"] is True
+    assert status["scope"] == "managed-training-window-whole-device"
+    assert status["excludedOutsideTrainingWindow"] == 1
+    assert [row["game"] for row in status["series"]] == [100]
+
+
+def test_gpu_telemetry_is_unavailable_when_only_post_training_samples_exist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    windows = monitor._managed_training_windows(
+        [
+            {
+                "event_type": "managed_segment_started",
+                "timestamp_utc": "2026-08-13T04:52:00Z",
+            },
+            {
+                "event_type": "managed_plan_completed",
+                "timestamp_utc": "2026-08-13T06:49:14Z",
+            },
+        ]
+    )
+    telemetry_path = tmp_path / "local-monitor" / "gpu-telemetry.jsonl"
+    telemetry_path.parent.mkdir()
+    telemetry_path.write_text(
+        json.dumps(
+            {
+                "game": 5000,
+                "timestampUtc": "2026-08-13T07:31:34Z",
+                "gpuUtilPct": 10.0,
+                "memoryUtilPct": 18.0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        monitor.subprocess,
+        "run",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("completed runs must not sample the live GPU")
+        ),
+    )
+
+    status = monitor._gpu_status(
+        tmp_path,
+        5000,
+        training_windows=windows,
+        sampling_active=False,
+    )
+
+    assert status["available"] is False
+    assert status["latest"] == {}
+    assert status["series"] == []
+    assert status["excludedOutsideTrainingWindow"] == 1
+
+
+def test_dashboard_labels_gpu_as_training_window_whole_device_telemetry() -> None:
+    assert "cardGpu:'训练期 GPU 遥测'" in monitor.HTML
+    assert "panelGpu:'训练期间 GPU 与显存遥测（整卡）'" in monitor.HTML
+    assert 'data-i18n="gpuTrainingNote"' in monitor.HTML
+    assert "excludedOutsideTrainingWindow" in monitor.HTML
