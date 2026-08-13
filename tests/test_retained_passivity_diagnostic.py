@@ -458,8 +458,14 @@ def test_web_payload_reads_identity_bound_safe_progress_report(tmp_path, spec) -
     runner.write_new_canonical(tmp_path / "spec.json", spec)
     record = _synthetic_record(spec, 0, None, survives=False, length=30)
     diagnostic.append_game_record(tmp_path / "games.jsonl", record, must_create=True)
+    source_result_identity = web.build_payload(tmp_path)["report"]["result_identity"]
     body = {
         "schema_version": "nmm.retained-safe-progress-audit-result.v1",
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "result_identity": source_result_identity,
+        },
         "by_candidate": {},
         "paired": {},
     }

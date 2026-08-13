@@ -25,6 +25,10 @@ from learned_ai.evaluation.retained_passivity_diagnostic import (  # noqa: E402
     sha256_file,
 )
 from learned_ai.evaluation.retained_safe_progress_audit import (  # noqa: E402
+    ENGINEERING_Z,
+    EXPECTED_GAMES,
+    MAX_PRIMARY_HALF_WIDTH,
+    MIN_SAFE_CAPTURE_OPPORTUNITIES,
     REPORT_SCHEMA,
     RetainedSafeProgressAuditError,
     recompute_safe_progress_audit,
@@ -79,6 +83,47 @@ def load_audit_plan(path: str | Path) -> dict[str, Any]:
         "checkpoint_writes": 0,
     }:
         raise RetainedSafeProgressAuditError("safe-progress workload differs")
+    analysis = plan.get("analysis")
+    if not isinstance(analysis, Mapping) or (
+        analysis.get("engineering_interval")
+        != {
+            "interpretation": (
+                "fixed-corpus paired variation summary, not population inference"
+            ),
+            "maximum_primary_half_width": MAX_PRIMARY_HALF_WIDTH,
+            "method": "normal-interval-on-matched-per-game-rate-difference",
+            "z": ENGINEERING_Z,
+        }
+        or analysis.get("minimum_safe_capture_opportunities_per_candidate")
+        != MIN_SAFE_CAPTURE_OPPORTUNITIES
+    ):
+        raise RetainedSafeProgressAuditError("safe-progress analysis differs")
+    if plan.get("claim_boundary") != {
+        "automatic_training_setting_selection": False,
+        "development_corpus_reused": True,
+        "held_out_strength_claim": False,
+        "malom_history_aware": False,
+        "playing_strength_claim": False,
+        "promotion_or_publication": False,
+        "refresh_causal_claim": False,
+        "training_or_update": False,
+        "zero_game_reanalysis": True,
+    }:
+        raise RetainedSafeProgressAuditError("safe-progress claim boundary differs")
+    if (
+        plan.get("source", {}).get("games") != EXPECTED_GAMES
+        or plan.get("implementation", {}).get("branch") != "dev"
+        or plan.get("output", {}).get("path")
+        != (
+            "learned_ai/checkpoints/evaluation/"
+            "sanmill-retained-v3-v4-passivity-diagnostic-v1/"
+            "safe-progress-report.json"
+        )
+        or plan.get("malom", {}).get("history_aware") is not False
+        or plan.get("malom", {}).get("read_only") is not True
+        or plan.get("malom", {}).get("label_version") != "sector-corrected-v1"
+    ):
+        raise RetainedSafeProgressAuditError("safe-progress resources differ")
     return plan
 
 
@@ -113,7 +158,13 @@ def _load_source(
         "completion": paths.completion,
     }
     for key, path in observed_paths.items():
-        if not path.is_file() or sha256_file(path) != expected_files[key]["sha256"]:
+        expected = expected_files[key]
+        expected_path = (_ROOT / expected["path"]).resolve()
+        if (
+            path != expected_path
+            or not path.is_file()
+            or sha256_file(path) != expected["sha256"]
+        ):
             raise RetainedSafeProgressAuditError(f"source {key} differs")
 
     spec = _strict_json(paths.spec)
@@ -131,7 +182,11 @@ def _load_source(
         raise RetainedSafeProgressAuditError("source report does not recompute")
 
     manifest = load_dataset_manifest(paths.malom_manifest)
-    if manifest.manifest_sha256 != plan["malom"]["identity"]:
+    expected_manifest = (_ROOT / plan["malom"]["manifest"]).resolve()
+    if (
+        paths.malom_manifest != expected_manifest
+        or manifest.manifest_sha256 != plan["malom"]["identity"]
+    ):
         raise RetainedSafeProgressAuditError("Malom manifest identity differs")
     snapshot = verify_dataset_snapshot(paths.malom_db, manifest, full_hash=False)
     malom = ExternalSolvedDB(str(paths.malom_db), strict=True)

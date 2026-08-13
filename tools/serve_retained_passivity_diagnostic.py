@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -173,6 +174,16 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
         }
         if canonical_sha256(safe_body) != safe_progress.get("result_identity"):
             raise ValueError("safe-progress report identity differs")
+        safe_source = safe_progress.get("source")
+        if (
+            safe_progress.get("schema_version")
+            != "nmm.retained-safe-progress-audit-result.v1"
+            or not isinstance(safe_source, Mapping)
+            or safe_source.get("diagnostic_id") != spec.get("diagnostic_id")
+            or safe_source.get("spec_identity") != spec.get("spec_identity")
+            or safe_source.get("result_identity") != report.get("result_identity")
+        ):
+            raise ValueError("safe-progress source binding differs")
     return {
         "available": True,
         "status": status,
