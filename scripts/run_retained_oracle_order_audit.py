@@ -105,15 +105,42 @@ def load_audit_plan(path: str | Path) -> dict[str, Any]:
         "zero_game_reanalysis": True,
     }:
         raise RetainedOracleOrderAuditError("oracle-order claim boundary differs")
+    implementation_commit = plan.get("implementation", {}).get("commit")
+    safe_source = plan.get("safe_progress_source", {})
     if (
         plan.get("source", {}).get("games") != EXPECTED_GAMES
+        or plan.get("source", {}).get("plan_path")
+        != "docs/experiments/sanmill-retained-v3-v4-passivity-diagnostic-v1.json"
         or plan.get("implementation", {}).get("branch") != "dev"
+        or not isinstance(implementation_commit, str)
+        or len(implementation_commit) != 40
+        or any(
+            character not in "0123456789abcdef"
+            for character in implementation_commit
+        )
         or plan.get("output", {}).get("path")
         != (
             "learned_ai/checkpoints/evaluation/"
             "sanmill-retained-v3-v4-passivity-diagnostic-v1/"
             "oracle-order-report.json"
         )
+        or safe_source.get("path")
+        != (
+            "learned_ai/checkpoints/evaluation/"
+            "sanmill-retained-v3-v4-passivity-diagnostic-v1/"
+            "safe-progress-report.json"
+        )
+        or any(
+            not isinstance(safe_source.get(field), str)
+            or len(safe_source[field]) != 64
+            for field in (
+                "file_sha256",
+                "result_identity",
+                "audit_plan_identity",
+            )
+        )
+        or plan.get("malom", {}).get("manifest")
+        != "data/manifests/malom-sector-corrected-v1.json"
         or plan.get("malom", {}).get("history_aware") is not False
         or plan.get("malom", {}).get("read_only") is not True
         or plan.get("malom", {}).get("label_version") != "sector-corrected-v1"
