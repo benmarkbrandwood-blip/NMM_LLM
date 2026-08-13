@@ -1,18 +1,21 @@
 # Sanmill retained-v3 versus no-refresh-v4 passivity diagnostic v1
 
-Status: `frozen_awaiting_product_authorization`
+Status: `completed_development_diagnostic_not_held_out`
 
-This is a no-update development diagnosis. It is not held-out evidence, a
-playing-strength test, a refresh-cadence causal experiment, or authority to
-play any game. The machine-readable
+This is a completed no-update development diagnosis. It is not held-out
+evidence, a playing-strength test, a refresh-cadence causal experiment, or
+authority to play another game. The machine-readable
 [plan](sanmill-retained-v3-v4-passivity-diagnostic-v1.json) is frozen at
 identity
 `035c68f80b94dddb8d139d56c38c86c4fde29fa13de5e19db1f4e1fe484c318e`,
 file SHA-256
 `e4394d015490d1e337554589c339db19a20ae45f2968bb9cbceee2ba207cd5b3`,
 and evaluator implementation commit `361d99a43a9ca549b6f4594d8cb5c26a23d5dd54`.
-A separate product-owner grant must bind that exact plan identity, file and
-resource envelope before a development-corpus game may start.
+Its prelaunch status remains intentionally immutable inside that JSON. The
+product owner subsequently bound the exact plan and resource envelope; the
+256-game authorization completed once and is consumed. Current execution and
+result identities are recorded in the
+[completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
 
 ## Observed facts / 观察事实
 
@@ -184,21 +187,39 @@ refresh claim still requires same-source, same-seed, equal-transition
 refresh/no-refresh pairs across multiple seeds. A playing-strength claim still
 requires a separately powered, newly exposure-audited held-out contract.
 
-## Current launch gates
+## Completion reconciliation
 
-| Gate | Current state |
+| Item | Completed state |
 | --- | --- |
-| Objective and claim boundary | frozen |
-| Candidate checkpoint and route identities | verified |
-| Primary metric and precision rule | frozen |
-| Corpus and schedule | frozen as non-held-out development |
-| Resource and failure envelope | frozen |
-| Prospective process evaluator | implemented and unit tested |
-| Live web report and metric help | implemented and JavaScript-checked |
-| Focused and mandatory provenance tests | 55 focused passed; 103 tests / 498 subtests provenance passed |
-| Clean published implementation source | implementation `361d99a` awaits ordinary publication with this amended plan |
-| Machine-readable plan identity | `035c68f8...` |
-| Separate product authorization | absent |
+| Machine-readable plan identity | `035c68f8...`; frozen JSON unchanged |
+| Product-authorized readiness | `eb7e75fa...` |
+| Launch-time readiness | `a591af4a...` |
+| Authorization / launch | `d1b1286f...` / `4a43f780...`; consumed |
+| Runtime spec | `d47c94e2...` |
+| Games / active time | 256 / 256; 984.057494 seconds |
+| Result / completion | `d250f03d...` / `fe1f243c...` |
+| Corpus status | `development_corpus_reused=true`; not held out |
+| Training / updates / writes | none |
 
-Verdict: `needs_decision` until the frozen plan is itself published, a final
-read-only preflight passes, and an exact plan-bound product grant exists.
+The predeclared primary endpoint produced
+`v4_higher_120_ply_survival`: v3 survived beyond total logical ply 120 in
+52/128 games and v4 in 62/128, for a paired `+7.8125pp` fixed-corpus
+engineering difference with interval `[+0.4051pp, +15.2199pp]`. All 256 games
+then reached strict rules terminals; no game reached the safety cap. Eventual
+W/D/L was 4/119/5 for v3 and 6/118/4 for v4 and carries no strength claim.
+
+Two completed zero-game audits did not explain the prolongation through missed
+immediate W/D/L-preserving captures and did not produce a directional complete
+Malom-order regret result. Their conditional opportunity metrics remain
+descriptive, not post-hoc decisions. A further zero-game score analysis first
+averaged both colours within each of 64 independent starts and obtained
+v4-minus-v3 `+1.171875pp`, interval `[-0.8492pp, +3.1929pp]`. That interval is
+neither a strength distinction nor equivalence evidence.
+
+The next decision is whether to buy a new-corpus process-generalization study,
+a start-clustered and prospectively powered held-out score study, or a much
+larger same-source causal training experiment. This completed plan authorizes
+none of them. See the updated
+[evaluation decision brief](sanmill-retained-v3-v4-evaluation-decision-brief.md).
+
+Verdict: `needs_decision`.

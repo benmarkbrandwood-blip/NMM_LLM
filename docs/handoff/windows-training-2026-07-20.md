@@ -192,6 +192,26 @@ preflight hardening and before the current explicit read/LR mode interfaces.
 The new run remains useful as a current-source research baseline, but no
 difference from v3 may be attributed solely to target refresh.
 
+The retained-v3/v4 passivity diagnostic subsequently completed once under
+plan identity `035c68f8`, product-authorized source readiness `eb7e75fa`,
+runtime spec `d47c94e2`, result identity `d250f03d` and completion identity
+`fe1f243c`. All 256 reused-development-corpus games reached strict rules
+terminals with no safety-cap hit. The predeclared process result was
+`v4_higher_120_ply_survival`: 62/128 v4 games versus 52/128 v3 games remained
+ongoing after total logical ply 120, a paired `+7.8125pp` fixed-corpus
+engineering difference with interval `[+0.4051pp, +15.2199pp]`. This is a
+named-route passivity finding, not a strength or refresh-causal result.
+
+Eventual W/D/L was 4/119/5 for v3 and 6/118/4 for v4. V4 had 66 no-progress
+terminals versus 56 for v3, while v3 had 63 threefold repetitions versus 52
+for v4. Two zero-game audits found essentially complete selection of immediate
+W/D/L-preserving captures and an inconclusive complete-order regret difference.
+They leave no-capture history and opportunity exposure as hypotheses, not
+established mechanisms. A final zero-game score calculation averaged both
+colours inside each of 64 independent starts: v4-minus-v3 was `+1.171875pp`,
+with interval `[-0.8492pp, +3.1929pp]`. Preserve the
+[completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -218,19 +238,22 @@ difference from v3 may be attributed solely to target refresh.
    identity `77cc65ad`, source `662fe160`, all 20 accepted segment directories,
    final checkpoint, database, controller ledger and consumed authorization.
    Do not rerun, resume, extend, overwrite, promote or publish it.
-9. Keep the next v3/v4 work at `needs_decision`. First freeze whether the
-   objective is passivity/mechanism diagnosis or playing-strength relation,
-   then add a paired power/precision analysis, prospective ply-120 state
-   capture, a strict safety cap, disjoint corpus/exposure audit and a tested
-   no-update evaluator. A 16-game pilot is too small to estimate the observed
-   2--4% decisive-game rate, and process metrics cannot replace W/D/L for a
-   strength claim. Preserve the
+9. Preserve the completed v3/v4 development diagnostic, its 256-row ledger,
+   reports, web evidence and consumed authorization. The next work remains at
+   `needs_decision`: choose one of new-corpus process generalization,
+   start-clustered held-out paired score, or a materially larger causal
+   training design. For score, the independent unit is one start after
+   averaging both colours; the observed 64-start half-width is `2.0211pp`.
+   Freeze a product-relevant width, effect or equivalence margin before the
+   budget. Do not launch the existing early mature-fork checkpoints as a
+   passivity shortcut. Preserve the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
-   No evaluation game is authorized yet.
+   No additional evaluation or training is authorized.
 
-No candidate-vs-baseline held-out match, model promotion, publication, or long
-training is currently authorized. Historical ignored artifacts under `out/`
-are evidence inputs and must not be deleted, overwritten, or relabelled.
+No additional candidate-vs-baseline held-out match, model promotion,
+publication, or long training is currently authorized. Historical ignored
+artifacts under `out/` are evidence inputs and must not be deleted, overwritten,
+or relabelled.
 
 ### Latest state: early target refresh is harmful; later cadence unresolved
 
@@ -2622,23 +2645,21 @@ the current successor in this order:
     descriptive, and its grant covers no held-out work. The next evaluator
     must be prospectively instrumented because the training rows do not retain
     cap states or strict rule history.
-34. The next source-only branch is the
+34. The
     [retained-v3/v4 passivity diagnostic](../experiments/sanmill-retained-v3-v4-passivity-diagnostic-v1.md).
-    It reuses the 64-start corpus explicitly as non-held-out development data,
-    pairs the two named final routes within each start/colour unit, and makes
-    strict-referee survival beyond total logical ply 120 its primary process
-    metric. The prospective ledger also preserves the full ply-120 referee
-    state, history-free Malom context, conditional move-value coverage, rules
-    terminations and incomplete safety caps. Its two exact route bundles have
-    been exported and CPU verified. The evaluator and help-bearing web report
-    were introduced at `82c6650`. A preflight-report/launch-gate hardening fix
-    at `361d99a` removes raw corpus bodies from readiness and makes skipped
-    tests or prefix replay non-runnable. A subsequent full preflight failed
-    closed because the v3 original database has preserved sidecars. The plan
-    now binds its existing byte-identical audit snapshot plus a new
-    byte-identical, sidecar-free v4 snapshot in the ignored diagnostic root.
-    The amended plan identity is `035c68f8`; no product authorization or
-    diagnostic game exists yet. Do not reuse the attempt-003 training grant.
+    completed once on the explicitly reused 64-start development corpus. Its
+    product-authorized readiness was `eb7e75fa`, launch identity `4a43f780`,
+    spec identity `d47c94e2`, result identity `d250f03d` and completion identity
+    `fe1f243c`; the authorization is consumed. All 256 games reached strict
+    rules terminals and no safety cap. The predeclared fixed-corpus finding is
+    higher v4 survival past ply 120, 62/128 versus 52/128. Eventual score and
+    both zero-game mechanism audits do not distinguish strength or identify a
+    refresh cause. The web page now displays the start-clustered score interval
+    and fixed-width planning budgets with claim help. Preserve the
+    [result evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md),
+    ledger and reports. Do not rerun, extend or relabel them held out. A
+    successor requires a new objective, corpus, immutable plan, resource
+    envelope, readiness and authority.
 
 The previously executed isolated smoke command was:
 

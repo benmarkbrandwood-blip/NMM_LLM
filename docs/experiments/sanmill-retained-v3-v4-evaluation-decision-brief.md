@@ -1,137 +1,190 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `needs_decision_no_games_authorized`
+Status: `needs_decision_after_completed_development_diagnostic`
 
-This is a source-only planning record. It authorizes no development game,
-held-out game, model update, database write, checkpoint write, promotion or
-publication.
+This is the current planning record after completion of the 256-game
+development diagnostic and two zero-game mechanism audits. It authorizes no
+new development or held-out game, model update, database or checkpoint write,
+training, promotion, publication or release.
 
 ## Observed facts
 
-The proposed 64-start, colour-swapped design would produce 128 games per
-checkpoint and 256 games total. In the sequential 500,000-node training stage,
-the result counts were:
+### Completed development evidence
 
-| Candidate | Games | Wins + losses | Decisive rate | Wilson 95% interval |
-| --- | ---: | ---: | ---: | ---: |
-| retained-v3, refresh every 50 | 1,004 | 40 | 3.984% | 2.939%–5.380% |
-| retained-v4, no refresh | 1,051 | 22 | 2.093% | 1.386%–3.149% |
+Plan identity
+`035c68f80b94dddb8d139d56c38c86c4fde29fa13de5e19db1f4e1fe484c318e`
+completed once under product-authorized source readiness
+`eb7e75fa8f52f2f4a8c3e09b92c5be802ea20f513ac1f6fb4eb071d4cfb4a8ec`.
+Its result identity is
+`d250f03d72b535c0249bdf0ada7d5a75d91f7fcc44e8926c4f6dfba35d2e63d0`.
+The 64-start corpus was already inspected and has
+`development_corpus_reused=true`; it is not held out.
+The full authority, identity and result chain is preserved in the
+[completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
 
-These rates are confounded training observations, not evaluation-rate
-estimates. Treating them only as plug-in planning values gives:
+The predeclared process endpoint obtained a direction on this fixed corpus:
 
-| Games per checkpoint | Expected decisive v3 | Expected decisive v4 | Probability of zero v3 | Probability of zero v4 |
-| ---: | ---: | ---: | ---: | ---: |
-| 16 | 0.64 | 0.33 | 52.2% | 71.3% |
-| 128 | 5.10 | 2.68 | 0.55% | 6.67% |
-| 256 | 10.20 | 5.36 | 0.003% | 0.44% |
-| 512 | 20.40 | 10.72 | <0.001% | 0.002% |
+| Candidate | Games surviving beyond total logical ply 120 | Rate |
+| --- | ---: | ---: |
+| retained-v3, refresh every 50 | 52 / 128 | 40.625% |
+| retained-v4, no refresh | 62 / 128 | 48.438% |
 
-At the v4 plug-in rate, 1,234 games are needed to have a 90% chance of seeing
-at least 20 decisive results. The analogous v3 count is 647. These are event
-yield calculations, not paired-effect power and not recommended budgets.
-They show why 16 games cannot estimate the rare-event rate and why 128 games
-per checkpoint is unlikely to distinguish effects near two percentage points.
+The matched start/colour v4-minus-v3 difference was `+7.8125pp`, with
+engineering interval `[+0.4051pp, +15.2199pp]`. This confirms that the named
+v4 route prolonged more often under the development protocol. Survival is a
+process event, not a draw or a directionally valid strength metric.
 
-The calculations are reproducible with:
+All 256 games reached rules terminals after the horizon; none reached the
+1,536-post-prefix safety cap. V3 ended 4 W / 119 D / 5 L, score 49.6094%; v4
+ended 6 W / 118 D / 4 L, score 50.7812%. V4 had more no-progress terminals
+(66 versus 56) and fewer threefold repetitions (52 versus 63). These outcome
+counts were secondary and were not powered or held out.
 
-```powershell
-.\.venv\Scripts\python.exe tools\estimate_decisive_event_feasibility.py `
-  --label v4-no-refresh-l5 --observed-events 22 --observed-games 1051
+### Completed zero-game mechanism evidence
 
-.\.venv\Scripts\python.exe tools\estimate_decisive_event_feasibility.py `
-  --label v3-refresh50-l5 --observed-events 40 --observed-games 1004
-```
+The safe-progress audit, result identity
+`b60eaf6392d55e520b5a2a493ce7dd8961c05e811a7fd3cbb5375735fe312fea`,
+found v3 selected 330/331 and v4 309/309 immediately available
+W/D/L-preserving captures. Both selected every observed such capture after
+ply 120. Its predeclared missed-capture difference was inconclusive with
+half-width 0.0547pp, well below its 2pp maximum.
 
-The existing training logs cannot answer what the 120-ply cap states were.
-They store neither final board/history nor repetition and no-capture state.
-Malom also omits those strict-referee history counters. Cap-state W/D/L must
-therefore be captured prospectively and may be used only as a theoretical
-position diagnostic.
+The complete Malom order audit, result identity
+`e0576747c7cc6e7b3a4295b3ae31fe9a377adb5d2cd9a2c997df6f70d9bffa00`,
+found a predeclared normalized-regret v4-minus-v3 difference of `-0.5619pp`,
+interval `[-2.4350pp, +1.3111pp]`, also inconclusive. Conditional-on-
+opportunity regret points in the opposite direction but has no separately
+preregistered paired test. V4 encountered fewer distinct complete-order
+choice opportunities, particularly after ply 120; this is a mediator
+hypothesis, not proof that all legal actions were equivalent or that winning
+paths were absent.
+
+### Start-clustered paired-score precision
+
+For future playing-strength planning, the independent unit must be one start,
+not one start/colour unit. The two colour-specific score differences were
+therefore averaged within each start before calculating the interval.
+
+| Statistic | 128 start/colour units | 64 independent starts |
+| --- | ---: | ---: |
+| Difference distribution | -0.5 × 2; 0 × 121; +0.5 × 5 | -0.25 × 2; 0 × 57; +0.25 × 5 |
+| Mean v4 minus v3 | +1.171875pp | +1.171875pp |
+| Sample standard deviation | 11.6795pp | 8.2492pp |
+| 95% engineering half-width | 2.0234pp | 2.0211pp |
+| 95% engineering interval | [-0.8515pp, +3.1952pp] | [-0.8492pp, +3.1929pp] |
+
+The cluster correction did not widen this particular interval because the
+seven discordant colour units occurred in seven different starts; observed
+within-start colour correlation was zero. Future contracts must nevertheless
+use starts as the unit and must not assume zero clustering in a new corpus.
+
+The fixed-corpus interval is not population inference. It neither distinguishes
+the candidates nor proves equivalence. Equivalence would require a
+prospectively chosen margin and the entire interval inside that margin.
+
+Using the observed start-level standard deviation only as a fixed-width
+planning input gives:
+
+| Target 95% half-width | Starts | Total games |
+| ---: | ---: | ---: |
+| 2.0pp | 66 | 264 |
+| 1.5pp | 117 | 468 |
+| 1.171875pp | 191 | 764 |
+| 1.0pp | 262 | 1,048 |
+
+Each start costs four games: two candidates and a black/white swap. The
+1.171875pp row only asks for a fixed width equal to the noisy pilot estimate.
+Power estimates aimed at that same observed effect, approximately 389 starts
+/ 1,556 games at 80% and 521 starts / 2,084 games at 90%, are illustrative,
+post-hoc values and must not choose the contract.
 
 ## Hypotheses
 
-1. If the objective is **passivity/mechanism diagnosis**, paired game length,
-   cap incidence, rules termination and Malom-preserving trajectories may be
-   more sensitive than W/D/L to a v3/v4 behavior difference.
-2. If the objective is **playing-strength relation**, W/D/L pair score must
-   remain primary. Process metrics can explain a result but cannot replace it.
-3. Deterministic argmax evaluation could have a different decisive rate from
-   temperature-sampled training, but a 16-game pilot is too small to estimate
-   whether that difference is material.
+1. The named no-refresh-v4 route's longer survival may generalize to a new
+   opening corpus and may be mediated by no-capture-clock trajectories or
+   different exposure to complete-order choices.
+2. The named candidates may have a small paired-score difference that the
+   reused 64-start development corpus cannot distinguish.
+3. Any causal effect of target refresh requires new same-source, same-seed,
+   equal-transition training pairs at a maturity that includes the late
+   behavior of interest.
 
 ## Supporting evidence
 
-- The two candidates have almost equal logged 500,000-node stage scores,
-  50.40% and 50.38%, while their truncation shares differ materially,
-  43.9% and 57.6%.
-- The 128-game plug-in yields are only about five and three decisive games.
-- Under the existing strict protocol, a 1,536-post-prefix-ply cap is invalid,
-  not a draw; this preserves honest result semantics.
-- Colour-swapped paired starts and identical Sanmill work remain the correct
-  controls for both objectives.
+- Ply-120 survival produced a directional fixed-corpus decision at the frozen
+  precision gate.
+- All games finished under the larger safety ceiling, so strict termination
+  reason and no-capture history can be measured prospectively.
+- The start-clustered score variance and exact discordance distribution are
+  now known without spending another game.
+- Colour swapping, identical frozen Sanmill work and start-level pairing remain
+  the correct controls for both process and score questions.
 
 ## Counterevidence and confounders
 
-- v3 and v4 use different seeds and source commits. Their direct comparison
-  cannot identify the causal effect of refresh cadence.
-- Training decisive rates may not transfer to deterministic evaluation.
-- A fixed-corpus engineering interval is not population inference. A formal
-  power claim needs a defined sampling universe or a preregistered finite-
-  corpus precision rule.
-- We do not yet know the variance of paired process differences or the rate of
-  discordant paired scores. Decisive counts alone cannot choose a final sample
-  size.
-- Reusing the already inspected 64-start corpus could support development
-  diagnosis but would not create new held-out evidence.
+- V3 and v4 use different seeds, source commits, target ages and accumulated
+  SpecialistDBs. Their comparison cannot identify a refresh effect.
+- The completed corpus is development data. Its intervals summarize only this
+  fixed corpus and deterministic route.
+- Survival can mean greater resistance, passivity, or both. It cannot replace
+  paired score when the claim is playing strength.
+- Only seven of 128 colour-specific score pairs were discordant. The observed
+  standard deviation is therefore uncertain as a population planning value.
+- The existing mature-fork checkpoints are much earlier than the late v4
+  behavior under study. A new multi-seed evaluation of those checkpoints could
+  miss the phenomenon for maturity reasons and should not be launched.
 
-## Next validation experiments
+## Next validation choices
 
-Freeze one of two different contracts; do not combine their claims after
-seeing results.
+Freeze exactly one claim before choosing games. Do not combine these endpoints
+after observing a new result.
 
-### Option A: passivity/mechanism development study
+### Option A: new-corpus process generalization
 
-- Same frozen v3/v4 `latest.pt` identities.
-- Same colour-swapped start histories, candidate inference route, 500,000-node
-  Sanmill configuration and strict complete-history referee.
-- Prospective snapshots at logical ply 120, including full rule history and a
-  separately labelled Malom theoretical W/D/L.
-- Continue each game to the existing 1,536-post-prefix-ply safety cap; cap is
-  invalid, never scored as a draw.
-- Primary estimands may be paired cap incidence, logical-ply distribution and
-  preserving-to-downgrading trajectory events. W/D/L is secondary and no
-  strength claim is allowed.
-- A development corpus may be reused only if labelled non-held-out. Its size
-  still needs a variance/precision rule and resource bound.
+- Keep the two named frozen final routes and strict 500,000-node Sanmill
+  protocol.
+- Use a newly exposure-audited opening corpus disjoint from development.
+- Make start-clustered ply-120 survival the primary process estimand; retain
+  no-capture count, repetition count, termination reason and complete-order
+  opportunity exposure as secondary endpoints.
+- Continue to strict rule terminal or an explicitly invalid safety cap.
+- Freeze a start-level fixed-width target and maximum start/game/time/node
+  envelope before launch.
+- W/D/L remains descriptive; this option cannot answer which model is
+  stronger.
 
-### Option B: playing-strength evaluation
+### Option B: held-out playing-strength relation
 
-- Pair score is primary; process metrics and ply-120 Malom snapshots are
-  explanatory secondary endpoints.
-- Freeze a practically relevant minimum paired-score effect and an error or
-  fixed-width precision rule before choosing sample size.
-- Use a new exposure-audited confirmatory corpus. If a development pilot is
-  needed for discordance and decisive-rate estimation, keep it disjoint and
-  prohibit its results from changing the confirmatory effect threshold.
-- Freeze the maximum number of starts/games, active-time ceiling, invalid-cap
-  rule and any interim stopping rule. Repeating deterministic starts adds no
-  information.
+- Use a newly exposure-audited opening corpus and the same black/white pairing.
+- Make the within-start averaged v4-minus-v3 score difference primary.
+- The product owner must first choose a practically meaningful fixed-width
+  target, directional minimum effect, or equivalence margin. Use that choice,
+  not the observed +1.171875pp pilot value, to set the number of starts.
+- Keep process endpoints explanatory and preserve invalid-cap semantics.
+- Report by colour, opening stratum and termination reason, but do not change
+  the primary decision after seeing those strata.
 
-For the causal refresh question, neither option is sufficient. That requires
-same-source, same-seed, equal-transition refresh/no-refresh pairs across
-multiple seeds.
+### Option C: refresh-cadence causality
 
-| Launch gate | State |
+- Train same-source, same-seed, equal-transition refresh/no-refresh pairs
+  across multiple seeds.
+- Reach a preregistered late maturity comparable to the onset being studied;
+  the existing early mature-fork cohort is not a substitute.
+- Hold schedule exposure, opponent work, data routes and evaluation protocol
+  paired. This is a materially larger training experiment with a separate
+  authority decision.
+
+## Current launch gates
+
+| Gate | State |
 | --- | --- |
-| Checkpoint and source identities | known |
-| Objective: mechanism or strength | product decision required |
-| Primary estimand and material threshold | not frozen |
-| Variance/discordance basis | unavailable |
-| Corpus membership and exposure audit | not frozen |
-| Maximum game/time/node envelope | not frozen |
-| Prospective cap-state evaluator | not implemented |
-| Focused referee/evaluator tests | not run |
-| Separate launch authority | absent |
+| Completed development result and audits | verified and identity-bound |
+| Independent analysis unit | one start, averaging both colours |
+| Objective: process, strength or causality | product decision required |
+| Primary estimand and material threshold | not frozen for a successor |
+| New corpus membership and exposure audit | absent |
+| Maximum game/time/node envelope | absent |
+| Successor machine-readable plan and readiness | absent |
+| Separate launch or training authority | absent |
 
 Verdict: `needs_decision`.

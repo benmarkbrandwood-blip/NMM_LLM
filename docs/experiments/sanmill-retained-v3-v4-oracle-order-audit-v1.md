@@ -22,7 +22,7 @@ eventual W/D/L remained overwhelmingly drawn.
 The completed first zero-game audit is also immutable for this plan:
 
 - audit plan identity:
-  `3338ba5979db20d89d81bf4408d2fa1eeef098eefb6c467edd429b91139cfec1ef`;
+  `3338ba5979db20d89d81bf4408d2fa1eeef098eefb6d854ef56d707ad268fb73`;
 - result identity:
   `b60eaf6392d55e520b5a2a493ce7dd8961c05e811a7fd3cbb5375735fe312fea`;
 - report SHA-256:
