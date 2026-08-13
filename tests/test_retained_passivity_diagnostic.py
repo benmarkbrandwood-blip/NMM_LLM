@@ -452,6 +452,7 @@ def test_web_payload_recomputes_partial_ledger(tmp_path, spec) -> None:
     assert payload["report"]["completed_games"] == 1
     assert payload["report"]["paired"]["matched_units_complete"] == 0
     assert payload["safe_progress"] is None
+    assert payload["oracle_order"] is None
 
 
 def test_web_payload_reads_identity_bound_safe_progress_report(tmp_path, spec) -> None:
@@ -483,6 +484,66 @@ def test_web_payload_rejects_tampered_safe_progress_report(tmp_path, spec) -> No
     }
     runner.write_new_canonical(tmp_path / "safe-progress-report.json", body)
     with pytest.raises(ValueError, match="identity differs"):
+        web.build_payload(tmp_path)
+
+
+def test_web_payload_reads_identity_bound_oracle_order_report(tmp_path, spec) -> None:
+    runner.write_new_canonical(tmp_path / "spec.json", spec)
+    record = _synthetic_record(spec, 0, None, survives=False, length=30)
+    diagnostic.append_game_record(tmp_path / "games.jsonl", record, must_create=True)
+    source_result_identity = web.build_payload(tmp_path)["report"]["result_identity"]
+    safe_body = {
+        "schema_version": "nmm.retained-safe-progress-audit-result.v1",
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "result_identity": source_result_identity,
+        },
+    }
+    safe = {**safe_body, "result_identity": canonical_sha256(safe_body)}
+    runner.write_new_canonical(tmp_path / "safe-progress-report.json", safe)
+    order_body = {
+        "schema_version": "nmm.retained-oracle-order-audit-result.v1",
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "result_identity": source_result_identity,
+            "safe_progress_result_identity": safe["result_identity"],
+        },
+    }
+    order = {**order_body, "result_identity": canonical_sha256(order_body)}
+    runner.write_new_canonical(tmp_path / "oracle-order-report.json", order)
+    payload = web.build_payload(tmp_path)
+    assert payload["oracle_order"] == order
+
+
+def test_web_payload_rejects_wrong_oracle_order_source_binding(tmp_path, spec) -> None:
+    runner.write_new_canonical(tmp_path / "spec.json", spec)
+    record = _synthetic_record(spec, 0, None, survives=False, length=30)
+    diagnostic.append_game_record(tmp_path / "games.jsonl", record, must_create=True)
+    source_result_identity = web.build_payload(tmp_path)["report"]["result_identity"]
+    safe_body = {
+        "schema_version": "nmm.retained-safe-progress-audit-result.v1",
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "result_identity": source_result_identity,
+        },
+    }
+    safe = {**safe_body, "result_identity": canonical_sha256(safe_body)}
+    runner.write_new_canonical(tmp_path / "safe-progress-report.json", safe)
+    order_body = {
+        "schema_version": "nmm.retained-oracle-order-audit-result.v1",
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "result_identity": source_result_identity,
+            "safe_progress_result_identity": "0" * 64,
+        },
+    }
+    order = {**order_body, "result_identity": canonical_sha256(order_body)}
+    runner.write_new_canonical(tmp_path / "oracle-order-report.json", order)
+    with pytest.raises(ValueError, match="source binding differs"):
         web.build_payload(tmp_path)
 
 
