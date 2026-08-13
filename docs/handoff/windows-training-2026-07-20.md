@@ -2630,8 +2630,10 @@ the current successor in this order:
     metric. The prospective ledger also preserves the full ply-120 referee
     state, history-free Malom context, conditional move-value coverage, rules
     terminations and incomplete safety caps. Its two exact route bundles have
-    been exported and CPU verified. The implementation and web report are
-    under test; no machine-readable final plan, product authorization or
+    been exported and CPU verified. The evaluator and help-bearing web report
+    are published at implementation commit `82c6650`; 55 focused tests and the
+    mandatory 103-test / 498-subtest provenance suite passed. The machine plan
+    is frozen at identity `bb995716`, but no product authorization or
     diagnostic game exists yet. Do not reuse the attempt-003 training grant.
 
 The previously executed isolated smoke command was:

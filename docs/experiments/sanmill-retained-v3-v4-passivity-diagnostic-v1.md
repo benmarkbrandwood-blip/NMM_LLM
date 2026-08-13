@@ -1,12 +1,18 @@
 # Sanmill retained-v3 versus no-refresh-v4 passivity diagnostic v1
 
-Status: `draft_implementation_in_progress_no_games_authorized`
+Status: `frozen_awaiting_product_authorization`
 
 This is a no-update development diagnosis. It is not held-out evidence, a
 playing-strength test, a refresh-cadence causal experiment, or authority to
-play any game. A machine-readable plan will be frozen only after the evaluator
-and report page are committed and published. A separate product-owner grant
-must then bind that exact plan identity and its resource envelope.
+play any game. The machine-readable
+[plan](sanmill-retained-v3-v4-passivity-diagnostic-v1.json) is frozen at
+identity
+`bb99571690ab4fcf2009bf5c2f3dc8ca39eb5b0e2842551e96a1f6041505d1d8`,
+file SHA-256
+`c651469a1cbe533f4269e9adaf8f4018b18ee56deff08a913699740b30746b07`,
+and published evaluator implementation commit `82c665022789570d3165fe0d4b6366f90abc5663`.
+A separate product-owner grant must bind that exact plan identity, file and
+resource envelope before a development-corpus game may start.
 
 ## Observed facts / 观察事实
 
@@ -171,17 +177,17 @@ requires a separately powered, newly exposure-audited held-out contract.
 
 | Gate | Current state |
 | --- | --- |
-| Objective and claim boundary | frozen in this draft |
+| Objective and claim boundary | frozen |
 | Candidate checkpoint and route identities | verified |
-| Primary metric and precision rule | frozen in this draft |
-| Corpus and schedule | frozen in this draft as non-held-out |
-| Resource and failure envelope | frozen in this draft |
-| Prospective process evaluator | implementation in progress |
-| Live web report and metric help | implementation in progress |
-| Focused and mandatory provenance tests | not yet run |
-| Clean published implementation source | not yet established |
-| Machine-readable plan identity | not yet frozen |
+| Primary metric and precision rule | frozen |
+| Corpus and schedule | frozen as non-held-out development |
+| Resource and failure envelope | frozen |
+| Prospective process evaluator | implemented and unit tested |
+| Live web report and metric help | implemented and JavaScript-checked |
+| Focused and mandatory provenance tests | 55 focused passed; 103 tests / 498 subtests provenance passed |
+| Clean published implementation source | `dev == origin/dev == 82c6650` when the plan was frozen |
+| Machine-readable plan identity | `bb995716...` |
 | Separate product authorization | absent |
 
-Verdict: `needs_decision` until implementation, publication, final preflight
-and an exact plan-bound product grant all pass.
+Verdict: `needs_decision` until the frozen plan is itself published, a final
+read-only preflight passes, and an exact plan-bound product grant exists.

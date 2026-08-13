@@ -234,6 +234,50 @@ def test_schedule_pairs_candidates_adjacent_with_same_start_and_colour(spec) -> 
         assert v4["candidate_id"] == diagnostic.EXPECTED_CANDIDATES[1]
 
 
+def test_frozen_plan_binds_process_estimand_resources_and_claim_boundary() -> None:
+    plan = runner.load_plan(runner.DEFAULT_PLAN)
+    assert plan["plan_identity"] == (
+        "bb99571690ab4fcf2009bf5c2f3dc8ca39eb5b0e2842551e96a1f6041505d1d8"
+    )
+    assert plan["implementation"]["commit"] == (
+        "82c665022789570d3165fe0d4b6366f90abc5663"
+    )
+    assert plan["workload"] == {
+        "automatic_retry_or_recovery": False,
+        "candidate_colors_per_start": 2,
+        "candidates_per_unit": 2,
+        "games": 256,
+        "matched_units": 128,
+        "max_active_hours": 2.0,
+        "max_sanmill_search_turns": 196608,
+        "max_summed_node_ceiling": 98304000000,
+        "safe_exact_resume_same_spec": True,
+        "unique_starts": 64,
+    }
+    assert plan["protocol"]["horizon_total_logical_ply"] == 120
+    assert plan["protocol"]["safety_cap_disposition"] == (
+        "incomplete-invalid-for-eventual-WDL-not-draw"
+    )
+    assert plan["analysis"]["engineering_interval"][
+        "maximum_primary_half_width"
+    ] == 0.10
+    assert plan["claim_boundary"] == {
+        "development_corpus_reused": True,
+        "held_out_strength_claim": False,
+        "playing_strength_claim": False,
+        "promotion_or_publication": False,
+        "refresh_causal_claim": False,
+        "training_or_update": False,
+    }
+    assert [
+        candidate["specialist_db"]["file_sha256"]
+        for candidate in plan["candidates"]
+    ] == [
+        "82d7fbcd897be2493ee40b40a44aa7cd941c95ff538b4f9bf21e2977cd4a8abe",
+        "3d69d1acb007dbd26a48ae1c6acec4bb29f905ffedd21c816ad1771a6cf942ed",
+    ]
+
+
 def test_horizon_snapshot_retains_strict_history_and_labels_malom_history_free() -> None:
     class Malom:
         @staticmethod
