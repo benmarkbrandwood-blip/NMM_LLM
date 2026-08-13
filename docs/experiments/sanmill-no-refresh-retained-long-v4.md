@@ -1,14 +1,35 @@
 # Sanmill no-refresh retained long v4
 
-Status: `designed_unlaunched`
+Status: `designed_unlaunched_attempt_002`
 
-Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70`
+Experiment ID: `dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-002`
 
-Plan ID: `managed-sanmill-no-refresh-retained-v4-seed70`
+Plan ID: `managed-sanmill-no-refresh-retained-v4-seed70-attempt-002`
 
 This document freezes a fresh 5,000-game research baseline that suppresses
 all periodic frozen-target refreshes. It does not authorize launch, held-out
 evaluation, promotion, or publication.
+
+## Preparation attempts
+
+Preparation attempt 001 is the preserved machine-local directory
+`managed-sanmill-no-refresh-retained-v4-seed70`. It froze plan identity
+`2421fa96ab471af19b4134a1782953770e729ea40df894b62e2b345af9211a25`
+at source `f1a8974a`, but it never received an authorization, never created a
+segment directory, and completed zero games. Its readiness JSON was not
+produced by version-controlled code and did not preserve the raw preflight
+report or command artifact. It is therefore marked
+`invalidated_unlaunched_never_authorize` in its ignored disposition record.
+Its existing plan, ledger, readiness narrative, database and disposition must
+remain byte-for-byte historical evidence; they must not be authorized,
+launched, resumed, overwritten, relabelled, or reused.
+
+Attempt 002 uses the same unused seed 70 but new experiment, plan, control and
+database identities. Reusing the seed does not resume attempt 001 because no
+model, optimizer, transition or game was ever created. Machine-local plan,
+command, raw preflight and canonical readiness files generated after the final
+source commit own the current preparation state; this tracked document alone
+never grants launch authority.
 
 ## Objective and evidence boundary
 
@@ -30,10 +51,22 @@ that stale targets are generally beneficial.
 
 The comparison baseline is the completed seed-58 v3 lineage. Seed 70 is new,
 so any between-run difference is descriptive and seed-confounded; it is not a
-causal cadence estimate. Training W/D/L, the 29-state policy-health gate,
-repetition, max-ply truncation, and late-window curves remain development
-diagnostics. A candidate produced here requires a separately frozen held-out
-evaluation before any strength or promotion claim.
+causal cadence estimate. It is also source-confounded. Retained v3 ran at
+source `3f400135`, before the current explicit SpecialistDB read-mode and
+learning-rate-mode interfaces and before later manager, preflight and trainer
+hardening. Focused tests show that `full` and
+`adaptive-search-opponent-win-rate` preserve their intended historical paths,
+and current-source stale-control arms exercise the new route, but there is no
+byte-for-byte trajectory-parity proof against the v3 executable.
+
+The allowed conclusion is therefore limited to the health and outcome of a
+fresh no-refresh baseline under the attempt-002 source, plus later held-out
+performance of its frozen candidate if separately authorized. A difference
+from v3 cannot be attributed solely to target refresh, seed, or any other
+single factor. Training W/D/L, the 29-state policy-health gate, repetition,
+max-ply truncation, and late-window curves remain development diagnostics. A
+candidate produced here requires a separately frozen held-out evaluation
+before any strength or promotion claim.
 
 ## Frozen lineage
 
@@ -77,9 +110,11 @@ or editing the plan in place.
 - log and checkpoint cadence 50 games, with one managed process segment every
   250 completed games.
 
-`target-refresh-every=5001` is the only intended learning-schedule change from
-retained v3. The explicit read-mode and learning-rate-mode arguments freeze
-current names for historical behavior; they do not introduce new mechanisms.
+`target-refresh-every=5001` is the only intended learning-schedule change in
+the frozen configuration relative to retained v3. It is not the only source
+code difference. The explicit read-mode and learning-rate-mode arguments
+freeze current names for historical behavior; they do not establish binary or
+trajectory parity with the older source.
 
 ## Rules, data, and runtime identities
 
@@ -118,22 +153,32 @@ Control and output directory:
 
 ```text
 learned_ai/checkpoints/scaffolded/s_gen_v2_sanmill_refereed/
-managed-sanmill-no-refresh-retained-v4-seed70
+managed-sanmill-no-refresh-retained-v4-seed70-attempt-002
 ```
 
 SpecialistDB:
 
 ```text
-data/specialist_db.sanmill_no_refresh_retained_v4.seed70.sqlite
+data/specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_002.sqlite
 ```
 
 Both targets must be absent before preparation. Copy the database once from
-`data/specialist_db.mill_bonus_ablation_v1.template.sqlite`. The template and
-fresh copy must be 45,056 bytes with SHA-256
+the closed snapshot
+`data/specialist_db.no_refresh_retained_v4.attempt_002.template.sqlite`.
+The snapshot was copied byte-for-byte from the already closed attempt-001
+runtime database, not opened through a writable SQLite connection, and has no
+WAL, SHM or rollback-journal sidecar. The snapshot and fresh copy must be
+45,056 bytes with SHA-256
 `5a5d8eb1df4184b1ed3581258ab2490f6b1320c7f9fd8a5322affeaf2cad540d`,
 `malom_label_version=sector-corrected-v1`, `quick_check=ok`, zero positions,
 zero winning lines, zero preferred plays, and no WAL, SHM, or rollback-journal
 sidecar.
+
+The older
+`data/specialist_db.mill_bonus_ablation_v1.template.sqlite` currently has an
+empty WAL and a non-empty SHM sidecar. It is preserved untouched as historical
+local state and is not an attempt-002 input. Its sidecars must not be deleted
+to make a readiness check pass.
 
 These machine-local artefacts remain ignored. They must not be committed,
 overwritten, shared with another lineage, or replaced after plan generation.
@@ -197,11 +242,11 @@ both isolated targets are absent and creating the exact empty database:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py prepare `
-  --control-dir learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70 `
-  --plan-id managed-sanmill-no-refresh-retained-v4-seed70 `
+  --control-dir learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
+  --plan-id managed-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
   --max-wall-hours 12 `
   --objective "fresh no-refresh retained research baseline after the pooled mature-refresh null result" `
-  --experiment-id dev-v4-sanmill-no-refresh-retained-v4-seed70 `
+  --experiment-id dev-v4-sanmill-no-refresh-retained-v4-seed70-attempt-002 `
   --seed 70 `
   --max-games 5000 --segment-games 250 --max-ply 120 `
   --engine-profile sanmill-fixed-resource --self-play-ratio 0.60 `
@@ -212,7 +257,7 @@ both isolated targets are absent and creating the exact empty database:
   --mill-bonus-mode malom-preserving-only `
   --malom-policy-aux-mode fixed --malom-policy-aux-coef 0.0 `
   --specialist-read-mode full `
-  --specialist-db data\specialist_db.sanmill_no_refresh_retained_v4.seed70.sqlite `
+  --specialist-db data\specialist_db.sanmill_no_refresh_retained_v4.seed70.attempt_002.sqlite `
   --policy-health-gate --policy-health-device auto
 ```
 
@@ -221,9 +266,9 @@ freeze the exact source commit, objective, fresh lineage, 5,000-game and
 12-hour ceilings, isolated paths, component switches, target interval, and
 policy-health gate. It must keep publication and promotion disabled.
 
-## Final technical readiness gate
+## Final technical readiness gate and evidence bundle
 
-Before reporting `ready_for_long_run`:
+Before reporting that technical gates passed with verdict `needs_decision`:
 
 1. fetch and prove `HEAD == origin/dev == plan.git_commit`, active branch
    `dev`, and a clean tracked worktree;
@@ -239,15 +284,36 @@ Before reporting `ready_for_long_run`:
 5. run the mandatory Malom/DB/provenance tests plus focused manager, preflight,
    trainer, checkpoint, exact-resume, Sanmill, reward-mode, target-refresh, and
    policy-health tests;
-6. run the exact first-segment preflight and require no technical errors or
-   unresolved experiment choices; and
+6. run the exact first-segment preflight and require no technical errors and
+   no unresolved decision other than the separate product authorization; and
 7. prove that no trainer, supervisor, stale lock, or competing process owns
    the output, database, runtime, or CUDA resource.
 
+The version-controlled generic readiness generator constructs the real first
+segment from `plan.json`; no command is copied from prose. It persists the
+command array, raw preflight JSON and raw-report SHA-256, plan, document,
+database and dependency identities, and a canonical readiness identity:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\generate_managed_generalist_readiness.py generate `
+  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\plan.json `
+  --experiment-document docs\experiments\sanmill-no-refresh-retained-long-v4.md `
+  --reviewed-main bc2b87a2e21fad3c86cd417e3d5f6e2b81879066
+```
+
+The ignored bundle can be independently recalculated and checked without
+launching training:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\generate_managed_generalist_readiness.py verify `
+  --readiness learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\technical-readiness.json
+```
+
 Technical readiness and launch authority are reported separately. This
 document permits plan generation and read-only preflight only. A later direct
-long-run request must bind the exact generated plan and may create its one
-ordinary plan authorization without introducing per-segment approval prompts.
+long-run request must bind the exact generated plan and readiness identity and
+may create its one ordinary plan authorization without introducing
+per-segment approval prompts.
 
 ## Reviewed launch route
 
@@ -256,8 +322,8 @@ reviewed supervisor route is:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py run-authorized `
-  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70\plan.json `
-  --authorization learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70\authorization.json
+  --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\plan.json `
+  --authorization learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\authorization.json
 ```
 
 Do not launch this command from the document alone.
