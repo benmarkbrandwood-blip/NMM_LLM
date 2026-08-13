@@ -239,6 +239,20 @@ establish the opposite direction. Preserve the
 [source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md)
 and [completion evidence](../evidence/sanmill-retained-v3-v4-phase-process-generalization-v1-result-2026-08-14.md).
 
+A zero-new-game cross-corpus synthesis then applied one-start clustering to
+both completed ledgers. The reused-development survival effect is
+`+7.8125pp`, interval `[+0.5019pp, +15.1231pp]`; the phase-history effect is
+`-2.5641pp`, interval `[-6.0707pp, +0.9425pp]`. Their post-hoc fixed-corpus
+contrast is `-10.3766pp`, interval `[-18.4847pp, -2.2685pp]`. The justified
+decision is that the earlier positive direction did not generalize, not that
+either route has a universal passivity or strength advantage. The larger of
+the two visible-corpus start-level score SDs is 12.1493pp, so conservative
+fixed-width planning now estimates 568 games for a 2pp half-width, 1,012 for
+1.5pp and 2,272 for 1pp. These are planning values, not held-out evidence or
+authority. The next owner must choose held-out score, late-maturity refresh
+causality, or a separately preregistered history/revisit mechanism. Preserve
+the [cross-corpus synthesis](../evidence/sanmill-retained-v3-v4-cross-corpus-synthesis-2026-08-14.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -2701,8 +2715,12 @@ the current successor in this order:
     runtime spec `bb349a96`, launch `82782019` and completion `48ac2ad4` are
     consumed. The primary result is `inconclusive`, not held out and not a
     strength, refresh-causal or equivalence result. Preserve the ledger and
-    reports; do not rerun, resume, extend or relabel them. Any successor needs
-    a new objective, corpus, frozen plan, readiness and explicit authority.
+    reports; do not rerun, resume, extend or relabel them. The subsequent
+    zero-game cross-corpus synthesis found that the earlier positive survival
+    direction did not generalize and superseded the development-only 2pp
+    score-width budget with a conservative 568-game estimate. Any successor
+    needs an owner-selected objective and threshold, a new corpus, frozen
+    plan, readiness and explicit authority.
 
 The previously executed isolated smoke command was:
 

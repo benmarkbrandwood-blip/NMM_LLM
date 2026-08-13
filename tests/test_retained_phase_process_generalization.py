@@ -444,6 +444,75 @@ def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
     assert "history-free" in web.HTML
     assert "不是 held-out" in web.HTML
     assert "cap" in web.HTML
+    assert "跨语料复现" in web.HTML
+    assert "事后工程描述" in web.HTML
+    assert "配对得分主指标" in web.HTML
+
+
+def test_web_clusters_score_by_start_before_computing_precision() -> None:
+    records = []
+    candidate_ids = diagnostic.EXPECTED_CANDIDATES
+    values = {
+        ("start-a", "W"): (0.0, 1.0),
+        ("start-a", "B"): (0.5, 0.5),
+        ("start-b", "W"): (1.0, 0.0),
+        ("start-b", "B"): (0.5, 0.5),
+    }
+    for (start_id, colour), scores in values.items():
+        for candidate_id, score in zip(candidate_ids, scores, strict=True):
+            records.append(
+                {
+                    "start_id": start_id,
+                    "candidate_color": colour,
+                    "candidate_id": candidate_id,
+                    "candidate_score": score,
+                    "termination_class": "rules_terminal",
+                }
+            )
+
+    result = web._start_clustered_precision(
+        records,
+        start_key="start_id",
+        value_key="candidate_score",
+        require_rules_terminal=True,
+    )
+    assert result["support"] == 2
+    assert result["matched_colour_units"] == 4
+    assert result["mean"] == 0.0
+    assert result["distribution"] == {"-0.5": 1, "0.5": 1}
+
+
+def test_web_cross_corpus_contrast_and_conservative_score_budget() -> None:
+    development = {
+        "support": 64,
+        "mean": 0.078125,
+        "standard_error": 0.03729898172468536,
+    }
+    phase = {
+        "support": 39,
+        "mean": -0.02564102564102564,
+        "standard_error": 0.017890787562163092,
+    }
+    contrast = web._independent_fixed_corpus_contrast(phase, development)
+    assert contrast["mean"] == pytest.approx(-0.10376602564102563)
+    assert contrast["interval"] == pytest.approx(
+        [-0.18484690038539592, -0.022685150896655362]
+    )
+    assert contrast["post_hoc"] is True
+
+    planning = web._score_planning_budgets(
+        [0.08249203304485238, 0.12149262874514737]
+    )
+    assert planning == {
+        "conservative_sample_standard_deviation": 0.12149262874514737,
+        "rows": [
+            {"target_half_width": 0.03, "starts": 64, "games": 256},
+            {"target_half_width": 0.02, "starts": 142, "games": 568},
+            {"target_half_width": 0.015, "starts": 253, "games": 1012},
+            {"target_half_width": 0.01, "starts": 568, "games": 2272},
+        ],
+        "planning_only": True,
+    }
 
 
 def test_embedded_phase_process_web_javascript_parses_with_node() -> None:

@@ -149,3 +149,13 @@ requested:
 3. The exploratory revisit-share direction may motivate a separately frozen
    mechanism diagnostic on a new corpus. It cannot be promoted from this
    result without a new plan, readiness record and explicit authority.
+
+A later zero-new-game comparison placed this result beside the completed
+reused-development diagnostic using a common start-clustered analysis unit.
+The prior `+7.8125pp` v4-survival direction became `-2.5641pp` here; the
+post-hoc fixed-corpus effect contrast was `-10.3766pp`, engineering interval
+`[-18.4847pp, -2.2685pp]`. This closes the proposed generalization direction
+without changing this preregistered result or authorizing an extension. See
+the
+[cross-corpus synthesis](sanmill-retained-v3-v4-cross-corpus-synthesis-2026-08-14.md)
+for the comparability audit, score-precision planning and claim boundaries.

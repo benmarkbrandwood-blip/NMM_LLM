@@ -6,7 +6,10 @@ import argparse
 import hashlib
 import json
 import math
+import statistics
 import sys
+from collections import Counter
+from functools import lru_cache
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,10 +21,16 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from learned_ai.evaluation.retained_phase_process_generalization import (  # noqa: E402
+    EXPECTED_CANDIDATES,
     EXPECTED_GAMES,
     EXPECTED_STARTS,
     load_game_ledger,
     summarize_records,
+)
+from learned_ai.evaluation.retained_passivity_diagnostic import (  # noqa: E402
+    EXPECTED_GAMES as DEVELOPMENT_EXPECTED_GAMES,
+    load_game_ledger as load_development_game_ledger,
+    summarize_diagnostic_records as summarize_development_records,
 )
 from learned_ai.training.run_contract import canonical_sha256  # noqa: E402
 
@@ -67,7 +76,323 @@ def _fixed_width_budgets(primary: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def build_payload(output_root: str | Path) -> dict[str, Any]:
+def _start_clustered_precision(
+    records: list[dict[str, Any]],
+    *,
+    start_key: str,
+    value_key: str,
+    require_rules_terminal: bool = False,
+) -> dict[str, Any]:
+    """Average both colours within a start before computing an interval."""
+    by_colour: dict[tuple[str, str], dict[str, float]] = {}
+    for record in records:
+        if (
+            require_rules_terminal
+            and record.get("termination_class") != "rules_terminal"
+        ):
+            continue
+        value = record.get(value_key)
+        if isinstance(value, bool):
+            numeric = float(value)
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            numeric = float(value)
+        else:
+            continue
+        key = (str(record[start_key]), str(record["candidate_color"]))
+        by_colour.setdefault(key, {})[str(record["candidate_id"])] = numeric
+
+    by_start: dict[str, dict[str, float]] = {}
+    matched_colour_units = 0
+    for (start_id, colour), candidates in by_colour.items():
+        if set(candidates) != set(EXPECTED_CANDIDATES):
+            continue
+        matched_colour_units += 1
+        by_start.setdefault(start_id, {})[colour] = (
+            candidates[EXPECTED_CANDIDATES[1]]
+            - candidates[EXPECTED_CANDIDATES[0]]
+        )
+
+    differences = [
+        (colours["W"] + colours["B"]) / 2.0
+        for _, colours in sorted(by_start.items())
+        if set(colours) == {"W", "B"}
+    ]
+    support = len(differences)
+    mean = sum(differences) / support if support else None
+    if support:
+        deviation = statistics.stdev(differences) if support > 1 else 0.0
+        standard_error = deviation / math.sqrt(support)
+        half_width = 1.96 * standard_error
+        interval: list[float | None] = [mean - half_width, mean + half_width]
+    else:
+        deviation = standard_error = half_width = None
+        interval = [None, None]
+    distribution = Counter(differences)
+    return {
+        "support": support,
+        "matched_colour_units": matched_colour_units,
+        "mean": mean,
+        "sample_standard_deviation": deviation,
+        "standard_error": standard_error,
+        "half_width": half_width,
+        "interval": interval,
+        "distribution": {
+            str(value): distribution[value] for value in sorted(distribution)
+        },
+    }
+
+
+def _independent_fixed_corpus_contrast(
+    phase: dict[str, Any], development: dict[str, Any]
+) -> dict[str, Any]:
+    """Describe phase minus development fixed-corpus effects post hoc."""
+    if not phase["support"] or not development["support"]:
+        return {
+            "mean": None,
+            "standard_error": None,
+            "half_width": None,
+            "interval": [None, None],
+        }
+    mean = float(phase["mean"]) - float(development["mean"])
+    standard_error = math.sqrt(
+        float(phase["standard_error"]) ** 2
+        + float(development["standard_error"]) ** 2
+    )
+    half_width = 1.96 * standard_error
+    return {
+        "mean": mean,
+        "standard_error": standard_error,
+        "half_width": half_width,
+        "interval": [mean - half_width, mean + half_width],
+        "development_starts": development["support"],
+        "phase_starts": phase["support"],
+        "post_hoc": True,
+    }
+
+
+def _score_planning_budgets(deviations: list[float]) -> dict[str, Any]:
+    """Use the larger observed start-level score SD as a planning input."""
+    conservative_deviation = max(deviations)
+    rows = []
+    for target_half_width in (0.03, 0.02, 0.015, 0.01):
+        starts = max(
+            1,
+            math.ceil(
+                (1.96 * conservative_deviation / target_half_width) ** 2
+            ),
+        )
+        rows.append(
+            {
+                "target_half_width": target_half_width,
+                "starts": starts,
+                "games": starts * 4,
+            }
+        )
+    return {
+        "conservative_sample_standard_deviation": conservative_deviation,
+        "rows": rows,
+        "planning_only": True,
+    }
+
+
+def _candidate_route_signature(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    signature = []
+    for candidate in spec.get("candidates", []):
+        signature.append(
+            {
+                "candidate_id": candidate.get("candidate_id"),
+                "bundle_identity": candidate.get("bundle", {}).get("identity"),
+                "bundle_manifest_sha256": candidate.get("bundle", {}).get(
+                    "manifest_sha256"
+                ),
+                "checkpoint_file_sha256": candidate.get("checkpoint", {}).get(
+                    "file_sha256"
+                ),
+                "checkpoint_payload_sha256": candidate.get("checkpoint", {}).get(
+                    "payload_sha256"
+                ),
+                "specialist_db_file_sha256": candidate.get(
+                    "specialist_db", {}
+                ).get("file_sha256"),
+            }
+        )
+    return sorted(signature, key=lambda row: str(row["candidate_id"]))
+
+
+def _validate_cross_corpus_comparability(
+    phase_spec: dict[str, Any],
+    development_spec: dict[str, Any],
+    development_records: list[dict[str, Any]],
+) -> None:
+    if _candidate_route_signature(phase_spec) != _candidate_route_signature(
+        development_spec
+    ):
+        raise ValueError("cross-corpus candidate route identities differ")
+    if phase_spec.get("runtime") != development_spec.get("runtime"):
+        raise ValueError("cross-corpus deterministic runtime differs")
+
+    phase_protocol = phase_spec.get("protocol", {})
+    development_protocol = development_spec.get("protocol", {})
+    for key in (
+        "candidate_move_selection",
+        "color_swap",
+        "result_based_early_stop",
+        "safety_cap_disposition",
+        "sanmill_node_ceiling_per_turn",
+        "strict_referee",
+    ):
+        if phase_protocol.get(key) != development_protocol.get(key):
+            raise ValueError(f"cross-corpus protocol differs for {key}")
+    if (
+        development_protocol.get("horizon_total_logical_ply") != 120
+        or phase_protocol.get("horizon_post_start_logical_plies") != 108
+        or development_protocol.get("max_post_prefix_logical_plies")
+        != phase_protocol.get("max_post_start_logical_plies")
+    ):
+        raise ValueError("cross-corpus horizon or safety ceiling differs")
+    prefix_plies = {
+        record.get("prefix", {}).get("logical_ply_count")
+        for record in development_records
+    }
+    if prefix_plies != {12}:
+        raise ValueError("development prefixes are not all 12 logical plies")
+
+
+def _development_stamp(root: Path) -> tuple[tuple[str, int, int], ...]:
+    names = ("spec.json", "games.jsonl", "completion.json")
+    result = []
+    for name in names:
+        path = root / name
+        if not path.is_file():
+            raise ValueError(f"development comparison is missing {name}")
+        stat = path.stat()
+        result.append((name, stat.st_size, stat.st_mtime_ns))
+    return tuple(result)
+
+
+@lru_cache(maxsize=4)
+def _load_development_evidence_cached(
+    root_text: str, _stamp: tuple[tuple[str, int, int], ...]
+) -> dict[str, Any]:
+    root = Path(root_text)
+    spec = _read_json(root / "spec.json")
+    _validate_spec_identity(spec)
+    records, tail = load_development_game_ledger(spec, root / "games.jsonl")
+    report = summarize_development_records(spec, records, tail)
+    completion = _read_json(root / "completion.json")
+    completion_body = {
+        key: value
+        for key, value in completion.items()
+        if key != "completion_identity"
+    }
+    if (
+        report.get("completed_games") != DEVELOPMENT_EXPECTED_GAMES
+        or report.get("status") != "completed"
+        or canonical_sha256(completion_body)
+        != completion.get("completion_identity")
+        or completion.get("diagnostic_id") != spec.get("diagnostic_id")
+        or completion.get("spec_identity") != spec.get("spec_identity")
+        or completion.get("result_identity") != report.get("result_identity")
+        or completion.get("completed_games") != DEVELOPMENT_EXPECTED_GAMES
+        or completion.get("ledger_sha256") != _sha256_file(root / "games.jsonl")
+        or completion.get("ledger_tail_record_sha256") != tail
+    ):
+        raise ValueError("development completion binding differs")
+    return {
+        "spec": spec,
+        "records": records,
+        "result_identity": report.get("result_identity"),
+    }
+
+
+def _cross_corpus_payload(
+    phase_spec: dict[str, Any],
+    phase_records: list[dict[str, Any]],
+    development_output_root: str | Path,
+) -> dict[str, Any]:
+    root = Path(development_output_root).resolve()
+    development = _load_development_evidence_cached(
+        str(root), _development_stamp(root)
+    )
+    development_spec = development["spec"]
+    development_records = development["records"]
+    _validate_cross_corpus_comparability(
+        phase_spec, development_spec, development_records
+    )
+
+    phase_survival = _start_clustered_precision(
+        phase_records,
+        start_key="start_id",
+        value_key="ongoing_after_post_start_logical_ply_108",
+    )
+    development_survival = _start_clustered_precision(
+        development_records,
+        start_key="source_core_id",
+        value_key="ongoing_after_total_logical_ply_120",
+    )
+    phase_score = _start_clustered_precision(
+        phase_records,
+        start_key="start_id",
+        value_key="candidate_score",
+        require_rules_terminal=True,
+    )
+    development_score = _start_clustered_precision(
+        development_records,
+        start_key="source_core_id",
+        value_key="candidate_score",
+        require_rules_terminal=True,
+    )
+    score_deviations = [
+        float(item["sample_standard_deviation"])
+        for item in (development_score, phase_score)
+        if item["sample_standard_deviation"] is not None
+    ]
+    return {
+        "available": True,
+        "comparison_basis": {
+            "same_candidate_route_identities": True,
+            "same_deterministic_runtime": True,
+            "same_strict_referee_and_sanmill_work": True,
+            "comparable_post_start_horizon_plies": 108,
+            "development_corpus_reused": True,
+            "phase_corpus_project_visible": True,
+            "development_result_identity": development["result_identity"],
+        },
+        "survival": {
+            "development": development_survival,
+            "phase": phase_survival,
+            "phase_minus_development": _independent_fixed_corpus_contrast(
+                phase_survival, development_survival
+            ),
+        },
+        "score": {
+            "development": development_score,
+            "phase": phase_score,
+            "phase_minus_development": _independent_fixed_corpus_contrast(
+                phase_score, development_score
+            ),
+            "fixed_width_planning": (
+                _score_planning_budgets(score_deviations)
+                if len(score_deviations) == 2
+                else None
+            ),
+        },
+        "claim_boundary": {
+            "post_hoc_fixed_corpus_description": True,
+            "population_inference": False,
+            "held_out": False,
+            "playing_strength_claim": False,
+            "refresh_causal_claim": False,
+            "equivalence_claim": False,
+            "authorization_for_more_games": False,
+        },
+    }
+
+
+def build_payload(
+    output_root: str | Path,
+    development_output_root: str | Path | None = None,
+) -> dict[str, Any]:
     """Build current progress and independently recomputed process metrics."""
     root = Path(output_root).resolve()
     spec_path = root / "spec.json"
@@ -124,6 +449,11 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
             or source.get("new_games") != 0
         ):
             raise ValueError("phase-process mechanism source binding differs")
+    cross_corpus = (
+        _cross_corpus_payload(spec, records, development_output_root)
+        if development_output_root is not None
+        else None
+    )
     return {
         "available": True,
         "status": status,
@@ -150,6 +480,7 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
             "fixed_width_budgets": _fixed_width_budgets(primary),
         },
         "mechanism": mechanism,
+        "cross_corpus": cross_corpus,
     }
 
 
@@ -178,12 +509,14 @@ function phaseRows(phases){return ['placement','movement','flying'].map(phase=>{
 function processRows(a,b){const rows=[['起点 no-capture','start_no_capture'],['窗口 no-capture','horizon_no_capture'],['窗口 − 起点 no-capture','horizon_minus_start_no_capture'],['终局 no-capture','final_no_capture'],['起点当前重复计数','start_repetition_current'],['窗口当前重复计数','horizon_repetition_current'],['终局当前重复计数','final_repetition_current']];return rows.map(([label,key])=>{const x=a.history_process[key],y=b.history_process[key];return `<tr><td>${label}</td><td>${integer(x.support)}</td><td>${num(x.mean)}</td><td>${integer(y.support)}</td><td>${num(y.mean)}</td></tr>`}).join('')}
 function reasonRows(a,b){const keys=[...new Set([...Object.keys(a.outcome_reasons||{}),...Object.keys(b.outcome_reasons||{})])].sort();if(!keys.length)return '<tr><td>暂无规则终局</td><td>0</td><td>0</td></tr>';return keys.map(key=>`<tr><td>${esc(key)}</td><td>${integer(a.outcome_reasons[key]||0)}</td><td>${integer(b.outcome_reasons[key]||0)}</td></tr>`).join('')}
 function precisionBlock(x){if(!x.start_clustered_primary.support)return `<div class="panel"><h2>起点聚类精度</h2><p class="help">等待同一起点的候选执白、执黑两个颜色单元都形成完整 v3/v4 配对。</p></div>`;const p=x.start_clustered_primary,iv=p.interval||[null,null],dist=Object.entries(p.distribution||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([v,n])=>`<tr><td>${pp(Number(v))}</td><td>${integer(n)}</td></tr>`).join(''),budgets=x.fixed_width_budgets.map(row=>`<tr><td>${pp(row.target_half_width)}</td><td>${integer(row.starts)}</td><td>${integer(row.games)}</td></tr>`).join('');return `<div class="panel"><h2>起点聚类精度与差值分布</h2><p class="help">先在每个起点内平均候选执白、执黑的两个差值，再跨独立起点计算工程区间；颜色单元不能当成独立样本。预算只是用已观测标准差做的固定半宽说明，不会自动扩展本次 39 起点合同。</p><div class="two"><table><thead><tr><th>两色平均差</th><th>起点</th></tr></thead><tbody>${dist}</tbody></table><table><thead><tr><th>目标半宽</th><th>估计起点</th><th>估计局数</th></tr></thead><tbody>${budgets}</tbody></table></div></div>`}
+function crossCorpusBlock(x){if(!x)return '';const s=x.survival,d=s.development,p=s.phase,c=s.phase_minus_development,sc=x.score,ds=sc.development,ps=sc.phase,cs=sc.phase_minus_development,ci=c.interval||[null,null],dsi=d.interval||[null,null],psi=p.interval||[null,null],dc=ds.interval||[null,null],pc=ps.interval||[null,null],cc=cs.interval||[null,null],planning=sc.fixed_width_planning,rows=planning?planning.rows.map(row=>`<tr><td>${pp(row.target_half_width)}</td><td>${integer(row.starts)}</td><td>${integer(row.games)}</td></tr>`).join(''):'';return `<div class="panel"><h2>跨语料复现：原存活方向未复现</h2><p class="help">两批使用相同候选 route、checkpoint、SpecialistDB、确定性 CPU float32、严格裁判与 500,000 节点 Sanmill。开发集从 12 手前缀到总第 120 手，等价于阶段集的相对 108 手。两批起点不同且都已对项目可见。</p><table><thead><tr><th>固定语料</th><th>独立起点</th><th>存活差 v4−v3</th><th>95% 工程区间</th></tr></thead><tbody><tr><td>复用开发集</td><td>${integer(d.support)}</td><td>${pp(d.mean)}</td><td>${pp(dsi[0])} … ${pp(dsi[1])}</td></tr><tr><td>阶段历史集</td><td>${integer(p.support)}</td><td>${pp(p.mean)}</td><td>${pp(psi[0])} … ${pp(psi[1])}</td></tr><tr><td>阶段 − 开发（事后）</td><td>${integer(c.phase_starts)} + ${integer(c.development_starts)}</td><td>${pp(c.mean)}</td><td>${pp(ci[0])} … ${pp(ci[1])}</td></tr></tbody></table><p class="help"><b>结论边界：</b>开发集上的正方向没有在阶段集复现。最后一行只是两个固定语料效应的事后工程描述，不是预注册方向门、总体推断、refresh 因果或棋力结论，也不授权追加样本。</p><div class="two"><div><h2>配对得分（仅规划）</h2><table><thead><tr><th>固定语料</th><th>起点</th><th>得分差 v4−v3</th><th>工程区间</th></tr></thead><tbody><tr><td>复用开发集</td><td>${integer(ds.support)}</td><td>${pp(ds.mean)}</td><td>${pp(dc[0])} … ${pp(dc[1])}</td></tr><tr><td>阶段历史集</td><td>${integer(ps.support)}</td><td>${pp(ps.mean)}</td><td>${pp(pc[0])} … ${pp(pc[1])}</td></tr><tr><td>阶段 − 开发（事后）</td><td>${integer(cs.phase_starts)} + ${integer(cs.development_starts)}</td><td>${pp(cs.mean)}</td><td>${pp(cc[0])} … ${pp(cc[1])}</td></tr></tbody></table></div><div><h2>未来 held-out 固定半宽预算</h2><table><thead><tr><th>目标半宽</th><th>估计起点</th><th>总局数</th></tr></thead><tbody>${rows}</tbody></table></div></div><p class="help">预算采用两批已观测起点级得分标准差中较大的 ${planning?pct(planning.conservative_sample_standard_deviation):'—'}，每个起点四局。它只是保守的工程规划输入，不是总体方差保证、等效界值或新评测授权；真正 held-out 必须预先冻结配对得分主指标、语料、目标半宽/最小效应/等效界值及资源上限。</p></div>`}
 function mechanismBlock(m){if(!m)return `<div class="panel"><h2>安全推进与完整排序复算</h2><p class="help">等待完整逐手账本的身份绑定零新对局复算。网页不会从普通吃子率、粗 W/D/L 或存活率猜测安全吃子机会与完整 Malom 排序。</p></div>`;const a=m.by_candidate[C.v3],b=m.by_candidate[C.v4],sa=a.safe_progress.all_candidate_turns,sb=b.safe_progress.all_candidate_turns,sha=a.safe_progress.after_relative_horizon_candidate_turns,shb=b.safe_progress.after_relative_horizon_candidate_turns,oa=a.complete_order.all_candidate_turns,ob=b.complete_order.all_candidate_turns,oha=a.complete_order.after_relative_horizon_candidate_turns,ohb=b.complete_order.after_relative_horizon_candidate_turns,ps=m.paired.start_clustered_missed_safe_capture_share_v4_minus_v3,po=m.paired.start_clustered_mean_order_regret_v4_minus_v3,siv=ps.interval||[null,null],oiv=po.interval||[null,null];return `<div class="panel"><h2>安全吃子与后缀重访（零新对局复算）</h2><p class="help">安全吃子机会要求至少一个完整合法吃子动作保持当前 Malom 粗 W/D/L，并会重置严格无吃子计数。机会内选择率的分母是安全吃子机会；错过份额与棋盘重访率的分母是全部候选回合。棋盘重访只检查冻结起点及已记录 post-start 后缀，不等于严格三次重复。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>安全机会</th><th>机会内保值吃子</th><th>错过/候选回合</th><th>重访/候选回合</th><th>窗口后重访</th></tr></thead><tbody><tr><td>v3</td><td>${integer(sa.candidate_turns)}</td><td>${integer(sa.safe_capture_opportunity_turns)}</td><td>${pct(sa.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sa.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sa.chosen_board_revisit_rate)}</td><td>${sha.chosen_board_revisit_turns} / ${sha.candidate_turns}</td></tr><tr><td>v4</td><td>${integer(sb.candidate_turns)}</td><td>${integer(sb.safe_capture_opportunity_turns)}</td><td>${pct(sb.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sb.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sb.chosen_board_revisit_rate)}</td><td>${shb.chosen_board_revisit_turns} / ${shb.candidate_turns}</td></tr></tbody></table><p class="help">起点聚类的错过份额差 v4−v3：${pp(ps.mean)}，工程区间 ${pp(siv[0])} … ${pp(siv[1])}，支持 ${ps.support} / 39 个完整起点。该指标是探索性机制证据，没有方向性验收门。</p></div><div class="panel"><h2>完整 Malom 保值集合排序（零新对局复算）</h2><p class="help">只在粗 W/D/L 保值动作集合内、且每个保值动作都有完整可比 OracleMoveValue 时排序。序位后悔 0 表示选最高等级、1 表示选最低不同等级；分母是可完整排序回合。它是 history-free 位置排序，不是终局距离、活性或棋力。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>可排序覆盖</th><th>有不同等级</th><th>机会内选最高等级</th><th>序位后悔*</th><th>窗口后后悔*</th></tr></thead><tbody><tr><td>v3</td><td>${integer(oa.candidate_turns)}</td><td>${pct(oa.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(oa.full_order_choice_opportunity_turns)}</td><td>${pct(oa.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(oa.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(oha.mean_normalised_ordinal_regret_given_orderable)}</td></tr><tr><td>v4</td><td>${integer(ob.candidate_turns)}</td><td>${pct(ob.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(ob.full_order_choice_opportunity_turns)}</td><td>${pct(ob.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(ob.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(ohb.mean_normalised_ordinal_regret_given_orderable)}</td></tr></tbody></table><p class="help">起点聚类的平均序位后悔差 v4−v3：${pp(po.mean)}，工程区间 ${pp(oiv[0])} … ${pp(oiv[1])}，支持 ${po.support} / 39 个完整起点。条件版本不会用更大的候选回合分母摊薄；支持不足时必须显示而不能补零。</p></div>`}
 function render(payload){const app=document.getElementById('app');if(!payload.available){app.innerHTML=`<div class="empty"><div class="panel"><h1>v3/v4 阶段过程确认</h1><p class="sub">${esc(payload.message)}</p><div class="notice">没有精确计划和授权时，网页只显示“未启动”，不会预填或推测结果。</div></div></div>`;return}const r=payload.report,a=r.by_candidate[C.v3],b=r.by_candidate[C.v4],p=r.paired.primary_start_clustered_108_ply_survival_v4_minus_v3,iv=p.interval||[null,null],active=payload.progress.active_seconds;
 app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 阶段过程确认</h1><div class="sub">${esc(payload.identities.diagnostic_id)} · <span class="badge">${esc(payload.status)}</span></div><div class="notice"><b>固定项目可见语料的过程确认，不是 held-out 棋力评测。</b> 结果不能归因 refresh，不能用于晋级、发布或释放。</div>
 <div class="grid">${card('完成进度',`${payload.progress.completed_games} / ${payload.progress.expected_games}`,payload.progress.current_stage?`game ${Number(payload.progress.current_game_ordinal)+1} · ${payload.progress.current_stage} ply ${payload.progress.current_stage_ply}`:'当前无在途对局')}${card('完整起点',`${r.paired.start_units_complete} / ${r.paired.start_units_expected}`,`${r.paired.matched_colour_units_complete} / ${r.paired.matched_colour_units_expected} 个颜色配对`)}${card('主差值 v4 − v3',pp(p.mean),iv[0]==null?'等待完整起点':`工程区间 ${pp(iv[0])} … ${pp(iv[1])}`)}${card('主判决',decisionText(p.decision),`半宽 ${pp(p.half_width)}；门限 10.00pp`)}${card('v3: 相对 108 手仍在进行',pct(a.horizon_108_post_start.survival_rate),`${a.horizon_108_post_start.survived} / ${a.games} 局`)}${card('v4: 相对 108 手仍在进行',pct(b.horizon_108_post_start.survival_rate),`${b.horizon_108_post_start.survived} / ${b.games} 局`)}${card('活动用时',active==null?'—':num(active/60)+' min','只计 evaluator active time；上限 2 h')}${card('报告身份',r.result_identity?esc(r.result_identity.slice(0,12)):'—','实时从规范账本独立复算')}</div>
 <div class="panel"><h2>相对 108 手 continuation survival</h2><p class="help">从每个冻结历史起点再走 108 个完整逻辑手后，严格裁判仍未终局。它不是和棋、不是胜率，也不预测最终结果；不同起点的绝对手数不同。</p><div class="bars">${bar('retained-v3 refresh-50',a.horizon_108_post_start.survival_rate)}${bar('retained-v4 no-refresh',b.horizon_108_post_start.survival_rate,'v4')}</div></div>
 ${precisionBlock(payload.precision)}
+${crossCorpusBlock(payload.cross_corpus)}
 <div class="panel"><h2>按起始阶段分层</h2><p class="help">分母是各阶段已经完成的候选对局数；placement / movement / flying 的固定支持分别来自 18 / 14 / 7 个起点。</p><table><thead><tr><th>阶段</th><th>v3 局数</th><th>v3 存活率</th><th>v4 局数</th><th>v4 存活率</th></tr></thead><tbody>${phaseRows(r.by_phase)}</tbody></table></div>
 <div class="two"><div class="panel"><h2>无吃子与重复过程</h2><p class="help">每一行都显示自己的支持数；窗口行只含到达相对 108 手的局。严格无吃子/三次重复历史由 Sanmill 裁判持有，不能由 Malom 棋盘值替代。</p><table><thead><tr><th>指标</th><th>v3 n</th><th>v3 均值</th><th>v4 n</th><th>v4 均值</th></tr></thead><tbody>${processRows(a,b)}</tbody></table></div><div class="panel"><h2>规则终止原因</h2><p class="help">1,536 post-start 是故障安全 cap；命中时记 incomplete，绝不转成和棋。</p><table><thead><tr><th>原因</th><th>v3</th><th>v4</th></tr></thead><tbody>${reasonRows(a,b)}</tbody></table></div></div>
 ${mechanismBlock(payload.mechanism)}
@@ -197,6 +530,7 @@ tick();setInterval(tick,3000);
 
 class Handler(BaseHTTPRequestHandler):
     output_root: Path
+    development_output_root: Path | None
 
     def log_message(self, _format: str, *_args: Any) -> None:
         return
@@ -222,7 +556,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if route == "/api/diagnostic":
                 body = json.dumps(
-                    build_payload(self.output_root),
+                    build_payload(
+                        self.output_root,
+                        self.development_output_root,
+                    ),
                     ensure_ascii=False,
                     separators=(",", ":"),
                 ).encode("utf-8")
@@ -244,6 +581,14 @@ class Handler(BaseHTTPRequestHandler):
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument(
+        "--development-output-root",
+        type=Path,
+        help=(
+            "optional completed retained passivity diagnostic root for an "
+            "identity-checked, zero-new-game cross-corpus comparison"
+        ),
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8772)
     return parser
@@ -251,7 +596,14 @@ def _parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = _parser().parse_args()
-    handler = type("PhaseProcessHandler", (Handler,), {"output_root": args.output_root})
+    handler = type(
+        "PhaseProcessHandler",
+        (Handler,),
+        {
+            "output_root": args.output_root,
+            "development_output_root": args.development_output_root,
+        },
+    )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     print(f"http://{args.host}:{args.port}/", flush=True)
     server.serve_forever()
