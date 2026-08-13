@@ -417,6 +417,7 @@ def test_web_payload_does_not_invent_metrics_before_launch(tmp_path) -> None:
     assert "history-free" in web.HTML
     assert "query coverage" in web.HTML
     assert "不能归因" in web.HTML
+    assert "起点层 120 手存活精度" in web.HTML
     assert "起点层配对得分精度" in web.HTML
 
 
@@ -454,7 +455,41 @@ def test_web_payload_recomputes_partial_ledger(tmp_path, spec) -> None:
     assert payload["report"]["paired"]["matched_units_complete"] == 0
     assert payload["safe_progress"] is None
     assert payload["oracle_order"] is None
+    assert payload["horizon_precision_by_start"]["start_units_complete"] == 0
     assert payload["score_precision_by_start"]["start_units_complete"] == 0
+
+
+def test_start_level_horizon_precision_clusters_both_colours() -> None:
+    records = []
+    for start, colour_differences in {
+        "start-1": {"W": 1, "B": 0},
+        "start-2": {"W": -1, "B": 0},
+    }.items():
+        for colour, difference in colour_differences.items():
+            v3 = difference < 0
+            v4 = difference > 0
+            records.extend(
+                [
+                    {
+                        "source_core_id": start,
+                        "candidate_color": colour,
+                        "candidate_id": diagnostic.EXPECTED_CANDIDATES[0],
+                        "ongoing_after_total_logical_ply_120": v3,
+                    },
+                    {
+                        "source_core_id": start,
+                        "candidate_color": colour,
+                        "candidate_id": diagnostic.EXPECTED_CANDIDATES[1],
+                        "ongoing_after_total_logical_ply_120": v4,
+                    },
+                ]
+            )
+    summary = web._start_level_horizon_precision(records)
+    assert summary["matched_colour_units"] == 4
+    assert summary["start_units_complete"] == 2
+    assert summary["mean"] == 0.0
+    assert summary["distribution"] == {"-0.5": 1, "0.5": 1}
+    assert summary["strength_claim_allowed"] is False
 
 
 def test_start_level_score_precision_clusters_both_colours() -> None:
