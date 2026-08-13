@@ -9,9 +9,14 @@ historical wording below. The repository root is this directory. At handoff
 publication the tracked worktree was clean and `dev` was synchronized with
 `origin/dev`; a receiving operator must verify the exact current values with
 `git rev-parse HEAD` and `git rev-parse origin/dev` rather than relying on a
-copied SHA in prose. At the latest review, `origin/main` remained at the
-already reviewed `bc2b87a2e21fad3c86cd417e3d5f6e2b81879066`. Ben's monitored
-training thread had no newer training-related message or main-branch commit.
+copied SHA in prose. A real fetch during the attempt-002 readiness correction
+advanced `origin/main` to
+`40da3ddfced972c418541665ec739b3752edcd1f`. The four commits since
+`bc2b87a2` harden the separate Human Move Preference Net and GapNet-v3
+training/gating plans and tests. They do not touch the retained Generalist
+trainer, managed-run route, Sanmill referee/opponent path or inputs enabled by
+this experiment. No cherry-pick is required for the no-refresh baseline; the
+new main tip is recorded as reviewed source context only.
 
 The latest authorized mature target-refresh attempt is consumed and must not be
 restarted. Its six training arms all completed and passed policy health: 2,529

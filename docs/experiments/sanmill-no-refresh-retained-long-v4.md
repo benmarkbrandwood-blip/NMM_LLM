@@ -273,7 +273,7 @@ Before reporting that technical gates passed with verdict `needs_decision`:
 1. fetch and prove `HEAD == origin/dev == plan.git_commit`, active branch
    `dev`, and a clean tracked worktree;
 2. confirm reviewed `origin/main` remains
-   `bc2b87a2e21fad3c86cd417e3d5f6e2b81879066` or stop for a new read-only
+   `40da3ddfced972c418541665ec739b3752edcd1f` or stop for a new read-only
    source review;
 3. verify the plan, local path registry, this document, empty database,
    policy corpus, audit script, ruleset, Malom, HumanDB, MIF release, and seed-70
@@ -298,7 +298,7 @@ database and dependency identities, and a canonical readiness identity:
 .\.venv\Scripts\python.exe scripts\generate_managed_generalist_readiness.py generate `
   --plan learned_ai\checkpoints\scaffolded\s_gen_v2_sanmill_refereed\managed-sanmill-no-refresh-retained-v4-seed70-attempt-002\plan.json `
   --experiment-document docs\experiments\sanmill-no-refresh-retained-long-v4.md `
-  --reviewed-main bc2b87a2e21fad3c86cd417e3d5f6e2b81879066
+  --reviewed-main 40da3ddfced972c418541665ec739b3752edcd1f
 ```
 
 The ignored bundle can be independently recalculated and checked without
