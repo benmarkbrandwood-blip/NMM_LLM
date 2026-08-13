@@ -447,6 +447,31 @@ def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
     assert "跨语料复现" in web.HTML
     assert "事后工程描述" in web.HTML
     assert "配对得分主指标" in web.HTML
+    assert "真正 held-out 候选盲源池" in web.HTML
+    assert "源池可用" in web.HTML
+
+
+def test_web_exposes_only_validated_heldout_pool_summary() -> None:
+    source = web._heldout_pool_payload(web.DEFAULT_HELDOUT_POOL)
+
+    assert source is not None
+    assert source["available"] is True
+    assert source["pool_identity"] == (
+        "2eb04f542f88f8360f08f97e7657ca15646582a1532358dfeb04182ebad7d8f7"
+    )
+    assert source["independent_starts"] == 361
+    assert source["phase_counts"] == {
+        "flying": 56,
+        "movement": 152,
+        "placement": 153,
+    }
+    assert source["strict_replay"] == {
+        "repeat_passes": 2,
+        "fresh_process_count": 722,
+        "accepted_count": 361,
+        "excluded_count": 0,
+    }
+    assert "records" not in source
 
 
 def test_web_clusters_score_by_start_before_computing_precision() -> None:

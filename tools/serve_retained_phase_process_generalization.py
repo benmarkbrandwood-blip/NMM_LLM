@@ -32,10 +32,17 @@ from learned_ai.evaluation.retained_passivity_diagnostic import (  # noqa: E402
     load_game_ledger as load_development_game_ledger,
     summarize_diagnostic_records as summarize_development_records,
 )
+from learned_ai.evaluation.retained_late_import_heldout_pool import (  # noqa: E402
+    validate_retained_late_import_pool,
+)
 from learned_ai.training.run_contract import canonical_sha256  # noqa: E402
 
 
 MECHANISM_SCHEMA = "nmm.retained-phase-process-mechanism-audit-result.v1"
+DEFAULT_HELDOUT_POOL = _ROOT / (
+    "docs/experiments/"
+    "sanmill-retained-v3-v4-late-import-heldout-pool-v1.json"
+)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -193,6 +200,67 @@ def _score_planning_budgets(deviations: list[float]) -> dict[str, Any]:
         "rows": rows,
         "planning_only": True,
     }
+
+
+@lru_cache(maxsize=4)
+def _heldout_pool_payload_cached(
+    path_text: str,
+    _size: int,
+    _modified_ns: int,
+) -> dict[str, Any]:
+    pool_path = Path(path_text)
+    payload = _read_json(pool_path)
+    records = validate_retained_late_import_pool(payload)
+    source = payload["source_audit"]
+    exposure = payload["exposure_audit"]
+    strict = payload["strict_replay_audit"]
+    return {
+        "available": True,
+        "status": payload["status"],
+        "pool_identity": payload["pool_identity"],
+        "records_identity": payload["records_identity"],
+        "independent_starts": len(records),
+        "phase_counts": payload["selection_contract"]["strict_phase_counts"],
+        "source_audit": {
+            "late_import_count": source["late_import_count"],
+            "locally_valid_source_count": source["locally_valid_source_count"],
+            "invalid_source_count": source["invalid_source_count"],
+            "late_import_timestamp_range": source["late_import_timestamp_range"],
+        },
+        "exposure_audit": {
+            "candidate_state_count": exposure["candidate_state_count"],
+            "eligible_state_count": exposure["eligible_state_count"],
+            "eligible_source_game_count": exposure["eligible_source_game_count"],
+            "rejection_hits_nonexclusive": exposure[
+                "rejection_hits_nonexclusive"
+            ],
+        },
+        "strict_replay": {
+            "repeat_passes": strict["repeat_passes"],
+            "fresh_process_count": strict["fresh_process_count"],
+            "accepted_count": strict["accepted_count"],
+            "excluded_count": strict["excluded_count"],
+        },
+        "nested_precision_prefixes": payload["nested_precision_prefixes"],
+        "claim_boundary": payload["claim_boundaries"],
+    }
+
+
+def _heldout_pool_payload(path: str | Path | None) -> dict[str, Any] | None:
+    """Return validated source-only pool facts without exposing full histories."""
+    if path is None:
+        return None
+    pool_path = Path(path).resolve()
+    if not pool_path.is_file():
+        return {
+            "available": False,
+            "status": "source_pool_absent",
+            "message": "候选盲 held-out 源池尚未冻结。",
+        }
+    stat = pool_path.stat()
+    return _heldout_pool_payload_cached(
+        str(pool_path), stat.st_size, stat.st_mtime_ns
+    )
 
 
 def _candidate_route_signature(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -392,6 +460,7 @@ def _cross_corpus_payload(
 def build_payload(
     output_root: str | Path,
     development_output_root: str | Path | None = None,
+    heldout_pool_path: str | Path | None = DEFAULT_HELDOUT_POOL,
 ) -> dict[str, Any]:
     """Build current progress and independently recomputed process metrics."""
     root = Path(output_root).resolve()
@@ -481,6 +550,7 @@ def build_payload(
         },
         "mechanism": mechanism,
         "cross_corpus": cross_corpus,
+        "heldout_pool": _heldout_pool_payload(heldout_pool_path),
     }
 
 
@@ -510,6 +580,7 @@ function processRows(a,b){const rows=[['起点 no-capture','start_no_capture'],[
 function reasonRows(a,b){const keys=[...new Set([...Object.keys(a.outcome_reasons||{}),...Object.keys(b.outcome_reasons||{})])].sort();if(!keys.length)return '<tr><td>暂无规则终局</td><td>0</td><td>0</td></tr>';return keys.map(key=>`<tr><td>${esc(key)}</td><td>${integer(a.outcome_reasons[key]||0)}</td><td>${integer(b.outcome_reasons[key]||0)}</td></tr>`).join('')}
 function precisionBlock(x){if(!x.start_clustered_primary.support)return `<div class="panel"><h2>起点聚类精度</h2><p class="help">等待同一起点的候选执白、执黑两个颜色单元都形成完整 v3/v4 配对。</p></div>`;const p=x.start_clustered_primary,iv=p.interval||[null,null],dist=Object.entries(p.distribution||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([v,n])=>`<tr><td>${pp(Number(v))}</td><td>${integer(n)}</td></tr>`).join(''),budgets=x.fixed_width_budgets.map(row=>`<tr><td>${pp(row.target_half_width)}</td><td>${integer(row.starts)}</td><td>${integer(row.games)}</td></tr>`).join('');return `<div class="panel"><h2>起点聚类精度与差值分布</h2><p class="help">先在每个起点内平均候选执白、执黑的两个差值，再跨独立起点计算工程区间；颜色单元不能当成独立样本。预算只是用已观测标准差做的固定半宽说明，不会自动扩展本次 39 起点合同。</p><div class="two"><table><thead><tr><th>两色平均差</th><th>起点</th></tr></thead><tbody>${dist}</tbody></table><table><thead><tr><th>目标半宽</th><th>估计起点</th><th>估计局数</th></tr></thead><tbody>${budgets}</tbody></table></div></div>`}
 function crossCorpusBlock(x){if(!x)return '';const s=x.survival,d=s.development,p=s.phase,c=s.phase_minus_development,sc=x.score,ds=sc.development,ps=sc.phase,cs=sc.phase_minus_development,ci=c.interval||[null,null],dsi=d.interval||[null,null],psi=p.interval||[null,null],dc=ds.interval||[null,null],pc=ps.interval||[null,null],cc=cs.interval||[null,null],planning=sc.fixed_width_planning,rows=planning?planning.rows.map(row=>`<tr><td>${pp(row.target_half_width)}</td><td>${integer(row.starts)}</td><td>${integer(row.games)}</td></tr>`).join(''):'';return `<div class="panel"><h2>跨语料复现：原存活方向未复现</h2><p class="help">两批使用相同候选 route、checkpoint、SpecialistDB、确定性 CPU float32、严格裁判与 500,000 节点 Sanmill。开发集从 12 手前缀到总第 120 手，等价于阶段集的相对 108 手。两批起点不同且都已对项目可见。</p><table><thead><tr><th>固定语料</th><th>独立起点</th><th>存活差 v4−v3</th><th>95% 工程区间</th></tr></thead><tbody><tr><td>复用开发集</td><td>${integer(d.support)}</td><td>${pp(d.mean)}</td><td>${pp(dsi[0])} … ${pp(dsi[1])}</td></tr><tr><td>阶段历史集</td><td>${integer(p.support)}</td><td>${pp(p.mean)}</td><td>${pp(psi[0])} … ${pp(psi[1])}</td></tr><tr><td>阶段 − 开发（事后）</td><td>${integer(c.phase_starts)} + ${integer(c.development_starts)}</td><td>${pp(c.mean)}</td><td>${pp(ci[0])} … ${pp(ci[1])}</td></tr></tbody></table><p class="help"><b>结论边界：</b>开发集上的正方向没有在阶段集复现。最后一行只是两个固定语料效应的事后工程描述，不是预注册方向门、总体推断、refresh 因果或棋力结论，也不授权追加样本。</p><div class="two"><div><h2>配对得分（仅规划）</h2><table><thead><tr><th>固定语料</th><th>起点</th><th>得分差 v4−v3</th><th>工程区间</th></tr></thead><tbody><tr><td>复用开发集</td><td>${integer(ds.support)}</td><td>${pp(ds.mean)}</td><td>${pp(dc[0])} … ${pp(dc[1])}</td></tr><tr><td>阶段历史集</td><td>${integer(ps.support)}</td><td>${pp(ps.mean)}</td><td>${pp(pc[0])} … ${pp(pc[1])}</td></tr><tr><td>阶段 − 开发（事后）</td><td>${integer(cs.phase_starts)} + ${integer(cs.development_starts)}</td><td>${pp(cs.mean)}</td><td>${pp(cc[0])} … ${pp(cc[1])}</td></tr></tbody></table></div><div><h2>未来 held-out 固定半宽预算</h2><table><thead><tr><th>目标半宽</th><th>估计起点</th><th>总局数</th></tr></thead><tbody>${rows}</tbody></table></div></div><p class="help">预算采用两批已观测起点级得分标准差中较大的 ${planning?pct(planning.conservative_sample_standard_deviation):'—'}，每个起点四局。它只是保守的工程规划输入，不是总体方差保证、等效界值或新评测授权；真正 held-out 必须预先冻结配对得分主指标、语料、目标半宽/最小效应/等效界值及资源上限。</p></div>`}
+function heldoutPoolBlock(x){if(!x)return '';if(!x.available)return `<div class="panel"><h2>真正 held-out 源池</h2><p class="help">${esc(x.message||'候选盲源池尚未冻结。')}</p></div>`;const widths={64:'3.0pp',142:'2.0pp',253:'1.5pp',568:'1.0pp'},rows=x.nested_precision_prefixes.map(row=>`<tr><td>${widths[row.target_starts]||'—'}</td><td>${integer(row.target_starts)}</td><td>${integer(row.target_games)}</td><td>${row.available?'可用':'不足'}</td><td>${integer(row.phase_counts.placement||0)} / ${integer(row.phase_counts.movement||0)} / ${integer(row.phase_counts.flying||0)}</td></tr>`).join(''),s=x.source_audit,e=x.exposure_audit,r=x.strict_replay,p=x.phase_counts;return `<div class="panel"><h2>真正 held-out 候选盲源池（已冻结，尚未评测）</h2><p class="help">406 局迟到导入的 PlayOK 人类棋谱未进入两条 retained route 共用的活动 HumanDB。选择不读取人类胜负，也不加载 v3/v4 policy；每个源局最多一个起点，并要求起点 ring16 轨道唯一。</p><div class="grid">${card('冻结独立起点',integer(x.independent_starts),`placement ${integer(p.placement)} · movement ${integer(p.movement)} · flying ${integer(p.flying)}`)}${card('合法源局',`${integer(s.locally_valid_source_count)} / ${integer(s.late_import_count)}`,`${integer(s.invalid_source_count)} 局 fail-closed 排除`)}${card('零暴露状态',integer(e.eligible_state_count),`扫描 ${integer(e.candidate_state_count)} 个第 12 手后状态`)}${card('严格历史重放',`${integer(r.accepted_count)} / ${integer(x.independent_starts)}`,`${integer(r.fresh_process_count)} 个新裁判进程；排除 ${integer(r.excluded_count)}`)}</div><table><thead><tr><th>规划目标半宽</th><th>起点</th><th>总局数</th><th>源池</th><th>P / M / F 起点</th></tr></thead><tbody>${rows}</tbody></table><p class="help"><b>帮助：</b>“源池可用”只表示存在足够的候选盲、训练库未暴露、严格非终局历史；它不等于已经完成 held-out，也不授权任何对局。1pp 方案需要 568 起点，当前只有 361，因此不能按该功效目标冻结。下一步仍须由产品负责人选择固定半宽、方向最小效应或等效框架，再冻结子集、计划、资源上限与 readiness。</p><code>held-out source pool ${esc(x.pool_identity)} · records ${esc(x.records_identity)}</code></div>`}
 function mechanismBlock(m){if(!m)return `<div class="panel"><h2>安全推进与完整排序复算</h2><p class="help">等待完整逐手账本的身份绑定零新对局复算。网页不会从普通吃子率、粗 W/D/L 或存活率猜测安全吃子机会与完整 Malom 排序。</p></div>`;const a=m.by_candidate[C.v3],b=m.by_candidate[C.v4],sa=a.safe_progress.all_candidate_turns,sb=b.safe_progress.all_candidate_turns,sha=a.safe_progress.after_relative_horizon_candidate_turns,shb=b.safe_progress.after_relative_horizon_candidate_turns,oa=a.complete_order.all_candidate_turns,ob=b.complete_order.all_candidate_turns,oha=a.complete_order.after_relative_horizon_candidate_turns,ohb=b.complete_order.after_relative_horizon_candidate_turns,ps=m.paired.start_clustered_missed_safe_capture_share_v4_minus_v3,po=m.paired.start_clustered_mean_order_regret_v4_minus_v3,siv=ps.interval||[null,null],oiv=po.interval||[null,null];return `<div class="panel"><h2>安全吃子与后缀重访（零新对局复算）</h2><p class="help">安全吃子机会要求至少一个完整合法吃子动作保持当前 Malom 粗 W/D/L，并会重置严格无吃子计数。机会内选择率的分母是安全吃子机会；错过份额与棋盘重访率的分母是全部候选回合。棋盘重访只检查冻结起点及已记录 post-start 后缀，不等于严格三次重复。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>安全机会</th><th>机会内保值吃子</th><th>错过/候选回合</th><th>重访/候选回合</th><th>窗口后重访</th></tr></thead><tbody><tr><td>v3</td><td>${integer(sa.candidate_turns)}</td><td>${integer(sa.safe_capture_opportunity_turns)}</td><td>${pct(sa.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sa.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sa.chosen_board_revisit_rate)}</td><td>${sha.chosen_board_revisit_turns} / ${sha.candidate_turns}</td></tr><tr><td>v4</td><td>${integer(sb.candidate_turns)}</td><td>${integer(sb.safe_capture_opportunity_turns)}</td><td>${pct(sb.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sb.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sb.chosen_board_revisit_rate)}</td><td>${shb.chosen_board_revisit_turns} / ${shb.candidate_turns}</td></tr></tbody></table><p class="help">起点聚类的错过份额差 v4−v3：${pp(ps.mean)}，工程区间 ${pp(siv[0])} … ${pp(siv[1])}，支持 ${ps.support} / 39 个完整起点。该指标是探索性机制证据，没有方向性验收门。</p></div><div class="panel"><h2>完整 Malom 保值集合排序（零新对局复算）</h2><p class="help">只在粗 W/D/L 保值动作集合内、且每个保值动作都有完整可比 OracleMoveValue 时排序。序位后悔 0 表示选最高等级、1 表示选最低不同等级；分母是可完整排序回合。它是 history-free 位置排序，不是终局距离、活性或棋力。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>可排序覆盖</th><th>有不同等级</th><th>机会内选最高等级</th><th>序位后悔*</th><th>窗口后后悔*</th></tr></thead><tbody><tr><td>v3</td><td>${integer(oa.candidate_turns)}</td><td>${pct(oa.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(oa.full_order_choice_opportunity_turns)}</td><td>${pct(oa.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(oa.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(oha.mean_normalised_ordinal_regret_given_orderable)}</td></tr><tr><td>v4</td><td>${integer(ob.candidate_turns)}</td><td>${pct(ob.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(ob.full_order_choice_opportunity_turns)}</td><td>${pct(ob.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(ob.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(ohb.mean_normalised_ordinal_regret_given_orderable)}</td></tr></tbody></table><p class="help">起点聚类的平均序位后悔差 v4−v3：${pp(po.mean)}，工程区间 ${pp(oiv[0])} … ${pp(oiv[1])}，支持 ${po.support} / 39 个完整起点。条件版本不会用更大的候选回合分母摊薄；支持不足时必须显示而不能补零。</p></div>`}
 function render(payload){const app=document.getElementById('app');if(!payload.available){app.innerHTML=`<div class="empty"><div class="panel"><h1>v3/v4 阶段过程确认</h1><p class="sub">${esc(payload.message)}</p><div class="notice">没有精确计划和授权时，网页只显示“未启动”，不会预填或推测结果。</div></div></div>`;return}const r=payload.report,a=r.by_candidate[C.v3],b=r.by_candidate[C.v4],p=r.paired.primary_start_clustered_108_ply_survival_v4_minus_v3,iv=p.interval||[null,null],active=payload.progress.active_seconds;
 app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 阶段过程确认</h1><div class="sub">${esc(payload.identities.diagnostic_id)} · <span class="badge">${esc(payload.status)}</span></div><div class="notice"><b>固定项目可见语料的过程确认，不是 held-out 棋力评测。</b> 结果不能归因 refresh，不能用于晋级、发布或释放。</div>
@@ -517,6 +588,7 @@ app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 阶段过程确认</h1
 <div class="panel"><h2>相对 108 手 continuation survival</h2><p class="help">从每个冻结历史起点再走 108 个完整逻辑手后，严格裁判仍未终局。它不是和棋、不是胜率，也不预测最终结果；不同起点的绝对手数不同。</p><div class="bars">${bar('retained-v3 refresh-50',a.horizon_108_post_start.survival_rate)}${bar('retained-v4 no-refresh',b.horizon_108_post_start.survival_rate,'v4')}</div></div>
 ${precisionBlock(payload.precision)}
 ${crossCorpusBlock(payload.cross_corpus)}
+${heldoutPoolBlock(payload.heldout_pool)}
 <div class="panel"><h2>按起始阶段分层</h2><p class="help">分母是各阶段已经完成的候选对局数；placement / movement / flying 的固定支持分别来自 18 / 14 / 7 个起点。</p><table><thead><tr><th>阶段</th><th>v3 局数</th><th>v3 存活率</th><th>v4 局数</th><th>v4 存活率</th></tr></thead><tbody>${phaseRows(r.by_phase)}</tbody></table></div>
 <div class="two"><div class="panel"><h2>无吃子与重复过程</h2><p class="help">每一行都显示自己的支持数；窗口行只含到达相对 108 手的局。严格无吃子/三次重复历史由 Sanmill 裁判持有，不能由 Malom 棋盘值替代。</p><table><thead><tr><th>指标</th><th>v3 n</th><th>v3 均值</th><th>v4 n</th><th>v4 均值</th></tr></thead><tbody>${processRows(a,b)}</tbody></table></div><div class="panel"><h2>规则终止原因</h2><p class="help">1,536 post-start 是故障安全 cap；命中时记 incomplete，绝不转成和棋。</p><table><thead><tr><th>原因</th><th>v3</th><th>v4</th></tr></thead><tbody>${reasonRows(a,b)}</tbody></table></div></div>
 ${mechanismBlock(payload.mechanism)}
@@ -531,6 +603,7 @@ tick();setInterval(tick,3000);
 class Handler(BaseHTTPRequestHandler):
     output_root: Path
     development_output_root: Path | None
+    heldout_pool_path: Path | None
 
     def log_message(self, _format: str, *_args: Any) -> None:
         return
@@ -559,6 +632,7 @@ class Handler(BaseHTTPRequestHandler):
                     build_payload(
                         self.output_root,
                         self.development_output_root,
+                        self.heldout_pool_path,
                     ),
                     ensure_ascii=False,
                     separators=(",", ":"),
@@ -589,6 +663,15 @@ def _parser() -> argparse.ArgumentParser:
             "identity-checked, zero-new-game cross-corpus comparison"
         ),
     )
+    parser.add_argument(
+        "--heldout-pool",
+        type=Path,
+        default=DEFAULT_HELDOUT_POOL,
+        help=(
+            "validated candidate-blind source-only pool to show beside the "
+            "completed development diagnostics"
+        ),
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8772)
     return parser
@@ -602,6 +685,7 @@ def main() -> int:
         {
             "output_root": args.output_root,
             "development_output_root": args.development_output_root,
+            "heldout_pool_path": args.heldout_pool,
         },
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)

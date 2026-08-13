@@ -253,6 +253,24 @@ authority. The next owner must choose held-out score, late-maturity refresh
 causality, or a separately preregistered history/revisit mechanism. Preserve
 the [cross-corpus synthesis](../evidence/sanmill-retained-v3-v4-cross-corpus-synthesis-2026-08-14.md).
 
+Option A source preparation is now complete without loading either candidate
+policy or playing a candidate game. The 406 PlayOK games imported on 20 July
+but absent from the retained routes' active HumanDB were replayed and audited
+as a candidate-blind universe. Eleven failed local legal replay and were
+excluded. Across the valid games, 12,371 board-before-move states at logical
+ply 12 or later were checked against the active HumanDB, both candidate-owned
+SpecialistDB snapshots and prior frozen corpus orbits. The 6,663 unexposed
+states came from 361 source games. One source-game-unique and `ring16`-unique
+start per game was selected; all 361 histories passed two fresh-process strict
+Sanmill replays with zero already-terminal exclusions. The frozen source pool
+identity is `2eb04f54`, records identity `4e5f9ecf`, with 153 placement / 152
+movement / 56 flying starts. Its nested prefixes can supply 64 starts / 256
+games for 3pp planning, 142 / 568 for 2pp, and 253 / 1,012 for 1.5pp. The
+568-start / 2,272-game 1pp option is not source-feasible. This is source
+readiness only; no evaluation subset, decision framework, plan, readiness or
+authorization exists. Preserve the
+[source-pool evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -279,15 +297,16 @@ the [cross-corpus synthesis](../evidence/sanmill-retained-v3-v4-cross-corpus-syn
    identity `77cc65ad`, source `662fe160`, all 20 accepted segment directories,
    final checkpoint, database, controller ledger and consumed authorization.
    Do not rerun, resume, extend, overwrite, promote or publish it.
-9. Preserve the completed v3/v4 development diagnostic, its 256-row ledger,
-   reports, web evidence and consumed authorization. Option A source
-   preparation is now frozen as the 39-start phase-process corpus under
-   identity `3be3d76c`; no successor evaluation is authorized. Implement the
-   variable-history, relative-108-ply runner and successor-owned route
-   snapshots before freezing a machine plan. For score, the independent unit
-   remains one start after averaging both colours; the observed 64-start
-   half-width is `2.0211pp`. Do not launch the existing early mature-fork
-   checkpoints as a passivity shortcut. Preserve the updated
+9. Preserve the completed v3/v4 development and phase-process diagnostics,
+   their ledgers, reports, web evidence and consumed authorizations. Preserve
+   candidate-blind held-out source pool `2eb04f54` exactly; do not import its
+   406-game source universe into the active HumanDB, reorder a selected prefix
+   after choosing a bound, or describe the pool as an evaluated result. The
+   independent score unit remains one start after averaging both colours. The
+   next product choice is fixed-width, directional-minimum-effect or
+   equivalence, followed by its bound; only then freeze the 64-, 142- or
+   253-start subset and a new plan. Do not launch the existing early
+   mature-fork checkpoints as a passivity shortcut. Preserve the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
    No additional evaluation or training is authorized.
 

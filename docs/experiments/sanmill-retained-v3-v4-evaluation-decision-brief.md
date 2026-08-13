@@ -1,13 +1,15 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `process_generalization_completed_next_objective_unselected`
+Status: `heldout_source_pool_frozen_precision_framework_unselected`
 
 Decision status: `needs_decision`
 
 This is the current planning record after the 256-game reused-development
 diagnostic, its zero-game mechanism audits, the 156-game phase-process
-generalization diagnostic, and a zero-new-game cross-corpus synthesis. Every
-associated game authorization is consumed. This record authorizes no new
+generalization diagnostic, a zero-new-game cross-corpus synthesis, and a
+zero-candidate-game freeze of a new training-disjoint source pool. Every
+associated game authorization is consumed. The source pool is preparation,
+not a held-out result or launch grant. This record authorizes no new
 evaluation, training, update, promotion, publication or release.
 
 ## Completed evidence
@@ -116,6 +118,39 @@ only the lower development-corpus SD and is superseded for conservative
 planning by 568 games. A held-out plan must freeze its objective and decision
 threshold before the number of starts is selected.
 
+## Candidate-blind held-out source pool
+
+The previously missing Option A input is now frozen before either candidate
+policy is loaded. Pool identity
+`2eb04f542f88f8360f08f97e7657ca15646582a1532358dfeb04182ebad7d8f7`
+contains 361 independent complete-history starts, one per source game and one
+per unique `ring16` orbit. The phase mix is 153 placement, 152 movement and 56
+flying.
+
+The sources are the 406 PlayOK games present in the import manifest but absent
+from the active HumanDB used by both retained routes. Of those, 395 replayed
+legally; 11 failed closed. A read-only scan then rejected any candidate state
+with D4 exposure in that HumanDB or either candidate SpecialistDB, or exact /
+`ring16` overlap with eight prior experiment corpora. It left 6,663 states from
+361 games. All 361 selected histories passed two fresh-process strict Sanmill
+replays; no start was already terminal. Source results were not read for
+selection, candidate policies were not loaded, and zero candidate games were
+played.
+
+The master order was frozen to support nested, phase-covered prefixes:
+
+| Conservative planning target | Starts | Total candidate games | P / M / F | Pool support |
+| ---: | ---: | ---: | ---: | --- |
+| 3.0pp half-width | 64 | 256 | 22 / 21 / 21 | available |
+| 2.0pp half-width | 142 | 568 | 48 / 47 / 47 | available |
+| 1.5pp half-width | 253 | 1,012 | 99 / 98 / 56 | available |
+| 1.0pp half-width | 568 | 2,272 | pool total 153 / 152 / 56 | unavailable |
+
+This establishes source feasibility only. It does not turn the pool into an
+evaluated held-out result, guarantee the planning variance, select a precision
+target, or authorize any game. Preserve the
+[source-pool readiness evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
+
 ## Remaining hypotheses and confounders
 
 1. Start/history composition may materially alter process behavior. The
@@ -134,7 +169,8 @@ Freeze exactly one claim family before preparing another immutable plan.
 
 ### Option A: genuinely held-out route relation
 
-- Use a new, exposure-audited corpus and the same black/white pairing.
+- Use a prospectively frozen prefix of source pool identity `2eb04f54` and the
+  same black/white pairing. Do not alter its order after choosing the bound.
 - Make within-start averaged v4-minus-v3 score the primary endpoint.
 - Choose one decision framework prospectively: fixed-width description,
   directional minimum effect, or equivalence with a meaningful margin.
@@ -143,9 +179,9 @@ Freeze exactly one claim family before preparing another immutable plan.
 - Keep survival, no-capture, repetition, phase and termination reason
   explanatory; none may replace paired score after seeing the result.
 
-This is the shortest route to a model-selection answer, but it still requires
-a product choice of precision/effect/equivalence target and explicit launch
-authority.
+The source-disjointness work is complete. This remains the shortest route to a
+model-selection answer, but it still requires a product choice of
+precision/effect/equivalence target and explicit launch authority.
 
 ### Option B: target-refresh causality
 
@@ -175,8 +211,9 @@ revisit interval cannot be promoted into the new decision.
 | Phase-process generalization | completed; authorization consumed; `inconclusive` |
 | Cross-corpus zero-game synthesis | completed; prior positive direction not reproduced |
 | Independent analysis unit | one start, averaging both colours |
-| New objective | not selected |
-| Held-out corpus | absent |
+| New objective | Option A source work complete; decision framework not selected |
+| Candidate-blind held-out source pool | frozen; identity `2eb04f54`; 361 starts; zero candidate games |
+| Evaluation corpus subset | not selected; nested 64 / 142 / 253 prefixes available |
 | Primary threshold / equivalence margin | absent |
 | New game, time and node envelope | absent |
 | New immutable plan and readiness | absent |
