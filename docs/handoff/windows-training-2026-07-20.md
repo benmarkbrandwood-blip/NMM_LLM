@@ -224,7 +224,9 @@ difference from v3 may be attributed solely to target refresh.
    capture, a strict safety cap, disjoint corpus/exposure audit and a tested
    no-update evaluator. A 16-game pilot is too small to estimate the observed
    2--4% decisive-game rate, and process metrics cannot replace W/D/L for a
-   strength claim. No evaluation game is authorized yet.
+   strength claim. Preserve the
+   [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
+   No evaluation game is authorized yet.
 
 No candidate-vs-baseline held-out match, model promotion, publication, or long
 training is currently authorized. Historical ignored artifacts under `out/`

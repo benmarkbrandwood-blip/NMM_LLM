@@ -220,7 +220,10 @@ The next scientific decision must separate two objectives:
 
 The historical training logs cannot supply the proposed cap-state snapshots;
 the evaluator must capture them prospectively. No held-out or replay games are
-authorized by the completed long-run grant.
+authorized by the completed long-run grant. The source-only
+[v3/v4 evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md)
+records the plug-in event-yield calculation and the two non-interchangeable
+contract options.
 
 | Launch gate | State |
 | --- | --- |
