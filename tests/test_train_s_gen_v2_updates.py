@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import random
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -106,6 +107,22 @@ def test_exact_transition_queue_consumes_two_ordered_batches() -> None:
 def test_exact_transition_queue_rejects_invalid_batch_size() -> None:
     with pytest.raises(ValueError, match="positive integer"):
         trainer._take_exact_transition_batch([], batch_size=0)
+
+
+def test_non_exact_update_batch_survives_pending_queue_clear_for_logging() -> None:
+    pending = [
+        SimpleNamespace(behaviour_temperature=value)
+        for value in (0.9, 0.7, 0.5)
+    ]
+
+    batch = trainer._snapshot_non_exact_transition_batch(pending)
+    pending.clear()
+
+    temperatures = [step.behaviour_temperature for step in batch]
+    assert temperatures == [0.9, 0.7, 0.5]
+    assert min(temperatures) == pytest.approx(0.5)
+    assert sum(temperatures) / len(temperatures) == pytest.approx(0.7)
+    assert max(temperatures) == pytest.approx(0.9)
 
 
 def test_exact_transition_mode_never_runs_final_undersized_flush() -> None:

@@ -873,6 +873,13 @@ def _take_exact_transition_batch(
     return batch
 
 
+def _snapshot_non_exact_transition_batch(
+    pending_steps: list[Any],
+) -> list[Any]:
+    """Snapshot a legacy full-queue batch before the pending queue is cleared."""
+    return list(pending_steps)
+
+
 def _should_run_final_transition_flush(
     *,
     pending_count: int,
@@ -3965,7 +3972,7 @@ def run(args: argparse.Namespace, *, paths_configured: bool = False) -> None:
                             "exact transition queue produced no complete batch"
                         )
                 else:
-                    update_steps = ep_steps
+                    update_steps = _snapshot_non_exact_transition_batch(ep_steps)
                 batch_steps = len(update_steps)
                 update_result = _update_if_ready(
                     update_fn=update_fn,
