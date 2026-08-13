@@ -310,9 +310,15 @@ def build(
     # np.savez may append ".npz" — normalise before rename
     if not tmp_path.exists() and tmp_path.with_suffix(tmp_path.suffix + ".npz").exists():
         tmp_path = tmp_path.with_suffix(tmp_path.suffix + ".npz")
-    # Ensure fsync on the temporary file
-    with tmp_path.open("rb") as f:
-        os.fsync(f.fileno())
+    # Ensure fsync on the temporary file.  Codex 2026-08-13: previous code
+    # used `open("rb")` + `os.fsync` which raises EBADF on Windows (fsync
+    # requires a writable fd).  Use os.open(..., O_RDWR) for cross-platform
+    # durability.
+    fd = os.open(str(tmp_path), os.O_RDWR)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
     tmp_path.replace(output)
 
     print(f"[session_index] Saved → {output}")

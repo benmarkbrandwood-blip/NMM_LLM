@@ -246,6 +246,29 @@ def test_index_force_overrides_no_clobber(
     index_builder.build(dataset_dir, games_dir, ledger_path, idx_path, force=True)
 
 
+def test_index_publish_uses_writable_fsync_fd(
+    index_builder, ledger_builder, tmp_path,
+):
+    """Codex 2026-08-13 regression: previous atomic publish opened the .tmp with
+    read-only mode + os.fsync, which raises EBADF on Windows.  The published
+    output must exist (as opposed to remaining at the .tmp path) and no
+    OSError must escape."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_game(games_dir, "g.jsonl", "s")
+    ledger_path = tmp_path / "ledger.json"
+    ledger_builder.build(games_dir, ledger_path)
+    dataset_dir = tmp_path / "hmpn_ds"
+    _write_dataset_metadata(dataset_dir, [_initial_state_key()])
+    idx_path = tmp_path / "session_index.npz"
+
+    index_builder.build(dataset_dir, games_dir, ledger_path, idx_path)
+
+    # Canonical output present; sidecar .tmp removed.
+    assert idx_path.exists()
+    assert not idx_path.with_suffix(idx_path.suffix + ".tmp").exists()
+
+
 def test_index_counts_sessions_not_in_ledger(
     index_builder, ledger_builder, tmp_path,
 ):

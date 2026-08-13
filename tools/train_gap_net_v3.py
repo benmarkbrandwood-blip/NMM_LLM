@@ -253,14 +253,22 @@ def _evaluate_cell_verdict(
         return "SKIP_INSUFFICIENT_SUPPORT", {
             "reason": f"n_high_support {n_high_support} < min_n_high_support {min_n_high_support}",
         }
+    # Codex P1 2026-08-13: supported cells with non-finite MSE fail closed.
+    # NaN with adequate high-support means MSE computation broke (training
+    # bug or corrupt data), not a data gap; ±inf indicates numerical
+    # divergence.  Both are treated as gate failures, not skips.
     if not np.isfinite(candidate_mse) or not np.isfinite(reference_mse):
-        # NaN → skip (no data); ±inf → fail-closed (diverged).
-        if np.isnan(candidate_mse) or np.isnan(reference_mse):
-            return "SKIP_NON_FINITE", {
+        if np.isinf(candidate_mse) or np.isinf(reference_mse):
+            return "FAIL_DIVERGED", {
                 "candidate_mse": candidate_mse, "reference_mse": reference_mse,
             }
-        return "FAIL_DIVERGED", {
+        return "FAIL_UNEXPECTED_NAN", {
             "candidate_mse": candidate_mse, "reference_mse": reference_mse,
+            "reason": (
+                f"NaN MSE despite n_high_support={n_high_support} "
+                f">= min_n_high_support={min_n_high_support} (training bug or "
+                f"corrupt data)"
+            ),
         }
     if abs(reference_mse) < min_denominator:
         return "SKIP_DEGENERATE_DENOMINATOR", {
@@ -411,9 +419,18 @@ def _report_gate(
         results.append(comp_result)
 
     total_cells = _N_HEADS * _N_BANDS
-    all_pass    = (n_fail == 0) and (n_pass > 0)
+    # Codex P1 2026-08-13: promotion requires ALL n_cells_total cells to PASS.
+    # A single passing cell surrounded by skips must not be reported as PASS.
+    # If a different coverage rule is agreed with the user, freeze it here
+    # (and update tests + §16 wording).
+    if n_fail > 0:
+        overall = "FAIL"
+    elif n_pass == total_cells:
+        overall = "PASS"
+    else:
+        overall = "FAIL_INSUFFICIENT_COVERAGE"
     summary = {
-        "overall_verdict":              "PASS" if all_pass else "FAIL" if n_fail > 0 else "INSUFFICIENT_SUPPORT",
+        "overall_verdict":              overall,
         "n_cells_total":                total_cells,
         "n_cells_pass":                 n_pass,
         "n_cells_fail":                 n_fail,
@@ -422,6 +439,7 @@ def _report_gate(
         "n_cells_skip_non_finite":      n_non_finite,
         "failing_cells":                failing_cells,
         "skipped_cells":                insufficient_cells,
+        "coverage_rule":                "ALL_CELLS_MUST_PASS",
         "thresholds": {
             "x_a":                x_a,
             "x_b":                x_b,
@@ -437,23 +455,28 @@ def _report_gate(
 def _combine_gate_verdicts(g1: str, g2: str) -> str:
     """Combine two gate verdicts into a cell verdict.
 
-    Any FAIL_DIVERGED → cell FAIL_DIVERGED (highest precedence).
-    Any FAIL → cell FAIL.
-    Otherwise both must PASS.  If either is a SKIP variant, cell inherits it.
+    Precedence (highest first):
+      FAIL_DIVERGED       → training numerical blow-up.
+      FAIL_UNEXPECTED_NAN → supported cell with NaN MSE (Codex P1 2026-08-13).
+      FAIL                → normal threshold miss.
+      PASS                → both gates passed.
+      SKIP_INSUFFICIENT_SUPPORT / SKIP_DEGENERATE_DENOMINATOR
+                          → cell not evaluable; does NOT block on its own but
+                            prevents overall PASS under the ALL_CELLS_MUST_PASS
+                            coverage rule.
     """
     if "FAIL_DIVERGED" in (g1, g2):
         return "FAIL_DIVERGED"
+    if "FAIL_UNEXPECTED_NAN" in (g1, g2):
+        return "FAIL_UNEXPECTED_NAN"
     if "FAIL" in (g1, g2):
         return "FAIL"
     if g1 == "PASS" and g2 == "PASS":
         return "PASS"
-    # Both are some SKIP_* variant.  Prefer more informative one:
-    #   INSUFFICIENT_SUPPORT > DEGENERATE_DENOMINATOR > NON_FINITE
+    # Both are some SKIP_* variant.  Prefer more informative one.
     if any("INSUFFICIENT_SUPPORT" in v for v in (g1, g2)):
         return "SKIP_INSUFFICIENT_SUPPORT"
-    if any("DEGENERATE_DENOMINATOR" in v for v in (g1, g2)):
-        return "SKIP_DEGENERATE_DENOMINATOR"
-    return "SKIP_NON_FINITE"
+    return "SKIP_DEGENERATE_DENOMINATOR"
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────

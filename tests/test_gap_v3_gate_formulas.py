@@ -146,8 +146,9 @@ def test_no_high_support_rows_skips_gate(trainer):
     assert row["gate_2_verdict"] == "SKIP_INSUFFICIENT_SUPPORT"
     assert row["cell_verdict"]   == "SKIP_INSUFFICIENT_SUPPORT"
     assert not math.isnan(row["candidate_teacher_fidelity_mse"])
-    # No cells passed since all skipped → overall INSUFFICIENT_SUPPORT
-    assert summary["overall_verdict"] == "INSUFFICIENT_SUPPORT"
+    # No cells passed since all skipped → overall FAIL_INSUFFICIENT_COVERAGE
+    # (P1 Codex 2026-08-13: promotion blocked unless every cell PASSes)
+    assert summary["overall_verdict"] == "FAIL_INSUFFICIENT_COVERAGE"
     assert summary["n_cells_skip_insufficient"] >= 1
 
 
@@ -257,17 +258,120 @@ def test_diverged_reference_fails_closed(trainer):
     assert verdict == "FAIL_DIVERGED"
 
 
-def test_overall_verdict_pass_requires_all_cells_pass(trainer):
-    """A single failing cell must flip overall to FAIL."""
-    # Two bands, but only band 0 has data; band 1 will SKIP_INSUFFICIENT
-    # candidate 0.75, uniform 1.0 → FAIL under X_A=0.30 (0.75 > 0.70)
+def test_single_failing_cell_produces_overall_fail(trainer):
+    """A single failing cell (surrounded by skips) must produce overall FAIL."""
     kw = _build_synthetic_cell(n_rows=200,
                                candidate_mse=0.75, teacher_mse=0.75,
-                               uniform_mse=1.0)
+                               uniform_mse=1.0)   # gate 1 FAIL at X_A=0.30
     _, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
     assert summary["overall_verdict"] == "FAIL"
     assert summary["n_cells_fail"] >= 1
     assert len(summary["failing_cells"]) >= 1
+
+
+# ── P1 Codex 2026-08-13: all-cells-must-pass coverage rule ──────────────────
+
+def _build_full_grid(
+    cell_specs: dict | None = None,
+    n_rows_per_cell: int = 200,
+) -> dict:
+    """Build inputs populating every one of the 9 (band × component) cells.
+
+    Each cell (b, c) lives in its own row block; band_idx=b in those rows and
+    y_emp[:, c]=0.0 (finite) with other components NaN.  candidate/teacher/
+    uniform predictors are constant sqrt(mse) so the resulting MSE equals
+    the requested value.  Default spec makes every cell PASS Gate 1 and Gate 2.
+    """
+    default = {"candidate": 0.5, "teacher": 0.5, "uniform": 1.0}
+    cell_specs = cell_specs or {}
+    n_total = 9 * n_rows_per_cell
+    val_pred = np.zeros((n_total, 3), dtype=np.float32)
+    y_model  = np.zeros((n_total, 3), dtype=np.float32)
+    y_unif   = np.zeros((n_total, 3), dtype=np.float32)
+    y_emp    = np.full((n_total, 3), np.nan, dtype=np.float32)
+    band_idx = np.zeros(n_total, dtype=np.int64)
+    for b in range(3):
+        for c in range(3):
+            spec = cell_specs.get((b, c), default)
+            idx = b * 3 + c
+            start = idx * n_rows_per_cell
+            end   = start + n_rows_per_cell
+            band_idx[start:end]      = b
+            y_emp[start:end, c]      = 0.0
+            val_pred[start:end, c]   = np.sqrt(spec["candidate"])
+            y_model[start:end, c]    = np.sqrt(spec["teacher"])
+            y_unif[start:end, c]     = np.sqrt(spec["uniform"])
+    tr_means = np.zeros(3, dtype=np.float64)
+    return {"val_pred": val_pred, "y_model": y_model, "y_unif": y_unif,
+            "y_emp": y_emp, "band_idx": band_idx, "tr_means": tr_means}
+
+
+def test_one_pass_eight_skip_is_not_overall_pass(trainer):
+    """P1 Codex 2026-08-13 regression: a single PASS cell + 8 SKIPs must NOT
+    be reported as overall PASS.  The previous logic
+    `all_pass = (n_fail == 0) and (n_pass > 0)` false-positived here."""
+    kw = _build_synthetic_cell(n_rows=200,
+                               candidate_mse=0.5, teacher_mse=0.5,
+                               uniform_mse=1.0)   # would PASS a single cell
+    _, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    assert summary["overall_verdict"] != "PASS", (
+        f"one PASS cell + 8 SKIP must NOT be overall PASS; "
+        f"got {summary['overall_verdict']}"
+    )
+    assert summary["overall_verdict"] == "FAIL_INSUFFICIENT_COVERAGE"
+    assert summary["n_cells_pass"] == 1
+    assert summary["n_cells_skip_insufficient"] == 8
+
+
+def test_all_9_cells_pass_yields_overall_pass(trainer):
+    """P1 Codex 2026-08-13: happy path — full grid of PASS cells → overall PASS."""
+    kw = _build_full_grid()   # every cell PASS under default 0.5/0.5/1.0 spec
+    _, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    assert summary["overall_verdict"] == "PASS"
+    assert summary["n_cells_pass"] == 9
+    assert summary["n_cells_fail"] == 0
+
+
+def test_eight_pass_one_skip_is_not_overall_pass(trainer):
+    """P1 Codex 2026-08-13: 8 PASS cells + 1 SKIP is NOT overall PASS."""
+    kw = _build_full_grid()
+    # Blank out y_emp for cell (band=0, comp=0) — reduces n_high_support to 0
+    kw["y_emp"][0:200, 0] = np.nan
+    _, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    assert summary["overall_verdict"] == "FAIL_INSUFFICIENT_COVERAGE"
+    assert summary["n_cells_pass"] == 8
+    assert summary["n_cells_skip_insufficient"] == 1
+
+
+def test_supported_cell_with_nan_mse_fails_closed(trainer):
+    """P1 Codex 2026-08-13: cell with adequate n_high_support but NaN in
+    predictions must FAIL_UNEXPECTED_NAN — NOT be skipped."""
+    kw = _build_full_grid()
+    # Inject NaN into val_pred for cell (0, 0): 200 rows, adequate support
+    kw["val_pred"][0:200, 0] = np.nan
+    results, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    row = results[0]["per_band"]["lower"]
+    assert row["gate_1_verdict"] == "FAIL_UNEXPECTED_NAN"
+    assert row["cell_verdict"].startswith("FAIL")
+    assert summary["overall_verdict"] == "FAIL"
+    assert summary["n_cells_fail"] >= 1
+
+
+def test_diverged_supported_cell_fails_closed_end_to_end(trainer):
+    """P1 Codex 2026-08-13: supported cell with inf MSE → FAIL_DIVERGED."""
+    kw = _build_full_grid()
+    kw["val_pred"][0:200, 0] = float("inf")
+    results, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    row = results[0]["per_band"]["lower"]
+    assert row["gate_1_verdict"] == "FAIL_DIVERGED"
+    assert summary["overall_verdict"] == "FAIL"
+
+
+def test_summary_records_coverage_rule(trainer):
+    """P1 Codex 2026-08-13: summary must document the coverage rule."""
+    kw = _build_full_grid()
+    _, summary = trainer._report_gate(x_a=0.30, x_b=0.20, **kw)
+    assert summary["coverage_rule"] == "ALL_CELLS_MUST_PASS"
 
 
 def test_summary_records_thresholds(trainer):
