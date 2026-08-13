@@ -24,10 +24,10 @@ def test_committed_plan_is_reproducible_canonical_and_runtime_valid() -> None:
     assert rebuilt == persisted
     assert runner.load_plan(PLAN) == persisted
     assert persisted["plan_identity"] == (
-        "7dfd8e32451a43acaddf1d8bc654c560779a96e60029aecb22d34cfbe7d8c367"
+        "4c85ff3362927db9b63014e0c91022a5d169d19efa4aa85b3a643febd0ce3256"
     )
     assert persisted["implementation"]["commit"] == (
-        "32e8843b791ea0ebbf149b5ad4ccfb96ad13318f"
+        "5a318a063b561b12bafe5e72e44ff6fdc9426f1e"
     )
 
 

@@ -45,7 +45,7 @@ OUTPUT = _ROOT / (
     "docs/experiments/"
     "sanmill-retained-v3-v4-phase-process-generalization-v1.json"
 )
-IMPLEMENTATION_COMMIT = "32e8843b791ea0ebbf149b5ad4ccfb96ad13318f"
+IMPLEMENTATION_COMMIT = "5a318a063b561b12bafe5e72e44ff6fdc9426f1e"
 OUTPUT_ROOT = (
     "learned_ai/checkpoints/evaluation/"
     "sanmill-retained-v3-v4-phase-process-generalization-v1"
