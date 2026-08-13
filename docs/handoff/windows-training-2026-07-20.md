@@ -2633,9 +2633,12 @@ the current successor in this order:
     been exported and CPU verified. The evaluator and help-bearing web report
     were introduced at `82c6650`. A preflight-report/launch-gate hardening fix
     at `361d99a` removes raw corpus bodies from readiness and makes skipped
-    tests or prefix replay non-runnable. The amended machine plan is frozen at
-    identity `4281cdbd`; no product authorization or diagnostic game exists
-    yet. Do not reuse the attempt-003 training grant.
+    tests or prefix replay non-runnable. A subsequent full preflight failed
+    closed because the v3 original database has preserved sidecars. The plan
+    now binds its existing byte-identical audit snapshot plus a new
+    byte-identical, sidecar-free v4 snapshot in the ignored diagnostic root.
+    The amended plan identity is `035c68f8`; no product authorization or
+    diagnostic game exists yet. Do not reuse the attempt-003 training grant.
 
 The previously executed isolated smoke command was:
 

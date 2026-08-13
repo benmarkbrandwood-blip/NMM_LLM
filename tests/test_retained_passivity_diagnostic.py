@@ -237,7 +237,7 @@ def test_schedule_pairs_candidates_adjacent_with_same_start_and_colour(spec) -> 
 def test_frozen_plan_binds_process_estimand_resources_and_claim_boundary() -> None:
     plan = runner.load_plan(runner.DEFAULT_PLAN)
     assert plan["plan_identity"] == (
-        "4281cdbd40374bcd3ff20429a759598382bf2ce1cbe27bde85ee1acacb328b8d"
+        "035c68f80b94dddb8d139d56c38c86c4fde29fa13de5e19db1f4e1fe484c318e"
     )
     assert plan["implementation"]["commit"] == (
         "361d99a43a9ca549b6f4594d8cb5c26a23d5dd54"
@@ -275,6 +275,13 @@ def test_frozen_plan_binds_process_estimand_resources_and_claim_boundary() -> No
     ] == [
         "82d7fbcd897be2493ee40b40a44aa7cd941c95ff538b4f9bf21e2977cd4a8abe",
         "3d69d1acb007dbd26a48ae1c6acec4bb29f905ffedd21c816ad1771a6cf942ed",
+    ]
+    assert [
+        candidate["specialist_db"]["path"]
+        for candidate in plan["candidates"]
+    ] == [
+        "data/specialist_db.sanmill_preserving_retained_v3.seed58.audit_snapshot.sqlite",
+        "learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-passivity-diagnostic-v1/v4-specialist-db-snapshot.sqlite",
     ]
 
 

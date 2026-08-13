@@ -7,9 +7,9 @@ playing-strength test, a refresh-cadence causal experiment, or authority to
 play any game. The machine-readable
 [plan](sanmill-retained-v3-v4-passivity-diagnostic-v1.json) is frozen at
 identity
-`4281cdbd40374bcd3ff20429a759598382bf2ce1cbe27bde85ee1acacb328b8d`,
+`035c68f80b94dddb8d139d56c38c86c4fde29fa13de5e19db1f4e1fe484c318e`,
 file SHA-256
-`e6d9c6dcf724af6e83eab61f47077408b45ea869c2a8c0e39f54ed344d86007d`,
+`e4394d015490d1e337554589c339db19a20ae45f2968bb9cbceee2ba207cd5b3`,
 and evaluator implementation commit `361d99a43a9ca549b6f4594d8cb5c26a23d5dd54`.
 A separate product-owner grant must bind that exact plan identity, file and
 resource envelope before a development-corpus game may start.
@@ -37,6 +37,17 @@ HumanDB and corrected Malom are common. Sentinel, ValueNet and GapNet remain
 disabled. The retained-v3 SpecialistDB identity is `82d7fbcd...`, and the
 retained-v4 identity is `3d69d1ac...`; replacing either with a common database
 would no longer evaluate the frozen training route.
+
+The first full source preflight at published commit `bebad52` failed closed
+under readiness identity `1ad48701...`: both the separate authorization and
+the v3 immutable data route were absent/invalid. The latter failure was caused
+by the preserved empty WAL plus 32,768-byte SHM beside the original v3 main
+file. The main file remained byte-identical. The plan now binds the already
+documented sidecar-free v3 audit snapshot and a newly created sidecar-free v4
+main-file snapshot in the ignored diagnostic namespace. Both snapshots are
+byte-identical to their lineage-owned main files, report `quick_check=ok`, and
+remain free of WAL, SHM and journal after strict route loading. No sidecar was
+deleted and no training database was changed.
 
 In sequential 500,000-node training rows, the Sanmill arm reached the
 120-logical-ply limit in 43.9% of retained-v3 games and 57.6% of retained-v4
@@ -186,7 +197,7 @@ requires a separately powered, newly exposure-audited held-out contract.
 | Live web report and metric help | implemented and JavaScript-checked |
 | Focused and mandatory provenance tests | 55 focused passed; 103 tests / 498 subtests provenance passed |
 | Clean published implementation source | implementation `361d99a` awaits ordinary publication with this amended plan |
-| Machine-readable plan identity | `4281cdbd...` |
+| Machine-readable plan identity | `035c68f8...` |
 | Separate product authorization | absent |
 
 Verdict: `needs_decision` until the frozen plan is itself published, a final
