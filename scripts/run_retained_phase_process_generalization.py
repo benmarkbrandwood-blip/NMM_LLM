@@ -46,6 +46,9 @@ from learned_ai.evaluation.retained_phase_process_generalization import (  # noq
     recompute_report,
     replay_frozen_start,
 )
+from learned_ai.evaluation.retained_phase_process_mechanism_audit import (  # noqa: E402
+    recompute_mechanism_audit,
+)
 from learned_ai.evaluation.training_aligned_policy import (  # noqa: E402
     TrainingAlignedPolicy,
 )
@@ -61,11 +64,12 @@ from scripts.run_retained_passivity_diagnostic import (  # noqa: E402
     _git,
     _load_policy,
     _local_path,
-    _output_record,
+    _output_record as _base_output_record,
     _repo_path,
     _repository_record,
     _sanmill_record,
     _strict_json,
+    _assert_ignored,
 )
 from tools.prepare_retained_phase_process_inputs import (  # noqa: E402
     TARGET_ROOT as SNAPSHOT_ROOT,
@@ -97,6 +101,17 @@ def sha256_file(path: str | Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _output_record(paths: DiagnosticPaths, *, resume: bool) -> dict[str, Any]:
+    result = _base_output_record(paths, resume=resume)
+    mechanism = paths.output_root / "mechanism-report.json"
+    _assert_ignored(mechanism)
+    if mechanism.exists():
+        raise RetainedPhaseProcessError(
+            "phase-process mechanism report already exists"
+        )
+    return {**result, "mechanism_report": "absent"}
 
 
 def load_plan(path: str | Path) -> dict[str, Any]:
@@ -388,6 +403,7 @@ def _test_record() -> dict[str, Any]:
             "pytest",
             "tests/test_retained_phase_process_corpus.py",
             "tests/test_retained_phase_process_generalization.py",
+            "tests/test_retained_phase_process_mechanism_audit.py",
             "tests/test_prepare_retained_phase_process_inputs.py",
             "tests/test_training_aligned_policy.py",
             "tests/test_sanmill_training_referee.py",
@@ -421,6 +437,7 @@ def _test_record() -> dict[str, Any]:
             ruff,
             "check",
             "learned_ai/evaluation/retained_phase_process_generalization.py",
+            "learned_ai/evaluation/retained_phase_process_mechanism_audit.py",
             "scripts/run_retained_phase_process_generalization.py",
             "tools/prepare_retained_phase_process_inputs.py",
             "tools/serve_retained_phase_process_generalization.py",
@@ -1059,7 +1076,46 @@ def run_once(
                     ),
                 )
             report = recompute_report(spec, paths.ledger)
+            ledger_sha256 = sha256_file(paths.ledger)
+
+            def audit_progress(game_index: int, turn_index: int) -> None:
+                replace_canonical(
+                    paths.progress,
+                    _progress_body(
+                        spec["spec_identity"],
+                        completed_games=EXPECTED_GAMES,
+                        current_game_ordinal=game_index,
+                        current_stage="mechanism_audit",
+                        current_stage_ply=turn_index,
+                        active_seconds=clock.require_within_budget(),
+                        ledger_tail_record_sha256=previous_hash,
+                    ),
+                )
+
+            mechanism = recompute_mechanism_audit(
+                source_spec=spec,
+                source_records=records,
+                source_ledger_sha256=ledger_sha256,
+                source_result_identity=report["result_identity"],
+                implementation_commit=spec["implementation"]["commit"],
+                malom=policies[EXPECTED_CANDIDATES[0]].malom,
+                progress=audit_progress,
+            )
+            replace_canonical(
+                paths.progress,
+                _progress_body(
+                    spec["spec_identity"],
+                    completed_games=EXPECTED_GAMES,
+                    current_game_ordinal=None,
+                    current_stage=None,
+                    current_stage_ply=0,
+                    active_seconds=clock.require_within_budget(),
+                    ledger_tail_record_sha256=previous_hash,
+                ),
+            )
             write_new_canonical(paths.report, report)
+            mechanism_path = paths.output_root / "mechanism-report.json"
+            write_new_canonical(mechanism_path, mechanism)
             completion_body = {
                 "schema_version": COMPLETION_SCHEMA,
                 "diagnostic_id": spec["diagnostic_id"],
@@ -1067,8 +1123,10 @@ def run_once(
                 "result_identity": report["result_identity"],
                 "completed_games": EXPECTED_GAMES,
                 "completed_at_utc": utc_now(),
-                "ledger_sha256": sha256_file(paths.ledger),
+                "ledger_sha256": ledger_sha256,
                 "ledger_tail_record_sha256": previous_hash,
+                "mechanism_result_identity": mechanism["result_identity"],
+                "mechanism_report_sha256": sha256_file(mechanism_path),
             }
             write_new_canonical(
                 paths.completion,
@@ -1168,12 +1226,32 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if args.command == "recompute":
             spec = _strict_json(paths.spec)
+            records, _tail = load_game_ledger(spec, paths.ledger)
             result = recompute_report(spec, paths.ledger)
             if paths.report.is_file() and _strict_json(paths.report) != result:
                 raise RetainedPhaseProcessError(
                     "persisted report differs from recomputation"
                 )
-            _print(result)
+            mechanism_path = paths.output_root / "mechanism-report.json"
+            mechanism = None
+            if mechanism_path.is_file():
+                policy = _load_policy(EXPECTED_CANDIDATES[0], paths)
+                try:
+                    mechanism = recompute_mechanism_audit(
+                        source_spec=spec,
+                        source_records=records,
+                        source_ledger_sha256=sha256_file(paths.ledger),
+                        source_result_identity=result["result_identity"],
+                        implementation_commit=spec["implementation"]["commit"],
+                        malom=policy.malom,
+                    )
+                finally:
+                    policy.close()
+                if _strict_json(mechanism_path) != mechanism:
+                    raise RetainedPhaseProcessError(
+                        "persisted mechanism report differs from recomputation"
+                    )
+            _print({"report": result, "mechanism": mechanism})
             return 0
         if not paths.spec.is_file():
             _print(

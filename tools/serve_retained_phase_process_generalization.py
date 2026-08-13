@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -25,11 +26,22 @@ from learned_ai.evaluation.retained_phase_process_generalization import (  # noq
 from learned_ai.training.run_contract import canonical_sha256  # noqa: E402
 
 
+MECHANISM_SCHEMA = "nmm.retained-phase-process-mechanism-audit-result.v1"
+
+
 def _read_json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"{path.name} is not a JSON object")
     return value
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _validate_spec_identity(spec: dict[str, Any]) -> None:
@@ -89,6 +101,29 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
     primary = report["paired"][
         "primary_start_clustered_108_ply_survival_v4_minus_v3"
     ]
+    mechanism = None
+    mechanism_path = root / "mechanism-report.json"
+    if mechanism_path.is_file():
+        mechanism = _read_json(mechanism_path)
+        mechanism_body = {
+            key: value
+            for key, value in mechanism.items()
+            if key != "result_identity"
+        }
+        source = mechanism.get("source")
+        if (
+            mechanism.get("schema_version") != MECHANISM_SCHEMA
+            or canonical_sha256(mechanism_body)
+            != mechanism.get("result_identity")
+            or not isinstance(source, dict)
+            or source.get("diagnostic_id") != spec.get("diagnostic_id")
+            or source.get("spec_identity") != spec.get("spec_identity")
+            or source.get("result_identity") != report.get("result_identity")
+            or source.get("ledger_sha256") != _sha256_file(ledger_path)
+            or source.get("games") != EXPECTED_GAMES
+            or source.get("new_games") != 0
+        ):
+            raise ValueError("phase-process mechanism source binding differs")
     return {
         "available": True,
         "status": status,
@@ -114,6 +149,7 @@ def build_payload(output_root: str | Path) -> dict[str, Any]:
             "start_clustered_primary": primary,
             "fixed_width_budgets": _fixed_width_budgets(primary),
         },
+        "mechanism": mechanism,
     }
 
 
@@ -142,6 +178,7 @@ function phaseRows(phases){return ['placement','movement','flying'].map(phase=>{
 function processRows(a,b){const rows=[['起点 no-capture','start_no_capture'],['窗口 no-capture','horizon_no_capture'],['窗口 − 起点 no-capture','horizon_minus_start_no_capture'],['终局 no-capture','final_no_capture'],['起点当前重复计数','start_repetition_current'],['窗口当前重复计数','horizon_repetition_current'],['终局当前重复计数','final_repetition_current']];return rows.map(([label,key])=>{const x=a.history_process[key],y=b.history_process[key];return `<tr><td>${label}</td><td>${integer(x.support)}</td><td>${num(x.mean)}</td><td>${integer(y.support)}</td><td>${num(y.mean)}</td></tr>`}).join('')}
 function reasonRows(a,b){const keys=[...new Set([...Object.keys(a.outcome_reasons||{}),...Object.keys(b.outcome_reasons||{})])].sort();if(!keys.length)return '<tr><td>暂无规则终局</td><td>0</td><td>0</td></tr>';return keys.map(key=>`<tr><td>${esc(key)}</td><td>${integer(a.outcome_reasons[key]||0)}</td><td>${integer(b.outcome_reasons[key]||0)}</td></tr>`).join('')}
 function precisionBlock(x){if(!x.start_clustered_primary.support)return `<div class="panel"><h2>起点聚类精度</h2><p class="help">等待同一起点的候选执白、执黑两个颜色单元都形成完整 v3/v4 配对。</p></div>`;const p=x.start_clustered_primary,iv=p.interval||[null,null],dist=Object.entries(p.distribution||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([v,n])=>`<tr><td>${pp(Number(v))}</td><td>${integer(n)}</td></tr>`).join(''),budgets=x.fixed_width_budgets.map(row=>`<tr><td>${pp(row.target_half_width)}</td><td>${integer(row.starts)}</td><td>${integer(row.games)}</td></tr>`).join('');return `<div class="panel"><h2>起点聚类精度与差值分布</h2><p class="help">先在每个起点内平均候选执白、执黑的两个差值，再跨独立起点计算工程区间；颜色单元不能当成独立样本。预算只是用已观测标准差做的固定半宽说明，不会自动扩展本次 39 起点合同。</p><div class="two"><table><thead><tr><th>两色平均差</th><th>起点</th></tr></thead><tbody>${dist}</tbody></table><table><thead><tr><th>目标半宽</th><th>估计起点</th><th>估计局数</th></tr></thead><tbody>${budgets}</tbody></table></div></div>`}
+function mechanismBlock(m){if(!m)return `<div class="panel"><h2>安全推进与完整排序复算</h2><p class="help">等待完整逐手账本的身份绑定零新对局复算。网页不会从普通吃子率、粗 W/D/L 或存活率猜测安全吃子机会与完整 Malom 排序。</p></div>`;const a=m.by_candidate[C.v3],b=m.by_candidate[C.v4],sa=a.safe_progress.all_candidate_turns,sb=b.safe_progress.all_candidate_turns,sha=a.safe_progress.after_relative_horizon_candidate_turns,shb=b.safe_progress.after_relative_horizon_candidate_turns,oa=a.complete_order.all_candidate_turns,ob=b.complete_order.all_candidate_turns,oha=a.complete_order.after_relative_horizon_candidate_turns,ohb=b.complete_order.after_relative_horizon_candidate_turns,ps=m.paired.start_clustered_missed_safe_capture_share_v4_minus_v3,po=m.paired.start_clustered_mean_order_regret_v4_minus_v3,siv=ps.interval||[null,null],oiv=po.interval||[null,null];return `<div class="panel"><h2>安全吃子与后缀重访（零新对局复算）</h2><p class="help">安全吃子机会要求至少一个完整合法吃子动作保持当前 Malom 粗 W/D/L，并会重置严格无吃子计数。机会内选择率的分母是安全吃子机会；错过份额与棋盘重访率的分母是全部候选回合。棋盘重访只检查冻结起点及已记录 post-start 后缀，不等于严格三次重复。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>安全机会</th><th>机会内保值吃子</th><th>错过/候选回合</th><th>重访/候选回合</th><th>窗口后重访</th></tr></thead><tbody><tr><td>v3</td><td>${integer(sa.candidate_turns)}</td><td>${integer(sa.safe_capture_opportunity_turns)}</td><td>${pct(sa.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sa.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sa.chosen_board_revisit_rate)}</td><td>${sha.chosen_board_revisit_turns} / ${sha.candidate_turns}</td></tr><tr><td>v4</td><td>${integer(sb.candidate_turns)}</td><td>${integer(sb.safe_capture_opportunity_turns)}</td><td>${pct(sb.safe_capture_selection_rate_given_opportunity)}</td><td>${pct(sb.missed_safe_capture_share_per_candidate_turn)}</td><td>${pct(sb.chosen_board_revisit_rate)}</td><td>${shb.chosen_board_revisit_turns} / ${shb.candidate_turns}</td></tr></tbody></table><p class="help">起点聚类的错过份额差 v4−v3：${pp(ps.mean)}，工程区间 ${pp(siv[0])} … ${pp(siv[1])}，支持 ${ps.support} / 39 个完整起点。该指标是探索性机制证据，没有方向性验收门。</p></div><div class="panel"><h2>完整 Malom 保值集合排序（零新对局复算）</h2><p class="help">只在粗 W/D/L 保值动作集合内、且每个保值动作都有完整可比 OracleMoveValue 时排序。序位后悔 0 表示选最高等级、1 表示选最低不同等级；分母是可完整排序回合。它是 history-free 位置排序，不是终局距离、活性或棋力。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>可排序覆盖</th><th>有不同等级</th><th>机会内选最高等级</th><th>序位后悔*</th><th>窗口后后悔*</th></tr></thead><tbody><tr><td>v3</td><td>${integer(oa.candidate_turns)}</td><td>${pct(oa.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(oa.full_order_choice_opportunity_turns)}</td><td>${pct(oa.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(oa.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(oha.mean_normalised_ordinal_regret_given_orderable)}</td></tr><tr><td>v4</td><td>${integer(ob.candidate_turns)}</td><td>${pct(ob.within_wdl_orderable_coverage_per_candidate_turn)}</td><td>${integer(ob.full_order_choice_opportunity_turns)}</td><td>${pct(ob.chosen_full_order_best_rate_given_opportunity)}</td><td>${pct(ob.mean_normalised_ordinal_regret_given_orderable)}</td><td>${pct(ohb.mean_normalised_ordinal_regret_given_orderable)}</td></tr></tbody></table><p class="help">起点聚类的平均序位后悔差 v4−v3：${pp(po.mean)}，工程区间 ${pp(oiv[0])} … ${pp(oiv[1])}，支持 ${po.support} / 39 个完整起点。条件版本不会用更大的候选回合分母摊薄；支持不足时必须显示而不能补零。</p></div>`}
 function render(payload){const app=document.getElementById('app');if(!payload.available){app.innerHTML=`<div class="empty"><div class="panel"><h1>v3/v4 阶段过程确认</h1><p class="sub">${esc(payload.message)}</p><div class="notice">没有精确计划和授权时，网页只显示“未启动”，不会预填或推测结果。</div></div></div>`;return}const r=payload.report,a=r.by_candidate[C.v3],b=r.by_candidate[C.v4],p=r.paired.primary_start_clustered_108_ply_survival_v4_minus_v3,iv=p.interval||[null,null],active=payload.progress.active_seconds;
 app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 阶段过程确认</h1><div class="sub">${esc(payload.identities.diagnostic_id)} · <span class="badge">${esc(payload.status)}</span></div><div class="notice"><b>固定项目可见语料的过程确认，不是 held-out 棋力评测。</b> 结果不能归因 refresh，不能用于晋级、发布或释放。</div>
 <div class="grid">${card('完成进度',`${payload.progress.completed_games} / ${payload.progress.expected_games}`,payload.progress.current_stage?`game ${Number(payload.progress.current_game_ordinal)+1} · ${payload.progress.current_stage} ply ${payload.progress.current_stage_ply}`:'当前无在途对局')}${card('完整起点',`${r.paired.start_units_complete} / ${r.paired.start_units_expected}`,`${r.paired.matched_colour_units_complete} / ${r.paired.matched_colour_units_expected} 个颜色配对`)}${card('主差值 v4 − v3',pp(p.mean),iv[0]==null?'等待完整起点':`工程区间 ${pp(iv[0])} … ${pp(iv[1])}`)}${card('主判决',decisionText(p.decision),`半宽 ${pp(p.half_width)}；门限 10.00pp`)}${card('v3: 相对 108 手仍在进行',pct(a.horizon_108_post_start.survival_rate),`${a.horizon_108_post_start.survived} / ${a.games} 局`)}${card('v4: 相对 108 手仍在进行',pct(b.horizon_108_post_start.survival_rate),`${b.horizon_108_post_start.survived} / ${b.games} 局`)}${card('活动用时',active==null?'—':num(active/60)+' min','只计 evaluator active time；上限 2 h')}${card('报告身份',r.result_identity?esc(r.result_identity.slice(0,12)):'—','实时从规范账本独立复算')}</div>
@@ -149,6 +186,7 @@ app.innerHTML=`<h1>NMM_LLM · retained-v3 / no-refresh-v4 阶段过程确认</h1
 ${precisionBlock(payload.precision)}
 <div class="panel"><h2>按起始阶段分层</h2><p class="help">分母是各阶段已经完成的候选对局数；placement / movement / flying 的固定支持分别来自 18 / 14 / 7 个起点。</p><table><thead><tr><th>阶段</th><th>v3 局数</th><th>v3 存活率</th><th>v4 局数</th><th>v4 存活率</th></tr></thead><tbody>${phaseRows(r.by_phase)}</tbody></table></div>
 <div class="two"><div class="panel"><h2>无吃子与重复过程</h2><p class="help">每一行都显示自己的支持数；窗口行只含到达相对 108 手的局。严格无吃子/三次重复历史由 Sanmill 裁判持有，不能由 Malom 棋盘值替代。</p><table><thead><tr><th>指标</th><th>v3 n</th><th>v3 均值</th><th>v4 n</th><th>v4 均值</th></tr></thead><tbody>${processRows(a,b)}</tbody></table></div><div class="panel"><h2>规则终止原因</h2><p class="help">1,536 post-start 是故障安全 cap；命中时记 incomplete，绝不转成和棋。</p><table><thead><tr><th>原因</th><th>v3</th><th>v4</th></tr></thead><tbody>${reasonRows(a,b)}</tbody></table></div></div>
+${mechanismBlock(payload.mechanism)}
 <div class="two"><div class="panel"><h2>长度（post-start）</h2><table><thead><tr><th>候选</th><th>支持</th><th>均值</th><th>中位</th><th>P90</th><th>最大</th></tr></thead><tbody>${[[a,'v3'],[b,'v4']].map(([x,label])=>`<tr><td>${label}</td><td>${x.lengths.post_start.support}</td><td>${num(x.lengths.post_start.mean)}</td><td>${num(x.lengths.post_start.median,0)}</td><td>${num(x.lengths.p90_post_start,0)}</td><td>${integer(x.lengths.post_start.max)}</td></tr>`).join('')}</tbody></table></div><div class="panel"><h2>Malom 候选动作过程</h2><p class="help">query coverage 的分母是候选回合；保值/降级率的分母仅是可查询候选回合。Malom 是 history-free 位置理论值。</p><table><thead><tr><th>候选</th><th>候选回合</th><th>覆盖率</th><th>保值率*</th><th>降级率*</th></tr></thead><tbody>${[[a,'v3'],[b,'v4']].map(([x,label])=>`<tr><td>${label}</td><td>${integer(x.candidate_malom_moves.candidate_turns)}</td><td>${pct(x.candidate_malom_moves.query_coverage)}</td><td>${pct(x.candidate_malom_moves.preserving_rate_given_queryable)}</td><td>${pct(x.candidate_malom_moves.downgrade_rate_given_queryable)}</td></tr>`).join('')}</tbody></table></div></div>
 <div class="two"><div class="panel"><h2>相对窗口 Malom 理论 W/D/L</h2><p class="help">仅含到达窗口的快照，从候选视角投影；它不携带三次重复与无吃子历史，不是严格终局裁定。</p><table><thead><tr><th>候选</th><th>快照</th><th>可查</th><th>W</th><th>D</th><th>L</th></tr></thead><tbody>${[[a,'v3'],[b,'v4']].map(([x,label])=>{const m=x.malom_at_horizon_candidate_perspective;return `<tr><td>${label}</td><td>${m.snapshot_support}</td><td>${m.queryable}</td><td>${m.wins}</td><td>${m.draws}</td><td>${m.losses}</td></tr>`}).join('')}</tbody></table></div><div class="panel"><h2>最终严格规则 W/D/L（描述性）</h2><p class="help">只含规则终局，cap 单列剔除。该端点未按稀有胜负设计功效，不能产生 held-out 棋力、等效或晋级主张。</p><table><thead><tr><th>候选</th><th>支持</th><th>胜</th><th>和</th><th>负</th><th>cap</th></tr></thead><tbody>${[[a,'v3'],[b,'v4']].map(([x,label])=>{const w=x.eventual_rules_wdl;return `<tr><td>${label}</td><td>${w.support}</td><td>${w.wins}</td><td>${w.draws}</td><td>${w.losses}</td><td>${w.safety_cap_excluded}</td></tr>`}).join('')}</tbody></table></div></div>
 <div class="panel"><h2>指标帮助与身份边界</h2><details open><summary>这些数能回答什么？</summary><p class="help">只能回答两个命名 final route 在这 39 个固定、项目已可见、起点处对两候选数据库均无 D4 命中的阶段历史上，过程指标是否复现。存活率方向本身不表示棋力；W/D/L 是次要描述；差异不能归因 target refresh。</p></details><details><summary>安全吃子与完整排序指标在哪里？</summary><p class="help">它们必须从完整逐手账本做身份绑定的零新对局复算，并显示各自机会分母与 query coverage。在该复算产物存在前，网页不会从普通吃子率或粗 W/D/L 猜测结果。</p></details><code>plan ${esc(payload.identities.plan_identity)} · spec ${esc(payload.identities.spec_identity)} · corpus ${esc(payload.identities.corpus_identity)} · source ${esc(payload.identities.implementation_commit)}</code></div>`}

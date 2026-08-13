@@ -480,6 +480,7 @@ def test_web_recomputes_partial_ledger_and_start_support(tmp_path, spec) -> None
     assert payload["report"]["paired"]["matched_colour_units_complete"] == 1
     assert payload["report"]["paired"]["start_units_complete"] == 0
     assert payload["precision"]["fixed_width_budgets"] == []
+    assert payload["mechanism"] is None
     assert payload["identities"]["corpus_identity"] == _corpus()[
         "corpus_identity"
     ]
@@ -489,4 +490,70 @@ def test_web_rejects_a_tampered_spec_identity(tmp_path, spec) -> None:
     tampered = {**spec, "diagnostic_id": "tampered"}
     (tmp_path / "spec.json").write_bytes(canonical_json_bytes(tampered) + b"\n")
     with pytest.raises(ValueError, match="spec identity differs"):
+        web.build_payload(tmp_path)
+
+
+def test_web_reads_only_an_identity_bound_zero_game_mechanism_report(
+    tmp_path,
+    spec,
+    monkeypatch,
+) -> None:
+    (tmp_path / "spec.json").write_bytes(canonical_json_bytes(spec) + b"\n")
+    ledger = tmp_path / "games.jsonl"
+    ledger.write_bytes(b"fixed-ledger\n")
+    source_result = "r" * 64
+    primary = {
+        "support": 39,
+        "mean": 0.0,
+        "sample_standard_deviation": 0.0,
+        "standard_error": 0.0,
+        "interval": [0.0, 0.0],
+        "half_width": 0.0,
+        "distribution": {"0.0": 39},
+    }
+    monkeypatch.setattr(
+        web,
+        "load_game_ledger",
+        lambda _spec, _ledger: ([], None),
+    )
+    monkeypatch.setattr(
+        web,
+        "summarize_records",
+        lambda _spec, _records, _tail: {
+            "completed_games": 156,
+            "result_identity": source_result,
+            "paired": {
+                "primary_start_clustered_108_ply_survival_v4_minus_v3": primary,
+            },
+        },
+    )
+    body = {
+        "schema_version": web.MECHANISM_SCHEMA,
+        "source": {
+            "diagnostic_id": spec["diagnostic_id"],
+            "spec_identity": spec["spec_identity"],
+            "ledger_sha256": hashlib.sha256(b"fixed-ledger\n").hexdigest(),
+            "result_identity": source_result,
+            "games": 156,
+            "new_games": 0,
+        },
+        "by_candidate": {},
+        "paired": {},
+    }
+    mechanism = {**body, "result_identity": canonical_sha256(body)}
+    (tmp_path / "mechanism-report.json").write_bytes(
+        canonical_json_bytes(mechanism) + b"\n"
+    )
+    payload = web.build_payload(tmp_path)
+    assert payload["mechanism"] == mechanism
+
+    mechanism["source"]["new_games"] = 1
+    changed_body = {
+        key: value for key, value in mechanism.items() if key != "result_identity"
+    }
+    mechanism["result_identity"] = canonical_sha256(changed_body)
+    (tmp_path / "mechanism-report.json").write_bytes(
+        canonical_json_bytes(mechanism) + b"\n"
+    )
+    with pytest.raises(ValueError, match="source binding differs"):
         web.build_payload(tmp_path)
