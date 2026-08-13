@@ -1,12 +1,13 @@
 # Retained-v3/v4 phase-process generalization v1
 
-Status: `draft_source_ready_runner_plan_readiness_and_authority_absent`
+Status: `draft_source_inputs_and_evaluator_core_ready_runner_plan_readiness_and_authority_absent`
 
 This is the recommended successor design after the completed reused-corpus
-passivity diagnostic. It authorizes no evaluation game, candidate load,
-training, update, database or checkpoint write, promotion, publication or
-release. The machine-readable plan is intentionally absent until the runtime
-can execute this contract exactly.
+passivity diagnostic. It authorizes no evaluation game, policy decision,
+training, update, database or checkpoint mutation, promotion, publication or
+release. Candidate artefacts have now been opened only to verify successor-
+owned byte-exact snapshots. The machine-readable plan is intentionally absent
+until the runtime can execute this contract exactly.
 
 ## Objective and claim boundary
 
@@ -71,6 +72,22 @@ development corpus's start-level standard deviation is reused. That is a
 planning input, not a promised precision result and not permission to add
 starts after launch.
 
+## Successor-owned input snapshots
+
+The ignored input root is
+`learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-phase-process-generalization-v1/inputs`.
+It was populated once from the completed diagnostic inputs, marked read-only,
+and audited without selecting a move. Snapshot identity is
+`b35ecc061e53a35e227c69ff886a7c6534e707bd124abdbe13acbbf9647f48ac`;
+the canonical manifest file SHA-256 is
+`cda9456e0234a9532ddfb1b90e3a78bb6a35ef788c0eddfca607e9f33cb1942a`.
+
+The v3 and v4 route identities remain respectively `b6d7ecf6...` and
+`817d2e36...`; their ordered file-list identities are `97c6413a...` and
+`f701206d...`. The sidecar-free SpecialistDB main-file SHA-256 values remain
+`82d7fbcd...` and `3d69d1ac...`. Runtime planning must bind only these
+successor paths, not the completed plan-`035c68f8` paths.
+
 ## Secondary evidence
 
 For every candidate and phase, report with denominators:
@@ -106,15 +123,17 @@ incomplete caps are never converted into draws.
 
 ## Remaining freeze gates
 
-1. Create successor-owned, sidecar-free, read-only copies of both exact route
-   bundles and both candidate SpecialistDB snapshots; bind their byte
-   identities without changing the completed diagnostic namespace.
-2. Implement variable-history replay, the relative 108-ply horizon,
-   start-clustered reporting and the required web explanations.
-3. Add focused schedule, ledger, report, exact-resume, strict-prefix and web
-   tests; run the mandatory Malom/DB/provenance gate because both route
-   databases are in scope.
-4. Freeze one machine-readable plan at a clean implementation commit and run
-   final source readiness against fresh ignored output paths.
+1. Completed: create and byte-audit successor-owned, sidecar-free, read-only
+   copies of both exact route bundles and SpecialistDB snapshots without
+   changing the completed diagnostic namespace.
+2. Completed at source commit `f8070d1`: implement variable-history replay,
+   the relative 108-ply horizon, start-clustered reporting, live partial
+   recomputation and the required web explanations.
+3. Implement the fail-closed runner, exact missing-suffix resume and the
+   identity-bound zero-game safe-capture/full-order follow-up over the new
+   ledger. Add focused runner, authorization and strict-history gates.
+4. Run all focused checks plus the mandatory Malom/DB/provenance gate, freeze
+   one machine-readable plan at a clean published implementation commit, and
+   produce final source readiness against fresh ignored runtime targets.
 5. Obtain one explicit product authorization bound to that exact plan and
    readiness identity before opening the first game.

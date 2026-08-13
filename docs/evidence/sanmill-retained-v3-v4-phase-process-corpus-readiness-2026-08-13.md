@@ -1,14 +1,15 @@
 # Retained-v3/v4 phase-process corpus readiness — 13 August 2026
 
-Status: `source_only_corpus_frozen_no_evaluation_authority`
+Status: `source_corpus_inputs_and_evaluator_core_ready_no_evaluation_authority`
 
 Technical-readiness verdict: `not_ready`
 
-The source corpus is ready, but the successor evaluator, successor-owned route
-snapshots, immutable machine-readable plan, final readiness identity and
-product authorization do not yet exist. No candidate was loaded and no game,
-search, training step, optimizer update, database write or checkpoint write
-occurred in this audit.
+The source corpus, successor-owned inputs and evaluator core are ready, but the
+fail-closed runner, immutable machine-readable plan, final readiness identity
+and product authorization do not yet exist. Route bundles were opened only
+for identity verification after corpus membership was frozen. No policy move,
+game, search, training step, optimizer update, database mutation or checkpoint
+mutation occurred in this preparation.
 
 ## Observed facts
 
@@ -36,7 +37,9 @@ The remaining 39 starts are non-terminal under the pinned current referee.
 | retained-v3 SpecialistDB exposure | 0/39 D4 matches | zero | pass |
 | retained-v4 SpecialistDB exposure | 0/39 D4 matches | zero | pass |
 | Candidate database side effects | both sidecar-free snapshots remained sidecar-free | read-only | pass |
-| Evaluation runner | fixed-12-ply/absolute-ply-120 implementation only | variable history plus relative window support | absent |
+| Evaluator core | variable replay, relative 108-ply snapshot, canonical ledger, start clustering and live web implemented at `f8070d1` | exact source support | pass |
+| Successor inputs | snapshot identity `b35ecc06`; both bundles identity-equal; both DBs byte-equal, read-only and sidecar-free | no completed-plan runtime path reuse | pass |
+| Fail-closed runner | no successor CLI/controller yet | preflight, exact suffix resume and launch gates | absent |
 | Launch authority | none | plan-bound product authorization | absent |
 
 The accepted corpus has 18 placement, 14 movement and seven flying starts;
@@ -55,6 +58,9 @@ properties of a deterministic source pool, not a population sample.
 | Strict replay audit identity | `6f65dc3dfa52fd6c7aaae23698e57df51239729105bd6ca79f9dd26d7815d349` |
 | Exposure audit identity | `f9b2ebb1fdec2dfdfa451aba90c340b8f59de2d2fd456869e09604bd268b0b2b` |
 | Completed diagnostic plan | `035c68f80b94dddb8d139d56c38c86c4fde29fa13de5e19db1f4e1fe484c318e` |
+| Successor input snapshot identity | `b35ecc061e53a35e227c69ff886a7c6534e707bd124abdbe13acbbf9647f48ac` |
+| Successor input manifest SHA-256 | `cda9456e0234a9532ddfb1b90e3a78bb6a35ef788c0eddfca607e9f33cb1942a` |
+| Evaluator core commit | `f8070d125844635bde8095079cbe3ea5d36e99dd` |
 
 The tracked artifact is
 [the phase-process corpus](../experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json).
@@ -113,14 +119,15 @@ start, matching the prior 12-to-120 observation window.
 
 ## Next validation
 
-Implement a successor runner that accepts variable-length strict histories and
-uses a 108-post-start-ply primary window. It must cluster both candidate
-colours by start, retain phase and start-clock strata, continue to strict rules
-terminal or an invalid safety cap, and expose every new metric and denominator
-with claim help on the web page. Create successor-owned read-only route and
-database snapshots rather than reusing plan-`035c68f8` paths. Only after the
-focused tests, prefix replay gate, immutable plan and readiness identity pass
-may the product owner be asked once to authorize the bounded 156-game run.
+Implement the successor fail-closed controller around the committed evaluator
+core. It must bind the successor input manifest, audit every variable strict
+history without loading a policy, forbid skipped tests at launch, and allow
+only an explicitly authorized same-spec missing-suffix resume after host
+interruption. Complete-result safe-capture and full-order reports must be
+identity-bound zero-game reanalyses of the new ledger. Only after focused
+tests, the mandatory provenance gate, immutable plan and readiness identity
+pass may the product owner be asked once to authorize the bounded 156-game
+run.
 
 The reviewed source-only command was:
 

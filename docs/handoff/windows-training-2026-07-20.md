@@ -212,17 +212,20 @@ colours inside each of 64 independent starts: v4-minus-v3 was `+1.171875pp`,
 with interval `[-0.8492pp, +3.1929pp]`. Preserve the
 [completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
 
-Source-only preparation for the recommended process-generalization successor
-is now complete. The frozen phase-process corpus has identity `3be3d76c`, 39
+Source and evaluator-core preparation for the recommended process-
+generalization successor is now complete. The frozen phase-process corpus has
+identity `3be3d76c`, 39
 starts (18 placement / 14 movement / 7 flying), zero exact or `ring16` overlap
 with the previous 64 openings, and zero D4 start-state hits in HumanDB or
 either candidate SpecialistDB. Two strict replay passes agreed; source entries
 29, 31 and 32 were excluded because the current referee reaches threefold at
-ply 142 before those requested states. No candidate was loaded and no game was
-played. The comparable primary window is 108 post-start logical plies because
-the frozen histories begin at plies 7–178. The draft workload is 156 games and
-two active hours, but the runner, successor-owned route snapshots, machine
-plan, readiness and authorization remain absent. Preserve the
+ply 142 before those requested states. No policy move or game was played. The
+comparable primary window is 108 post-start logical plies because the frozen
+histories begin at plies 7–178. The evaluator core and live web were committed
+at `f8070d1`. Successor-owned, read-only route and sidecar-free DB copies have
+snapshot identity `b35ecc06`. The draft workload is 156 games and two active
+hours, but the fail-closed runner, machine plan, readiness and authorization
+remain absent. Preserve the
 [source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md).
 
 ### Remaining work for the next operator
@@ -2673,13 +2676,14 @@ the current successor in this order:
     ledger and reports. Do not rerun, extend or relabel them held out. A
     successor requires a new objective, corpus, immutable plan, resource
     envelope, readiness and authority.
-35. Preserve the source-only retained-v3/v4 phase-process corpus under
+35. Preserve the retained-v3/v4 phase-process corpus under
     identity `3be3d76c`, records identity `8fdf3adf`, strict replay audit
     `6f65dc3d` and exposure audit `f9b2ebb1`. It has 39 accepted starts and no
     candidate result. The draft successor uses a relative 108-ply window and
-    156 games, but no runner, machine-readable plan, readiness or launch grant
-    exists. Do not reuse plan-`035c68f8` route/database paths in the successor;
-    create identity-equal successor-owned read-only snapshots first.
+    156 games. Its evaluator core/live web is at `f8070d1`, and identity-equal
+    successor-owned inputs are frozen under snapshot identity `b35ecc06`.
+    No fail-closed runner, machine-readable plan, readiness or launch grant
+    exists. Do not reuse or modify the plan-`035c68f8` route/database paths.
 
 The previously executed isolated smoke command was:
 
