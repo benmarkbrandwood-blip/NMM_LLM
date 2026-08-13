@@ -128,6 +128,25 @@ Together, the audits rule out a large missed-immediate-safe-capture mechanism
 on this corpus and leave complete-order selection inconclusive. They do not
 identify the cause of longer v4 survival.
 
+## Start-clustered horizon precision
+
+The predeclared horizon interval used 128 start/colour units. For planning the
+new-corpus process confirmation, the two colour-specific v4-minus-v3 survival
+differences were also averaged inside each of the 64 independent starts.
+
+The start-level differences were `-0.5` six times, `0` 43 times, `+0.5`
+14 times and `+1` once. Their mean was still `+7.8125pp`; sample standard
+deviation was `29.8392pp`; the 95% engineering half-width was `7.3106pp`, for
+interval `[+0.5019pp, +15.1231pp]`. This start-clustered result remains a
+fixed reused-development-corpus description, not population inference.
+
+Using that observed standard deviation only as a planning input gives 35
+starts / 140 games for an estimated 10pp half-width, 61 / 244 for 7.5pp, and
+137 / 548 for 5pp. The subsequently audited 39-start phase corpus therefore
+has an estimated 9.3651pp half-width at 156 games. Its actual variance may be
+larger, so the successor must permit `inconclusive_precision` and must not add
+starts after seeing results.
+
 ## Start-clustered score precision
 
 The original report's paired engineering intervals treat 128 start/colour
@@ -180,9 +199,11 @@ or reinterpret longer survival as strength.
 
 The next owner decision is the claim to buy:
 
-1. For **process generalization**, freeze a new exposure-audited opening
-   corpus and keep ply-120 survival, no-capture clock state, repetition state
-   and termination reason as process endpoints. W/D/L remains descriptive.
+1. For **process generalization**, the source-only 39-start phase corpus is
+   now frozen under identity `3be3d76c...`. Because its histories begin at
+   logical plies 7–178, use survival through 108 additional plies rather than
+   an absolute ply-120 snapshot. The runner, machine plan, readiness and
+   authority remain absent. W/D/L remains descriptive.
 2. For **playing-strength relation**, use the start-clustered paired score as
    the primary endpoint, select a practically meaningful fixed-width or
    effect threshold first, and then bind the required starts, four games per

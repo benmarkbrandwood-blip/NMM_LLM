@@ -212,6 +212,19 @@ colours inside each of 64 independent starts: v4-minus-v3 was `+1.171875pp`,
 with interval `[-0.8492pp, +3.1929pp]`. Preserve the
 [completion evidence](../evidence/sanmill-retained-v3-v4-passivity-diagnostic-v1-result-2026-08-13.md).
 
+Source-only preparation for the recommended process-generalization successor
+is now complete. The frozen phase-process corpus has identity `3be3d76c`, 39
+starts (18 placement / 14 movement / 7 flying), zero exact or `ring16` overlap
+with the previous 64 openings, and zero D4 start-state hits in HumanDB or
+either candidate SpecialistDB. Two strict replay passes agreed; source entries
+29, 31 and 32 were excluded because the current referee reaches threefold at
+ply 142 before those requested states. No candidate was loaded and no game was
+played. The comparable primary window is 108 post-start logical plies because
+the frozen histories begin at plies 7–178. The draft workload is 156 games and
+two active hours, but the runner, successor-owned route snapshots, machine
+plan, readiness and authorization remain absent. Preserve the
+[source readiness evidence](../evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -239,14 +252,14 @@ with interval `[-0.8492pp, +3.1929pp]`. Preserve the
    final checkpoint, database, controller ledger and consumed authorization.
    Do not rerun, resume, extend, overwrite, promote or publish it.
 9. Preserve the completed v3/v4 development diagnostic, its 256-row ledger,
-   reports, web evidence and consumed authorization. The next work remains at
-   `needs_decision`: choose one of new-corpus process generalization,
-   start-clustered held-out paired score, or a materially larger causal
-   training design. For score, the independent unit is one start after
-   averaging both colours; the observed 64-start half-width is `2.0211pp`.
-   Freeze a product-relevant width, effect or equivalence margin before the
-   budget. Do not launch the existing early mature-fork checkpoints as a
-   passivity shortcut. Preserve the updated
+   reports, web evidence and consumed authorization. Option A source
+   preparation is now frozen as the 39-start phase-process corpus under
+   identity `3be3d76c`; no successor evaluation is authorized. Implement the
+   variable-history, relative-108-ply runner and successor-owned route
+   snapshots before freezing a machine plan. For score, the independent unit
+   remains one start after averaging both colours; the observed 64-start
+   half-width is `2.0211pp`. Do not launch the existing early mature-fork
+   checkpoints as a passivity shortcut. Preserve the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
    No additional evaluation or training is authorized.
 
@@ -2660,6 +2673,13 @@ the current successor in this order:
     ledger and reports. Do not rerun, extend or relabel them held out. A
     successor requires a new objective, corpus, immutable plan, resource
     envelope, readiness and authority.
+35. Preserve the source-only retained-v3/v4 phase-process corpus under
+    identity `3be3d76c`, records identity `8fdf3adf`, strict replay audit
+    `6f65dc3d` and exposure audit `f9b2ebb1`. It has 39 accepted starts and no
+    candidate result. The draft successor uses a relative 108-ply window and
+    156 games, but no runner, machine-readable plan, readiness or launch grant
+    exists. Do not reuse plan-`035c68f8` route/database paths in the successor;
+    create identity-equal successor-owned read-only snapshots first.
 
 The previously executed isolated smoke command was:
 

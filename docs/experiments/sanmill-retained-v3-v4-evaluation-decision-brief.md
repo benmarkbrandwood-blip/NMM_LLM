@@ -1,6 +1,6 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `needs_decision_after_completed_development_diagnostic`
+Status: `process_generalization_source_ready_runner_and_authority_absent`
 
 This is the current planning record after completion of the 256-game
 development diagnostic and two zero-game mechanism audits. It authorizes no
@@ -98,6 +98,26 @@ Power estimates aimed at that same observed effect, approximately 389 starts
 / 1,556 games at 80% and 521 starts / 2,084 games at 90%, are illustrative,
 post-hoc values and must not choose the contract.
 
+### Source-only preparation for Option A
+
+The recommended process-generalization route now has a frozen, candidate-blind
+source corpus. It retains all 39 current-referee-valid histories remaining
+after excluding the 12-start phase-development corpus and three histories that
+strictly terminate before their requested source state. Its identity is
+`3be3d76c34511e0f78d0f5bfe4a338c415c393306a955538bb85823e9d62c080`.
+
+All 39 starts are disjoint from the completed diagnostic's 64 openings by
+exact FEN and `ring16`, and have zero D4 hits in HumanDB and both candidate-
+owned SpecialistDBs. The source has 18 placement, 14 movement and seven flying
+starts. No candidate was loaded and no game was played.
+
+The start-clustered horizon differences in the existing ledger have standard
+deviation `29.8392pp`. A 39-start / 156-game successor therefore has an
+estimated 95% half-width of `9.3651pp`, below the prior 10pp planning target,
+but the new corpus can still fail the actual precision gate. Because the
+histories begin at different absolute plies, the successor endpoint must be
+survival through 108 additional post-start plies, not absolute ply 120.
+
 ## Hypotheses
 
 1. The named no-refresh-v4 route's longer survival may generalize to a new
@@ -139,12 +159,14 @@ post-hoc values and must not choose the contract.
 Freeze exactly one claim before choosing games. Do not combine these endpoints
 after observing a new result.
 
-### Option A: new-corpus process generalization
+### Option A: new-corpus process generalization — source selected
 
 - Keep the two named frozen final routes and strict 500,000-node Sanmill
   protocol.
-- Use a newly exposure-audited opening corpus disjoint from development.
-- Make start-clustered ply-120 survival the primary process estimand; retain
+- Use the frozen 39-start phase corpus, disjoint from the completed diagnostic
+  and the two candidate database routes at the audited D4 start-state level.
+- Make start-clustered 108-post-start-ply survival the primary process
+  estimand; retain
   no-capture count, repetition count, termination reason and complete-order
   opportunity exposure as secondary endpoints.
 - Continue to strict rule terminal or an explicitly invalid safety cap.
@@ -180,11 +202,11 @@ after observing a new result.
 | --- | --- |
 | Completed development result and audits | verified and identity-bound |
 | Independent analysis unit | one start, averaging both colours |
-| Objective: process, strength or causality | product decision required |
-| Primary estimand and material threshold | not frozen for a successor |
-| New corpus membership and exposure audit | absent |
-| Maximum game/time/node envelope | absent |
+| Objective: process, strength or causality | Option A continued for technical preparation; no launch grant |
+| Primary estimand and material threshold | draft: 108-post-start survival; 10pp maximum half-width |
+| New corpus membership and exposure audit | 39 starts frozen; identity `3be3d76c...` |
+| Maximum game/time/node envelope | draft: 156 games, 2 active hours, 59.904B summed node ceiling |
 | Successor machine-readable plan and readiness | absent |
 | Separate launch or training authority | absent |
 
-Verdict: `needs_decision`.
+Verdict: `not_ready`.
