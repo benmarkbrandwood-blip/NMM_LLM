@@ -96,3 +96,25 @@ def test_dashboard_orders_outcome_bars_as_win_draw_loss() -> None:
         "{win:COLORS.blue,draw:COLORS.yellow,loss:COLORS.magenta},"
         "OUTCOME_BAR_ORDER);"
     ) in monitor.HTML
+
+
+def test_learning_rate_series_preserves_actual_step_boundary() -> None:
+    rows = [
+        {"game": 1, "lr": 1e-4},
+        {"game": 50, "lr": 1e-4},
+        {"game": 51, "lr": 5e-5},
+        {"game": 5000, "lr": 5e-5},
+    ]
+
+    assert monitor._learning_rate_step_rows(rows) == [
+        {"game": 1, "lr_x1e4": 1.0},
+        {"game": 51, "lr_x1e4": 0.5},
+        {"game": 5000, "lr_x1e4": 0.5},
+    ]
+
+
+def test_dashboard_renders_learning_rate_as_actual_steps() -> None:
+    assert 'id="lrChartNote"' in monitor.HTML
+    assert "lineChart('lrChart',data.series.learningRate||[]" in monitor.HTML
+    assert "stepped:true" in monitor.HTML
+    assert "learningRateNote(data.series.learningRate||[])" in monitor.HTML

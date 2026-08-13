@@ -218,6 +218,31 @@ def _update_series_row(row: dict[str, Any]) -> dict[str, Any]:
     return {key: row.get(key) for key in keys}
 
 
+def _learning_rate_step_rows(
+    rows: list[dict[str, Any]],
+) -> list[dict[str, float | int]]:
+    """Keep exact LR change boundaries plus the final observed endpoint."""
+    result: list[dict[str, float | int]] = []
+    last_lr: float | None = None
+    final_point: dict[str, float | int] | None = None
+    for row in rows:
+        game = _integer(row.get("game"))
+        lr = _number(row.get("lr"))
+        if game is None or lr is None:
+            continue
+        point: dict[str, float | int] = {
+            "game": game,
+            "lr_x1e4": lr * 10_000.0,
+        }
+        if last_lr is None or lr != last_lr:
+            result.append(point)
+        last_lr = lr
+        final_point = point
+    if final_point is not None and result[-1]["game"] != final_point["game"]:
+        result.append(final_point)
+    return result
+
+
 def _chart_game_rows(
     rows: list[dict[str, Any]], *, rolling_win: int | None
 ) -> list[dict[str, Any]]:
@@ -838,6 +863,7 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
             warnings_superseded = stderr_timestamp <= last_event_timestamp
     rolling_win = _rolling_window_from_manifests(segment_dirs)
     chart_games = _chart_game_rows(games, rolling_win=rolling_win)
+    learning_rate_steps = _learning_rate_step_rows(games)
     latest_chart = chart_games[-1] if chart_games else {}
     sampled_games = _downsample(chart_games)
     sampled_updates = _downsample(updates)
@@ -985,6 +1011,7 @@ def collect_status(control_dir: Path) -> dict[str, Any]:
         "series": {
             "games": [_series_row(row) for row in sampled_games],
             "updates": [_update_series_row(row) for row in sampled_updates],
+            "learningRate": learning_rate_steps,
             "terminations50": _termination_series(games),
         },
     }
@@ -1137,7 +1164,7 @@ HTML = r"""<!doctype html>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelExploration">温度与选择概率</h2><button type="button" class="help-button" data-help-key="exploration">?</button></div><canvas id="exploreChart"></canvas></div>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelRewards">奖励信号（50 局平滑）</h2><button type="button" class="help-button" data-help-key="rewards">?</button></div><canvas id="rewardChart"></canvas></div>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelLosses">Policy / Value loss</h2><button type="button" class="help-button" data-help-key="losses">?</button></div><canvas id="lossChart"></canvas></div>
-    <div class="panel"><div class="panel-head"><h2 data-i18n="panelLr">Learning rate × 10⁴</h2><button type="button" class="help-button" data-help-key="learningRate">?</button></div><canvas id="lrChart"></canvas></div>
+    <div class="panel"><div class="panel-head"><h2 data-i18n="panelLr">Learning rate × 10⁴（实际值·阶梯）</h2><button type="button" class="help-button" data-help-key="learningRate">?</button></div><div id="lrChartNote" class="table-note">原始执行值；阶梯线不做平滑或线性插值。</div><canvas id="lrChart"></canvas></div>
     <div class="panel wide"><div class="panel-head"><h2 data-i18n="panelTerminationTrend">终止原因构成（滚动 50 局）</h2><button type="button" class="help-button" data-help-key="terminationTrend">?</button></div><canvas id="terminationChart"></canvas></div>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelTerminations">终止原因</h2><button type="button" class="help-button" data-help-key="terminations">?</button></div><div id="terminationBars" class="bars"></div></div>
     <div class="panel"><div class="panel-head"><h2 data-i18n="panelGpu">GPU 与显存占用率</h2><button type="button" class="help-button" data-help-key="gpuTrend">?</button></div><canvas id="gpuChart"></canvas></div>
@@ -1168,7 +1195,7 @@ const I18N = {
     cardHealth:'训练健康度', cardGames:'观测局数', cardSegments:'分段', cardActiveTime:'活跃运行时间', cardDifficulty:'节点级别',
     cardFrozenRecent:'冻结臂 · 最近 200 来源局', cardSanmillRecent:'Sanmill · 最近 200 来源局', cardTrainingWindow:'混合训练窗口', cardRuleDraws:'规则和棋', cardMaxPly:'max-ply 截断', cardLatestUpdate:'最近更新', cardGpu:'GPU', cardComponents:'实验开关', panelWinTrend:'按对手来源的 200 局得分率趋势',
     panelTop1:'策略、启发式与 Malom Top-1（50 局平滑）', panelExploration:'温度与选择概率',
-    panelLosses:'Policy / Value loss', panelEntropy:'Entropy（50 局平滑）', panelRewards:'奖励信号（50 局平滑）', panelLr:'Learning rate × 10⁴', panelDifficultyPly:'对局长度（50 局平均）', panelGpu:'GPU 与显存占用率', panelTerminationTrend:'终止原因构成（滚动 50 局）', panelTerminations:'终止原因',
+    panelLosses:'Policy / Value loss', panelEntropy:'Entropy（50 局平滑）', panelRewards:'奖励信号（50 局平滑）', panelLr:'Learning rate × 10⁴（实际值·阶梯）', lrChartNote:'原始执行值；阶梯线不做平滑或线性插值。', panelDifficultyPly:'对局长度（50 局平均）', panelGpu:'GPU 与显存占用率', panelTerminationTrend:'终止原因构成（滚动 50 局）', panelTerminations:'终止原因',
     panelOpponentOutcomes:'按对手来源的胜 / 和 / 负', opponentOutcomeNote:'规则和棋与 max-ply 截断分别计数；得分率仅为训练诊断。', sanmillByLevel:'Sanmill 按节点档位', nodeTimingNote:'参考搜索耗时为本机持久进程的校准中位数 / P90，仅包含 Sanmill 搜索。',
     panelOutcomes:'全部胜 / 和 / 负', panelOpponents:'对手来源', panelSegmentEvidence:'分段证据',
     panelWarnings:'警告（只读）', tableSegment:'分段', tableFirstGame:'首局', tableLastGame:'末局',
@@ -1181,7 +1208,7 @@ const I18N = {
     healthStates:{healthy:'正常',complete:'完整完成',warning:'需注意',stop:'停止信号'},
     states:{running:'运行中',between_segments:'分段交接中',completed:'已完成',complete:'已完成',stopped:'已停止',failed:'失败',unknown:'未知'},
     chart:{win200:'200 局胜率',draw200:'200 局和棋率',best:'最佳',frozenScore200:'冻结模型得分率',sanmillScore200:'Sanmill 得分率',policy:'策略',heuristic:'启发式',malom:'Malom',
-      temperature:'温度',chosenProbability:'选中概率',entropy:'Entropy',policyLoss:'Policy loss',valueLoss:'Value loss',totalReward:'总奖励',heuristicReward:'启发式奖励',retroReward:'Retro 奖励',learningRate:'LR × 10⁴',difficulty:'难度',ply:'50 局平均 ply',gpuUtil:'GPU 利用率',vramUtil:'显存占用率',malomKnown:'Malom 标签覆盖率'},
+      temperature:'温度',chosenProbability:'选中概率',entropy:'Entropy',policyLoss:'Policy loss',valueLoss:'Value loss',totalReward:'总奖励',heuristicReward:'启发式奖励',retroReward:'Retro 奖励',learningRate:'实际 LR × 10⁴',difficulty:'难度',ply:'50 局平均 ply',gpuUtil:'GPU 利用率',vramUtil:'显存占用率',malomKnown:'Malom 标签覆盖率'},
     values:{win:'胜',draw:'和',loss:'负','fewer-than-three':'少于三子','no-legal-move':'无合法着',
       repetition:'重复局面','threefold-repetition':'三次重复','draw_repetition':'重复和棋','max-ply':'达到 ply 上限','max-ply-truncation':'ply 上限截断',
       max_ply:'达到 ply 上限',DRAW_LONG:'长局截断','no-progress':'无进展和棋','vs_heuristic':'启发式对手',
@@ -1194,7 +1221,7 @@ const I18N = {
     cardHealth:'Training health', cardGames:'Observed games', cardSegments:'Segments', cardActiveTime:'Active time', cardDifficulty:'Node level',
     cardFrozenRecent:'Frozen arm · latest 200 source games', cardSanmillRecent:'Sanmill · latest 200 source games', cardTrainingWindow:'Mixed training window', cardRuleDraws:'Rules draws', cardMaxPly:'max-ply truncations', cardLatestUpdate:'Latest update', cardGpu:'GPU', cardComponents:'Experiment switches', panelWinTrend:'200-game score-rate trend by opponent source',
     panelTop1:'Policy, heuristic, and Malom Top-1 (50-game smoothed)', panelExploration:'Temperature and chosen probability',
-    panelLosses:'Policy / Value loss', panelEntropy:'Entropy (50-game smoothed)', panelRewards:'Reward signals (50-game smoothed)', panelLr:'Learning rate × 10⁴', panelDifficultyPly:'Game length (50-game mean)', panelGpu:'GPU and VRAM utilization', panelTerminationTrend:'Termination mix (rolling 50 games)', panelTerminations:'Termination reasons',
+    panelLosses:'Policy / Value loss', panelEntropy:'Entropy (50-game smoothed)', panelRewards:'Reward signals (50-game smoothed)', panelLr:'Learning rate × 10⁴ (actual steps)', lrChartNote:'Actual executed values; step line with no smoothing or linear interpolation.', panelDifficultyPly:'Game length (50-game mean)', panelGpu:'GPU and VRAM utilization', panelTerminationTrend:'Termination mix (rolling 50 games)', panelTerminations:'Termination reasons',
     panelOpponentOutcomes:'Wins / draws / losses by opponent source', opponentOutcomeNote:'Rules draws and max-ply truncations are counted separately; score rate is a training diagnostic only.', sanmillByLevel:'Sanmill by node level', nodeTimingNote:'Reference search time is this host’s warm-process calibration median / P90 and includes Sanmill search only.',
     panelOutcomes:'All wins / draws / losses', panelOpponents:'Opponent mix', panelSegmentEvidence:'Segment evidence',
     panelWarnings:'Warnings (read only)', tableSegment:'Segment', tableFirstGame:'First game', tableLastGame:'Last game',
@@ -1207,7 +1234,7 @@ const I18N = {
     healthStates:{healthy:'healthy',complete:'complete',warning:'warning',stop:'stop signal'},
     states:{running:'running',between_segments:'between segments',completed:'completed',complete:'completed',stopped:'stopped',failed:'failed',unknown:'unknown'},
     chart:{win200:'win 200',draw200:'draw 200',best:'best',frozenScore200:'frozen-model score',sanmillScore200:'Sanmill score',policy:'policy',heuristic:'heuristic',malom:'Malom',temperature:'temperature',
-      chosenProbability:'chosen probability',entropy:'entropy',policyLoss:'policy loss',valueLoss:'value loss',totalReward:'total reward',heuristicReward:'heuristic reward',retroReward:'retro reward',learningRate:'LR × 10⁴',difficulty:'difficulty',ply:'50-game mean ply',gpuUtil:'GPU utilization',vramUtil:'VRAM utilization',malomKnown:'Malom label coverage'},
+      chosenProbability:'chosen probability',entropy:'entropy',policyLoss:'policy loss',valueLoss:'value loss',totalReward:'total reward',heuristicReward:'heuristic reward',retroReward:'retro reward',learningRate:'actual LR × 10⁴',difficulty:'difficulty',ply:'50-game mean ply',gpuUtil:'GPU utilization',vramUtil:'VRAM utilization',malomKnown:'Malom label coverage'},
     values:{win:'win',draw:'draw',loss:'loss','fewer-than-three':'fewer than three','no-legal-move':'no legal move',
       repetition:'repetition','threefold-repetition':'threefold repetition','draw_repetition':'repetition draw','max-ply':'ply limit','max-ply-truncation':'ply-limit truncation',
       max_ply:'ply limit',DRAW_LONG:'long-game truncation','no-progress':'no-progress draw','vs_heuristic':'heuristic opponent',
@@ -1282,8 +1309,8 @@ const HELP = {
     en:{title:'Reward signals',purpose:'Shows 50-game moving averages for total, heuristic, and retro rewards to reveal whether outcome propagation and shaping behave coherently.',read:'All three lines use full equal-weight 50-game means and are hidden before game 50. Total is the combined training reward, heuristic is a small shaping term, and retro carries outcome feedback. Sentinel reward is omitted because Sentinel is disabled.',expected:'Noise is normal. Retro/total may improve with more wins, while heuristic reward should remain small and finite.',watch:'Non-finite reward, heuristic dominating total, retro contradicting outcomes, or unexplained resume-boundary shifts.'}
   },
   learningRate: {
-    zh:{title:'Learning rate',purpose:'显示训练器实际使用的学习率，纵轴为原值乘以 10⁴，便于观察很小的数。',read:'曲线使用完整 50 局等权平均，第 50 局前不绘制。例如图上的 0.5 代表实际 LR=0.00005。当前训练器可根据滚动表现把 LR 限制在基准值的一定比例。',expected:'可按既有适配规则分段变化，但 exact-resume 后应连续，不应无原因重置。',watch:'变为零、非有限、超出预期范围，或恰好在每个 250 局边界反复重置。'},
-    en:{title:'Learning rate',purpose:'Shows the optimizer learning rate multiplied by 10⁴ so small values remain readable.',read:'The line uses a full equal-weight 50-game mean and is hidden before game 50. A plotted value of 0.5 means an actual LR of 0.00005. The trainer may adapt LR within its bounded rule using rolling outcomes.',expected:'Bounded steps are possible, but exact resume should preserve continuity rather than reset it.',watch:'Zero, non-finite or out-of-range LR, or repeated resets exactly at every 250-game boundary.'}
+    zh:{title:'Learning rate',purpose:'显示训练器实际执行的学习率，纵轴为原值乘以 10⁴，便于观察很小的数。',read:'这是未经平滑的原始控制量。水平段表示学习率保持不变，垂直跳变表示从该局起启用新值；不会把离散降档画成连续衰减。例如图上的 0.5 代表实际 LR=0.00005。',expected:'可按冻结的适配规则离散变化，但 exact-resume 后应连续，不应在分段边界无原因重置。',watch:'变为零、非有限、超出预期范围，或恰好在每个 250 局边界反复重置。'},
+    en:{title:'Learning rate',purpose:'Shows the optimizer learning rate multiplied by 10⁴ so small values remain readable.',read:'This is the unsmoothed executed control value. Horizontal runs mean the rate was held; a vertical step marks the game where the new value took effect. Discrete changes are never drawn as gradual decay. A plotted value of 0.5 means an actual LR of 0.00005.',expected:'Bounded discrete steps are possible, but exact resume should remain continuous instead of resetting at segment boundaries.',watch:'Zero, non-finite or out-of-range LR, or repeated resets exactly at every 250-game boundary.'}
   },
   difficultyPly: {
     zh:{title:'对局长度',purpose:'显示完整 50 局窗口内的平均 rollout 逻辑 ply；第 50 局前不绘制。',read:'纵轴从 0 开始并按 10 ply 整数刻度显示。蓝色竖虚线是冻结计划中的节点升档边界，不是难度曲线或未来预测。',expected:'对局长度会随局面大幅波动，节点档位变化后可能出现分布改变。',watch:'大量对局粘在 120-ply 截断上限、分段边界无解释跳变，或所有长度突然相同。'},
@@ -1338,6 +1365,7 @@ const num = (v,d=2) => finiteNumber(v)===null ? '—' : finiteNumber(v).toFixed(
 const integer = v => finiteNumber(v)===null ? '—' : Math.round(finiteNumber(v)).toLocaleString(currentLanguage==='zh'?'zh-CN':'en-US');
 const valueLabel = key => I18N[currentLanguage].values[key] || String(key).replaceAll('_',' ');
 function nodeTimingLabel(nodeBudget){const timing=NODE_TIMING_MS[Math.round(Number(nodeBudget))];return timing?`${timing[0].toFixed(2)} / ${timing[1].toFixed(2)} ms`:'—';}
+function learningRateNote(rows){const points=rows||[],changes=points.slice(1).filter((point,index)=>finiteNumber(point.lr_x1e4)!==finiteNumber(points[index].lr_x1e4));if(!points.length)return t('noData');const start=points[0];if(!changes.length)return currentLanguage==='zh'?`原始执行值：第 ${integer(start.game)} 局起 ${num(start.lr_x1e4,2)}，此后未变化；无平滑。`:`Actual executed value: ${num(start.lr_x1e4,2)} from game ${integer(start.game)}, unchanged thereafter; unsmoothed.`;return currentLanguage==='zh'?`原始执行值：第 ${integer(start.game)} 局起 ${num(start.lr_x1e4,2)}；${changes.map(point=>`第 ${integer(point.game)} 局起 ${num(point.lr_x1e4,2)}`).join('；')}。阶梯线，无平滑。`:`Actual executed value: ${num(start.lr_x1e4,2)} from game ${integer(start.game)}; ${changes.map(point=>`${num(point.lr_x1e4,2)} from game ${integer(point.game)}`).join('; ')}. Step line; unsmoothed.`;}
 
 function applyStaticTranslations(){
   document.documentElement.lang=currentLanguage==='zh'?'zh-CN':'en';document.title=t('documentTitle');
@@ -1380,7 +1408,7 @@ function lineChart(id,rows,specs,fixedDomain=null,markers=[],tickStep=null,xDoma
   drawMarkers(c,markers,X,xmin,xmax,pad,h);
   c.fillText(integer(xmin),pad.l,h-7);const xmaxText=integer(xmax);c.fillText(xmaxText,w-pad.r-c.measureText(xmaxText).width,h-7);
   let lx=pad.l;for(const s of specs){c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();c.moveTo(lx,pad.t-15);c.lineTo(lx+11,pad.t-15);c.stroke();c.restore();c.fillStyle='#c8d5e6';c.fillText(s.label,lx+15,pad.t-12);lx+=c.measureText(s.label).width+37;
-    c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();let started=false;for(const r of rows){const x=finiteNumber(r.game),y=finiteNumber(r[s.key]);if(x===null||y===null){started=false;continue;}const px=X(x),py=Y(y);if(!started){c.moveTo(px,py);started=true;}else c.lineTo(px,py);}c.stroke();c.restore();}drawObservedBadge(c,w,pad);
+    c.save();c.strokeStyle=s.color;c.lineWidth=s.width||2;c.setLineDash(s.dash||[]);c.beginPath();let started=false,previousPy=null;for(const r of rows){const x=finiteNumber(r.game),y=finiteNumber(r[s.key]);if(x===null||y===null){started=false;previousPy=null;continue;}const px=X(x),py=Y(y);if(!started){c.moveTo(px,py);started=true;}else{if(s.stepped)c.lineTo(px,previousPy);c.lineTo(px,py);}previousPy=py;}c.stroke();c.restore();}drawObservedBadge(c,w,pad);
 }
 
 function stackedAreaChart(id,rows,specs,markers=[],xDomain=null){
@@ -1431,7 +1459,8 @@ function render(data){lastData=data;const s=data.state,l=data.latest,g=data.gpu|
   lineChart('entropyChart',data.series.games,[{key:'entropy_mean_smooth50',label:t('chart.entropy'),color:COLORS.blue,width:2.3}],null,markers,null,sharedGameDomain);
   lineChart('lossChart',data.series.updates,[{key:'policy_loss',label:t('chart.policyLoss'),color:COLORS.blue,width:2.2},{key:'value_loss',label:t('chart.valueLoss'),color:COLORS.magenta,dash:[8,5],width:2.2}],null,markers,null,sharedGameDomain);
   lineChart('rewardChart',data.series.games,[{key:'reward_total_mean_smooth50',label:t('chart.totalReward'),color:COLORS.blue,width:2.3},{key:'reward_heuristic_mean_smooth50',label:t('chart.heuristicReward'),color:COLORS.orange,dash:[8,5]},{key:'reward_retro_mean_smooth50',label:t('chart.retroReward'),color:COLORS.magenta,dash:[3,4]}],null,markers,null,sharedGameDomain);
-  lineChart('lrChart',data.series.games,[{key:'lr_x1e4',label:t('chart.learningRate'),color:COLORS.blue,width:2.3}],null,markers,null,sharedGameDomain);
+  document.getElementById('lrChartNote').textContent=learningRateNote(data.series.learningRate||[]);
+  lineChart('lrChart',data.series.learningRate||[],[{key:'lr_x1e4',label:t('chart.learningRate'),color:COLORS.blue,width:2.3,stepped:true}],null,markers,null,sharedGameDomain);
   lineChart('depthChart',data.series.games,[{key:'ply_smooth50',label:t('chart.ply'),color:COLORS.blue,width:2.3}],null,markers,10,sharedGameDomain);
   lineChart('gpuChart',g.series||[],[{key:'gpuUtilPct',label:t('chart.gpuUtil'),color:COLORS.gpu,width:2.4},{key:'memoryUtilPct',label:t('chart.vramUtil'),color:COLORS.vram,dash:[8,5],width:2.4}],[0,100],markers,null,sharedGameDomain);
   const terminationSpecs=[{key:'win_fewer_than_three',color:'#56b4e9'},{key:'win_no_legal_moves',color:'#0072b2'},{key:'draw_repetition',color:'#f0e442'},{key:'draw_no_progress',color:'#e69f00'},{key:'max_ply_truncation',color:'#8f9fb3'},{key:'lose_no_legal_moves',color:'#cc79a7'},{key:'lose_fewer_than_three',color:'#d55e00'},{key:'other',color:'#b794f4'}].filter(spec=>(data.series.terminations50||[]).some(row=>Number(row[spec.key])>0));stackedAreaChart('terminationChart',data.series.terminations50||[],terminationSpecs,markers,sharedGameDomain);

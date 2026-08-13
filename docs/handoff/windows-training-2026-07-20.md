@@ -1966,6 +1966,14 @@ diagnostic rather than strength evidence. The server is read-only with respect
 to trainer evidence; only whole-device GPU telemetry is appended beneath the
 selected run's ignored `local-monitor` directory.
 
+Dashboard categorical order and control-value plots must not inherit incidental
+log ordering or smoothing. Aggregate outcomes are rendered in fixed
+win/draw/loss order. Learning rate is rendered from the raw executed value as a
+step function with an explicit change-point note, not as a 50-game moving
+average. For no-refresh attempt 003, the evidence is `1e-4` through game 50 and
+`5e-5` from game 51 onward; the former diagonal `0.93 -> 0.50` display was a
+visualisation artefact caused by smoothing that one discrete change.
+
 ## Deferred and Conditional Work from the Original Notes
 
 - Direct "learn traps" training is not implemented. The v5 plan defines fixed
