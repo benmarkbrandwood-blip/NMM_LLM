@@ -229,6 +229,41 @@ def test_crossfit_effect_reports_uncorrected_and_shrunk_estimates() -> None:
     assert result["W->L"]["corrected_point"] == pytest.approx(0.0)
 
 
+def test_crossfit_zero_event_transition_cannot_gain_lift_from_prior() -> None:
+    cells: dict[str, EstimabilityCell] = {}
+    for class_index in range(20):
+        cell = EstimabilityCell()
+        for fold in (0, 1):
+            for action, observations in (("a", 3), ("b", 10)):
+                for observation in range(observations):
+                    cell.observe(
+                        game=f"g-{class_index}-{fold}-{action}-{observation}",
+                        players=(f"p-{observation}", f"q-{observation}"),
+                        action=action,
+                        fold=fold,
+                        event=None,
+                    )
+        cells[f"class-{class_index}"] = cell
+
+    result = estimate_action_effects(
+        cells,
+        eligible_keys=set(cells),
+        minimum_per_action_m=5,
+        selection_minimum=2,
+        evaluation_minimum=2,
+        minimum_crossfit_classes=20,
+        bootstrap_replicates=100,
+        bootstrap_seed="zero-event-fixture",
+    )
+
+    wl = result["W->L"]
+    assert wl["status"] == "no_observed_transition_events"
+    assert wl["uncorrected_weighted_within_class_max_minus_min"] == 0.0
+    assert wl["corrected_point"] == 0.0
+    assert wl["conservative_lower_95"] == 0.0
+    assert wl["conservative_upper_95"] < 0.01
+
+
 def test_clustered_proportion_uses_whole_games_as_clusters() -> None:
     result = clustered_proportion(
         {"g1": 1, "g2": 0, "g3": 2},

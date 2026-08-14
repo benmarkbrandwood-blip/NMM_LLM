@@ -795,6 +795,47 @@ def estimate_action_effects(
     """Report naive max-min and cross-fitted Jeffreys-shrunk lift."""
     results: dict[str, Any] = {}
     for event in DOWNGRADE_TYPES:
+        event_exposures = sum(
+            cells[key].exposures for key in eligible_keys if key in cells
+        )
+        observed_events = sum(
+            cells[key].fold_action_events[fold][action][event]
+            for key in eligible_keys
+            if key in cells
+            for fold in (0, 1)
+            for action in cells[key].fold_action_totals[fold]
+        )
+        eligible_varied_classes = sum(
+            sum(
+                count >= minimum_per_action_m
+                for count in cells[key].action_counts.values()
+            )
+            >= 2
+            for key in eligible_keys
+            if key in cells
+        )
+        if observed_events == 0:
+            if event_exposures <= 0:
+                raise TrainScreenError("zero-event transition has no exposures")
+            event_rate_interval = wilson_interval(0, event_exposures)
+            results[event] = {
+                "status": "no_observed_transition_events",
+                "observed_transition_events": 0,
+                "eligible_exposures": event_exposures,
+                "uncorrected_weighted_within_class_max_minus_min": 0.0,
+                "uncorrected_classes": eligible_varied_classes,
+                "corrected_crossfit_classes": 0,
+                "minimum_crossfit_classes": minimum_crossfit_classes,
+                "corrected_point": 0.0,
+                "conservative_lower_95": 0.0,
+                "conservative_upper_95": event_rate_interval["upper_95"],
+                "upper_bound_method": (
+                    "fixed-membership Wilson upper bound on the zero-event "
+                    "exposure rate; no action contrast is asserted"
+                ),
+                "bootstrap_replicates": 0,
+            }
+            continue
         naive_rows: list[tuple[float, float]] = []
         corrected_by_class: dict[str, tuple[float, float]] = {}
         for key in sorted(eligible_keys):

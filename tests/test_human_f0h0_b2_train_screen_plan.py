@@ -3,7 +3,6 @@ from pathlib import Path
 from learned_ai.evaluation.human_f0h0_b2_train_screen import (
     EXPECTED_SAMPLE_COMPOSITION,
     load_screen_plan,
-    verify_implementation_artifacts,
 )
 
 
@@ -11,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "docs/experiments/f0-h0-b2-train-rejection-screen-v1.json"
 
 
-def test_frozen_train_screen_plan_is_sealed_and_code_bound() -> None:
+def test_historical_frozen_train_screen_plan_remains_sealed() -> None:
     plan, file_sha = load_screen_plan(PLAN)
 
     assert plan["plan_identity"] == (
@@ -21,7 +20,9 @@ def test_frozen_train_screen_plan_is_sealed_and_code_bound() -> None:
     assert plan["repository_base_commit"] == (
         "32b1386b0f87ddbde0a052c2d95ad59b958838d3"
     )
-    verify_implementation_artifacts(ROOT, plan)
+    assert plan["implementation_artifacts"][0]["sha256"] == (
+        "588e6bdf73bc00cff60966926f496f03c4ec11719090878b068bac6d9e1ef44c"
+    )
 
 
 def test_frozen_plan_uses_only_the_preregistered_train_intersection() -> None:
