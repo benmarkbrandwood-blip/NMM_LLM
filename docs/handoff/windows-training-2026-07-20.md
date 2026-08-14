@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 14 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 15 August 2026)
 
 ## Executive Summary
 
@@ -22,8 +22,8 @@ The governing product objective is now safe human-error induction and
 conversion inside a verified permitted action set, not fixed-node Sanmill
 score alone. The
 [measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
-now records completed read-only F0-D0 and F0-H0 screens but authorizes no later
-gate.
+now records completed F0-D0 evidence and a corrected F0-H0 split-scale
+measurement, but authorizes no scientific screen or later gate.
 The remaining 108 held-out source records remain unconsumed.
 
 F0-D0 froze current raw-corpus identity
@@ -46,18 +46,27 @@ sessions plus 848 accepted duplicate paths in a different inventory that has
 [F0-D0 evidence](../evidence/f0-d0-human-raw-reconstructability-2026-08-14.md)
 and its 30,378,269-byte machine-readable manifest.
 
-F0-H0 froze plan identity
-`95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530`
-before membership calculation.  All 4,994 player keys and 92,226 behavior
-games form one player-game connected component, so a complete player-isolated
-four-way split cannot populate selection, one-time-confirmation, or final-test.
-The decision is `触发停止条件` under result identity
-`714627f8be20bc45a267c97752171644040fc1273a24f82a570a7cb83512fe82`.
-The screen stopped with zero raw-game reads and zero Malom queries.  Preserve
-the [F0-H0 evidence](../evidence/f0-h0-human-feasibility-screen-2026-08-14.md)
-and its frozen membership file.  E0, F0-H1, and T0-H-pilot have not started;
-no database rebuild, alternative data substitution, or source-pool access is
-authorized by this result.
+The F0-H0 v1 stop decision is
+`superseded_by_corrected_split_design`.  Its rule required every complete game
+and all games of every player to remain in one partition, which algebraically
+collapses each connected component and tests only a zero-cut split.  Preserve
+the unchanged v1 plan, membership, result, and
+[v1 evidence](../evidence/f0-h0-human-feasibility-screen-2026-08-14.md),
+along with the
+[supersession correction](../evidence/f0-h0-v1-supersession-correction-2026-08-15.md).
+
+A corrected measurement was preregistered under plan identity
+`e1d2241cc23da1227fde7a3f84d2ff4c43a4167c2020d521abbc9f3eee1f833c`.
+It measured graph structure and exact scale for player cuts, calendar
+holdouts, and player-owned decisions.  The result identity is
+`cbfa6d43fa31e9644bae169e6b6d42232aa008e54921c96a46fbdddb73a95931`.
+It selects no split and makes no feasible/infeasible or continue/stop
+decision.  See the
+[corrected evidence](../evidence/f0-h0-corrected-split-feasibility-2026-08-15.md)
+and machine manifest.  The four F0-H0 scientific dimensions, E0, F0-H1, and
+T0-H-pilot have not started.  No Malom query, game, search, model load,
+training, database rebuild, alternative data substitution, or source-pool
+access is authorized by the corrected measurement.
 
 ## Transfer checkpoint — 13 August 2026
 
