@@ -812,6 +812,23 @@ def audit_human_db(
     processed_sessions = set(groups)
     duplicate_groups = [rows for rows in groups.values() if len(rows) > 1]
     games_found_sum = sum(int(row["games_found"]) for row in processed_rows)
+    games_found_value_counts = Counter(
+        int(row["games_found"]) for row in processed_rows
+    )
+    duplicate_games_found_patterns = Counter(
+        ",".join(str(int(row["games_found"])) for row in rows)
+        for rows in duplicate_groups
+    )
+    duplicate_extra_games_found = sum(
+        sum(int(row["games_found"]) for row in rows)
+        - int(any(int(row["games_found"]) > 0 for row in rows))
+        for rows in duplicate_groups
+    )
+    processed_sessions_with_any_game = sum(
+        any(int(row["games_found"]) > 0 for row in rows)
+        for rows in groups.values()
+    )
+    processed_sessions_without_game = len(groups) - processed_sessions_with_any_game
     metadata_total = int(metadata["total_games"]) if "total_games" in metadata else None
     after_files = [
         _path_record(path, root, role if path == database else f"{role}_sidecar")
@@ -832,18 +849,21 @@ def audit_human_db(
         "metadata": metadata,
         "processed_rows_identity": canonical_sha256(processed_rows),
         "processed_games_found_sum": games_found_sum,
+        "processed_games_found_value_counts": {
+            str(value): games_found_value_counts[value]
+            for value in sorted(games_found_value_counts)
+        },
         "metadata_total_games_minus_processed_sum": (
             metadata_total - games_found_sum if metadata_total is not None else None
         ),
+        "metadata_total_games_drift_cause": (
+            "none"
+            if metadata_total == games_found_sum
+            else "not_recoverable_from_retained_database_state"
+        ),
         "normalized_processed_session_count": len(processed_sessions),
-        "processed_session_ids_with_any_game": sum(
-            any(int(row["games_found"]) > 0 for row in rows)
-            for rows in groups.values()
-        ),
-        "processed_session_ids_without_game": sum(
-            not any(int(row["games_found"]) > 0 for row in rows)
-            for rows in groups.values()
-        ),
+        "processed_session_ids_with_any_game": processed_sessions_with_any_game,
+        "processed_session_ids_without_game": processed_sessions_without_game,
         "duplicate_processed_session_count": len(duplicate_groups),
         "duplicate_processed_extra_rows": sum(
             len(rows) - 1 for rows in duplicate_groups
@@ -852,6 +872,16 @@ def audit_human_db(
             len({row["sha256"] for row in rows}) > 1
             for rows in duplicate_groups
         ),
+        "duplicate_processed_games_found_patterns": {
+            pattern: duplicate_games_found_patterns[pattern]
+            for pattern in sorted(duplicate_games_found_patterns)
+        },
+        "duplicate_processed_extra_games_found": duplicate_extra_games_found,
+        "processed_games_found_decomposition": {
+            "unique_sessions_with_any_game": processed_sessions_with_any_game,
+            "duplicate_extra_games_found": duplicate_extra_games_found,
+            "sum": games_found_sum,
+        },
         "current_session_ids_not_processed": sorted(
             current_sessions - processed_sessions
         ),
@@ -980,6 +1010,63 @@ def _ruleset_input(path: Path, repository_root: Path) -> dict[str, Any]:
 
 def _count_field(records: Sequence[Mapping[str, Any]], field: str) -> int:
     return sum(bool(row[field]) for row in records)
+
+
+def _support_class_counts(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, int]]:
+    classes = {
+        "all_records": list(records),
+        "history_recoverable": [
+            row
+            for row in records
+            if row["dimensions"]["history"] == _RECOVERABLE
+        ],
+        "behavior_replay_eligible": [
+            row for row in records if row["behavior_replay_eligible"]
+        ],
+        "strict_outcome_eligible": [
+            row for row in records if row["outcome_analysis_eligible"]
+        ],
+    }
+    return {
+        name: {
+            "games": len(rows),
+            "logical_plies": sum(int(row.get("move_count") or 0) for row in rows),
+            "independent_player_keys": len(
+                {key for row in rows for key in row.get("player_keys", [])}
+            ),
+        }
+        for name, rows in classes.items()
+    }
+
+
+def _raw_inventory_summary(
+    input_files: Sequence[Mapping[str, Any]],
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    prefix = "data/human_games/test_set/"
+
+    def scope(path: Any) -> str:
+        return "test_set" if str(path).startswith(prefix) else "top_level"
+
+    return {
+        "file_occurrences_by_scope": dict(
+            sorted(Counter(scope(row.get("relative_path")) for row in input_files).items())
+        ),
+        "canonical_unique_sessions_by_scope": dict(
+            sorted(Counter(scope(row.get("canonical_file")) for row in records).items())
+        ),
+        "duplicate_file_occurrences_by_scope": dict(
+            sorted(
+                Counter(
+                    scope(path)
+                    for row in records
+                    for path in row.get("duplicate_files", [])
+                ).items()
+            )
+        ),
+    }
 
 
 def _optional_value_table(values: Sequence[Any]) -> list[Any]:
@@ -1339,6 +1426,7 @@ def build_f0d0_manifest(
         "duplicate_extra_file_occurrences": reconciled["duplicate_extra_files"],
         "imported_manifest_entries": len(imported),
         "unassigned_raw_files": len(reconciled["unassigned_files"]),
+        "zero_move_sessions": sum(row.get("move_count") == 0 for row in records),
         "behavior_replay_eligible_sessions": _count_field(
             records,
             "behavior_replay_eligible",
@@ -1364,6 +1452,7 @@ def build_f0d0_manifest(
         "unique_player_keys": len(player_keys),
     }
     reconciliation = {
+        "raw_inventory": _raw_inventory_summary(input_files, records),
         "raw_session_ids_not_imported": reconciled[
             "raw_session_ids_not_imported"
         ],
@@ -1401,16 +1490,8 @@ def build_f0d0_manifest(
     encoded_input_files, input_file_encoding, normalized_input_files = (
         _encode_input_files(data_input_files)
     )
-    audit_result_identity = canonical_sha256(
-        {
-            "record_encoding": record_encoding,
-            "records": encoded_records,
-            "dimension_counts": dimension_counts,
-            "counts": counts,
-            "reconciliation": reconciliation,
-        }
-    )
     inputs_identity = canonical_sha256(normalized_input_files)
+    support_class_counts = _support_class_counts(records)
     field_presence_counts = {
         "source": {
             field: sum(bool(row["source_fields"].get(field)) for row in records)
@@ -1423,6 +1504,17 @@ def build_f0d0_manifest(
             for field in _CONDITION_FIELDS
         },
     }
+    audit_result_identity = canonical_sha256(
+        {
+            "record_encoding": record_encoding,
+            "records": encoded_records,
+            "dimension_counts": dimension_counts,
+            "support_class_counts": support_class_counts,
+            "field_presence_counts": field_presence_counts,
+            "counts": counts,
+            "reconciliation": reconciliation,
+        }
+    )
 
     history_recoverable = dimension_counts["history"][_RECOVERABLE]
     player_recoverable = dimension_counts["player"][_RECOVERABLE]
@@ -1459,6 +1551,7 @@ def build_f0d0_manifest(
         "imported_manifest": imported_evidence,
         "counts": counts,
         "dimension_counts": dimension_counts,
+        "support_class_counts": support_class_counts,
         "field_presence_counts": field_presence_counts,
         "failure_reason_counts": [
             {"code": code, "count": failure_counts[code]}
@@ -1627,11 +1720,49 @@ def verify_manifest(payload: Mapping[str, Any]) -> None:
                 player_keys[player_index]
         except (IndexError, TypeError) as exc:
             raise F0D0AuditError("player key index is invalid") from exc
+    support_rows = {
+        "all_records": records,
+        "history_recoverable": [row for row in records if row[10][0] == 2],
+        "behavior_replay_eligible": [row for row in records if row[23]],
+        "strict_outcome_eligible": [row for row in records if row[24]],
+    }
+    support_class_counts = {
+        name: {
+            "games": len(rows),
+            "logical_plies": sum(int(row[6] or 0) for row in rows),
+            "independent_player_keys": len(
+                {player for row in rows for player in row[9]}
+            ),
+        }
+        for name, rows in support_rows.items()
+    }
+    if support_class_counts != payload["support_class_counts"]:
+        raise F0D0AuditError("support class counts differ")
+    if record_encoding.get("source_presence_fields") != list(_SOURCE_FIELDS):
+        raise F0D0AuditError("source presence encoding differs")
+    if record_encoding.get("condition_presence_fields") != list(
+        _CONDITION_FIELDS
+    ):
+        raise F0D0AuditError("condition presence encoding differs")
+    field_presence_counts = {
+        "source": {
+            field: sum(bool(row[11] & (1 << index)) for row in records)
+            for index, field in enumerate(_SOURCE_FIELDS)
+        },
+        "condition": {
+            field: sum(bool(row[12] & (1 << index)) for row in records)
+            for index, field in enumerate(_CONDITION_FIELDS)
+        },
+    }
+    if field_presence_counts != payload["field_presence_counts"]:
+        raise F0D0AuditError("field presence counts differ")
     audit_result_identity = canonical_sha256(
         {
             "record_encoding": record_encoding,
             "records": records,
             "dimension_counts": payload["dimension_counts"],
+            "support_class_counts": payload["support_class_counts"],
+            "field_presence_counts": payload["field_presence_counts"],
             "counts": payload["counts"],
             "reconciliation": payload["reconciliation"],
         }

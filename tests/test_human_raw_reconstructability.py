@@ -12,6 +12,7 @@ from learned_ai.evaluation.human_raw_reconstructability import (
     _decode_input_files,
     _encode_game_records,
     _encode_input_files,
+    _support_class_counts,
     audit_game_record,
     reconcile_file_audits,
     seal_manifest,
@@ -217,6 +218,24 @@ def test_compact_input_encoding_round_trips_every_sha256() -> None:
 
     assert _decode_input_files(rows, encoding) == normalized
     assert [row["sha256"] for row in normalized] == ["a" * 64, "b" * 64]
+
+
+def test_support_classes_count_games_plies_and_independent_players() -> None:
+    audit = audit_game_record(
+        _short_record(),
+        relative_path="data/human_games/human_ml-fixture-1.jsonl",
+        imported_at="2026-01-03T04:05:06",
+    )
+
+    counts = _support_class_counts([audit])
+
+    assert counts["all_records"] == {
+        "games": 1,
+        "logical_plies": 6,
+        "independent_player_keys": 2,
+    }
+    assert counts["behavior_replay_eligible"] == counts["all_records"]
+    assert counts["strict_outcome_eligible"]["games"] == 0
 
 
 def test_manifest_identity_detects_tampering() -> None:
