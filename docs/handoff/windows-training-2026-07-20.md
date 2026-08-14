@@ -22,8 +22,30 @@ The governing product objective is now safe human-error induction and
 conversion inside a verified permitted action set, not fixed-node Sanmill
 score alone. The
 [measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
-is design-only and authorizes no execution. The remaining 108 held-out source
-records remain unconsumed.
+now records a completed read-only F0-D0 screen but authorizes no later gate.
+The remaining 108 held-out source records remain unconsumed.
+
+F0-D0 froze current raw-corpus identity
+`4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29`
+under manifest identity
+`bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7`.
+The exact inventory is 95,389 JSONL occurrences, 94,540 unique sessions, and
+849 byte-identical duplicate exports. Strict history is recoverable for
+92,789 sessions; 92,226 games with 4,994 source-scoped player keys contain
+behavior decisions; 37,866 results agree with independently replayed strict
+terminals; and zero results disagree. Source and condition recovery remain
+partial because upstream file/batch, UI orientation, time control, exact
+rules variant, and source termination basis are absent.
+
+The active HumanDB's 94,429 decomposes into a 94,423 processed-file game sum
+plus six entries of historical metadata drift whose game identities are not
+recoverable. The archived 95,221 value belongs to 94,373 accepted unique
+sessions plus 848 accepted duplicate paths in a different inventory that has
+396 session IDs absent from the current raw corpus. See the
+[F0-D0 evidence](../evidence/f0-d0-human-raw-reconstructability-2026-08-14.md)
+and its 30,378,269-byte machine-readable manifest. F0-H0, E0, F0-H1, and
+T0-H-pilot have not started; no database rebuild or source-pool access is
+authorized by this result.
 
 ## Transfer checkpoint — 13 August 2026
 

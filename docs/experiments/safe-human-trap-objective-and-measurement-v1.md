@@ -2,7 +2,7 @@
 
 Date: 2026-08-14
 
-Status: `product_objective_defined_measurement_draft_no_launch_authority`
+Status: `product_objective_defined_f0_d0_completed_no_launch_authority`
 
 Authority: `product-owner-direct`
 
@@ -25,11 +25,16 @@ information, and deeper Sanmill search supplies generic tactical strength.
 The project-specific opportunity is to learn which theory-safe positions and
 continuations are difficult for actual humans.
 
-The available corpus is valuable but its exact usable identity is not yet
-frozen. Current machine evidence distinguishes 95,389 human-game JSONL files,
-94,540 imported IDs, and 94,429 games in the active HumanDB. The previously
-quoted 95,221 is not a current manifest-backed identity and must not appear in
-an acceptance denominator until a replayed dataset manifest establishes it.
+F0-D0 now freezes the current raw-corpus identity as
+`4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29`.
+It reconciles 95,389 human-game JSONL occurrences to 94,540 unique imported
+sessions and identifies 92,226 behavior-replay-eligible sessions. The active
+HumanDB's 94,429 is stale, duplicate-path-inflated metadata with an
+unattributed six-game drift. The previously quoted 95,221 belongs exactly to
+a different archived 95,785-path inventory and is not a current-corpus
+acceptance denominator. Preserve the
+[F0-D0 evidence](../evidence/f0-d0-human-raw-reconstructability-2026-08-14.md)
+and its machine-readable manifest.
 
 ## Governing definitions
 
@@ -139,6 +144,27 @@ No trap reward or training modification is allowed before these gates:
    inside the accepted permit set.
 5. `T0-H-pilot`: run a separately authorized non-promotable direct comparison
    only if the feasibility screens permit it.
+
+## F0-D0 completion -- 14 August 2026
+
+F0-D0 completed read-only under manifest identity
+`bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7`.
+Of 94,540 unique sessions, 92,789 have strict recoverable histories, all have
+both source-supplied player identifiers, 92,226 contain at least one eligible
+human decision, and 37,866 have a recorded result that agrees with an
+independently replayed strict terminal. There are zero result disagreements.
+
+This is partial source-domain recoverability, not full five-dimension
+recovery. Explicit import batch, upstream source-file identity, UI
+orientation, time control, exact source rules variant, and every source-side
+termination basis are absent. The 1,751 strict legality failures and 54,923
+nonterminal results remain individually attributed in the manifest without
+invented causes.
+
+F0-H0 has not started. Its membership, access controls, target condition, and
+claim boundary must be frozen separately. No later gate, game, search, model
+load, training change, database rebuild, or source-pool access is authorized
+by the F0-D0 result.
 
 The complexity proxy may be designed alongside F0, but execution still needs
 its own immutable search/evaluation contract and resource authorization.
