@@ -68,6 +68,32 @@ T0-H-pilot have not started.  No Malom query, game, search, model load,
 training, database rebuild, alternative data substitution, or source-pool
 access is authorized by the corrected measurement.
 
+A follow-up Design B supplement was frozen under plan identity
+`889ccfcc407def9b7c2b4f3058611566e1bcb541976c42ed286d449dc67d633a`
+and completed read-only under result identity
+`a45fbfa0c472f86f03596b0618c799c4e0fb522bcfaa9b431efc904e838301a2`.
+The March strong pool has 4,577 games, 1,245 player keys, 207,044 decisions,
+and 1,973 strict-outcome games.  Its giant component contains 1,178 players
+and 4,465 games; a measured three-role player cut discards 737 games.  The
+three preregistered calendar subdivisions have strong role scales of
+887/386/847, 1,686/773/22, and 2,535/469/58 games.  A same-size random
+whole-game `ring16` control measured 37.55%/57.31% overlap versus
+34.32%/53.60% for coarse Design B, demonstrating a large game-intrinsic
+overlap baseline without making the structurally different Design C result
+equivalent to that control.  Preserve the
+[supplement evidence](../evidence/f0-h0-design-b-supplement-2026-08-15.md)
+and machine manifest.
+
+The supplement selects no split, freezes no eventual final-test membership,
+and makes no feasibility or continuation decision.  The four F0-H0 scientific
+dimensions, E0, F0-H1, and T0-H-pilot remain unstarted.  No Malom query,
+game, search, model load, training, database operation, or source-pool access
+is authorized by it.
+
+The result verifier passed with the recorded result identity and file hash.
+The supplement's two focused test files pass 11 tests, and task-scope Ruff
+passes on the measurement module, runner, and both focused test files.
+
 ## Transfer checkpoint — 13 August 2026
 
 This section is the current handoff checkpoint and takes precedence over older

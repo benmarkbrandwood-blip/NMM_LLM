@@ -4,7 +4,7 @@ Date: 2026-08-14
 
 Updated: 2026-08-15
 
-Status: `f0_h0_v1_superseded_split_scale_measured_no_launch_authority`
+Status: `f0_h0_design_b_supplement_measured_no_split_selected_no_launch_authority`
 
 Authority: `product-owner-direct`
 
@@ -194,6 +194,37 @@ dimensions remain unrun, and final-test membership has not been selected or
 opened as an analysis population.  No later gate, game, search, model load,
 Malom query, training change, database rebuild, alternative-data
 substitution, or source-pool access is authorized by either F0 result.
+
+## F0-H0 Design B supplement -- 15 August 2026
+
+The Design B support and second-level split supplement was frozen under plan
+identity
+`889ccfcc407def9b7c2b4f3058611566e1bcb541976c42ed286d449dc67d633a`
+and pushed before its result was calculated.  Result identity
+`a45fbfa0c472f86f03596b0618c799c4e0fb522bcfaa9b431efc904e838301a2`
+records the completed read-only measurement.
+
+The March strong pool contains 4,577 games, 1,245 source player keys, 207,044
+decisions, and 1,973 strict-outcome games.  Its induced graph has 31
+components, but the giant contains 1,178 players and 4,465 games.  One
+measured 50%/25%/25% player subdivision discards 737 cross-role games.  The
+three frozen time-pair candidates produce strong selection, confirmation, and
+final role scales of 887/386/847, 1,686/773/22, and 2,535/469/58 games.
+
+A same-size random whole-game control measured decision-weighted `ring16`
+overlap of 37.55% and 57.31%, compared with 34.32% and 53.60% for the coarse
+March Design B split.  This shows that recurring game states create a large
+baseline overlap.  It does not make the prior four-role Design C result
+equivalent to the two-role random control; partition count, support, and
+same-game trajectory exposure differ.  See the
+[Design B supplement evidence](../evidence/f0-h0-design-b-supplement-2026-08-15.md).
+
+This is
+`completed_measurement_only_no_final_split_selection`.  The role names in the
+candidate measurements are hypothetical only.  No final membership is
+frozen, no support threshold or split is selected, and no F0-H0 scientific
+dimension has run.  The supplement authorizes no later gate or state-changing
+operation.
 
 The complexity proxy may be designed alongside F0, but execution still needs
 its own immutable search/evaluation contract and resource authorization.
