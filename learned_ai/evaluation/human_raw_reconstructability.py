@@ -24,14 +24,68 @@ from game.draw_rules import StandardDrawTracker
 from game.rules import get_all_legal_moves, get_game_phase, terminal_result
 
 
-SCHEMA_VERSION = "nmm.f0-d0-human-raw-reconstructability.v1"
-AUDIT_ID = "f0-d0-human-raw-reconstructability-v1"
+SCHEMA_VERSION = "nmm.f0-d0-human-raw-reconstructability.v2"
+AUDIT_ID = "f0-d0-human-raw-reconstructability-v2"
 RULESET_ID = "nmm-training-core@2"
 
 _DIMENSIONS = ("history", "player", "source", "result", "condition")
 _RECOVERABLE = "recoverable"
 _PARTIAL = "partial"
 _NOT_RECOVERABLE = "not_recoverable"
+_SOURCE_FIELDS = (
+    "platform",
+    "source_type",
+    "current_raw_file",
+    "import_timestamp",
+    "exact_import_batch",
+    "upstream_file_identity",
+)
+_CONDITION_FIELDS = (
+    "color_assignment",
+    "ui_orientation",
+    "time_control",
+    "exact_rules_variant",
+    "date",
+    "white_elo",
+    "black_elo",
+)
+_GAME_RECORD_FIELDS = (
+    "session_id",
+    "canonical_file",
+    "duplicate_files",
+    "imported_at",
+    "source_index",
+    "date",
+    "move_count",
+    "recorded_outcome_index",
+    "source_result_basis_index",
+    "player_key_indices",
+    "dimension_status_indices",
+    "source_presence_mask",
+    "condition_presence_mask",
+    "replay_status_index",
+    "replay_failure_code_index",
+    "replay_failure_ply",
+    "logical_plies_replayed",
+    "final_no_progress_plies",
+    "final_repetition_current_count",
+    "maximum_repetition_count",
+    "independent_outcome_index",
+    "independent_reason_index",
+    "result_comparison_index",
+    "behavior_replay_eligible",
+    "outcome_analysis_eligible",
+    "failure_code_indices",
+)
+_INPUT_FILE_FIELDS = (
+    "relative_path",
+    "role_index",
+    "byte_length",
+    "sha256",
+    "session_id",
+    "status_index",
+    "failure_index",
+)
 _RESULT_TO_OUTCOME = {
     "1-0": "W",
     "0-1": "B",
@@ -88,10 +142,16 @@ def _position_key(board: BoardState) -> tuple[tuple[str, ...], str]:
     return tuple(board.positions[position] for position in POSITIONS), board.turn
 
 
-def _failed_replay(code: str, replayed: int) -> dict[str, Any]:
+def _failed_replay(
+    code: str,
+    replayed: int,
+    *,
+    failure_ply: int | None = None,
+) -> dict[str, Any]:
     return {
         "status": "failed",
         "failure_code": code,
+        "failure_ply": failure_ply,
         "logical_plies_replayed": replayed,
         "history_identity": None,
         "final_fen_sha256": None,
@@ -113,21 +173,42 @@ def _replay_moves(moves: Sequence[Any]) -> dict[str, Any]:
     for index, raw_move in enumerate(moves):
         if independent_outcome is not None:
             return _failed_replay(
-                f"history.move_{index}_after_rules_terminal",
+                "history.move_after_rules_terminal",
                 index,
+                failure_ply=index,
             )
         if not isinstance(raw_move, Mapping):
-            return _failed_replay(f"history.move_{index}_not_object", index)
+            return _failed_replay(
+                "history.move_not_object",
+                index,
+                failure_ply=index,
+            )
         if raw_move.get("board_fen_before") != board.to_fen_string():
-            return _failed_replay(f"history.move_{index}_fen_mismatch", index)
+            return _failed_replay(
+                "history.fen_mismatch",
+                index,
+                failure_ply=index,
+            )
         if raw_move.get("color") != board.turn:
-            return _failed_replay(f"history.move_{index}_color_mismatch", index)
+            return _failed_replay(
+                "history.color_mismatch",
+                index,
+                failure_ply=index,
+            )
         if raw_move.get("turn") != index // 2 + 1:
-            return _failed_replay(f"history.move_{index}_turn_mismatch", index)
+            return _failed_replay(
+                "history.turn_mismatch",
+                index,
+                failure_ply=index,
+            )
 
         expected_type = get_game_phase(board, board.turn)
         if raw_move.get("type") != expected_type:
-            return _failed_replay(f"history.move_{index}_type_mismatch", index)
+            return _failed_replay(
+                "history.type_mismatch",
+                index,
+                failure_ply=index,
+            )
         expected = {
             "from": raw_move.get("from"),
             "to": raw_move.get("to"),
@@ -140,14 +221,16 @@ def _replay_moves(moves: Sequence[Any]) -> dict[str, Any]:
         ]
         if len(matching) != 1:
             return _failed_replay(
-                f"history.move_{index}_illegal_or_ambiguous",
+                "history.illegal_or_ambiguous",
                 index,
+                failure_ply=index,
             )
         move = matching[0]
         if raw_move.get("notation") != _move_notation(move):
             return _failed_replay(
-                f"history.move_{index}_notation_mismatch",
+                "history.notation_mismatch",
                 index,
+                failure_ply=index,
             )
 
         after = board.apply_move(move)
@@ -179,6 +262,7 @@ def _replay_moves(moves: Sequence[Any]) -> dict[str, Any]:
     return {
         "status": status,
         "failure_code": None,
+        "failure_ply": None,
         "logical_plies_replayed": len(moves),
         "history_identity": canonical_sha256(normalized),
         "final_fen_sha256": hashlib.sha256(
@@ -335,9 +419,13 @@ def audit_game_record(
         ),
         None,
     )
-    if result_failure is not None or history_status == _NOT_RECOVERABLE:
+    if result_failure is not None:
         result_status = _NOT_RECOVERABLE
         comparison = "unavailable"
+    elif history_status == _NOT_RECOVERABLE:
+        result_status = _NOT_RECOVERABLE
+        comparison = "unavailable"
+        result_failure = "result.history_unrecoverable"
     elif independent_outcome is not None:
         if recorded_outcome == independent_outcome:
             result_status = _RECOVERABLE
@@ -894,6 +982,210 @@ def _count_field(records: Sequence[Mapping[str, Any]], field: str) -> int:
     return sum(bool(row[field]) for row in records)
 
 
+def _optional_value_table(values: Sequence[Any]) -> list[Any]:
+    return [None] + sorted({value for value in values if value is not None})
+
+
+def _presence_mask(details: Mapping[str, Any], fields: Sequence[str]) -> int:
+    result = 0
+    for index, field in enumerate(fields):
+        if bool(details.get(field)):
+            result |= 1 << index
+    return result
+
+
+def _encode_game_records(
+    records: Sequence[Mapping[str, Any]],
+) -> tuple[list[list[Any]], dict[str, Any]]:
+    player_keys = sorted(
+        {str(key) for row in records for key in row.get("player_keys", [])}
+    )
+    encoding: dict[str, Any] = {
+        "fields": list(_GAME_RECORD_FIELDS),
+        "dimension_fields": list(_DIMENSIONS),
+        "dimension_status_values": [
+            _NOT_RECOVERABLE,
+            _PARTIAL,
+            _RECOVERABLE,
+        ],
+        "source_presence_fields": list(_SOURCE_FIELDS),
+        "condition_presence_fields": list(_CONDITION_FIELDS),
+        "presence_mask_semantics": "bit i is one when fields[i] is present",
+        "source_values": _optional_value_table(
+            [row.get("source") for row in records]
+        ),
+        "outcome_values": [None, "W", "B", "D"],
+        "source_result_basis_values": _optional_value_table(
+            [row.get("source_result_basis") for row in records]
+        ),
+        "player_keys": player_keys,
+        "replay_status_values": _optional_value_table(
+            [row["replay"].get("status") for row in records]
+        ),
+        "replay_failure_code_values": _optional_value_table(
+            [row["replay"].get("failure_code") for row in records]
+        ),
+        "independent_reason_values": _optional_value_table(
+            [row["replay"].get("independent_reason") for row in records]
+        ),
+        "result_comparison_values": _optional_value_table(
+            [row.get("result_comparison") for row in records]
+        ),
+        "failure_code_values": sorted(
+            {code for row in records for code in row.get("failure_codes", [])}
+        ),
+    }
+    index = {
+        key: {value: position for position, value in enumerate(encoding[key])}
+        for key in (
+            "dimension_status_values",
+            "source_values",
+            "outcome_values",
+            "source_result_basis_values",
+            "player_keys",
+            "replay_status_values",
+            "replay_failure_code_values",
+            "independent_reason_values",
+            "result_comparison_values",
+            "failure_code_values",
+        )
+    }
+    encoded: list[list[Any]] = []
+    for row in records:
+        replay = row["replay"]
+        encoded.append(
+            [
+                row.get("session_id"),
+                row.get("canonical_file"),
+                row.get("duplicate_files", []),
+                row.get("imported_at"),
+                index["source_values"][row.get("source")],
+                row.get("date"),
+                row.get("move_count"),
+                index["outcome_values"][row.get("recorded_outcome")],
+                index["source_result_basis_values"][
+                    row.get("source_result_basis")
+                ],
+                [index["player_keys"][key] for key in row.get("player_keys", [])],
+                [
+                    index["dimension_status_values"][row["dimensions"][field]]
+                    for field in _DIMENSIONS
+                ],
+                _presence_mask(row.get("source_fields", {}), _SOURCE_FIELDS),
+                _presence_mask(
+                    row.get("condition_fields", {}),
+                    _CONDITION_FIELDS,
+                ),
+                index["replay_status_values"][replay.get("status")],
+                index["replay_failure_code_values"][
+                    replay.get("failure_code")
+                ],
+                replay.get("failure_ply"),
+                replay.get("logical_plies_replayed"),
+                replay.get("final_no_progress_plies"),
+                replay.get("final_repetition_current_count"),
+                replay.get("maximum_repetition_count"),
+                index["outcome_values"][replay.get("independent_outcome")],
+                index["independent_reason_values"][
+                    replay.get("independent_reason")
+                ],
+                index["result_comparison_values"][
+                    row.get("result_comparison")
+                ],
+                bool(row.get("behavior_replay_eligible")),
+                bool(row.get("outcome_analysis_eligible")),
+                [
+                    index["failure_code_values"][code]
+                    for code in row.get("failure_codes", [])
+                ],
+            ]
+        )
+    return encoded, encoding
+
+
+def _normalize_input_file(row: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "relative_path": row.get("relative_path"),
+        "role": row.get("role"),
+        "byte_length": row.get("byte_length"),
+        "sha256": row.get("sha256"),
+        "session_id": row.get("session_id"),
+        "status": row.get("status"),
+        "failure": row.get("failure"),
+    }
+
+
+def _encode_input_files(
+    input_files: Sequence[Mapping[str, Any]],
+) -> tuple[list[list[Any]], dict[str, Any], list[dict[str, Any]]]:
+    normalized = [_normalize_input_file(row) for row in input_files]
+    roles = _optional_value_table([row["role"] for row in normalized])
+    statuses = _optional_value_table([row["status"] for row in normalized])
+    failures = _optional_value_table([row["failure"] for row in normalized])
+    role_index = {value: index for index, value in enumerate(roles)}
+    status_index = {value: index for index, value in enumerate(statuses)}
+    failure_index = {value: index for index, value in enumerate(failures)}
+    encoded = [
+        [
+            row["relative_path"],
+            role_index[row["role"]],
+            row["byte_length"],
+            row["sha256"],
+            row["session_id"],
+            status_index[row["status"]],
+            failure_index[row["failure"]],
+        ]
+        for row in normalized
+    ]
+    encoding = {
+        "fields": list(_INPUT_FILE_FIELDS),
+        "role_values": roles,
+        "status_values": statuses,
+        "failure_values": failures,
+    }
+    return encoded, encoding, normalized
+
+
+def _encoded_position(fields: Sequence[str], field: str) -> int:
+    try:
+        return fields.index(field)
+    except ValueError as exc:
+        raise F0D0AuditError(f"encoded field is absent: {field}") from exc
+
+
+def _decode_input_files(
+    rows: Sequence[Any],
+    encoding: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    fields = encoding.get("fields")
+    if fields != list(_INPUT_FILE_FIELDS):
+        raise F0D0AuditError("input file encoding fields differ")
+    roles = encoding.get("role_values")
+    statuses = encoding.get("status_values")
+    failures = encoding.get("failure_values")
+    if not all(isinstance(table, list) for table in (roles, statuses, failures)):
+        raise F0D0AuditError("input file encoding tables are invalid")
+    decoded: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, list) or len(row) != len(_INPUT_FILE_FIELDS):
+            raise F0D0AuditError("input file row width differs")
+        try:
+            decoded.append(
+                {
+                    "relative_path": row[0],
+                    "role": roles[row[1]],
+                    "byte_length": row[2],
+                    "sha256": row[3],
+                    "session_id": row[4],
+                    "status": statuses[row[5]],
+                    "failure": failures[row[6]],
+                }
+            )
+        except (IndexError, TypeError) as exc:
+            raise F0D0AuditError("input file row index is invalid") from exc
+    return decoded
+
+
 def build_f0d0_manifest(
     *,
     repository_root: str | Path,
@@ -1099,21 +1391,38 @@ def build_f0d0_manifest(
             ),
         },
     }
-    audit_result_identity = canonical_sha256(
-        {
-            "records": records,
-            "dimension_counts": dimension_counts,
-            "counts": counts,
-            "reconciliation": reconciliation,
-        }
-    )
     data_input_files = (
         input_files
         + [imported_file, ruleset_input]
         + active_db["files"]
         + archived_db["files"]
     )
-    inputs_identity = canonical_sha256(data_input_files)
+    encoded_records, record_encoding = _encode_game_records(records)
+    encoded_input_files, input_file_encoding, normalized_input_files = (
+        _encode_input_files(data_input_files)
+    )
+    audit_result_identity = canonical_sha256(
+        {
+            "record_encoding": record_encoding,
+            "records": encoded_records,
+            "dimension_counts": dimension_counts,
+            "counts": counts,
+            "reconciliation": reconciliation,
+        }
+    )
+    inputs_identity = canonical_sha256(normalized_input_files)
+    field_presence_counts = {
+        "source": {
+            field: sum(bool(row["source_fields"].get(field)) for row in records)
+            for field in _SOURCE_FIELDS
+        },
+        "condition": {
+            field: sum(
+                bool(row["condition_fields"].get(field)) for row in records
+            )
+            for field in _CONDITION_FIELDS
+        },
+    }
 
     history_recoverable = dimension_counts["history"][_RECOVERABLE]
     player_recoverable = dimension_counts["player"][_RECOVERABLE]
@@ -1150,6 +1459,7 @@ def build_f0d0_manifest(
         "imported_manifest": imported_evidence,
         "counts": counts,
         "dimension_counts": dimension_counts,
+        "field_presence_counts": field_presence_counts,
         "failure_reason_counts": [
             {"code": code, "count": failure_counts[code]}
             for code in sorted(failure_counts)
@@ -1160,8 +1470,10 @@ def build_f0d0_manifest(
             "history": _selection_bias_summary(records, dimension="history"),
         },
         "reconciliation": reconciliation,
-        "input_files": data_input_files,
-        "game_records": records,
+        "input_file_encoding": input_file_encoding,
+        "input_files": encoded_input_files,
+        "record_encoding": record_encoding,
+        "game_records": encoded_records,
         "unassigned_files": reconciled["unassigned_files"],
         "result_disagreements": [
             {
@@ -1218,7 +1530,22 @@ def verify_manifest(payload: Mapping[str, Any]) -> None:
     if "game_records" not in payload:
         return
     records = payload["game_records"]
-    input_files = payload["input_files"]
+    if not isinstance(records, list):
+        raise F0D0AuditError("game records are not an array")
+    record_encoding = payload.get("record_encoding")
+    if not isinstance(record_encoding, Mapping):
+        raise F0D0AuditError("record encoding is absent")
+    fields = record_encoding.get("fields")
+    if fields != list(_GAME_RECORD_FIELDS):
+        raise F0D0AuditError("game record encoding fields differ")
+    for row in records:
+        if not isinstance(row, list) or len(row) != len(_GAME_RECORD_FIELDS):
+            raise F0D0AuditError("game record row width differs")
+
+    input_files = _decode_input_files(
+        payload["input_files"],
+        payload["input_file_encoding"],
+    )
     identities = payload["identities"]
     raw_rows = [
         {
@@ -1227,19 +1554,28 @@ def verify_manifest(payload: Mapping[str, Any]) -> None:
             "sha256": row["sha256"],
         }
         for row in input_files
-        if row.get("role") is None
+        if row["role"] is None
     ]
     if canonical_sha256(raw_rows) != identities["raw_files_identity"]:
         raise F0D0AuditError("raw file identity differs")
-    session_rows = [
-        {
-            "session_id": row["session_id"],
-            "canonical_file": row["canonical_file"],
-            "file_sha256": row["file_sha256"],
-            "imported_at": row["imported_at"],
-        }
-        for row in records
-    ]
+    raw_sha_by_path = {
+        row["relative_path"]: row["sha256"]
+        for row in input_files
+        if row["role"] is None
+    }
+    session_rows = []
+    for row in records:
+        canonical_file = row[1]
+        if canonical_file not in raw_sha_by_path:
+            raise F0D0AuditError("canonical game file is absent from inputs")
+        session_rows.append(
+            {
+                "session_id": row[0],
+                "canonical_file": canonical_file,
+                "file_sha256": raw_sha_by_path[canonical_file],
+                "imported_at": row[3],
+            }
+        )
     if canonical_sha256(session_rows) != identities["session_source_identity"]:
         raise F0D0AuditError("session source identity differs")
     corpus_identity = canonical_sha256(
@@ -1253,17 +1589,47 @@ def verify_manifest(payload: Mapping[str, Any]) -> None:
     )
     if corpus_identity != identities["corpus_identity"]:
         raise F0D0AuditError("corpus identity differs")
-    if _dimension_counts(records) != payload["dimension_counts"]:
+
+    status_values = record_encoding.get("dimension_status_values")
+    if status_values != [_NOT_RECOVERABLE, _PARTIAL, _RECOVERABLE]:
+        raise F0D0AuditError("dimension status encoding differs")
+    observed_dimensions = {
+        dimension: Counter() for dimension in _DIMENSIONS
+    }
+    for row in records:
+        statuses = row[10]
+        if not isinstance(statuses, list) or len(statuses) != len(_DIMENSIONS):
+            raise F0D0AuditError("dimension status row width differs")
+        try:
+            for dimension, status_index in zip(_DIMENSIONS, statuses):
+                observed_dimensions[dimension][status_values[status_index]] += 1
+        except (IndexError, TypeError) as exc:
+            raise F0D0AuditError("dimension status index is invalid") from exc
+    dimension_counts = {
+        dimension: {
+            status: int(observed_dimensions[dimension].get(status, 0))
+            for status in (_RECOVERABLE, _PARTIAL, _NOT_RECOVERABLE)
+        }
+        for dimension in _DIMENSIONS
+    }
+    if dimension_counts != payload["dimension_counts"]:
         raise F0D0AuditError("dimension counts differ")
     if canonical_sha256(input_files) != identities["inputs_identity"]:
         raise F0D0AuditError("input files identity differs")
-    player_keys = sorted(
-        {str(key) for row in records for key in row.get("player_keys", [])}
-    )
+    player_keys = record_encoding.get("player_keys")
+    if not isinstance(player_keys, list):
+        raise F0D0AuditError("player key table is invalid")
     if canonical_sha256(player_keys) != identities["player_identifier_set_identity"]:
         raise F0D0AuditError("player identifier set identity differs")
+    for row in records:
+        try:
+            for player_index in row[9]:
+                player_keys[player_index]
+        except (IndexError, TypeError) as exc:
+            raise F0D0AuditError("player key index is invalid") from exc
     audit_result_identity = canonical_sha256(
         {
+            "record_encoding": record_encoding,
             "records": records,
             "dimension_counts": payload["dimension_counts"],
             "counts": payload["counts"],

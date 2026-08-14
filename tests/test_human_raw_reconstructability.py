@@ -6,7 +6,12 @@ import pytest
 
 from game.board import BoardState
 from learned_ai.evaluation.human_raw_reconstructability import (
+    AUDIT_ID,
     F0D0AuditError,
+    SCHEMA_VERSION,
+    _decode_input_files,
+    _encode_game_records,
+    _encode_input_files,
     audit_game_record,
     reconcile_file_audits,
     seal_manifest,
@@ -96,7 +101,8 @@ def test_recorded_fen_mismatch_fails_history_closed() -> None:
 
     assert result["dimensions"]["history"] == "not_recoverable"
     assert result["replay"]["status"] == "failed"
-    assert "history.move_2_fen_mismatch" in result["failure_codes"]
+    assert "history.fen_mismatch" in result["failure_codes"]
+    assert result["replay"]["failure_ply"] == 2
 
 
 def test_zero_move_record_has_exact_initial_history_but_no_behavior_turn() -> None:
@@ -167,10 +173,56 @@ def test_byte_identical_duplicate_session_collapses_with_both_paths() -> None:
     ]
 
 
+def test_compact_record_encoding_preserves_failure_and_player_identity() -> None:
+    record = _short_record()
+    record["moves"][2]["board_fen_before"] = "bad-fen"
+    audit = audit_game_record(
+        record,
+        relative_path="data/human_games/human_ml-fixture-1.jsonl",
+        imported_at="2026-01-03T04:05:06",
+    )
+
+    rows, encoding = _encode_game_records([audit])
+
+    assert encoding["fields"][15] == "replay_failure_ply"
+    assert rows[0][15] == 2
+    assert len(rows[0][9]) == 2
+    assert len(encoding["player_keys"]) == 2
+    failure_codes = [encoding["failure_code_values"][index] for index in rows[0][25]]
+    assert failure_codes == [
+        "history.fen_mismatch",
+        "result.history_unrecoverable",
+    ]
+
+
+def test_compact_input_encoding_round_trips_every_sha256() -> None:
+    inputs = [
+        {
+            "relative_path": "data/human_games/human_ml-fixture-1.jsonl",
+            "byte_length": 10,
+            "sha256": "a" * 64,
+            "session_id": "ml-fixture-1",
+            "status": "parsed",
+            "failure": None,
+        },
+        {
+            "relative_path": "data/human_db.sqlite",
+            "role": "active_human_db",
+            "byte_length": 20,
+            "sha256": "b" * 64,
+        },
+    ]
+
+    rows, encoding, normalized = _encode_input_files(inputs)
+
+    assert _decode_input_files(rows, encoding) == normalized
+    assert [row["sha256"] for row in normalized] == ["a" * 64, "b" * 64]
+
+
 def test_manifest_identity_detects_tampering() -> None:
     payload = {
-        "schema_version": "nmm.f0-d0-human-raw-reconstructability.v1",
-        "audit_id": "f0-d0-human-raw-reconstructability-v1",
+        "schema_version": SCHEMA_VERSION,
+        "audit_id": AUDIT_ID,
         "corpus_identity": "c" * 64,
         "counts": {"unique_sessions": 1},
     }
