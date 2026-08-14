@@ -451,6 +451,8 @@ def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
     assert "历史阶段过程诊断（156 / 156，已完成）" in web.HTML
     assert "按候选颜色分层（描述性）" in web.HTML
     assert "按冻结起始阶段分层（描述性）" in web.HTML
+    assert "产品处置：retained-v4 是优选研究候选" in web.HTML
+    assert "不是晋级、部署、发布或释放" in web.HTML
     assert web.HTML.index("held-out 高精度得分评测") < web.HTML.index(
         "历史阶段过程诊断"
     )
