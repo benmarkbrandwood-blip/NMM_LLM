@@ -1,0 +1,158 @@
+{
+  "schema_version": "nmm.f0-h0-corrected-split-measurement-plan.v1",
+  "measurement_id": "f0-h0-corrected-split-feasibility-2026-08-15",
+  "status": "frozen_before_corrected_split_statistics",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "repository_base_commit": "61f0d97d199fe81e7c45c7b4290e8c4700638187",
+  "plan_identity": "e1d2241cc23da1227fde7a3f84d2ff4c43a4167c2020d521abbc9f3eee1f833c",
+  "scope": {
+    "measure_split_scale_only": true,
+    "run_f0_h0_scientific_dimensions": false,
+    "select_final_design": false,
+    "make_feasibility_decision": false,
+    "make_recommendation": false
+  },
+  "input_boundary": {
+    "corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "behavior_games": 92226,
+    "behavior_logical_plies": 4394220,
+    "behavior_player_keys": 4994
+  },
+  "superseded_v1": {
+    "status": "superseded_by_corrected_split_design",
+    "defect": "requiring every complete game of every player to stay in one partition collapses each connected player-game component and tests only for a zero-cut partition; that algebraic consequence is not a corpus-specific split-scale measurement",
+    "preserve_without_modification": true,
+    "plan": {
+      "path": "docs/experiments/f0-h0-human-feasibility-screen-v1.json",
+      "file_sha256": "3ec32220b220f019b3a60c8a2e1519eae9933933a28b5ccf16072b06b78e2136",
+      "identity": "95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530"
+    },
+    "split": {
+      "path": "docs/experiments/f0-h0-human-player-split-membership-v1.json",
+      "file_sha256": "1ef901a6776bab15b96fa4ab25273223ae2028568f619fb35f6ecd96094b26c4",
+      "identity": "e41da5fbf1a2ba60441273664c6834dafcb54bcb79d541f3349a948f7cac5dd4"
+    },
+    "result": {
+      "path": "docs/evidence/f0-h0-human-feasibility-screen-manifest-2026-08-14.json",
+      "file_sha256": "84226cb96e1e7775a896220b3b9cee84b48f3f0562fb68c81ad6bdf28473692e",
+      "identity": "714627f8be20bc45a267c97752171644040fc1273a24f82a570a7cb83512fe82"
+    },
+    "replacement_scope": "the v1 split-stop conclusion only; F0-D0 identities and all v1 bytes remain historical evidence"
+  },
+  "graph_measurement": {
+    "vertices": "F0-D0 source-scoped behavior player keys",
+    "edges": "one behavior game; repeated player pairs are aggregated with game-count weight",
+    "self_games": "counted as games and player volume but excluded from opponent degree and topology edges",
+    "component_order": "descending player count, descending game count, component identity",
+    "degree_quantiles": "nearest-rank min, p01, p05, p10, p25, p50, p75, p90, p95, p99, max",
+    "opponent_degree_tail_thresholds": [5, 10, 25, 50, 100, 250],
+    "game_degree_tail_thresholds": [10, 25, 50, 100, 250, 500, 1000],
+    "community_detection": {
+      "method": "NetworkX Louvain",
+      "weight": "aggregated game count",
+      "resolution": 1.0,
+      "threshold": 1e-7,
+      "seed": 20260815
+    },
+    "time_week": "ISO Monday week start",
+    "time_cut_dates": [
+      "2026-03-01",
+      "2026-04-01",
+      "2026-05-01",
+      "2026-06-01",
+      "2026-07-01"
+    ],
+    "time_cut_semantics": "pre is date less than cut; post starts on cut date"
+  },
+  "design_a": {
+    "name": "player cut with discarded cross-boundary games",
+    "target_holdout_player_fractions": [0.05, 0.1, 0.2],
+    "algorithm": "Louvain-community initialization followed by fixed-cardinality weighted Kernighan-Lin refinement",
+    "targets_are_measured_independently": true,
+    "seed": "f0-h0-corrected-design-a-2026-08-15-v1",
+    "restarts": 8,
+    "maximum_kl_iterations": 25,
+    "selection_within_target": "minimum measured cut-game count, then membership identity",
+    "reported_counts": [
+      "holdout players",
+      "holdout internal games",
+      "train internal games",
+      "discarded cross-cut games and fraction"
+    ]
+  },
+  "design_b": {
+    "name": "calendar time holdout",
+    "cut_dates": [
+      "2026-03-01",
+      "2026-04-01",
+      "2026-05-01",
+      "2026-06-01",
+      "2026-07-01"
+    ],
+    "time_only": "all games on or after the cut",
+    "strong_time_and_player_isolation": "post-cut games for which both player keys are absent from every pre-cut game"
+  },
+  "design_c": {
+    "name": "decision-owner player partition",
+    "player_ratios": {
+      "train": 0.7,
+      "selection": 0.15,
+      "one-time-confirmation": 0.075,
+      "final-test": 0.075
+    },
+    "player_count_rounding": "largest remainder with fixed partition order for ties",
+    "seed": "f0-h0-corrected-design-c-2026-08-15-v1",
+    "assignment": "rank source player keys by domain-separated SHA-256 and assign exact player-count blocks",
+    "decision_owner": "White owns even zero-based logical plies and Black owns odd plies",
+    "game_count": "a partition counts a game when at least one logical ply is owned by one of its players",
+    "state_identity": "repository ring16 canonical pre-decision NMM FEN",
+    "raw_replay_reason": "F0-D0 retains move count but not per-ply predecessor states, so exact ring16 overlap requires strict replay of the manifest-bound raw game",
+    "overlap_rates": [
+      "unique ring16 orbit overlap per partition",
+      "decision-weighted overlap per partition",
+      "pairwise ring16 intersection and Jaccard",
+      "same-game versus cross-game-only shared orbits"
+    ],
+    "ply_distance_buckets": ["1", "2", "3-4", "5-8", "9-16", "17+"],
+    "trajectory_leakage": "cross-partition decision pairs from the same game, counted by exact logical-ply distance bucket regardless of ring16 equality"
+  },
+  "claim_analysis": {
+    "required_topics": [
+      "unseen source player generalization",
+      "future-period source traffic generalization",
+      "trajectory and state leakage",
+      "mechanism endpoint impact",
+      "product endpoint impact"
+    ],
+    "recommendation_prohibited": true
+  },
+  "implementation_inputs": {
+    "module": {
+      "path": "learned_ai/evaluation/human_f0h0_split_retest.py",
+      "sha256": "3bdd1a83299bbf4db3a8625459c9ac03063da216267a6903502cd7a23a8f44de"
+    },
+    "runner": {
+      "path": "scripts/measure_human_f0h0_split_retest.py",
+      "sha256": "3a675fd7cb483a54bc5d0ad2d22a2864758eef39fa44ba5396e0939758d83fa1"
+    },
+    "focused_tests": {
+      "path": "tests/test_human_f0h0_split_retest.py",
+      "sha256": "5a6726671356f6e75e66653f517f9702c93d3b019c275d0632bab6b0f1bedbe5"
+    },
+    "networkx_version": "3.6.1",
+    "ring16_implementation": "learned_ai.evaluation.oracle_corpus.ring16_canonical_fen"
+  },
+  "prohibited_operations": {
+    "database_writes": true,
+    "games": true,
+    "search_batches": true,
+    "models": true,
+    "training": true,
+    "malom_queries": true,
+    "f0_h0_scientific_dimensions": true,
+    "final_split_selection": true,
+    "source_pool_2eb04f54_reads": true
+  }
+}
