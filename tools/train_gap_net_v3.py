@@ -239,15 +239,22 @@ def _evaluate_cell_verdict(
 ) -> tuple[str, dict]:
     """Return (verdict, detail) for one Gate × (band × component) cell.
 
-    Verdicts (Codex P2-A, 2026-08-12):
+    Verdicts (Codex P2-A 2026-08-12, hardened by P1 follow-up 2026-08-13):
       - "PASS"                              — gate satisfied.
       - "FAIL"                              — finite metrics, gate violated.
-      - "SKIP_INSUFFICIENT_SUPPORT"         — n_high_support < min_n_high_support.
-      - "SKIP_DEGENERATE_DENOMINATOR"       — |reference_mse| < min_denominator.
-      - "SKIP_NON_FINITE"                   — candidate or reference MSE is NaN
-                                              (empty mask), a diagnostic gap.
       - "FAIL_DIVERGED"                     — candidate or reference MSE is ±inf
                                               (training divergence).
+      - "FAIL_UNEXPECTED_NAN"               — cell has adequate support
+                                              (n_high_support ≥ min) but a
+                                              gate MSE is NaN — a training bug
+                                              or corrupt data, treated as
+                                              failure (was SKIP_NON_FINITE).
+      - "SKIP_INSUFFICIENT_SUPPORT"         — n_high_support < min_n_high_support.
+      - "SKIP_DEGENERATE_DENOMINATOR"       — |reference_mse| < min_denominator.
+
+    SKIP_NON_FINITE is no longer returned by this helper — supported cells
+    with NaN MSE are FAIL_UNEXPECTED_NAN.  The name is retained as a defensive
+    combine-helper fallback only (see _combine_gate_verdicts).
     """
     if n_high_support < min_n_high_support:
         return "SKIP_INSUFFICIENT_SUPPORT", {
@@ -310,9 +317,12 @@ def _report_gate(
 ) -> tuple[list[dict], dict]:
     """Compute Stage E gate metrics per component per band with executable verdicts.
 
-    Codex P2-A hardening (2026-08-12): the gate returns pass/fail per cell
-    (band × component) alongside the raw MSE values.  Overall verdict is
-    "PASS" iff every non-skipped cell in both gates passes.
+    Codex P2-A 2026-08-12 + P1 follow-up 2026-08-13: the gate returns
+    pass/fail per cell (band × component) alongside the raw MSE values.
+    Under the "ALL_CELLS_MUST_PASS" coverage rule, overall PASS requires
+    every one of `n_cells_total = _N_HEADS × _N_BANDS` cells to PASS.
+    Anything less is FAIL (if any FAIL) or FAIL_INSUFFICIENT_COVERAGE
+    (if all non-fail cells are SKIP).  See summary.overall_verdict.
 
     Reference framing (Decision 3A, 2026-08-06):
       - High-support rows (empirical present): empirical G_v is the reference.
@@ -330,10 +340,10 @@ def _report_gate(
       results:  list[per-component dict with per_band verdict info]
       summary:  overall verdict + thresholds + failing/insufficient cell lists
     """
-    results:  list[dict] = []
-    failing_cells:      list[dict] = []
-    insufficient_cells: list[dict] = []
-    n_pass = n_fail = n_insufficient = n_degenerate = n_non_finite = n_diverged = 0
+    results:       list[dict] = []
+    failing_cells: list[dict] = []
+    skipped_cells: list[dict] = []
+    n_pass = n_fail = n_insufficient = n_degenerate = n_non_finite = 0
 
     for c in range(_N_HEADS):
         comp_result = {"component": _COMP_NAMES[c], "per_band": {}}
@@ -382,8 +392,10 @@ def _report_gate(
             row["gate_2_verdict"] = gate2_verdict
             row["gate_2_detail"]  = gate2_detail
 
-            # Cell verdict = PASS iff both gates PASS.  Any FAIL / FAIL_DIVERGED
-            # → cell FAIL.  Otherwise (all SKIP_* variants) → SKIP.
+            # Cell verdict: PASS iff both gates PASS; any FAIL / FAIL_DIVERGED /
+            # FAIL_UNEXPECTED_NAN → cell FAIL (see _combine_gate_verdicts for
+            # precedence).  Only when both gates are SKIP does the cell SKIP;
+            # under ALL_CELLS_MUST_PASS a single SKIP blocks overall PASS.
             cell_verdict = _combine_gate_verdicts(gate1_verdict, gate2_verdict)
             row["cell_verdict"] = cell_verdict
 
@@ -402,14 +414,19 @@ def _report_gate(
                     "n_high_support": n_high_support,
                 })
             else:
-                # SKIP_INSUFFICIENT_SUPPORT / SKIP_DEGENERATE_DENOMINATOR / SKIP_NON_FINITE
+                # SKIP_INSUFFICIENT_SUPPORT / SKIP_DEGENERATE_DENOMINATOR.
+                # SKIP_NON_FINITE is a defensive combine-helper fallback and
+                # should not be reachable via _evaluate_cell_verdict any more
+                # (supported NaN is FAIL_UNEXPECTED_NAN); n_cells_skip_non_finite
+                # is retained as a diagnostic counter in case that invariant
+                # ever regresses.
                 if "INSUFFICIENT" in cell_verdict:
                     n_insufficient += 1
                 elif "DEGENERATE" in cell_verdict:
                     n_degenerate += 1
                 elif "NON_FINITE" in cell_verdict:
                     n_non_finite += 1
-                insufficient_cells.append({
+                skipped_cells.append({
                     "band": band_name, "component": comp_name,
                     "cell_verdict": cell_verdict,
                     "n_high_support": n_high_support,
@@ -438,7 +455,7 @@ def _report_gate(
         "n_cells_skip_degenerate":      n_degenerate,
         "n_cells_skip_non_finite":      n_non_finite,
         "failing_cells":                failing_cells,
-        "skipped_cells":                insufficient_cells,
+        "skipped_cells":                skipped_cells,
         "coverage_rule":                "ALL_CELLS_MUST_PASS",
         "thresholds": {
             "x_a":                x_a,
