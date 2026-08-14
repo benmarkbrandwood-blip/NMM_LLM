@@ -3,11 +3,13 @@ from pathlib import Path
 from learned_ai.evaluation.human_f0h0_b2_train_screen import (
     EXPECTED_SAMPLE_COMPOSITION,
     load_screen_plan,
+    verify_implementation_artifacts,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PLAN = ROOT / "docs/experiments/f0-h0-b2-train-rejection-screen-v1.json"
+PLAN_V2 = ROOT / "docs/experiments/f0-h0-b2-train-rejection-screen-v2.json"
 
 
 def test_historical_frozen_train_screen_plan_remains_sealed() -> None:
@@ -50,3 +52,20 @@ def test_frozen_plan_keeps_rejection_and_positional_boundaries() -> None:
     assert (
         plan["thresholds"]["product_effect"]["minimum_signable_absolute_effect"] == 0.01
     )
+
+
+def test_technical_replay_changes_code_only_not_thresholds_or_sample() -> None:
+    original, _original_sha = load_screen_plan(PLAN)
+    replay, _replay_sha = load_screen_plan(PLAN_V2)
+
+    assert replay["plan_identity"] == (
+        "a6972c3dae62ec249ccf6ea7bc7bf46132288a15db41b1c33b347b75615a9d0c"
+    )
+    assert replay["technical_correction"]["thresholds_changed"] is False
+    assert replay["technical_correction"]["sample_changed"] is False
+    assert replay["thresholds"] == original["thresholds"]
+    assert (
+        replay["sample"]["train_session_ids_identity"]
+        == original["sample"]["train_session_ids_identity"]
+    )
+    verify_implementation_artifacts(ROOT, replay)

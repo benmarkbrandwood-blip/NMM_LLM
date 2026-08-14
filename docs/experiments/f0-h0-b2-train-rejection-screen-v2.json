@@ -1,0 +1,175 @@
+{
+  "schema_version": "nmm.f0-h0-b2-train-rejection-plan.v1",
+  "screen_id": "f0-h0-b2-train-only-rejection-screen-technical-replay-v2-2026-08-15",
+  "status": "technical_replay_frozen_with_v1_thresholds_unchanged",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "repository_base_commit": "264ef1fbb1a0463deab7dcde7edecb209e8d34ac",
+  "plan_identity": "a6972c3dae62ec249ccf6ea7bc7bf46132288a15db41b1c33b347b75615a9d0c",
+  "technical_correction": {
+    "supersedes_execution_plan_identity": "dd87175dc950cbcde4b0b44cd5d4a8da0b039dcbd3cacaf198ba43ec00de0bdc",
+    "supersedes_execution_plan_file_sha256": "a5c9c09bba136f9b794c369aded06df6c0980fe9849320cfdaf6bacca22a5dc1",
+    "supersedes_result_identity": "84434066d5c4fc58fd82585a32c5bff9ef69ecfe4badb2a0c3289b4b0fb7068b",
+    "supersedes_result_file_sha256": "e03e6e63a788e53f76479c48995d3c02657231c74a78d6396a35cb57ce403297",
+    "defect": "unequal Jeffreys pseudo-count denominators created positive action lift for transitions with zero observed events",
+    "correction": "zero-event transitions report point zero and a fixed-membership Wilson exposure-rate upper bound without asserting an action contrast",
+    "thresholds_changed": false,
+    "sample_changed": false,
+    "resampling_allowed": false,
+    "historical_v1_files_modified": false
+  },
+  "objective": {
+    "stage": "F0-H0",
+    "kind": "train-only read-only rejection screen technical replay",
+    "pass_effect": "does not approve E0 or any later stage",
+    "decision_vocabulary": [
+      "not_rejected_at_f0_h0",
+      "stop_condition_triggered"
+    ]
+  },
+  "input_boundary": {
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "b2_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "b2_membership_file_sha256": "06c3be92c87927d506dc36eb908aec3064220f4ead2ebb3b5ff3dfb7bf5032cb",
+    "b2_characterization_identity": "183a39ab29ddfbec76a7188606b0a1297ffbdb845346a05753807f2c609b65e6",
+    "b2_characterization_file_sha256": "7ab7f68b29072e0de132525970b9cbcbbf68b58d07bda8ed36117e54c45da779",
+    "fallback_sample_identity": "d43ee042514d9dea389849e943a5fb9d0f2d6218f6e226a980afc9354e9c8cd4",
+    "malom": {
+      "manifest_file_sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+      "content_sha256": "c414fe88778f8d1d95cd3015532b43cad59f09e8398d8e46c42188b6829f3544",
+      "dataset_id": "malom-standard-ultra-strong-sector-corrected-v1",
+      "trust_level": "sector-corrected-v1"
+    },
+    "ruleset_file_sha256": "79f69a60ba9a1171df113f208396c17a31c85407388857e00fd7010f3a01293a",
+    "source_pool_2eb04f54_records_allowed": 0
+  },
+  "sample": {
+    "frozen_fallback_games": 10000,
+    "membership_composition": {
+      "train": 9113,
+      "selection": 887,
+      "confirmation": 0,
+      "final-test": 0
+    },
+    "analysis_partition": "train",
+    "analysis_games": 9113,
+    "train_session_ids_identity": "124f568c60c4c3e475987ac7f2187b758c617cf70a7ed1b052b2301265138cd1",
+    "resampling_allowed": false
+  },
+  "statistics_partitions": [
+    "train"
+  ],
+  "protected_partitions": {
+    "selection": "membership-only; content sealed",
+    "confirmation": "membership-only; content sealed",
+    "final-test": "membership-only; content sealed"
+  },
+  "safe_set": "A_pos",
+  "a_allow_claim": false,
+  "state_safety": "positional-only",
+  "four_b_execution_rule": "run_only_if_four_a_passes",
+  "thresholds": {
+    "independent_support": {
+      "minimum_independent_players": 5,
+      "minimum_independent_games": 10,
+      "minimum_ring16_supported_classes": 50,
+      "minimum_ring16_supported_decision_fraction": 0.8,
+      "observation_tail_thresholds": [
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+        250,
+        500,
+        1000
+      ],
+      "provenance": "inherits the pre-statistic exact-state support floor and supported-decision coverage from F0-H0 v1; applies the same floor to ring16"
+    },
+    "modifiable_reachability": {
+      "minimum_modifiable_decisions": 1000,
+      "minimum_modifiable_fraction_lcb": 0.05,
+      "minimum_supported_modifiable_fraction_lcb": 0.01,
+      "minimum_supported_modifiable_game_reach_lcb": 0.1,
+      "interval": "whole-game clustered normal 95 percent interval",
+      "provenance": "inherits the pre-statistic 5 percent modifiable-state and 10 percent supported-game-reach floors from F0-H0 v1"
+    },
+    "concentration": {
+      "maximum_player_top_1_percent_share": 0.25,
+      "maximum_player_top_5_percent_share": 0.5,
+      "maximum_player_top_10_percent_share": 0.7,
+      "maximum_player_gini": 0.75,
+      "minimum_player_kish_effective_units": 500.0,
+      "minimum_supported_modifiable_players": 100,
+      "maximum_supported_modifiable_player_top_5_percent_share": 0.5,
+      "maximum_ring16_state_top_1_percent_share": 0.1,
+      "provenance": "player top-1, Gini, and Kish gates inherit F0-H0 v1; remaining descriptive gates were frozen before this screen"
+    },
+    "estimability": {
+      "k": 20,
+      "m": 5,
+      "minimum_ring16_classes": 50,
+      "minimum_ring16_covered_decision_fraction": 0.01,
+      "minimum_ring16_covered_games": 250,
+      "minimum_ring16_covered_players": 100,
+      "crossfit_seed": "f0-h0-b2-train-action-effect-crossfit-2026-08-15-v1",
+      "crossfit_selection_minimum": 2,
+      "crossfit_evaluation_minimum": 2,
+      "minimum_crossfit_classes": 20,
+      "bootstrap_replicates": 2000,
+      "bootstrap_seed": "f0-h0-b2-train-ring16-bootstrap-2026-08-15-v1",
+      "provenance": "frozen before state support, reachability, concentration, or effect statistics were computed"
+    },
+    "product_effect": {
+      "minimum_signable_absolute_effect": 0.01,
+      "unit": "absolute probability of an immediate first positional WDL downgrade per eligible source-domain game or exposure",
+      "gate": "trigger the stop condition when every corrected transition upper 95 percent bound, or the conservative all-sample supported-guided upper bound, is below 0.01",
+      "provenance": "inherits the one-percentage-point pre-statistic signed product threshold from F0-H0 v1; this is a rejection threshold, not an approval or release threshold"
+    },
+    "oracle_coverage": {
+      "minimum_decision_coverage": 0.99,
+      "maximum_abstention_fraction": 0.01,
+      "missing_or_out_of_domain_policy": "abstain and count against coverage; never substitute or impute"
+    }
+  },
+  "threshold_equality": {
+    "reference_plan_identity": "dd87175dc950cbcde4b0b44cd5d4a8da0b039dcbd3cacaf198ba43ec00de0bdc",
+    "required": true,
+    "comparison": "canonical SHA-256 of the thresholds object must match v1"
+  },
+  "decision_rule": {
+    "not_rejected_at_f0_h0": "every preregistered gate is true; this is not approval",
+    "stop_condition_triggered": "one or more preregistered gate is false",
+    "no_gate_changes_after_statistics": true,
+    "no_substitute_data_after_stop": true
+  },
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_f0h0_b2_train_screen.py",
+      "sha256": "d39b67c2593ac081eb4eb7f26b34166c7e4759649b8926dddc0c303ec2c7fe86"
+    },
+    {
+      "path": "scripts/run_human_f0h0_b2_train_screen.py",
+      "sha256": "f179581b78a66726e6eda9438e395a39d75eee6ba9be6f97556210fabe07ac72"
+    },
+    {
+      "path": "tests/test_human_f0h0_b2_train_screen.py",
+      "sha256": "67d6b9bfdb50f4f4f886aac3d1d0b392577f3592d330fe9695d24b5984e8546a"
+    }
+  ],
+  "prohibited_operations": {
+    "database_writes_or_rebuilds": true,
+    "games": true,
+    "search_batches": true,
+    "model_loading": true,
+    "training": true,
+    "selection_content_reads": true,
+    "confirmation_content_reads": true,
+    "final_test_content_reads": true,
+    "later_funnel_stages": true,
+    "source_pool_2eb04f54_reads": true
+  }
+}
