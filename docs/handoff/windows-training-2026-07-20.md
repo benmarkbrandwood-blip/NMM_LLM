@@ -22,7 +22,8 @@ The governing product objective is now safe human-error induction and
 conversion inside a verified permitted action set, not fixed-node Sanmill
 score alone. The
 [measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
-now records a completed read-only F0-D0 screen but authorizes no later gate.
+now records completed read-only F0-D0 and F0-H0 screens but authorizes no later
+gate.
 The remaining 108 held-out source records remain unconsumed.
 
 F0-D0 froze current raw-corpus identity
@@ -43,8 +44,19 @@ recoverable. The archived 95,221 value belongs to 94,373 accepted unique
 sessions plus 848 accepted duplicate paths in a different inventory that has
 396 session IDs absent from the current raw corpus. See the
 [F0-D0 evidence](../evidence/f0-d0-human-raw-reconstructability-2026-08-14.md)
-and its 30,378,269-byte machine-readable manifest. F0-H0, E0, F0-H1, and
-T0-H-pilot have not started; no database rebuild or source-pool access is
+and its 30,378,269-byte machine-readable manifest.
+
+F0-H0 froze plan identity
+`95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530`
+before membership calculation.  All 4,994 player keys and 92,226 behavior
+games form one player-game connected component, so a complete player-isolated
+four-way split cannot populate selection, one-time-confirmation, or final-test.
+The decision is `触发停止条件` under result identity
+`714627f8be20bc45a267c97752171644040fc1273a24f82a570a7cb83512fe82`.
+The screen stopped with zero raw-game reads and zero Malom queries.  Preserve
+the [F0-H0 evidence](../evidence/f0-h0-human-feasibility-screen-2026-08-14.md)
+and its frozen membership file.  E0, F0-H1, and T0-H-pilot have not started;
+no database rebuild, alternative data substitution, or source-pool access is
 authorized by this result.
 
 ## Transfer checkpoint — 13 August 2026

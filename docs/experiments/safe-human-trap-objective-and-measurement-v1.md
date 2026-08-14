@@ -2,7 +2,7 @@
 
 Date: 2026-08-14
 
-Status: `product_objective_defined_f0_d0_completed_no_launch_authority`
+Status: `product_objective_defined_f0_h0_stop_condition_no_launch_authority`
 
 Authority: `product-owner-direct`
 
@@ -161,10 +161,27 @@ termination basis are absent. The 1,751 strict legality failures and 54,923
 nonterminal results remain individually attributed in the manifest without
 invented causes.
 
-F0-H0 has not started. Its membership, access controls, target condition, and
-claim boundary must be frozen separately. No later gate, game, search, model
-load, training change, database rebuild, or source-pool access is authorized
-by the F0-D0 result.
+## F0-H0 completion -- 14 August 2026
+
+F0-H0 froze plan identity
+`95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530`
+before calculating membership.  Its mandatory player-isolated split then
+found that all 4,994 player keys and 92,226 behavior games belong to one
+connected player-game component.  Complete player isolation therefore puts
+all games in train and leaves selection, one-time-confirmation, and final-test
+empty.
+
+The rejection-only decision is **`触发停止条件`**, under result identity
+`714627f8be20bc45a267c97752171644040fc1273a24f82a570a7cb83512fe82`.
+The screen stopped before opening raw game records or starting its Malom cost
+pilot.  State support, `A_pos` reach, decision-level concentration, and product
+headroom are explicit abstentions, not zero estimates.  See the
+[F0-H0 evidence](../evidence/f0-h0-human-feasibility-screen-2026-08-14.md).
+
+The required sequence stops here for this corpus and player-isolated design.
+No later gate, game, search, model load, training change, database rebuild,
+alternative-data substitution, or source-pool access is authorized by either
+F0 result.
 
 The complexity proxy may be designed alongside F0, but execution still needs
 its own immutable search/evaluation contract and resource authorization.

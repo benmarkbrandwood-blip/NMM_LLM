@@ -1,0 +1,236 @@
+{
+  "schema_version": "nmm.f0-h0-read-only-rejection-result.v1",
+  "screen_id": "f0-h0-safe-human-trap-read-only-rejection-2026-08-14",
+  "status": "terminated_at_mandatory_player_split_gate",
+  "decision": "触发停止条件",
+  "completed_at_utc": "2026-08-14T15:12:43.156Z",
+  "result_identity": "714627f8be20bc45a267c97752171644040fc1273a24f82a570a7cb83512fe82",
+  "decision_scope": {
+    "kind": "read-only rejection only",
+    "cannot_approve_e0_or_later": true,
+    "no_feasibility_claim": true,
+    "no_substitute_data": true,
+    "terminal_reason": "the required player-isolated four-way split is impossible because every behavior-eligible game and player key belongs to one connected player-game component"
+  },
+  "lineage": {
+    "repository_base_commit": "4803dcde127ca8e4a16a8df287de1a7dc76a5e2a",
+    "preregistration_commit": "ba2fbf658cd2922e56544ab11bf3f5d16d78425f",
+    "split_commit": "1d37ae52c2df5ddb10c4a429f0f530033cad15fa",
+    "plan_identity": "95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530",
+    "split_identity": "e41da5fbf1a2ba60441273664c6834dafcb54bcb79d541f3349a948f7cac5dd4",
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7"
+  },
+  "input_files": [
+    {
+      "path": "docs/evidence/f0-d0-human-raw-reconstructability-manifest-2026-08-14.json",
+      "role": "mandatory source-domain boundary",
+      "sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6"
+    },
+    {
+      "path": "docs/experiments/f0-h0-human-feasibility-screen-v1.json",
+      "role": "frozen preregistration",
+      "sha256": "3ec32220b220f019b3a60c8a2e1519eae9933933a28b5ccf16072b06b78e2136"
+    },
+    {
+      "path": "docs/experiments/f0-h0-human-player-split-membership-v1.json",
+      "role": "frozen membership",
+      "sha256": "1ef901a6776bab15b96fa4ab25273223ae2028568f619fb35f6ecd96094b26c4"
+    }
+  ],
+  "identity_recomputation": {
+    "f0d0_manifest_file_sha256_match": true,
+    "f0d0_manifest_identity_match": true,
+    "f0d0_corpus_identity_match": true,
+    "split_identity_match": true,
+    "split_file_sha256_match": true,
+    "independent_player_graph_recomputation_match": true
+  },
+  "frozen_split": {
+    "algorithm": "complete player-game connected components assigned as indivisible units",
+    "seed": "f0-h0-player-component-split-2026-08-14-v1",
+    "requested_ratios": {
+      "train": 0.7,
+      "selection": 0.15,
+      "one-time-confirmation": 0.075,
+      "final-test": 0.075
+    },
+    "component_count": 1,
+    "largest_component": {
+      "component_identity": "a8171ae6e77e84577c5df2b6a4f5712ca7face9f3d474989f6cc5d81012420b1",
+      "games": 92226,
+      "logical_plies": 4394220,
+      "player_keys": 4994,
+      "game_share": 1.0,
+      "partition": "train"
+    },
+    "actual_counts": {
+      "train": {
+        "games": 92226,
+        "logical_plies": 4394220,
+        "player_keys": 4994
+      },
+      "selection": {
+        "games": 0,
+        "logical_plies": 0,
+        "player_keys": 0
+      },
+      "one-time-confirmation": {
+        "games": 0,
+        "logical_plies": 0,
+        "player_keys": 0
+      },
+      "final-test": {
+        "games": 0,
+        "logical_plies": 0,
+        "player_keys": 0
+      }
+    },
+    "provisional_cross_partition_games": 38156,
+    "mandatory_four_way_player_isolation_satisfied": false,
+    "failure_proof": "splitting any game into another partition would place at least one of its connected player keys in more than one partition"
+  },
+  "gate_results": {
+    "mandatory_player_isolated_four_way_split": false,
+    "analysis_independent_components": false,
+    "analysis_largest_component_game_share": false,
+    "oracle_independent_components": null,
+    "oracle_largest_component_game_share": null,
+    "coarse_supported_decision_fraction": null,
+    "modifiable_state_fraction": null,
+    "supported_modifiable_game_reach_lcb": null,
+    "player_top_1_percent_share": null,
+    "player_gini": null,
+    "player_kish_effective_units": null,
+    "product_effect_upper_bound": null
+  },
+  "thresholds": {
+    "support": {
+      "exact_minimum_players": 5,
+      "exact_minimum_games": 10,
+      "coarse_minimum_players": 30,
+      "coarse_minimum_games": 100,
+      "minimum_supported_decision_fraction": 0.8
+    },
+    "reachability": {
+      "minimum_modifiable_state_fraction": 0.05,
+      "minimum_supported_game_reach_lcb": 0.1
+    },
+    "concentration": {
+      "maximum_top_1_percent_share": 0.25,
+      "maximum_player_gini": 0.75,
+      "minimum_player_kish_ess": 500.0
+    },
+    "dependence": {
+      "minimum_analysis_components": 30,
+      "maximum_analysis_component_game_share": 0.2,
+      "minimum_oracle_components": 30,
+      "maximum_oracle_component_game_share": 0.2
+    },
+    "product_effect": {
+      "minimum_signable_score_effect": 0.01,
+      "unit": "average match-score points per natural source-domain game",
+      "gate": "reject when the conservative factual upper 95 percent bound is below 0.01",
+      "rationale": "one percentage point is the smallest product effect signed before observing F0-H0 statistics; this is a rejection threshold, not a release threshold"
+    }
+  },
+  "dimensions": {
+    "independent_support": {
+      "status": "abstained_after_prerequisite_failure",
+      "measured_split_components": 1,
+      "minimum_analysis_components": 30,
+      "measured_largest_component_game_share": 1.0,
+      "maximum_analysis_component_game_share": 0.2,
+      "state_support_distribution": null,
+      "reason": "no player-isolated selection population exists; opening train raw games would not repair the failed split"
+    },
+    "modifiable_state_reachability": {
+      "status": "abstained_after_prerequisite_failure",
+      "labels": "positional-only",
+      "safe_set_name": "A_pos",
+      "not_a_allow": true,
+      "malom_queries": 0,
+      "a_pos_cardinality_distribution": null,
+      "reason": "the mandatory split gate failed before the bounded Malom cost pilot"
+    },
+    "concentration": {
+      "status": "structural_component_concentration_measured; decision-level concentration abstained",
+      "player_network_components": 1,
+      "largest_component_game_share": 1.0,
+      "top_1_percent_player_decision_share": null,
+      "player_decision_gini": null,
+      "player_decision_kish_ess": null,
+      "reason": "decision records were not opened after the terminal split failure"
+    },
+    "product_effect_upper_bound": {
+      "status": "abstained_after_prerequisite_failure",
+      "mechanism_global_base": {
+        "games": 92226,
+        "logical_plies": 4394220,
+        "player_keys": 4994
+      },
+      "factual_global_base": {
+        "games": 37866,
+        "player_keys": 3392
+      },
+      "first_transition_counts": {
+        "W->D": null,
+        "W->L": null,
+        "D->L": null
+      },
+      "supported_steerable_predecessor_bound": null,
+      "factual_outcome_distribution": null,
+      "reason": "estimating the signed bound after the split failure would use a noncompliant all-train corpus and could not support the frozen selection design"
+    }
+  },
+  "cost_and_sampling": {
+    "bounded_cost_pilot_status": "not_started_due_to_prior_terminal_gate",
+    "malom_queries": 0,
+    "full_or_sample_decision": null,
+    "sample_membership": null,
+    "frozen_fallback_design": {
+      "unit": "whole train-or-selection game",
+      "games": 8192,
+      "seed": "f0-h0-oracle-analysis-sample-2026-08-14-v1"
+    },
+    "reason": "no Malom execution mode needed to be chosen after the mandatory split failed"
+  },
+  "access_audit": {
+    "f0d0_manifest_read": true,
+    "raw_human_game_files_opened": 0,
+    "raw_human_game_bytes_read": 0,
+    "one-time-confirmation_raw_record_reads": 0,
+    "one-time-confirmation_statistics_reads": 0,
+    "final-test_raw_record_reads": 0,
+    "final-test_statistics_reads": 0,
+    "aggregated_humandb_membership_reads": 0,
+    "source_pool_2eb04f54_records_read": 0
+  },
+  "known_biases_inherited": {
+    "history_attrition_nonrandom": {
+      "excluded_games": 1751,
+      "excluded_draws": 35,
+      "retained_history_games": 92789,
+      "retained_draws": 26157,
+      "random_sample_claim": false
+    },
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact source rules variant",
+      "explicit import batch",
+      "upstream source-file identity"
+    ],
+    "unverifiable_result_games": 54923,
+    "transport": "no inference to product UI, other time controls, other rule variants, or new people"
+  },
+  "prohibited_operations_observed": {
+    "database_writes": 0,
+    "games_started": 0,
+    "search_batches_started": 0,
+    "models_loaded": 0,
+    "training_updates": 0,
+    "later_funnel_stages_started": 0,
+    "source_pool_records_consumed": 0
+  }
+}
