@@ -4,7 +4,7 @@ Date: 2026-08-14
 
 Updated: 2026-08-15
 
-Status: `f0_h0_design_b_supplement_measured_no_split_selected_no_launch_authority`
+Status: `f0_h0_b2_membership_frozen_before_screening_no_launch_authority`
 
 Authority: `product-owner-direct`
 
@@ -225,6 +225,40 @@ candidate measurements are hypothetical only.  No final membership is
 frozen, no support threshold or split is selected, and no F0-H0 scientific
 dimension has run.  The supplement authorizes no later gate or state-changing
 operation.
+
+## Binding B2 split and state-novelty addendum -- 15 August 2026
+
+The product owner selected Design B2 with cuts at 1 April and 1 May 2026.
+The freeze contract was sealed before membership generation under plan
+identity
+`a4dc271d00a36394d4e5b61751f7536cf3e869cb90136fbe7bedd6016c6acb30`.
+The F0-D0 manifest then reproduced exactly 36,949 train, 887 selection, 386
+confirmation, and 847 final-test sessions without opening any raw game.
+Official membership identity
+`06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b`
+freezes those four session-ID sets.  The three test-segment player-key sets
+have 295, 160, and 322 keys and zero pairwise intersections.  Final-test
+content remains sealed behind a fail-closed accessor until a separate
+one-time authorization.
+
+This addendum does not run or pass F0-H0.  Independent support, modifiable
+state reach, concentration, and the product-effect upper bound remain
+uncomputed.  Only train, selection, and confirmation may be characterized in
+the freeze round; final-test may expose only its count and membership hash.
+
+The earlier same-metric comparison measured decision-weighted `ring16`
+overlap of 34.32% and 53.60% for Design B, below the 37.55% and 57.31%
+same-size random disjoint-game baseline.  The source is the
+[Design B supplement evidence](../evidence/f0-h0-design-b-supplement-2026-08-15.md).
+The substantial shared-state rate therefore reflects intrinsic Nine Men's
+Morris state convergence, not a defect uniquely introduced by B2.  At the
+coverage required by this corpus, state-level novelty is not an attainable
+acceptance boundary.  This is binding on later contracts: contamination,
+acceptance, and generalization claims must be defined at game and player
+levels.  They must not require that a canonical or `ring16` state was never
+seen.  State overlap may still be measured and reported as a diagnostic, but
+it cannot veto a game/player-isolated split or be relabelled as player or
+game leakage.
 
 The complexity proxy may be designed alongside F0, but execution still needs
 its own immutable search/evaluation contract and resource authorization.

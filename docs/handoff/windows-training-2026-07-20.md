@@ -23,7 +23,8 @@ conversion inside a verified permitted action set, not fixed-node Sanmill
 score alone. The
 [measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
 now records completed F0-D0 evidence and a corrected F0-H0 split-scale
-measurement, but authorizes no scientific screen or later gate.
+measurement.  The product owner subsequently selected and froze Design B2,
+but this authorizes no scientific screen or later gate.
 The remaining 108 held-out source records remain unconsumed.
 
 F0-D0 froze current raw-corpus identity
@@ -84,11 +85,28 @@ equivalent to that control.  Preserve the
 [supplement evidence](../evidence/f0-h0-design-b-supplement-2026-08-15.md)
 and machine manifest.
 
-The supplement selects no split, freezes no eventual final-test membership,
-and makes no feasibility or continuation decision.  The four F0-H0 scientific
-dimensions, E0, F0-H1, and T0-H-pilot remain unstarted.  No Malom query,
-game, search, model load, training, database operation, or source-pool access
-is authorized by it.
+The supplement itself selected no split and made no feasibility or
+continuation decision.  The product owner later selected its B2 early-month
+candidate.  Plan identity
+`a4dc271d00a36394d4e5b61751f7536cf3e869cb90136fbe7bedd6016c6acb30`
+froze the definitions and cost rules before membership generation.  The
+F0-D0 manifest reproduced 36,949/887/386/847 session memberships exactly,
+with official membership identity
+`06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b`.
+The selection, confirmation, and final-test player sets contain 295, 160, and
+322 keys with zero pairwise intersections.  No raw game was opened while
+freezing.  Final-test is now sealed: only its 847 IDs and membership hash may
+be read until separate one-time authorization, and the supported accessor
+raises before any raw, decision, or feature read.
+
+The four F0-H0 scientific dimensions, E0, F0-H1, and T0-H-pilot remain
+unstarted.  The selected split and frozen membership authorize no game,
+search, model load, training, database operation, scientific-screen claim, or
+source-pool access.  The binding objective addendum also records that unseen
+state is not a valid gate: Design B's 34.32%/53.60% decision-weighted `ring16`
+overlap was below the 37.55%/57.31% same-size random baseline.  Future
+contamination and generalization boundaries must therefore be game- and
+player-level; state overlap remains diagnostic only.
 
 The result verifier passed with the recorded result identity and file hash.
 The supplement's two focused test files pass 11 tests, and task-scope Ruff
