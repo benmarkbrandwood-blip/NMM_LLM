@@ -78,26 +78,21 @@ from tools.prepare_retained_phase_process_inputs import (  # noqa: E402
 
 
 DEFAULT_PLAN = _ROOT / (
-    "docs/experiments/"
-    "sanmill-retained-v3-v4-phase-process-generalization-v1.json"
+    "docs/experiments/sanmill-retained-v3-v4-phase-process-generalization-v1.json"
 )
 DEFAULT_PATHS = _ROOT / "data/training_paths.local.json"
 SOURCE_READINESS_SCHEMA = (
     "nmm.retained-phase-process-generalization-source-readiness.v1"
 )
 READINESS_SCHEMA = "nmm.retained-phase-process-generalization-readiness.v1"
-AUTHORIZATION_SCHEMA = (
-    "nmm.retained-phase-process-generalization-authorization.v1"
-)
+AUTHORIZATION_SCHEMA = "nmm.retained-phase-process-generalization-authorization.v1"
 LAUNCH_SCHEMA = "nmm.retained-phase-process-generalization-launch.v1"
 PROGRESS_SCHEMA = "nmm.retained-phase-process-generalization-progress.v1"
 FAILURE_SCHEMA = "nmm.retained-phase-process-generalization-failure.v1"
 COMPLETION_SCHEMA = "nmm.retained-phase-process-generalization-completion.v1"
 POST_PLAN_STATUS_DOCUMENTS = {
-    "docs/evidence/"
-    "sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md",
-    "docs/experiments/"
-    "sanmill-retained-v3-v4-phase-process-generalization-v1.md",
+    "docs/evidence/sanmill-retained-v3-v4-phase-process-corpus-readiness-2026-08-13.md",
+    "docs/experiments/sanmill-retained-v3-v4-phase-process-generalization-v1.md",
     "docs/handoff/windows-training-2026-07-20.md",
     "docs/local-training-layout.md",
 }
@@ -116,9 +111,7 @@ def _output_record(paths: DiagnosticPaths, *, resume: bool) -> dict[str, Any]:
     mechanism = paths.output_root / "mechanism-report.json"
     _assert_ignored(mechanism)
     if mechanism.exists():
-        raise RetainedPhaseProcessError(
-            "phase-process mechanism report already exists"
-        )
+        raise RetainedPhaseProcessError("phase-process mechanism report already exists")
     return {**result, "mechanism_report": "absent"}
 
 
@@ -128,9 +121,7 @@ def _repository_record(
 ) -> dict[str, Any]:
     observed = _base_repository_record(plan, paths)
     relative_plan = paths.plan.relative_to(_ROOT).as_posix()
-    plan_commit = str(
-        _git("log", "-1", "--format=%H", "--", relative_plan)
-    )
+    plan_commit = str(_git("log", "-1", "--format=%H", "--", relative_plan))
     if len(plan_commit) != 40:
         raise RetainedPhaseProcessError("tracked plan commit is absent")
     try:
@@ -190,9 +181,7 @@ def _source_gate_view(gates: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]
                     "repository source-readiness evidence is incomplete: "
                     + ", ".join(missing)
                 )
-            item["observed"] = {
-                field: observed[field] for field in fields
-            }
+            item["observed"] = {field: observed[field] for field in fields}
         stable.append(item)
     return stable
 
@@ -207,9 +196,11 @@ def load_plan(path: str | Path) -> dict[str, Any]:
     if not isinstance(identity, str) or canonical_sha256(body) != identity:
         raise RetainedPhaseProcessError("phase-process plan identity differs")
     candidates = plan.get("candidates")
-    if not isinstance(candidates, list) or tuple(
-        candidate.get("candidate_id") for candidate in candidates
-    ) != EXPECTED_CANDIDATES:
+    if (
+        not isinstance(candidates, list)
+        or tuple(candidate.get("candidate_id") for candidate in candidates)
+        != EXPECTED_CANDIDATES
+    ):
         raise RetainedPhaseProcessError("phase-process candidate order differs")
     workload = plan.get("workload")
     if not isinstance(workload, Mapping) or (
@@ -222,10 +213,8 @@ def load_plan(path: str | Path) -> dict[str, Any]:
     if not isinstance(protocol, Mapping) or (
         protocol.get("horizon_post_start_logical_plies")
         != HORIZON_POST_START_LOGICAL_PLIES
-        or protocol.get("max_post_start_logical_plies")
-        != MAX_POST_START_LOGICAL_PLIES
-        or protocol.get("sanmill_node_ceiling_per_turn")
-        != SANMILL_NODE_CEILING
+        or protocol.get("max_post_start_logical_plies") != MAX_POST_START_LOGICAL_PLIES
+        or protocol.get("sanmill_node_ceiling_per_turn") != SANMILL_NODE_CEILING
     ):
         raise RetainedPhaseProcessError("phase-process protocol differs")
     if plan.get("status") != "frozen_awaiting_product_authorization":
@@ -315,9 +304,7 @@ def _input_record(
     manifest = build_input_manifest()
     if manifest["snapshot_identity"] != plan["inputs"]["snapshot_identity"]:
         raise RetainedPhaseProcessError("phase-process snapshot identity differs")
-    by_candidate = {
-        item["candidate_id"]: item for item in manifest["candidates"]
-    }
+    by_candidate = {item["candidate_id"]: item for item in manifest["candidates"]}
     for candidate in plan["candidates"]:
         candidate_id = str(candidate["candidate_id"])
         observed = by_candidate.get(candidate_id)
@@ -325,24 +312,18 @@ def _input_record(
             raise RetainedPhaseProcessError("snapshot candidate is absent")
         if (
             observed["route_bundle"]["path"] != candidate["bundle"]["path"]
-            or observed["route_bundle"]["identity"]
-            != candidate["bundle"]["identity"]
-            or observed["specialist_db"]["path"]
-            != candidate["specialist_db"]["path"]
+            or observed["route_bundle"]["identity"] != candidate["bundle"]["identity"]
+            or observed["specialist_db"]["path"] != candidate["specialist_db"]["path"]
             or observed["specialist_db"]["sha256"]
             != candidate["specialist_db"]["file_sha256"]
         ):
-            raise RetainedPhaseProcessError(
-                f"{candidate_id} snapshot binding differs"
-            )
+            raise RetainedPhaseProcessError(f"{candidate_id} snapshot binding differs")
         if not (
             observed["route_bundle"]["read_only_files"]
             and observed["specialist_db"]["read_only_file"]
             and observed["specialist_db"]["sidecars_absent"]
         ):
-            raise RetainedPhaseProcessError(
-                f"{candidate_id} snapshot is not immutable"
-            )
+            raise RetainedPhaseProcessError(f"{candidate_id} snapshot is not immutable")
     relative = expected_root.relative_to(_ROOT).as_posix()
     ignored = subprocess.run(
         ["git", "check-ignore", "-q", "--", relative],
@@ -428,7 +409,8 @@ def _competing_processes() -> list[dict[str, Any]]:
     pattern = (
         "train_s_gen_v2\\.py|manage_generalist_run\\.py|"
         "run_heldout_evaluation\\.py|run_retained_passivity_diagnostic\\.py|"
-        "run_retained_phase_process_generalization\\.py"
+        "run_retained_phase_process_generalization\\.py|"
+        "run_retained_heldout_score\\.py"
     )
     script = (
         f"$self={os.getpid()}; $parent={os.getppid()}; $scanner=$PID; "
@@ -466,9 +448,7 @@ def _stable_check(command: Sequence[str], *, label: str) -> dict[str, Any]:
         encoding="utf-8",
     )
     if result.returncode != 0:
-        raise RetainedPhaseProcessError(
-            f"{label} failed with exit {result.returncode}"
-        )
+        raise RetainedPhaseProcessError(f"{label} failed with exit {result.returncode}")
     return {
         "label": label,
         "exit_code": 0,
@@ -583,9 +563,8 @@ def build_authorization(
     operator: str = "product-owner-direct",
 ) -> dict[str, Any]:
     """Build, but do not write, the exact grant after owner approval."""
-    if (
-        len(source_readiness_identity) != 64
-        or any(character not in "0123456789abcdef" for character in source_readiness_identity)
+    if len(source_readiness_identity) != 64 or any(
+        character not in "0123456789abcdef" for character in source_readiness_identity
     ):
         raise RetainedPhaseProcessError("source readiness identity is invalid")
     if len(plan_commit) != 40 or any(
@@ -711,8 +690,7 @@ def _resume_record(
         raise RetainedPhaseProcessError("resume spec identity differs")
     if (
         spec["plan"]["identity"] != plan["plan_identity"]
-        or spec["authorization"]["identity"]
-        != authorization["authorization_identity"]
+        or spec["authorization"]["identity"] != authorization["authorization_identity"]
         or spec["source_readiness_identity"]
         != authorization["source_readiness_identity"]
         or spec["implementation"]["commit"] != str(_git("rev-parse", "HEAD"))
@@ -755,7 +733,10 @@ def build_readiness_report(
     _gate(
         technical,
         "plan",
-        "canonical 156-game two-hour fixed-corpus process plan",
+        (
+            f"canonical {EXPECTED_GAMES}-game "
+            f"{plan['workload']['max_active_hours']}-active-hour fixed-corpus plan"
+        ),
         lambda: {
             "plan_identity": plan["plan_identity"],
             "plan_file_sha256": sha256_file(paths.plan),
@@ -779,7 +760,10 @@ def build_readiness_report(
     corpus_result = _gate(
         technical,
         "corpus",
-        "exact 39-start corpus and adjacent 156-game schedule",
+        (
+            f"exact {EXPECTED_STARTS}-start corpus and adjacent "
+            f"{EXPECTED_GAMES}-game schedule"
+        ),
         lambda: _corpus_record(plan, paths),
     )
     if corpus_result is not None:
@@ -803,7 +787,10 @@ def build_readiness_report(
             technical.append(
                 {
                     "gate": "strict_history_replay",
-                    "expected": "all 39 variable histories replay without a candidate",
+                    "expected": (
+                        f"all {EXPECTED_STARTS} variable histories replay "
+                        "without a candidate"
+                    ),
                     "observed": {"error": "corpus or Sanmill gate failed"},
                     "result": "fail",
                 }
@@ -812,7 +799,10 @@ def build_readiness_report(
             _gate(
                 technical,
                 "strict_history_replay",
-                "all 39 variable histories replay without a candidate",
+                (
+                    f"all {EXPECTED_STARTS} variable histories replay "
+                    "without a candidate"
+                ),
                 lambda: _strict_history_record(
                     corpus_result[1],
                     sanmill_result[1],
@@ -856,9 +846,7 @@ def build_readiness_report(
         lambda: _load_authorization(
             plan,
             paths,
-            expected_source_readiness_identity=(
-                None if resume else source_identity
-            ),
+            expected_source_readiness_identity=(None if resume else source_identity),
         ),
     )
     if resume and authorization is not None:
@@ -874,9 +862,7 @@ def build_readiness_report(
     verdict = (
         "ready_for_evaluation"
         if ready
-        else "fatal_stop"
-        if not technical_ready
-        else "needs_decision"
+        else "fatal_stop" if not technical_ready else "needs_decision"
     )
     body = {
         "schema_version": READINESS_SCHEMA,
@@ -1105,9 +1091,7 @@ def run_once(
                         f"runtime {candidate_id} bundle differs"
                     )
                 policies[candidate_id] = policy
-            installation = inspect_sanmill_training_installation(
-                paths.sanmill_checkout
-            )
+            installation = inspect_sanmill_training_installation(paths.sanmill_checkout)
             corpus_by_id = {
                 str(record["start_id"]): record for record in corpus_records
             }
@@ -1177,15 +1161,18 @@ def run_once(
                     ),
                 )
 
-            mechanism = recompute_mechanism_audit(
-                source_spec=spec,
-                source_records=records,
-                source_ledger_sha256=ledger_sha256,
-                source_result_identity=report["result_identity"],
-                implementation_commit=spec["implementation"]["commit"],
-                malom=policies[EXPECTED_CANDIDATES[0]].malom,
-                progress=audit_progress,
-            )
+            mechanism_enabled = plan["protocol"].get("mechanism_reanalysis") != "none"
+            mechanism = None
+            if mechanism_enabled:
+                mechanism = recompute_mechanism_audit(
+                    source_spec=spec,
+                    source_records=records,
+                    source_ledger_sha256=ledger_sha256,
+                    source_result_identity=report["result_identity"],
+                    implementation_commit=spec["implementation"]["commit"],
+                    malom=policies[EXPECTED_CANDIDATES[0]].malom,
+                    progress=audit_progress,
+                )
             replace_canonical(
                 paths.progress,
                 _progress_body(
@@ -1200,7 +1187,8 @@ def run_once(
             )
             write_new_canonical(paths.report, report)
             mechanism_path = paths.output_root / "mechanism-report.json"
-            write_new_canonical(mechanism_path, mechanism)
+            if mechanism is not None:
+                write_new_canonical(mechanism_path, mechanism)
             completion_body = {
                 "schema_version": COMPLETION_SCHEMA,
                 "diagnostic_id": spec["diagnostic_id"],
@@ -1210,8 +1198,12 @@ def run_once(
                 "completed_at_utc": utc_now(),
                 "ledger_sha256": ledger_sha256,
                 "ledger_tail_record_sha256": previous_hash,
-                "mechanism_result_identity": mechanism["result_identity"],
-                "mechanism_report_sha256": sha256_file(mechanism_path),
+                "mechanism_result_identity": (
+                    None if mechanism is None else mechanism["result_identity"]
+                ),
+                "mechanism_report_sha256": (
+                    None if mechanism is None else sha256_file(mechanism_path)
+                ),
             }
             write_new_canonical(
                 paths.completion,
@@ -1278,14 +1270,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         if args.command in {"run", "resume"} and not args.launch:
-            raise RetainedPhaseProcessError(
-                "run requires the explicit --launch flag"
-            )
+            raise RetainedPhaseProcessError("run requires the explicit --launch flag")
         if args.command in {"run", "resume"} and (
             args.skip_tests or args.skip_history_audit
         ):
             raise RetainedPhaseProcessError(
-                "launch cannot skip tests or the 39-history replay audit"
+                "launch cannot skip tests or the complete history replay audit"
             )
         plan, paths = _load_context(args)
         if args.command in {"preflight", "preflight-resume"}:
@@ -1358,9 +1348,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "status": (
                     "completed"
                     if paths.completion.is_file()
-                    else "failed"
-                    if paths.failure.is_file()
-                    else "partial"
+                    else "failed" if paths.failure.is_file() else "partial"
                 ),
                 "authorization_consumed": paths.launch.is_file(),
                 "completed_games": len(records),

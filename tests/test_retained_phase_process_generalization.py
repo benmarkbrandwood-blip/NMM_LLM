@@ -15,9 +15,7 @@ from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CORPUS = ROOT / (
-    "docs/experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json"
-)
+CORPUS = ROOT / ("docs/experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json")
 
 
 def _corpus() -> dict:
@@ -44,9 +42,7 @@ def spec() -> dict:
             "horizon_post_start_logical_plies": (
                 diagnostic.HORIZON_POST_START_LOGICAL_PLIES
             ),
-            "max_post_start_logical_plies": (
-                diagnostic.MAX_POST_START_LOGICAL_PLIES
-            ),
+            "max_post_start_logical_plies": (diagnostic.MAX_POST_START_LOGICAL_PLIES),
         },
         "schedule": schedule,
     }
@@ -155,17 +151,13 @@ def _synthetic_ledger_record(
     if survives:
         horizon = turns[diagnostic.HORIZON_POST_START_LOGICAL_PLIES - 1]
         snapshot_state = _strict_state(
-            logical_ply=(
-                start_ply + diagnostic.HORIZON_POST_START_LOGICAL_PLIES
-            ),
+            logical_ply=(start_ply + diagnostic.HORIZON_POST_START_LOGICAL_PLIES),
             terminal=False,
             history=horizon["after_history_sha256"],
             no_capture_count=diagnostic.HORIZON_POST_START_LOGICAL_PLIES,
         )
         snapshot = {
-            "post_start_logical_ply": (
-                diagnostic.HORIZON_POST_START_LOGICAL_PLIES
-            ),
+            "post_start_logical_ply": (diagnostic.HORIZON_POST_START_LOGICAL_PLIES),
             "absolute_logical_ply": (
                 start_ply + diagnostic.HORIZON_POST_START_LOGICAL_PLIES
             ),
@@ -356,26 +348,23 @@ def test_complete_report_clusters_both_colours_at_start_level(spec) -> None:
         records.append(
             _summary_record(
                 item,
-                survives=(
-                    item["candidate_id"] == diagnostic.EXPECTED_CANDIDATES[1]
-                ),
+                survives=(item["candidate_id"] == diagnostic.EXPECTED_CANDIDATES[1]),
             )
         )
     report = diagnostic.summarize_records(spec, records, "f" * 64)
-    primary = report["paired"][
-        "primary_start_clustered_108_ply_survival_v4_minus_v3"
-    ]
+    primary = report["paired"]["primary_start_clustered_108_ply_survival_v4_minus_v3"]
     assert report["status"] == "completed"
     assert primary["support"] == 39
     assert primary["mean"] == 1.0
     assert primary["interval"] == [1.0, 1.0]
     assert primary["distribution"] == {"1.0": 39}
-    assert primary["decision"] == (
-        "v4_higher_108_post_start_ply_survival"
+    assert primary["decision"] == ("v4_higher_108_post_start_ply_survival")
+    assert (
+        report["by_candidate"][diagnostic.EXPECTED_CANDIDATES[1]]["history_process"][
+            "horizon_no_capture"
+        ]["support"]
+        == 78
     )
-    assert report["by_candidate"][diagnostic.EXPECTED_CANDIDATES[1]][
-        "history_process"
-    ]["horizon_no_capture"]["support"] == 78
     assert report["claim_boundary"]["held_out"] is False
     assert report["claim_boundary"]["playing_strength_claim"] is False
 
@@ -394,9 +383,12 @@ def test_partial_ledger_round_trips_variable_start_and_history(tmp_path, spec) -
     assert report["completed_games"] == 2
     assert report["paired"]["matched_colour_units_complete"] == 1
     assert report["paired"]["start_units_complete"] == 0
-    assert report["paired"][
-        "primary_start_clustered_108_ply_survival_v4_minus_v3"
-    ]["decision"] == "pending"
+    assert (
+        report["paired"]["primary_start_clustered_108_ply_survival_v4_minus_v3"][
+            "decision"
+        ]
+        == "pending"
+    )
 
 
 def test_ledger_rejects_a_skipped_relative_horizon(tmp_path, spec) -> None:
@@ -432,12 +424,17 @@ def test_ledger_uses_the_frozen_start_turn_for_actor_order(tmp_path, spec) -> No
 
 
 def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
-    assert web.build_payload(tmp_path) == {
+    assert web.build_payload(
+        tmp_path,
+        heldout_plan_path=None,
+        heldout_output_root=None,
+    ) == {
         "available": False,
         "status": "not_started",
         "message": "诊断尚未启动；没有伪造或预填结果。",
         "expected_games": 156,
         "expected_starts": 39,
+        "heldout_score": None,
     }
     assert "相对 108 手" in web.HTML
     assert "不是和棋" in web.HTML
@@ -449,6 +446,8 @@ def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
     assert "配对得分主指标" in web.HTML
     assert "真正 held-out 候选盲源池" in web.HTML
     assert "源池可用" in web.HTML
+    assert "held-out 高精度得分方案" in web.HTML
+    assert "跨 0 只能判“不确定”" in web.HTML
 
 
 def test_web_exposes_only_validated_heldout_pool_summary() -> None:
@@ -472,6 +471,33 @@ def test_web_exposes_only_validated_heldout_pool_summary() -> None:
         "excluded_count": 0,
     }
     assert "records" not in source
+
+
+def test_web_shows_selected_heldout_plan_without_inventing_results(
+    tmp_path,
+) -> None:
+    body = {
+        "schema_version": "nmm.retained-heldout-score-plan.v1",
+        "workload": {
+            "games": 1012,
+            "unique_starts": 253,
+            "max_active_hours": 4.0,
+        },
+        "corpus": {"phase_counts": {"placement": 99, "movement": 98, "flying": 56}},
+        "analysis": {"engineering_interval": {"maximum_primary_half_width": 0.015}},
+    }
+    plan = {**body, "plan_identity": canonical_sha256(body)}
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    summary = web._heldout_score_payload(plan_path, tmp_path / "output")
+
+    assert summary["status"] == "awaiting_authorization"
+    assert summary["selected_starts"] == 253
+    assert summary["expected_games"] == 1012
+    assert summary["maximum_primary_half_width"] == 0.015
+    assert summary["authorization_present"] is False
+    assert summary["primary"] is None
 
 
 def test_web_clusters_score_by_start_before_computing_precision() -> None:
@@ -525,9 +551,7 @@ def test_web_cross_corpus_contrast_and_conservative_score_budget() -> None:
     )
     assert contrast["post_hoc"] is True
 
-    planning = web._score_planning_budgets(
-        [0.08249203304485238, 0.12149262874514737]
-    )
+    planning = web._score_planning_budgets([0.08249203304485238, 0.12149262874514737])
     assert planning == {
         "conservative_sample_standard_deviation": 0.12149262874514737,
         "rows": [
@@ -575,9 +599,7 @@ def test_web_recomputes_partial_ledger_and_start_support(tmp_path, spec) -> None
     assert payload["report"]["paired"]["start_units_complete"] == 0
     assert payload["precision"]["fixed_width_budgets"] == []
     assert payload["mechanism"] is None
-    assert payload["identities"]["corpus_identity"] == _corpus()[
-        "corpus_identity"
-    ]
+    assert payload["identities"]["corpus_identity"] == _corpus()["corpus_identity"]
 
 
 def test_web_rejects_a_tampered_spec_identity(tmp_path, spec) -> None:

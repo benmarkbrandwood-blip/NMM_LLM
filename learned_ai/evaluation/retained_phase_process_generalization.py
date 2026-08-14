@@ -213,8 +213,7 @@ def _snapshot_at_horizon(
     start_logical_ply: int,
 ) -> dict[str, Any]:
     if (
-        state.logical_ply_count
-        != start_logical_ply + HORIZON_POST_START_LOGICAL_PLIES
+        state.logical_ply_count != start_logical_ply + HORIZON_POST_START_LOGICAL_PLIES
         or state.terminal
     ):
         raise RetainedPhaseProcessError("relative-horizon snapshot differs")
@@ -286,9 +285,7 @@ def _history_process(
     final_state: Mapping[str, Any],
 ) -> dict[str, Any]:
     horizon_state = (
-        snapshot.get("strict_referee_state")
-        if isinstance(snapshot, Mapping)
-        else None
+        snapshot.get("strict_referee_state") if isinstance(snapshot, Mapping) else None
     )
     return {
         "start": {
@@ -311,12 +308,8 @@ def _history_process(
         ),
         "final": {
             "no_capture_count": final_state.get("no_capture_count"),
-            "repetition_current_count": final_state.get(
-                "repetition_current_count"
-            ),
-            "repetition_history_length": final_state.get(
-                "repetition_history_length"
-            ),
+            "repetition_current_count": final_state.get("repetition_current_count"),
+            "repetition_history_length": final_state.get("repetition_history_length"),
         },
     }
 
@@ -332,6 +325,7 @@ def play_phase_process_game(
     clock: ActiveClock,
     progress_callback: Callable[[str, int], None],
     game_factory: Callable[..., Any] = SanmillTrainingGame,
+    game_schema: str = GAME_SCHEMA,
 ) -> dict[str, Any]:
     """Play one strict game from a variable frozen history."""
     game_started = clock.elapsed()
@@ -353,9 +347,10 @@ def play_phase_process_game(
         )
         if start["start_record_identity"] != schedule_item["start_record_identity"]:
             raise RetainedPhaseProcessError("runtime start identity differs")
-        if start["observed_history_sha256"] != schedule_item[
-            "expected_start_history_sha256"
-        ]:
+        if (
+            start["observed_history_sha256"]
+            != schedule_item["expected_start_history_sha256"]
+        ):
             raise RetainedPhaseProcessError("runtime start history differs")
         start_logical_ply = int(start["logical_ply_count"])
         candidate_color = str(schedule_item["candidate_color"])
@@ -441,13 +436,15 @@ def play_phase_process_game(
             winner = {None: None, "white": "W", "black": "B"}.get(winner_name)
             if winner_name not in {None, "white", "black"}:
                 raise RetainedPhaseProcessError("Sanmill winner value is unknown")
-            score = 0.5 if winner is None else (1.0 if winner == candidate_color else 0.0)
+            score = (
+                0.5 if winner is None else (1.0 if winner == candidate_color else 0.0)
+            )
             outcome_reason = str(game.state.outcome_reason)
             termination_class = "rules_terminal"
 
         active = clock.require_within_budget()
         return {
-            "schema_version": GAME_SCHEMA,
+            "schema_version": game_schema,
             "spec_identity": spec["spec_identity"],
             "ordinal": schedule_item["ordinal"],
             "unit_index": schedule_item["unit_index"],
@@ -491,9 +488,12 @@ def _validate_game_record(
     record: Mapping[str, Any],
     ordinal: int,
     previous_hash: str | None,
+    *,
+    expected_games: int = EXPECTED_GAMES,
+    game_schema: str = GAME_SCHEMA,
 ) -> None:
     schedule = spec.get("schedule")
-    if not isinstance(schedule, list) or len(schedule) != EXPECTED_GAMES:
+    if not isinstance(schedule, list) or len(schedule) != expected_games:
         raise RetainedPhaseProcessError("runtime schedule differs")
     if ordinal >= len(schedule) or record.get("ordinal") != ordinal:
         raise RetainedPhaseProcessError("phase-process ordinal differs")
@@ -509,7 +509,7 @@ def _validate_game_record(
     ):
         if record.get(field) != expected.get(field):
             raise RetainedPhaseProcessError(f"phase-process {field} differs")
-    if record.get("schema_version") != GAME_SCHEMA:
+    if record.get("schema_version") != game_schema:
         raise RetainedPhaseProcessError("phase-process game schema differs")
     if record.get("spec_identity") != spec.get("spec_identity"):
         raise RetainedPhaseProcessError("phase-process spec identity differs")
@@ -543,8 +543,7 @@ def _validate_game_record(
         if not isinstance(snapshot, Mapping):
             raise RetainedPhaseProcessError("surviving game lacks horizon snapshot")
         if (
-            snapshot.get("post_start_logical_ply")
-            != HORIZON_POST_START_LOGICAL_PLIES
+            snapshot.get("post_start_logical_ply") != HORIZON_POST_START_LOGICAL_PLIES
             or snapshot.get("absolute_logical_ply")
             != start_ply + HORIZON_POST_START_LOGICAL_PLIES
             or plies <= HORIZON_POST_START_LOGICAL_PLIES
@@ -599,9 +598,10 @@ def _validate_game_record(
             raise RetainedPhaseProcessError("safety-cap game has terminal turn")
 
     final_state = record.get("final_state")
-    if not isinstance(final_state, Mapping) or final_state.get(
-        "history_sha256"
-    ) != previous:
+    if (
+        not isinstance(final_state, Mapping)
+        or final_state.get("history_sha256") != previous
+    ):
         raise RetainedPhaseProcessError("phase-process final history differs")
     if record.get("candidate_malom") != _candidate_malom_summary(turns):
         raise RetainedPhaseProcessError("candidate Malom summary differs")
@@ -648,6 +648,9 @@ def append_game_record(
 def load_game_ledger(
     spec: Mapping[str, Any],
     path: str | Path,
+    *,
+    expected_games: int = EXPECTED_GAMES,
+    game_schema: str = GAME_SCHEMA,
 ) -> tuple[list[dict[str, Any]], str | None]:
     target = Path(path)
     if not target.exists():
@@ -680,10 +683,17 @@ def load_game_ledger(
                 "record_sha256"
             ] != canonical_sha256(record):
                 raise RetainedPhaseProcessError("phase-process ledger hash differs")
-            _validate_game_record(spec, record, len(records), previous)
+            _validate_game_record(
+                spec,
+                record,
+                len(records),
+                previous,
+                expected_games=expected_games,
+                game_schema=game_schema,
+            )
             previous = str(wrapper["record_sha256"])
             records.append(record)
-    if len(records) > EXPECTED_GAMES:
+    if len(records) > expected_games:
         raise RetainedPhaseProcessError("phase-process ledger has too many games")
     return records, previous
 
@@ -702,8 +712,7 @@ def _numeric_summary(values: Sequence[int | float]) -> dict[str, Any]:
 def _candidate_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     games = len(records)
     survival = sum(
-        bool(record["ongoing_after_post_start_logical_ply_108"])
-        for record in records
+        bool(record["ongoing_after_post_start_logical_ply_108"]) for record in records
     )
     post_lengths = [int(record["post_start_logical_plies"]) for record in records]
     total_lengths = [int(record["total_logical_plies"]) for record in records]
@@ -840,15 +849,11 @@ def _paired_comparison(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         v3 = unit[EXPECTED_CANDIDATES[0]]
         v4 = unit[EXPECTED_CANDIDATES[1]]
         key = (str(v3["start_id"]), str(v3["candidate_color"]))
-        colour_differences[key] = (
-            float(v4["ongoing_after_post_start_logical_ply_108"])
-            - float(v3["ongoing_after_post_start_logical_ply_108"])
-        )
+        colour_differences[key] = float(
+            v4["ongoing_after_post_start_logical_ply_108"]
+        ) - float(v3["ongoing_after_post_start_logical_ply_108"])
         length_differences.append(
-            (
-                int(v4["post_start_logical_plies"])
-                - int(v3["post_start_logical_plies"])
-            )
+            (int(v4["post_start_logical_plies"]) - int(v3["post_start_logical_plies"]))
             / MAX_POST_START_LOGICAL_PLIES
         )
         v3_rate = v3["candidate_malom"]["preserving_rate_given_queryable"]
@@ -858,11 +863,9 @@ def _paired_comparison(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
     starts = sorted({key[0] for key in colour_differences})
     start_differences = [
-        (colour_differences[(start, "W")] + colour_differences[(start, "B")])
-        / 2.0
+        (colour_differences[(start, "W")] + colour_differences[(start, "B")]) / 2.0
         for start in starts
-        if (start, "W") in colour_differences
-        and (start, "B") in colour_differences
+        if (start, "W") in colour_differences and (start, "B") in colour_differences
     ]
     primary = _interval(start_differences)
     complete = len(start_differences) == EXPECTED_STARTS
@@ -904,9 +907,7 @@ def _paired_comparison(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             list(colour_differences.values())
         ),
         "restricted_length_v4_minus_v3": _interval(length_differences),
-        "per_game_preserving_rate_v4_minus_v3": _interval(
-            preserving_differences
-        ),
+        "per_game_preserving_rate_v4_minus_v3": _interval(preserving_differences),
     }
 
 

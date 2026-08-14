@@ -35,13 +35,25 @@ from learned_ai.evaluation.retained_passivity_diagnostic import (  # noqa: E402
 from learned_ai.evaluation.retained_late_import_heldout_pool import (  # noqa: E402
     validate_retained_late_import_pool,
 )
+from learned_ai.evaluation.retained_heldout_score import (  # noqa: E402
+    EXPECTED_GAMES as HELDOUT_EXPECTED_GAMES,
+    EXPECTED_STARTS as HELDOUT_EXPECTED_STARTS,
+    PLAN_SCHEMA as HELDOUT_PLAN_SCHEMA,
+    load_game_ledger as load_heldout_game_ledger,
+    summarize_records as summarize_heldout_records,
+)
 from learned_ai.training.run_contract import canonical_sha256  # noqa: E402
 
 
 MECHANISM_SCHEMA = "nmm.retained-phase-process-mechanism-audit-result.v1"
 DEFAULT_HELDOUT_POOL = _ROOT / (
-    "docs/experiments/"
-    "sanmill-retained-v3-v4-late-import-heldout-pool-v1.json"
+    "docs/experiments/sanmill-retained-v3-v4-late-import-heldout-pool-v1.json"
+)
+DEFAULT_HELDOUT_PLAN = _ROOT / (
+    "docs/experiments/sanmill-retained-v3-v4-heldout-score-v1.json"
+)
+DEFAULT_HELDOUT_OUTPUT = _ROOT / (
+    "learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-heldout-score-v1"
 )
 
 
@@ -75,8 +87,7 @@ def _fixed_width_budgets(primary: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "target_half_width": width,
             "starts": max(1, math.ceil((1.96 * float(deviation) / width) ** 2)),
-            "games": max(1, math.ceil((1.96 * float(deviation) / width) ** 2))
-            * 4,
+            "games": max(1, math.ceil((1.96 * float(deviation) / width) ** 2)) * 4,
             "planning_only": True,
         }
         for width in (0.10, 0.075, 0.05)
@@ -115,8 +126,7 @@ def _start_clustered_precision(
             continue
         matched_colour_units += 1
         by_start.setdefault(start_id, {})[colour] = (
-            candidates[EXPECTED_CANDIDATES[1]]
-            - candidates[EXPECTED_CANDIDATES[0]]
+            candidates[EXPECTED_CANDIDATES[1]] - candidates[EXPECTED_CANDIDATES[0]]
         )
 
     differences = [
@@ -162,8 +172,7 @@ def _independent_fixed_corpus_contrast(
         }
     mean = float(phase["mean"]) - float(development["mean"])
     standard_error = math.sqrt(
-        float(phase["standard_error"]) ** 2
-        + float(development["standard_error"]) ** 2
+        float(phase["standard_error"]) ** 2 + float(development["standard_error"]) ** 2
     )
     half_width = 1.96 * standard_error
     return {
@@ -184,9 +193,7 @@ def _score_planning_budgets(deviations: list[float]) -> dict[str, Any]:
     for target_half_width in (0.03, 0.02, 0.015, 0.01):
         starts = max(
             1,
-            math.ceil(
-                (1.96 * conservative_deviation / target_half_width) ** 2
-            ),
+            math.ceil((1.96 * conservative_deviation / target_half_width) ** 2),
         )
         rows.append(
             {
@@ -231,9 +238,7 @@ def _heldout_pool_payload_cached(
             "candidate_state_count": exposure["candidate_state_count"],
             "eligible_state_count": exposure["eligible_state_count"],
             "eligible_source_game_count": exposure["eligible_source_game_count"],
-            "rejection_hits_nonexclusive": exposure[
-                "rejection_hits_nonexclusive"
-            ],
+            "rejection_hits_nonexclusive": exposure["rejection_hits_nonexclusive"],
         },
         "strict_replay": {
             "repeat_passes": strict["repeat_passes"],
@@ -258,9 +263,95 @@ def _heldout_pool_payload(path: str | Path | None) -> dict[str, Any] | None:
             "message": "候选盲 held-out 源池尚未冻结。",
         }
     stat = pool_path.stat()
-    return _heldout_pool_payload_cached(
-        str(pool_path), stat.st_size, stat.st_mtime_ns
+    return _heldout_pool_payload_cached(str(pool_path), stat.st_size, stat.st_mtime_ns)
+
+
+def _heldout_score_payload(
+    plan_path: str | Path | None,
+    output_root: str | Path | None,
+) -> dict[str, Any] | None:
+    """Return plan/progress/result facts without loading either candidate."""
+    if plan_path is None or output_root is None:
+        return None
+    frozen_path = Path(plan_path).resolve()
+    if not frozen_path.is_file():
+        return {
+            "available": False,
+            "status": "plan_not_frozen",
+            "message": "held-out 得分计划尚未冻结。",
+        }
+    plan = _read_json(frozen_path)
+    plan_identity = plan.get("plan_identity")
+    plan_body = {key: value for key, value in plan.items() if key != "plan_identity"}
+    if (
+        plan.get("schema_version") != HELDOUT_PLAN_SCHEMA
+        or not isinstance(plan_identity, str)
+        or canonical_sha256(plan_body) != plan_identity
+        or plan.get("workload", {}).get("games") != HELDOUT_EXPECTED_GAMES
+        or plan.get("workload", {}).get("unique_starts") != HELDOUT_EXPECTED_STARTS
+    ):
+        raise ValueError("held-out score plan binding differs")
+
+    root = Path(output_root).resolve()
+    spec_path = root / "spec.json"
+    authorization_present = (root / "authorization.json").is_file()
+    if not spec_path.is_file():
+        return {
+            "available": True,
+            "status": "awaiting_authorization",
+            "plan_identity": plan_identity,
+            "selected_starts": HELDOUT_EXPECTED_STARTS,
+            "expected_games": HELDOUT_EXPECTED_GAMES,
+            "phase_counts": plan["corpus"]["phase_counts"],
+            "maximum_primary_half_width": plan["analysis"]["engineering_interval"][
+                "maximum_primary_half_width"
+            ],
+            "max_active_hours": plan["workload"]["max_active_hours"],
+            "authorization_present": authorization_present,
+            "authorization_consumed": False,
+            "completed_games": 0,
+            "active_seconds": 0.0,
+            "primary": None,
+            "by_candidate": None,
+        }
+
+    spec = _read_json(spec_path)
+    _validate_spec_identity(spec)
+    if spec.get("plan", {}).get("identity") != plan_identity:
+        raise ValueError("held-out runtime plan differs")
+    ledger_path = root / "games.jsonl"
+    if ledger_path.is_file():
+        records, tail = load_heldout_game_ledger(spec, ledger_path)
+    else:
+        records, tail = [], None
+    report = summarize_heldout_records(spec, records, tail)
+    progress_path = root / "progress.json"
+    progress = _read_json(progress_path) if progress_path.is_file() else {}
+    status = (
+        "completed"
+        if (root / "completion.json").is_file()
+        else "failed" if (root / "failure.json").is_file() else "running"
     )
+    return {
+        "available": True,
+        "status": status,
+        "plan_identity": plan_identity,
+        "spec_identity": spec["spec_identity"],
+        "selected_starts": HELDOUT_EXPECTED_STARTS,
+        "expected_games": HELDOUT_EXPECTED_GAMES,
+        "phase_counts": plan["corpus"]["phase_counts"],
+        "maximum_primary_half_width": plan["analysis"]["engineering_interval"][
+            "maximum_primary_half_width"
+        ],
+        "max_active_hours": plan["workload"]["max_active_hours"],
+        "authorization_present": authorization_present,
+        "authorization_consumed": (root / "launch.json").is_file(),
+        "completed_games": len(records),
+        "active_seconds": float(progress.get("active_seconds") or 0.0),
+        "primary": report["paired"]["primary_start_clustered_score_v4_minus_v3"],
+        "by_candidate": report["by_candidate"],
+        "result_identity": report["result_identity"],
+    }
 
 
 def _candidate_route_signature(spec: dict[str, Any]) -> list[dict[str, Any]]:
@@ -279,9 +370,9 @@ def _candidate_route_signature(spec: dict[str, Any]) -> list[dict[str, Any]]:
                 "checkpoint_payload_sha256": candidate.get("checkpoint", {}).get(
                     "payload_sha256"
                 ),
-                "specialist_db_file_sha256": candidate.get(
-                    "specialist_db", {}
-                ).get("file_sha256"),
+                "specialist_db_file_sha256": candidate.get("specialist_db", {}).get(
+                    "file_sha256"
+                ),
             }
         )
     return sorted(signature, key=lambda row: str(row["candidate_id"]))
@@ -349,15 +440,12 @@ def _load_development_evidence_cached(
     report = summarize_development_records(spec, records, tail)
     completion = _read_json(root / "completion.json")
     completion_body = {
-        key: value
-        for key, value in completion.items()
-        if key != "completion_identity"
+        key: value for key, value in completion.items() if key != "completion_identity"
     }
     if (
         report.get("completed_games") != DEVELOPMENT_EXPECTED_GAMES
         or report.get("status") != "completed"
-        or canonical_sha256(completion_body)
-        != completion.get("completion_identity")
+        or canonical_sha256(completion_body) != completion.get("completion_identity")
         or completion.get("diagnostic_id") != spec.get("diagnostic_id")
         or completion.get("spec_identity") != spec.get("spec_identity")
         or completion.get("result_identity") != report.get("result_identity")
@@ -379,9 +467,7 @@ def _cross_corpus_payload(
     development_output_root: str | Path,
 ) -> dict[str, Any]:
     root = Path(development_output_root).resolve()
-    development = _load_development_evidence_cached(
-        str(root), _development_stamp(root)
-    )
+    development = _load_development_evidence_cached(str(root), _development_stamp(root))
     development_spec = development["spec"]
     development_records = development["records"]
     _validate_cross_corpus_comparability(
@@ -461,6 +547,8 @@ def build_payload(
     output_root: str | Path,
     development_output_root: str | Path | None = None,
     heldout_pool_path: str | Path | None = DEFAULT_HELDOUT_POOL,
+    heldout_plan_path: str | Path | None = DEFAULT_HELDOUT_PLAN,
+    heldout_output_root: str | Path | None = DEFAULT_HELDOUT_OUTPUT,
 ) -> dict[str, Any]:
     """Build current progress and independently recomputed process metrics."""
     root = Path(output_root).resolve()
@@ -472,6 +560,9 @@ def build_payload(
             "message": "诊断尚未启动；没有伪造或预填结果。",
             "expected_games": EXPECTED_GAMES,
             "expected_starts": EXPECTED_STARTS,
+            "heldout_score": _heldout_score_payload(
+                heldout_plan_path, heldout_output_root
+            ),
         }
 
     spec = _read_json(spec_path)
@@ -487,28 +578,21 @@ def build_payload(
     status = (
         "completed"
         if (root / "completion.json").is_file()
-        else "failed"
-        if (root / "failure.json").is_file()
-        else "running"
+        else "failed" if (root / "failure.json").is_file() else "running"
     )
     report["status"] = status
-    primary = report["paired"][
-        "primary_start_clustered_108_ply_survival_v4_minus_v3"
-    ]
+    primary = report["paired"]["primary_start_clustered_108_ply_survival_v4_minus_v3"]
     mechanism = None
     mechanism_path = root / "mechanism-report.json"
     if mechanism_path.is_file():
         mechanism = _read_json(mechanism_path)
         mechanism_body = {
-            key: value
-            for key, value in mechanism.items()
-            if key != "result_identity"
+            key: value for key, value in mechanism.items() if key != "result_identity"
         }
         source = mechanism.get("source")
         if (
             mechanism.get("schema_version") != MECHANISM_SCHEMA
-            or canonical_sha256(mechanism_body)
-            != mechanism.get("result_identity")
+            or canonical_sha256(mechanism_body) != mechanism.get("result_identity")
             or not isinstance(source, dict)
             or source.get("diagnostic_id") != spec.get("diagnostic_id")
             or source.get("spec_identity") != spec.get("spec_identity")
@@ -551,6 +635,7 @@ def build_payload(
         "mechanism": mechanism,
         "cross_corpus": cross_corpus,
         "heldout_pool": _heldout_pool_payload(heldout_pool_path),
+        "heldout_score": _heldout_score_payload(heldout_plan_path, heldout_output_root),
     }
 
 
@@ -599,11 +684,39 @@ async function tick(){try{const response=await fetch('/api/diagnostic',{cache:'n
 tick();setInterval(tick,3000);
 </script></body></html>"""
 
+HELDOUT_SCORE_SCRIPT = r"""
+function heldoutScoreDecision(value){return ({pending:'等待完整配对',inconclusive:'区间跨 0：不确定',inconclusive_precision:'实际半宽超过 1.5pp',inconclusive_incomplete_safety_cap:'存在未到规则终局的 cap：主结论无效',v4_higher_fixed_heldout_score:'v4 在冻结 held-out 语料上得分更高',v3_higher_fixed_heldout_score:'v3 在冻结 held-out 语料上得分更高'})[value]||value}
+function heldoutScoreBlock(x){if(!x)return '';if(!x.available)return `<div class="panel"><h2>held-out 高精度得分方案</h2><p class="help">${esc(x.message||'计划尚未冻结。')}</p></div>`;const p=x.primary,iv=p&&p.interval?p.interval:[null,null],a=x.by_candidate&&x.by_candidate[C.v3],b=x.by_candidate&&x.by_candidate[C.v4],phase=x.phase_counts||{};return `<div class="panel"><h2>held-out 高精度得分方案：253 起点 / 1,012 局 / ±1.5pp</h2><p class="help">产品已选固定半宽描述框架。每个独立起点由 v3、v4 各执白和执黑共四局组成；先在起点内平均两种颜色的 v4−v3 得分差，再跨 253 个起点计算区间。胜/和/负按 1 / 0.5 / 0 计分。</p><div class="grid">${card('状态',esc(x.status),x.authorization_present?(x.authorization_consumed?'授权已消费':'授权文件已存在，尚未消费'):'尚无启动授权')}${card('完成进度',`${integer(x.completed_games)} / ${integer(x.expected_games)}`,`活动上限 ${num(x.max_active_hours,1)} h`)}${card('独立起点',integer(x.selected_starts),`P ${integer(phase.placement)} · M ${integer(phase.movement)} · F ${integer(phase.flying)}`)}${card('目标半宽',pp(x.maximum_primary_half_width),'95% 起点聚类工程区间')}${card('主得分差 v4−v3',p?pp(p.mean):'—',p&&iv[0]!=null?`${pp(iv[0])} … ${pp(iv[1])}`:'尚未产生评测对局')}${card('主判决',p?heldoutScoreDecision(p.decision):'等待授权',p?`实际半宽 ${pp(p.half_width)}；支持 ${integer(p.support)} 起点`:'计划冻结不等于可以启动')}${card('v3 严格终局计分',a?pct(a.eventual_rules_wdl.score_rate):'—',a?`${integer(a.eventual_rules_wdl.support)} 局；cap ${integer(a.eventual_rules_wdl.safety_cap_excluded)}`:'等待对局')}${card('v4 严格终局计分',b?pct(b.eventual_rules_wdl.score_rate):'—',b?`${integer(b.eventual_rules_wdl.support)} 局；cap ${integer(b.eventual_rules_wdl.safety_cap_excluded)}`:'等待对局')}</div><p class="help"><b>怎么读：</b>区间完全高于 0 且半宽不超过 1.5pp，才判 v4 在这批冻结 held-out 起点上得分更高；完全低于 0 才判 v3 更高；跨 0 只能判“不确定”，绝不等同于“两模型等效”。若任何对局命中 1,536 post-start 安全 cap，该局不按和棋计，方向性主结论 fail closed。108 手存活、无吃子计时、重复、阶段和 Malom 指标都是解释性过程指标，不能替换配对得分主指标。该结果也不能隔离 target refresh 因果、外推 Elo/总体棋力或自动触发晋级、发布、释放。</p><code>plan ${esc(x.plan_identity)}${x.spec_identity?` · spec ${esc(x.spec_identity)}`:''}${x.result_identity?` · result ${esc(x.result_identity)}`:''}</code></div>`}
+"""
+
+HTML = (
+    HTML.replace(
+        "function heldoutPoolBlock",
+        HELDOUT_SCORE_SCRIPT + "\nfunction heldoutPoolBlock",
+    )
+    .replace(
+        "${heldoutPoolBlock(payload.heldout_pool)}",
+        (
+            "${heldoutScoreBlock(payload.heldout_score)}\n"
+            "${heldoutPoolBlock(payload.heldout_pool)}"
+        ),
+    )
+    .replace(
+        (
+            "下一步仍须由产品负责人选择固定半宽、方向最小效应或等效框架，"
+            "再冻结子集、计划、资源上限与 readiness。"
+        ),
+        "当前实际选择与状态以本页“held-out 高精度得分方案”卡片为准。",
+    )
+)
+
 
 class Handler(BaseHTTPRequestHandler):
     output_root: Path
     development_output_root: Path | None
     heldout_pool_path: Path | None
+    heldout_plan_path: Path | None
+    heldout_output_root: Path | None
 
     def log_message(self, _format: str, *_args: Any) -> None:
         return
@@ -633,6 +746,8 @@ class Handler(BaseHTTPRequestHandler):
                         self.output_root,
                         self.development_output_root,
                         self.heldout_pool_path,
+                        self.heldout_plan_path,
+                        self.heldout_output_root,
                     ),
                     ensure_ascii=False,
                     separators=(",", ":"),
@@ -672,6 +787,18 @@ def _parser() -> argparse.ArgumentParser:
             "completed development diagnostics"
         ),
     )
+    parser.add_argument(
+        "--heldout-plan",
+        type=Path,
+        default=DEFAULT_HELDOUT_PLAN,
+        help="frozen high-precision held-out score plan",
+    )
+    parser.add_argument(
+        "--heldout-output-root",
+        type=Path,
+        default=DEFAULT_HELDOUT_OUTPUT,
+        help="read-only runtime evidence root for the held-out score plan",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8772)
     return parser
@@ -686,6 +813,8 @@ def main() -> int:
             "output_root": args.output_root,
             "development_output_root": args.development_output_root,
             "heldout_pool_path": args.heldout_pool,
+            "heldout_plan_path": args.heldout_plan,
+            "heldout_output_root": args.heldout_output_root,
         },
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
