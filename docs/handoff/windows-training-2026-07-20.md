@@ -1,4 +1,4 @@
-# Windows Training Handover — 20 July 2026 (updated 13 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 14 August 2026)
 
 ## Executive Summary
 
@@ -284,6 +284,14 @@ Preserve the
 [frozen plan](../experiments/sanmill-retained-v3-v4-heldout-score-v1.md) and
 [result evidence](../evidence/sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
 
+The product owner subsequently selected the exact retained-v4 route as the
+preferred research candidate. The selection is bound to route bundle
+`817d2e36`, checkpoint file `295b268e` and checkpoint payload `ed7932bc`.
+Retained-v3 remains the frozen comparator. This is a research-only disposition:
+it changes no model alias or file and authorizes no new game, training,
+promotion, deployment, publication or release. Preserve the
+[candidate decision](../experiments/sanmill-retained-v4-preferred-research-candidate-v1.md).
+
 ### Remaining work for the next operator
 
 1. Preserve recovery-v1 as consumed fail-closed evidence. Do not delete,
@@ -319,11 +327,15 @@ Preserve the
    `99951a69`, result `8d7a4a0a` and completion `8949a8fd`. The independent
    score unit remains one start after averaging both colours, and the 1.5pp
    target was fixed-width rather than equivalence. Do not rerun or extend the
-   consumed prefix. The next product decision is whether to nominate v4 as a
-   preferred research candidate; promotion or release needs a separate frozen
-   gate and authority. Do not launch the existing early
+   consumed prefix. Retained-v4 is now the product-selected preferred research
+   candidate and retained-v3 remains its frozen comparator. Promotion or
+   release still needs a separately frozen absolute acceptance gate and
+   authority; the deployment slot and minimum acceptable absolute performance
+   are not yet selected. Do not launch the existing early
    mature-fork checkpoints as a passivity shortcut. Preserve the updated
-   [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
+   [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md)
+   and
+   [candidate decision](../experiments/sanmill-retained-v4-preferred-research-candidate-v1.md).
    No additional evaluation or training is authorized.
 
 The completed high-precision held-out authorization is consumed. No further
@@ -2763,7 +2775,10 @@ the current successor in this order:
     [+0.6195pp, +2.7402pp]. All 1,012 games reached strict terminals and zero
     hit the cap. The authorization is consumed; do not rerun, resume, extend
     or reuse the prefix. The result does not establish refresh causality, Elo,
-    equivalence or automatic promotion.
+    equivalence or automatic promotion. The product owner subsequently named
+    the exact retained-v4 route the preferred research candidate; this changes
+    no checkpoint alias and grants no promotion, deployment, release, new-game
+    or training authority.
 
 The previously executed isolated smoke command was:
 

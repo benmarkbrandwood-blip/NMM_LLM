@@ -1,8 +1,8 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `high_precision_heldout_completed_v4_higher_named_route`
+Status: `preferred_research_candidate_selected`
 
-Decision status: `named_route_direction_established_no_automatic_promotion`
+Decision status: `retained_v4_preferred_for_research_no_promotion`
 
 This is the current planning record after the 256-game reused-development
 diagnostic, its zero-game mechanism audits, the 156-game phase-process
@@ -12,6 +12,20 @@ game authorization is consumed. The selected 253-start / 1,012-game /
 target-1.5pp fixed-width held-out successor has now also completed once and its
 authorization is consumed. This record authorizes no further evaluation,
 training, update, promotion, publication or release.
+
+## Product disposition
+
+On 14 August 2026, the product owner accepted retained-v4 as the preferred
+research candidate. The decision is bound to candidate ID
+`retained-v4-no-refresh`, route-bundle identity `817d2e36...`, checkpoint file
+SHA-256 `295b268e...` and checkpoint payload SHA-256 `ed7932bc...`.
+
+This resolves which of the two existing named routes should be preferred in
+future research planning. Retained-v3 remains a frozen comparator. The
+selection does not copy or rename a checkpoint, change an active model alias,
+authorize another game or training update, or constitute promotion,
+deployment, publication or release. Preserve the full
+[research-candidate decision](sanmill-retained-v4-preferred-research-candidate-v1.md).
 
 ## Completed evidence
 
@@ -243,8 +257,11 @@ revisit interval cannot be promoted into the new decision.
 | New game, time and node envelope | 1,012 games; 4 active hours; frozen node ceiling |
 | Immutable plan and runtime | plan `6620821e`; launch `b4505be8`; completion `8949a8fd` |
 | Primary decision | `v4_higher_fixed_heldout_score`; +1.6798pp; [+0.6195pp, +2.7402pp] |
+| Research candidate disposition | retained-v4 selected for research; retained-v3 remains comparator |
 | Further launch, promotion or training authority | absent |
 
 Verdict: the named v4 route scored higher on the frozen held-out prefix under
-the preregistered precision rule. No automatic promotion, refresh-causal or
-population-strength conclusion follows.
+the preregistered precision rule and is now the product-selected preferred
+research candidate. Promotion readiness remains `needs_decision`; no
+refresh-causal, population-strength, Elo, deployment or release conclusion
+follows.

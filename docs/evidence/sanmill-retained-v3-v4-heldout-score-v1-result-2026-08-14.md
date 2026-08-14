@@ -138,11 +138,14 @@ rates leave the behavioural mechanism unresolved.
 ## Next validation experiments / 下一步验证实验
 
 The preregistered named-route question is answered; no extension or repeat on
-the consumed 253-start prefix is justified. The product owner may separately
-decide whether the result is sufficient to nominate v4 as the preferred
-research candidate. Any promotion, release or broader strength claim requires
-its own frozen acceptance contract, genuinely unconsumed evaluation data and
-explicit authority.
+the consumed 253-start prefix is justified. The product owner subsequently
+selected the exact retained-v4 route as the preferred research candidate; see
+the
+[research-candidate decision](../experiments/sanmill-retained-v4-preferred-research-candidate-v1.md).
+That downstream disposition changes no result or artifact identity. Any
+promotion, release or broader strength claim still requires its own frozen
+acceptance contract, genuinely unconsumed evaluation data and explicit
+authority.
 
 If the objective instead becomes target-refresh causality, the smallest valid
 design remains same-source, same-seed, equal-transition refresh/no-refresh
