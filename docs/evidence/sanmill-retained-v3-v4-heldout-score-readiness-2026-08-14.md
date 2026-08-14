@@ -2,13 +2,14 @@
 
 Date: 2026-08-14
 
-Verdict: `needs_decision`
+Historical verdict: `needs_decision`; superseded by completed evaluation
 
-The 253-start / 1,012-game / target-1.5pp held-out score plan is technically
-ready for an exact plan-bound product authorization. That authorization is
-absent. No authorization file, runtime specification, launch record, game
-ledger, progress report, result, completion or failure record exists, and no
-candidate game has been played under this plan.
+This document preserves the zero-game prelaunch readiness state. The plan was
+later authorized and completed once under authorization `816cc390...`, result
+`8d7a4a0a...` and completion `8949a8fd...`. See the
+[completion evidence](sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
+At the time captured below, no authorization or runtime artifact existed and
+no candidate game had been played.
 
 ## Frozen identities
 
@@ -83,7 +84,7 @@ passed`. An earlier combined implementation verification completed with `188
 passed, 498 subtests passed`; Ruff and `git diff --check` were clean before the
 immutable plan was frozen.
 
-## Authorization boundary
+## Historical authorization boundary
 
 A later launch decision must name both:
 
@@ -93,8 +94,7 @@ A later launch decision must name both:
 - source-readiness identity
   `f233c991aa66a8699fac8952fd0c758a5fabb09de7a0e66ba3043635934b2b08`.
 
-Only a grant within the plan's 1,012-game, four-active-hour and node ceilings
-may launch. A host interruption may use same-spec missing-suffix exact resume
-only if the authorization says so. Automatic retry, semantic-failure recovery,
+The later direct grant matched this boundary and is now consumed. It cannot be
+reused for a rerun or extension. Automatic retry, semantic-failure recovery,
 expansion, training or update, equivalence/Elo/population/refresh-causal
 claims, promotion, publication and release remain prohibited.

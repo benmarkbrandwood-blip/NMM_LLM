@@ -270,19 +270,19 @@ games for 3pp planning, 142 / 568 for 2pp, and 253 / 1,012 for 1.5pp. The
 readiness only. Preserve the
 [source-pool evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
 
-The product owner then selected the 253-start / 1,012-game fixed-width option
-with a target 1.5pp 95% engineering half-width. Machine plan identity
-`6620821e879f53058d15990cd0e8c884ae62fec213b3d96200e8894c20e19714`
-freezes the first 253 pool records under prefix identity `99951a69`, 99
-placement / 98 movement / 56 flying, with implementation commit `5eb1423` and
-plan commit `5929500`. Two clean published-dev preflights produced stable
-source readiness `f233c991` and passed every technical gate with zero corpus
-candidate moves and zero games. Product authorization is absent, so the plan
-is technically ready but not launched. The 1.5pp target is fixed-width
-planning, not equivalence; a zero-crossing interval remains inconclusive.
+The product-selected 253-start / 1,012-game fixed-width held-out evaluation is
+now complete. Plan `6620821e`, prefix `99951a69`, stable source readiness
+`f233c991`, direct authorization `816cc390`, spec `cb736759`, launch
+`b4505be8`, result `8d7a4a0a` and completion `8949a8fd` form the identity chain.
+All 1,012 games reached strict rules terminals in 1,749.805795 active seconds;
+zero hit the cap. The primary v4-minus-v3 score difference is `+1.6798pp`,
+interval `[+0.6195pp, +2.7402pp]`, half-width `1.0604pp`, decision
+`v4_higher_fixed_heldout_score`. The grant is consumed. This is a named-route
+fixed-corpus result, not equivalence, Elo, refresh causality or automatic
+promotion.
 Preserve the
 [frozen plan](../experiments/sanmill-retained-v3-v4-heldout-score-v1.md) and
-[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md).
+[result evidence](../evidence/sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
 
 ### Remaining work for the next operator
 
@@ -314,20 +314,22 @@ Preserve the
    their ledgers, reports, web evidence and consumed authorizations. Preserve
    candidate-blind held-out source pool `2eb04f54` and selected 253-record
    prefix `99951a69` exactly; do not import its 406-game source universe into
-   the active HumanDB, reorder the prefix, or describe the pool as an evaluated
-   result. Preserve frozen plan `6620821e` and source readiness `f233c991`.
-   The independent score unit remains one start after averaging both colours,
-   and the 1.5pp target is fixed-width rather than equivalence. The only next
-   decision is whether to grant exact plan-bound launch authority; until then
-   create no authorization or game. Do not launch the existing early
+   the active HumanDB, reorder the prefix, or describe the unevaluated suffix
+   as result evidence. Preserve frozen plan `6620821e`, consumed prefix
+   `99951a69`, result `8d7a4a0a` and completion `8949a8fd`. The independent
+   score unit remains one start after averaging both colours, and the 1.5pp
+   target was fixed-width rather than equivalence. Do not rerun or extend the
+   consumed prefix. The next product decision is whether to nominate v4 as a
+   preferred research candidate; promotion or release needs a separate frozen
+   gate and authority. Do not launch the existing early
    mature-fork checkpoints as a passivity shortcut. Preserve the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
    No additional evaluation or training is authorized.
 
-The frozen high-precision candidate-vs-baseline held-out plan is not launch
-authority. No held-out match, model promotion, publication or long training is
-currently authorized. Historical ignored artifacts under `out/` are evidence
-inputs and must not be deleted, overwritten or relabelled.
+The completed high-precision held-out authorization is consumed. No further
+held-out match, model promotion, publication or long training is currently
+authorized. Historical ignored artifacts under `out/` are evidence inputs and
+must not be deleted, overwritten or relabelled.
 
 ### Latest state: early target refresh is harmful; later cadence unresolved
 
@@ -2754,16 +2756,14 @@ the current successor in this order:
     score-width budget with a conservative 568-game estimate. Any successor
     needs an owner-selected objective and threshold, a new corpus, frozen
     plan, readiness and explicit authority.
-36. The product-selected high-precision held-out successor is frozen under
-    machine plan identity `6620821e`, implementation `5eb1423`, plan commit
-    `5929500`, first-253 prefix identity `99951a69` and source readiness
-    `f233c991`. It binds 253 independent starts, 1,012 games, four active hours
-    and a target 1.5pp engineering half-width. Both preflights requested zero
-    corpus candidate moves and played zero games. Authorization is absent. Do
-    not create runtime artifacts or launch until the owner grants authority
-    bound to the exact plan and readiness identities; do not call a
-    zero-crossing interval equivalence or use process metrics to replace the
-    score primary.
+36. Preserve the completed high-precision held-out successor under plan
+    `6620821e`, first-253 prefix `99951a69`, authorization `816cc390`, launch
+    `b4505be8`, result `8d7a4a0a` and completion `8949a8fd`. The primary
+    decision is `v4_higher_fixed_heldout_score`: +1.6798pp with interval
+    [+0.6195pp, +2.7402pp]. All 1,012 games reached strict terminals and zero
+    hit the cap. The authorization is consumed; do not rerun, resume, extend
+    or reuse the prefix. The result does not establish refresh causality, Elo,
+    equivalence or automatic promotion.
 
 The previously executed isolated smoke command was:
 

@@ -1,19 +1,35 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `high_precision_heldout_plan_frozen_awaiting_authorization`
+Status: `high_precision_heldout_completed_v4_higher_named_route`
 
-Decision status: `ready_for_plan_bound_authorization`
+Decision status: `named_route_direction_established_no_automatic_promotion`
 
 This is the current planning record after the 256-game reused-development
 diagnostic, its zero-game mechanism audits, the 156-game phase-process
 generalization diagnostic, a zero-new-game cross-corpus synthesis, and a
 zero-candidate-game freeze of a new training-disjoint source pool. Every prior
-game authorization is consumed. The product owner has now selected the
-253-start / 1,012-game / target-1.5pp fixed-width option, and its immutable
-successor plan is technically ready but not authorized. This record itself
-authorizes no evaluation, training, update, promotion, publication or release.
+game authorization is consumed. The selected 253-start / 1,012-game /
+target-1.5pp fixed-width held-out successor has now also completed once and its
+authorization is consumed. This record authorizes no further evaluation,
+training, update, promotion, publication or release.
 
 ## Completed evidence
+
+### High-precision held-out score result
+
+Plan `6620821e...` completed all 1,012 games over 253 independent held-out
+starts with result `8d7a4a0a...` and completion `8949a8fd...`. Every game
+reached a strict rules terminal and zero hit the safety cap. The preregistered
+start-clustered v4-minus-v3 score difference was `+1.6798pp`, interval
+`[+0.6195pp, +2.7402pp]`, half-width `1.0604pp`, decision
+`v4_higher_fixed_heldout_score`.
+
+V4 recorded 80 wins, 273 draws and 153 losses versus v3's 62 / 292 / 152.
+Twenty-four start units favoured v4, seven favoured v3 and 222 tied. The
+secondary 108-post-start-ply survival difference was `+0.5929pp`, interval
+`[-1.7668pp, +2.9526pp]`, so the earlier development-corpus passivity direction
+did not reproduce on held-out data. Preserve the
+[completion evidence](../evidence/sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
 
 ### Reused-development process result
 
@@ -149,8 +165,9 @@ The master order was frozen to support nested, phase-covered prefixes:
 
 The product owner subsequently selected the 253-record prefix and 1.5pp
 fixed-width target. That selection is now bound by the immutable successor
-plan described below. It does not turn the source pool into an evaluated
-result, guarantee the planning variance or authorize any game. Preserve the
+plan described below, and the selected prefix has completed one evaluation.
+The remaining pool is not an evaluated result, the observed variance is not a
+population guarantee, and completion authorizes no additional game. Preserve the
 [source-pool readiness evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
 
 ## Remaining hypotheses and confounders
@@ -158,14 +175,15 @@ result, guarantee the planning variance or authorize any game. Preserve the
 1. Start/history composition may materially alter process behavior. The
    positive development effect was concentrated in its PerfectDB stratum, but
    this is a post-hoc mediator hypothesis.
-2. The named candidates may have a small paired-score difference that neither
-   visible corpus can establish as a held-out strength relation.
+2. The named v4 route has a small positive score relation on the completed
+   frozen held-out prefix; its mechanism and population generality remain
+   unresolved.
 3. V3 and v4 differ in seed, source commit, target age and accumulated
    SpecialistDB. Their comparison cannot identify a target-refresh effect.
 4. The existing mature-fork cohort is much earlier than the late v4 behavior
    of interest and should not be used as a maturity-mismatched causal proxy.
 
-## Selected Option A successor
+## Completed Option A successor
 
 The product owner chose fixed-width description with a target 1.5pp 95%
 engineering half-width. Machine plan identity
@@ -180,13 +198,13 @@ no-capture, repetition, phase, length, termination and Malom diagnostics are
 secondary and may not replace score after outcomes are observed.
 
 Two zero-game preflights passed every technical gate with stable source
-readiness
-`f233c991aa66a8699fac8952fd0c758a5fabb09de7a0e66ba3043635934b2b08`.
-The only absent gate is exact plan-bound product authorization. The target
-width is not an equivalence margin: a zero-crossing interval is inconclusive,
-and an observed half-width above 1.5pp is `inconclusive_precision`. See the
+readiness `f233c991...`. Direct authorization `816cc390...`, launch
+`b4505be8...`, result `8d7a4a0a...` and completion `8949a8fd...` are now
+consumed. The observed interval was wholly positive and its half-width passed
+the 1.5pp precision gate. The target width was not an equivalence margin. See
+the
 [frozen plan](sanmill-retained-v3-v4-heldout-score-v1.md) and
-[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md).
+[completion evidence](../evidence/sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
 
 ## Other unselected objectives
 
@@ -218,13 +236,15 @@ revisit interval cannot be promoted into the new decision.
 | Phase-process generalization | completed; authorization consumed; `inconclusive` |
 | Cross-corpus zero-game synthesis | completed; prior positive direction not reproduced |
 | Independent analysis unit | one start, averaging both colours |
-| New objective | Option A fixed-width held-out score selected |
-| Candidate-blind held-out source pool | frozen; identity `2eb04f54`; 361 starts; zero candidate games |
-| Evaluation corpus subset | first 253 frozen records; prefix identity `99951a69`; 99 / 98 / 56 phases |
+| New objective | Option A fixed-width held-out score completed |
+| Candidate-blind held-out source pool | identity `2eb04f54`; selected prefix now consumed as evaluation evidence |
+| Evaluation corpus subset | first 253 records completed; prefix `99951a69`; 99 / 98 / 56 phases |
 | Primary threshold / equivalence margin | target half-width 1.5pp; no equivalence margin |
 | New game, time and node envelope | 1,012 games; 4 active hours; frozen node ceiling |
-| New immutable plan and readiness | plan `6620821e`; source readiness `f233c991`; all technical gates pass |
-| New launch or training authority | absent |
+| Immutable plan and runtime | plan `6620821e`; launch `b4505be8`; completion `8949a8fd` |
+| Primary decision | `v4_higher_fixed_heldout_score`; +1.6798pp; [+0.6195pp, +2.7402pp] |
+| Further launch, promotion or training authority | absent |
 
-Verdict: `ready_for_plan_bound_authorization`. The successor is technically
-ready, but no authorization file exists and no game has been launched.
+Verdict: the named v4 route scored higher on the frozen held-out prefix under
+the preregistered precision rule. No automatic promotion, refresh-causal or
+population-strength conclusion follows.

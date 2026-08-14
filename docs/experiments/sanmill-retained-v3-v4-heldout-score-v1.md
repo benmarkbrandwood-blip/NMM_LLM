@@ -1,11 +1,12 @@
 # Retained-v3/v4 high-precision held-out score v1
 
-Status: `frozen_awaiting_product_authorization`
+Status: `completed_v4_higher_named_route_fixed_heldout_score`
 
 The product owner selected the 253-start / 1,012-game fixed-width option with
 a target 95% engineering half-width of at most 1.5 percentage points. This
 document records that decision and the resulting immutable evaluation plan.
-It is not launch authority. No candidate game has been played under this plan.
+The plan was subsequently authorized and completed once. Its authorization is
+consumed and it grants no rerun, extension, promotion, publication or release.
 
 The canonical [machine plan](sanmill-retained-v3-v4-heldout-score-v1.json) has
 identity
@@ -116,7 +117,7 @@ The immutable ceiling is:
 - no equivalence, Elo, population, refresh-causal, promotion, publication or
   release action or claim.
 
-## Source readiness and launch gate
+## Source readiness, authorization and completion
 
 Two complete fresh preflights on published clean `dev` produced the same
 source-readiness identity
@@ -127,8 +128,18 @@ Sanmill, all 253 strict history replays, process ownership, focused tests,
 mandatory Malom/provenance tests and Ruff. Both preflights requested zero
 candidate moves from the held-out corpus and played zero games.
 
-Product authorization bound to the exact plan and source-readiness identities
-is absent. Therefore the current verdict is `needs_decision`: technically
-ready for a plan-bound launch decision, but not authorized and not launched.
-See the
-[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md).
+Direct product authorization identity `816cc390...` bound the exact plan and
+stable source readiness. Post-authorization readiness `765c0829...` passed
+every gate, runtime specification `cb736759...` and launch `b4505be8...` were
+created once, and all 1,012 games completed in 1,749.805795 active seconds.
+No resume, retry, recovery, expansion, training, update or safety cap occurred.
+
+The primary v4-minus-v3 score difference is `+1.6798pp`, engineering interval
+`[+0.6195pp, +2.7402pp]`, half-width `1.0604pp`, decision
+`v4_higher_fixed_heldout_score`. Result identity is `8d7a4a0a...` and
+completion identity is `8949a8fd...`. This answers the frozen named-route
+question only; it does not identify a refresh cause or authorize automatic
+promotion. Preserve the historical
+[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md)
+and the
+[completion evidence](../evidence/sanmill-retained-v3-v4-heldout-score-v1-result-2026-08-14.md).
