@@ -108,6 +108,30 @@ overlap was below the 37.55%/57.31% same-size random baseline.  Future
 contamination and generalization boundaries must therefore be game- and
 player-level; state overlap remains diagnostic only.
 
+The allowed nonfinal characterization then completed under result identity
+`183a39ab29ddfbec76a7188606b0a1297ffbdb845346a05753807f2c609b65e6`.
+It strictly replayed 38,222 train, selection, and confirmation games with
+1,801,435 decisions.  It opened zero final-test records.  The frozen 256-state
+Malom benchmark measured 3,497 queries in 29.2633 seconds on the cold first
+pass and the same queries in 0.0800 seconds with 79 sectors cached.  The
+preregistered conservative first-pass projection exceeded its 7,200-second
+threshold and therefore selected the already frozen 10,000-game sample,
+identity
+`d43ee042514d9dea389849e943a5fb9d0f2d6218f6e226a980afc9354e9c8cd4`.
+That sample contains every selection game plus 9,113 hash-ranked train games.
+The cold/warm difference shows that the binding projection is intentionally
+very conservative; it cannot be changed after the result.  Any corrected
+cache-amortized cost rule must be frozen separately before an F0-H0 screen.
+See the
+[B2 freeze evidence](../evidence/f0-h0-design-b2-freeze-characterization-2026-08-15.md)
+and machine manifest.  The four scientific dimensions remain unrun.
+
+Both sealed verifiers reproduce the plan, membership, and result lineages.
+The two B2 focused test files pass 15 tests.  Task-scope Ruff passes for the
+new evaluation module, both runners, and both focused test files.  The access
+audit records zero HumanDB reads, database writes, games, searches, model
+loads, training updates, and `2eb04f54` reads or consumption.
+
 The result verifier passed with the recorded result identity and file hash.
 The supplement's two focused test files pass 11 tests, and task-scope Ruff
 passes on the measurement module, runner, and both focused test files.

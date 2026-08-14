@@ -4,7 +4,7 @@ Date: 2026-08-14
 
 Updated: 2026-08-15
 
-Status: `f0_h0_b2_membership_frozen_before_screening_no_launch_authority`
+Status: `f0_h0_b2_nonfinal_characterized_screen_unrun_no_launch_authority`
 
 Authority: `product-owner-direct`
 
@@ -245,6 +245,17 @@ This addendum does not run or pass F0-H0.  Independent support, modifiable
 state reach, concentration, and the product-effect upper bound remain
 uncomputed.  Only train, selection, and confirmation may be characterized in
 the freeze round; final-test may expose only its count and membership hash.
+
+The permitted nonfinal characterization subsequently completed under result
+identity
+`183a39ab29ddfbec76a7188606b0a1297ffbdb845346a05753807f2c609b65e6`.
+It strictly replayed 38,222 train, selection, and confirmation games and kept
+all final-test access counters at zero.  The preregistered Malom cost rule
+selected the already frozen 10,000-game fallback sample, identity
+`d43ee042514d9dea389849e943a5fb9d0f2d6218f6e226a980afc9354e9c8cd4`.
+This cost branch is not an F0-H0 result and cannot be changed after observing
+the benchmark without a new frozen contract.  See the
+[freeze evidence](../evidence/f0-h0-design-b2-freeze-characterization-2026-08-15.md).
 
 The earlier same-metric comparison measured decision-weighted `ring16`
 overlap of 34.32% and 53.60% for Design B, below the 37.55% and 57.31%
