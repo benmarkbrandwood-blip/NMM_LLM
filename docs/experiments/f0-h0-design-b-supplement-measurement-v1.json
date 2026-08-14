@@ -1,0 +1,191 @@
+{
+  "schema_version": "nmm.f0-h0-design-b-supplement-plan.v1",
+  "measurement_id": "f0-h0-design-b-supplement-2026-08-15",
+  "status": "frozen_before_supplement_statistics",
+  "frozen_at_utc": "2026-08-14T19:20:25Z",
+  "repository_base_commit": "28e3951bea4deda479a9a7fb60d0bcebc33b21df",
+  "purpose": "Measure Design B support, second-level player and time splits, and same-metric ring16 comparators without selecting a design or making a feasibility decision.",
+  "input_boundary": {
+    "corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "behavior_games": 92226,
+    "behavior_logical_plies": 4394220,
+    "behavior_player_keys": 4994,
+    "outcome_games": 37866,
+    "previous_split_result_identity": "cbfa6d43fa31e9644bae169e6b6d42232aa008e54921c96a46fbdddb73a95931",
+    "previous_split_result_file_sha256": "eb0ed05a458b282a88b6bce12824a9744780238601609f446d7772b886dba77a"
+  },
+  "scope": {
+    "select_final_split": false,
+    "make_feasibility_decision": false,
+    "run_f0_h0_scientific_dimensions": false
+  },
+  "support_measurement": {
+    "cut_dates": [
+      "2026-03-01",
+      "2026-05-01"
+    ],
+    "preexisting_scale_checks": {
+      "2026-03-01": {
+        "train_games": 36949,
+        "strong_post_games": 4577,
+        "strong_post_player_keys": 1245,
+        "strong_post_membership_identity": "cf65a0030d9051ecdf6fe3a07e0693c05ba9cfc833d1b32c398f5cd8268ffe6a"
+      },
+      "2026-05-01": {
+        "train_games": 69284,
+        "strong_post_games": 847,
+        "strong_post_player_keys": 322,
+        "strong_post_membership_identity": "2a7f6f19cee1ba97ceda6cd3070a96f70f0fef46414b67613e4b68bcad6ec6f8"
+      }
+    },
+    "player_game_distribution": {
+      "unit": "source-domain player key incidence in the measured subset",
+      "quantile_method": "nearest-rank",
+      "quantiles": [
+        "min",
+        "p01",
+        "p05",
+        "p10",
+        "p25",
+        "p50",
+        "p75",
+        "p90",
+        "p95",
+        "p99",
+        "max"
+      ],
+      "tail_threshold_games": [
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+        250,
+        500
+      ]
+    },
+    "outcome_definition": "F0-D0 outcome_analysis_eligible only; never inferred from recorded result",
+    "decision_definition": "one strictly replayed logical ply",
+    "phase_definition": "repository get_game_phase on the exact predecessor board; place, move, and fly are reported as placement, movement, and flying"
+  },
+  "b1_player_resplit": {
+    "source_cut": "2026-03-01",
+    "source_definition": "all post-cut games whose two player keys are absent from every behavior game before the source cut",
+    "source_games": 4577,
+    "source_player_keys": 1245,
+    "source_membership_identity": "cf65a0030d9051ecdf6fe3a07e0693c05ba9cfc833d1b32c398f5cd8268ffe6a",
+    "zero_cut_measurement": "connected components of the induced player graph",
+    "independent_cut_player_fractions": [
+      0.25,
+      0.3333333333333333,
+      0.5
+    ],
+    "independent_cut_restarts": 8,
+    "three_way_player_ratios": {
+      "selection": 0.5,
+      "one-time-confirmation": 0.25,
+      "final-test": 0.25
+    },
+    "three_way_outer_restarts": 4,
+    "three_way_inner_restarts": 4,
+    "seed": "f0-h0-design-b1-supplement-2026-08-15-v1",
+    "louvain_seed": 20260815,
+    "maximum_kl_iterations": 25,
+    "method": "weighted Louvain initialization followed by exact-size Kernighan-Lin edge-cut minimization; game count is the edge weight",
+    "selection_rule_for_measurement_only": "minimum discarded cross-partition games, then lexicographically smallest membership SHA-256",
+    "final_membership_frozen": false
+  },
+  "b2_time_resplit": {
+    "base_cut": "2026-03-01",
+    "base_test_pool_definition": "the 4577 games after the base cut whose two players are absent before the base cut",
+    "segment_total_definition": "games from the base test pool whose date falls in the segment",
+    "strong_segment_definition": "segment games whose two player keys are absent from every behavior game before that segment start",
+    "candidate_cut_pairs": [
+      {
+        "candidate_id": "equal-calendar-span",
+        "cut_one": "2026-04-17",
+        "cut_two": "2026-06-03"
+      },
+      {
+        "candidate_id": "early-month-boundaries",
+        "cut_one": "2026-04-01",
+        "cut_two": "2026-05-01"
+      },
+      {
+        "candidate_id": "later-month-boundaries",
+        "cut_one": "2026-05-01",
+        "cut_two": "2026-06-01"
+      }
+    ],
+    "candidate_status": "measurement_only_no_final_time_cuts_selected"
+  },
+  "ring16_comparison": {
+    "state_identity": "repository ring16: D4 x abstract inner/outer-ring swap over the pre-decision NMM FEN",
+    "primary_overlap_metric": "for each partition, decisions whose ring16 orbit occurs in at least one other partition divided by all decisions in that partition",
+    "strict_replay_required": true,
+    "design_b_profiles": [
+      "coarse March train versus strong post-cut pool",
+      "each preregistered B2 train-selection-confirmation-final profile"
+    ],
+    "design_c_comparator": {
+      "source_result_identity": "cbfa6d43fa31e9644bae169e6b6d42232aa008e54921c96a46fbdddb73a95931",
+      "method": "reuse the sealed previous result without recomputation"
+    },
+    "random_baseline": {
+      "sampling_unit": "whole behavior-eligible game",
+      "population": "all 92226 F0-D0 behavior games",
+      "left_games": 36949,
+      "right_games": 4577,
+      "sets_disjoint": true,
+      "player_or_time_isolation": false,
+      "seed": "f0-h0-design-b-ring16-random-2026-08-15-v1",
+      "selection_method": "sort by SHA-256(namespace, seed, session_id), take left then right"
+    },
+    "interpretation_rule": "report B, prior C, and random baseline together; make no design judgment in this round"
+  },
+  "raw_record_access": {
+    "required": true,
+    "reason": "F0-D0 retains per-game move counts but not exact per-ply phase or predecessor ring16 state",
+    "allowed_files": "only F0-D0 manifest-bound behavior-eligible raw games required by a frozen phase or ring16 profile",
+    "verification": "verify each path, size, SHA-256, session id, move count, strict metadata, legal move, notation, and strict terminal eligibility",
+    "source_pool_2eb04f54_allowed": false
+  },
+  "decision_thresholds": [],
+  "result_contract": {
+    "decision": null,
+    "recommendation": null,
+    "final_split_membership": null,
+    "feasibility_claim": null
+  },
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_f0h0_design_b_supplement.py",
+      "sha256": "d52d61d47b8715d74f8a85b29b091600fd8ac097b0c383f66c37b34c5d03fbce"
+    },
+    {
+      "path": "scripts/measure_human_f0h0_design_b_supplement.py",
+      "sha256": "78d821d55a5133a06f2ff10229d0e12c2733b0ea718351177e2e651899b8d1cc"
+    },
+    {
+      "path": "tests/test_human_f0h0_design_b_supplement.py",
+      "sha256": "f6dd5e2c46360926026b1f63f8cdd48fd91c825ec0c2502ee5c0b3ced8af7432"
+    }
+  ],
+  "prohibited_operations": {
+    "database_writes": true,
+    "games": true,
+    "search_batches": true,
+    "model_loads": true,
+    "training": true,
+    "malom_queries": true,
+    "source_pool_2eb04f54_reads_or_consumption": true,
+    "final_split_selection": true,
+    "feasibility_decision": true,
+    "existing_frozen_record_changes": true
+  },
+  "plan_identity": "889ccfcc407def9b7c2b4f3058611566e1bcb541976c42ed286d449dc67d633a"
+}
