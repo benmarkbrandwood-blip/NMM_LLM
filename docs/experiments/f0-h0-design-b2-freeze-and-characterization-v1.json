@@ -1,0 +1,214 @@
+{
+  "schema_version": "nmm.f0-h0-design-b2-freeze-plan.v1",
+  "freeze_id": "f0-h0-design-b2-official-freeze-2026-08-15",
+  "status": "frozen_before_membership_generation_and_screening_statistics",
+  "frozen_at_utc": "2026-08-14T20:07:19Z",
+  "repository_base_commit": "ab964b47b800e30325bab50d34af546a970711dc",
+  "owner_decision": {
+    "selected_design": "B2",
+    "selected_cut_pair": [
+      "2026-04-01",
+      "2026-05-01"
+    ],
+    "b1_selected": false,
+    "reason": "B2 provides simultaneous time and player isolation with the strongest supported claim boundary."
+  },
+  "input_boundary": {
+    "corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "behavior_games": 92226,
+    "behavior_logical_plies": 4394220,
+    "behavior_player_keys": 4994,
+    "outcome_games": 37866
+  },
+  "split": {
+    "cuts": {
+      "train_end_exclusive": "2026-03-01",
+      "selection_end_exclusive": "2026-04-01",
+      "confirmation_end_exclusive": "2026-05-01"
+    },
+    "definitions": {
+      "train": "every F0-D0 behavior-eligible game dated before 2026-03-01",
+      "selection": "games in [2026-03-01, 2026-04-01) whose two player keys occur in no behavior game before 2026-03-01",
+      "confirmation": "games in [2026-04-01, 2026-05-01) whose two player keys occur in no behavior game before 2026-04-01",
+      "final-test": "games in [2026-05-01, corpus end] whose two player keys occur in no behavior game before 2026-05-01"
+    },
+    "expected_games": {
+      "train": 36949,
+      "selection": 887,
+      "confirmation": 386,
+      "final-test": 847
+    },
+    "membership_unit": "F0-D0 source-domain session_id",
+    "membership_identity": "SHA-256 of canonical JSON sorted session-id list per partition",
+    "strong_isolation_rule": "the three test-segment player-key sets must be pairwise disjoint",
+    "mismatch_rule": "fail closed on any count difference; never alter a cut or novelty definition to match the expected count"
+  },
+  "scope": {
+    "freeze_membership": true,
+    "characterize_train_selection_confirmation": true,
+    "benchmark_malom_cost_only": true,
+    "independent_support": false,
+    "modifiable_state_reachability": false,
+    "concentration": false,
+    "product_effect_upper_bound": false
+  },
+  "final_test_guard": {
+    "default": "deny",
+    "membership_visibility": "session IDs, count, and identity only",
+    "denied_access_kinds": [
+      "raw game records",
+      "human decisions",
+      "derived features",
+      "expanded statistics"
+    ],
+    "failure": "raise FinalTestAccessError before opening a raw path or invoking a feature producer",
+    "future_access": "requires separate one-time product-owner authorization",
+    "supported_accessor": "FrozenSplitAccess"
+  },
+  "characterization": {
+    "partitions": [
+      "train",
+      "selection",
+      "confirmation"
+    ],
+    "player_game_distribution": {
+      "unit": "source-domain player-key game incidence",
+      "quantile_method": "nearest-rank",
+      "tail_threshold_games": [
+        1,
+        2,
+        5,
+        10,
+        20,
+        50,
+        100,
+        250,
+        500
+      ]
+    },
+    "decision_definition": "one strictly replayed logical ply",
+    "phase_definition": "repository get_game_phase on the exact predecessor board; place, move, fly map to placement, movement, flying",
+    "strict_outcome_definition": "F0-D0 outcome_analysis_eligible and independent_outcome only",
+    "color_definition": "unique player keys by white or black game side plus strictly replayed decisions by actor color",
+    "length_definition": {
+      "unit": "logical ply per source game",
+      "quantile_method": "nearest-rank",
+      "bins": [
+        "1-18",
+        "19-40",
+        "41-60",
+        "61-100",
+        "101+"
+      ]
+    },
+    "final_test_content_statistics": null
+  },
+  "malom_cost_benchmark": {
+    "purpose": "cost only; publish no oracle outcomes, safe sets, or F0-H0 screening statistic",
+    "population": "all train plus selection human decisions",
+    "sampling_unit": "one source session ID plus zero-based logical-ply index",
+    "sample_decisions": 256,
+    "sample_seed": "f0-h0-b2-malom-cost-benchmark-2026-08-15-v1",
+    "sample_rule": "hash-rank every train+selection decision by namespace, seed, session ID and logical ply, then take the first 256",
+    "query_work": "one parent query plus each non-rules-terminal legal successor using the complete Malom comparator",
+    "passes": [
+      "sector-cold first pass on one new MalomDB instance",
+      "same-order sector-warm repeat pass on that instance"
+    ],
+    "cache_measurement": "sector-cache entries before and after each pass plus throughput",
+    "projection": "upper 95% normal interval for mean first-pass query seconds and queries per decision, plus measured state-construction seconds, multiplied by the fixed safety factor",
+    "projection_safety_multiplier": 1.25,
+    "maximum_projected_active_seconds": 7200.0,
+    "decision_rule": "full if conservative train+selection projection is at most 7200 active seconds; otherwise the frozen fallback sample",
+    "fallback_sampling_unit": "whole source game",
+    "fallback_sample_games": 10000,
+    "fallback_selection_policy": "all_887_selection_plus_hash_ranked_train",
+    "fallback_sample_seed": "f0-h0-b2-malom-fallback-games-2026-08-15-v1",
+    "fallback_identity_rule": "SHA-256 of the canonical sorted session-ID list",
+    "trusted_label_version": "sector-corrected-v1",
+    "dataset_manifest_file_sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+    "dataset_content_sha256": "c414fe88778f8d1d95cd3015532b43cad59f09e8398d8e46c42188b6829f3544",
+    "full_component_hash_required_for_benchmark": false
+  },
+  "claim_boundaries": {
+    "safe_set_name": "A_pos",
+    "full_rule_safe_set_name_prohibited": "A_allow",
+    "scope_population": "observed PlayOK-like source domain only",
+    "product_ui_or_new_population_generalization": false,
+    "history_recovery_attenuation": {
+      "excluded_games": 1751,
+      "excluded_draws": 35,
+      "retained_games": 92789,
+      "retained_draws": 26157,
+      "nonrandom": true
+    },
+    "games_without_verifiable_terminal_basis": 54923,
+    "zero_result_disagreements_implies_all_results_verified": false
+  },
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_f0h0_b2_freeze.py",
+      "sha256": "f0e4d59b25b5262a2b092a86699f9bd2acf0a96c5ecfb7000a7936db778a7e2a"
+    },
+    {
+      "path": "scripts/freeze_human_f0h0_design_b2.py",
+      "sha256": "53306320b21a45467d0115ede60f650ab880efbe512b1e5ea76291a653504543"
+    },
+    {
+      "path": "scripts/characterize_human_f0h0_design_b2.py",
+      "sha256": "9c397ef48f7120d8b7069e70191a2f2abdf1b967d371e055b39c9f3e532af86c"
+    },
+    {
+      "path": "tests/test_human_f0h0_b2_freeze.py",
+      "sha256": "212b61dc389d141c0741d13b208dc79d228728a5a61c65372e8791238fc99ef8"
+    },
+    {
+      "path": "learned_ai/evaluation/human_f0h0_split_retest.py",
+      "sha256": "3bdd1a83299bbf4db3a8625459c9ac03063da216267a6903502cd7a23a8f44de"
+    },
+    {
+      "path": "learned_ai/evaluation/human_f0h0_design_b_supplement.py",
+      "sha256": "d52d61d47b8715d74f8a85b29b091600fd8ac097b0c383f66c37b34c5d03fbce"
+    },
+    {
+      "path": "learned_ai/evaluation/human_f0h0_feasibility.py",
+      "sha256": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95"
+    },
+    {
+      "path": "ai/malom_db.py",
+      "sha256": "5b01c78c040d3725e4d3bd26db486e664da2452eb976f89eb6a5e77599b2e845"
+    },
+    {
+      "path": "game/board.py",
+      "sha256": "a54421e8b099523ea7e4255e46fd6e6b8fe068595438aa107512b61fc1eb5377"
+    },
+    {
+      "path": "game/rules.py",
+      "sha256": "1e93a87ee4f29a26787ecb1590d3d8a178033fd2fee1d6d95f17a925d2eac19a"
+    },
+    {
+      "path": "game/draw_rules.py",
+      "sha256": "e9bfae41fdae0250e3277f2df303eb1ba01a6c3c1db588aa15307d136e539c8f"
+    }
+  ],
+  "prohibited_operations": {
+    "database_writes_or_rebuilds": true,
+    "games_or_search_batches": true,
+    "model_loads": true,
+    "training": true,
+    "final_test_content_access": true,
+    "source_pool_2eb04f54_access_or_consumption": true,
+    "f0_h0_screening_dimensions": true,
+    "existing_frozen_record_changes": true
+  },
+  "result_contract": {
+    "membership_must_precede_characterization": true,
+    "screening_decision": null,
+    "feasibility_decision": null,
+    "recommendation": null,
+    "final_test_statistics": null
+  },
+  "plan_identity": "a4dc271d00a36394d4e5b61751f7536cf3e869cb90136fbe7bedd6016c6acb30"
+}
