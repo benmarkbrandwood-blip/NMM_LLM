@@ -448,6 +448,12 @@ def test_web_does_not_invent_metrics_before_a_spec_exists(tmp_path) -> None:
     assert "源池可用" in web.HTML
     assert "held-out 高精度得分方案" in web.HTML
     assert "跨 0 只能判“不确定”" in web.HTML
+    assert "历史阶段过程诊断（156 / 156，已完成）" in web.HTML
+    assert "按候选颜色分层（描述性）" in web.HTML
+    assert "按冻结起始阶段分层（描述性）" in web.HTML
+    assert web.HTML.index("held-out 高精度得分评测") < web.HTML.index(
+        "历史阶段过程诊断"
+    )
 
 
 def test_web_exposes_only_validated_heldout_pool_summary() -> None:
