@@ -267,9 +267,22 @@ identity is `2eb04f54`, records identity `4e5f9ecf`, with 153 placement / 152
 movement / 56 flying starts. Its nested prefixes can supply 64 starts / 256
 games for 3pp planning, 142 / 568 for 2pp, and 253 / 1,012 for 1.5pp. The
 568-start / 2,272-game 1pp option is not source-feasible. This is source
-readiness only; no evaluation subset, decision framework, plan, readiness or
-authorization exists. Preserve the
+readiness only. Preserve the
 [source-pool evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
+
+The product owner then selected the 253-start / 1,012-game fixed-width option
+with a target 1.5pp 95% engineering half-width. Machine plan identity
+`6620821e879f53058d15990cd0e8c884ae62fec213b3d96200e8894c20e19714`
+freezes the first 253 pool records under prefix identity `99951a69`, 99
+placement / 98 movement / 56 flying, with implementation commit `5eb1423` and
+plan commit `5929500`. Two clean published-dev preflights produced stable
+source readiness `f233c991` and passed every technical gate with zero corpus
+candidate moves and zero games. Product authorization is absent, so the plan
+is technically ready but not launched. The 1.5pp target is fixed-width
+planning, not equivalence; a zero-crossing interval remains inconclusive.
+Preserve the
+[frozen plan](../experiments/sanmill-retained-v3-v4-heldout-score-v1.md) and
+[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md).
 
 ### Remaining work for the next operator
 
@@ -299,21 +312,22 @@ authorization exists. Preserve the
    Do not rerun, resume, extend, overwrite, promote or publish it.
 9. Preserve the completed v3/v4 development and phase-process diagnostics,
    their ledgers, reports, web evidence and consumed authorizations. Preserve
-   candidate-blind held-out source pool `2eb04f54` exactly; do not import its
-   406-game source universe into the active HumanDB, reorder a selected prefix
-   after choosing a bound, or describe the pool as an evaluated result. The
-   independent score unit remains one start after averaging both colours. The
-   next product choice is fixed-width, directional-minimum-effect or
-   equivalence, followed by its bound; only then freeze the 64-, 142- or
-   253-start subset and a new plan. Do not launch the existing early
+   candidate-blind held-out source pool `2eb04f54` and selected 253-record
+   prefix `99951a69` exactly; do not import its 406-game source universe into
+   the active HumanDB, reorder the prefix, or describe the pool as an evaluated
+   result. Preserve frozen plan `6620821e` and source readiness `f233c991`.
+   The independent score unit remains one start after averaging both colours,
+   and the 1.5pp target is fixed-width rather than equivalence. The only next
+   decision is whether to grant exact plan-bound launch authority; until then
+   create no authorization or game. Do not launch the existing early
    mature-fork checkpoints as a passivity shortcut. Preserve the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md).
    No additional evaluation or training is authorized.
 
-No additional candidate-vs-baseline held-out match, model promotion,
-publication, or long training is currently authorized. Historical ignored
-artifacts under `out/` are evidence inputs and must not be deleted, overwritten,
-or relabelled.
+The frozen high-precision candidate-vs-baseline held-out plan is not launch
+authority. No held-out match, model promotion, publication or long training is
+currently authorized. Historical ignored artifacts under `out/` are evidence
+inputs and must not be deleted, overwritten or relabelled.
 
 ### Latest state: early target refresh is harmful; later cadence unresolved
 
@@ -2740,6 +2754,16 @@ the current successor in this order:
     score-width budget with a conservative 568-game estimate. Any successor
     needs an owner-selected objective and threshold, a new corpus, frozen
     plan, readiness and explicit authority.
+36. The product-selected high-precision held-out successor is frozen under
+    machine plan identity `6620821e`, implementation `5eb1423`, plan commit
+    `5929500`, first-253 prefix identity `99951a69` and source readiness
+    `f233c991`. It binds 253 independent starts, 1,012 games, four active hours
+    and a target 1.5pp engineering half-width. Both preflights requested zero
+    corpus candidate moves and played zero games. Authorization is absent. Do
+    not create runtime artifacts or launch until the owner grants authority
+    bound to the exact plan and readiness identities; do not call a
+    zero-crossing interval equivalence or use process metrics to replace the
+    score primary.
 
 The previously executed isolated smoke command was:
 

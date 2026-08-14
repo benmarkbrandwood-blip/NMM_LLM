@@ -1,16 +1,17 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `heldout_source_pool_frozen_precision_framework_unselected`
+Status: `high_precision_heldout_plan_frozen_awaiting_authorization`
 
-Decision status: `needs_decision`
+Decision status: `ready_for_plan_bound_authorization`
 
 This is the current planning record after the 256-game reused-development
 diagnostic, its zero-game mechanism audits, the 156-game phase-process
 generalization diagnostic, a zero-new-game cross-corpus synthesis, and a
-zero-candidate-game freeze of a new training-disjoint source pool. Every
-associated game authorization is consumed. The source pool is preparation,
-not a held-out result or launch grant. This record authorizes no new
-evaluation, training, update, promotion, publication or release.
+zero-candidate-game freeze of a new training-disjoint source pool. Every prior
+game authorization is consumed. The product owner has now selected the
+253-start / 1,012-game / target-1.5pp fixed-width option, and its immutable
+successor plan is technically ready but not authorized. This record itself
+authorizes no evaluation, training, update, promotion, publication or release.
 
 ## Completed evidence
 
@@ -146,9 +147,10 @@ The master order was frozen to support nested, phase-covered prefixes:
 | 1.5pp half-width | 253 | 1,012 | 99 / 98 / 56 | available |
 | 1.0pp half-width | 568 | 2,272 | pool total 153 / 152 / 56 | unavailable |
 
-This establishes source feasibility only. It does not turn the pool into an
-evaluated held-out result, guarantee the planning variance, select a precision
-target, or authorize any game. Preserve the
+The product owner subsequently selected the 253-record prefix and 1.5pp
+fixed-width target. That selection is now bound by the immutable successor
+plan described below. It does not turn the source pool into an evaluated
+result, guarantee the planning variance or authorize any game. Preserve the
 [source-pool readiness evidence](../evidence/sanmill-retained-v3-v4-late-import-heldout-pool-readiness-2026-08-14.md).
 
 ## Remaining hypotheses and confounders
@@ -163,25 +165,30 @@ target, or authorize any game. Preserve the
 4. The existing mature-fork cohort is much earlier than the late v4 behavior
    of interest and should not be used as a maturity-mismatched causal proxy.
 
-## Next owner choice
+## Selected Option A successor
 
-Freeze exactly one claim family before preparing another immutable plan.
+The product owner chose fixed-width description with a target 1.5pp 95%
+engineering half-width. Machine plan identity
+`6620821e879f53058d15990cd0e8c884ae62fec213b3d96200e8894c20e19714`
+freezes the first 253 records of pool `2eb04f54`, both candidate colours, both
+candidates and 1,012 games. The ordered prefix identity is `99951a69`; its
+phase support is 99 placement / 98 movement / 56 flying.
 
-### Option A: genuinely held-out route relation
+The independent unit is one start after averaging the black and white
+v4-minus-v3 score differences. Strict W/D/L score is primary. Survival,
+no-capture, repetition, phase, length, termination and Malom diagnostics are
+secondary and may not replace score after outcomes are observed.
 
-- Use a prospectively frozen prefix of source pool identity `2eb04f54` and the
-  same black/white pairing. Do not alter its order after choosing the bound.
-- Make within-start averaged v4-minus-v3 score the primary endpoint.
-- Choose one decision framework prospectively: fixed-width description,
-  directional minimum effect, or equivalence with a meaningful margin.
-- Use the selected target and a conservative variance assumption to freeze
-  starts, games, active time and node work.
-- Keep survival, no-capture, repetition, phase and termination reason
-  explanatory; none may replace paired score after seeing the result.
+Two zero-game preflights passed every technical gate with stable source
+readiness
+`f233c991aa66a8699fac8952fd0c758a5fabb09de7a0e66ba3043635934b2b08`.
+The only absent gate is exact plan-bound product authorization. The target
+width is not an equivalence margin: a zero-crossing interval is inconclusive,
+and an observed half-width above 1.5pp is `inconclusive_precision`. See the
+[frozen plan](sanmill-retained-v3-v4-heldout-score-v1.md) and
+[readiness evidence](../evidence/sanmill-retained-v3-v4-heldout-score-readiness-2026-08-14.md).
 
-The source-disjointness work is complete. This remains the shortest route to a
-model-selection answer, but it still requires a product choice of
-precision/effect/equivalence target and explicit launch authority.
+## Other unselected objectives
 
 ### Option B: target-refresh causality
 
@@ -211,13 +218,13 @@ revisit interval cannot be promoted into the new decision.
 | Phase-process generalization | completed; authorization consumed; `inconclusive` |
 | Cross-corpus zero-game synthesis | completed; prior positive direction not reproduced |
 | Independent analysis unit | one start, averaging both colours |
-| New objective | Option A source work complete; decision framework not selected |
+| New objective | Option A fixed-width held-out score selected |
 | Candidate-blind held-out source pool | frozen; identity `2eb04f54`; 361 starts; zero candidate games |
-| Evaluation corpus subset | not selected; nested 64 / 142 / 253 prefixes available |
-| Primary threshold / equivalence margin | absent |
-| New game, time and node envelope | absent |
-| New immutable plan and readiness | absent |
+| Evaluation corpus subset | first 253 frozen records; prefix identity `99951a69`; 99 / 98 / 56 phases |
+| Primary threshold / equivalence margin | target half-width 1.5pp; no equivalence margin |
+| New game, time and node envelope | 1,012 games; 4 active hours; frozen node ceiling |
+| New immutable plan and readiness | plan `6620821e`; source readiness `f233c991`; all technical gates pass |
 | New launch or training authority | absent |
 
-Verdict: `needs_decision`. No exact launch command has been reviewed because
-no successor plan or authority exists.
+Verdict: `ready_for_plan_bound_authorization`. The successor is technically
+ready, but no authorization file exists and no game has been launched.
