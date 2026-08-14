@@ -2,6 +2,29 @@
 
 ## Executive Summary
 
+### Product disposition -- 14 August 2026
+
+The product owner closed the retained-v4 promotion question with the decision
+not to promote. Retained-v4 remains the preferred research candidate and
+retained-v3 remains its frozen comparator; no alias, checkpoint, deployment,
+publication, release, game, or training state changed.
+
+A zero-game audit verified both retained-v4 model canaries exactly and then
+compared the current product `GeneralistAgent` route with the frozen
+`TrainingAlignedPolicy` route on 12 already consumed held-out starts. Seven
+argmax moves differed and mean total variation was 45.26%, so the 1,012-game
+evidence cannot be transferred to the product route. The active three
+specialists retain their expected hashes and load successfully, but their
+payloads do not prove corrected-label training lineage. Preserve the
+[route and lineage evidence](../evidence/retained-v4-product-route-and-specialist-lineage-audit-2026-08-14.md).
+
+The governing product objective is now safe human-error induction and
+conversion inside a verified permitted action set, not fixed-node Sanmill
+score alone. The
+[measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
+is design-only and authorizes no execution. The remaining 108 held-out source
+records remain unconsumed.
+
 ## Transfer checkpoint — 13 August 2026
 
 This section is the current handoff checkpoint and takes precedence over older
@@ -1360,9 +1383,10 @@ The assets are present, but they are not all equally trustworthy:
   describe or reuse it as an empty input for another fresh experiment.
 - Both legacy SpecialistDB deliveries are isolated in the ignored backup
   directory and must remain read-only.
-- Historical checkpoints and nets pre-date the corrected decoder/provenance
-  migration. Retain them as exploratory baselines; do not claim that they were
-  trained from corrected labels.
+- Historical checkpoints and nets do not bind their producing trainer commit,
+  databases, or Malom-label version. Retain them as exploratory baselines; do
+  not claim corrected-label training merely because their tracked import may
+  appear after the corrected code.
 - The original maintainer describes the endgame tables and `fullgame.bin` as
   outputs of their backwards solver. That is a provenance statement, not an
   independent correctness check. A follow-up read-only inventory and sampling
@@ -1973,10 +1997,11 @@ therefore been superseded, but the active path remains important evidence.
 Any smoke or release check must record which route made the decision and test
 that route with corrected atomic-capture, terminal-state, perspective, and
 full-value semantics. The existing Sentinel, value-net, gap-net, specialist,
-and generalist checkpoints all pre-date the correction. They may be used only
-as explicitly labelled legacy inputs or ablations; loading one does not make it
-a corrected model. Whether Sentinel training improves after corrected labels
-is still untested.
+and generalist checkpoint payloads do not carry artifact-bound proof of their
+producing trainer commit, databases, or Malom-label version. They may be used
+only as explicitly labelled legacy inputs or ablations; loading one does not
+establish corrected-label training. Whether Sentinel training improves after
+corrected labels is still untested.
 
 The newly supplied browser evidence exposes a second route mismatch. The
 trainer constructs its Generalist lookahead with the configured Malom database
@@ -2779,6 +2804,19 @@ the current successor in this order:
     the exact retained-v4 route the preferred research candidate; this changes
     no checkpoint alias and grants no promotion, deployment, release, new-game
     or training authority.
+37. The product owner subsequently closed the promotion question with the
+    decision not to promote retained-v4. A zero-game audit reproduced both
+    retained-v4 canaries exactly, but the current product `GeneralistAgent`
+    route disagreed with the frozen `TrainingAlignedPolicy` argmax on 7 of 12
+    reused starts and had 45.26% mean total variation. Therefore the 1,012-game
+    result does not transfer to the product route. The active specialist hashes
+    remain `D020E144...`, `A587AB99...`, and `5DE51A1A...`; their payloads do
+    not establish corrected-label training lineage. The governing research
+    objective is now safe human-error induction and conversion inside a
+    verified permitted action set, as defined by the design-only
+    [measurement plan](../experiments/safe-human-trap-objective-and-measurement-v1.md).
+    Retained-v4 stays research-only, retained-v3 stays its frozen comparator,
+    and all 108 remaining held-out source records stay unconsumed.
 
 The previously executed isolated smoke command was:
 

@@ -1,8 +1,8 @@
 # Sanmill retained-v3 versus no-refresh-v4 evaluation decision brief
 
-Status: `preferred_research_candidate_selected`
+Status: `preferred_research_candidate_selected_no_promotion`
 
-Decision status: `retained_v4_preferred_for_research_no_promotion`
+Decision status: `retained_v4_research_only_promotion_rejected`
 
 This is the current planning record after the 256-game reused-development
 diagnostic, its zero-game mechanism audits, the 156-game phase-process
@@ -26,6 +26,19 @@ selection does not copy or rename a checkpoint, change an active model alias,
 authorize another game or training update, or constitute promotion,
 deployment, publication or release. Preserve the full
 [research-candidate decision](sanmill-retained-v4-preferred-research-candidate-v1.md).
+
+The product owner subsequently closed the promotion question with a negative
+decision. The current Generalist slot is neither a default product path nor
+semantically compatible with the frozen retained-v4 route. A 12-position,
+zero-game inference audit using the same v4 weights found 7 argmax differences
+and 45.26% mean total variation while both model canaries remained exact. The
+current active three-specialist checkpoints also lack sufficient embedded
+provenance to prove corrected-label retraining. See the
+[route and lineage audit](../evidence/retained-v4-product-route-and-specialist-lineage-audit-2026-08-14.md).
+
+This closes, rather than defers, the current promotion proposal. It does not
+remove retained-v4 from research use and does not select Sanmill or another
+component for deployment.
 
 ## Completed evidence
 
@@ -258,10 +271,13 @@ revisit interval cannot be promoted into the new decision.
 | Immutable plan and runtime | plan `6620821e`; launch `b4505be8`; completion `8949a8fd` |
 | Primary decision | `v4_higher_fixed_heldout_score`; +1.6798pp; [+0.6195pp, +2.7402pp] |
 | Research candidate disposition | retained-v4 selected for research; retained-v3 remains comparator |
+| Promotion decision | closed: retained-v4 is not promoted into the current product Generalist route |
+| Product research objective | safe human-error induction and conversion inside a verified permitted action set |
 | Further launch, promotion or training authority | absent |
 
 Verdict: the named v4 route scored higher on the frozen held-out prefix under
 the preregistered precision rule and is now the product-selected preferred
-research candidate. Promotion readiness remains `needs_decision`; no
-refresh-causal, population-strength, Elo, deployment or release conclusion
-follows.
+research candidate. Promotion into the current product route is rejected, not
+pending. The next design target is the
+[safe human-trap objective](safe-human-trap-objective-and-measurement-v1.md),
+but no search batch, game, training, deployment, or release is authorized.

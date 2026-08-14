@@ -2,7 +2,7 @@
 
 Date: 2026-08-14
 
-Status: `preferred_research_candidate_selected_research_only`
+Status: `preferred_research_candidate_selected_no_promotion`
 
 Authority: `product-owner-direct`
 
@@ -10,6 +10,25 @@ The product owner accepted the recommendation to nominate the exact
 `retained-v4-no-refresh` route as the preferred research candidate after the
 completed high-precision held-out comparison. This is a research disposition,
 not model promotion, deployment, publication or release.
+
+## Promotion decision -- closed
+
+On 14 August 2026, the product owner closed the prior promotion
+`needs_decision` with the decision **not to promote retained-v4** into the
+current product Generalist slot.
+
+The current slot is not a default user path: difficulty 1--8 does not
+automatically use a neural player, difficulty 9--10 automatically uses the
+three-specialist route, and specialists take priority over the explicitly
+selected Generalist checkbox. More importantly, the product Generalist route
+is not the frozen route evaluated below. A zero-game same-position audit using
+the same retained-v4 weights found 7/12 different argmax moves and 45.26% mean
+total variation between the two output distributions even though both stored
+model canaries reproduced with zero error.
+
+The complete evidence is in the
+[product-route and specialist-lineage audit](../evidence/retained-v4-product-route-and-specialist-lineage-audit-2026-08-14.md).
+No alias, checkpoint file, deployment configuration, or runtime was changed.
 
 ## Selected candidate identity
 
@@ -73,13 +92,16 @@ component set or runtime is a different candidate.
 
 ## Next gate
 
-No additional v3/v4 route-selection match is recommended: that relative
-question is answered. Before any promotion proposal, the product owner must
-define the intended deployment slot and an absolute acceptance contract. That
-contract should freeze a genuinely unconsumed, deployment-representative
-corpus; colour pairing; strict rules; primary score or non-inferiority floor;
-latency and resource ceilings; compatibility and failure gates; claim scope;
-and a bounded game/time envelope.
+No additional v3/v4 route-selection match and no promotion contract are
+recommended. The deployment-slot premise has been withdrawn rather than left
+open for another threshold decision.
+
+The next research design question is whether a candidate can create and
+convert human-relevant errors while remaining inside a verified safe action
+domain. The product objective and falsifiable measurement order are recorded
+in the
+[safe human-trap design](safe-human-trap-objective-and-measurement-v1.md).
+That record authorizes no game or training.
 
 The remaining 108 records in the already frozen source pool are still
 unevaluated, but they belong to the same source family and are not automatically
@@ -87,5 +109,7 @@ converted into a promotion gate after observing the first-prefix result.
 
 Readiness verdict for the nomination itself: complete.
 
-Readiness verdict for any promotion, deployment, new evaluation or training:
-`needs_decision`.
+Promotion/deployment verdict for the current product Generalist path:
+`fatal_stop`.
+
+New evaluation and training authority: absent.

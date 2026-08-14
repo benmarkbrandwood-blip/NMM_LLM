@@ -197,8 +197,11 @@ The base inventory was measured on 20 July 2026. Rows explicitly dated 21 or
 | Gap-net artefacts | `data/gap_net.npz` and `data/gap_net_training.npz`; present but disabled in the local training path configuration pending provenance review |
 
 The checkpoint and net files listed above exist. The important limitation is
-their lineage: they pre-date the sector-decoder and persisted-label migration,
-so they are exploratory baselines rather than evidence of a corrected training
+their lineage: their payloads do not bind the producing trainer commit, data,
+database identity, Malom-label version, optimizer, RNG, or run manifest. The
+tracked import may post-date corrected code, but it does not prove that the
+weights were trained with the sector decoder and persisted-label migration.
+They are exploratory baselines rather than evidence of a corrected training
 run.
 
 ### Author `main` diagnostic bundle
