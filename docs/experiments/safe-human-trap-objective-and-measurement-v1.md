@@ -4,7 +4,7 @@ Date: 2026-08-14
 
 Updated: 2026-08-15
 
-Status: `f0_h0_b2_nonfinal_characterized_screen_unrun_no_launch_authority`
+Status: `f0_h0_stop_condition_triggered_no_later_gate_authority`
 
 Authority: `product-owner-direct`
 
@@ -273,6 +273,42 @@ game leakage.
 
 The complexity proxy may be designed alongside F0, but execution still needs
 its own immutable search/evaluation contract and resource authorization.
+
+## F0-H0 B2 train rejection decision -- 15 August 2026
+
+The train-only rejection contract was frozen before screening statistics
+under plan identity
+`dd87175dc950cbcde4b0b44cd5d4a8da0b039dcbd3cacaf198ba43ec00de0bdc`.
+The immutable 10,000-game cost sample intersects official B2 train membership
+in 9,113 games and 429,523 decisions.  Selection, confirmation, and final-test
+content remained sealed.
+
+The first execution exposed a technical estimator defect: unequal Jeffreys
+pseudo-count denominators could create positive action lift for a transition
+with zero observed events.  The original plan and result remain unchanged.
+A corrected technical replay was frozen under plan identity
+`a6972c3dae62ec249ccf6ea7bc7bf46132288a15db41b1c33b347b75615a9d0c`.
+It uses exactly the v1 sample and threshold object and changes only zero-event
+handling.  Corrected result identity
+`8bd2da62785e9c8cda0a055e98213959cbdf8f88aa860384171f00f4f39c6bdc`
+is the decision source.  Preserve the
+[screen evidence](../evidence/f0-h0-b2-train-rejection-screen-2026-08-15.md)
+and both historical and corrected manifests.
+
+F0-H0 triggers the stop condition.  Positional choice itself is abundant:
+88.69% of sampled decisions have `A_pos` cardinality greater than one, and
+the state-level `k=20`, `m=5` estimability gate passes.  The corpus fails the
+independent-support and concentration contract instead.  Only 20.16% of
+decisions belong to a `ring16` class supported by at least five players and
+ten games, against the frozen 80% floor.  Player Gini is 0.804 against 0.75,
+and Kish effective support is 177.7 against 500.  Seven of 23 conjunctive
+gates fail.
+
+The stop condition for overly concentrated independent support is binding.
+E0, F0-H1, T0-H-pilot, reward changes, training, and substitution of another
+data source remain closed.  This is positional-only `A_pos` evidence in the
+observed PlayOK-like source domain.  It is not an `A_allow` proof, a causal
+inducement claim, or evidence about product UI users or a new population.
 
 ## Current evidence and tension
 

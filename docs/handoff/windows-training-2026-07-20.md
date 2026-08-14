@@ -24,7 +24,8 @@ score alone. The
 [measurement design](../experiments/safe-human-trap-objective-and-measurement-v1.md)
 now records completed F0-D0 evidence and a corrected F0-H0 split-scale
 measurement.  The product owner subsequently selected and froze Design B2,
-but this authorizes no scientific screen or later gate.
+and the subsequent train-only F0-H0 screen triggered its stop condition on
+independent support and concentration.  It authorizes no later gate.
 The remaining 108 held-out source records remain unconsumed.
 
 F0-D0 froze current raw-corpus identity
@@ -65,7 +66,8 @@ It selects no split and makes no feasible/infeasible or continue/stop
 decision.  See the
 [corrected evidence](../evidence/f0-h0-corrected-split-feasibility-2026-08-15.md)
 and machine manifest.  The four F0-H0 scientific dimensions, E0, F0-H1, and
-T0-H-pilot have not started.  No Malom query, game, search, model load,
+T0-H-pilot had not started at that measurement point.  No Malom query, game,
+search, model load,
 training, database rebuild, alternative data substitution, or source-pool
 access is authorized by the corrected measurement.
 
@@ -99,8 +101,9 @@ freezing.  Final-test is now sealed: only its 847 IDs and membership hash may
 be read until separate one-time authorization, and the supported accessor
 raises before any raw, decision, or feature read.
 
-The four F0-H0 scientific dimensions, E0, F0-H1, and T0-H-pilot remain
-unstarted.  The selected split and frozen membership authorize no game,
+At the B2 freeze, the four F0-H0 scientific dimensions, E0, F0-H1, and
+T0-H-pilot remained unstarted.  The selected split and frozen membership
+themselves authorize no game,
 search, model load, training, database operation, scientific-screen claim, or
 source-pool access.  The binding objective addendum also records that unseen
 state is not a valid gate: Design B's 34.32%/53.60% decision-weighted `ring16`
@@ -124,13 +127,47 @@ very conservative; it cannot be changed after the result.  Any corrected
 cache-amortized cost rule must be frozen separately before an F0-H0 screen.
 See the
 [B2 freeze evidence](../evidence/f0-h0-design-b2-freeze-characterization-2026-08-15.md)
-and machine manifest.  The four scientific dimensions remain unrun.
+and machine manifest.  The four scientific dimensions remained unrun at that
+characterization step.
 
-Both sealed verifiers reproduce the plan, membership, and result lineages.
-The two B2 focused test files pass 15 tests.  Task-scope Ruff passes for the
-new evaluation module, both runners, and both focused test files.  The access
-audit records zero HumanDB reads, database writes, games, searches, model
-loads, training updates, and `2eb04f54` reads or consumption.
+The train-only F0-H0 rejection plan then froze identity
+`dd87175dc950cbcde4b0b44cd5d4a8da0b039dcbd3cacaf198ba43ec00de0bdc`
+before screening statistics.  Its 9,113-game train intersection contains
+429,523 decisions from 1,314 player keys.  A deterministic review of the
+first execution found that unequal Jeffreys pseudo-count denominators could
+manufacture action lift for a transition with zero observed events.  The
+original plan and result remain unchanged.  Corrected technical-replay plan
+identity
+`a6972c3dae62ec249ccf6ea7bc7bf46132288a15db41b1c33b347b75615a9d0c`
+reuses the exact v1 sample and threshold object; corrected result identity
+`8bd2da62785e9c8cda0a055e98213959cbdf8f88aa860384171f00f4f39c6bdc`
+is the decision source.
+
+F0-H0 triggers the stop condition.  `A_pos` cardinality exceeds one for
+88.69% of decisions, and the state-level estimability precheck passes.  The
+failure is evidence support and concentration: supported `ring16` classes
+cover only 20.16% of decisions against the 80% floor; player Gini is 0.804
+against 0.75; and Kish effective support is 177.7 against 500.  Seven of 23
+conjunctive gates fail.  All protected-partition content reads, source-pool
+reads, games, searches, model loads, training updates, and database writes
+are zero.  See the
+[F0-H0 screen evidence](../evidence/f0-h0-b2-train-rejection-screen-2026-08-15.md)
+and corrected machine manifest.
+
+E0, F0-H1, T0-H-pilot, trap-reward work, training, and substitute data remain
+closed by the design stop condition.  Selection, confirmation, and final-test
+content remain sealed; the remaining 108 source-pool records remain
+unconsumed.
+
+The corrected result verifier reproduces the v2 plan lineage.  The historical
+v1 plan and result identities remain sealed; implementation-artifact replay
+belongs to their recorded commit rather than the corrected current checkout.
+The current screen's three focused test files pass 25 tests.  Task-scope Ruff
+passes for the evaluation module, runner, and those tests; the mandatory
+Malom, DB-teacher, and label-provenance group passes 103 tests and 498
+subtests.  The access audit records zero HumanDB reads, database writes,
+games, searches, model loads, training updates, protected content reads, and
+`2eb04f54` reads or consumption.
 
 The result verifier passed with the recorded result identity and file hash.
 The supplement's two focused test files pass 11 tests, and task-scope Ruff
