@@ -156,6 +156,115 @@ def _phase_from_board(board: BoardState) -> str:
     return "move"
 
 
+# ── Manifest and teacher lineage checks (Codex P1 2026-08-14) ────────────────
+
+def _verify_files_match_manifest(
+    games_dir: Path,
+    ledger_file_shas: dict[str, str],
+    limit_files: Optional[int],
+) -> None:
+    """Codex P1(2) 2026-08-14: prior implementation only verified files
+    that were PRESENT on disk against the ledger's file manifest — deleted
+    files (present in manifest, missing from disk) went undetected.  For a
+    full run we now require exact set equality between disk and manifest.
+    Smoke runs (limit_files set) may see a subset of the manifest, but any
+    disk file NOT in manifest is still reported.
+    """
+    disk_files = {
+        p.relative_to(games_dir).as_posix()
+        for p in games_dir.glob("*.jsonl")
+    }
+    manifest_files = set(ledger_file_shas.keys())
+    extra_on_disk = disk_files - manifest_files
+    missing_from_disk = manifest_files - disk_files
+    if limit_files is not None:
+        if extra_on_disk:
+            print(f"[extract v2] Smoke: {len(extra_on_disk)} files on disk not "
+                  f"in ledger manifest (skipped): "
+                  f"{sorted(extra_on_disk)[:5]}")
+        return
+    if missing_from_disk or extra_on_disk:
+        raise RuntimeError(
+            f"[extract v2] Files-manifest disagreement (full run):\n"
+            f"  missing from disk (in ledger, not found): "
+            f"{len(missing_from_disk)} files, sample "
+            f"{sorted(missing_from_disk)[:5]}\n"
+            f"  extra on disk (not in ledger):            "
+            f"{len(extra_on_disk)} files, sample "
+            f"{sorted(extra_on_disk)[:5]}\n"
+            f"Rebuild the ledger against the current games_dir before extracting."
+        )
+
+
+def _verify_teacher_lineage(
+    teacher_net: Path,
+    ledger_path: Path,
+    ledger_info: dict,
+) -> dict:
+    """Verify teacher .npz was trained on the SAME session-ledger-isolated
+    dataset that this extraction consumes.
+
+    Codex P1(3) 2026-08-14: prior implementation accepted any teacher NPZ
+    that existed, so the leaky v2 candidate or a v3 teacher trained against
+    a different ledger could reach gate_status="ok".  We now enforce:
+      - Teacher provenance carries
+        dataset_split_scheme == session_ledger_strict_single_tier.
+      - Teacher's recorded session_ledger_sha256 matches sha256(ledger_path).
+      - Teacher's recorded session_ledger_files_manifest_sha256 matches
+        this ledger's files_manifest_sha256.
+    Missing provenance field → fail closed.
+
+    NB (self-review 2026-08-14): the checklist's Decision 6B also requires
+    the same "split seed" between teacher and extractor.  Split seed lives
+    in the ledger's `split_manifest_version` (and `split_function`).  It is
+    NOT verified as a separate field here because ledger_sha256 already
+    covers it transitively: any change to split_manifest_version changes
+    the ledger's content and therefore its SHA-256, which our sha check
+    catches.  The files_manifest_sha256 check adds defence-in-depth against
+    downstream drift.  Do NOT weaken the ledger_sha256 check without
+    replacing this transitive guarantee.
+    """
+    z = np.load(str(teacher_net), allow_pickle=True)
+    if "provenance_json" not in z.files:
+        raise RuntimeError(
+            f"[extract v2] teacher {teacher_net} has no provenance_json "
+            f"field; a v3 session-ledger-isolated teacher is required "
+            f"(Codex P1 2026-08-14)"
+        )
+    prov = json.loads(str(z["provenance_json"]))
+    scheme = prov.get("dataset_split_scheme")
+    if scheme != "session_ledger_strict_single_tier":
+        raise RuntimeError(
+            f"[extract v2] teacher {teacher_net} was trained under "
+            f"split_scheme={scheme!r}; required "
+            f"'session_ledger_strict_single_tier'.  This rejects the leaky "
+            f"v2 candidate and any other non-session-ledger teacher."
+        )
+    teacher_ledger_sha = prov.get("session_ledger_sha256")
+    if not teacher_ledger_sha:
+        raise RuntimeError(
+            f"[extract v2] teacher {teacher_net} has no session_ledger_sha256 "
+            f"in provenance; cannot verify ledger lineage"
+        )
+    actual_sha = _sha256_file(ledger_path)
+    if teacher_ledger_sha != actual_sha:
+        raise RuntimeError(
+            f"[extract v2] teacher was trained against ledger sha "
+            f"{teacher_ledger_sha}, but current --session-ledger at "
+            f"{ledger_path} has sha {actual_sha}; teacher and extractor "
+            f"must consume the SAME ledger"
+        )
+    teacher_manifest_sha = prov.get("session_ledger_files_manifest_sha256")
+    ledger_manifest_sha  = ledger_info["provenance"].get("files_manifest_sha256")
+    if teacher_manifest_sha != ledger_manifest_sha:
+        raise RuntimeError(
+            f"[extract v2] teacher's session_ledger_files_manifest_sha256 "
+            f"({teacher_manifest_sha}) does not match this ledger's "
+            f"({ledger_manifest_sha})"
+        )
+    return prov
+
+
 # ── Session ledger ───────────────────────────────────────────────────────────
 
 def _load_session_ledger(path: Path, allow_partial: bool = False) -> dict:
@@ -405,6 +514,11 @@ def _scan_pass2_aggregate(
     events_dropped_uncovered = 0
     kept_by_band_phase = defaultdict(int)
     disc_by_band_phase = defaultdict(int)
+    # Codex P2 2026-08-14: per-(band, phase) state counts alongside events.
+    # A state_key can appear in multiple (b, p) buckets; we count it once per
+    # bucket if any owning-tier / non-owning-tier event landed in that bucket.
+    states_kept_by_band_phase: dict[tuple[str, str], set[str]] = defaultdict(set)
+    states_discarded_by_band_phase: dict[tuple[str, str], set[str]] = defaultdict(set)
 
     n_events = 0
     for sk, session_id, band, notation, phase, mover_color in _iter_jsonl_events(
@@ -423,10 +537,12 @@ def _scan_pass2_aggregate(
         if session_tier != owning_tier:
             events_discarded_by_tier[session_tier] += 1
             disc_by_band_phase[bp] += 1
+            states_discarded_by_band_phase[bp].add(sk)
             continue
 
         events_kept_by_tier[session_tier] += 1
         kept_by_band_phase[bp] += 1
+        states_kept_by_band_phase[bp].add(sk)
 
         entry = counts.get(key)
         if entry is None:
@@ -443,12 +559,18 @@ def _scan_pass2_aggregate(
                   f"aggregated_keys={len(counts):,}  ({time.time()-t0:.0f}s)")
 
     disposition = {
-        "events_kept_by_tier":       dict(events_kept_by_tier),
-        "events_discarded_by_tier":  dict(events_discarded_by_tier),
-        "events_dropped_uncovered":  events_dropped_uncovered,
-        "kept_by_band_phase":        {f"{b}|{p}": n for (b, p), n in kept_by_band_phase.items()},
-        "disc_by_band_phase":        {f"{b}|{p}": n for (b, p), n in disc_by_band_phase.items()},
-        "elapsed_seconds":           round(time.time() - t0, 1),
+        "events_kept_by_tier":              dict(events_kept_by_tier),
+        "events_discarded_by_tier":         dict(events_discarded_by_tier),
+        "events_dropped_uncovered":         events_dropped_uncovered,
+        "kept_by_band_phase":               {f"{b}|{p}": n for (b, p), n in kept_by_band_phase.items()},
+        "disc_by_band_phase":               {f"{b}|{p}": n for (b, p), n in disc_by_band_phase.items()},
+        # Codex P2 2026-08-14: per-(band, phase) state counts.
+        "states_kept_by_band_phase":        {f"{b}|{p}": len(s) for (b, p), s in states_kept_by_band_phase.items()},
+        "states_discarded_other_tier_by_band_phase":
+                                            {f"{b}|{p}": len(s) for (b, p), s in states_discarded_by_band_phase.items()},
+        "events_discarded_other_tier_by_band_phase":
+                                            {f"{b}|{p}": n for (b, p), n in disc_by_band_phase.items()},
+        "elapsed_seconds":                  round(time.time() - t0, 1),
     }
     return counts, disposition
 
@@ -503,15 +625,41 @@ def _empirical_ph(
     notation_counts: dict[str, int],
     legal_moves: list[dict],
     min_support: int,
-) -> Optional[np.ndarray]:
-    """Empirical P_h over legal moves.  Returns None if TOTAL support < min."""
-    total = sum(notation_counts.values())
-    if total < min_support:
-        return None
+) -> tuple[Optional[np.ndarray], int]:
+    """Empirical P_h over legal moves.
+
+    Codex P1 2026-08-14: previously the denominator was the sum of ALL
+    observed notation counts, including notations that were not in
+    `legal_moves`.  That silently produced sub-normalised P_h (e.g. legal 25
+    + illegal 25 → legal-move vector summing to 0.5) and multiplicatively
+    scaled the resulting empirical G_v.  Fix: only legal-notation counts
+    enter the denominator; illegal-notation counts are dropped and reported
+    separately so the caller can attribute them in provenance / abstain.
+
+    Returns (ph, n_illegal_events):
+      ph:               length-|legal_moves| float32 that sums to 1 (within eps),
+                        or None if legal_total < min_support.
+      n_illegal_events: sum of counts for notations NOT in legal_moves.
+    """
+    legal_notation_set = {_move_notation(mv) for mv in legal_moves}
+    legal_total   = 0
+    illegal_total = 0
+    for nt, cnt in notation_counts.items():
+        if nt in legal_notation_set:
+            legal_total += cnt
+        else:
+            illegal_total += cnt
+    if legal_total < min_support:
+        return None, illegal_total
     ph = np.zeros(len(legal_moves), dtype=np.float64)
     for i, mv in enumerate(legal_moves):
-        ph[i] = notation_counts.get(_move_notation(mv), 0) / total
-    return ph.astype(np.float32)
+        ph[i] = notation_counts.get(_move_notation(mv), 0) / legal_total
+    result = ph.astype(np.float32)
+    # Normalisation sanity — legal-only denominator should always yield sum≈1.
+    assert abs(float(result.sum()) - 1.0) < 1e-4, (
+        f"empirical_ph not normalised: sum={float(result.sum())!r}"
+    )
+    return result, illegal_total
 
 
 # ── Board reconstruction ─────────────────────────────────────────────────────
@@ -585,10 +733,18 @@ def run_extraction(
           f"tiers: {ledger_info['n_by_split']}   "
           f"files in manifest: {len(ledger_file_shas):,}")
 
+    # ── Manifest set equality (Codex P1(2) 2026-08-14) ─────────────────────
+    _verify_files_match_manifest(games_dir, ledger_file_shas, limit_files)
+
     # ── Teacher net + Malom ────────────────────────────────────────────────
     print(f"[extract v2] Loading teacher net: {teacher_net}")
     if not teacher_net.exists():
         raise FileNotFoundError(f"teacher net not found: {teacher_net}")
+    # Codex P1(3) 2026-08-14: teacher provenance must reference THIS ledger.
+    teacher_prov = _verify_teacher_lineage(teacher_net, ledger_path, ledger_info)
+    print(f"[extract v2]   teacher lineage OK "
+          f"(split_scheme={teacher_prov['dataset_split_scheme']!r}, "
+          f"ledger_sha256={teacher_prov['session_ledger_sha256'][:16]}…)")
     advisor = HumanMovePolicyAdvisor(teacher_net, temperature=temperature)
 
     malom = MalomDB(malom_db_dir)
@@ -650,6 +806,10 @@ def run_extraction(
         "n_abstained_not_emittable":   0,
         "n_hybrid_rows":               0,
         "n_model_only_rows":           0,
+        # Codex P2 2026-08-14 self-review: per-(band, phase) counts of actually
+        # emitted rows.  Populated during emit loop so it is meaningful on a
+        # coverage-floor halt too (halt fires AFTER the emit loop runs).
+        "emitted_by_band_phase":       {},
     }
 
     for (state_key, band), entry in counts.items():
@@ -695,22 +855,45 @@ def run_extraction(
             }))
             continue
 
-        # Model P_h from teacher net
+        # Model P_h from teacher net.
+        # Codex P1 2026-08-14: probs() silently returned a uniform vector on
+        # degenerate teacher output.  probs_strict() raises instead; we then
+        # additionally enforce shape, finite/non-negative, and sum≈1 so no
+        # bad teacher output can silently enter G_v.
         try:
-            ph_model = advisor.probs(board, legal_moves, elo_band=band)
+            ph_model = advisor.probs_strict(board, legal_moves, elo_band=band)
             ph_model = np.asarray(ph_model, dtype=np.float32)
+            if ph_model.shape != (len(legal_moves),):
+                raise ValueError(
+                    f"ph_model shape {ph_model.shape} != ({len(legal_moves)},)"
+                )
+            if not np.isfinite(ph_model).all():
+                raise ValueError("ph_model contains non-finite values")
+            if (ph_model < 0.0).any():
+                raise ValueError("ph_model contains negative values")
+            if abs(float(ph_model.sum()) - 1.0) > 1e-4:
+                raise ValueError(
+                    f"ph_model does not sum to 1: sum={float(ph_model.sum())!r}"
+                )
         except Exception as e:
             counters["n_abstained_not_emittable"] += 1
             abstained_lines.append(json.dumps({
-                "state_key": state_key, "band": band, "reason": f"teacher_probs_failed:{e!s}",
+                "state_key": state_key, "band": band,
+                "reason": f"teacher_probs_failed:{e!s}",
             }))
             continue
 
         # Uniform P_h
         ph_uniform = _uniform_ph(len(legal_moves))
 
-        # Empirical P_h (or None if support too low)
-        ph_emp = _empirical_ph(entry["notation_counts"], legal_moves, min_empirical_support)
+        # Empirical P_h — legal-only denominator (Codex P1 2026-08-14).
+        ph_emp, illegal_events = _empirical_ph(
+            entry["notation_counts"], legal_moves, min_empirical_support,
+        )
+        if illegal_events:
+            counters["empirical_illegal_events_seen"] = (
+                counters.get("empirical_illegal_events_seen", 0) + illegal_events
+            )
 
         # G_v triples per source
         g_a_m, g_b_m, g_c_m = _compute_gv(ph_model,   legal_moves, regrets)
@@ -758,6 +941,11 @@ def run_extraction(
         ph_source_arr.append(ph_src)
         owning_hash_arr.append(state_key_owning[state_key]["session_hash"])
         counters["n_emitted"] += 1
+        # Per-(band, phase) emitted-row counter (Codex P2 2026-08-14 self-review).
+        bp_key = f"{band}|{entry['phase']}"
+        counters["emitted_by_band_phase"][bp_key] = (
+            counters["emitted_by_band_phase"].get(bp_key, 0) + 1
+        )
 
     print(f"[extract v2] Emitted rows: {counters['n_emitted']:,}")
 
@@ -774,6 +962,9 @@ def run_extraction(
             coverage_floor_rows, limit_files,
             gate_status="halt_coverage_floor",
             elapsed_wall=round(time.time() - t_wall_start, 1),
+            require_ready=require_ready, strict=strict,
+            allow_partial_ledger=allow_partial_ledger,
+            teacher_prov=teacher_prov,
         )
         (out_dir / "provenance.json").write_text(
             json.dumps(provenance, indent=2), encoding="utf-8",
@@ -817,6 +1008,9 @@ def run_extraction(
         coverage_floor_rows, limit_files,
         gate_status="ok",
         elapsed_wall=round(time.time() - t_wall_start, 1),
+        require_ready=require_ready, strict=strict,
+        allow_partial_ledger=allow_partial_ledger,
+        teacher_prov=teacher_prov,
     )
     # Re-save metadata with real provenance
     md = dict(np.load(metadata_path, allow_pickle=True))
@@ -838,15 +1032,53 @@ def _make_provenance(
     min_empirical_support: int, temperature: float,
     coverage_floor_rows: int, limit_files: Optional[int],
     gate_status: str, elapsed_wall: float,
+    require_ready: bool = True,
+    strict: bool = True,
+    allow_partial_ledger: bool = False,
+    teacher_prov: Optional[dict] = None,
 ) -> dict:
+    """Assemble the provenance dict for the emitted (or halt-reported) dataset.
+
+    Codex P1(4) 2026-08-14: previously any run — including smoke, under-floor,
+    or hardening-bypassed — could reach gate_status="ok" and be published as
+    a normal Stage-E-ready output.  We now compute `production_ready` and a
+    `non_ready_reasons` list so Stage E can hard-reject them.
+    """
     n_emitted = counters["n_emitted"]
-    band_counts = {"lower": 0, "middle": 0, "upper": 0}
-    split_counts = {"train": 0, "val": 0, "test": 0}
+    coverage_floor_met = n_emitted >= coverage_floor_rows
+
+    non_ready_reasons: list[str] = []
+    if limit_files is not None:
+        non_ready_reasons.append(f"limit_files={limit_files}")
+    if not strict:
+        non_ready_reasons.append("strict=False (tolerated malformed JSON)")
+    if allow_partial_ledger:
+        non_ready_reasons.append("allow_partial_ledger=True (partial ledger accepted)")
+    if not require_ready:
+        non_ready_reasons.append("require_ready=False (--no-coverage-gate)")
+    if not coverage_floor_met:
+        non_ready_reasons.append(
+            f"coverage_floor not met (n_emitted={n_emitted} < "
+            f"coverage_floor_rows={coverage_floor_rows})"
+        )
+    if gate_status != "ok":
+        non_ready_reasons.append(f"gate_status={gate_status!r}")
+    production_ready = (not non_ready_reasons)
+
     return {
         "extract_version":                  EXTRACT_VERSION,
         "gate_status":                      gate_status,
+        # Codex P1(4) 2026-08-14: ready-flag surfaced for Stage E gate.
+        "production_ready":                 production_ready,
+        "non_ready_reasons":                non_ready_reasons,
         "coverage_floor_rows":              coverage_floor_rows,
-        "coverage_floor_met":               n_emitted >= coverage_floor_rows,
+        "coverage_floor_met":               coverage_floor_met,
+        "extract_run_flags": {
+            "require_ready":        require_ready,
+            "strict":               strict,
+            "allow_partial_ledger": allow_partial_ledger,
+            "limit_files":          limit_files,
+        },
         "extract_git_commit":               _git_commit(),
         "built_at":                         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "elapsed_seconds":                  elapsed_wall,
@@ -857,6 +1089,10 @@ def _make_provenance(
             ledger_info["provenance"].get("files_manifest_sha256"),
         "teacher_net_path":                 str(teacher_net),
         "teacher_net_sha256":               _sha256_file(teacher_net),
+        # Codex P1(3) 2026-08-14: teacher lineage recorded from teacher provenance.
+        "teacher_provenance":               teacher_prov,
+        "teacher_split_scheme":             (teacher_prov or {}).get("dataset_split_scheme"),
+        "teacher_session_ledger_sha256":    (teacher_prov or {}).get("session_ledger_sha256"),
         "temperature":                      float(temperature),
         "malom_db_dir":                     str(malom_db_dir),
         "malom_label_version":              _MALOM_LABEL_VERSION,

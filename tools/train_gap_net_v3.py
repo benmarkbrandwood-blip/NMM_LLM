@@ -118,6 +118,52 @@ def _build_features(board: torch.Tensor, band: torch.Tensor) -> torch.Tensor:
 
 # ── Dataset loading (fail-closed) ────────────────────────────────────────────
 
+def _verify_dataset_production_ready(
+    dataset_dir: Path, allow_non_production: bool = False,
+) -> dict:
+    """Codex P1(4) 2026-08-14: Stage E must hard-reject datasets that came
+    from a smoke, sub-floor, or hardening-bypassed extraction.  The extractor
+    now writes production_ready + non_ready_reasons to metadata.npz provenance;
+    we refuse to train against a non-ready dataset unless the user explicitly
+    passes --allow-non-production-dataset (which disqualifies the run from
+    promotion evidence).
+    """
+    meta_path = dataset_dir / "metadata.npz"
+    if not meta_path.exists():
+        raise SystemExit(
+            f"[gap_net_v3] metadata.npz not found in {dataset_dir}"
+        )
+    meta = np.load(meta_path, allow_pickle=True)
+    if "provenance" not in meta.files:
+        if allow_non_production:
+            print(f"[gap_net_v3] WARNING: dataset has no provenance; "
+                  f"proceeding under --allow-non-production-dataset")
+            return {}
+        raise SystemExit(
+            f"[gap_net_v3] Dataset at {dataset_dir} has no provenance; "
+            f"cannot verify production_ready.  Pass --allow-non-production-dataset "
+            f"to override (NOT for promotion evidence)."
+        )
+    prov_raw = meta["provenance"].item()
+    if isinstance(prov_raw, bytes):
+        prov_raw = prov_raw.decode("utf-8")
+    prov = json.loads(prov_raw)
+    if not prov.get("production_ready", False):
+        reasons = prov.get("non_ready_reasons", ["unknown"])
+        if allow_non_production:
+            print(f"[gap_net_v3] WARNING: training on non-production dataset")
+            print(f"[gap_net_v3]   non_ready_reasons: {reasons}")
+            print(f"[gap_net_v3]   this run is NOT eligible for promotion evidence.")
+            return prov
+        raise SystemExit(
+            f"[gap_net_v3] Dataset at {dataset_dir} is NOT production_ready:\n"
+            f"  reasons: {reasons}\n"
+            f"Pass --allow-non-production-dataset to train against it anyway "
+            f"(NOT eligible for promotion evidence)."
+        )
+    return prov
+
+
 def _load_split(dataset_dir: Path, split_val: int) -> dict:
     """Load one split.  Returns dict of tensors + numpy arrays.
 
@@ -523,6 +569,12 @@ def main() -> None:
                         "gate evaluation.  Cells below → SKIP_INSUFFICIENT_SUPPORT.")
     p.add_argument("--stage-e-min-denominator", type=float, default=1e-9,
                    help="Minimum reference-MSE magnitude; below → SKIP_DEGENERATE_DENOMINATOR.")
+    p.add_argument("--allow-non-production-dataset", action="store_true",
+                   help="Codex P1(4) 2026-08-14: refuse to train against a dataset "
+                        "whose provenance says production_ready=False (smoke, "
+                        "sub-floor, or hardening-bypassed extractions).  Pass this "
+                        "flag to override — the run will NOT be eligible for "
+                        "promotion evidence.")
     args = p.parse_args()
 
     torch.manual_seed(args.seed)
@@ -532,6 +584,11 @@ def main() -> None:
     dataset_dir = Path(args.dataset_dir)
     out_path    = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Codex P1(4) 2026-08-14: verify dataset is production-ready before load.
+    _verify_dataset_production_ready(
+        dataset_dir, allow_non_production=args.allow_non_production_dataset,
+    )
 
     # ── Load train / val ─────────────────────────────────────────────────────
     print("[gap_net_v3] Loading train split …")
