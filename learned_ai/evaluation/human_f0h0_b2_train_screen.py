@@ -1162,6 +1162,14 @@ def run_train_screen(
         game_supported_modifiable,
         game_totals,
     )
+    one_per_game = {session: 1 for session in train_sessions}
+    supported_modifiable_game_reach = clustered_proportion(
+        {
+            session: int(game_supported_modifiable.get(session, 0) > 0)
+            for session in train_sessions
+        },
+        one_per_game,
+    )
     estimability_spec = plan["thresholds"]["estimability"]
     exact_estimability_summary, exact_estimable_keys = estimability_summary(
         exact_estimability,
@@ -1223,7 +1231,8 @@ def run_train_screen(
         and any(
             row.get("status") == "estimated"
             and row.get("conservative_lower_95") is not None
-            and row["conservative_lower_95"]
+            and row.get("conservative_upper_95") is not None
+            and row["conservative_upper_95"]
             >= float(product_spec["minimum_signable_absolute_effect"])
             for row in action_effects.values()
         )
@@ -1267,6 +1276,10 @@ def run_train_screen(
             supported_modifiable_interval["lower_95"]
             >= float(reach_spec["minimum_supported_modifiable_fraction_lcb"])
         ),
+        "minimum_supported_modifiable_game_reach_lcb": (
+            supported_modifiable_game_reach["lower_95"]
+            >= float(reach_spec["minimum_supported_modifiable_game_reach_lcb"])
+        ),
     }
     concentration_gates = {
         "maximum_player_top_1_percent_share": (
@@ -1284,6 +1297,10 @@ def run_train_screen(
         "maximum_player_gini": (
             player_concentration["gini"]
             <= float(concentration_spec["maximum_player_gini"])
+        ),
+        "minimum_player_kish_effective_units": (
+            player_concentration["kish_effective_units"]
+            >= float(concentration_spec["minimum_player_kish_effective_units"])
         ),
         "minimum_supported_modifiable_players": (
             len(supported_modifiable_players)
@@ -1305,11 +1322,11 @@ def run_train_screen(
     }
     product_gates = {
         "four_a_state_level_estimability": four_a_passes,
-        "minimum_supported_guided_first_downgrade_lcb": (
-            mechanism_availability["lower_95"]
+        "minimum_supported_guided_first_downgrade_upper_bound": (
+            mechanism_availability["upper_95"]
             >= float(product_spec["minimum_signable_absolute_effect"])
         ),
-        "minimum_corrected_action_effect_lcb": action_effect_gate,
+        "minimum_corrected_action_effect_upper_bound": action_effect_gate,
     }
     coverage_gates = {
         "minimum_oracle_coverage": (
@@ -1480,6 +1497,9 @@ def run_train_screen(
                 "a_pos_cardinality_greater_than_one": modifiable_interval,
                 "support_qualified_ring16_and_modifiable": (
                     supported_modifiable_interval
+                ),
+                "support_qualified_modifiable_game_reach": (
+                    supported_modifiable_game_reach
                 ),
                 "phase_color_tier_counts": [
                     {
