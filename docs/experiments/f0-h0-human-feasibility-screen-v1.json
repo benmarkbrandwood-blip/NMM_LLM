@@ -1,0 +1,223 @@
+{
+  "schema_version": "nmm.f0-h0-read-only-rejection-plan.v1",
+  "screen_id": "f0-h0-safe-human-trap-read-only-rejection-2026-08-14",
+  "status": "frozen_before_any_f0_h0_statistic",
+  "frozen_at_utc": "2026-08-14T00:00:00Z",
+  "repository_base_commit": "4803dcde127ca8e4a16a8df287de1a7dc76a5e2a",
+  "plan_identity": "95a802625867906ab453ed7a52bbba1e0202b08473b10f897ba81c87fb59d530",
+  "objective": {
+    "stage": "F0-H0",
+    "kind": "read-only rejection screen",
+    "decision_vocabulary": [
+      "未被否决",
+      "触发停止条件"
+    ],
+    "pass_effect": "does not approve E0 or any later stage",
+    "prohibited_positive_conclusions": [
+      "可行",
+      "有前景",
+      "建议推进"
+    ]
+  },
+  "input_boundary": {
+    "corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "behavior": {
+      "games": 92226,
+      "logical_plies": 4394220,
+      "player_keys": 4994
+    },
+    "factual": {
+      "games": 37866,
+      "player_keys": 3392
+    },
+    "forbidden_aggregate_membership_source": [
+      "HumanDB.positions",
+      "HumanDB.moves"
+    ],
+    "source_pool_2eb04f54_records_allowed": 0
+  },
+  "claim_boundary": {
+    "source_domain": "observed PlayOK-like source only",
+    "labels": "positional-only",
+    "safe_set_name": "A_pos",
+    "must_not_name_safe_set": "A_allow",
+    "full_rule_safety_claim": false,
+    "malom_required_trust_level": "sector-corrected-v1",
+    "no_transport_to": [
+      "product UI",
+      "other time controls",
+      "other rules variants",
+      "new people"
+    ]
+  },
+  "protected_access": {
+    "one-time-confirmation": "membership-only-unopened",
+    "final-test": "unopened",
+    "statistics_partitions": [
+      "train",
+      "selection"
+    ]
+  },
+  "split": {
+    "freeze_before_statistics": true,
+    "unit": "complete player-game connected component",
+    "algorithm": "build the undirected player interaction graph from F0-D0 manifest membership only; sort connected components by descending game count then component identity; assign each component to the partition minimizing post-assignment game load divided by its target load, with canonical SHA-256 as the tie break",
+    "cross_player_conflict_rule": "all games and players in the connected component receive the component partition",
+    "ratios": {
+      "train": 0.7,
+      "selection": 0.15,
+      "one-time-confirmation": 0.075,
+      "final-test": 0.075
+    },
+    "seed": "f0-h0-player-component-split-2026-08-14-v1",
+    "required_invariants": [
+      "one player key occurs in exactly one partition",
+      "one behavior game occurs in exactly one partition",
+      "both players of a game share its partition",
+      "protected raw records are not opened"
+    ]
+  },
+  "cost": {
+    "decision_before_screening_statistics": true,
+    "pilot_unit": "whole train game with deterministically selected predecessor states",
+    "pilot_games": 64,
+    "pilot_states_per_game": 4,
+    "pilot_seed": "f0-h0-malom-cost-pilot-2026-08-14-v1",
+    "require_full_malom_hash": true,
+    "projection_estimator": "upper 95 percent normal bound for mean queries and seconds per state multiplied by eligible logical plies",
+    "maximum_full_queries": 50000000,
+    "maximum_full_wall_seconds": 7200.0,
+    "fallback_sample_unit": "whole train-or-selection game",
+    "sample_games": 8192,
+    "sample_seed": "f0-h0-oracle-analysis-sample-2026-08-14-v1",
+    "sample_rule": "rank all train and selection session IDs by canonical SHA-256 of namespace, seed, and session ID; take the first 8192 whole games",
+    "maximum_sample_queries": 10000000,
+    "maximum_sample_wall_seconds": 7200.0,
+    "fail_closed_if_sample_exceeds_bound": true
+  },
+  "estimands": {
+    "support": {
+      "full_replay_scope": "train and selection",
+      "behavior_class": "phase, actor color, on-board counts, unplaced counts, and legal-action-count bucket",
+      "exact_positional_state": "SHA-256 of full pre-action FEN",
+      "unsupported_policy": "abstain; never inherit a global probability"
+    },
+    "reachability": {
+      "safe_set": "all legal moves preserving the best positional Malom WDL tier",
+      "modifiable": "A_pos cardinality greater than one",
+      "strata": [
+        "phase",
+        "color",
+        "parent WDL tier"
+      ]
+    },
+    "mechanism_bound": {
+      "event": "first positional theory downgrade in a game",
+      "transitions": [
+        "W->D",
+        "W->L",
+        "D->L"
+      ],
+      "steerable": "the immediately preceding human move preserved its parent WDL tier, had A_pos cardinality greater than one, and belonged to a supported preregistered behavior class",
+      "within_tier_full_comparator_regret": "secondary only and never merged with WDL loss"
+    },
+    "product_bound": {
+      "population": "strict factual-result subset only",
+      "upper_bound": "fraction of factual games with a supported steerable predecessor; maximum score swing is one point per such game",
+      "outcomes": [
+        "W",
+        "B",
+        "D"
+      ]
+    },
+    "interval": {
+      "method": "envelope of fixed-membership Wilson and player-network connected-component cluster-robust normal 95 percent intervals",
+      "insufficient_components": "if fewer than two components, return [0,1] and fail dependence gates",
+      "interpretation": "fixed source-domain engineering interval, not population inference"
+    }
+  },
+  "thresholds": {
+    "support": {
+      "exact_minimum_players": 5,
+      "exact_minimum_games": 10,
+      "coarse_minimum_players": 30,
+      "coarse_minimum_games": 100,
+      "minimum_supported_decision_fraction": 0.8
+    },
+    "reachability": {
+      "minimum_modifiable_state_fraction": 0.05,
+      "minimum_supported_game_reach_lcb": 0.1
+    },
+    "concentration": {
+      "maximum_top_1_percent_share": 0.25,
+      "maximum_player_gini": 0.75,
+      "minimum_player_kish_ess": 500.0
+    },
+    "dependence": {
+      "minimum_analysis_components": 30,
+      "maximum_analysis_component_game_share": 0.2,
+      "minimum_oracle_components": 30,
+      "maximum_oracle_component_game_share": 0.2
+    },
+    "product_effect": {
+      "minimum_signable_score_effect": 0.01,
+      "unit": "average match-score points per natural source-domain game",
+      "gate": "reject when the conservative factual upper 95 percent bound is below 0.01",
+      "rationale": "one percentage point is the smallest product effect signed before observing F0-H0 statistics; this is a rejection threshold, not a release threshold"
+    }
+  },
+  "decision_rule": {
+    "未被否决": "every preregistered gate is true",
+    "触发停止条件": "one or more preregistered gates is false",
+    "no_gate_changes_after_statistics": true,
+    "no_substitute_data_after_stop": true
+  },
+  "known_biases_inherited": {
+    "history_attrition": {
+      "excluded_games": 1751,
+      "excluded_draws": 35,
+      "retained_history_games": 92789,
+      "retained_draws": 26157,
+      "random_sample_claim": false
+    },
+    "unverifiable_results": 54923,
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact source rules variant"
+    ]
+  },
+  "implementation_inputs": {
+    "evaluation_module": {
+      "path": "learned_ai/evaluation/human_f0h0_feasibility.py",
+      "sha256": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95"
+    },
+    "runner": {
+      "path": "scripts/run_human_f0h0_feasibility.py",
+      "sha256": "5d630847634b1a52ef5098d5fbe43a79953591b8fccf4428578e2533e478cc74"
+    },
+    "focused_tests": {
+      "path": "tests/test_human_f0h0_feasibility.py",
+      "sha256": "b7962a76157e718676b127b6c160108017cb21a2bc7f2a0e8aa1686a6ee9b634"
+    },
+    "malom_manifest": {
+      "path": "data/manifests/malom-sector-corrected-v1.json",
+      "sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747"
+    },
+    "ruleset": {
+      "path": "data/rulesets/nmm-training-core@2.json",
+      "sha256": "79f69a60ba9a1171df113f208396c17a31c85407388857e00fd7010f3a01293a"
+    }
+  },
+  "prohibited_operations": {
+    "database_writes": true,
+    "games": true,
+    "search_batches": true,
+    "model_loading": true,
+    "training": true,
+    "later_funnel_stages": true,
+    "source_pool_2eb04f54_reads": true
+  }
+}
