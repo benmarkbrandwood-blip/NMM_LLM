@@ -1,0 +1,288 @@
+{
+  "schema_version": "nmm.human-feature-deviation-estimator-readiness-plan.v1",
+  "research_id": "human-feature-deviation-estimator-readiness-v1",
+  "status": "preregistered_exploration_only_before_any_fit_or_new_outcome_read",
+  "frozen_at_utc": "2026-08-15T11:32:20Z",
+  "repository_base_commit": "98f167460ce09043accebde707fdd4f67e25720a",
+  "plan_identity": "0ed6030a41efc91724fa5ab453a5d126d1ab55923182629451e067dd6cdfcbb3",
+  "lineage": {
+    "screen_v2_plan_identity": "5919b9666d66c568898797e3b2089a71a71bc289696291d29c7aec6dd91e0935",
+    "screen_v2_file_sha256": "c7be5ee600e1a52657108ff923e4a28831451b563ab57bd152edbc77d1731289",
+    "selected_split_identity": "8187ffa06cc73f4e052b7481f06dc3629a23feace63e086c7075c74c17940028",
+    "selected_split_file": "docs/experiments/human-feature-deviation-train-split-v3.json",
+    "selected_split_file_sha256": "8b98ec4ebd0876d2d5d56e1cfc35e99259724eace18ab09337a7f8e4a31425d3",
+    "task_named_split_v2_identity": "b3cdff57ccdbe4148d661c10cbbb6c6515b76ccd76e0cead2d39c2ab912b3acb",
+    "task_named_split_v2_file_sha256": "75925b87fac6695d918792e23a25f10497d1098082c8441a622494ff129ee2f0",
+    "split_name_reconciliation": "screen-v2 binds the selected activity-balanced split stored as train-split-v3; train-split-v2 is the preserved rejected cut-only design and is not an estimator input",
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "b2_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "b2_membership_file_sha256": "06c3be92c87927d506dc36eb908aec3064220f4ead2ebb3b5ff3dfb7bf5032cb"
+  },
+  "research_question": "whether the frozen conditional-choice estimator is technically ready for one single protected research-confirmation execution; this round is exploratory estimator calibration only",
+  "feature_contract": {
+    "ordered_features": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree",
+      "closes_mill",
+      "opponent_immediate_mill_destinations_removed",
+      "creates_mill_fork",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "opponent_mobility_reduction",
+      "captured_opponent_threat_lines"
+    ],
+    "geometry_control": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree"
+    ],
+    "tactical_panel": [
+      "closes_mill",
+      "opponent_immediate_mill_destinations_removed",
+      "creates_mill_fork",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "opponent_mobility_reduction",
+      "captured_opponent_threat_lines"
+    ],
+    "definitions": {
+      "source_degree": "actor-normalized adjacency degree of the source divided by 4; zero for placement",
+      "destination_degree": "actor-normalized adjacency degree of the destination divided by 4",
+      "capture_degree": "adjacency degree of the captured point divided by 4; zero without capture",
+      "closes_mill": "one when the settled atomic action leaves the destination in an actor mill",
+      "opponent_immediate_mill_destinations_removed": "count of opponent immediate-mill destinations present before but absent after the settled action",
+      "creates_mill_fork": "one when the settled action leaves at least two actor immediate-mill destinations and creates at least one of them",
+      "new_own_potential_mills": "actor two-piece-one-empty mill-line count after minus before",
+      "own_mobility_delta": "actor legal placement-or-move count after minus before, divided by 24",
+      "opponent_mobility_reduction": "opponent legal placement-or-move count before minus after, divided by 24",
+      "captured_opponent_threat_lines": "opponent lines containing the captured point with at least two opponent pieces before the action, divided by 2"
+    },
+    "new_features_prohibited": true,
+    "malom_is_not_a_predictor": true
+  },
+  "numerical_contract": {
+    "model_family": "conditional multinomial logit without intercept",
+    "specifications": {
+      "geometry": 3,
+      "full": 10,
+      "primary_difference": "per-player mean geometry log loss minus per-player mean full log loss"
+    },
+    "objective": "mean across training actor players of that player's mean exact conditional negative log likelihood, plus lambda times one half of the squared coefficient norm",
+    "choice_set_normalization": "one softmax denominator per complete legal atomic choice set; each actor player has equal total likelihood weight",
+    "regularization": {
+      "type": "L2 ridge",
+      "lambda": 0.01,
+      "penalized_terms": "all slope coefficients including geometry controls",
+      "intercept": "absent because it cancels within every choice set",
+      "adaptive_regularization_prohibited": true
+    },
+    "standardization": {
+      "statistics": "unweighted float64 mean and population standard deviation over all legal-alternative rows in the training players and training games of the current fold",
+      "held_out_fold_use": "transform only; held-out rows never affect means or scales",
+      "minimum_scale": 1e-12,
+      "zero_or_nonfinite_scale": "fail the fold"
+    },
+    "choice_construction": {
+      "source": "complete atomic inventory from the board-first positional oracle wrapper",
+      "move_key": ["from", "to", "capture"],
+      "normalization": "missing from or capture becomes an empty string only for lexical ordering; original null semantics are retained for application",
+      "order": "ascending lexical normalized move key",
+      "duplicates": "any duplicate normalized move key fails the run; duplicates are not silently removed",
+      "observed_choice": "must match exactly one inventory row",
+      "maximum_actions": 768
+    },
+    "probability_handling": {
+      "training": "float64 max-shifted log-sum-exp with no probability clipping in the objective",
+      "reporting_floor": 1e-12,
+      "reporting_ceiling": 0.999999999999,
+      "reported_log_loss": "negative log of the clipped chosen probability",
+      "nonfinite_score_or_probability": "fail the fold"
+    },
+    "invalid_choice_policy": {
+      "missing_observed_choice": "fatal",
+      "empty_choice_set": "fatal",
+      "single_action_choice_set": "abstain from both specifications, count against evaluable coverage, and fail readiness if more than 1 percent of covered decisions",
+      "over_768_actions": "fatal",
+      "missing_or_nonfinite_feature": "fatal",
+      "malom_abstention": "abstain from both specifications and count against the frozen oracle coverage gate; never impute"
+    },
+    "optimizer": {
+      "name": "deterministic limited-memory BFGS with Armijo backtracking",
+      "initial_coefficients": "all zeros",
+      "history_size": 10,
+      "maximum_iterations": 100,
+      "gradient_infinity_tolerance": 1e-7,
+      "relative_objective_tolerance": 1e-10,
+      "relative_objective_consecutive_iterations": 3,
+      "secondary_gradient_tolerance_for_objective_stop": 1e-6,
+      "initial_step": 1.0,
+      "armijo_c1": 0.0001,
+      "backtracking_factor": 0.5,
+      "maximum_line_search_steps": 25,
+      "non_descent_direction": "clear history once and use negative gradient; a second occurrence fails",
+      "line_search_failure": "fail the fold"
+    },
+    "determinism": {
+      "seed": "human-feature-deviation-estimator-readiness-v1-2026-08-15",
+      "parallel_reduction": "disabled; sorted folds, sessions, decisions, and lexical actions with sequential float64 batch reduction",
+      "fit_repetition_requirement": "two fits on the deterministic fixture and one repeated real-data fold must agree within 1e-10 in coefficients and 1e-12 in objective"
+    },
+    "finite_and_separation_checks": {
+      "maximum_absolute_coefficient": 20.0,
+      "maximum_observed_information_condition_number": 1000000000000.0,
+      "minimum_observed_information_eigenvalue": 1e-10,
+      "near_separation_chosen_probability": 0.9999999999,
+      "maximum_near_separation_choice_fraction_when_coefficient_norm_exceeds_10": 0.01,
+      "trigger_action": "fail closed; do not change lambda or standardization"
+    }
+  },
+  "cross_fit_contract": {
+    "population": "selected v2 research-exploration arm within official B2 train",
+    "folds": 5,
+    "unit": "source_domain_player_key",
+    "seed": "human-feature-deviation-estimator-readiness-folds-v1-2026-08-15",
+    "assignment": "sort assigned exploration players by descending structural decision count then seeded hash; greedily place into a non-full fold maximizing already assigned incident game weight, then minimizing fold player count, fold decision mass, seeded player-fold hash, and fold index",
+    "fold_capacities": [222, 222, 222, 221, 221],
+    "cross_fold_game_policy": "discard the entire game from fitting, scoring, variance estimation, and D-to-L estimation",
+    "held_out_fold": "score only games whose two players are in that fold",
+    "training_for_fold": "use only same-fold sampled games belonging to the other four folds",
+    "player_overlap_allowed": false,
+    "out_of_fold_result_use_before_freeze": false
+  },
+  "exploration_expansion": {
+    "selection": "within each fold greedily select internal games maximizing uncovered participating endpoints with seeded session-hash tie-breaks, then fill by that hash rank",
+    "selection_seed": "human-feature-deviation-estimator-readiness-sample-v1-2026-08-15",
+    "maximum_games_per_fold": 1280,
+    "maximum_total_games": 6400,
+    "minimum_evaluable_players_for_readiness": 800,
+    "structural_reference": {
+      "available_players": 980,
+      "available_games": 20264,
+      "available_decisions": 958664,
+      "prior_queries_per_decision": 13.27,
+      "prior_queries_per_second": 5760.0
+    },
+    "preregistered_projection": {
+      "decisions": 302775.8389261745,
+      "queries": 4017835.3825503355,
+      "seconds": 697.5408650261
+    },
+    "hard_budget": {
+      "maximum_decisions": 400000,
+      "maximum_queries": 6000000,
+      "maximum_active_seconds": 1800.0
+    },
+    "deviation_stop": {
+      "minimum_queries_per_decision": 10.0,
+      "maximum_queries_per_decision": 17.0,
+      "minimum_queries_per_second": 2880.0,
+      "action": "stop and diagnose; do not silently reduce the frozen sample"
+    }
+  },
+  "uncertainty_contract": {
+    "cluster": "actor player key",
+    "bootstrap_replicates": 2000,
+    "bootstrap_seed": "human-feature-deviation-estimator-readiness-bootstrap-v1-2026-08-15",
+    "interval": "percentile 2.5 and 97.5 percent from deterministic player-cluster resamples",
+    "paired_log_loss_sd": "sample standard deviation across evaluable players of geometry-minus-full player mean log loss",
+    "sd_uncertainty": "bootstrap the player sample standard deviation; readiness uses its 97.5 percentile upper bound",
+    "zero_event_policy": "observed zero remains zero; no pseudo-count or prior creates an event or effect"
+  },
+  "power_contract": {
+    "alpha_two_sided": 0.05,
+    "planning_power": 0.8,
+    "z_0_975": 1.959963984540054,
+    "z_0_80": 0.8416212335729143,
+    "minimum_true_log_loss_improvement_nats": 0.01,
+    "optimistic_confirmation_N": 487.0,
+    "conservative_kish_proxy_N": 58.91083564214028,
+    "binding_readiness_basis": "N=487 because the frozen primary estimand gives each participating player equal weight; Kish is a required traffic-concentration sensitivity and any conclusion flip is reported",
+    "pass_rule": "the 97.5 percentile SD upper bound must be no greater than 0.01 divided by ((z_0_975 plus z_0_80) divided by sqrt(487))",
+    "threshold_relaxation": false
+  },
+  "d_to_l_contract": {
+    "frozen_source_text": "minimum top-versus-bottom risk-quintile D-to-L difference 0.02 and difference lower 95 must meet minimum",
+    "handoff_half_width_description_is_not_binding": true,
+    "evaluation_population": "out-of-fold evaluable decisions whose parent positional tier is D",
+    "risk": "sum of full-model conditional choice probabilities on alternatives whose positional transition is D-to-L",
+    "quintile_boundaries": "for each held-out fold, weighted 20th and 80th percentiles of full-model risk on that fold's training players only; every training player has equal total weight across parent-D decisions",
+    "boundary_quantile": "left-continuous weighted empirical quantile in ascending risk then session, ply, and move-key order",
+    "held_out_groups": "bottom risk is less than or equal to the fold training 20th percentile; top risk is greater than or equal to the fold training 80th percentile",
+    "player_weighting": "each player has equal total weight across all of that player's held-out parent-D decisions; group rates are ratio estimates from those weights",
+    "event": "chosen action has positional transition D-to-L",
+    "zero_event_players": "included with observed event count zero when they have parent-D exposure; no smoothing",
+    "players_without_parent_D_exposure": "excluded from D-to-L endpoints and counted",
+    "degenerate_group_rule": "fail if either risk group contains fewer than 10 percent of evaluable parent-D decisions or fewer than 50 players",
+    "interval": "the same 2000-replicate player-cluster percentile bootstrap with frozen predictions and fold-specific boundaries",
+    "precision_projection": "scale the exploration player-cluster standard error by the square root of exploration evaluable players divided by the planning N; use the bootstrap 97.5 percentile half-width upper bound",
+    "optimistic_pass": "projected point difference minus conservative projected half-width at N=487 must be at least 0.02",
+    "kish_sensitivity": "repeat projection at N=58.91083564214028 and report whether the decision flips",
+    "brier_endpoint": "geometry Brier minus full Brier for D-to-L risk, averaged equally over players; report player bootstrap interval and projected lower bound",
+    "minimum_events": 50,
+    "minimum_event_players": 50
+  },
+  "readiness_rule": {
+    "choices": [
+      "A_technical_ready_for_one_time_research_confirmation",
+      "B_not_ready_fail_closed"
+    ],
+    "A_requires": [
+      "all identity and access preflight checks pass",
+      "all folds converge for both specifications and pass finite and separation diagnostics",
+      "at least 800 exploration players have out-of-fold evaluable decisions",
+      "oracle coverage is at least 0.99 and total abstention is at most 0.01",
+      "single-action abstention is at most 0.01",
+      "the conservative paired-log-loss SD upper bound passes the N=487 power rule",
+      "D-to-L event and event-player support pass",
+      "the conservative N=487 D-to-L top-bottom projected lower bound is at least 0.02",
+      "the full-model D-to-L Brier projected lower bound exceeds zero"
+    ],
+    "B_classification": [
+      "implementation_or_design_not_ready",
+      "current_corpus_intrinsic_limit_under_frozen_estimand"
+    ],
+    "research_confirmation_execution_in_this_round": false,
+    "post_result_threshold_or_estimand_change": false
+  },
+  "claim_boundary": {
+    "exploratory_only": true,
+    "safe_set": "A_pos",
+    "state_safety": "positional-only",
+    "a_allow_claim": false,
+    "F0_H0_stop_remains_effective": true,
+    "human_trap_claim": false,
+    "causal_claim": false,
+    "product_effect_claim": false,
+    "playing_strength_claim": false,
+    "training_or_model_update_authorized": false,
+    "promotion_deployment_publication_release_authorized": false
+  },
+  "protected_access": {
+    "default": "deny",
+    "allowed_raw_content": "only session IDs in the subsequently frozen estimator exploration sample, all of which must belong to selected research-exploration and official B2 train",
+    "research_confirmation_content_reads": 0,
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "human_db_reads": 0,
+    "database_writes": 0,
+    "games_searches_strategy_model_loads_or_training": 0
+  },
+  "known_biases": {
+    "history_recovery_nonrandom": "1751 excluded games contain 35 draws while 92789 retained games contain 26157 draws",
+    "unverified_terminal_basis_games": 54923,
+    "source_domain": "observed PlayOK-like platform only",
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact source rules variant"
+    ],
+    "product_population_transport": false,
+    "state_novelty_gate": false
+  },
+  "confirmation_execution_authorized": false
+}
