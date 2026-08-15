@@ -1,0 +1,80 @@
+{
+  "schema_version": "nmm.human-feature-deviation-estimator-readiness-plan.v2",
+  "research_id": "human-feature-deviation-estimator-readiness-v2",
+  "status": "preregistered_structural_correction_before_any_fit_or_new_outcome_read",
+  "frozen_at_utc": "2026-08-15T11:55:00Z",
+  "repository_base_commit": "44e14c45880e52489b151d1000c205a1d4918ec7",
+  "plan_identity": "246eef0ae2c42cb6606b8fa28a2ebb323f7ef65b7a80bdc09e4e456fba43eb87",
+  "v1_disposition": {
+    "plan_identity": "0ed6030a41efc91724fa5ab453a5d126d1ab55923182629451e067dd6cdfcbb3",
+    "plan_file_sha256": "d88b43d651374410b4d9e32ffde5485bab065f9ecc4c14ab8c390fd178d56caf",
+    "remains_immutable": true,
+    "status": "superseded_for_future_execution_by_structural_fold_correction",
+    "failure": "the outcome-blind greedy affinity assignment left only 286 players in same-fold sample games, below the frozen 800-player gate",
+    "new_human_actions_features_malom_labels_or_outcomes_read_before_failure": 0
+  },
+  "frozen_inheritance": {
+    "source": "docs/experiments/human-feature-deviation-estimator-readiness-v1.json",
+    "rule": "all v1 sections listed here are inherited exactly and may not be overridden by this file",
+    "sections": [
+      "lineage",
+      "research_question",
+      "feature_contract",
+      "numerical_contract",
+      "exploration_expansion",
+      "uncertainty_contract",
+      "power_contract",
+      "d_to_l_contract",
+      "readiness_rule",
+      "claim_boundary",
+      "protected_access",
+      "known_biases"
+    ]
+  },
+  "cross_fit_contract": {
+    "population": "selected v2 research-exploration arm within official B2 train",
+    "folds": 5,
+    "unit": "source_domain_player_key",
+    "graph": "all 1108 assigned exploration players as vertices and the 20264 same-arm games as integer game-weighted edges; structural move counts only",
+    "community_method": "NetworkX Louvain communities",
+    "community_resolution": 2.0,
+    "community_seed": 170816,
+    "community_weight": "games",
+    "community_integrity": "each detected community is indivisible across folds",
+    "assignment": "sort communities by descending structural decision mass, descending player count, then canonical community identity; place each whole community into the fold minimizing the maximum of prospective player-count ratio and decision-mass ratio, then minimizing their absolute deviations from one, then fold index",
+    "target_player_count_per_fold": 221.6,
+    "target_structural_decisions_per_fold": 191732.8,
+    "pre_outcome_structural_gates": {
+      "minimum_assigned_players_per_fold": 180,
+      "maximum_assigned_players_per_fold": 260,
+      "minimum_participating_players_per_fold": 150,
+      "minimum_internal_games_per_fold": 1280,
+      "minimum_total_sample_players": 800
+    },
+    "cross_fold_game_policy": "discard the entire game from fitting, scoring, variance estimation, and D-to-L estimation",
+    "held_out_fold": "score only sampled games whose two players are in that fold",
+    "training_for_fold": "use only sampled same-fold games belonging to the other four folds",
+    "sample_selection": "use the inherited v1 selection seed and maximum 1280 internal games per fold; greedily cover participating endpoints then fill by frozen hash rank",
+    "player_overlap_allowed": false,
+    "out_of_fold_result_use_before_freeze": false
+  },
+  "change_scope": {
+    "changed": [
+      "player-to-fold assignment only"
+    ],
+    "unchanged": [
+      "ten feature fields and definitions",
+      "choice construction",
+      "objective and ridge penalty",
+      "standardization",
+      "optimizer and separation diagnostics",
+      "exploration sample budget and selection seed",
+      "bootstrap",
+      "log-loss power rule",
+      "D-to-L estimator and thresholds",
+      "protected access and claim boundaries"
+    ],
+    "result_dependent_change": false
+  },
+  "confirmation_execution_authorized": false
+}
