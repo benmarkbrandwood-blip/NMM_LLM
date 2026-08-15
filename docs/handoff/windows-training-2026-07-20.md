@@ -228,6 +228,34 @@ Task-scope Ruff passes, the focused feature-deviation group passes 15 tests,
 and the required Malom provenance group passes 103 tests plus 498
 parameterized subtests.
 
+The exploration-only conditional estimator readiness round is complete under
+result identity
+`0df4a8bcfab8636048c8b005945a1d4bd719b23f377c06d25a6d6e5b745d0ec2`.
+The result is `B_not_ready_fail_closed`; research confirmation was not opened.
+The five-fold conditional-logit implementation converged reproducibly with
+100% positional-only `A_pos` coverage over 292,192 decisions from 6,400
+frozen exploration games.  It made 3,869,797 read-only Malom queries and no
+protected-content, HumanDB, source-pool, game, search, strategy-model,
+training, or database-write access.
+
+The only failed readiness item is the preregistered player-level log-loss
+power gate.  The paired player SD is 0.140557 with bootstrap interval
+[0.132147, 0.149679].  Using the required upper endpoint gives a 0.019002-nat
+minimum detectable effect at 487 confirmation players, or 1,759 comparable
+players for the frozen 0.01-nat effect.  The separate D-to-L lower-bound and
+Brier projections pass, but the readiness contract is conjunctive and they do
+not authorize confirmation.  Preserve the v1 and corrected v2 numerical
+plans, the frozen cross-fit structure, the result manifest, and the
+[evidence](../evidence/human-feature-deviation-estimator-readiness-2026-08-15.md)
+together.  A new player acquisition decision or a genuinely new minimum-effect
+question needs separate product authority; thresholds cannot be changed as a
+repair of this result.
+
+Task-scope Ruff passes.  The complete feature-deviation focused group passes
+36 tests, the B2 freeze and final-test guard file passes eight tests, and the
+mandatory Malom provenance group passes 103 tests plus 498 parameterized
+subtests.
+
 The corrected result verifier reproduces the v2 plan lineage.  The historical
 v1 plan and result identities remain sealed; implementation-artifact replay
 belongs to their recorded commit rather than the corrected current checkout.

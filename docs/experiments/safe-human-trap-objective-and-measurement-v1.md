@@ -426,3 +426,32 @@ calibration exists.  Confirmation therefore remains prohibited.  A later
 round may implement and calibrate the frozen estimator using research
 exploration only; it may not relax thresholds after that calibration or open
 protected content without satisfying the frozen gate.
+
+## Featureized-deviation estimator-readiness addendum -- 15 August 2026
+
+The permitted exploration-only implementation and calibration completed under
+result identity
+`0df4a8bcfab8636048c8b005945a1d4bd719b23f377c06d25a6d6e5b745d0ec2`.
+Its decision is `B_not_ready_fail_closed`; research confirmation remains
+unopened.
+
+The conditional-choice estimator is numerically healthy, but the frozen
+minimum-effect power gate fails.  The player-bootstrap upper endpoint for the
+paired player SD is `0.149679`, above the `0.078770` maximum compatible with a
+`0.01`-nat effect and 487 structurally participating confirmation players.
+At that conservative SD, the minimum detectable effect is `0.019002` nats and
+1,759 comparable independent confirmation players would be required for the
+original `0.01`-nat question.
+
+The separate D-to-L precision projection passes its binding lower-bound
+contract.  It cannot replace the failed conditional-choice gate because the
+frozen readiness decision is conjunctive.  The exploratory point estimates
+are not confirmation evidence and cannot be used to relax the threshold.
+
+The
+[readiness evidence](../evidence/human-feature-deviation-estimator-readiness-2026-08-15.md)
+records the numerical contract, player-level cross-fit, optimizer diagnostics,
+power calibration, and zero-access ledger.  F0-H0 remains stopped.  This
+addendum grants no authority to open research confirmation or any official
+holdout, and no authority for E0, F0-H1, T0, games, training, reward changes,
+promotion, publication, deployment, or release.
