@@ -391,3 +391,38 @@ No confirmatory model or one-ply steerability result exists.  The
 records the independent critique, frozen thresholds, pilot evidence, and
 claim boundary.  This addendum grants no authority for confirmation, E0,
 F0-H1, T0, reward changes, games, training, promotion, publication, or release.
+
+## Featureized-deviation precision addendum -- 15 August 2026
+
+The follow-up precision and design round does not alter the F0-H0 stop.  Its
+[evidence](../evidence/human-feature-deviation-precision-rebalance-and-extension-2026-08-15.md)
+records an outcome-blind split rebalance and a larger exploration-only feature
+screen.
+
+The selected future research split has identity
+`8187ffa06cc73f4e052b7481f06dc3629a23feace63e086c7075c74c17940028`.
+Its disjoint player arms are assigned 1,108 keys each.  Surviving same-arm
+games contain 980 exploration and 487 confirmation player keys.  The
+confirmation-side decision-weighted Kish diagnostic is 58.91, up from 46.78
+under v1, but this does not certify the frozen precision gates.  Research
+confirmation and all official holdouts remain unopened.
+
+The 1,024-game exploration extension has result identity
+`53e010f473a88d4a384b264906a4a8d1826b92fd5f48e4b386b57356ee78c61a`.
+It opened only the frozen exploration membership and fit no model.  The old
+post-action material term is exactly affine with mill closure inside every
+one of 48,855 complete choice sets and is removed from future conditional
+choice models.  Simultaneous double-mill closure remains a real but absent
+event in this sample; it is replaced by the distinct, observable future
+mill-fork proxy.  These are exploratory design decisions, not predictive or
+causal findings.
+
+Revised feature plan identity
+`5919b9666d66c568898797e3b2089a71a71bc289696291d29c7aec6dd91e0935`
+freezes the new split, ten-term dictionary, unchanged substantive effect
+floors, and a new pre-execution precision gate.  That gate is not met because
+no permitted exploration-only conditional model or player-level variance
+calibration exists.  Confirmation therefore remains prohibited.  A later
+round may implement and calibrate the frozen estimator using research
+exploration only; it may not relax thresholds after that calibration or open
+protected content without satisfying the frozen gate.

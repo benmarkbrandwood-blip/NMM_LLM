@@ -185,6 +185,49 @@ Task-scope Ruff passes; the combined focused feature, reused F0-H0 comparator,
 and mandatory Malom provenance suite passes 124 tests and 498 parameterized
 subtests.
 
+A subsequent design round evaluated precision before opening the internal
+research confirmation arm.  Under v1, that arm has 290 participating players,
+129,697 decisions, player Gini 0.783, and decision-weighted Kish 46.78.  The
+unknown player-level paired-loss variance and D-to-L support are protected
+result variables, so the 0.01-nat and two-percentage-point gates cannot be
+certified from structure alone.  This is not a proof of mathematical
+impossibility.  Confirmation was not opened.
+
+The first frozen cut-minimizing rebalance failed structurally by selecting
+low-activity confirmation players.  Preserve its negative plan and result.
+The corrected outcome-blind design chose the 50/50 activity-balanced split
+under identity
+`8187ffa06cc73f4e052b7481f06dc3629a23feace63e086c7075c74c17940028`.
+It assigns 1,108 keys to each arm; surviving games contain 980/487 players,
+20,264/2,543 games, and 958,664/117,802 decisions.  The confirmation Kish
+diagnostic improves to 58.91.  Cross-player discard remains 14,142 games.
+
+The frozen 1,024-game exploration extension completed under result identity
+`53e010f473a88d4a384b264906a4a8d1826b92fd5f48e4b386b57356ee78c61a`.
+It covered 48,855 decisions with 632,094 read-only Malom queries and zero
+abstentions.  It fit no model and opened zero protected records.  The first
+process attempt failed before its first Malom query due to reversed comparator
+arguments; recovery identity
+`95b649c2377ec010ae9e9a39a2a54b9b2eef7873ddb8c91b900fd920128b7d83`
+binds the semantics-identical complete restart.
+
+All 48,855 complete choice sets confirm exact within-choice affine dependence
+between `material_balance_after` and `closes_mill`.  The simultaneous
+double-mill feature remains zero, while the distinct future mill-fork proxy
+varies in 12,744 choice sets.  Revised feature plan identity
+`5919b9666d66c568898797e3b2089a71a71bc289696291d29c7aec6dd91e0935`
+removes the redundant material term, replaces the misnamed double-mill proxy,
+and adds opponent threat-removal and mobility terms.  Its precision execution
+gate is not met.  A later exploration-only estimator implementation and
+player-level cross-fitted variance calibration are required before research
+confirmation can be opened.  The
+[precision and extension evidence](../evidence/human-feature-deviation-precision-rebalance-and-extension-2026-08-15.md)
+is the owning narrative.
+
+Task-scope Ruff passes, the focused feature-deviation group passes 15 tests,
+and the required Malom provenance group passes 103 tests plus 498
+parameterized subtests.
+
 The corrected result verifier reproduces the v2 plan lineage.  The historical
 v1 plan and result identities remain sealed; implementation-artifact replay
 belongs to their recorded commit rather than the corrected current checkout.

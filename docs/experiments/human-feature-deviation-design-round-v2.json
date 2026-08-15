@@ -1,0 +1,178 @@
+{
+  "schema_version": "nmm.human-feature-deviation-design-round.v1",
+  "research_id": "human-feature-deviation-precision-rebalance-extension-v2-2026-08-15",
+  "status": "frozen_after_cut-only-structural-rejection_before_v2-candidate-measurement",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "repository_base_commit": "3d3d5b12d96fbdc11abea18c7fbc3301082e9bf1",
+  "plan_identity": "60e1f0ee63871b76dce17741ebec985660ceb99df3da28edc73dacb48884f347",
+  "v1_identities": {
+    "plan": "04177a73ca5b9a1aa8cc8352477f2050759e6a742cee049f1191d3064ae5d662",
+    "split": "fa74650c1afdffeb0d30f334b2b7859538f81b0e502c17a64092bfdcd99a06dd",
+    "exploration": "c489dca91c00569491d2b50a879bd014081e0109e0899afcc2bf2f13d584d7d6"
+  },
+  "superseded_design_round": {
+    "plan_identity": "5ab80986109a4a2b7d918a85091701af733b1a6b9167e7f7a1202d49a26ebe6e",
+    "plan_file_sha256": "a60e904495b2feb30ad03ed152579fb48a83c4d3e82d73810fc9fb08c5ae175a",
+    "result_identity": "1e7477f80adb8e60d2bde8a27bf26865c8f35a3590f7390c760ab1538c0d88e7",
+    "result_file_sha256": "478e4fdf056369483d5a12f22f2a74c2543a3dbdac780adcf7133f49900c88b4",
+    "selected_split_identity": "b3cdff57ccdbe4148d661c10cbbb6c6515b76ccd76e0cead2d39c2ab912b3acb",
+    "selected_split_file_sha256": "75925b87fac6695d918792e23a25f10497d1098082c8441a622494ff129ee2f0",
+    "disposition": "structurally_rejected_not_used_for_exploration_or_confirmation",
+    "reason": "minimizing cut weight alone selected low-activity confirmation players; its nominal 50 percent arm retained only 137 same-arm games, 48 participating players, and Kish 8.99",
+    "records_remain_immutable": true
+  },
+  "input_boundary": {
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "b2_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "official_train_games": 36949,
+    "official_protected_content_allowed": 0,
+    "source_pool_2eb04f54_records_allowed": 0
+  },
+  "precision_screen": {
+    "structure_only": true,
+    "normal_approximation": "(z_0.975 + z_0.80) times player-level SD divided by sqrt(N)",
+    "report_actual_participating_players": true,
+    "report_decision_weighted_kish_as_conservative_proxy": true,
+    "outcome_variance_allowed": false,
+    "tier_loss_event_support_allowed": false,
+    "fail_closed_rule": "unbounded log loss without a frozen probability floor and unknown player-level variance cannot be structurally certified as precision-reachable",
+    "mathematical_impossibility_claim_allowed": false
+  },
+  "rebalance": {
+    "assignment_unit": "source_domain_player_key",
+    "graph_edges": "official B2 train games weighted by game count",
+    "louvain_seed": 170815,
+    "louvain_resolution": 1.0,
+    "candidate_confirmation_player_fractions": [
+      0.3,
+      0.4,
+      0.5
+    ],
+    "candidate_seed": "human-feature-deviation-community-activity-v2-2026-08-15",
+    "algorithm_version": "community_activity_balance_v2",
+    "initialization": "within each frozen Louvain community, greedily balance structural player decision mass while meeting an exact largest-remainder player quota",
+    "improvement": "none; cut-only pair swaps are prohibited after their frozen failure",
+    "maximum_pair_swap_iterations": 0,
+    "pair_swap_shortlist_per_side": 1,
+    "lock_v1_pilot_players_to_exploration": true,
+    "cross_arm_game_policy": "discard",
+    "outcome_variables_allowed": false,
+    "selection_rule": "among v1 and the three new candidates, maximize the smaller arm's decision-weighted Kish effective player count; then minimize discarded games; then candidate_id lexical order",
+    "v1_comparator_eligible_for_selection": true,
+    "output_split_schema": "nmm.human-feature-deviation-train-split.v3",
+    "failure_rule": "if no candidate beats v1 under the frozen selection rule, retain v1 and do not claim a successful rebalance"
+  },
+  "exploration_extension": {
+    "total_games": 1024,
+    "includes_v1_pilot": true,
+    "additional_games": 896,
+    "sample_seed": "human-feature-deviation-exploration-extension-v2-2026-08-15",
+    "selection": "retain all v1 pilot games, then lowest SHA-256(seed NUL session_id) ranks from selected exploration",
+    "prior_cost_basis": {
+      "games": 128,
+      "decisions": 6140,
+      "queries": 81463,
+      "elapsed_seconds": 53.601339199987706,
+      "queries_per_decision": 13.267589576547231,
+      "queries_per_second": 1519.794117383147
+    },
+    "linear_budget_estimate": {
+      "total_decisions": 49120,
+      "total_queries": 651704,
+      "total_seconds": 428.81,
+      "additional_decisions": 42980,
+      "additional_queries": 570241,
+      "additional_seconds": 375.21
+    },
+    "hard_budget": {
+      "maximum_decisions": 75000,
+      "maximum_queries": 1000000,
+      "maximum_seconds": 1200,
+      "failure_policy": "fail closed; no partial frozen extension"
+    },
+    "candidate_feature_dictionary": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree",
+      "closes_mill",
+      "opponent_immediate_mill_destinations_removed",
+      "creates_mill_fork",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "opponent_mobility_reduction",
+      "captured_opponent_threat_lines"
+    ],
+    "diagnostics": [
+      "retain all v1 feature summaries",
+      "test exact within-choice closes_mill/material affine identity",
+      "separate simultaneous double-mill closure from future mill-fork creation",
+      "report candidate feature variation and A_pos conflict"
+    ],
+    "no_model_fit": true,
+    "no_confirmatory_evidence": true
+  },
+  "confirmation_execution": {
+    "authorized_in_this_round": false,
+    "preconditions": [
+      "precision reachability certified",
+      "final split frozen",
+      "final preregistration frozen"
+    ],
+    "all_must_hold": true,
+    "current_precision_status": "not_certified_fail_closed",
+    "content_reads_before_a_later_explicit_execution": 0
+  },
+  "claim_boundary": {
+    "safe_set": "A_pos",
+    "state_safety": "positional-only",
+    "a_allow_claim": false,
+    "F0_H0_stop_condition_remains_effective": true,
+    "source_domain": "observed PlayOK-like source only",
+    "state_novelty_claim": false,
+    "confirmation_or_product_claim": false
+  },
+  "known_biases": {
+    "history_recovery_selection": "excluded 1751 games contain only 35 draws; retained 92789 contain 26157 draws",
+    "unverified_terminal_basis_games": 54923,
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact rules variant"
+    ]
+  },
+  "prohibited_content": {
+    "research_confirmation": true,
+    "official_selection": true,
+    "official_confirmation": true,
+    "official_final_test": true,
+    "source_pool_2eb04f54": true
+  },
+  "prohibited_operations": {
+    "database_writes_or_rebuilds": true,
+    "games": true,
+    "search_batches": true,
+    "model_loading": true,
+    "model_training_or_weight_updates": true,
+    "F0_H0_rerun_or_threshold_relaxation": true
+  },
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_feature_deviation_design_round.py",
+      "sha256": "2e086417a60cf82b9c4ec24deca4441757d38cbe351ba6bcb0522d1d700dc74f"
+    },
+    {
+      "path": "scripts/analyze_human_feature_deviation_design_round.py",
+      "sha256": "15190ab4fddc5aea076de1402de9315006b86d683b6df208477869aada45e1da"
+    },
+    {
+      "path": "scripts/run_human_feature_deviation_exploration_extension.py",
+      "sha256": "e28b6265bf6f6e17501dfd5f763af439607043d117ad4fe6ce12205a3495b51b"
+    },
+    {
+      "path": "tests/test_human_feature_deviation_design_round.py",
+      "sha256": "0cb88d5f562ce1ba40d9765f0c5e1020e7012b6e9aa84c645f914063d3d36ac5"
+    }
+  ]
+}

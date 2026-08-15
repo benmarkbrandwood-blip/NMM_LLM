@@ -1,0 +1,189 @@
+{
+  "schema_version": "nmm.human-feature-deviation-design-round.v1",
+  "research_id": "human-feature-deviation-precision-rebalance-extension-2026-08-15",
+  "status": "frozen_before_candidate_rebalance_measurement_and_extended_exploration",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "repository_base_commit": "3d3d5b12d96fbdc11abea18c7fbc3301082e9bf1",
+  "plan_identity": "5ab80986109a4a2b7d918a85091701af733b1a6b9167e7f7a1202d49a26ebe6e",
+  "v1_identities": {
+    "plan": "04177a73ca5b9a1aa8cc8352477f2050759e6a742cee049f1191d3064ae5d662",
+    "split": "fa74650c1afdffeb0d30f334b2b7859538f81b0e502c17a64092bfdcd99a06dd",
+    "exploration": "c489dca91c00569491d2b50a879bd014081e0109e0899afcc2bf2f13d584d7d6"
+  },
+  "input_boundary": {
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "b2_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "official_train_games": 36949,
+    "official_protected_content_allowed": 0,
+    "source_pool_2eb04f54_records_allowed": 0
+  },
+  "sequence": [
+    "v1_confirmation_structural_precision_screen",
+    "outcome_blind_rebalance_candidates",
+    "freeze_selected_v2_split",
+    "freeze_extended_exploration_sample",
+    "run_extended_exploration_only",
+    "decide_v1_or_v2_preregistration_disposition",
+    "do_not_open_confirmation_unless_all_three_user_gates_hold"
+  ],
+  "information_available_before_this_freeze": {
+    "v1_confirmation_assigned_players": 551,
+    "v1_confirmation_participating_players": 290,
+    "v1_confirmation_same_arm_games": 2751,
+    "v1_confirmation_decisions": 129697,
+    "v1_confirmation_player_decision_gini": 0.7827025749405845,
+    "v1_confirmation_player_decision_kish": 46.77875354516436,
+    "use": "motivates a frozen rebalance; no human choice, feature, tier, loss, or outcome variable was read"
+  },
+  "precision_screen": {
+    "structure_only": true,
+    "normal_approximation": "(z_0.975 + z_0.80) times player-level SD divided by sqrt(N)",
+    "report_actual_participating_players": true,
+    "report_decision_weighted_kish_as_conservative_proxy": true,
+    "outcome_variance_allowed": false,
+    "tier_loss_event_support_allowed": false,
+    "fail_closed_rule": "unbounded log loss without a frozen probability floor and unknown player-level variance cannot be structurally certified as precision-reachable",
+    "mathematical_impossibility_claim_allowed": false
+  },
+  "rebalance": {
+    "assignment_unit": "source_domain_player_key",
+    "graph_edges": "official B2 train games weighted by game count",
+    "louvain_seed": 170815,
+    "louvain_resolution": 1.0,
+    "candidate_confirmation_player_fractions": [
+      0.3,
+      0.4,
+      0.5
+    ],
+    "candidate_seed": "human-feature-deviation-community-cut-v2-2026-08-15",
+    "initialization": "community-stratified exact-size deterministic hash ranks",
+    "improvement": "fixed-size deterministic pair swaps minimizing cross-player game weight",
+    "maximum_pair_swap_iterations": 200,
+    "pair_swap_shortlist_per_side": 64,
+    "lock_v1_pilot_players_to_exploration": true,
+    "cross_arm_game_policy": "discard",
+    "outcome_variables_allowed": false,
+    "selection_rule": "maximize the smaller arm's decision-weighted Kish effective player count; then minimize discarded games; then candidate_id lexical order",
+    "v1_comparator_eligible_for_selection": false,
+    "reason": "v1 is preserved as the frozen comparator; this round explicitly evaluates 30, 40, and 50 percent confirmation candidates"
+  },
+  "exploration_extension": {
+    "total_games": 1024,
+    "includes_v1_pilot": true,
+    "additional_games": 896,
+    "sample_seed": "human-feature-deviation-exploration-extension-v2-2026-08-15",
+    "selection": "retain all v1 pilot games, then lowest SHA-256(seed NUL session_id) ranks from selected v2 exploration",
+    "prior_cost_basis": {
+      "games": 128,
+      "decisions": 6140,
+      "queries": 81463,
+      "elapsed_seconds": 53.601339199987706,
+      "queries_per_decision": 13.267589576547231,
+      "queries_per_second": 1519.794117383147
+    },
+    "linear_budget_estimate": {
+      "total_decisions": 49120,
+      "total_queries": 651704,
+      "total_seconds": 428.81,
+      "additional_decisions": 42980,
+      "additional_queries": 570241,
+      "additional_seconds": 375.21
+    },
+    "hard_budget": {
+      "maximum_decisions": 75000,
+      "maximum_queries": 1000000,
+      "maximum_seconds": 1200,
+      "failure_policy": "fail closed; do not publish a partial sample as the frozen extension"
+    },
+    "candidate_feature_dictionary": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree",
+      "closes_mill",
+      "opponent_immediate_mill_destinations_removed",
+      "creates_mill_fork",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "opponent_mobility_reduction",
+      "captured_opponent_threat_lines"
+    ],
+    "diagnostics": [
+      "retain and report all v1 feature opportunity summaries",
+      "test material_balance_after minus closes_mill divided by nine for exact within-choice constancy",
+      "distinguish simultaneous double-mill closure from creating at least two future mill destinations",
+      "report candidate feature variation and A_pos conflict by the existing positional-only contract"
+    ],
+    "no_model_fit": true,
+    "no_confirmatory_evidence": true
+  },
+  "feature_design_decisions_frozen_before_extension": {
+    "material_balance_after": "candidate for removal because a capture is available only after closing a mill, making it structurally affine with closes_mill inside an atomic choice set; extension must test this identity",
+    "creates_double_mill": "retain in v1 diagnostics but replace in the candidate panel with creates_mill_fork because simultaneous closure and double-three setup are different constructs",
+    "phase": "report as a stratum, not an action feature that is constant within a choice set",
+    "last_move_local_response": "not admitted to v2 candidate panel because its observation and missing-history contract is not yet frozen"
+  },
+  "confirmation_execution": {
+    "authorized_in_this_round": false,
+    "preconditions": [
+      "precision reachability certified",
+      "final split frozen",
+      "final preregistration frozen"
+    ],
+    "all_must_hold": true,
+    "current_precision_status": "not_certified_fail_closed",
+    "content_reads_before_a_later_explicit_execution": 0
+  },
+  "claim_boundary": {
+    "safe_set": "A_pos",
+    "state_safety": "positional-only",
+    "a_allow_claim": false,
+    "F0_H0_stop_condition_remains_effective": true,
+    "source_domain": "observed PlayOK-like source only",
+    "state_novelty_claim": false,
+    "confirmation_or_product_claim": false
+  },
+  "known_biases": {
+    "history_recovery_selection": "excluded 1751 games contain only 35 draws; retained 92789 contain 26157 draws",
+    "unverified_terminal_basis_games": 54923,
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact rules variant"
+    ]
+  },
+  "prohibited_content": {
+    "research_confirmation": true,
+    "official_selection": true,
+    "official_confirmation": true,
+    "official_final_test": true,
+    "source_pool_2eb04f54": true
+  },
+  "prohibited_operations": {
+    "database_writes_or_rebuilds": true,
+    "games": true,
+    "search_batches": true,
+    "model_loading": true,
+    "model_training_or_weight_updates": true,
+    "F0_H0_rerun_or_threshold_relaxation": true
+  },
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_feature_deviation_design_round.py",
+      "sha256": "021db72427d247f7e23c9a05937be6da3009752029a0cd894b552898810ea207"
+    },
+    {
+      "path": "scripts/analyze_human_feature_deviation_design_round.py",
+      "sha256": "15190ab4fddc5aea076de1402de9315006b86d683b6df208477869aada45e1da"
+    },
+    {
+      "path": "scripts/run_human_feature_deviation_exploration_extension.py",
+      "sha256": "e28b6265bf6f6e17501dfd5f763af439607043d117ad4fe6ce12205a3495b51b"
+    },
+    {
+      "path": "tests/test_human_feature_deviation_design_round.py",
+      "sha256": "0cb88d5f562ce1ba40d9765f0c5e1020e7012b6e9aa84c645f914063d3d36ac5"
+    }
+  ]
+}

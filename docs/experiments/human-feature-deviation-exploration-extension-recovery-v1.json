@@ -1,0 +1,40 @@
+{
+  "schema_version": "nmm.human-feature-deviation-exploration-recovery.v1",
+  "status": "frozen_semantics_identical_retry_after_prequery_interface_failure",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "recovery_identity": "95b649c2377ec010ae9e9a39a2a54b9b2eef7873ddb8c91b900fd920128b7d83",
+  "design_round_plan_identity": "60e1f0ee63871b76dce17741ebec985660ceb99df3da28edc73dacb48884f347",
+  "design_round_plan_file_sha256": "363869529338e220d762ef330478317a9180e9241954379e5d6a7473ffceb001",
+  "split_identity": "8187ffa06cc73f4e052b7481f06dc3629a23feace63e086c7075c74c17940028",
+  "split_file_sha256": "8b98ec4ebd0876d2d5d56e1cfc35e99259724eace18ab09337a7f8e4a31425d3",
+  "failed_attempt": {
+    "failure": "_oracle_inventory_positional arguments were reversed",
+    "failure_location": "first frozen-sample decision before the first database query",
+    "raw_exploration_games_opened": 1,
+    "replayed_exploration_games": 1,
+    "malom_queries": 0,
+    "result_file_created": false,
+    "partial_result_accepted": false,
+    "human_summary_statistics_observed": false,
+    "research_confirmation_content_reads": 0,
+    "selection_content_reads": 0,
+    "confirmation_content_reads": 0,
+    "final_test_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0
+  },
+  "fix": {
+    "description": "add a board-first tested wrapper and pass board before MalomDB",
+    "module_sha256": "a462810ae1f0382145a40cac2a5f2021a113d7fb617cd2a196a97bc415074f38",
+    "focused_test_sha256": "a52aef0d8d2c5827e3f5ea0688b4f9f0a797456ff16717bca08e5a4171a191b9",
+    "focused_test_result": "6 passed"
+  },
+  "retry_contract": {
+    "same_1024_session_membership": true,
+    "same_feature_dictionary": true,
+    "same_Malom_snapshot": true,
+    "same_query_and_time_budgets": true,
+    "no_threshold_or_design_change": true,
+    "partial_prefix_reuse": false,
+    "restart_complete_frozen_exploration_sample": true
+  }
+}
