@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -18,9 +19,25 @@ from typing import Any, Callable, Mapping, Sequence
 import networkx as nx
 import numpy as np
 
+from ai.malom_db import MalomDB
+from game.rules import get_game_phase
+from learned_ai.evaluation.human_f0h0_b2_train_screen import (
+    OracleCoverageAbstention,
+)
 from learned_ai.evaluation.human_f0h0_feasibility import (
+    CorpusRecord,
+    F0D0Boundary,
+    F0H0Error,
+    _read_raw_game,
     canonical_sha256,
     concentration,
+    replay_game,
+)
+from learned_ai.evaluation.human_feature_deviation import PHASE_NAMES
+from learned_ai.evaluation.human_feature_deviation_design_round import (
+    V2_FEATURE_NAMES,
+    _query_inventory,
+    extended_action_feature_scores,
 )
 
 
@@ -117,6 +134,27 @@ def load_effective_readiness_plan(
         "v1_plan_identity": inherited["plan_identity"],
         "v1_plan_file_sha256": inherited_sha,
     }
+
+
+def load_crossfit_structure(path: str | Path) -> tuple[dict[str, Any], str]:
+    source = Path(path)
+    raw = source.read_bytes()
+    try:
+        value = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise EstimatorReadinessError(f"invalid crossfit structure: {source}") from exc
+    if not isinstance(value, dict) or value.get("schema_version") != STRUCTURE_SCHEMA:
+        raise EstimatorReadinessError("crossfit structure schema differs")
+    identity = value.get("structure_identity")
+    body = dict(value)
+    body.pop("structure_identity", None)
+    if not isinstance(identity, str) or canonical_sha256(body) != identity:
+        raise EstimatorReadinessError("crossfit structure identity differs")
+    if value.get("status") != "frozen_structure_before_new_outcome_or_malom_read":
+        raise EstimatorReadinessError("crossfit structure status differs")
+    if value.get("structural_gates", {}).get("passed") is not True:
+        raise EstimatorReadinessError("crossfit structural gates did not pass")
+    return value, hashlib.sha256(raw).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -620,6 +658,771 @@ def player_cluster_bootstrap(
     }
 
 
+def _choice_probabilities(
+    choice: ChoiceObservation,
+    *,
+    columns: Sequence[int],
+    mean: np.ndarray,
+    scale: np.ndarray,
+    coefficients: np.ndarray,
+    contract: NumericalContract,
+) -> np.ndarray:
+    matrix = (choice.features[:, tuple(columns)] - mean) / scale
+    probabilities, _log_sum = _stable_probabilities(
+        matrix @ coefficients,
+        floor=contract.reporting_floor,
+        ceiling=contract.reporting_ceiling,
+    )
+    return probabilities
+
+
+def observed_information_and_chosen_probabilities(
+    choices: Sequence[ChoiceObservation],
+    *,
+    columns: Sequence[int],
+    mean: np.ndarray,
+    scale: np.ndarray,
+    coefficients: np.ndarray,
+    contract: NumericalContract,
+) -> tuple[np.ndarray, np.ndarray]:
+    weights = _player_choice_weights(choices)
+    information = np.eye(len(tuple(columns)), dtype=np.float64)
+    information *= contract.ridge_lambda
+    chosen: list[float] = []
+    for choice in choices:
+        matrix = (choice.features[:, tuple(columns)] - mean) / scale
+        probabilities = _choice_probabilities(
+            choice,
+            columns=columns,
+            mean=mean,
+            scale=scale,
+            coefficients=coefficients,
+            contract=contract,
+        )
+        expected = probabilities @ matrix
+        centered = matrix - expected
+        information += weights[choice.player_key] * (
+            centered.T @ (centered * probabilities[:, None])
+        )
+        chosen.append(float(probabilities[choice.chosen_index]))
+    return information, np.asarray(chosen, dtype=np.float64)
+
+
+def _player_mean(values: Sequence[tuple[str, float]]) -> dict[str, float]:
+    totals: Counter[str] = Counter()
+    counts: Counter[str] = Counter()
+    for player, value in values:
+        totals[player] += float(value)
+        counts[player] += 1
+    return {player: totals[player] / counts[player] for player in sorted(counts)}
+
+
+def _bootstrap_ratio_contrast(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    replicates: int,
+    seed: str,
+) -> dict[str, Any]:
+    by_player: dict[str, dict[str, float]] = {}
+    for row in rows:
+        player = str(row["player"])
+        value = by_player.setdefault(
+            player,
+            {
+                "parent_d": 0.0,
+                "events": 0.0,
+                "top_exposure": 0.0,
+                "top_events": 0.0,
+                "bottom_exposure": 0.0,
+                "bottom_events": 0.0,
+            },
+        )
+        value["parent_d"] += 1.0
+        value["events"] += float(row["event"])
+    for row in rows:
+        value = by_player[str(row["player"])]
+        weight = 1.0 / value["parent_d"]
+        if row["group"] == "top":
+            value["top_exposure"] += weight
+            value["top_events"] += weight * float(row["event"])
+        elif row["group"] == "bottom":
+            value["bottom_exposure"] += weight
+            value["bottom_events"] += weight * float(row["event"])
+    players = sorted(by_player)
+    if len(players) < 2:
+        raise EstimatorReadinessError("D-to-L player support is insufficient")
+
+    def statistic(sample: Sequence[str]) -> float:
+        top_exposure = sum(by_player[player]["top_exposure"] for player in sample)
+        bottom_exposure = sum(by_player[player]["bottom_exposure"] for player in sample)
+        if top_exposure <= 0 or bottom_exposure <= 0:
+            raise EstimatorReadinessError("D-to-L bootstrap risk group is empty")
+        top = sum(by_player[player]["top_events"] for player in sample) / top_exposure
+        bottom = (
+            sum(by_player[player]["bottom_events"] for player in sample)
+            / bottom_exposure
+        )
+        return top - bottom
+
+    point = statistic(players)
+    rng = np.random.default_rng(_seed_integer(seed))
+    distribution: list[float] = []
+    for _ in range(replicates):
+        sample = [
+            players[index] for index in rng.integers(0, len(players), len(players))
+        ]
+        distribution.append(statistic(sample))
+    lower = _percentile(distribution, 0.025)
+    upper = _percentile(distribution, 0.975)
+    event_players = sum(value["events"] > 0 for value in by_player.values())
+    top_players = sum(value["top_exposure"] > 0 for value in by_player.values())
+    bottom_players = sum(value["bottom_exposure"] > 0 for value in by_player.values())
+    return {
+        "players": len(players),
+        "events": int(sum(value["events"] for value in by_player.values())),
+        "event_players": event_players,
+        "zero_event_players": len(players) - event_players,
+        "zero_event_player_fraction": (len(players) - event_players) / len(players),
+        "top_players": top_players,
+        "bottom_players": bottom_players,
+        "top_decisions": sum(row["group"] == "top" for row in rows),
+        "bottom_decisions": sum(row["group"] == "bottom" for row in rows),
+        "parent_d_decisions": len(rows),
+        "point": point,
+        "interval": [lower, upper],
+        "conservative_half_width": max(point - lower, upper - point),
+        "replicates": replicates,
+        "seed": seed,
+        "zero_events_not_smoothed": True,
+    }
+
+
+def _project_interval(
+    *,
+    point: float,
+    conservative_half_width: float,
+    observed_players: int,
+    planning_n: float,
+) -> dict[str, float]:
+    if observed_players <= 0 or planning_n <= 0:
+        raise EstimatorReadinessError("precision projection support is invalid")
+    projected = conservative_half_width * math.sqrt(observed_players / planning_n)
+    return {
+        "planning_N": planning_n,
+        "point": point,
+        "conservative_projected_half_width": projected,
+        "projected_lower": point - projected,
+        "projected_upper": point + projected,
+    }
+
+
+def extract_exploration_observations(
+    *,
+    repository_root: str | Path,
+    boundary: F0D0Boundary,
+    official_membership: Mapping[str, Any],
+    research_split: Mapping[str, Any],
+    structure: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    database: MalomDB,
+) -> tuple[list[ChoiceObservation], dict[str, Any]]:
+    """Replay only the frozen sample and attach positional oracle labels."""
+    rows = structure["structure"]["sample_games"]
+    session_ids = [str(row["session_id"]) for row in rows]
+    access = EstimatorAccess.from_memberships(
+        official_membership,
+        research_split,
+        allowed_sessions=session_ids,
+    )
+    record_by_id = {record.session_id: record for record in boundary.records}
+    expansion = plan["exploration_expansion"]
+    hard = expansion["hard_budget"]
+    maximum_actions = int(
+        plan["numerical_contract"]["choice_construction"]["maximum_actions"]
+    )
+    observations: list[ChoiceObservation] = []
+    query_count = 0
+    expected_decisions = 0
+    covered = 0
+    abstained = 0
+    degenerate = 0
+    a_pos_modifiable = 0
+    abstention_reasons: Counter[str] = Counter()
+    started = time.perf_counter()
+    root = Path(repository_root)
+    for sample_row in rows:
+        session_id = str(sample_row["session_id"])
+        try:
+            record = record_by_id[session_id]
+        except KeyError as exc:
+            raise EstimatorReadinessError("sample session missing from F0-D0") from exc
+        decisions = access.load_decisions(root, record, boundary)
+        expected_decisions += record.move_count
+        if len(decisions) != record.move_count:
+            raise EstimatorReadinessError("sample replay decision count differs")
+        for decision_index, decision in enumerate(decisions):
+            elapsed = time.perf_counter() - started
+            if elapsed > float(hard["maximum_active_seconds"]):
+                raise EstimatorReadinessError("active-time budget exceeded")
+            try:
+                parent_tier, inventory, queries = _query_inventory(
+                    decision.board, database
+                )
+            except OracleCoverageAbstention as exc:
+                abstained += 1
+                query_count += exc.query_count
+                abstention_reasons[exc.reason] += 1
+                continue
+            query_count += queries
+            if query_count > int(hard["maximum_queries"]):
+                raise EstimatorReadinessError("Malom query budget exceeded")
+            moves = [move for move, _value in inventory]
+            feature_rows = [
+                extended_action_feature_scores(decision.board, move) for move in moves
+            ]
+            ordered_moves, features, chosen_index = canonicalize_choice_inventory(
+                moves,
+                feature_rows,
+                decision.move,
+                feature_names=V2_FEATURE_NAMES,
+                maximum_actions=maximum_actions,
+            )
+            outcome_by_key = {
+                _move_key(move): value.outcome for move, value in inventory
+            }
+            outcomes = tuple(outcome_by_key[_move_key(move)] for move in ordered_moves)
+            raw_phase = get_game_phase(decision.board, decision.board.turn)
+            if raw_phase not in PHASE_NAMES:
+                raise EstimatorReadinessError("exploration decision phase is invalid")
+            observation = ChoiceObservation(
+                player_key=decision.actor_player_key,
+                game_id=decision.game_id,
+                decision_index=decision_index,
+                fold=int(sample_row["fold"]),
+                features=features,
+                chosen_index=chosen_index,
+                parent_tier=parent_tier,
+                action_outcomes=outcomes,
+                phase=PHASE_NAMES[raw_phase],
+                color=decision.board.turn,
+            )
+            observations.append(observation)
+            covered += 1
+            degenerate += observation.is_degenerate
+            safe_count = sum(outcome == parent_tier for outcome in outcomes)
+            if safe_count <= 0:
+                raise EstimatorReadinessError("A_pos is empty")
+            a_pos_modifiable += safe_count > 1
+    elapsed = time.perf_counter() - started
+    if expected_decisions != int(structure["structure"]["sample_decisions"]):
+        raise EstimatorReadinessError("sample structural decision count differs")
+    if covered + abstained != expected_decisions:
+        raise EstimatorReadinessError("sample oracle accounting differs")
+    queries_per_decision = query_count / expected_decisions
+    queries_per_second = query_count / elapsed
+    deviation = expansion["deviation_stop"]
+    if not (
+        float(deviation["minimum_queries_per_decision"])
+        <= queries_per_decision
+        <= float(deviation["maximum_queries_per_decision"])
+    ):
+        raise EstimatorReadinessError("queries per decision deviated from contract")
+    if queries_per_second < float(deviation["minimum_queries_per_second"]):
+        raise EstimatorReadinessError("Malom throughput deviated from contract")
+    if access.denied:
+        raise EstimatorReadinessError("protected access attempt occurred")
+    return observations, {
+        "games": len(rows),
+        "expected_decisions": expected_decisions,
+        "covered_decisions": covered,
+        "abstained_decisions": abstained,
+        "degenerate_single_action_decisions": degenerate,
+        "independent_players": len({choice.player_key for choice in observations}),
+        "queries": query_count,
+        "elapsed_seconds": elapsed,
+        "queries_per_decision": queries_per_decision,
+        "queries_per_second": queries_per_second,
+        "coverage": covered / expected_decisions,
+        "abstention_fraction": abstained / expected_decisions,
+        "degenerate_fraction": degenerate / covered if covered else 1.0,
+        "a_pos_cardinality_greater_than_one_fraction": (
+            a_pos_modifiable / covered if covered else 0.0
+        ),
+        "abstention_reasons": dict(sorted(abstention_reasons.items())),
+        "access_audit": {
+            "successful": {
+                f"{partition}:{kind}": int(value)
+                for (partition, kind), value in sorted(access.successful.items())
+            },
+            "denied": {},
+            "research_confirmation_content_reads": 0,
+            "official_selection_content_reads": 0,
+            "official_confirmation_content_reads": 0,
+            "official_final_test_content_reads": 0,
+            "source_pool_2eb04f54_reads_or_consumption": 0,
+            "human_db_reads": 0,
+            "database_writes": 0,
+            "games_searches_strategy_models_or_training": 0,
+        },
+    }
+
+
+def run_crossfit_readiness(
+    *,
+    observations: Sequence[ChoiceObservation],
+    extraction: Mapping[str, Any],
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Fit both frozen specifications and project protected-arm precision."""
+    contract = NumericalContract.from_plan(plan)
+    usable = [choice for choice in observations if not choice.is_degenerate]
+    if not usable:
+        raise EstimatorReadinessError("no evaluable choices remain")
+    folds = int(plan["cross_fit_contract"]["folds"])
+    geometry_columns = tuple(range(3))
+    full_columns = tuple(range(10))
+    fold_reports: list[dict[str, Any]] = []
+    log_loss_rows: list[tuple[str, float]] = []
+    geometry_loss_rows: list[tuple[str, float]] = []
+    full_loss_rows: list[tuple[str, float]] = []
+    brier_rows: list[tuple[str, float]] = []
+    d_rows: list[dict[str, Any]] = []
+    phase_rows: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    color_rows: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    repeated_fit: dict[str, Any] = {}
+    for fold in range(folds):
+        training = [choice for choice in usable if choice.fold != fold]
+        held_out = [choice for choice in usable if choice.fold == fold]
+        training_players = {choice.player_key for choice in training}
+        held_out_players = {choice.player_key for choice in held_out}
+        if not training or not held_out or training_players & held_out_players:
+            raise EstimatorReadinessError("crossfit player isolation failed")
+        mean_full, scale_full = standardize_from_training_fold(
+            training, columns=full_columns
+        )
+        geometry_fit = fit_conditional_logit(
+            training,
+            columns=geometry_columns,
+            mean=mean_full[:3],
+            scale=scale_full[:3],
+            contract=contract,
+        )
+        full_fit = fit_conditional_logit(
+            training,
+            columns=full_columns,
+            mean=mean_full,
+            scale=scale_full,
+            contract=contract,
+        )
+        geometry_information, geometry_chosen = (
+            observed_information_and_chosen_probabilities(
+                training,
+                columns=geometry_columns,
+                mean=mean_full[:3],
+                scale=scale_full[:3],
+                coefficients=geometry_fit.coefficients,
+                contract=contract,
+            )
+        )
+        full_information, full_chosen = observed_information_and_chosen_probabilities(
+            training,
+            columns=full_columns,
+            mean=mean_full,
+            scale=scale_full,
+            coefficients=full_fit.coefficients,
+            contract=contract,
+        )
+        geometry_diagnostic = diagnose_separation(
+            coefficients=geometry_fit.coefficients,
+            information=geometry_information,
+            chosen_probabilities=geometry_chosen,
+            contract=contract,
+        )
+        full_diagnostic = diagnose_separation(
+            coefficients=full_fit.coefficients,
+            information=full_information,
+            chosen_probabilities=full_chosen,
+            contract=contract,
+        )
+        if fold == 0:
+            geometry_repeat = fit_conditional_logit(
+                training,
+                columns=geometry_columns,
+                mean=mean_full[:3],
+                scale=scale_full[:3],
+                contract=contract,
+            )
+            full_repeat = fit_conditional_logit(
+                training,
+                columns=full_columns,
+                mean=mean_full,
+                scale=scale_full,
+                contract=contract,
+            )
+            geometry_coefficient_delta = float(
+                np.max(np.abs(geometry_fit.coefficients - geometry_repeat.coefficients))
+            )
+            full_coefficient_delta = float(
+                np.max(np.abs(full_fit.coefficients - full_repeat.coefficients))
+            )
+            geometry_objective_delta = abs(
+                geometry_fit.objective - geometry_repeat.objective
+            )
+            full_objective_delta = abs(full_fit.objective - full_repeat.objective)
+            if (
+                geometry_coefficient_delta > 1e-10
+                or full_coefficient_delta > 1e-10
+                or geometry_objective_delta > 1e-12
+                or full_objective_delta > 1e-12
+            ):
+                raise EstimatorReadinessError("real-data fit repetition differs")
+            repeated_fit = {
+                "fold": 0,
+                "geometry_maximum_coefficient_difference": (geometry_coefficient_delta),
+                "full_maximum_coefficient_difference": full_coefficient_delta,
+                "geometry_objective_difference": geometry_objective_delta,
+                "full_objective_difference": full_objective_delta,
+                "passed": True,
+            }
+
+        training_d: list[tuple[ChoiceObservation, float]] = []
+        training_d_counts: Counter[str] = Counter(
+            choice.player_key for choice in training if choice.parent_tier == "D"
+        )
+        for choice in training:
+            if choice.parent_tier != "D":
+                continue
+            probabilities = _choice_probabilities(
+                choice,
+                columns=full_columns,
+                mean=mean_full,
+                scale=scale_full,
+                coefficients=full_fit.coefficients,
+                contract=contract,
+            )
+            risk = sum(
+                float(probability)
+                for probability, outcome in zip(
+                    probabilities, choice.action_outcomes, strict=True
+                )
+                if outcome == "L"
+            )
+            training_d.append((choice, risk))
+        if not training_d:
+            raise EstimatorReadinessError("fold has no training D-tier choices")
+        training_risks = np.asarray([row[1] for row in training_d])
+        training_weights = np.asarray(
+            [1.0 / training_d_counts[row[0].player_key] for row in training_d]
+        )
+        lower_boundary = _weighted_quantile(training_risks, training_weights, 0.2)
+        upper_boundary = _weighted_quantile(training_risks, training_weights, 0.8)
+        if lower_boundary >= upper_boundary:
+            raise EstimatorReadinessError("D-to-L risk quintile boundaries collapse")
+
+        for choice in held_out:
+            geometry_probabilities = _choice_probabilities(
+                choice,
+                columns=geometry_columns,
+                mean=mean_full[:3],
+                scale=scale_full[:3],
+                coefficients=geometry_fit.coefficients,
+                contract=contract,
+            )
+            full_probabilities = _choice_probabilities(
+                choice,
+                columns=full_columns,
+                mean=mean_full,
+                scale=scale_full,
+                coefficients=full_fit.coefficients,
+                contract=contract,
+            )
+            geometry_log_loss = -math.log(
+                float(geometry_probabilities[choice.chosen_index])
+            )
+            full_log_loss = -math.log(float(full_probabilities[choice.chosen_index]))
+            improvement = geometry_log_loss - full_log_loss
+            log_loss_rows.append((choice.player_key, improvement))
+            geometry_loss_rows.append((choice.player_key, geometry_log_loss))
+            full_loss_rows.append((choice.player_key, full_log_loss))
+            phase_rows[choice.phase].append((choice.player_key, improvement))
+            color_rows[choice.color].append((choice.player_key, improvement))
+            if choice.parent_tier != "D":
+                continue
+            geometry_risk = sum(
+                float(probability)
+                for probability, outcome in zip(
+                    geometry_probabilities, choice.action_outcomes, strict=True
+                )
+                if outcome == "L"
+            )
+            full_risk = sum(
+                float(probability)
+                for probability, outcome in zip(
+                    full_probabilities, choice.action_outcomes, strict=True
+                )
+                if outcome == "L"
+            )
+            event = int(choice.action_outcomes[choice.chosen_index] == "L")
+            brier_rows.append(
+                (
+                    choice.player_key,
+                    (geometry_risk - event) ** 2 - (full_risk - event) ** 2,
+                )
+            )
+            group = (
+                "bottom"
+                if full_risk <= lower_boundary
+                else "top"
+                if full_risk >= upper_boundary
+                else "middle"
+            )
+            d_rows.append(
+                {
+                    "player": choice.player_key,
+                    "fold": fold,
+                    "risk": full_risk,
+                    "event": event,
+                    "group": group,
+                }
+            )
+        fold_reports.append(
+            {
+                "fold": fold,
+                "training_players": len(training_players),
+                "training_decisions": len(training),
+                "held_out_players": len(held_out_players),
+                "held_out_decisions": len(held_out),
+                "feature_mean": mean_full.tolist(),
+                "feature_scale": scale_full.tolist(),
+                "geometry_fit": {
+                    "coefficients": geometry_fit.coefficients.tolist(),
+                    "objective": geometry_fit.objective,
+                    "gradient_infinity_norm": (geometry_fit.gradient_infinity_norm),
+                    "iterations": geometry_fit.iterations,
+                    "convergence_reason": geometry_fit.convergence_reason,
+                    "separation": geometry_diagnostic,
+                },
+                "full_fit": {
+                    "coefficients": full_fit.coefficients.tolist(),
+                    "objective": full_fit.objective,
+                    "gradient_infinity_norm": full_fit.gradient_infinity_norm,
+                    "iterations": full_fit.iterations,
+                    "convergence_reason": full_fit.convergence_reason,
+                    "separation": full_diagnostic,
+                },
+                "d_to_l_training_risk_boundaries": {
+                    "bottom_20_percent": lower_boundary,
+                    "top_20_percent": upper_boundary,
+                    "training_parent_d_decisions": len(training_d),
+                    "training_parent_d_players": len(training_d_counts),
+                },
+            }
+        )
+
+    player_log_loss = _player_mean(log_loss_rows)
+    geometry_player_loss = _player_mean(geometry_loss_rows)
+    full_player_loss = _player_mean(full_loss_rows)
+    if set(player_log_loss) != set(geometry_player_loss) or set(player_log_loss) != set(
+        full_player_loss
+    ):
+        raise EstimatorReadinessError("paired log-loss player support differs")
+    uncertainty = plan["uncertainty_contract"]
+    bootstrap_replicates = int(uncertainty["bootstrap_replicates"])
+    bootstrap_seed = str(uncertainty["bootstrap_seed"])
+    log_loss_bootstrap = player_cluster_bootstrap(
+        player_log_loss,
+        replicates=bootstrap_replicates,
+        seed=f"{bootstrap_seed}:paired-log-loss",
+        statistic="mean_and_sd",
+    )
+    brier_player = _player_mean(brier_rows)
+    brier_bootstrap = player_cluster_bootstrap(
+        brier_player,
+        replicates=bootstrap_replicates,
+        seed=f"{bootstrap_seed}:brier",
+        statistic="mean_and_sd",
+    )
+    d_contrast = _bootstrap_ratio_contrast(
+        d_rows,
+        replicates=bootstrap_replicates,
+        seed=f"{bootstrap_seed}:d-to-l-contrast",
+    )
+
+    power = plan["power_contract"]
+    z_sum = float(power["z_0_975"]) + float(power["z_0_80"])
+    optimistic_n = float(power["optimistic_confirmation_N"])
+    kish_n = float(power["conservative_kish_proxy_N"])
+    optimistic_coefficient = z_sum / math.sqrt(optimistic_n)
+    kish_coefficient = z_sum / math.sqrt(kish_n)
+    sd_upper = float(log_loss_bootstrap["sd_interval"][1])
+    effect = float(power["minimum_true_log_loss_improvement_nats"])
+    optimistic_sd_ceiling = effect / optimistic_coefficient
+    kish_sd_ceiling = effect / kish_coefficient
+    log_loss_power = {
+        "z_sum": z_sum,
+        "optimistic": {
+            "planning_N": optimistic_n,
+            "coefficient": optimistic_coefficient,
+            "maximum_SD_for_0_01_effect": optimistic_sd_ceiling,
+            "minimum_detectable_effect_at_SD_upper": optimistic_coefficient * sd_upper,
+            "passes": sd_upper <= optimistic_sd_ceiling,
+        },
+        "kish_sensitivity": {
+            "planning_N": kish_n,
+            "coefficient": kish_coefficient,
+            "maximum_SD_for_0_01_effect": kish_sd_ceiling,
+            "minimum_detectable_effect_at_SD_upper": kish_coefficient * sd_upper,
+            "passes": sd_upper <= kish_sd_ceiling,
+        },
+        "required_players_at_SD_upper": math.ceil((z_sum * sd_upper / effect) ** 2),
+        "binding_basis": power["binding_readiness_basis"],
+    }
+
+    d_optimistic = _project_interval(
+        point=float(d_contrast["point"]),
+        conservative_half_width=float(d_contrast["conservative_half_width"]),
+        observed_players=int(d_contrast["players"]),
+        planning_n=optimistic_n,
+    )
+    d_kish = _project_interval(
+        point=float(d_contrast["point"]),
+        conservative_half_width=float(d_contrast["conservative_half_width"]),
+        observed_players=int(d_contrast["players"]),
+        planning_n=kish_n,
+    )
+    d_floor = float(
+        plan["d_to_l_contract"].get(
+            "minimum_top_vs_bottom_risk_quintile_D_to_L_difference", 0.02
+        )
+    )
+    d_optimistic["minimum_required_lower"] = d_floor
+    d_optimistic["passes"] = d_optimistic["projected_lower"] >= d_floor
+    d_kish["minimum_required_lower"] = d_floor
+    d_kish["passes"] = d_kish["projected_lower"] >= d_floor
+
+    brier_half_width = max(
+        brier_bootstrap["point_mean"] - brier_bootstrap["mean_interval"][0],
+        brier_bootstrap["mean_interval"][1] - brier_bootstrap["point_mean"],
+    )
+    brier_optimistic = _project_interval(
+        point=float(brier_bootstrap["point_mean"]),
+        conservative_half_width=float(brier_half_width),
+        observed_players=int(brier_bootstrap["players"]),
+        planning_n=optimistic_n,
+    )
+    brier_kish = _project_interval(
+        point=float(brier_bootstrap["point_mean"]),
+        conservative_half_width=float(brier_half_width),
+        observed_players=int(brier_bootstrap["players"]),
+        planning_n=kish_n,
+    )
+    brier_optimistic["passes"] = brier_optimistic["projected_lower"] > 0
+    brier_kish["passes"] = brier_kish["projected_lower"] > 0
+
+    support = plan["d_to_l_contract"]
+    implementation_failures: list[str] = []
+    corpus_failures: list[str] = []
+    evaluable_players = len(player_log_loss)
+    if evaluable_players < int(
+        plan["exploration_expansion"]["minimum_evaluable_players_for_readiness"]
+    ):
+        implementation_failures.append("out_of_fold_evaluable_players")
+    if float(extraction["coverage"]) < 0.99:
+        implementation_failures.append("oracle_coverage")
+    if float(extraction["abstention_fraction"]) > 0.01:
+        implementation_failures.append("oracle_abstention")
+    if float(extraction["degenerate_fraction"]) > 0.01:
+        implementation_failures.append("degenerate_choice_share")
+    if not log_loss_power["optimistic"]["passes"]:
+        corpus_failures.append("paired_log_loss_player_SD")
+    if d_contrast["events"] < int(support["minimum_events"]):
+        corpus_failures.append("D_to_L_events")
+    if d_contrast["event_players"] < int(support["minimum_event_players"]):
+        corpus_failures.append("D_to_L_event_players")
+    if d_contrast["top_players"] < 50 or d_contrast["bottom_players"] < 50:
+        corpus_failures.append("D_to_L_risk_group_players")
+    if not d_optimistic["passes"]:
+        corpus_failures.append("D_to_L_projected_lower_bound")
+    if not brier_optimistic["passes"]:
+        corpus_failures.append("D_to_L_Brier_projected_lower_bound")
+    decision = (
+        "A_technical_ready_for_one_time_research_confirmation"
+        if not implementation_failures and not corpus_failures
+        else "B_not_ready_fail_closed"
+    )
+
+    phase = {
+        name: {
+            "players": len(_player_mean(rows)),
+            "mean_geometry_minus_full_log_loss": (
+                sum(_player_mean(rows).values()) / len(_player_mean(rows))
+                if rows
+                else None
+            ),
+        }
+        for name, rows in sorted(phase_rows.items())
+    }
+    color = {
+        name: {
+            "players": len(_player_mean(rows)),
+            "mean_geometry_minus_full_log_loss": (
+                sum(_player_mean(rows).values()) / len(_player_mean(rows))
+                if rows
+                else None
+            ),
+        }
+        for name, rows in sorted(color_rows.items())
+    }
+    required_d_players: int | None = None
+    d_margin = float(d_contrast["point"]) - d_floor
+    if d_margin > 0:
+        required_d_players = math.ceil(
+            d_contrast["players"]
+            * (float(d_contrast["conservative_half_width"]) / d_margin) ** 2
+        )
+    return {
+        "folds": fold_reports,
+        "determinism": repeated_fit,
+        "paired_log_loss": {
+            "geometry_average_unique_player": sum(geometry_player_loss.values())
+            / len(geometry_player_loss),
+            "full_average_unique_player": sum(full_player_loss.values())
+            / len(full_player_loss),
+            "geometry_minus_full": log_loss_bootstrap,
+            "power": log_loss_power,
+        },
+        "D_to_L": {
+            "criterion_source": plan["d_to_l_contract"]["frozen_source_text"],
+            "handoff_half_width_description_used": False,
+            "contrast": d_contrast,
+            "contrast_projection": {
+                "optimistic": d_optimistic,
+                "kish_sensitivity": d_kish,
+                "conclusion_flips": d_optimistic["passes"] != d_kish["passes"],
+                "minimum_players_at_observed_point_and_width": required_d_players,
+                "minimum_effect_at_487": d_floor
+                + d_optimistic["conservative_projected_half_width"],
+            },
+            "Brier_geometry_minus_full": brier_bootstrap,
+            "Brier_projection": {
+                "optimistic": brier_optimistic,
+                "kish_sensitivity": brier_kish,
+                "conclusion_flips": (
+                    brier_optimistic["passes"] != brier_kish["passes"]
+                ),
+            },
+        },
+        "descriptive_stability": {"phase": phase, "color": color},
+        "readiness": {
+            "decision": decision,
+            "implementation_or_design_failures": implementation_failures,
+            "current_corpus_intrinsic_failures": corpus_failures,
+            "research_confirmation_opened": False,
+            "claim_or_later_gate_authority": False,
+        },
+    }
+
+
 def _structural_decisions(
     games: Sequence[tuple[str, str, str, int]],
 ) -> Counter[str]:
@@ -971,6 +1774,37 @@ class EstimatorAccess:
     successful: Counter[tuple[str, str]] = field(default_factory=Counter)
     denied: Counter[tuple[str, str]] = field(default_factory=Counter)
 
+    @classmethod
+    def from_memberships(
+        cls,
+        official_membership: Mapping[str, Any],
+        research_split: Mapping[str, Any],
+        *,
+        allowed_sessions: Sequence[str],
+    ) -> "EstimatorAccess":
+        official: dict[str, str] = {}
+        for name, row in official_membership["partitions"].items():
+            for session in row["session_ids"]:
+                if session in official:
+                    raise EstimatorReadinessError("official membership overlaps")
+                official[str(session)] = str(name)
+        research: dict[str, str] = {}
+        for name, row in research_split["partitions"].items():
+            for session in row["session_ids"]:
+                if session in research:
+                    raise EstimatorReadinessError("research membership overlaps")
+                research[str(session)] = str(name)
+        allow = frozenset(str(session) for session in allowed_sessions)
+        if len(allow) != len(allowed_sessions) or not allow:
+            raise EstimatorReadinessError("estimator allowlist is empty or duplicated")
+        if any(
+            official.get(session) != "train"
+            or research.get(session) != "research-exploration"
+            for session in allow
+        ):
+            raise EstimatorReadinessError("estimator allowlist crosses protection")
+        return cls(official, research, allow)
+
     def assert_allowed(self, session_id: str, *, access_kind: str) -> None:
         official = self.official_partition_by_session.get(session_id, "outside")
         research = self.research_partition_by_session.get(session_id, "outside")
@@ -996,6 +1830,25 @@ class EstimatorAccess:
         value = producer()
         self.successful[("research-exploration", access_kind)] += 1
         return value
+
+    def load_decisions(
+        self,
+        repository_root: Path,
+        record: CorpusRecord,
+        boundary: F0D0Boundary,
+    ) -> list[Any]:
+        def producer() -> list[Any]:
+            try:
+                raw = _read_raw_game(repository_root, record, boundary)
+                return replay_game(raw, record)
+            except F0H0Error as exc:
+                raise EstimatorReadinessError(str(exc)) from exc
+
+        return self.derive(
+            record.session_id,
+            access_kind="raw_replay_and_decisions",
+            producer=producer,
+        )
 
 
 __all__ = [
