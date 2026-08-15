@@ -231,8 +231,8 @@ def _verify_dataset_production_ready(
     meta = np.load(meta_path, allow_pickle=True)
     if "provenance" not in meta.files:
         if allow_non_production:
-            print(f"[gap_net_v3] WARNING: dataset has no provenance; "
-                  f"proceeding under --allow-non-production-dataset")
+            print("[gap_net_v3] WARNING: dataset has no provenance; "
+                  "proceeding under --allow-non-production-dataset")
             return {
                 "dataset_production_ready":  False,
                 "dataset_non_ready_reasons": ["no_dataset_provenance"],
@@ -267,9 +267,9 @@ def _verify_dataset_production_ready(
 
     if production_ready is False:
         if allow_non_production:
-            print(f"[gap_net_v3] WARNING: training on non-production dataset")
+            print("[gap_net_v3] WARNING: training on non-production dataset")
             print(f"[gap_net_v3]   non_ready_reasons: {reasons}")
-            print(f"[gap_net_v3]   this run is NOT eligible for promotion evidence.")
+            print("[gap_net_v3]   this run is NOT eligible for promotion evidence.")
             return {
                 "dataset_production_ready":  False,
                 "dataset_non_ready_reasons": reasons,
@@ -369,7 +369,137 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-# ── Saved-provenance builder (Codex 2026-08-15 2nd pass P1 + P2) ─────────────
+# ── Stage E threshold registry (Codex 2026-08-15 3rd pass P1) ────────────────
+
+_STAGE_E_THRESHOLDS_REGISTRY = (
+    _ROOT / "configs" / "stage_e_thresholds.json"
+)
+
+
+def _validate_threshold_ranges(entry_or_args: dict) -> None:
+    """Codex 2026-08-15 (3rd pass) P1: hard range checks on the four gate
+    threshold values.  A deterministic probe at the previous commit showed
+    a 2x-worse candidate PASSing Gate 1 with x_a=-2.0 (threshold 3.0).
+    Applied to both frozen-registry entries AND runtime CLI values.
+
+    Ranges:
+      x_a in [0.0, 1.0]  — fractional improvement over uniform required.
+      x_b in [0.0, 1.0]  — fractional MSE degradation vs teacher tolerated.
+      min_high_support > 0 integer — cells with fewer high-support rows SKIP.
+      min_denominator > 0 finite float — smaller denominators SKIP.
+    """
+    def _err(msg: str) -> None:
+        raise SystemExit(f"[gap_net_v3] Stage E threshold out of range: {msg}")
+
+    xa = entry_or_args.get("x_a") if isinstance(entry_or_args, dict) else getattr(entry_or_args, "stage_e_x_a", None)
+    xb = entry_or_args.get("x_b") if isinstance(entry_or_args, dict) else getattr(entry_or_args, "stage_e_x_b", None)
+    mhs = (entry_or_args.get("min_high_support") if isinstance(entry_or_args, dict)
+           else getattr(entry_or_args, "stage_e_min_high_support", None))
+    mden = (entry_or_args.get("min_denominator") if isinstance(entry_or_args, dict)
+            else getattr(entry_or_args, "stage_e_min_denominator", None))
+
+    for name, val in (("x_a", xa), ("x_b", xb), ("min_denominator", mden)):
+        if val is None:
+            _err(f"{name} missing")
+        if not isinstance(val, (int, float)) or isinstance(val, bool):
+            _err(f"{name}={val!r} must be a real number")
+        f = float(val)
+        if not (f == f) or f in (float("inf"), float("-inf")):   # NaN / inf
+            _err(f"{name}={val!r} is not finite")
+    if not (0.0 <= float(xa) <= 1.0):
+        _err(f"x_a={xa!r} outside allowed range [0.0, 1.0]")
+    if not (0.0 <= float(xb) <= 1.0):
+        _err(f"x_b={xb!r} outside allowed range [0.0, 1.0]")
+    if not isinstance(mhs, int) or isinstance(mhs, bool) or mhs <= 0:
+        _err(f"min_high_support={mhs!r} must be positive integer")
+    if float(mden) <= 0.0:
+        _err(f"min_denominator={mden!r} must be > 0")
+
+
+def _load_frozen_thresholds(
+    threshold_id: str,
+    registry_path: Path = _STAGE_E_THRESHOLDS_REGISTRY,
+) -> tuple[dict, str]:
+    """Load a specific entry from the tracked threshold registry.
+
+    Codex 2026-08-15 (3rd pass) P1: previously `--gate-thresholds-frozen-id`
+    was an unverified self-assertion.  Now it must resolve to a registry
+    entry with `frozen=true`; the entry's values are what the trainer must
+    match against its CLI args.
+
+    Returns (entry_dict, canonical_sha256).  Raises SystemExit on:
+      - registry file missing / not JSON / wrong shape
+      - id unknown
+      - entry not frozen (draft)
+      - entry values out of allowed ranges
+    """
+    if not registry_path.exists():
+        raise SystemExit(
+            f"[gap_net_v3] Stage E threshold registry not found: {registry_path}"
+        )
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise SystemExit(
+            f"[gap_net_v3] Stage E threshold registry unreadable: {e!s}"
+        )
+    entries = registry.get("entries")
+    if not isinstance(entries, list):
+        raise SystemExit(
+            "[gap_net_v3] Stage E threshold registry malformed: "
+            "missing 'entries' list"
+        )
+    matches = [e for e in entries if isinstance(e, dict)
+               and e.get("id") == threshold_id]
+    if not matches:
+        known = sorted(e.get("id", "?") for e in entries if isinstance(e, dict))
+        raise SystemExit(
+            f"[gap_net_v3] Stage E threshold id {threshold_id!r} is not in "
+            f"the registry.  Known ids: {known}"
+        )
+    if len(matches) > 1:
+        raise SystemExit(
+            f"[gap_net_v3] Stage E threshold id {threshold_id!r} appears "
+            f"more than once in the registry"
+        )
+    entry = matches[0]
+    if entry.get("frozen") is not True:
+        raise SystemExit(
+            f"[gap_net_v3] Stage E threshold id {threshold_id!r} is not "
+            f"frozen (draft).  Only frozen entries grant Stage F eligibility."
+        )
+
+    _validate_threshold_ranges(entry)
+
+    canonical_bytes = json.dumps(
+        {k: entry[k] for k in sorted(entry)}, sort_keys=True,
+    ).encode("utf-8")
+    canonical_sha256 = hashlib.sha256(canonical_bytes).hexdigest()
+    return entry, canonical_sha256
+
+
+def _cli_matches_frozen_entry(args, entry: dict) -> Optional[str]:
+    """Return None if CLI --stage-e-x-a/x-b/min-high-support/min-denominator
+    match the frozen entry EXACTLY, else a mismatch description string.
+
+    Exact equality is deliberate: a run using different values than the
+    frozen set is not the run authority granted."""
+    mismatches: list[str] = []
+    checks = (
+        ("x_a",              args.stage_e_x_a,             entry.get("x_a")),
+        ("x_b",              args.stage_e_x_b,             entry.get("x_b")),
+        ("min_high_support", args.stage_e_min_high_support, entry.get("min_high_support")),
+        ("min_denominator",  args.stage_e_min_denominator, entry.get("min_denominator")),
+    )
+    for name, cli_val, entry_val in checks:
+        if cli_val != entry_val:
+            mismatches.append(f"{name}: CLI={cli_val!r} vs frozen={entry_val!r}")
+    if mismatches:
+        return "; ".join(mismatches)
+    return None
+
+
+# ── Saved-provenance builder (Codex 2026-08-15 2nd pass P1 + P2, 3rd pass P1) ─
 
 def _build_saved_provenance(
     *,
@@ -377,7 +507,8 @@ def _build_saved_provenance(
     dataset_dir: Path,
     gate_results: list,
     gate_summary: dict,
-    gate_thresholds_frozen_id: Optional[str],
+    frozen_thresholds_entry: Optional[dict],
+    frozen_thresholds_sha256: Optional[str],
     args,
     n_train: int,
     n_val: int,
@@ -387,28 +518,38 @@ def _build_saved_provenance(
 ) -> tuple[dict, str]:
     """Single seam that constructs the provenance dict AND the model label.
 
-    Codex 2026-08-15 (2nd pass) P1: prior main() derived model label +
-    promotion_eligible from dataset readiness ALONE.  A clean-dataset run
-    whose Stage E gate failed or all-SKIP'd was still labelled
-    `gap_net_v3_candidate` with `promotion_eligible=True`.
+    Codex 2026-08-15 (3rd pass) P1 + P2: prior versions labelled a Stage E
+    PASS as promotion-eligible.  Under docs/gap_net_v3_plan.md §13/§16,
+    Stage E only creates the CANDIDATE.  Full promotion requires an
+    identity-bound Stage F artifact + every remaining plan gate + a
+    separate live-promotion decision — none of which this trainer runs.
 
     New rule (fail-closed):
-        promotion_eligible = (dataset_eligibility)
-                             AND (stage_e_gate_verdict == "PASS")
-                             AND (gate_thresholds_frozen_id is a non-empty
-                                  string identifying which owner-reviewed
-                                  threshold set was used)
+        stage_e_passed   = gate_summary["overall_verdict"] == "PASS"
+        stage_f_eligible = dataset_eligibility
+                           AND stage_e_passed
+                           AND frozen_thresholds_entry present
+                               (owner-reviewed registry hit with frozen=true)
+        promotion_eligible = False  — always.  Only Stage F artifact +
+                                       subsequent gates + live-promotion
+                                       tooling can flip this.
 
     where:
-        dataset_eligibility = dataset_production_ready AND NOT
-                              non_production_override
+        dataset_eligibility = dataset_production_ready AND NOT non_production_override
 
     Model label:
-        promotion_eligible True  → "gap_net_v3_candidate"
-        promotion_eligible False → "gap_net_v3_candidate_nonpromotion"
+        stage_f_eligible True  → "gap_net_v3_stage_e_candidate"
+                                 (candidate is eligible to enter Stage F)
+        stage_f_eligible False → "gap_net_v3_stage_e_candidate_ineligible"
+        In no path does this trainer emit the historical plain
+        "gap_net_v3_candidate" label — that name is reserved for the
+        Stage F artifact.
 
-    `promotion_ineligible_reasons` (list[str]) enumerates why the run is
-    non-promotable — always empty iff promotion_eligible is True.
+    `stage_f_ineligible_reasons` (list[str]) enumerates why the run is not
+    Stage F eligible — always empty iff stage_f_eligible is True.
+    `promotion_ineligible_reasons` always includes at least
+    `"stage_f_artifact_not_produced_by_this_tool"` since only Stage F
+    tooling can flip promotion_eligible.
 
     Codex 2026-08-15 P2: this is the SINGLE construction point for the
     saved provenance and model label.  main() is a thin wrapper and must
@@ -426,32 +567,43 @@ def _build_saved_provenance(
         gate_verdict = "MISSING"
     stage_e_passed = gate_verdict == "PASS"
 
-    # Thresholds-frozen side
-    frozen_id = (gate_thresholds_frozen_id or "").strip()
-    gate_thresholds_frozen = bool(frozen_id)
+    # Thresholds-frozen side — must be a real registry hit, not a self-assertion.
+    gate_thresholds_frozen = frozen_thresholds_entry is not None
+    frozen_id = (frozen_thresholds_entry or {}).get("id")
 
-    # Promotion verdict + reasons
-    promotion_ineligible_reasons: list[str] = []
+    # Stage F eligibility (this trainer can compute this):
+    stage_f_ineligible_reasons: list[str] = []
     if not dataset_ready:
-        promotion_ineligible_reasons.append(
+        stage_f_ineligible_reasons.append(
             f"dataset_not_production_ready:{dataset_taint['dataset_non_ready_reasons']!r}"
         )
     if override:
-        promotion_ineligible_reasons.append("non_production_override_set")
+        stage_f_ineligible_reasons.append("non_production_override_set")
     if not stage_e_passed:
-        promotion_ineligible_reasons.append(
+        stage_f_ineligible_reasons.append(
             f"stage_e_gate_verdict={gate_verdict!r} (must be 'PASS')"
         )
     if not gate_thresholds_frozen:
-        promotion_ineligible_reasons.append(
-            "gate_thresholds_frozen_id missing "
-            "(no owner-reviewed threshold identifier — see checklist §Batch 5)"
+        stage_f_ineligible_reasons.append(
+            "no_frozen_stage_e_thresholds "
+            "(--gate-thresholds-frozen-id must resolve to a registry entry "
+            "with frozen=true whose values equal the run's CLI values; "
+            "see configs/stage_e_thresholds.json and checklist §Batch 5)"
         )
-    promotion_eligible = not promotion_ineligible_reasons
+    stage_f_eligible = not stage_f_ineligible_reasons
 
-    model_label = ("gap_net_v3_candidate"
-                   if promotion_eligible
-                   else "gap_net_v3_candidate_nonpromotion")
+    # Promotion eligibility (always False in this trainer — Codex 3rd pass P1)
+    promotion_eligible = False
+    promotion_ineligible_reasons = list(stage_f_ineligible_reasons) + [
+        "stage_f_artifact_not_produced_by_this_tool "
+        "(Stage E trainer creates a candidate only; promotion requires "
+        "the Stage F single-use artifact + all remaining plan gates + "
+        "live-promotion authority — see docs/gap_net_v3_plan.md §13/§16)"
+    ]
+
+    model_label = ("gap_net_v3_stage_e_candidate"
+                   if stage_f_eligible
+                   else "gap_net_v3_stage_e_candidate_ineligible")
 
     provenance = {
         "model":                     model_label,
@@ -465,16 +617,24 @@ def _build_saved_provenance(
         "dataset_uniform_sha256":    _sha256(dataset_dir / "targets_uniform.f32.bin"),
         "dataset_emp_sha256":        _sha256(dataset_dir / "targets_empirical.f32.bin"),
         "dataset_metadata_sha256":   _sha256(dataset_dir / "metadata.npz"),
-        # Codex 2026-08-15 P1 (2nd pass): explicit taint + promotion fields.
+        # Codex 2026-08-15 P1 (2nd pass): dataset taint + Stage E gate.
         "dataset_production_ready":  dataset_taint["dataset_production_ready"],
         "dataset_non_ready_reasons": dataset_taint["dataset_non_ready_reasons"],
         "non_production_override":   dataset_taint["non_production_override"],
         "dataset_eligibility":       dataset_eligibility,
         "stage_e_gate_verdict":      gate_verdict,
+        "stage_e_passed":            stage_e_passed,
+        # Codex 2026-08-15 P1 (3rd pass): identity-bound frozen thresholds.
         "gate_thresholds_frozen":    gate_thresholds_frozen,
-        "gate_thresholds_frozen_id": frozen_id if gate_thresholds_frozen else None,
-        "promotion_eligible":        promotion_eligible,
-        "promotion_ineligible_reasons": promotion_ineligible_reasons,
+        "gate_thresholds_frozen_id": frozen_id,
+        "gate_thresholds_frozen_sha256": frozen_thresholds_sha256,
+        "gate_thresholds_frozen_entry":  frozen_thresholds_entry,
+        # Codex 2026-08-15 P1 (3rd pass): Stage F eligibility + separate
+        # promotion (always False from this tool).
+        "stage_f_eligible":              stage_f_eligible,
+        "stage_f_ineligible_reasons":    stage_f_ineligible_reasons,
+        "promotion_eligible":            promotion_eligible,
+        "promotion_ineligible_reasons":  promotion_ineligible_reasons,
         "n_train":                   n_train,
         "n_val":                     n_val,
         "best_val_loss":             best_val_loss,
@@ -797,7 +957,11 @@ def _combine_gate_verdicts(g1: str, g2: str) -> str:
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset-dir", default=str(_ROOT / "data" / "gap_net_v3_dataset_v2"))
-    p.add_argument("--out", default=str(_ROOT / "data" / "gap_net_v3_candidate.npz"))
+    # Default output name uses the Stage-E scope (Codex 2026-08-15 3rd pass P1):
+    # the plain "gap_net_v3_candidate.npz" name is reserved for the Stage F
+    # artifact — this trainer only produces the Stage E candidate.
+    p.add_argument("--out",
+                   default=str(_ROOT / "data" / "gap_net_v3_stage_e_candidate.npz"))
     p.add_argument("--epochs",       type=int,   default=80)
     p.add_argument("--lr",           type=float, default=3e-4)
     p.add_argument("--batch-size",   type=int,   default=4096)
@@ -825,16 +989,19 @@ def main() -> None:
                         "sub-floor, or hardening-bypassed extractions).  Pass this "
                         "flag to override — the run will NOT be eligible for "
                         "promotion evidence.")
-    # Codex 2026-08-15 (2nd pass) P1: promotion also requires an owner-reviewed
-    # frozen threshold identifier.  Default None → never promotable (a run
-    # with drafts thresholds cannot claim promotion authority).  Format is
-    # freeform but MUST identify what was frozen (e.g. plan-doc git sha, or
-    # a versioned tag like "gate_thresholds_v1_2026-08-15").
+    # Codex 2026-08-15 (3rd pass) P1: --gate-thresholds-frozen-id must resolve
+    # to a real entry in configs/stage_e_thresholds.json with frozen=true, AND
+    # the runtime CLI values for x_a/x_b/min-support/min-denominator must EQUAL
+    # that entry's values.  Anything else raises SystemExit.  Absent/empty →
+    # Stage F ineligible (draft thresholds carry no authority).
     p.add_argument("--gate-thresholds-frozen-id", default=None,
-                   help="Identifier for the owner-reviewed frozen Stage E "
-                        "threshold set (e.g. plan-doc git sha).  Required for "
-                        "promotion_eligible=True.  Absent/empty → not "
-                        "promotable regardless of dataset/gate state.")
+                   help="Registry id (from configs/stage_e_thresholds.json) "
+                        "of the owner-reviewed frozen Stage E threshold set.  "
+                        "Required for stage_f_eligible=True.  Trainer rejects "
+                        "unknown ids, draft (frozen=false) entries, and CLI "
+                        "values that do not match the entry exactly.  "
+                        "promotion_eligible is ALWAYS False from this trainer — "
+                        "only Stage F tooling produces a promotable artifact.")
     args = p.parse_args()
 
     torch.manual_seed(args.seed)
@@ -850,6 +1017,32 @@ def main() -> None:
     dataset_taint = _verify_dataset_production_ready(
         dataset_dir, allow_non_production=args.allow_non_production_dataset,
     )
+
+    # Codex 2026-08-15 (3rd pass) P1: range-validate CLI thresholds regardless
+    # of registry state — negative x_a / non-finite / degenerate values must
+    # not silently reach the gate math where they would flip legitimate FAILs
+    # to PASS.
+    _validate_threshold_ranges(args)
+
+    # Codex 2026-08-15 (3rd pass) P1: resolve --gate-thresholds-frozen-id to a
+    # registry entry with frozen=true whose values equal the CLI values EXACTLY.
+    # Anything less is a self-assertion — no promotion authority.
+    frozen_entry: Optional[dict] = None
+    frozen_sha256: Optional[str] = None
+    if args.gate_thresholds_frozen_id:
+        frozen_entry, frozen_sha256 = _load_frozen_thresholds(
+            args.gate_thresholds_frozen_id,
+        )
+        mismatch = _cli_matches_frozen_entry(args, frozen_entry)
+        if mismatch is not None:
+            raise SystemExit(
+                f"[gap_net_v3] --gate-thresholds-frozen-id "
+                f"{args.gate_thresholds_frozen_id!r} does not match runtime "
+                f"CLI values: {mismatch}.  Either use the frozen values or "
+                f"omit the id (which forfeits Stage F eligibility)."
+            )
+        print(f"[gap_net_v3] Frozen Stage E thresholds loaded: id="
+              f"{args.gate_thresholds_frozen_id!r}  sha256={frozen_sha256[:16]}…")
 
     # ── Load train / val ─────────────────────────────────────────────────────
     print("[gap_net_v3] Loading train split …")
@@ -1001,7 +1194,8 @@ def main() -> None:
         dataset_dir=dataset_dir,
         gate_results=gate_results,
         gate_summary=gate_summary,
-        gate_thresholds_frozen_id=args.gate_thresholds_frozen_id,
+        frozen_thresholds_entry=frozen_entry,
+        frozen_thresholds_sha256=frozen_sha256,
         args=args,
         n_train=len(tr["board"]),
         n_val=len(va["board"]),
@@ -1009,11 +1203,14 @@ def main() -> None:
         epochs_trained=epoch,
         tr_means=tr_means_list,
     )
-    print(f"[gap_net_v3] Model label: {model_label}  "
-          f"(promotion_eligible={provenance['promotion_eligible']})")
-    if not provenance["promotion_eligible"]:
-        print(f"[gap_net_v3]   promotion_ineligible_reasons:")
-        for r in provenance["promotion_ineligible_reasons"]:
+    print(f"[gap_net_v3] Model label: {model_label}")
+    print(f"[gap_net_v3]   stage_e_passed:    {provenance['stage_e_passed']}")
+    print(f"[gap_net_v3]   stage_f_eligible:  {provenance['stage_f_eligible']}")
+    print(f"[gap_net_v3]   promotion_eligible:{provenance['promotion_eligible']} "
+          "(always False from Stage E trainer)")
+    if not provenance["stage_f_eligible"]:
+        print("[gap_net_v3]   stage_f_ineligible_reasons:")
+        for r in provenance["stage_f_ineligible_reasons"]:
             print(f"[gap_net_v3]     - {r}")
 
     model_cpu = model.cpu()

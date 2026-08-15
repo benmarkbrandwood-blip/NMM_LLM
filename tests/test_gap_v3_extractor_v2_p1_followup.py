@@ -770,162 +770,415 @@ def _gate_summary(overall: str) -> dict:
     }
 
 
-def test_builder_promotion_eligible_only_when_all_three_conditions_met(
+def _frozen_entry(**overrides) -> dict:
+    """Test double for a frozen registry entry that matches the default
+    _StubArgs threshold defaults."""
+    base = {
+        "id":               "stage_e_thresholds_test_frozen",
+        "x_a":              0.30,
+        "x_b":              0.20,
+        "min_high_support": 100,
+        "min_denominator":  1e-9,
+        "frozen":           True,
+        "authored":         "2026-08-15",
+        "notes":            "test-only",
+    }
+    base.update(overrides)
+    return base
+
+
+class _StubArgsThresh(_StubArgs):
+    """StubArgs including the four gate thresholds used by the builder
+    range validator and CLI-match check."""
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.stage_e_x_a             = kw.get("stage_e_x_a", 0.30)
+        self.stage_e_x_b             = kw.get("stage_e_x_b", 0.20)
+        self.stage_e_min_high_support = kw.get("stage_e_min_high_support", 100)
+        self.stage_e_min_denominator = kw.get("stage_e_min_denominator", 1e-9)
+
+
+# ── Codex 2026-08-15 (3rd pass) P1: promotion is ALWAYS False; only
+#    stage_f_eligible reflects Stage E outcome + frozen thresholds. ─────────
+
+def test_builder_stage_f_eligible_only_when_all_three_conditions_met(
     trainer, tmp_path,
 ):
-    """Codex 2026-08-15 (2nd pass) P1: promotion_eligible requires
-    dataset_eligibility AND stage_e_gate == PASS AND frozen thresholds id."""
+    """Codex 2026-08-15 (3rd pass) P1: stage_f_eligible requires
+    dataset_eligibility AND stage_e_passed AND a real frozen registry entry.
+    promotion_eligible is ALWAYS False from this trainer."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, label = trainer._build_saved_provenance(
         dataset_taint=_clean_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("PASS"),
-        gate_thresholds_frozen_id="stage_e_thresholds_v1_2026-08-15",
-        args=_StubArgs(),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="a" * 64,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
-    assert prov["promotion_eligible"] is True
-    assert prov["promotion_ineligible_reasons"] == []
+    assert prov["stage_e_passed"] is True
+    assert prov["stage_f_eligible"] is True
+    assert prov["stage_f_ineligible_reasons"] == []
+    # Promotion is ALWAYS False from Stage E trainer.
+    assert prov["promotion_eligible"] is False
+    assert any("stage_f_artifact_not_produced_by_this_tool" in r
+               for r in prov["promotion_ineligible_reasons"])
     assert prov["dataset_eligibility"] is True
     assert prov["stage_e_gate_verdict"] == "PASS"
     assert prov["gate_thresholds_frozen"] is True
-    assert prov["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_2026-08-15"
-    assert label == "gap_net_v3_candidate"
-    assert prov["model"] == "gap_net_v3_candidate"
+    assert prov["gate_thresholds_frozen_id"] == "stage_e_thresholds_test_frozen"
+    assert prov["gate_thresholds_frozen_sha256"] == "a" * 64
+    assert label == "gap_net_v3_stage_e_candidate"
+    assert prov["model"] == "gap_net_v3_stage_e_candidate"
 
 
-def test_builder_gate_fail_blocks_promotion(trainer, tmp_path):
-    """Codex 2026-08-15 (2nd pass) P1: a clean-dataset run whose Stage E
-    gate FAILs must NOT be promotable."""
+def test_builder_gate_fail_blocks_stage_f_eligibility(trainer, tmp_path):
+    """A clean-dataset run whose Stage E gate FAILs is not Stage F eligible."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, label = trainer._build_saved_provenance(
         dataset_taint=_clean_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("FAIL"),
-        gate_thresholds_frozen_id="stage_e_thresholds_v1",
-        args=_StubArgs(),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="b" * 64,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
+    assert prov["stage_e_passed"] is False
+    assert prov["stage_f_eligible"] is False
     assert prov["promotion_eligible"] is False
-    assert prov["dataset_eligibility"] is True
-    assert prov["stage_e_gate_verdict"] == "FAIL"
-    assert any("stage_e_gate_verdict" in r for r in prov["promotion_ineligible_reasons"])
-    assert label == "gap_net_v3_candidate_nonpromotion"
-    assert prov["model"] == "gap_net_v3_candidate_nonpromotion"
+    assert any("stage_e_gate_verdict" in r for r in prov["stage_f_ineligible_reasons"])
+    assert label == "gap_net_v3_stage_e_candidate_ineligible"
 
 
-def test_builder_gate_skip_blocks_promotion(trainer, tmp_path):
-    """A run whose Stage E overall_verdict is FAIL_INSUFFICIENT_COVERAGE
-    (all cells SKIP) must NOT be promotable — this was the specific
-    scenario Codex flagged as still labelled promotable in da596ef."""
+def test_builder_gate_skip_blocks_stage_f_eligibility(trainer, tmp_path):
+    """An all-SKIP overall_verdict (FAIL_INSUFFICIENT_COVERAGE) also blocks
+    Stage F eligibility — this was Codex's da596ef scenario."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, _ = trainer._build_saved_provenance(
         dataset_taint=_clean_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("FAIL_INSUFFICIENT_COVERAGE"),
-        gate_thresholds_frozen_id="stage_e_thresholds_v1",
-        args=_StubArgs(),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="c" * 64,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
-    assert prov["promotion_eligible"] is False
+    assert prov["stage_f_eligible"] is False
+    assert prov["stage_e_passed"] is False
     assert prov["stage_e_gate_verdict"] == "FAIL_INSUFFICIENT_COVERAGE"
 
 
-def test_builder_missing_frozen_id_blocks_promotion_even_with_pass(
+def test_builder_missing_frozen_entry_blocks_stage_f_even_with_pass(
     trainer, tmp_path,
 ):
-    """Even a clean-dataset PASS run without --gate-thresholds-frozen-id
-    is not promotable — draft thresholds carry no promotion authority."""
+    """A clean-dataset PASS run without a frozen registry entry is not
+    Stage F eligible.  Draft thresholds carry no authority."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, label = trainer._build_saved_provenance(
         dataset_taint=_clean_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("PASS"),
-        gate_thresholds_frozen_id=None,          # not frozen
-        args=_StubArgs(),
+        frozen_thresholds_entry=None,           # no frozen registry entry
+        frozen_thresholds_sha256=None,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
-    assert prov["promotion_eligible"] is False
+    assert prov["stage_f_eligible"] is False
     assert prov["gate_thresholds_frozen"] is False
     assert prov["gate_thresholds_frozen_id"] is None
-    assert any("gate_thresholds_frozen_id" in r
-               for r in prov["promotion_ineligible_reasons"])
-    assert label == "gap_net_v3_candidate_nonpromotion"
+    assert prov["gate_thresholds_frozen_sha256"] is None
+    assert any("no_frozen_stage_e_thresholds" in r
+               for r in prov["stage_f_ineligible_reasons"])
+    assert label == "gap_net_v3_stage_e_candidate_ineligible"
 
 
-def test_builder_empty_frozen_id_blocks_promotion(trainer, tmp_path):
-    """Empty string / whitespace-only id is not a valid frozen identifier."""
-    ds = _make_dataset_dir_with_sha_files(tmp_path)
-    prov, _ = trainer._build_saved_provenance(
-        dataset_taint=_clean_taint(),
-        dataset_dir=ds,
-        gate_results=[],
-        gate_summary=_gate_summary("PASS"),
-        gate_thresholds_frozen_id="   ",         # whitespace only
-        args=_StubArgs(),
-        n_train=100, n_val=20,
-        best_val_loss=0.1, epochs_trained=1,
-        tr_means=[0.0, 0.0, 0.0],
-    )
-    assert prov["promotion_eligible"] is False
-    assert prov["gate_thresholds_frozen"] is False
-
-
-def test_builder_nonready_dataset_blocks_promotion_and_lists_all_reasons(
-    trainer, tmp_path,
-):
-    """A non-ready dataset (override set) with gate FAIL and no frozen id
-    must record ALL three ineligibility reasons in the saved provenance."""
+def test_builder_nonready_dataset_lists_all_stage_f_reasons(trainer, tmp_path):
+    """Non-ready dataset + gate FAIL + no frozen id records all reasons."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, label = trainer._build_saved_provenance(
         dataset_taint=_nonready_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("FAIL"),
-        gate_thresholds_frozen_id=None,
-        args=_StubArgs(),
+        frozen_thresholds_entry=None,
+        frozen_thresholds_sha256=None,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
-    reasons_blob = " | ".join(prov["promotion_ineligible_reasons"])
+    reasons_blob = " | ".join(prov["stage_f_ineligible_reasons"])
+    assert prov["stage_f_eligible"] is False
     assert prov["promotion_eligible"] is False
     assert "dataset_not_production_ready" in reasons_blob
     assert "non_production_override_set" in reasons_blob
     assert "stage_e_gate_verdict" in reasons_blob
-    assert "gate_thresholds_frozen_id" in reasons_blob
-    assert label == "gap_net_v3_candidate_nonpromotion"
+    assert "no_frozen_stage_e_thresholds" in reasons_blob
+    assert label == "gap_net_v3_stage_e_candidate_ineligible"
 
 
 def test_builder_missing_overall_verdict_treated_as_missing(trainer, tmp_path):
-    """A gate_summary without overall_verdict (unexpected schema drift)
-    must be treated as non-PASS, not silently pass."""
+    """A gate_summary without overall_verdict is treated as non-PASS."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     prov, _ = trainer._build_saved_provenance(
         dataset_taint=_clean_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary={},                          # no overall_verdict
-        gate_thresholds_frozen_id="stage_e_thresholds_v1",
-        args=_StubArgs(),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="d" * 64,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
-    assert prov["promotion_eligible"] is False
     assert prov["stage_e_gate_verdict"] == "MISSING"
+    assert prov["stage_f_eligible"] is False
+
+
+def test_builder_promotion_eligible_is_always_false_even_when_everything_passes(
+    trainer, tmp_path,
+):
+    """Codex 2026-08-15 (3rd pass) P1: even with dataset ready, gate PASS,
+    and frozen thresholds, this trainer must NOT set promotion_eligible=True.
+    Promotion requires the Stage F artifact + remaining plan gates."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, label = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("PASS"),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="e" * 64,
+        args=_StubArgsThresh(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["stage_f_eligible"] is True         # ← this trainer can flip
+    assert prov["promotion_eligible"] is False      # ← this trainer NEVER flips
+    assert label != "gap_net_v3_candidate"          # ← reserved for Stage F artifact
+    assert label == "gap_net_v3_stage_e_candidate"
+
+
+# ── Codex 2026-08-15 (3rd pass) P1: threshold registry loader + range checks ─
+
+def _write_registry(tmp_path: Path, entries: list) -> Path:
+    """Write a registry JSON file at a fresh path (not the real one)."""
+    p = tmp_path / "stage_e_thresholds_test.json"
+    p.write_text(json.dumps({"registry_version": 1, "entries": entries}),
+                 encoding="utf-8")
+    return p
+
+
+def test_registry_loads_frozen_entry(trainer, tmp_path):
+    """Happy path: a frozen entry loads and returns a canonical sha256."""
+    reg = _write_registry(tmp_path, [_frozen_entry(id="stage_e_t_v1")])
+    entry, sha = trainer._load_frozen_thresholds("stage_e_t_v1", reg)
+    assert entry["id"] == "stage_e_t_v1"
+    assert entry["frozen"] is True
+    assert isinstance(sha, str) and len(sha) == 64
+
+
+def test_registry_rejects_unknown_id(trainer, tmp_path):
+    """Unknown id → SystemExit citing known ids."""
+    reg = _write_registry(tmp_path, [_frozen_entry(id="stage_e_t_v1")])
+    with pytest.raises(SystemExit, match="not in the registry"):
+        trainer._load_frozen_thresholds("does_not_exist", reg)
+
+
+def test_registry_rejects_draft_entry(trainer, tmp_path):
+    """A registered entry with frozen=False is a draft and grants no authority."""
+    reg = _write_registry(tmp_path, [_frozen_entry(id="draft_v1", frozen=False)])
+    with pytest.raises(SystemExit, match="not frozen"):
+        trainer._load_frozen_thresholds("draft_v1", reg)
+
+
+def test_registry_rejects_missing_file(trainer, tmp_path):
+    """Missing registry file → SystemExit."""
+    missing = tmp_path / "does_not_exist.json"
+    with pytest.raises(SystemExit, match="registry not found"):
+        trainer._load_frozen_thresholds("any", missing)
+
+
+def test_registry_rejects_out_of_range_frozen_entry(trainer, tmp_path):
+    """Even a `frozen=true` entry with an out-of-range value is rejected."""
+    reg = _write_registry(tmp_path, [
+        _frozen_entry(id="bad_v1", x_a=-2.0),        # x_a < 0
+    ])
+    with pytest.raises(SystemExit, match="threshold out of range"):
+        trainer._load_frozen_thresholds("bad_v1", reg)
+
+
+def test_registry_picks_correct_entry_when_draft_and_frozen_coexist(
+    trainer, tmp_path,
+):
+    """Two entries with different ids in one registry: passing the draft's id
+    fails (not frozen), the frozen's id succeeds.  Ensures the loader keys
+    on `id` (not e.g. array position) and never accepts the wrong entry."""
+    reg = _write_registry(tmp_path, [
+        _frozen_entry(id="draft_v0", frozen=False),
+        _frozen_entry(id="frozen_v1", frozen=True),
+    ])
+    with pytest.raises(SystemExit, match="not frozen"):
+        trainer._load_frozen_thresholds("draft_v0", reg)
+    entry, _ = trainer._load_frozen_thresholds("frozen_v1", reg)
+    assert entry["id"] == "frozen_v1"
+    assert entry["frozen"] is True
+
+
+def test_registry_rejects_duplicate_id(trainer, tmp_path):
+    """A registry containing two entries with the same id is malformed."""
+    reg = _write_registry(tmp_path, [
+        _frozen_entry(id="dup_id"),
+        _frozen_entry(id="dup_id"),
+    ])
+    with pytest.raises(SystemExit, match="more than once"):
+        trainer._load_frozen_thresholds("dup_id", reg)
+
+
+def test_range_validator_rejects_negative_x_a(trainer):
+    """Runtime CLI x_a<0 is rejected before it can flip a FAIL to PASS."""
+    args = _StubArgsThresh(stage_e_x_a=-2.0)
+    with pytest.raises(SystemExit, match=r"x_a=.*outside allowed range"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_range_validator_rejects_x_a_above_one(trainer):
+    args = _StubArgsThresh(stage_e_x_a=1.5)
+    with pytest.raises(SystemExit, match=r"x_a=.*outside allowed range"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_range_validator_rejects_x_b_out_of_range(trainer):
+    args = _StubArgsThresh(stage_e_x_b=2.0)
+    with pytest.raises(SystemExit, match=r"x_b=.*outside allowed range"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_range_validator_rejects_non_finite_denominator(trainer):
+    args = _StubArgsThresh(stage_e_min_denominator=float("nan"))
+    with pytest.raises(SystemExit, match="not finite"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_range_validator_rejects_zero_min_high_support(trainer):
+    args = _StubArgsThresh(stage_e_min_high_support=0)
+    with pytest.raises(SystemExit, match="min_high_support"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_range_validator_rejects_negative_min_denominator(trainer):
+    args = _StubArgsThresh(stage_e_min_denominator=-1.0)
+    with pytest.raises(SystemExit, match="min_denominator"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_cli_matches_frozen_entry_returns_none_on_exact_match(trainer):
+    """When CLI values equal the frozen entry exactly, no mismatch is reported."""
+    entry = _frozen_entry()
+    result = trainer._cli_matches_frozen_entry(_StubArgsThresh(), entry)
+    assert result is None
+
+
+def test_cli_matches_frozen_entry_reports_mismatch(trainer):
+    """CLI value different from frozen entry → mismatch string."""
+    entry = _frozen_entry(x_a=0.30)
+    args = _StubArgsThresh(stage_e_x_a=0.29)
+    result = trainer._cli_matches_frozen_entry(args, entry)
+    assert result is not None
+    assert "x_a" in result
+    assert "0.29" in result
+
+
+# ── Codex 2026-08-15 (3rd pass) P1: negative regression — the exact Codex
+#    probe: a 2x-worse candidate MUST NOT PASS by supplying permissive
+#    thresholds.  Validated at two layers: (1) range-validator rejects the
+#    permissive thresholds before the gate math runs, and (2) if a caller
+#    somehow bypassed that, _evaluate_cell_verdict with x_a=-2.0 would
+#    give a PASS — this test documents both. ─────────────────────────────
+
+def test_negative_regression_permissive_thresholds_rejected_up_front(trainer):
+    """The exact Codex 2026-08-15T12:23+08 probe: candidate MSE = 2.0,
+    reference MSE = 1.0 (candidate is 2x WORSE) with x_a = -2.0 (threshold
+    3.0) would give PASS at the raw gate math.  New range validator must
+    stop this at CLI parse time, before any gate cell is evaluated."""
+    # Confirm the gate math itself does give the wrong verdict under
+    # permissive thresholds — this is the exploit surface being closed.
+    verdict, _ = trainer._evaluate_cell_verdict(
+        candidate_mse=2.0, reference_mse=1.0,
+        n_high_support=1000,
+        x=-2.0, direction="min_improvement",
+        min_n_high_support=100, min_denominator=1e-9,
+    )
+    assert verdict == "PASS", \
+        "sanity check: raw gate math with x=-2.0 must PASS a 2x-worse " \
+        "candidate — this is what we are defending against"
+
+    # Fix: range validator rejects x_a=-2.0 before it reaches the gate math.
+    args = _StubArgsThresh(stage_e_x_a=-2.0)
+    with pytest.raises(SystemExit, match="outside allowed range"):
+        trainer._validate_threshold_ranges(args)
+
+
+def test_negative_regression_permissive_x_b_rejected_up_front(trainer):
+    """Codex 2026-08-15T12:23+08 probe part 2: x_b = 1.0 (threshold 2.0)
+    for a 2x-worse candidate would return PASS at the raw math."""
+    verdict, _ = trainer._evaluate_cell_verdict(
+        candidate_mse=2.0, reference_mse=1.0,
+        n_high_support=1000,
+        x=1.0, direction="max_tolerance",
+        min_n_high_support=100, min_denominator=1e-9,
+    )
+    assert verdict == "PASS", \
+        "sanity check: raw gate math with x=1.0 (max_tolerance) must PASS " \
+        "the 2x-worse candidate — this is what we defend against"
+
+    args = _StubArgsThresh(stage_e_x_b=1.0)
+    # x_b=1.0 is at the boundary; try 1.5 to make sure > 1.0 rejected.
+    args_bad = _StubArgsThresh(stage_e_x_b=1.5)
+    with pytest.raises(SystemExit, match="outside allowed range"):
+        trainer._validate_threshold_ranges(args_bad)
+    # x_b=1.0 is the ceiling and is accepted, but even so must not grant
+    # stage_f eligibility (still needs frozen registry entry with EXACT match).
+    trainer._validate_threshold_ranges(args)   # boundary accepted
+
+
+def test_negative_regression_permissive_frozen_entry_rejected_at_load(trainer, tmp_path):
+    """A malicious registry entry that IS `frozen=true` but uses permissive
+    values must be rejected by the loader's range validation, so an attacker
+    cannot smuggle promotion authority via a broken registry."""
+    reg = _write_registry(tmp_path, [
+        _frozen_entry(id="malicious_v1", x_a=-2.0, x_b=1.0),   # permissive
+    ])
+    with pytest.raises(SystemExit, match="threshold out of range"):
+        trainer._load_frozen_thresholds("malicious_v1", reg)
+
+
+def test_negative_regression_cli_mismatch_forfeits_frozen_authority(trainer):
+    """Even a valid frozen entry does not grant authority when the runtime
+    CLI values differ.  This closes the 'load frozen entry, then override
+    x_a via CLI' attack path."""
+    entry = _frozen_entry(x_a=0.30, x_b=0.20,
+                          min_high_support=100, min_denominator=1e-9)
+    args = _StubArgsThresh(stage_e_x_a=0.10)   # differs from frozen entry
+    result = trainer._cli_matches_frozen_entry(args, entry)
+    assert result is not None
+    assert "x_a" in result
 
 
 # ── Codex 2026-08-15 (2nd pass) P2: save/load round-trip through builder ────
@@ -941,8 +1194,9 @@ def test_builder_saved_npz_round_trip_all_promotion_fields_preserved(
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("PASS"),
-        gate_thresholds_frozen_id="stage_e_thresholds_v1_2026-08-15",
-        args=_StubArgs(),
+        frozen_thresholds_entry=_frozen_entry(),
+        frozen_thresholds_sha256="f" * 64,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
@@ -955,89 +1209,83 @@ def test_builder_saved_npz_round_trip_all_promotion_fields_preserved(
     reloaded = json.loads(str(z["provenance"]))
     for k in ("model", "dataset_production_ready", "dataset_non_ready_reasons",
               "non_production_override", "dataset_eligibility",
-              "stage_e_gate_verdict", "gate_thresholds_frozen",
-              "gate_thresholds_frozen_id", "promotion_eligible",
-              "promotion_ineligible_reasons"):
+              "stage_e_gate_verdict", "stage_e_passed",
+              "gate_thresholds_frozen", "gate_thresholds_frozen_id",
+              "gate_thresholds_frozen_sha256", "gate_thresholds_frozen_entry",
+              "stage_f_eligible", "stage_f_ineligible_reasons",
+              "promotion_eligible", "promotion_ineligible_reasons"):
         assert k in reloaded, f"promotion field {k!r} missing from saved NPZ"
-    assert reloaded["model"] == model_label == "gap_net_v3_candidate"
-    assert reloaded["promotion_eligible"] is True
-    assert reloaded["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_2026-08-15"
+    assert reloaded["model"] == model_label == "gap_net_v3_stage_e_candidate"
+    assert reloaded["stage_f_eligible"] is True
+    assert reloaded["promotion_eligible"] is False
+    assert reloaded["gate_thresholds_frozen_id"] == "stage_e_thresholds_test_frozen"
 
 
-def test_builder_saved_npz_round_trip_nonpromotion_carries_reasons(
+def test_builder_saved_npz_round_trip_ineligible_carries_reasons(
     trainer, tmp_path,
 ):
-    """A non-promotable run's saved NPZ must record ineligibility reasons
-    that a downstream consumer can enumerate without running the trainer
-    again."""
+    """Non-Stage-F-eligible run's saved NPZ records ineligibility reasons."""
     ds = _make_dataset_dir_with_sha_files(tmp_path)
     provenance, model_label = trainer._build_saved_provenance(
         dataset_taint=_nonready_taint(),
         dataset_dir=ds,
         gate_results=[],
         gate_summary=_gate_summary("FAIL"),
-        gate_thresholds_frozen_id=None,
-        args=_StubArgs(),
+        frozen_thresholds_entry=None,
+        frozen_thresholds_sha256=None,
+        args=_StubArgsThresh(),
         n_train=100, n_val=20,
         best_val_loss=0.1, epochs_trained=1,
         tr_means=[0.0, 0.0, 0.0],
     )
     model = trainer.GapNetV3()
-    out = tmp_path / "nonpromo.npz"
+    out = tmp_path / "ineligible.npz"
     trainer._save(model, out, provenance)
 
     z = np.load(str(out), allow_pickle=True)
     reloaded = json.loads(str(z["provenance"]))
-    assert reloaded["model"] == model_label == "gap_net_v3_candidate_nonpromotion"
+    assert reloaded["model"] == model_label == "gap_net_v3_stage_e_candidate_ineligible"
+    assert reloaded["stage_f_eligible"] is False
     assert reloaded["promotion_eligible"] is False
-    assert reloaded["promotion_ineligible_reasons"]   # non-empty
+    assert reloaded["stage_f_ineligible_reasons"]
     assert reloaded["gate_thresholds_frozen_id"] is None
+    assert reloaded["gate_thresholds_frozen_sha256"] is None
 
 
 # ── Codex 2026-08-15 (2nd pass) P2: bounded integration test through main() ─
 
 def test_main_integration_records_all_promotion_fields(trainer, tmp_path, monkeypatch):
     """Bounded integration test: run trainer.main() end-to-end on a tiny
-    synthetic dataset and assert every promotion field that the builder
-    emits also appears in the saved NPZ.
+    synthetic dataset and assert every promotion field the builder emits
+    also appears in the saved NPZ.
 
-    This catches the specific regression Codex 2026-08-15 flagged as
-    uncaught: main() dropping a field between builder output and _save
-    call.  Bounded because we run only 1 epoch on a 60-row synthetic
-    dataset (~1s).
+    Catches the specific regression Codex 2026-08-15 flagged as uncaught:
+    main() dropping a field between builder output and _save call.
+    Bounded: 1 epoch on a 60-row synthetic dataset (~1s).
 
-    The synthetic empirical target is all-NaN, so the Stage E gate SKIPs
-    every cell → overall_verdict is FAIL_INSUFFICIENT_COVERAGE → the
-    saved NPZ is NOT promotable.  That is intentional: the test asserts
-    the promotion-block reasons are recorded (not that promotion succeeds)."""
+    Synthetic empirical target is all-NaN → gate FAIL_INSUFFICIENT_COVERAGE
+    → stage_f_eligible=False (intentional; test asserts the block reasons
+    are recorded).  This run does NOT supply --gate-thresholds-frozen-id
+    (registry has no frozen entries in-repo), so the frozen check would
+    also block Stage F eligibility."""
     dataset_dir = tmp_path / "ds"
     dataset_dir.mkdir()
 
-    # Build a synthetic dataset with 60 rows: 40 train, 20 val.
-    n_total  = 60
-    n_train  = 40
-    n_val    = 20
-    n_bands  = 3
-    board_dim = 79
-    heads    = 3
+    n_total, n_train, n_val, n_bands = 60, 40, 20, 3
+    board_dim, heads = 79, 3
 
     rng = np.random.default_rng(0)
-    # Feats: random floats.
     feats = rng.standard_normal((n_total, board_dim)).astype(np.float32)
     (dataset_dir / "parent_feats.f32.bin").write_bytes(feats.tobytes())
-    # Targets: constant per row to make model easy to fit.
-    tgt = np.ones((n_total, heads), dtype=np.float32) * 0.1
+    tgt  = np.ones((n_total, heads), dtype=np.float32) * 0.1
     (dataset_dir / "targets.f32.bin").write_bytes(tgt.tobytes())
     unif = np.ones((n_total, heads), dtype=np.float32) * 0.5
     (dataset_dir / "targets_uniform.f32.bin").write_bytes(unif.tobytes())
-    # Empirical: NaN → all cells SKIP → gate FAIL_INSUFFICIENT_COVERAGE.
-    # That's what we want here — this test verifies promotion is CORRECTLY
-    # BLOCKED when the gate SKIPs, exercising the full main() → builder path.
     emp = np.full((n_total, heads), np.nan, dtype=np.float32)
     (dataset_dir / "targets_empirical.f32.bin").write_bytes(emp.tobytes())
 
-    split      = np.array([0] * n_train + [1] * n_val, dtype=np.int64)
-    band_idx   = rng.integers(0, n_bands, n_total).astype(np.int64)
+    split    = np.array([0] * n_train + [1] * n_val, dtype=np.int64)
+    band_idx = rng.integers(0, n_bands, n_total).astype(np.int64)
     np.savez(
         str(dataset_dir / "metadata.npz"),
         split=split,
@@ -1054,7 +1302,9 @@ def test_main_integration_records_all_promotion_fields(trainer, tmp_path, monkey
         "--epochs",       "1",
         "--patience",     "0",
         "--batch-size",   "16",
-        "--gate-thresholds-frozen-id", "stage_e_thresholds_v1_test",
+        # NB: intentionally omit --gate-thresholds-frozen-id; the checked-in
+        # registry has no frozen entries yet (Batch 5 pending), so passing an
+        # id would fail the loader.  Stage F ineligibility is expected.
     ])
     trainer.main()
 
@@ -1062,27 +1312,33 @@ def test_main_integration_records_all_promotion_fields(trainer, tmp_path, monkey
     z = np.load(str(out_path), allow_pickle=True)
     prov = json.loads(str(z["provenance"]))
 
-    # These are the builder's promotion fields — main() must not drop any.
+    # Every promotion field the builder emits must appear here.
     for k in ("model", "dataset_production_ready", "dataset_non_ready_reasons",
               "non_production_override", "dataset_eligibility",
-              "stage_e_gate_verdict", "gate_thresholds_frozen",
-              "gate_thresholds_frozen_id", "promotion_eligible",
-              "promotion_ineligible_reasons",
+              "stage_e_gate_verdict", "stage_e_passed",
+              "gate_thresholds_frozen", "gate_thresholds_frozen_id",
+              "gate_thresholds_frozen_sha256", "gate_thresholds_frozen_entry",
+              "stage_f_eligible", "stage_f_ineligible_reasons",
+              "promotion_eligible", "promotion_ineligible_reasons",
               "gate_results", "gate_summary",
               "dataset_feats_sha256", "dataset_metadata_sha256",
               "best_val_loss", "epochs_trained", "seed"):
         assert k in prov, f"required field {k!r} missing from main() output"
 
-    # This synthetic dataset produces all-SKIP gate → NOT promotable.
     assert prov["dataset_production_ready"] is True
     assert prov["dataset_eligibility"] is True
-    assert prov["gate_thresholds_frozen"] is True
-    assert prov["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_test"
-    assert prov["stage_e_gate_verdict"] != "PASS"   # empirical all-NaN → SKIP
+    assert prov["gate_thresholds_frozen"] is False
+    assert prov["gate_thresholds_frozen_id"] is None
+    assert prov["gate_thresholds_frozen_sha256"] is None
+    assert prov["stage_e_gate_verdict"] != "PASS"
+    assert prov["stage_e_passed"] is False
+    assert prov["stage_f_eligible"] is False
+    # Codex 2026-08-15 3rd pass: promotion_eligible is ALWAYS False here.
     assert prov["promotion_eligible"] is False
-    assert any("stage_e_gate_verdict" in r
-               for r in prov["promotion_ineligible_reasons"])
-    assert prov["model"] == "gap_net_v3_candidate_nonpromotion"
+    # Model label must be the Stage E ineligible name, NOT the reserved
+    # plain "gap_net_v3_candidate" name.
+    assert prov["model"] == "gap_net_v3_stage_e_candidate_ineligible"
+    assert prov["model"] != "gap_net_v3_candidate"
 
 
 # ── P2(1) emitted_by_band_phase counter ─────────────────────────────────────

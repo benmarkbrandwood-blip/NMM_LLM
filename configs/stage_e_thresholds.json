@@ -1,0 +1,23 @@
+{
+  "_purpose": "Tracked immutable Stage E gate threshold registry (Codex 2026-08-15 3rd pass P1). Each entry binds an identifier to a specific (x_a, x_b, min_high_support, min_denominator) quadruple. Only entries with frozen=true grant Stage F eligibility. Draft entries never do. Any change to a frozen entry's values MUST bump the id and set frozen=false initially, then a separate owner review re-freezes it.",
+  "_contract": {
+    "id_format": "stage_e_thresholds_v{N}_{state}_{YYYY-MM-DD}",
+    "x_a_range": "[0.0, 1.0] — fractional improvement over uniform required; higher = stricter",
+    "x_b_range": "[0.0, 1.0] — fractional MSE degradation vs teacher tolerated; lower = stricter",
+    "min_high_support_range": "positive integer; per-(band, component) minimum row count",
+    "min_denominator_range": "positive finite float; below → SKIP_DEGENERATE_DENOMINATOR"
+  },
+  "registry_version": 1,
+  "entries": [
+    {
+      "id": "stage_e_thresholds_v0_draft_2026-08-15",
+      "x_a": 0.30,
+      "x_b": 0.20,
+      "min_high_support": 100,
+      "min_denominator": 1e-9,
+      "frozen": false,
+      "authored": "2026-08-15",
+      "notes": "Initial draft values per docs/gap_net_v3_plan.md §16 revised 2026-08-12. NOT frozen — pending Batch 5 owner review. Any run using this id will be Stage F ineligible."
+    }
+  ]
+}
