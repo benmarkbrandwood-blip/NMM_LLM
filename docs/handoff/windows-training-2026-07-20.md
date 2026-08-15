@@ -256,6 +256,34 @@ Task-scope Ruff passes.  The complete feature-deviation focused group passes
 mandatory Malom provenance group passes 103 tests plus 498 parameterized
 subtests.
 
+The subsequent zero-game predictive-to-product derivation completed under
+result identity
+`3da605d1d92d1a53b00dc9dabda1ac95c2e4624ec53354bddc0f8a7f53301d5f`.
+Its decision is `C_conversion_not_established`.  The sealed estimator was
+reproduced exactly without refitting over the same 6,400 exploration games.
+The process made 44,347,095 read-only `sector-corrected-v1` Malom queries and
+opened zero research-confirmation, official holdout, HumanDB, or source-pool
+content.
+
+Fold-external calibration reduces the three parent-D predictive successor-
+risk uplift means from 0.13365--0.15484 to 0.07255--0.08295.  Those values
+remain observational prediction contrasts, not causal inducement effects.
+Paired log-loss improvement is nearly uncorrelated with safe-action argmax
+regret, so neither a D-discrimination nor a log-loss product equivalent is
+identified.  Policy visitation, opponent adaptation, and learner-versus-
+human redemption are also absent.  No product tier is decidable at 487
+players under this evidence design.
+
+Preserve both immutable derivation plans, the machine manifest, and the
+[conversion evidence](../evidence/human-feature-deviation-product-conversion-2026-08-16.md).
+The F0-H0 stop and `B_not_ready_fail_closed` decision remain unchanged.  This
+result authorizes no new research question, protected access, game,
+intervention, training, reward change, promotion, deployment, publication,
+or release.  Task-scope Ruff passes; the complete feature-deviation group
+passes 53 tests, the B2 freeze and final-test guard file passes eight tests,
+and the mandatory Malom provenance group passes 103 tests plus 498
+parameterized subtests.
+
 The corrected result verifier reproduces the v2 plan lineage.  The historical
 v1 plan and result identities remain sealed; implementation-artifact replay
 belongs to their recorded commit rather than the corrected current checkout.

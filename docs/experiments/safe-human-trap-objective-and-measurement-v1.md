@@ -455,3 +455,32 @@ power calibration, and zero-access ledger.  F0-H0 remains stopped.  This
 addendum grants no authority to open research confirmation or any official
 holdout, and no authority for E0, F0-H1, T0, games, training, reward changes,
 promotion, publication, deployment, or release.
+
+## Predictive-to-product conversion addendum -- 16 August 2026
+
+The exploration-only conversion derivation has result identity
+`3da605d1d92d1a53b00dc9dabda1ac95c2e4624ec53354bddc0f8a7f53301d5f`
+and decision `C_conversion_not_established`.  It preserves both the F0-H0
+stop and the later `B_not_ready_fail_closed` decision.
+
+The frozen estimator reproduces exactly and was not refitted.  Its positional
+safe-successor predictions exhibit nonzero risk spread, but this is a
+predictive plug-in contrast rather than an action-specific causal inducement
+effect.  Existing human-human observational paths identify neither policy-
+induced visitation nor learner-versus-human redemption.  Product score is
+therefore not identified.
+
+Under perfect redemption only, +0.5, +1.0, and +2.0 score points per 100 games
+would require necessary single-step uplifts of 0.000642, 0.001285, and
+0.002569 respectively.  These are not sufficient thresholds.  D-to-L
+discrimination and log-loss equivalents remain unidentified; the player-
+level correlation between log-loss improvement and safe-action argmax regret
+is effectively zero.
+
+The
+[conversion evidence](../evidence/human-feature-deviation-product-conversion-2026-08-16.md)
+records the six-link chain, complete predictive uplift distributions,
+calibration correction, loose perfect-redemption ceiling, and zero-access
+ledger.  It creates no new research question and grants no confirmation,
+game, intervention, training, reward, promotion, deployment, publication, or
+release authority.
