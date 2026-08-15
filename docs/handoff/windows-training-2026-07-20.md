@@ -159,6 +159,32 @@ closed by the design stop condition.  Selection, confirmation, and final-test
 content remain sealed; the remaining 108 source-pool records remain
 unconsumed.
 
+A later research/design round did not alter that stop decision.  It froze a
+new out-of-player conditional-choice question under plan identity
+`04177a73ca5b9a1aa8cc8352477f2050759e6a742cee049f1191d3064ae5d662`.
+This is not a rerun of exact-state or `ring16` frequency estimation.  Its
+train-internal split identity
+`fa74650c1afdffeb0d30f334b2b7859538f81b0e502c17a64092bfdcd99a06dd`
+assigns 1,665/551 disjoint player keys.  After 14,941 cross-player games are
+discarded, the 19,257 exploration and 2,751 unopened research-confirmation
+games involve only 1,416/290 player keys.  The participating counts, not the
+larger assigned counts, bound later evaluable support.
+
+The only executed measurement is a fixed 128-game exploration pilot under
+result identity
+`c489dca91c00569491d2b50a879bd014081e0109e0899afcc2bf2f13d584d7d6`.
+It covered 6,140 decisions with 81,463 read-only Malom queries, fit no model,
+and left research-confirmation plus all official protected partitions
+unopened.  It did not immediately reject all named visible features, but it is
+not confirmatory evidence.  Confirmation needs a separately frozen optimizer,
+clustered estimator, verifier, and one-time access ledger.  Preserve the
+[design review](../evidence/human-feature-deviation-design-review-2026-08-15.md),
+plan, split, and exploration manifest together.  They authorize no later gate,
+game, search, model load, training, database write, or source-pool access.
+Task-scope Ruff passes; the combined focused feature, reused F0-H0 comparator,
+and mandatory Malom provenance suite passes 124 tests and 498 parameterized
+subtests.
+
 The corrected result verifier reproduces the v2 plan lineage.  The historical
 v1 plan and result identities remain sealed; implementation-artifact replay
 belongs to their recorded commit rather than the corrected current checkout.

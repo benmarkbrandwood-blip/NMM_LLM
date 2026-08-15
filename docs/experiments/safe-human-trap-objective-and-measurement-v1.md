@@ -352,3 +352,42 @@ Do not:
   plan and explicit authority; or
 - start training while the metric, target population, split, reference,
   `p_min`, `delta_induce`, horizon, and conversion gate remain unfrozen.
+
+## Featureized-deviation research addendum -- 15 August 2026
+
+F0-H0 remains stopped under corrected result identity
+`8bd2da62785e9c8cda0a055e98213959cbdf8f88aa860384171f00f4f39c6bdc`.
+Its exact-state and `ring16` empirical-frequency estimator is not reopened,
+relaxed, or reinterpreted by this addendum.
+
+A distinct rejection-oriented question was frozen under plan identity
+`04177a73ca5b9a1aa8cc8352477f2050759e6a742cee049f1191d3064ae5d662`.
+It asks whether a fixed ten-term conditional-choice model predicts complete
+human actions and positional D-to-L loss on unseen source-domain players, then
+separately tests a one-ply `A_pos` steerability necessary condition.  It does
+not treat predictive association as causal human-error induction, and it does
+not establish `A_allow`, repeated-play reachability, product-user transport,
+or game-score conversion.
+
+The train-internal player split is frozen under identity
+`fa74650c1afdffeb0d30f334b2b7859538f81b0e502c17a64092bfdcd99a06dd`.
+The hash rule assigns 1,665/551 disjoint keys to research-exploration and
+research-confirmation.  After discarding 14,941 cross-arm games, their
+19,257/2,751 surviving games involve 1,416/290 player keys.  Assigned and
+participating counts must not be conflated.  Official selection, confirmation,
+and final-test content remain sealed.
+
+The fixed 128-game exploration-only result has identity
+`c489dca91c00569491d2b50a879bd014081e0109e0899afcc2bf2f13d584d7d6`.
+It covered all 6,140 decisions, made 81,463 read-only Malom queries, fit no
+model, and opened no protected content.  Several named features vary and
+conflict with positional safety often enough to avoid an immediate global
+rejection, while double-mill creation had zero pilot variation and mill closure
+is structurally close to post-action material balance.  These are exploratory
+observations only.
+
+No confirmatory model or one-ply steerability result exists.  The
+[design review](../evidence/human-feature-deviation-design-review-2026-08-15.md)
+records the independent critique, frozen thresholds, pilot evidence, and
+claim boundary.  This addendum grants no authority for confirmation, E0,
+F0-H1, T0, reward changes, games, training, promotion, publication, or release.

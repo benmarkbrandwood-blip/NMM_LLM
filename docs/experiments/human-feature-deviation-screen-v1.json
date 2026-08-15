@@ -1,0 +1,345 @@
+{
+  "schema_version": "nmm.human-feature-deviation-plan.v1",
+  "research_id": "featureized-human-deviation-v1-2026-08-15",
+  "status": "preregistered_before_split_membership_or_feature_statistics",
+  "frozen_at_utc": "2026-08-15T00:00:00Z",
+  "repository_base_commit": "778abfcc363c226351e990327a560b908defff18",
+  "plan_identity": "04177a73ca5b9a1aa8cc8352477f2050759e6a742cee049f1191d3064ae5d662",
+  "relationship_to_f0_h0": {
+    "f0_h0_decision": "stop_condition_triggered",
+    "f0_h0_result_identity": "8bd2da62785e9c8cda0a055e98213959cbdf8f88aa860384171f00f4f39c6bdc",
+    "f0_h0_state_frequency_route_remains_rejected": true,
+    "not_a_rerun_or_relaxation": true,
+    "new_estimand": "out-of-player conditional action choice from a fixed low-dimensional visible feature dictionary",
+    "later_e0_f0_h1_t0_authority": false
+  },
+  "formal_question": {
+    "text": "Within the frozen B2 train source domain, can a fixed ten-term, actor-normalized conditional-choice model improve average-unique-player prediction of complete human action choices on unseen source-domain players, and can its predicted positional tier-loss mass discriminate immediate D-to-L choices? Separately, does a one-ply A_pos-preserving predecessor choice have enough positional-only leverage to change that predicted exposure?",
+    "falsifiable": true,
+    "two_stage_interpretation": {
+      "stage_1": "predictive association for source-domain human choices and positional tier loss",
+      "stage_2": "one-ply positional steerability necessary condition only",
+      "not_established_by_either_stage": [
+        "causal human-error induction",
+        "full-rule safety",
+        "product-user transport",
+        "whole-game score conversion"
+      ]
+    }
+  },
+  "input_boundary": {
+    "f0d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29",
+    "f0d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0d0_manifest_file_sha256": "0ab20955d551351ac25885b54d59a9f63fb6b2708e3292404d71dab2ff7dace6",
+    "b2_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "b2_membership_file_sha256": "06c3be92c87927d506dc36eb908aec3064220f4ead2ebb3b5ff3dfb7bf5032cb",
+    "official_train_games": 36949,
+    "malom": {
+      "manifest_file_sha256": "f4c52b00f00d25131a28743218a601bb34f60172970620de608c80e93ce28747",
+      "content_sha256": "c414fe88778f8d1d95cd3015532b43cad59f09e8398d8e46c42188b6829f3544",
+      "dataset_id": "malom-standard-ultra-strong-sector-corrected-v1",
+      "trust_level": "sector-corrected-v1"
+    },
+    "ruleset_file_sha256": "79f69a60ba9a1171df113f208396c17a31c85407388857e00fd7010f3a01293a",
+    "source_pool_2eb04f54_records_allowed": 0
+  },
+  "statistics_partitions": [
+    "train"
+  ],
+  "official_protected_partitions": {
+    "selection": "membership only; content sealed",
+    "confirmation": "membership only; content sealed",
+    "final-test": "membership only; content sealed"
+  },
+  "train_internal_split": {
+    "assignment_unit": "source_domain_player_key",
+    "player_hash_seed": "human-feature-deviation-player-split-v1-2026-08-15",
+    "hash_rule": "SHA-256(seed NUL player_key)",
+    "confirmation_first_byte_values": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63
+    ],
+    "nominal_player_ratio": {
+      "research_exploration": 0.75,
+      "research_confirmation": 0.25
+    },
+    "cross_arm_game_policy": "discard",
+    "exploration_pilot_games": 128,
+    "exploration_pilot_hash_seed": "human-feature-deviation-pilot-games-v1-2026-08-15",
+    "membership_source": "F0-D0 manifest plus official B2 train membership only",
+    "raw_content_reads_before_freeze": 0
+  },
+  "observation_contract": {
+    "unit": "complete visible predecessor board, legal atomic choice set, observed human action, actor source-player key, game identity",
+    "unchosen_actions": "choice alternatives, not independent negative examples",
+    "hidden_predictors_prohibited": [
+      "exact state identity",
+      "ring16 state identity",
+      "player identity",
+      "Malom values or A_pos membership",
+      "unobserved repetition multiplicity",
+      "unobserved no-progress counters",
+      "selection, confirmation, or final-test content"
+    ],
+    "missing_ui_time_control_and_rules_variant": "explicitly unavailable"
+  },
+  "feature_dictionary": {
+    "ordered_features": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree",
+      "closes_mill",
+      "blocks_immediate_mill",
+      "creates_double_mill",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "material_balance_after",
+      "captured_opponent_threat_lines"
+    ],
+    "geometry_control": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree"
+    ],
+    "tactical_panel": [
+      "closes_mill",
+      "blocks_immediate_mill",
+      "creates_double_mill",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "material_balance_after",
+      "captured_opponent_threat_lines"
+    ],
+    "maximum_model_terms": 10,
+    "actor_and_color_normalized": true,
+    "phase_handling": "pooled primary model; placement, movement, and flying reported separately",
+    "multiple_recommendation_rule": {
+      "recommendation_set": "all legal actions tied at the maximum feature score",
+      "strict_conflict": "the entire recommendation set lies outside A_pos",
+      "mixed_conflict": "the tied maximum set contains both A_pos and non-A_pos actions",
+      "direct_joint_rate": "observed action is both a feature maximum and outside A_pos"
+    },
+    "feature_selection_after_exploration": false
+  },
+  "exploration_pilot": {
+    "purpose": "fast rejection-oriented support and conflict-opportunity description",
+    "model_fit": false,
+    "reported_only": [
+      "within-choice feature variation",
+      "possible, strict, and mixed A_pos conflict",
+      "observed feature-maximum following",
+      "direct joint unsafe feature following",
+      "independent player and game support",
+      "phase, color, and positional tier counts",
+      "separate W-to-D, W-to-L, and D-to-L counts",
+      "Malom query count, time, coverage, and abstention"
+    ],
+    "cannot_change_confirmation_features_or_thresholds": true,
+    "cannot_supply_confirmatory_evidence": true
+  },
+  "confirmatory_model": {
+    "execution_in_this_round": false,
+    "model_family": "L2-regularized conditional multinomial logit over each complete legal choice set",
+    "geometry_model_terms": 3,
+    "full_model_terms": 10,
+    "training_partition": "research-exploration excluding the 128-game descriptive pilot only as a sensitivity; primary may include the pilot because features and thresholds were frozen first",
+    "evaluation_partition": "research-confirmation opened once only after a separate execution freeze",
+    "primary_estimand": "average_unique_player",
+    "secondary_estimand": "average_natural_game",
+    "player_weighting": "each actor player has equal total loss weight; decisions within player share that weight",
+    "feature_standardization": "exploration-choice-row mean and standard deviation; zero-variance terms remain present with standardized value zero",
+    "ridge_lambda": 0.01,
+    "optimizer_contract": "unique convex penalized optimum, gradient infinity norm at most 1e-8",
+    "malom_role": "label A_pos and tier loss after prediction; never a predictor",
+    "primary_tier_loss": "D-to-L",
+    "other_transitions": "W-to-D and W-to-L always reported separately; zero events remain zero and receive no effect-creating prior",
+    "bootstrap": {
+      "unit": "source_domain_player_key",
+      "replicates": 2000,
+      "seed": "human-feature-deviation-confirmation-player-bootstrap-v1-2026-08-15",
+      "predictions_refit": false
+    }
+  },
+  "confirmatory_thresholds": {
+    "minimum_confirmatory_support": {
+      "independent_players_with_evaluable_choices": 200,
+      "covered_decisions": 10000,
+      "D_to_L_events": 50,
+      "independent_players_with_D_to_L": 50,
+      "provenance": "minimum player-cluster and rare-event support for a ten-term descriptive model; not inherited from F0-H0"
+    },
+    "feature_identifiability": {
+      "minimum_tactical_features_varying_on_one_percent_of_choices": 3,
+      "minimum_independent_players_per_counted_feature": 100,
+      "minimum_one_tactical_feature_possible_conflict_fraction": 0.02,
+      "minimum_players_with_direct_joint_unsafe_follow": 50,
+      "provenance": "requires multiple action-varying and conflict-bearing features before interpreting coefficients"
+    },
+    "choice_prediction": {
+      "minimum_average_unique_player_log_loss_reduction_nats": 0.01,
+      "lower_95_must_exceed_zero": true,
+      "contrast": "geometry control minus full tactical model",
+      "provenance": "0.01 nat is approximately a one-percent per-choice likelihood gain and is the minimum signal that justifies another oracle-backed stage"
+    },
+    "positional_loss_discrimination": {
+      "full_model_Brier_improvement_lower_95_must_exceed_zero": true,
+      "minimum_top_vs_bottom_risk_quintile_D_to_L_difference": 0.02,
+      "difference_lower_95_must_meet_minimum": true,
+      "provenance": "an independently chosen two-percentage-point discrimination floor; it is not the failed F0-H0 one-percent product bound"
+    },
+    "stability": {
+      "placement_log_loss_reduction_point_must_exceed_zero": true,
+      "movement_log_loss_reduction_point_must_exceed_zero": true,
+      "flying_is_descriptive_if_players_below": 50,
+      "maximum_adverse_color_specific_log_loss_change_nats": 0.005
+    },
+    "oracle_coverage": {
+      "minimum_decision_coverage": 0.99,
+      "maximum_abstention_fraction": 0.01,
+      "missing_policy": "abstain and count against coverage; never impute"
+    }
+  },
+  "one_ply_steerability_necessary_condition": {
+    "execution_order": "only after every predictive confirmation gate passes",
+    "definition": "at an observed predecessor decision, enumerate all actor A_pos actions and compute the frozen human model's next-player positional unsafe mass at each settled successor",
+    "support_abstention": "abstain when successor phase is absent from exploration or any standardized action feature has absolute value above four",
+    "minimum_within_A_pos_predicted_unsafe_mass_range": 0.02,
+    "minimum_player_clustered_lower_95_fraction_of_eligible_predecessors": 0.01,
+    "minimum_independent_players": 100,
+    "minimum_independent_games": 500,
+    "interpretation": "positional one-ply structural leverage necessary condition; not causal inducement, reachability under repeated play, A_allow, or product conversion"
+  },
+  "decision_rule": {
+    "feature_direction_rejected": "any confirmatory support, identifiability, choice-prediction, positional-loss, stability, oracle-coverage, or one-ply necessary-condition gate fails",
+    "feature_signal_screen_passed_no_later_authority": "all gates pass; permits only a later design decision and no E0, training, reward, game, promotion, or product claim",
+    "inconclusive": "required content or oracle coverage is unavailable, or a prespecified interval cannot be computed",
+    "no_threshold_or_feature_changes_after_exploration": true,
+    "no_substitute_data_after_rejection": true
+  },
+  "sparsity_curve_disposition": {
+    "f0_h0_state_coverage_extrapolation": "rejected because it would reopen the immutable failed estimator",
+    "allowed_future_redefinition": "player-cluster learning curve for the fixed feature model only",
+    "fractions": [
+      0.1,
+      0.25,
+      0.5,
+      1.0
+    ],
+    "sampling_units_reported_separately": [
+      "player-uniform for average_unique_player",
+      "whole-game for average_natural_game"
+    ],
+    "kish_and_predictive_curves_separate": true,
+    "far_extrapolation_prohibited": "no projection beyond twice observed player support",
+    "model_form_guard": "at least power-law, Michaelis-Menten, and log forms must backtest; disagreement above twofold is reported as unidentified"
+  },
+  "known_biases": {
+    "history_recovery_selection": "excluded 1751 games contain only 35 draws; retained 92789 contain 26157 draws",
+    "unverified_terminal_basis_games": 54923,
+    "source_domain": "observed PlayOK-like platform only",
+    "missing_conditions": [
+      "UI orientation",
+      "time control",
+      "exact rules variant"
+    ],
+    "product_user_target_distribution": "absent; no product-population reweighting is identifiable",
+    "state_novelty": "not attainable and not used as a gate"
+  },
+  "safe_set": "A_pos",
+  "state_safety": "positional-only",
+  "a_allow_claim": false,
+  "confirmation_execution_authorized": false,
+  "implementation_artifacts": [
+    {
+      "path": "learned_ai/evaluation/human_feature_deviation.py",
+      "sha256": "8e50904548a55e672d1454e77d3fbbc94321ca37a3fa4b1c8d81ff2d9882befc"
+    },
+    {
+      "path": "scripts/freeze_human_feature_deviation_split.py",
+      "sha256": "ed45ba329c490211522af2931b17547eb7a77f9d133960f17c3bfa69fdd6ad11"
+    },
+    {
+      "path": "scripts/run_human_feature_deviation_exploration.py",
+      "sha256": "06e722f78b1da380d23ffb3a603967fe506e1c2fb776e6c69c0776db9429fd31"
+    },
+    {
+      "path": "tests/test_human_feature_deviation.py",
+      "sha256": "41d42b1684e3d60e9bde2b2088a6334b371355731f5e8062c1de58152c63442a"
+    }
+  ],
+  "prohibited_operations": {
+    "database_writes_or_rebuilds": true,
+    "games": true,
+    "search_batches": true,
+    "neural_model_loading": true,
+    "model_training_or_weight_updates": true,
+    "selection_content_reads": true,
+    "official_confirmation_content_reads": true,
+    "final_test_content_reads": true,
+    "research_confirmation_content_reads_in_this_round": true,
+    "source_pool_2eb04f54_reads": true,
+    "E0_F0_H1_T0_or_trap_reward_work": true
+  }
+}
