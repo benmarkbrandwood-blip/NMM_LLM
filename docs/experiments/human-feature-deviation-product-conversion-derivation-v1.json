@@ -1,0 +1,170 @@
+{
+  "schema_version": "nmm.human-feature-deviation-product-conversion-derivation.v1",
+  "status": "frozen_derivation_contract_before_hypothetical_successor_queries",
+  "frozen_at_utc": "2026-08-15T13:16:08.751Z",
+  "repository_base_commit": "f413ceb1109803963d9585d99153898f621ad574",
+  "not_a_new_research_preregistration": true,
+  "purpose": "derive, without protected data or gameplay, whether predictive statistics can be mapped honestly to product-scale safe human-trap effects",
+  "input_lineage": {
+    "readiness_result_identity": "0df4a8bcfab8636048c8b005945a1d4bd719b23f377c06d25a6d6e5b745d0ec2",
+    "readiness_result_file_sha256": "b53eb80f18cbac197954f99dcae926bea7eedb2a2fff1b75484e43148c83a52d",
+    "readiness_plan_v2_identity": "246eef0ae2c42cb6606b8fa28a2ebb323f7ef65b7a80bdc09e4e456fba43eb87",
+    "crossfit_structure_identity": "b2ab654856a13d17fbc5256b6395c078e6cd13db9114da390daf720d952e6ae4",
+    "crossfit_sample_identity": "92538491c86bfdb60e1129226fb8f101f25d0accbab65feccae723632ce2fb90",
+    "selected_research_split_identity": "8187ffa06cc73f4e052b7481f06dc3629a23feace63e086c7075c74c17940028",
+    "official_membership_identity": "06c49903baf76ee7787af8333058e164cb54ea7a27035a1371747d6000d07b0b",
+    "f0_d0_manifest_identity": "bf7404d1f090073a1b36635b89d329e7011140d48e4fb3b3076efd7e55b5bca7",
+    "f0_d0_corpus_identity": "4c54d55209543e70edaeb33cb1dea25d2707312c3781580ba326ae35882dea29"
+  },
+  "execution_boundary": {
+    "allowed_raw_sessions": "the exact 6400 research-exploration sessions in the frozen crossfit structure",
+    "allowed_malom": "read-only sector-corrected-v1 positional queries",
+    "research_confirmation_reads": 0,
+    "official_selection_reads": 0,
+    "official_confirmation_reads": 0,
+    "official_final_test_reads": 0,
+    "human_db_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "database_writes": 0,
+    "games_searches_strategy_models_training_or_updates": 0,
+    "maximum_malom_queries": 80000000,
+    "maximum_active_seconds": 14400,
+    "failure_policy": "fail closed without partial-effect substitution"
+  },
+  "frozen_estimator_reuse": {
+    "refit": false,
+    "coefficients_and_fold_standardization": "load directly from the sealed readiness result",
+    "feature_order": [
+      "source_degree",
+      "destination_degree",
+      "capture_degree",
+      "closes_mill",
+      "opponent_immediate_mill_destinations_removed",
+      "creates_mill_fork",
+      "new_own_potential_mills",
+      "own_mobility_delta",
+      "opponent_mobility_reduction",
+      "captured_opponent_threat_lines"
+    ],
+    "required_reproduction": {
+      "covered_decisions": 292192,
+      "malom_queries_for_original_choice_inventory": 3869797,
+      "geometry_average_unique_player_log_loss": 2.146902903811703,
+      "full_average_unique_player_log_loss": 1.986710540640379,
+      "paired_log_loss_improvement": 0.16019236317132413,
+      "parent_D_decisions": 199234,
+      "D_to_L_events": 10416,
+      "tolerance": 1e-12
+    }
+  },
+  "risk_estimands": {
+    "primary": "for an observed learner parent-D state and each A_pos action, the frozen full model probability that the opponent chooses a positional D-to-L response in the successor",
+    "secondary": "opponent positional WDL-tier loss for all learner tiers; W-to-D and W-to-L remain separate and are not substituted for the primary",
+    "terminal_successor": "risk zero because no opponent decision occurs",
+    "safety_name": "A_pos",
+    "full_history_A_allow_claim": false,
+    "causal_inducement_claim": false
+  },
+  "reference_policies": {
+    "uniform_A_pos": "equal probability on every A_pos action",
+    "geometry_A_pos": "frozen out-of-fold geometry-control probabilities at the learner state, restricted to A_pos and renormalized",
+    "human_frequency_A_pos": "frozen out-of-fold full-panel probabilities at the learner state, restricted to A_pos and renormalized",
+    "stochastic_reference_value": "sum of reference action probability times successor risk",
+    "argmax_tie_break": "lexicographic canonical move key"
+  },
+  "uplift_reporting": {
+    "raw": "maximum successor risk minus stochastic reference value",
+    "quantiles": [0.0, 0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 0.9, 0.95, 0.99, 1.0],
+    "strata": [
+      "phase",
+      "learner_parent_tier",
+      "A_pos_cardinality:1,2,3-4,5-8,9-plus"
+    ],
+    "singleton_rule": "all A_pos-cardinality-one states remain in every applicable denominator with exactly zero uplift",
+    "weighting": {
+      "primary": "average unique actor player",
+      "secondary": "natural decision and side-game descriptive"
+    }
+  },
+  "calibration_and_winner_correction": {
+    "calibration_population": "observed out-of-fold parent-D human decisions only",
+    "reliability_bins": 10,
+    "binning": "equal unique-player-weight mass using deterministic weighted quantiles",
+    "reported": [
+      "predicted risk",
+      "observed D-to-L rate",
+      "decisions",
+      "players",
+      "Brier score",
+      "expected calibration error",
+      "calibration intercept",
+      "calibration slope"
+    ],
+    "cross_calibrator": "for each held-out fold, fit an unpenalized two-parameter logistic calibration of event on logit risk using the other four out-of-fold fold rows with equal-player total weight",
+    "zero_risk_rule": "exact zero predicted risk maps to exact zero and receives no prior-created event probability",
+    "corrected_uplift": "select the raw-risk argmax, then evaluate both selected and reference actions through the fold-external calibration map",
+    "negative_or_nonfinite_slope": "fail closed",
+    "bootstrap": {
+      "unit": "actor player",
+      "replicates": 2000,
+      "seed": "human-feature-deviation-product-conversion-v1-player-bootstrap"
+    },
+    "residual_limit": "calibration shrinkage does not identify counterfactual action-specific ranking error"
+  },
+  "policy_shift_support": {
+    "observed_support_basis": "the ten parent-D reliability bins",
+    "low_support_bin": "fewer than 100 independent players or 1000 observed decisions",
+    "report": [
+      "argmax and reference risk-bin mass",
+      "selected-to-reference bin mass ratio",
+      "Jensen-Shannon divergence",
+      "mass outside observed risk range",
+      "raw-to-corrected uplift attenuation"
+    ],
+    "no_support_extrapolation": "unsupported mass is reported, never assigned a global rate"
+  },
+  "log_loss_argmax_relationship": {
+    "tests": [
+      "full-risk versus geometry-risk A_pos argmax agreement",
+      "full-risk regret of geometry-risk argmax",
+      "player-balanced Pearson and Spearman association between current-state paired log-loss improvement and argmax regret",
+      "paired log-loss improvement split by argmax agreement"
+    ],
+    "no_assumed_proportionality": true
+  },
+  "product_scenarios": {
+    "score_convention": "win 1, draw 0.5, loss 0",
+    "additional_score_points_per_100_games": [0.5, 1.0, 2.0],
+    "perfect_redemption_upper_bound": true,
+    "side_game_unit": "one game and one color",
+    "necessary_single_step_formula": "delta_required >= 2 * score_gain_per_game / mean_parent_D_opportunities_per_side_game",
+    "observed_path_plug_in_upper": "0.5 times mean over side-games of min(1, sum corrected per-state D-to-L uplift)",
+    "independence_multiplication": false,
+    "log_loss_equivalence": "must be empirically tested; leave unidentified if no defensible mapping exists",
+    "D_discrimination_equivalence": "must be empirically tested; top-bottom discrimination is not assumed equal to policy uplift"
+  },
+  "required_conclusion": [
+    "A_conversion_established_with_decidable_tier",
+    "B_conversion_established_but_no_tier_decidable",
+    "C_conversion_not_established"
+  ],
+  "claim_boundary": {
+    "exploratory_derivation_only": true,
+    "positional_only": true,
+    "source_domain": "observed PlayOK-like source only",
+    "product_UI_or_new_population_transport": false,
+    "research_confirmation_authority": false,
+    "new_research_question_created": false,
+    "F0_H0_stop_remains_effective": true
+  },
+  "known_biases": {
+    "history_recovery_nonrandom": "1751 excluded games contain 35 draws while 92789 retained games contain 26157 draws",
+    "unverified_terminal_basis_games": 54923,
+    "unrecoverable_conditions": [
+      "UI orientation",
+      "time control",
+      "exact source rules variant"
+    ]
+  },
+  "derivation_identity": "5f45c0296d86553b7fa67e1aea45269690da15ccf00d840f0c3709479c575e1b"
+}
