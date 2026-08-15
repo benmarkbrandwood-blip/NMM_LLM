@@ -474,13 +474,38 @@ def _write_synth_dataset_metadata(dir_path: Path, provenance: dict) -> Path:
     return meta_path
 
 
+def _ready_prov(**overrides) -> dict:
+    """Default valid ready provenance (matching extractor contract).
+
+    Codex 2026-08-15 (2nd pass) P1: `_validate_dataset_provenance_contract`
+    requires `production_ready`, `non_ready_reasons`, and `gate_status`
+    with strict invariants.  Test helpers must produce contract-conformant
+    provenance."""
+    base = {
+        "production_ready":  True,
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    }
+    base.update(overrides)
+    return base
+
+
+def _nonready_prov(reason: str = "limit_files=5", gate_status: str = "ok",
+                   **overrides) -> dict:
+    """Default valid non-ready provenance (matching extractor contract)."""
+    base = {
+        "production_ready":  False,
+        "non_ready_reasons": [reason],
+        "gate_status":       gate_status,
+    }
+    base.update(overrides)
+    return base
+
+
 def test_trainer_refuses_non_production_dataset(trainer, tmp_path):
     """Codex P1(4): Stage E hard-rejects non-production datasets by default."""
     dataset_dir = tmp_path / "ds"
-    _write_synth_dataset_metadata(dataset_dir, {
-        "production_ready": False,
-        "non_ready_reasons": ["limit_files=5"],
-    })
+    _write_synth_dataset_metadata(dataset_dir, _nonready_prov("limit_files=5"))
     with pytest.raises(SystemExit, match="NOT production_ready"):
         trainer._verify_dataset_production_ready(dataset_dir)
 
@@ -488,32 +513,161 @@ def test_trainer_refuses_non_production_dataset(trainer, tmp_path):
 def test_trainer_allow_non_production_overrides(trainer, tmp_path):
     """--allow-non-production-dataset lets the run proceed (with warning).
 
-    Codex 2026-08-15 P1: return dict carries structured taint fields."""
+    Codex 2026-08-15 P1: return dict carries structured taint fields.
+    2nd pass: promotion_eligible is no longer computed here — it moved to
+    `_build_saved_provenance` (must factor Stage E gate + frozen thresholds)."""
     dataset_dir = tmp_path / "ds"
-    _write_synth_dataset_metadata(dataset_dir, {
-        "production_ready": False,
-        "non_ready_reasons": ["limit_files=5"],
-    })
+    _write_synth_dataset_metadata(dataset_dir, _nonready_prov("limit_files=5"))
     taint = trainer._verify_dataset_production_ready(
         dataset_dir, allow_non_production=True,
     )
     assert taint["dataset_production_ready"] is False
     assert taint["non_production_override"] is True
-    assert taint["promotion_eligible"] is False
     assert "limit_files=5" in taint["dataset_non_ready_reasons"]
+    # Contract change: promotion_eligible is no longer in the taint dict.
+    assert "promotion_eligible" not in taint
 
 
 def test_trainer_accepts_production_ready_dataset(trainer, tmp_path):
     dataset_dir = tmp_path / "ds"
-    _write_synth_dataset_metadata(dataset_dir, {
-        "production_ready": True,
-        "non_ready_reasons": [],
-    })
+    _write_synth_dataset_metadata(dataset_dir, _ready_prov())
     taint = trainer._verify_dataset_production_ready(dataset_dir)
     assert taint["dataset_production_ready"] is True
     assert taint["non_production_override"] is False
-    assert taint["promotion_eligible"] is True
     assert taint["dataset_non_ready_reasons"] == []
+    assert "promotion_eligible" not in taint
+
+
+# ── Codex 2026-08-15 (2nd pass) P1: strict provenance contract ──────────────
+
+def test_strict_contract_rejects_string_true_as_production_ready(trainer, tmp_path):
+    """`production_ready` must be an exact JSON boolean.  A string "true"
+    (silently truthy in Python) must not be accepted — Codex 2026-08-15
+    called this out explicitly."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  "true",           # string, not bool
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="exact JSON boolean"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_int_1_as_production_ready(trainer, tmp_path):
+    """`production_ready`=1 (int) is truthy in Python but not a bool — reject."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  1,                # int, not bool
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="exact JSON boolean"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_string_false_as_production_ready(trainer, tmp_path):
+    """A string "false" is a truthy non-empty string — must not be treated as
+    non-ready.  It's a malformed field, not a signal.  Fail closed."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  "false",          # string, not bool
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="exact JSON boolean"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_missing_production_ready(trainer, tmp_path):
+    """`production_ready` is a required field — missing → malformed."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        # production_ready omitted
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="missing `production_ready`"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_missing_gate_status(trainer, tmp_path):
+    """`gate_status` is a required field — missing → malformed."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  True,
+        "non_ready_reasons": [],
+        # gate_status omitted
+    })
+    with pytest.raises(SystemExit, match="missing `gate_status`"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_ready_with_non_empty_reasons(trainer, tmp_path):
+    """Invariant A: production_ready=True must have non_ready_reasons=[].
+    A ready flag paired with any reason is self-inconsistent — reject even
+    though the ready flag looks "good"."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  True,
+        "non_ready_reasons": ["limit_files=5"],   # contradicts ready=True
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="invariant A"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_ready_with_bad_gate_status(trainer, tmp_path):
+    """Invariant B: production_ready=True implies gate_status='ok'.
+    A ready flag paired with any halt gate is self-inconsistent."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  True,
+        "non_ready_reasons": [],
+        "gate_status":       "halt_coverage_floor",
+    })
+    with pytest.raises(SystemExit, match="invariant B"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_rejects_nonready_with_empty_reasons(trainer, tmp_path):
+    """Invariant C: production_ready=False must have at least one reason.
+    A non-ready flag with no explanation is malformed."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  False,
+        "non_ready_reasons": [],                  # empty
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="invariant C"):
+        trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_strict_contract_reject_cannot_be_bypassed_by_override(trainer, tmp_path):
+    """Malformed provenance is NOT bypassable by --allow-non-production-dataset.
+    The override flag is for legitimate non-ready datasets, not broken metadata."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  "false",   # malformed
+        "non_ready_reasons": [],
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="exact JSON boolean"):
+        trainer._verify_dataset_production_ready(
+            dataset_dir, allow_non_production=True,
+        )
+
+
+def test_strict_contract_reasons_must_be_list(trainer, tmp_path):
+    """non_ready_reasons must be a list, not a string."""
+    dataset_dir = tmp_path / "ds"
+    _write_synth_dataset_metadata(dataset_dir, {
+        "production_ready":  False,
+        "non_ready_reasons": "limit_files=5",   # string, not list
+        "gate_status":       "ok",
+    })
+    with pytest.raises(SystemExit, match="`non_ready_reasons` must be a list"):
+        trainer._verify_dataset_production_ready(dataset_dir)
 
 
 def test_trainer_refuses_missing_provenance(trainer, tmp_path):
@@ -553,72 +707,382 @@ def test_trainer_taint_missing_provenance_under_override(trainer, tmp_path):
     )
     assert taint["dataset_production_ready"] is False
     assert taint["non_production_override"] is True
-    assert taint["promotion_eligible"] is False
     assert "no_dataset_provenance" in taint["dataset_non_ready_reasons"]
+    # Contract change (2nd pass): promotion_eligible moved to the builder.
+    assert "promotion_eligible" not in taint
 
 
-def test_trainer_saved_npz_round_trip_carries_taint(trainer, tmp_path):
-    """Codex 2026-08-15 P1: the saved model NPZ must record taint fields
-    (dataset_production_ready, dataset_non_ready_reasons,
-    non_production_override, promotion_eligible) AND the model label must
-    reflect the taint.  Round-trip: build provenance the way `main()`
-    would, hand it to `_save`, reload with `np.load`, and assert taint
-    survived and the model label switched to *_nonproduction."""
-    model = trainer.GapNetV3()
+# ── Codex 2026-08-15 (2nd pass) P1 + P2: _build_saved_provenance builder ────
 
-    # Simulate main() computing taint for a non-production dataset.
-    taint_nonprod = {
-        "dataset_production_ready":  False,
-        "dataset_non_ready_reasons": ["limit_files=5", "coverage_floor not met"],
-        "non_production_override":   True,
-        "promotion_eligible":        False,
-        "dataset_provenance":        {"production_ready": False},
-    }
-    model_label = ("gap_net_v3_candidate"
-                   if taint_nonprod["promotion_eligible"]
-                   else "gap_net_v3_candidate_nonproduction")
-    provenance = {
-        "model":                     model_label,
-        "dataset_production_ready":  taint_nonprod["dataset_production_ready"],
-        "dataset_non_ready_reasons": taint_nonprod["dataset_non_ready_reasons"],
-        "non_production_override":   taint_nonprod["non_production_override"],
-        "promotion_eligible":        taint_nonprod["promotion_eligible"],
-    }
-    out = tmp_path / "nonprod.npz"
-    trainer._save(model, out, provenance)
-
-    z = np.load(str(out), allow_pickle=True)
-    reloaded_prov = json.loads(str(z["provenance"]))
-    assert reloaded_prov["model"] == "gap_net_v3_candidate_nonproduction"
-    assert reloaded_prov["dataset_production_ready"] is False
-    assert reloaded_prov["non_production_override"] is True
-    assert reloaded_prov["promotion_eligible"] is False
-    assert "limit_files=5" in reloaded_prov["dataset_non_ready_reasons"]
-    assert "coverage_floor not met" in reloaded_prov["dataset_non_ready_reasons"]
+class _StubArgs:
+    """Minimal args namespace for _build_saved_provenance."""
+    def __init__(self, **kw):
+        self.lr           = kw.get("lr", 3e-4)
+        self.batch_size   = kw.get("batch_size", 4096)
+        self.weight_decay = kw.get("weight_decay", 1e-5)
+        self.seed         = kw.get("seed", 42)
+        self.d4_augmentation = kw.get("d4_augmentation", "off")
 
 
-def test_trainer_saved_npz_round_trip_clean_run_promotion_eligible(trainer, tmp_path):
-    """Codex 2026-08-15 P1: clean production_ready dataset yields
-    promotion_eligible=True and the plain gap_net_v3_candidate label."""
-    model = trainer.GapNetV3()
+def _make_dataset_dir_with_sha_files(tmp_path: Path) -> Path:
+    """Create the four binaries + metadata.npz that _build_saved_provenance
+    sha256s.  Content is stub — we only need reproducible bytes."""
+    d = tmp_path / "ds"
+    d.mkdir()
+    for name in ("parent_feats.f32.bin", "targets.f32.bin",
+                 "targets_uniform.f32.bin", "targets_empirical.f32.bin"):
+        (d / name).write_bytes(b"stub")
+    np.savez(
+        str(d / "metadata.npz"),
+        state_keys=np.array(["sk"], dtype=object),
+        provenance=np.array(json.dumps(_ready_prov()), dtype=object),
+    )
+    return d
 
-    provenance = {
-        "model":                     "gap_net_v3_candidate",
+
+def _clean_taint() -> dict:
+    return {
         "dataset_production_ready":  True,
         "dataset_non_ready_reasons": [],
         "non_production_override":   False,
-        "promotion_eligible":        True,
+        "dataset_provenance":        _ready_prov(),
     }
-    out = tmp_path / "prod.npz"
+
+
+def _nonready_taint() -> dict:
+    return {
+        "dataset_production_ready":  False,
+        "dataset_non_ready_reasons": ["limit_files=5", "coverage_floor not met"],
+        "non_production_override":   True,
+        "dataset_provenance":        _nonready_prov("limit_files=5"),
+    }
+
+
+def _gate_summary(overall: str) -> dict:
+    return {
+        "overall_verdict":              overall,
+        "n_cells_total":                9,
+        "n_cells_pass":                 9 if overall == "PASS" else 0,
+        "n_cells_fail":                 9 if overall == "FAIL" else 0,
+        "n_cells_skip_insufficient":    0,
+        "n_cells_skip_degenerate":      0,
+        "n_cells_skip_non_finite":      0,
+    }
+
+
+def test_builder_promotion_eligible_only_when_all_three_conditions_met(
+    trainer, tmp_path,
+):
+    """Codex 2026-08-15 (2nd pass) P1: promotion_eligible requires
+    dataset_eligibility AND stage_e_gate == PASS AND frozen thresholds id."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, label = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("PASS"),
+        gate_thresholds_frozen_id="stage_e_thresholds_v1_2026-08-15",
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is True
+    assert prov["promotion_ineligible_reasons"] == []
+    assert prov["dataset_eligibility"] is True
+    assert prov["stage_e_gate_verdict"] == "PASS"
+    assert prov["gate_thresholds_frozen"] is True
+    assert prov["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_2026-08-15"
+    assert label == "gap_net_v3_candidate"
+    assert prov["model"] == "gap_net_v3_candidate"
+
+
+def test_builder_gate_fail_blocks_promotion(trainer, tmp_path):
+    """Codex 2026-08-15 (2nd pass) P1: a clean-dataset run whose Stage E
+    gate FAILs must NOT be promotable."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, label = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("FAIL"),
+        gate_thresholds_frozen_id="stage_e_thresholds_v1",
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is False
+    assert prov["dataset_eligibility"] is True
+    assert prov["stage_e_gate_verdict"] == "FAIL"
+    assert any("stage_e_gate_verdict" in r for r in prov["promotion_ineligible_reasons"])
+    assert label == "gap_net_v3_candidate_nonpromotion"
+    assert prov["model"] == "gap_net_v3_candidate_nonpromotion"
+
+
+def test_builder_gate_skip_blocks_promotion(trainer, tmp_path):
+    """A run whose Stage E overall_verdict is FAIL_INSUFFICIENT_COVERAGE
+    (all cells SKIP) must NOT be promotable — this was the specific
+    scenario Codex flagged as still labelled promotable in da596ef."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, _ = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("FAIL_INSUFFICIENT_COVERAGE"),
+        gate_thresholds_frozen_id="stage_e_thresholds_v1",
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is False
+    assert prov["stage_e_gate_verdict"] == "FAIL_INSUFFICIENT_COVERAGE"
+
+
+def test_builder_missing_frozen_id_blocks_promotion_even_with_pass(
+    trainer, tmp_path,
+):
+    """Even a clean-dataset PASS run without --gate-thresholds-frozen-id
+    is not promotable — draft thresholds carry no promotion authority."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, label = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("PASS"),
+        gate_thresholds_frozen_id=None,          # not frozen
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is False
+    assert prov["gate_thresholds_frozen"] is False
+    assert prov["gate_thresholds_frozen_id"] is None
+    assert any("gate_thresholds_frozen_id" in r
+               for r in prov["promotion_ineligible_reasons"])
+    assert label == "gap_net_v3_candidate_nonpromotion"
+
+
+def test_builder_empty_frozen_id_blocks_promotion(trainer, tmp_path):
+    """Empty string / whitespace-only id is not a valid frozen identifier."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, _ = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("PASS"),
+        gate_thresholds_frozen_id="   ",         # whitespace only
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is False
+    assert prov["gate_thresholds_frozen"] is False
+
+
+def test_builder_nonready_dataset_blocks_promotion_and_lists_all_reasons(
+    trainer, tmp_path,
+):
+    """A non-ready dataset (override set) with gate FAIL and no frozen id
+    must record ALL three ineligibility reasons in the saved provenance."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, label = trainer._build_saved_provenance(
+        dataset_taint=_nonready_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("FAIL"),
+        gate_thresholds_frozen_id=None,
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    reasons_blob = " | ".join(prov["promotion_ineligible_reasons"])
+    assert prov["promotion_eligible"] is False
+    assert "dataset_not_production_ready" in reasons_blob
+    assert "non_production_override_set" in reasons_blob
+    assert "stage_e_gate_verdict" in reasons_blob
+    assert "gate_thresholds_frozen_id" in reasons_blob
+    assert label == "gap_net_v3_candidate_nonpromotion"
+
+
+def test_builder_missing_overall_verdict_treated_as_missing(trainer, tmp_path):
+    """A gate_summary without overall_verdict (unexpected schema drift)
+    must be treated as non-PASS, not silently pass."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    prov, _ = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary={},                          # no overall_verdict
+        gate_thresholds_frozen_id="stage_e_thresholds_v1",
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    assert prov["promotion_eligible"] is False
+    assert prov["stage_e_gate_verdict"] == "MISSING"
+
+
+# ── Codex 2026-08-15 (2nd pass) P2: save/load round-trip through builder ────
+
+def test_builder_saved_npz_round_trip_all_promotion_fields_preserved(
+    trainer, tmp_path,
+):
+    """End-to-end round-trip through the exact seam `main()` uses:
+    builder → _save → np.load.  Every promotion-related field must survive."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    provenance, model_label = trainer._build_saved_provenance(
+        dataset_taint=_clean_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("PASS"),
+        gate_thresholds_frozen_id="stage_e_thresholds_v1_2026-08-15",
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    model = trainer.GapNetV3()
+    out = tmp_path / "candidate.npz"
     trainer._save(model, out, provenance)
 
     z = np.load(str(out), allow_pickle=True)
-    reloaded_prov = json.loads(str(z["provenance"]))
-    assert reloaded_prov["model"] == "gap_net_v3_candidate"
-    assert reloaded_prov["dataset_production_ready"] is True
-    assert reloaded_prov["non_production_override"] is False
-    assert reloaded_prov["promotion_eligible"] is True
-    assert reloaded_prov["dataset_non_ready_reasons"] == []
+    reloaded = json.loads(str(z["provenance"]))
+    for k in ("model", "dataset_production_ready", "dataset_non_ready_reasons",
+              "non_production_override", "dataset_eligibility",
+              "stage_e_gate_verdict", "gate_thresholds_frozen",
+              "gate_thresholds_frozen_id", "promotion_eligible",
+              "promotion_ineligible_reasons"):
+        assert k in reloaded, f"promotion field {k!r} missing from saved NPZ"
+    assert reloaded["model"] == model_label == "gap_net_v3_candidate"
+    assert reloaded["promotion_eligible"] is True
+    assert reloaded["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_2026-08-15"
+
+
+def test_builder_saved_npz_round_trip_nonpromotion_carries_reasons(
+    trainer, tmp_path,
+):
+    """A non-promotable run's saved NPZ must record ineligibility reasons
+    that a downstream consumer can enumerate without running the trainer
+    again."""
+    ds = _make_dataset_dir_with_sha_files(tmp_path)
+    provenance, model_label = trainer._build_saved_provenance(
+        dataset_taint=_nonready_taint(),
+        dataset_dir=ds,
+        gate_results=[],
+        gate_summary=_gate_summary("FAIL"),
+        gate_thresholds_frozen_id=None,
+        args=_StubArgs(),
+        n_train=100, n_val=20,
+        best_val_loss=0.1, epochs_trained=1,
+        tr_means=[0.0, 0.0, 0.0],
+    )
+    model = trainer.GapNetV3()
+    out = tmp_path / "nonpromo.npz"
+    trainer._save(model, out, provenance)
+
+    z = np.load(str(out), allow_pickle=True)
+    reloaded = json.loads(str(z["provenance"]))
+    assert reloaded["model"] == model_label == "gap_net_v3_candidate_nonpromotion"
+    assert reloaded["promotion_eligible"] is False
+    assert reloaded["promotion_ineligible_reasons"]   # non-empty
+    assert reloaded["gate_thresholds_frozen_id"] is None
+
+
+# ── Codex 2026-08-15 (2nd pass) P2: bounded integration test through main() ─
+
+def test_main_integration_records_all_promotion_fields(trainer, tmp_path, monkeypatch):
+    """Bounded integration test: run trainer.main() end-to-end on a tiny
+    synthetic dataset and assert every promotion field that the builder
+    emits also appears in the saved NPZ.
+
+    This catches the specific regression Codex 2026-08-15 flagged as
+    uncaught: main() dropping a field between builder output and _save
+    call.  Bounded because we run only 1 epoch on a 60-row synthetic
+    dataset (~1s).
+
+    The synthetic empirical target is all-NaN, so the Stage E gate SKIPs
+    every cell → overall_verdict is FAIL_INSUFFICIENT_COVERAGE → the
+    saved NPZ is NOT promotable.  That is intentional: the test asserts
+    the promotion-block reasons are recorded (not that promotion succeeds)."""
+    dataset_dir = tmp_path / "ds"
+    dataset_dir.mkdir()
+
+    # Build a synthetic dataset with 60 rows: 40 train, 20 val.
+    n_total  = 60
+    n_train  = 40
+    n_val    = 20
+    n_bands  = 3
+    board_dim = 79
+    heads    = 3
+
+    rng = np.random.default_rng(0)
+    # Feats: random floats.
+    feats = rng.standard_normal((n_total, board_dim)).astype(np.float32)
+    (dataset_dir / "parent_feats.f32.bin").write_bytes(feats.tobytes())
+    # Targets: constant per row to make model easy to fit.
+    tgt = np.ones((n_total, heads), dtype=np.float32) * 0.1
+    (dataset_dir / "targets.f32.bin").write_bytes(tgt.tobytes())
+    unif = np.ones((n_total, heads), dtype=np.float32) * 0.5
+    (dataset_dir / "targets_uniform.f32.bin").write_bytes(unif.tobytes())
+    # Empirical: NaN → all cells SKIP → gate FAIL_INSUFFICIENT_COVERAGE.
+    # That's what we want here — this test verifies promotion is CORRECTLY
+    # BLOCKED when the gate SKIPs, exercising the full main() → builder path.
+    emp = np.full((n_total, heads), np.nan, dtype=np.float32)
+    (dataset_dir / "targets_empirical.f32.bin").write_bytes(emp.tobytes())
+
+    split      = np.array([0] * n_train + [1] * n_val, dtype=np.int64)
+    band_idx   = rng.integers(0, n_bands, n_total).astype(np.int64)
+    np.savez(
+        str(dataset_dir / "metadata.npz"),
+        split=split,
+        band_idx=band_idx,
+        state_keys=np.array([f"sk_{i}" for i in range(n_total)], dtype=object),
+        provenance=np.array(json.dumps(_ready_prov()), dtype=object),
+    )
+
+    out_path = tmp_path / "candidate.npz"
+    monkeypatch.setattr(sys, "argv", [
+        "train_gap_net_v3.py",
+        "--dataset-dir",  str(dataset_dir),
+        "--out",          str(out_path),
+        "--epochs",       "1",
+        "--patience",     "0",
+        "--batch-size",   "16",
+        "--gate-thresholds-frozen-id", "stage_e_thresholds_v1_test",
+    ])
+    trainer.main()
+
+    assert out_path.exists(), "main() must produce the output NPZ"
+    z = np.load(str(out_path), allow_pickle=True)
+    prov = json.loads(str(z["provenance"]))
+
+    # These are the builder's promotion fields — main() must not drop any.
+    for k in ("model", "dataset_production_ready", "dataset_non_ready_reasons",
+              "non_production_override", "dataset_eligibility",
+              "stage_e_gate_verdict", "gate_thresholds_frozen",
+              "gate_thresholds_frozen_id", "promotion_eligible",
+              "promotion_ineligible_reasons",
+              "gate_results", "gate_summary",
+              "dataset_feats_sha256", "dataset_metadata_sha256",
+              "best_val_loss", "epochs_trained", "seed"):
+        assert k in prov, f"required field {k!r} missing from main() output"
+
+    # This synthetic dataset produces all-SKIP gate → NOT promotable.
+    assert prov["dataset_production_ready"] is True
+    assert prov["dataset_eligibility"] is True
+    assert prov["gate_thresholds_frozen"] is True
+    assert prov["gate_thresholds_frozen_id"] == "stage_e_thresholds_v1_test"
+    assert prov["stage_e_gate_verdict"] != "PASS"   # empirical all-NaN → SKIP
+    assert prov["promotion_eligible"] is False
+    assert any("stage_e_gate_verdict" in r
+               for r in prov["promotion_ineligible_reasons"])
+    assert prov["model"] == "gap_net_v3_candidate_nonpromotion"
 
 
 # ── P2(1) emitted_by_band_phase counter ─────────────────────────────────────

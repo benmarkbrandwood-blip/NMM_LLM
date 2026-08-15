@@ -29,6 +29,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
@@ -118,25 +119,109 @@ def _build_features(board: torch.Tensor, band: torch.Tensor) -> torch.Tensor:
 
 # ── Dataset loading (fail-closed) ────────────────────────────────────────────
 
+_DATASET_PROV_MALFORMED = "malformed_dataset_provenance"
+
+
+def _validate_dataset_provenance_contract(prov: dict) -> None:
+    """Codex 2026-08-15 P1: strict contract validation for a dataset's own
+    provenance dict (embedded in metadata.npz under key `provenance`).
+
+    Prior implementation parsed the provenance by truthiness — JSON string
+    `"false"`, integer `1`, or a `production_ready=true` with a non-empty
+    `non_ready_reasons` all silently coerced to a ready-and-clean state.
+    Codex flagged this as a promotion-safety hole.
+
+    Contract (fail-closed):
+      - `production_ready` must be an exact Python bool (True or False).
+        Missing, string, int, None → malformed → SystemExit.
+      - `non_ready_reasons` must be a list.  Missing or wrong type → malformed.
+      - `gate_status` must be a non-empty string.  Missing / wrong type → malformed.
+      - Invariant A: `production_ready is True` implies `non_ready_reasons == []`.
+      - Invariant B: `production_ready is True` implies `gate_status == "ok"`.
+      - Invariant C: `production_ready is False` implies non-empty non_ready_reasons.
+      - Invariant D: `gate_status != "ok"` implies `production_ready is False`.
+
+    Any violation raises SystemExit — this cannot be bypassed by
+    --allow-non-production-dataset, which is for legitimate non-ready
+    datasets, not for silently-broken provenance.
+    """
+    def _bail(msg: str) -> None:
+        raise SystemExit(
+            f"[gap_net_v3] Dataset provenance is malformed / self-inconsistent: "
+            f"{msg}.  Refusing to consume.  Re-run the extractor to rebuild "
+            f"provenance."
+        )
+
+    if "production_ready" not in prov:
+        _bail("missing `production_ready` field")
+    pr = prov["production_ready"]
+    if pr is not True and pr is not False:
+        _bail(
+            f"`production_ready` must be exact JSON boolean; got {pr!r} "
+            f"of type {type(pr).__name__}"
+        )
+    if "non_ready_reasons" not in prov:
+        _bail("missing `non_ready_reasons` field")
+    reasons = prov["non_ready_reasons"]
+    if not isinstance(reasons, list):
+        _bail(
+            f"`non_ready_reasons` must be a list; got {type(reasons).__name__}"
+        )
+    if "gate_status" not in prov:
+        _bail("missing `gate_status` field")
+    gate_status = prov["gate_status"]
+    if not isinstance(gate_status, str) or not gate_status:
+        _bail(f"`gate_status` must be a non-empty string; got {gate_status!r}")
+
+    if pr is True and reasons:
+        _bail(
+            f"invariant A violated: production_ready=True but "
+            f"non_ready_reasons={reasons!r}"
+        )
+    if pr is True and gate_status != "ok":
+        _bail(
+            f"invariant B violated: production_ready=True but "
+            f"gate_status={gate_status!r} (expected 'ok')"
+        )
+    if pr is False and not reasons:
+        _bail(
+            "invariant C violated: production_ready=False but "
+            "non_ready_reasons is empty"
+        )
+    if gate_status != "ok" and pr is True:
+        _bail(
+            f"invariant D violated: gate_status={gate_status!r} but "
+            f"production_ready=True"
+        )
+
+
 def _verify_dataset_production_ready(
     dataset_dir: Path, allow_non_production: bool = False,
 ) -> dict:
     """Codex P1(4) 2026-08-14: Stage E must hard-reject datasets that came
     from a smoke, sub-floor, or hardening-bypassed extraction.  The extractor
-    now writes production_ready + non_ready_reasons to metadata.npz provenance;
-    we refuse to train against a non-ready dataset unless the user explicitly
-    passes --allow-non-production-dataset (which disqualifies the run from
-    promotion evidence).
+    writes production_ready + non_ready_reasons + gate_status to metadata.npz
+    provenance; we refuse to train against a non-ready dataset unless the
+    user explicitly passes --allow-non-production-dataset.
 
-    Codex 2026-08-15 P1 hardening: returns a dict carrying explicit taint
-    fields so the caller can propagate them into the saved model NPZ.  The
-    returned dict always contains:
-        dataset_production_ready       bool
-        dataset_non_ready_reasons      list[str]  (empty when ready)
-        non_production_override        bool
-        promotion_eligible             bool       (ready AND not overridden)
-        dataset_provenance             dict       (raw extractor provenance,
-                                                   empty when missing)
+    Codex 2026-08-15 (2nd pass) P1: dataset provenance is now validated as a
+    strict contract (see `_validate_dataset_provenance_contract`).
+    Malformed / self-inconsistent provenance stops the run and CANNOT be
+    bypassed by --allow-non-production-dataset (which is for legitimate
+    non-ready datasets, not for broken metadata).
+
+    Returned dict (always with same keys):
+        dataset_production_ready       bool  — parsed strict bool
+        dataset_non_ready_reasons      list[str] — [] when ready
+        non_production_override        bool  — True if user bypassed refusal
+        dataset_provenance             dict  — raw extractor provenance
+                                              ({} only when missing under
+                                              --allow-non-production-dataset)
+
+    NOTE: promotion_eligible is intentionally NOT in this dict — it is a
+    downstream verdict computed by `_build_saved_provenance` from the
+    combination of dataset readiness AND Stage E gate result AND frozen
+    thresholds identifier.  This function only reports dataset state.
     """
     meta_path = dataset_dir / "metadata.npz"
     if not meta_path.exists():
@@ -152,7 +237,6 @@ def _verify_dataset_production_ready(
                 "dataset_production_ready":  False,
                 "dataset_non_ready_reasons": ["no_dataset_provenance"],
                 "non_production_override":   True,
-                "promotion_eligible":        False,
                 "dataset_provenance":        {},
             }
         raise SystemExit(
@@ -163,12 +247,25 @@ def _verify_dataset_production_ready(
     prov_raw = meta["provenance"].item()
     if isinstance(prov_raw, bytes):
         prov_raw = prov_raw.decode("utf-8")
-    prov = json.loads(prov_raw)
-    production_ready = bool(prov.get("production_ready", False))
-    reasons = list(prov.get("non_ready_reasons", []) or [])
-    if not production_ready:
-        if not reasons:
-            reasons = ["unknown"]
+    try:
+        prov = json.loads(prov_raw)
+    except Exception as e:
+        raise SystemExit(
+            f"[gap_net_v3] Dataset provenance is not valid JSON: {e!s}"
+        )
+    if not isinstance(prov, dict):
+        raise SystemExit(
+            f"[gap_net_v3] Dataset provenance is not a JSON object; "
+            f"got {type(prov).__name__}"
+        )
+
+    # Contract validation is unconditional — this cannot be overridden.
+    _validate_dataset_provenance_contract(prov)
+
+    production_ready = prov["production_ready"]   # already validated as bool
+    reasons = list(prov["non_ready_reasons"])     # already validated as list
+
+    if production_ready is False:
         if allow_non_production:
             print(f"[gap_net_v3] WARNING: training on non-production dataset")
             print(f"[gap_net_v3]   non_ready_reasons: {reasons}")
@@ -177,7 +274,6 @@ def _verify_dataset_production_ready(
                 "dataset_production_ready":  False,
                 "dataset_non_ready_reasons": reasons,
                 "non_production_override":   True,
-                "promotion_eligible":        False,
                 "dataset_provenance":        prov,
             }
         raise SystemExit(
@@ -190,7 +286,6 @@ def _verify_dataset_production_ready(
         "dataset_production_ready":  True,
         "dataset_non_ready_reasons": [],
         "non_production_override":   False,
-        "promotion_eligible":        True,
         "dataset_provenance":        prov,
     }
 
@@ -272,6 +367,130 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+# ── Saved-provenance builder (Codex 2026-08-15 2nd pass P1 + P2) ─────────────
+
+def _build_saved_provenance(
+    *,
+    dataset_taint: dict,
+    dataset_dir: Path,
+    gate_results: list,
+    gate_summary: dict,
+    gate_thresholds_frozen_id: Optional[str],
+    args,
+    n_train: int,
+    n_val: int,
+    best_val_loss: float,
+    epochs_trained: int,
+    tr_means: list,
+) -> tuple[dict, str]:
+    """Single seam that constructs the provenance dict AND the model label.
+
+    Codex 2026-08-15 (2nd pass) P1: prior main() derived model label +
+    promotion_eligible from dataset readiness ALONE.  A clean-dataset run
+    whose Stage E gate failed or all-SKIP'd was still labelled
+    `gap_net_v3_candidate` with `promotion_eligible=True`.
+
+    New rule (fail-closed):
+        promotion_eligible = (dataset_eligibility)
+                             AND (stage_e_gate_verdict == "PASS")
+                             AND (gate_thresholds_frozen_id is a non-empty
+                                  string identifying which owner-reviewed
+                                  threshold set was used)
+
+    where:
+        dataset_eligibility = dataset_production_ready AND NOT
+                              non_production_override
+
+    Model label:
+        promotion_eligible True  → "gap_net_v3_candidate"
+        promotion_eligible False → "gap_net_v3_candidate_nonpromotion"
+
+    `promotion_ineligible_reasons` (list[str]) enumerates why the run is
+    non-promotable — always empty iff promotion_eligible is True.
+
+    Codex 2026-08-15 P2: this is the SINGLE construction point for the
+    saved provenance and model label.  main() is a thin wrapper and must
+    not build provenance elsewhere.  Any regression that drops a field is
+    caught by unit tests + a bounded integration test through main().
+    """
+    # Dataset side
+    dataset_ready = dataset_taint["dataset_production_ready"] is True
+    override      = dataset_taint["non_production_override"] is True
+    dataset_eligibility = dataset_ready and not override
+
+    # Stage E gate side
+    gate_verdict = gate_summary.get("overall_verdict")
+    if not isinstance(gate_verdict, str):
+        gate_verdict = "MISSING"
+    stage_e_passed = gate_verdict == "PASS"
+
+    # Thresholds-frozen side
+    frozen_id = (gate_thresholds_frozen_id or "").strip()
+    gate_thresholds_frozen = bool(frozen_id)
+
+    # Promotion verdict + reasons
+    promotion_ineligible_reasons: list[str] = []
+    if not dataset_ready:
+        promotion_ineligible_reasons.append(
+            f"dataset_not_production_ready:{dataset_taint['dataset_non_ready_reasons']!r}"
+        )
+    if override:
+        promotion_ineligible_reasons.append("non_production_override_set")
+    if not stage_e_passed:
+        promotion_ineligible_reasons.append(
+            f"stage_e_gate_verdict={gate_verdict!r} (must be 'PASS')"
+        )
+    if not gate_thresholds_frozen:
+        promotion_ineligible_reasons.append(
+            "gate_thresholds_frozen_id missing "
+            "(no owner-reviewed threshold identifier — see checklist §Batch 5)"
+        )
+    promotion_eligible = not promotion_ineligible_reasons
+
+    model_label = ("gap_net_v3_candidate"
+                   if promotion_eligible
+                   else "gap_net_v3_candidate_nonpromotion")
+
+    provenance = {
+        "model":                     model_label,
+        "architecture":              f"{_INPUT_DIM}→{_H1}→{_H2}→{_H3}→{_N_HEADS}",
+        "input_layout":              "board[79] || band_onehot[3]",
+        "components":                list(_COMP_NAMES),
+        "bands":                     list(_BAND_NAMES),
+        "dataset_dir":               str(dataset_dir),
+        "dataset_feats_sha256":      _sha256(dataset_dir / "parent_feats.f32.bin"),
+        "dataset_targets_sha256":    _sha256(dataset_dir / "targets.f32.bin"),
+        "dataset_uniform_sha256":    _sha256(dataset_dir / "targets_uniform.f32.bin"),
+        "dataset_emp_sha256":        _sha256(dataset_dir / "targets_empirical.f32.bin"),
+        "dataset_metadata_sha256":   _sha256(dataset_dir / "metadata.npz"),
+        # Codex 2026-08-15 P1 (2nd pass): explicit taint + promotion fields.
+        "dataset_production_ready":  dataset_taint["dataset_production_ready"],
+        "dataset_non_ready_reasons": dataset_taint["dataset_non_ready_reasons"],
+        "non_production_override":   dataset_taint["non_production_override"],
+        "dataset_eligibility":       dataset_eligibility,
+        "stage_e_gate_verdict":      gate_verdict,
+        "gate_thresholds_frozen":    gate_thresholds_frozen,
+        "gate_thresholds_frozen_id": frozen_id if gate_thresholds_frozen else None,
+        "promotion_eligible":        promotion_eligible,
+        "promotion_ineligible_reasons": promotion_ineligible_reasons,
+        "n_train":                   n_train,
+        "n_val":                     n_val,
+        "best_val_loss":             best_val_loss,
+        "epochs_trained":            epochs_trained,
+        "lr":                        args.lr,
+        "batch_size":                args.batch_size,
+        "weight_decay":              args.weight_decay,
+        "seed":                      args.seed,
+        "d4_augmentation":           args.d4_augmentation,
+        "tr_means":                  tr_means,
+        "gate_results":              gate_results,
+        "gate_summary":              gate_summary,
+        "git_commit":                _git_commit(),
+        "built_at":                  time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    return provenance, model_label
 
 
 # ── Save ─────────────────────────────────────────────────────────────────────
@@ -606,6 +825,16 @@ def main() -> None:
                         "sub-floor, or hardening-bypassed extractions).  Pass this "
                         "flag to override — the run will NOT be eligible for "
                         "promotion evidence.")
+    # Codex 2026-08-15 (2nd pass) P1: promotion also requires an owner-reviewed
+    # frozen threshold identifier.  Default None → never promotable (a run
+    # with drafts thresholds cannot claim promotion authority).  Format is
+    # freeform but MUST identify what was frozen (e.g. plan-doc git sha, or
+    # a versioned tag like "gate_thresholds_v1_2026-08-15").
+    p.add_argument("--gate-thresholds-frozen-id", default=None,
+                   help="Identifier for the owner-reviewed frozen Stage E "
+                        "threshold set (e.g. plan-doc git sha).  Required for "
+                        "promotion_eligible=True.  Absent/empty → not "
+                        "promotable regardless of dataset/gate state.")
     args = p.parse_args()
 
     torch.manual_seed(args.seed)
@@ -763,47 +992,29 @@ def main() -> None:
           f"skip_degenerate={gate_summary['n_cells_skip_degenerate']}  "
           f"skip_non_finite={gate_summary['n_cells_skip_non_finite']}")
 
-    # Codex 2026-08-15 P1: propagate dataset production-readiness taint into
-    # the saved artifact.  The model label degrades to a *_nonproduction
-    # suffix whenever the run was not promotion-eligible so downstream
-    # consumers cannot mistake it for a promotable candidate on filename
-    # alone; the same taint is also encoded structurally in provenance.
-    model_label = ("gap_net_v3_candidate"
-                   if dataset_taint["promotion_eligible"]
-                   else "gap_net_v3_candidate_nonproduction")
-
-    provenance = {
-        "model":                    model_label,
-        "architecture":             f"{_INPUT_DIM}→{_H1}→{_H2}→{_H3}→{_N_HEADS}",
-        "input_layout":             "board[79] || band_onehot[3]",
-        "components":               list(_COMP_NAMES),
-        "bands":                    list(_BAND_NAMES),
-        "dataset_dir":              str(dataset_dir),
-        "dataset_feats_sha256":     _sha256(dataset_dir / "parent_feats.f32.bin"),
-        "dataset_targets_sha256":   _sha256(dataset_dir / "targets.f32.bin"),
-        "dataset_uniform_sha256":   _sha256(dataset_dir / "targets_uniform.f32.bin"),
-        "dataset_emp_sha256":       _sha256(dataset_dir / "targets_empirical.f32.bin"),
-        "dataset_metadata_sha256":  _sha256(dataset_dir / "metadata.npz"),
-        # Codex 2026-08-15 P1: taint fields (immutable in saved NPZ)
-        "dataset_production_ready": dataset_taint["dataset_production_ready"],
-        "dataset_non_ready_reasons": dataset_taint["dataset_non_ready_reasons"],
-        "non_production_override":  dataset_taint["non_production_override"],
-        "promotion_eligible":       dataset_taint["promotion_eligible"],
-        "n_train":                  len(tr["board"]),
-        "n_val":                    len(va["board"]),
-        "best_val_loss":            best_val_loss,
-        "epochs_trained":           epoch,
-        "lr":                       args.lr,
-        "batch_size":               args.batch_size,
-        "weight_decay":             args.weight_decay,
-        "seed":                     args.seed,
-        "d4_augmentation":          args.d4_augmentation,
-        "tr_means":                 tr_means_list,
-        "gate_results":             gate_results,
-        "gate_summary":             gate_summary,
-        "git_commit":               _git_commit(),
-        "built_at":                 time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    }
+    # Codex 2026-08-15 (2nd pass) P1 + P2: provenance + model label are built
+    # in exactly ONE place — `_build_saved_provenance`.  main() is a strict
+    # thin wrapper; do NOT construct provenance fields here.  Unit + bounded
+    # integration tests exercise this seam directly.
+    provenance, model_label = _build_saved_provenance(
+        dataset_taint=dataset_taint,
+        dataset_dir=dataset_dir,
+        gate_results=gate_results,
+        gate_summary=gate_summary,
+        gate_thresholds_frozen_id=args.gate_thresholds_frozen_id,
+        args=args,
+        n_train=len(tr["board"]),
+        n_val=len(va["board"]),
+        best_val_loss=best_val_loss,
+        epochs_trained=epoch,
+        tr_means=tr_means_list,
+    )
+    print(f"[gap_net_v3] Model label: {model_label}  "
+          f"(promotion_eligible={provenance['promotion_eligible']})")
+    if not provenance["promotion_eligible"]:
+        print(f"[gap_net_v3]   promotion_ineligible_reasons:")
+        for r in provenance["promotion_ineligible_reasons"]:
+            print(f"[gap_net_v3]     - {r}")
 
     model_cpu = model.cpu()
     _save(model_cpu, out_path, provenance)
