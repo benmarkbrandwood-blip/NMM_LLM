@@ -1,0 +1,45 @@
+{
+  "schema_version": "nmm.human-feature-deviation-product-conversion-derivation.v2",
+  "status": "frozen_exact-reproduction_correction_before_hypothetical_successor_queries",
+  "frozen_at_utc": "2026-08-15T13:26:07.113Z",
+  "repository_base_commit": "a59354c",
+  "v1_disposition": {
+    "derivation_identity": "5f45c0296d86553b7fa67e1aea45269690da15ccf00d840f0c3709479c575e1b",
+    "plan_file_sha256": "0203ef221c67d3a0d71d395910b54e835f757cec2f2bb9c6c78173e8c0204ef3",
+    "remains_immutable": true,
+    "status": "superseded_for_execution_by_exact_result_transcription_correction",
+    "failure": "three rounded narrative log-loss values were entered as exact reproduction targets and differed from the sealed machine result by about 1e-11, beyond the frozen 1e-12 tolerance",
+    "new_hypothetical_successor_queries_before_failure": 0,
+    "protected_content_reads_before_failure": 0
+  },
+  "frozen_inheritance": {
+    "source_derivation_identity": "5f45c0296d86553b7fa67e1aea45269690da15ccf00d840f0c3709479c575e1b",
+    "sections": [
+      "not_a_new_research_preregistration",
+      "purpose",
+      "input_lineage",
+      "execution_boundary",
+      "frozen_estimator_reuse",
+      "risk_estimands",
+      "reference_policies",
+      "uplift_reporting",
+      "calibration_and_winner_correction",
+      "policy_shift_support",
+      "log_loss_argmax_relationship",
+      "product_scenarios",
+      "required_conclusion",
+      "claim_boundary",
+      "known_biases"
+    ],
+    "unchanged_except_declared_correction": true
+  },
+  "exact_reproduction_correction": {
+    "geometry_average_unique_player_log_loss": 2.146902903833993,
+    "full_average_unique_player_log_loss": 1.986710540646765,
+    "paired_log_loss_improvement": 0.1601923631872277,
+    "source": "docs/evidence/human-feature-deviation-estimator-readiness-manifest-2026-08-15.json",
+    "other_required_reproduction_fields_unchanged": true,
+    "tolerance_unchanged": 1e-12
+  },
+  "derivation_identity": "d4ead92b6ff1b8be07d5a16ab1041547e973ee50d4ae794e3ab5fc1a06d20444"
+}
