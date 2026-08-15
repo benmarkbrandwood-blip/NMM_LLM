@@ -157,6 +157,153 @@ def test_manifest_verify_smoke_run_tolerates_subset(extractor, ledger_builder, t
     )
 
 
+# ── Codex 2026-08-15 P2: probs_strict abstain regression ────────────────────
+
+def test_compute_teacher_ph_abstains_on_degenerate_teacher(extractor):
+    """Codex 2026-08-15 P2: prior code silently returned a uniform teacher
+    P_h when `advisor.probs()` fell back on non-finite scores.  probs_strict()
+    now raises, and the extractor's emit loop must catch that and mark the
+    row abstained with reason prefix `teacher_probs_failed:`.
+
+    Proves (a) probs() would silently return uniform on the same input,
+    (b) probs_strict() raises, and (c) _compute_teacher_ph — the seam the
+    extractor emit loop uses — returns (None, teacher_probs_failed:…)."""
+    from ai.human_move_policy_advisor import HumanMovePolicyAdvisor    # noqa: WPS433
+    from game.board import BoardState                                  # noqa: WPS433
+
+    class DegenerateAdvisor(HumanMovePolicyAdvisor):
+        """Simulates a teacher whose forward pass yields non-finite logits.
+        probs() falls back to uniform (silent); probs_strict() raises."""
+        def __init__(self):                                             # noqa: D401
+            self.temperature = 1.0
+            self.board_feature_dim = 79
+
+        def _score_batch(self, x):
+            return np.full((x.shape[0],), np.nan, dtype=np.float32)
+
+        def _band_row(self, elo_band, n):
+            return np.zeros((n, 3), dtype=np.float32)
+
+        def _successor_features(self, board, legal_moves):
+            return np.zeros(
+                (len(legal_moves), self.board_feature_dim), dtype=np.float32,
+            )
+
+    advisor = DegenerateAdvisor()
+    board = BoardState.new_game()
+    legal_moves = [{"from": None, "to": "a7"},
+                   {"from": None, "to": "d7"}]
+
+    # (a) probs() silently degrades — this is the exact bug we hardened against.
+    ph_soft = advisor.probs(board, legal_moves, elo_band="middle")
+    assert np.allclose(ph_soft, [0.5, 0.5]), \
+        f"probs() must return uniform on NaN scores, got {ph_soft}"
+
+    # (b) probs_strict() raises rather than silently returning uniform.
+    with pytest.raises(ValueError):
+        advisor.probs_strict(board, legal_moves, elo_band="middle")
+
+    # (c) The extractor emit-loop seam abstains the row and surfaces the
+    #     teacher_probs_failed: reason exactly as written to abstained.jsonl.
+    ph_model, reason = extractor._compute_teacher_ph(
+        advisor, board, legal_moves, "middle",
+    )
+    assert ph_model is None, "abstained row must return None ph"
+    assert reason is not None
+    assert reason.startswith("teacher_probs_failed:"), \
+        f"reason must be teacher_probs_failed prefix, got {reason!r}"
+
+
+def test_compute_teacher_ph_happy_path_returns_valid_ph(extractor):
+    """Codex 2026-08-15 P2: a well-formed teacher returns (ph, None)."""
+    from ai.human_move_policy_advisor import HumanMovePolicyAdvisor    # noqa: WPS433
+    from game.board import BoardState                                  # noqa: WPS433
+
+    class UniformAdvisor(HumanMovePolicyAdvisor):
+        """Returns constant zero logits — softmax yields exact uniform."""
+        def __init__(self):
+            self.temperature = 1.0
+            self.board_feature_dim = 79
+
+        def _score_batch(self, x):
+            return np.zeros((x.shape[0],), dtype=np.float32)
+
+        def _band_row(self, elo_band, n):
+            return np.zeros((n, 3), dtype=np.float32)
+
+        def _successor_features(self, board, legal_moves):
+            return np.zeros(
+                (len(legal_moves), self.board_feature_dim), dtype=np.float32,
+            )
+
+    board = BoardState.new_game()
+    legal_moves = [{"from": None, "to": "a7"},
+                   {"from": None, "to": "d7"}]
+
+    ph_model, reason = extractor._compute_teacher_ph(
+        UniformAdvisor(), board, legal_moves, "middle",
+    )
+    assert reason is None
+    assert ph_model is not None
+    assert ph_model.shape == (2,)
+    assert abs(float(ph_model.sum()) - 1.0) < 1e-5
+
+
+# ── Codex 2026-08-15 P1: between-pass file-deletion detection ───────────────
+
+def test_iter_events_detects_between_pass_deletion(extractor, ledger_builder, tmp_path):
+    """Codex 2026-08-15 P1: `_verify_files_match_manifest` runs once before
+    pass 1.  If a ledger-listed file is deleted after that precheck but before
+    pass 2 starts, the disk-glob-driven iteration silently completes with fewer
+    events while provenance still binds the full manifest.
+
+    Fix: `_iter_jsonl_events` now iterates the frozen manifest keys, not a
+    fresh disk glob.  Missing-on-disk becomes fatal via FileNotFoundError →
+    RuntimeError with a between-pass-deletion hint."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_game(games_dir, "a.jsonl", "sa")
+    _write_game(games_dir, "b.jsonl", "sb")
+
+    ledger_path = tmp_path / "ledger.json"
+    ledger_builder.build(games_dir, ledger_path)
+    info = extractor._load_session_ledger(ledger_path)
+
+    # Simulate between-pass deletion: precheck already ran successfully, and
+    # now we're about to start pass 2 …
+    (games_dir / "b.jsonl").unlink()
+
+    with pytest.raises(RuntimeError, match="missing from disk"):
+        list(extractor._iter_jsonl_events(
+            games_dir, info["session_meta"],
+            ledger_file_shas=info["ledger_file_shas"],
+        ))
+
+
+def test_iter_events_manifest_driven_ignores_late_added_disk_file(
+    extractor, ledger_builder, tmp_path,
+):
+    """Codex 2026-08-15 P1 corollary: iteration is driven by the frozen
+    manifest, so a file added on disk after the ledger was built is a full-run
+    fatal (extra-on-disk detection preserved) rather than being silently
+    scanned."""
+    games_dir = tmp_path / "games"
+    games_dir.mkdir()
+    _write_game(games_dir, "a.jsonl", "sa")
+
+    ledger_path = tmp_path / "ledger.json"
+    ledger_builder.build(games_dir, ledger_path)
+    info = extractor._load_session_ledger(ledger_path)
+
+    _write_game(games_dir, "late.jsonl", "s_late")
+
+    with pytest.raises(RuntimeError, match="not in ledger file manifest"):
+        list(extractor._iter_jsonl_events(
+            games_dir, info["session_meta"],
+            ledger_file_shas=info["ledger_file_shas"],
+        ))
+
+
 # ── P1(3) teacher lineage ───────────────────────────────────────────────────
 
 def _write_synthetic_teacher_npz(
@@ -339,14 +486,21 @@ def test_trainer_refuses_non_production_dataset(trainer, tmp_path):
 
 
 def test_trainer_allow_non_production_overrides(trainer, tmp_path):
-    """--allow-non-production-dataset lets the run proceed (with warning)."""
+    """--allow-non-production-dataset lets the run proceed (with warning).
+
+    Codex 2026-08-15 P1: return dict carries structured taint fields."""
     dataset_dir = tmp_path / "ds"
     _write_synth_dataset_metadata(dataset_dir, {
         "production_ready": False,
         "non_ready_reasons": ["limit_files=5"],
     })
-    prov = trainer._verify_dataset_production_ready(dataset_dir, allow_non_production=True)
-    assert prov["production_ready"] is False
+    taint = trainer._verify_dataset_production_ready(
+        dataset_dir, allow_non_production=True,
+    )
+    assert taint["dataset_production_ready"] is False
+    assert taint["non_production_override"] is True
+    assert taint["promotion_eligible"] is False
+    assert "limit_files=5" in taint["dataset_non_ready_reasons"]
 
 
 def test_trainer_accepts_production_ready_dataset(trainer, tmp_path):
@@ -355,8 +509,11 @@ def test_trainer_accepts_production_ready_dataset(trainer, tmp_path):
         "production_ready": True,
         "non_ready_reasons": [],
     })
-    prov = trainer._verify_dataset_production_ready(dataset_dir)
-    assert prov["production_ready"] is True
+    taint = trainer._verify_dataset_production_ready(dataset_dir)
+    assert taint["dataset_production_ready"] is True
+    assert taint["non_production_override"] is False
+    assert taint["promotion_eligible"] is True
+    assert taint["dataset_non_ready_reasons"] == []
 
 
 def test_trainer_refuses_missing_provenance(trainer, tmp_path):
@@ -379,6 +536,89 @@ def test_trainer_refuses_missing_metadata_file(trainer, tmp_path):
     dataset_dir.mkdir()
     with pytest.raises(SystemExit, match="metadata.npz not found"):
         trainer._verify_dataset_production_ready(dataset_dir)
+
+
+def test_trainer_taint_missing_provenance_under_override(trainer, tmp_path):
+    """Codex 2026-08-15 P1 edge case: dataset with no provenance under
+    --allow-non-production-dataset must still yield a non-empty
+    dataset_non_ready_reasons list (synthetic 'no_dataset_provenance')."""
+    dataset_dir = tmp_path / "ds"
+    dataset_dir.mkdir()
+    np.savez(
+        str(dataset_dir / "metadata.npz"),
+        state_keys=np.array(["sk"], dtype=object),   # no provenance field
+    )
+    taint = trainer._verify_dataset_production_ready(
+        dataset_dir, allow_non_production=True,
+    )
+    assert taint["dataset_production_ready"] is False
+    assert taint["non_production_override"] is True
+    assert taint["promotion_eligible"] is False
+    assert "no_dataset_provenance" in taint["dataset_non_ready_reasons"]
+
+
+def test_trainer_saved_npz_round_trip_carries_taint(trainer, tmp_path):
+    """Codex 2026-08-15 P1: the saved model NPZ must record taint fields
+    (dataset_production_ready, dataset_non_ready_reasons,
+    non_production_override, promotion_eligible) AND the model label must
+    reflect the taint.  Round-trip: build provenance the way `main()`
+    would, hand it to `_save`, reload with `np.load`, and assert taint
+    survived and the model label switched to *_nonproduction."""
+    model = trainer.GapNetV3()
+
+    # Simulate main() computing taint for a non-production dataset.
+    taint_nonprod = {
+        "dataset_production_ready":  False,
+        "dataset_non_ready_reasons": ["limit_files=5", "coverage_floor not met"],
+        "non_production_override":   True,
+        "promotion_eligible":        False,
+        "dataset_provenance":        {"production_ready": False},
+    }
+    model_label = ("gap_net_v3_candidate"
+                   if taint_nonprod["promotion_eligible"]
+                   else "gap_net_v3_candidate_nonproduction")
+    provenance = {
+        "model":                     model_label,
+        "dataset_production_ready":  taint_nonprod["dataset_production_ready"],
+        "dataset_non_ready_reasons": taint_nonprod["dataset_non_ready_reasons"],
+        "non_production_override":   taint_nonprod["non_production_override"],
+        "promotion_eligible":        taint_nonprod["promotion_eligible"],
+    }
+    out = tmp_path / "nonprod.npz"
+    trainer._save(model, out, provenance)
+
+    z = np.load(str(out), allow_pickle=True)
+    reloaded_prov = json.loads(str(z["provenance"]))
+    assert reloaded_prov["model"] == "gap_net_v3_candidate_nonproduction"
+    assert reloaded_prov["dataset_production_ready"] is False
+    assert reloaded_prov["non_production_override"] is True
+    assert reloaded_prov["promotion_eligible"] is False
+    assert "limit_files=5" in reloaded_prov["dataset_non_ready_reasons"]
+    assert "coverage_floor not met" in reloaded_prov["dataset_non_ready_reasons"]
+
+
+def test_trainer_saved_npz_round_trip_clean_run_promotion_eligible(trainer, tmp_path):
+    """Codex 2026-08-15 P1: clean production_ready dataset yields
+    promotion_eligible=True and the plain gap_net_v3_candidate label."""
+    model = trainer.GapNetV3()
+
+    provenance = {
+        "model":                     "gap_net_v3_candidate",
+        "dataset_production_ready":  True,
+        "dataset_non_ready_reasons": [],
+        "non_production_override":   False,
+        "promotion_eligible":        True,
+    }
+    out = tmp_path / "prod.npz"
+    trainer._save(model, out, provenance)
+
+    z = np.load(str(out), allow_pickle=True)
+    reloaded_prov = json.loads(str(z["provenance"]))
+    assert reloaded_prov["model"] == "gap_net_v3_candidate"
+    assert reloaded_prov["dataset_production_ready"] is True
+    assert reloaded_prov["non_production_override"] is False
+    assert reloaded_prov["promotion_eligible"] is True
+    assert reloaded_prov["dataset_non_ready_reasons"] == []
 
 
 # ── P2(1) emitted_by_band_phase counter ─────────────────────────────────────

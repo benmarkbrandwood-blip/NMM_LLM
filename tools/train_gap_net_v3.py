@@ -127,6 +127,16 @@ def _verify_dataset_production_ready(
     we refuse to train against a non-ready dataset unless the user explicitly
     passes --allow-non-production-dataset (which disqualifies the run from
     promotion evidence).
+
+    Codex 2026-08-15 P1 hardening: returns a dict carrying explicit taint
+    fields so the caller can propagate them into the saved model NPZ.  The
+    returned dict always contains:
+        dataset_production_ready       bool
+        dataset_non_ready_reasons      list[str]  (empty when ready)
+        non_production_override        bool
+        promotion_eligible             bool       (ready AND not overridden)
+        dataset_provenance             dict       (raw extractor provenance,
+                                                   empty when missing)
     """
     meta_path = dataset_dir / "metadata.npz"
     if not meta_path.exists():
@@ -138,7 +148,13 @@ def _verify_dataset_production_ready(
         if allow_non_production:
             print(f"[gap_net_v3] WARNING: dataset has no provenance; "
                   f"proceeding under --allow-non-production-dataset")
-            return {}
+            return {
+                "dataset_production_ready":  False,
+                "dataset_non_ready_reasons": ["no_dataset_provenance"],
+                "non_production_override":   True,
+                "promotion_eligible":        False,
+                "dataset_provenance":        {},
+            }
         raise SystemExit(
             f"[gap_net_v3] Dataset at {dataset_dir} has no provenance; "
             f"cannot verify production_ready.  Pass --allow-non-production-dataset "
@@ -148,20 +164,35 @@ def _verify_dataset_production_ready(
     if isinstance(prov_raw, bytes):
         prov_raw = prov_raw.decode("utf-8")
     prov = json.loads(prov_raw)
-    if not prov.get("production_ready", False):
-        reasons = prov.get("non_ready_reasons", ["unknown"])
+    production_ready = bool(prov.get("production_ready", False))
+    reasons = list(prov.get("non_ready_reasons", []) or [])
+    if not production_ready:
+        if not reasons:
+            reasons = ["unknown"]
         if allow_non_production:
             print(f"[gap_net_v3] WARNING: training on non-production dataset")
             print(f"[gap_net_v3]   non_ready_reasons: {reasons}")
             print(f"[gap_net_v3]   this run is NOT eligible for promotion evidence.")
-            return prov
+            return {
+                "dataset_production_ready":  False,
+                "dataset_non_ready_reasons": reasons,
+                "non_production_override":   True,
+                "promotion_eligible":        False,
+                "dataset_provenance":        prov,
+            }
         raise SystemExit(
             f"[gap_net_v3] Dataset at {dataset_dir} is NOT production_ready:\n"
             f"  reasons: {reasons}\n"
             f"Pass --allow-non-production-dataset to train against it anyway "
             f"(NOT eligible for promotion evidence)."
         )
-    return prov
+    return {
+        "dataset_production_ready":  True,
+        "dataset_non_ready_reasons": [],
+        "non_production_override":   False,
+        "promotion_eligible":        True,
+        "dataset_provenance":        prov,
+    }
 
 
 def _load_split(dataset_dir: Path, split_val: int) -> dict:
@@ -585,8 +616,9 @@ def main() -> None:
     out_path    = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Codex P1(4) 2026-08-14: verify dataset is production-ready before load.
-    _verify_dataset_production_ready(
+    # Codex P1(4) 2026-08-14 + 2026-08-15 taint propagation: verify dataset is
+    # production-ready before load; capture taint fields for the saved model.
+    dataset_taint = _verify_dataset_production_ready(
         dataset_dir, allow_non_production=args.allow_non_production_dataset,
     )
 
@@ -731,32 +763,46 @@ def main() -> None:
           f"skip_degenerate={gate_summary['n_cells_skip_degenerate']}  "
           f"skip_non_finite={gate_summary['n_cells_skip_non_finite']}")
 
+    # Codex 2026-08-15 P1: propagate dataset production-readiness taint into
+    # the saved artifact.  The model label degrades to a *_nonproduction
+    # suffix whenever the run was not promotion-eligible so downstream
+    # consumers cannot mistake it for a promotable candidate on filename
+    # alone; the same taint is also encoded structurally in provenance.
+    model_label = ("gap_net_v3_candidate"
+                   if dataset_taint["promotion_eligible"]
+                   else "gap_net_v3_candidate_nonproduction")
+
     provenance = {
-        "model":                   "gap_net_v3_candidate",
-        "architecture":            f"{_INPUT_DIM}→{_H1}→{_H2}→{_H3}→{_N_HEADS}",
-        "input_layout":            "board[79] || band_onehot[3]",
-        "components":              list(_COMP_NAMES),
-        "bands":                   list(_BAND_NAMES),
-        "dataset_dir":             str(dataset_dir),
-        "dataset_feats_sha256":    _sha256(dataset_dir / "parent_feats.f32.bin"),
-        "dataset_targets_sha256":  _sha256(dataset_dir / "targets.f32.bin"),
-        "dataset_uniform_sha256":  _sha256(dataset_dir / "targets_uniform.f32.bin"),
-        "dataset_emp_sha256":      _sha256(dataset_dir / "targets_empirical.f32.bin"),
-        "dataset_metadata_sha256": _sha256(dataset_dir / "metadata.npz"),
-        "n_train":                 len(tr["board"]),
-        "n_val":                   len(va["board"]),
-        "best_val_loss":           best_val_loss,
-        "epochs_trained":          epoch,
-        "lr":                      args.lr,
-        "batch_size":              args.batch_size,
-        "weight_decay":            args.weight_decay,
-        "seed":                    args.seed,
-        "d4_augmentation":         args.d4_augmentation,
-        "tr_means":                tr_means_list,
-        "gate_results":            gate_results,
-        "gate_summary":            gate_summary,
-        "git_commit":              _git_commit(),
-        "built_at":                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "model":                    model_label,
+        "architecture":             f"{_INPUT_DIM}→{_H1}→{_H2}→{_H3}→{_N_HEADS}",
+        "input_layout":             "board[79] || band_onehot[3]",
+        "components":               list(_COMP_NAMES),
+        "bands":                    list(_BAND_NAMES),
+        "dataset_dir":              str(dataset_dir),
+        "dataset_feats_sha256":     _sha256(dataset_dir / "parent_feats.f32.bin"),
+        "dataset_targets_sha256":   _sha256(dataset_dir / "targets.f32.bin"),
+        "dataset_uniform_sha256":   _sha256(dataset_dir / "targets_uniform.f32.bin"),
+        "dataset_emp_sha256":       _sha256(dataset_dir / "targets_empirical.f32.bin"),
+        "dataset_metadata_sha256":  _sha256(dataset_dir / "metadata.npz"),
+        # Codex 2026-08-15 P1: taint fields (immutable in saved NPZ)
+        "dataset_production_ready": dataset_taint["dataset_production_ready"],
+        "dataset_non_ready_reasons": dataset_taint["dataset_non_ready_reasons"],
+        "non_production_override":  dataset_taint["non_production_override"],
+        "promotion_eligible":       dataset_taint["promotion_eligible"],
+        "n_train":                  len(tr["board"]),
+        "n_val":                    len(va["board"]),
+        "best_val_loss":            best_val_loss,
+        "epochs_trained":           epoch,
+        "lr":                       args.lr,
+        "batch_size":               args.batch_size,
+        "weight_decay":             args.weight_decay,
+        "seed":                     args.seed,
+        "d4_augmentation":          args.d4_augmentation,
+        "tr_means":                 tr_means_list,
+        "gate_results":             gate_results,
+        "gate_summary":             gate_summary,
+        "git_commit":               _git_commit(),
+        "built_at":                 time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
     model_cpu = model.cpu()

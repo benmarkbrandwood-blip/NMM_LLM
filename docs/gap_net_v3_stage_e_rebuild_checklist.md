@@ -61,30 +61,31 @@ OOF would not provide strict session-level OOF.
       full-scan cost ~7.6 h due to double file read (SHA + JSONL) — single-pass
       optimisation deferred until we're ready to run the full ledger.
 
-### Stage D redo — extraction rewrite
+### Stage D redo — extraction rewrite — ✅ TOOLING DONE, RUN PENDING (Batch 4, commits fdd5a97 + 93cc7da + Codex 2026-08-15 fixes)
 
-- [ ] Rewrite `tools/extract_gap_v3_dataset.py`:
-  - [ ] Read `data/human_games/*.jsonl` directly under the frozen manifest (Step 0).
-  - [ ] Use `session_id → split_tier` from the frozen ledger — do NOT recompute.
-  - [ ] **Multi-tier state assignment rule** (explicit, no shortcuts):
+- [x] Rewrite `tools/extract_gap_v3_dataset_v2.py`:
+  - [x] Read `data/human_games/*.jsonl` under the frozen manifest via the session ledger's `files` manifest.
+  - [x] Use `session_id → split_tier` from the frozen ledger — no recomputation.
+  - [x] **Multi-tier state assignment rule** implemented per Decision (owning-tier rule):
     1. For each state_key, enumerate the set of sessions that reached it.
     2. Compute the **smallest SHA-256 session-hash** across those sessions — that session's split_tier becomes the state_key's **owning tier**.
     3. Aggregate move counts using events **from the owning tier only**.
     4. **Discard** events for that state from all other tiers.
     5. **Never** combine counts across tiers before or during tier assignment.
-    6. Record, per (band, phase), the counts of `states_discarded_other_tier` and `events_discarded_other_tier` in `provenance.json`.
-  - [ ] Compute empirical `P_h` from per-(state_key, band) owning-tier counts; gate by frozen `min_support` (default 25).
-  - [ ] Compute model `P_h` via `HumanMovePolicyAdvisor` from the new teacher (Decision 6B).
-  - [ ] Compute uniform `P_h = 1/n_legal` per position.
-  - [ ] **A/B/C target discipline (fail-closed):**
-    - [ ] For each emitted row, **all three** components (class_downgrade, wdl_utility_loss, ordinal_rank_loss) must be finite in `targets.f32.bin` AND `targets_uniform.f32.bin`.
-    - [ ] If any component of R_v is unavailable for any legal successor at the parent, **abstain the entire row** — write to `abstained.jsonl` with reason and do not emit.  This replaces the earlier (wrong) draft that would have written NaN into required targets.
-    - [ ] `targets_empirical.f32.bin` is the **only** target file where NaN is permitted — NaN entries there indicate empirical support was below the frozen `min_support` threshold, not R_v unavailability.
-  - [ ] Emit `metadata.npz` with `state_keys`, `band_idx`, `split`, `phase`, `mover_color`, `n_legal`, `ph_source`, `owning_session_min_hash`, `provenance`.
-  - [ ] Emit `provenance.json`: session-ledger SHA + seed, JSONL manifest hash, HumanMovePolicyNet SHA + version, min_support value, per-(band, phase) discarded counts, `git_commit`.
-  - [ ] Emit `abstained.jsonl` per abstention reason (including all-legal-successor R_v unavailability).
-  - [ ] Output directory: `data/gap_net_v3_dataset_v2/`.
-  - [ ] **Coverage floor:** if final emission falls below X% of the state-key-split dataset's row count (X to be frozen with user before run), **halt and report** actual per-(band, phase) counts.  Do NOT fall back to mixed aggregates silently.
+    6. Record, per (band, phase), the counts of `states_discarded_other_tier_by_band_phase`, `events_discarded_other_tier_by_band_phase`, and `states_kept_by_band_phase` in provenance.
+  - [x] Compute empirical `P_h` from per-(state_key, band) owning-tier counts; gate by frozen `min_support` (default 25).  Denominator is legal-only (Codex P1 2026-08-14: illegal notations are dropped and reported separately as `empirical_illegal_events_seen`).
+  - [x] Compute model `P_h` via `HumanMovePolicyAdvisor.probs_strict()` from the v3 teacher (no silent uniform fallback; Codex P1 2026-08-14 + P2 2026-08-15 regression test).
+  - [x] Compute uniform `P_h = 1/n_legal` per position.
+  - [x] **A/B/C target discipline (fail-closed):**
+    - [x] For each emitted row, **all three** components are finite in `targets.f32.bin` AND `targets_uniform.f32.bin`.
+    - [x] If any component of R_v is unavailable for any legal successor at the parent, **abstain the entire row** — write to `abstained.jsonl` with reason and do not emit.
+    - [x] `targets_empirical.f32.bin` is the **only** target file where NaN is permitted — NaN entries there indicate empirical support was below the frozen `min_support` threshold.
+  - [x] Emit `metadata.npz` with `state_keys`, `band_idx`, `split`, `phase`, `mover_color`, `n_legal`, `ph_source`, `owning_session_min_hash`, and provenance (as `provenance` field with `production_ready` + `non_ready_reasons`).
+  - [x] Emit provenance (embedded in metadata.npz): session-ledger SHA + files_manifest_sha256, teacher SHA + verified lineage, min_support value, per-(band, phase) discarded/kept counts, `git_commit`, emitted-per-(band, phase).
+  - [x] Emit `abstained.jsonl` per abstention reason (bad_board, no_legal_moves, n_legal_lt2, parent_no_malom, not_emittable including `teacher_probs_failed:*` and `non_finite_target`).
+  - [x] Output directory: `data/gap_net_v3_dataset_v2/` (no-clobber guard refuses existing outputs unless `force=True`).
+  - [x] **Coverage floor:** if final emission falls below the configured floor, extractor sets `gate_status="halt_coverage_floor"`, marks `production_ready=False` with reason `coverage_floor not met`, and reports per-(band, phase) counts.  Stage E trainer refuses to consume non-ready datasets unless `--allow-non-production-dataset` is passed, and any such run propagates a `promotion_eligible=false` taint into the saved NPZ (Codex 2026-08-15 P1).
+- [ ] **Full extraction run not yet executed.**  Awaiting authorisation + HMPN v3 teacher.
 
 ### Stage D-a — HumanMovePolicyNet retrain (Decision 6B) — 🟡 TOOLING DONE, RUN PENDING (Batch 3b, commits ec567b2 + 9efe0ba)
 
@@ -149,10 +150,12 @@ Pending — write against synthetic data (no full training required):
 - [ ] `tests/test_gap_v3_provenance.py` — required provenance fields present under a synthetic save.
 - [ ] `tests/test_gap_v3_provenance_roundtrip.py` — save/load preserves every provenance field.
 
-Pending — depend on Stage D GapNet extractor rewrite (Batch 4):
+Landed — Batch 4 session-isolation + owning-tier + Codex 2026-08-14/15 hardening coverage:
 
-- [ ] `tests/test_gap_v3_session_split_isolation.py` — end-to-end: no val/test session events leak into GapNet Stage D train aggregation.
-- [ ] `tests/test_gap_v3_owning_tier_rule.py` — multi-tier state_key assignment picks smallest-hash session's tier and discards other-tier events.
+- [x] `tests/test_gap_v3_session_split_isolation.py` — end-to-end: no val/test session events leak into GapNet Stage D train aggregation (5).
+- [x] `tests/test_gap_v3_owning_tier_rule.py` — multi-tier state_key assignment picks smallest-hash session's tier and discards other-tier events (5).
+- [x] `tests/test_gap_v3_extractor_v2_hardening.py` — P1-B/P1-A ledger consumption, no-clobber, sha drift, missing/orphan file handling (11).
+- [x] `tests/test_gap_v3_extractor_v2_p1_followup.py` — Codex 2026-08-14 P1×5+P2×1 + 2026-08-15 P1×2+P2×2 (probs_strict abstain seam, taint save/load round trip, between-pass file deletion, manifest-driven iteration) (31).
 
 Pending — depend on a D4-on trained model:
 
@@ -164,13 +167,13 @@ Pending — depend on a D4-on trained model:
 - [x] Add per-band thresholds — **structure landed** (Gate 1 `X_A[b, c]` ≥ 30 % vs uniform; Gate 2 `X_B[b, c]` ≤ 20 % vs teacher, both per-(band × component)).  **Numeric values are initial drafts**; user reviews before Stage E run.
 - [x] Explicitly note teacher-fidelity is not empirical validation (bolded under "Separately reported" in the Stage E cell).
 
-## Current position (2026-08-11)
+## Current position (2026-08-15)
 
 Batch progress:
 - ✅ Batch 3a — session ledger builder + 12 tests (commit `6d61d40`).
 - ✅ Batch 3b — HMPN extractor + trainer session-ledger flags + guards + 19 tests (commits `ec567b2` + `9efe0ba`).
 - ⏳ Batch 3c — HMPN plan doc (`docs/human_move_policy_net_plan.md`) amendment describing v3 teacher retrain pipeline.  Not yet started.
-- ⏳ Batch 4 — Stage D GapNet extractor rewrite consuming the session ledger + session-isolation tests.
+- ✅ Batch 4 — Stage D GapNet extractor rewrite consuming the session ledger + session-isolation/owning-tier tests + Codex 2026-08-14 P1-B/P1-A hardening + Codex 2026-08-14 P1×5+P2×1 follow-up + Codex 2026-08-15 P1×2+P2×2 follow-up (commits `fdd5a97` → `93cc7da` → forthcoming taint/deletion/probs_strict fixes).  Tooling done; full extraction run still pending authorisation and HMPN v3 teacher.
 - ⏳ Batch 5 — Promotion-gate freeze (per-band thresholds in `docs/gap_net_v3_plan.md` §16).
 - ⏸️ Batch 6 — Results (blocked on runs; runs blocked on readiness checkpoints and user authorisation).
 
@@ -194,6 +197,14 @@ Runs pending user authorisation:
 - 2026-08-11 — Batch 3b extractor: `--session-ledger` flag, strict single-tier rule, `_load_state_key_masks`, `_apply_session_ledger_split`, `_guard_output_dir` + 10 tests.  Commit `ec567b2`.
 - 2026-08-11 — Batch 3b trainer: `_peek_dataset_provenance`, `_guard_output_path`, session-ledger identity surfaced at top-level provenance + 9 tests.  Commit `9efe0ba`.
 - 2026-08-11 — Checklist updated with current-position section + progress log entries.
+- 2026-08-12 — Batch 4 Stage D extractor (v2) + Stage E gate hardening: owning-tier rule, session-isolation, per-band gate thresholds, executable gate formulas (commits pre-`fdd5a97`).
+- 2026-08-13 — Codex review of Batch 4 hardened: `_verify_ledger_complete` P1-B fail-closed helper, Windows fsync via `os.open(O_RDWR)`, gate false-positive fix.  Commit `bb8fca9`.
+- 2026-08-14 — Batch 4 v2 extractor with hardened ledger consumption (commit `fdd5a97`) + six Codex 2026-08-14 findings (P1×5 + P2×1: probs_strict, legal-only empirical denominator, teacher lineage, production_ready flag, per-(band, phase) discard counts, emitted_by_band_phase counter).  Commit `93cc7da`.
+- 2026-08-15 — Codex review of `93cc7da` (BLOCK): four findings addressed —
+    - P1 between-pass file-deletion detection: `_iter_jsonl_events` refactored to be manifest-driven (frozen-manifest iteration; missing-on-disk → fatal).  Regression test `test_iter_events_detects_between_pass_deletion`.
+    - P1 taint propagation into saved model NPZ: `_verify_dataset_production_ready` now returns structured taint dict; `main()` captures it and writes `dataset_production_ready`, `dataset_non_ready_reasons`, `non_production_override`, `promotion_eligible` into provenance; model label degrades to `gap_net_v3_candidate_nonproduction` when tainted.  Save/load round-trip regressions added.
+    - P2 executable regression for `probs_strict` abstain path: extracted `_compute_teacher_ph` helper; test `test_compute_teacher_ph_abstains_on_degenerate_teacher` proves (a) probs() would return uniform, (b) probs_strict() raises, (c) extractor seam returns `teacher_probs_failed:` reason.
+    - P2 checklist reconciliation: this file updated to reflect landed Batch 4 status.
 
 ## Reversion
 

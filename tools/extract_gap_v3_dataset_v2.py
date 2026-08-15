@@ -265,6 +265,45 @@ def _verify_teacher_lineage(
     return prov
 
 
+# ── Teacher P_h with fail-closed abstain ────────────────────────────────────
+
+def _compute_teacher_ph(
+    advisor: "HumanMovePolicyAdvisor",
+    board: "BoardState",
+    legal_moves: list,
+    band: str,
+) -> tuple[Optional[np.ndarray], Optional[str]]:
+    """Return (ph_model, None) on success or (None, reason_string) on failure.
+
+    Codex P1 2026-08-14: `advisor.probs()` silently returned a uniform vector
+    on degenerate teacher output.  We use `probs_strict()` which raises, then
+    additionally enforce shape, finite/non-negative, and sum≈1 so no bad
+    teacher output can silently enter G_v.  Callers should abstain the row
+    and write the returned reason to `abstained.jsonl`.
+
+    Extracted from the emit loop 2026-08-15 (Codex P2) so the abstain path
+    can be exercised directly by unit tests.
+    """
+    try:
+        ph_model = advisor.probs_strict(board, legal_moves, elo_band=band)
+        ph_model = np.asarray(ph_model, dtype=np.float32)
+        if ph_model.shape != (len(legal_moves),):
+            raise ValueError(
+                f"ph_model shape {ph_model.shape} != ({len(legal_moves)},)"
+            )
+        if not np.isfinite(ph_model).all():
+            raise ValueError("ph_model contains non-finite values")
+        if (ph_model < 0.0).any():
+            raise ValueError("ph_model contains negative values")
+        if abs(float(ph_model.sum()) - 1.0) > 1e-4:
+            raise ValueError(
+                f"ph_model does not sum to 1: sum={float(ph_model.sum())!r}"
+            )
+    except Exception as e:
+        return None, f"teacher_probs_failed:{e!s}"
+    return ph_model, None
+
+
 # ── Session ledger ───────────────────────────────────────────────────────────
 
 def _load_session_ledger(path: Path, allow_partial: bool = False) -> dict:
@@ -341,23 +380,48 @@ def _iter_jsonl_events(
     - Single-pass file read (SHA + parse from the same bytes) to avoid
       read/hash drift.
 
+    Codex P1 2026-08-15 (between-pass file-deletion detection):
+    When `ledger_file_shas` is provided, iteration is driven from the frozen
+    manifest keys, NOT a fresh disk glob.  A file listed in the manifest but
+    missing from disk (deleted between the run_extraction precheck and this
+    pass, or between passes) is fatal.  A disk file missing from the
+    manifest is fatal under full runs, tolerated under smoke (skipped —
+    never iterated because it is not in the manifest set).
+
     Sessions absent from the ledger are skipped (drift indicator).
     """
-    jsonl_files = sorted(games_dir.glob("*.jsonl"))
+    disk_files = {
+        p.relative_to(games_dir).as_posix()
+        for p in games_dir.glob("*.jsonl")
+    }
+    if ledger_file_shas is not None:
+        manifest_files = set(ledger_file_shas.keys())
+        extra_on_disk = disk_files - manifest_files
+        if extra_on_disk and limit_files is None:
+            raise RuntimeError(
+                f"[extract v2] disk file(s) not in ledger file manifest "
+                f"(full run): {sorted(extra_on_disk)[:5]}"
+            )
+        iter_rels = sorted(manifest_files)
+    else:
+        iter_rels = sorted(disk_files)
     if limit_files is not None:
-        jsonl_files = jsonl_files[:limit_files]
-    for fpath in jsonl_files:
-        raw_bytes = fpath.read_bytes()
+        iter_rels = iter_rels[:limit_files]
+
+    for rel in iter_rels:
+        fpath = games_dir / rel
+        try:
+            raw_bytes = fpath.read_bytes()
+        except FileNotFoundError:
+            if ledger_file_shas is not None:
+                raise RuntimeError(
+                    f"[extract v2] ledger-listed file missing from disk: "
+                    f"{rel} (possible between-pass deletion; ledger claims "
+                    f"sha={ledger_file_shas.get(rel, '?')[:16]}…)"
+                )
+            continue
         if ledger_file_shas is not None:
-            rel = fpath.relative_to(games_dir).as_posix()
-            expected = ledger_file_shas.get(rel)
-            if expected is None:
-                if limit_files is None:
-                    raise RuntimeError(
-                        f"[extract v2] {rel} not in ledger file manifest; "
-                        f"ledger and games_dir have drifted"
-                    )
-                continue   # smoke run: skip files missing from ledger
+            expected = ledger_file_shas[rel]   # rel came from manifest
             actual = hashlib.sha256(raw_bytes).hexdigest()
             if actual != expected:
                 raise RuntimeError(
@@ -855,31 +919,16 @@ def run_extraction(
             }))
             continue
 
-        # Model P_h from teacher net.
-        # Codex P1 2026-08-14: probs() silently returned a uniform vector on
-        # degenerate teacher output.  probs_strict() raises instead; we then
-        # additionally enforce shape, finite/non-negative, and sum≈1 so no
-        # bad teacher output can silently enter G_v.
-        try:
-            ph_model = advisor.probs_strict(board, legal_moves, elo_band=band)
-            ph_model = np.asarray(ph_model, dtype=np.float32)
-            if ph_model.shape != (len(legal_moves),):
-                raise ValueError(
-                    f"ph_model shape {ph_model.shape} != ({len(legal_moves)},)"
-                )
-            if not np.isfinite(ph_model).all():
-                raise ValueError("ph_model contains non-finite values")
-            if (ph_model < 0.0).any():
-                raise ValueError("ph_model contains negative values")
-            if abs(float(ph_model.sum()) - 1.0) > 1e-4:
-                raise ValueError(
-                    f"ph_model does not sum to 1: sum={float(ph_model.sum())!r}"
-                )
-        except Exception as e:
+        # Model P_h from teacher net.  Delegated to _compute_teacher_ph so the
+        # abstain path is directly unit-testable (Codex 2026-08-15 P2).
+        ph_model, teacher_reason = _compute_teacher_ph(
+            advisor, board, legal_moves, band,
+        )
+        if teacher_reason is not None:
             counters["n_abstained_not_emittable"] += 1
             abstained_lines.append(json.dumps({
                 "state_key": state_key, "band": band,
-                "reason": f"teacher_probs_failed:{e!s}",
+                "reason": teacher_reason,
             }))
             continue
 
