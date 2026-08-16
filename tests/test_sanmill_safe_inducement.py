@@ -249,7 +249,11 @@ def test_protected_research_confirmation_cannot_enter_allowlist() -> None:
 def test_budget_decomposition_separates_invariant_and_sensitive_states() -> None:
     plan = _main_plan()
     rows = []
-    for state, phase in (("invariant", "placement"), ("sensitive", "flying")):
+    for state, phase in (
+        ("invariant", "placement"),
+        ("sensitive", "flying"),
+        ("never", "movement"),
+    ):
         for action in range(2):
             for budget in plan["main_experiment"]["node_budgets"]:
                 downgraded = state == "invariant" and action == 0
@@ -266,9 +270,12 @@ def test_budget_decomposition_separates_invariant_and_sensitive_states() -> None
                     }
                 )
     result = decompose_budget_stability(rows, plan=plan)
-    assert result["overall"]["o_inv"] == pytest.approx(0.5)
-    assert result["overall"]["o_sens"] == pytest.approx(0.5)
-    assert result["overall"]["o_union"] == pytest.approx(1.0)
+    assert result["overall"]["o_inv"] == pytest.approx(1 / 3)
+    assert result["overall"]["o_sens"] == pytest.approx(1 / 3)
+    assert result["overall"]["o_union"] == pytest.approx(2 / 3)
+    assert result["overall"]["invariant_share_of_induced_states"] == pytest.approx(
+        0.5
+    )
     assert result["overall"][
         "identity_check_o_union_equals_o_inv_plus_o_sens"
     ]

@@ -1052,6 +1052,7 @@ def decompose_budget_stability(
         outcomes = [
             bool(by_budget[budget].get("downgrade_transition")) for budget in budgets
         ]
+        state_flags[state_id]
         if all(outcomes):
             action_class = "budget_invariant"
             state_flags[state_id]["invariant"] = True
