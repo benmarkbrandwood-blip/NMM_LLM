@@ -15,6 +15,7 @@ from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     EXPECTED_STARTS,
     ResourceLedger,
     SafeGuidanceGameplayIncomplete,
+    _pooled_action_key,
     analyze_games,
     build_schedule,
     load_plan,
@@ -109,6 +110,12 @@ def test_tracked_start_pool_is_complete_history_and_candidate_blind() -> None:
         len(row["logical_turns"]) == row["logical_ply"] for row in pool["states"]
     )
     assert pool["access_audit"]["official_final_test_content_reads"] == 0
+    first_action = pool["states"][0]["a_pos"][0]
+    assert _pooled_action_key(first_action) == (
+        str(first_action["move"].get("from") or ""),
+        str(first_action["move"].get("to") or ""),
+        str(first_action["move"].get("capture") or ""),
+    )
 
 
 def test_primary_analysis_clusters_both_colors_at_start() -> None:

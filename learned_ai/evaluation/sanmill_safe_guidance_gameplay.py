@@ -272,6 +272,14 @@ def _normal_move(move: Mapping[str, Any]) -> dict[str, str | None]:
     }
 
 
+def _pooled_action_key(action: Mapping[str, Any]) -> tuple[str, str, str]:
+    """Return the move key from a persisted A_pos action envelope."""
+    move = action.get("move")
+    if not isinstance(move, Mapping):
+        raise SafeGuidanceGameplayError("persisted A_pos action move is absent")
+    return _move_key(move)
+
+
 def _matching_move(board: BoardState, actions: Sequence[str]) -> Mapping[str, Any]:
     expected = tuple(actions)
     matches = [
@@ -642,7 +650,7 @@ def run_guide_canary(
         if expected is None or str(state["state_id"]) not in pool_by_id:
             raise SafeGuidanceGameplayError("guide canary fixture is absent")
         fold = int(expected["fold"])
-        actions = sorted(state["a_pos"], key=_move_key)
+        actions = sorted(state["a_pos"], key=_pooled_action_key)
         full_risks = []
         geometry_risks = []
         for action in actions:
@@ -660,9 +668,9 @@ def run_guide_canary(
         full_index = int(np.argmax(np.asarray(full_risks, dtype=np.float64)))
         geometry_index = int(np.argmax(np.asarray(geometry_risks, dtype=np.float64)))
         passed = (
-            _move_key(actions[full_index])
+            _pooled_action_key(actions[full_index])
             == _move_key(expected["full"]["selected_action"])
-            and _move_key(actions[geometry_index])
+            and _pooled_action_key(actions[geometry_index])
             == _move_key(expected["geometry"]["selected_action"])
             and full_risks[full_index] == float(expected["full"]["maximum_risk"])
             and geometry_risks[geometry_index]
@@ -674,8 +682,10 @@ def run_guide_canary(
                 "phase": state["phase"],
                 "fold": fold,
                 "passed": passed,
-                "full_selected_move": _normal_move(actions[full_index]),
-                "geometry_selected_move": _normal_move(actions[geometry_index]),
+                "full_selected_move": _normal_move(actions[full_index]["move"]),
+                "geometry_selected_move": _normal_move(
+                    actions[geometry_index]["move"]
+                ),
                 "full_risk": full_risks[full_index],
                 "geometry_risk": geometry_risks[geometry_index],
             }
