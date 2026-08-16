@@ -51,7 +51,13 @@ from learned_ai.training.sanmill_referee import (
 POOL_SCHEMA = "nmm.sanmill-safe-inducement-state-pool.v1"
 PLAN_SCHEMA = "nmm.sanmill-safe-inducement-mechanism-plan.v1"
 RESULT_SCHEMA = "nmm.sanmill-safe-inducement-preprobe-result.v1"
+MAIN_POOL_SCHEMA = "nmm.sanmill-safe-inducement-main-state-pool.v2"
+MAIN_PLAN_SCHEMA = "nmm.sanmill-safe-inducement-mechanism-plan.v2"
+MAIN_AUTHORIZATION_SCHEMA = "nmm.sanmill-safe-inducement-authorization.v1"
+MAIN_PREFLIGHT_SCHEMA = "nmm.sanmill-safe-inducement-preflight.v1"
+MAIN_RESULT_SCHEMA = "nmm.sanmill-safe-inducement-main-result.v2"
 POOL_SELECTION_SEED = "sanmill-safe-inducement-preprobe-state-v1-20260816"
+MAIN_POOL_SELECTION_SEED = "sanmill-safe-inducement-main-state-v2-20260816"
 PHASES = ("placement", "movement", "flying")
 WDL_RANK = {"L": 0, "D": 1, "W": 2}
 WDL_INVERSE = {"W": "L", "D": "D", "L": "W"}
@@ -85,10 +91,14 @@ def _load_sealed(
     return value, hashlib.sha256(raw).hexdigest()
 
 
-def load_state_pool(path: str | Path) -> tuple[dict[str, Any], str]:
+def load_state_pool(
+    path: str | Path,
+    *,
+    schema: str = POOL_SCHEMA,
+) -> tuple[dict[str, Any], str]:
     pool, file_sha = _load_sealed(
         path,
-        schema=POOL_SCHEMA,
+        schema=schema,
         identity_field="pool_identity",
     )
     if pool.get("status") != "frozen_before_any_sanmill_query":
@@ -147,6 +157,85 @@ def load_plan(path: str | Path) -> tuple[dict[str, Any], str]:
     return plan, file_sha
 
 
+def load_main_plan(path: str | Path) -> tuple[dict[str, Any], str]:
+    """Load the sealed v2 main protocol and enforce its unchanged main gate."""
+    plan, file_sha = _load_sealed(
+        path,
+        schema=MAIN_PLAN_SCHEMA,
+        identity_field="plan_identity",
+    )
+    if plan.get("status") != "frozen_protocol_v2_execution_unlaunched":
+        raise SafeInducementError("main protocol status differs")
+    boundary = plan.get("claim_boundary", {})
+    if (
+        boundary.get("safe_set") != "A_pos"
+        or boundary.get("positional_only") is not True
+        or boundary.get("A_allow_claim") is not False
+        or boundary.get("human_trap_claim") is not False
+    ):
+        raise SafeInducementError("main protocol claim boundary differs")
+    main = plan.get("main_experiment", {})
+    if main.get("node_budgets") != [1_000, 100_000, 500_000]:
+        raise SafeInducementError("main protocol budget decomposition differs")
+    if main.get("primary_node_budget") != 100_000:
+        raise SafeInducementError("main protocol primary budget differs")
+    gate = main.get("mechanism_success_gate", {})
+    expected_gate = {
+        "minimum_point_o_minus_b": 0.05,
+        "minimum_lower_95_o_minus_b": 0.05,
+        "minimum_evaluable_states": 330,
+        "determinism_gate": True,
+        "all_conditions_conjunctive": True,
+    }
+    if any(gate.get(key) != value for key, value in expected_gate.items()):
+        raise SafeInducementError("main mechanism gate differs from v1")
+    resources = main.get("resource_envelope", {})
+    expected_resources = {
+        "maximum_states": 360,
+        "maximum_engine_single_step_queries": 40_000,
+        "maximum_malom_queries": 250_000,
+        "maximum_active_seconds": 14_400,
+        "maximum_concurrent_evaluators": 1,
+        "maximum_concurrent_sanmill_processes": 1,
+        "maximum_complete_games": 0,
+        "maximum_model_loads": 0,
+        "maximum_training_updates": 0,
+        "stop_at_any_limit": True,
+        "automatic_retry_or_extension": False,
+    }
+    if any(resources.get(key) != value for key, value in expected_resources.items()):
+        raise SafeInducementError("main resource envelope differs")
+    return plan, file_sha
+
+
+def load_main_authorization(path: str | Path) -> tuple[dict[str, Any], str]:
+    authorization, file_sha = _load_sealed(
+        path,
+        schema=MAIN_AUTHORIZATION_SCHEMA,
+        identity_field="authorization_identity",
+    )
+    if authorization.get("operator") != "product-owner-direct":
+        raise SafeInducementError("main authorization operator differs")
+    if authorization.get("grant_count") != 1:
+        raise SafeInducementError("main authorization is not one-time")
+    return authorization, file_sha
+
+
+def load_main_preflight(path: str | Path) -> tuple[dict[str, Any], str]:
+    preflight, file_sha = _load_sealed(
+        path,
+        schema=MAIN_PREFLIGHT_SCHEMA,
+        identity_field="preflight_identity",
+    )
+    if preflight.get("status") != "ready_for_one_authorized_execution":
+        raise SafeInducementError("main preflight is not ready")
+    if preflight.get("measurement_searches") != 0:
+        raise SafeInducementError("main preflight contains measurement searches")
+    if preflight.get("determinism", {}).get("passed") is not True:
+        raise SafeInducementError("main preflight determinism gate failed")
+    return preflight, file_sha
+
+
 def _move_key(move: Mapping[str, Any]) -> tuple[str, str, str]:
     return (
         str(move.get("from") or ""),
@@ -155,9 +244,15 @@ def _move_key(move: Mapping[str, Any]) -> tuple[str, str, str]:
     )
 
 
-def _candidate_rank(session_id: str, logical_ply: int, phase: str) -> str:
+def _candidate_rank(
+    session_id: str,
+    logical_ply: int,
+    phase: str,
+    *,
+    selection_seed: str = POOL_SELECTION_SEED,
+) -> str:
     material = (
-        f"{POOL_SELECTION_SEED}\0{session_id}\0{logical_ply}\0{phase}"
+        f"{selection_seed}\0{session_id}\0{logical_ply}\0{phase}"
     ).encode("utf-8")
     return hashlib.sha256(material).hexdigest()
 
@@ -212,10 +307,14 @@ def build_state_pool(
     crossfit_structure: Mapping[str, Any],
     database: MalomDB,
     states_per_phase: int = 12,
+    schema_version: str = POOL_SCHEMA,
+    selection_seed: str = POOL_SELECTION_SEED,
+    excluded_coordinates: frozenset[tuple[str, int]] = frozenset(),
 ) -> dict[str, Any]:
     """Build a source-game-unique pool without engine outcomes or predictions."""
     if states_per_phase <= 0:
         raise SafeInducementError("states_per_phase must be positive")
+    construction_started = time.perf_counter()
     sample_rows = crossfit_structure.get("structure", {}).get("sample_games")
     if not isinstance(sample_rows, list) or len(sample_rows) != 6_400:
         raise SafeInducementError("frozen crossfit exploration sample differs")
@@ -252,9 +351,16 @@ def build_state_pool(
             if phase not in candidates:
                 raise SafeInducementError("unexpected source state phase")
             fen = decision.board.to_fen_string()
+            if (session_id, decision.logical_ply) in excluded_coordinates:
+                continue
             candidates[phase].append(
                 (
-                    _candidate_rank(session_id, decision.logical_ply, phase),
+                    _candidate_rank(
+                        session_id,
+                        decision.logical_ply,
+                        phase,
+                        selection_seed=selection_seed,
+                    ),
                     session_id,
                     decision.logical_ply,
                     fen,
@@ -356,11 +462,11 @@ def build_state_pool(
     states.sort(key=lambda row: (PHASES.index(row["phase"]), row["state_id"]))
     malom_seconds = time.perf_counter() - malom_started
     return {
-        "schema_version": POOL_SCHEMA,
+        "schema_version": schema_version,
         "status": "frozen_before_any_sanmill_query",
         "selection_contract": {
             "source_population": "frozen_6400_game_research_exploration_crossfit_sample",
-            "seed": POOL_SELECTION_SEED,
+            "seed": selection_seed,
             "unit": "one_human_decision_state",
             "rank": "SHA-256(seed NUL session_id NUL logical_ply NUL phase)",
             "phase_order": list(PHASES),
@@ -368,6 +474,10 @@ def build_state_pool(
             "source_game_reuse": False,
             "result_variables_or_estimator_predictions_allowed": False,
             "replacement_after_malom_or_engine_observation": False,
+            "excluded_source_coordinates": len(excluded_coordinates),
+            "excluded_source_coordinates_identity": canonical_sha256(
+                sorted([session_id, ply] for session_id, ply in excluded_coordinates)
+            ),
         },
         "source": {
             "crossfit_structure_identity": crossfit_structure["structure_identity"],
@@ -399,6 +509,12 @@ def build_state_pool(
         "state_membership_identity": canonical_sha256(
             [row["state_id"] for row in states]
         ),
+        "resource_use": {
+            "construction_active_seconds": time.perf_counter()
+            - construction_started,
+            "malom_queries": malom_queries,
+            "engine_single_step_queries": 0,
+        },
         "access_audit": {
             "research_exploration_raw_replays": sum(access.successful.values()),
             "research_confirmation_content_reads": 0,
@@ -410,6 +526,66 @@ def build_state_pool(
             "sanmill_processes_or_search_queries": 0,
             "database_writes": 0,
             "models_games_or_training": 0,
+        },
+    }
+
+
+def count_source_phase_frequencies(
+    *,
+    repository_root: Path,
+    boundary: F0D0Boundary,
+    official_membership: Mapping[str, Any],
+    research_split: Mapping[str, Any],
+    crossfit_structure: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Independently replay the frozen source and count phase decisions only."""
+    sample_rows = crossfit_structure.get("structure", {}).get("sample_games")
+    if not isinstance(sample_rows, list) or len(sample_rows) != 6_400:
+        raise SafeInducementError("frozen crossfit exploration sample differs")
+    sample_ids = [str(row.get("session_id")) for row in sample_rows]
+    if len(set(sample_ids)) != len(sample_ids):
+        raise SafeInducementError("crossfit exploration sample is duplicated")
+    access = EstimatorAccess.from_memberships(
+        official_membership,
+        research_split,
+        allowed_sessions=sample_ids,
+    )
+    records = {record.session_id: record for record in boundary.records}
+    counts: Counter[str] = Counter()
+    started = time.perf_counter()
+    for session_id in sorted(sample_ids):
+        try:
+            record = records[session_id]
+        except KeyError as exc:
+            raise SafeInducementError("sample game is absent from F0-D0") from exc
+        decisions = access.load_decisions(repository_root, record, boundary)
+        for decision in decisions:
+            phase = PHASE_NAMES.get(get_game_phase(decision.board, decision.board.turn))
+            if phase not in PHASES:
+                raise SafeInducementError("unexpected source state phase")
+            counts[phase] += 1
+    total = sum(counts.values())
+    expected = int(crossfit_structure.get("structure", {}).get("sample_decisions", -1))
+    if total != expected:
+        raise SafeInducementError("crossfit sample decision count differs")
+    return {
+        "counts": {phase: counts[phase] for phase in PHASES},
+        "total": total,
+        "weights": {phase: counts[phase] / total for phase in PHASES},
+        "count_identity": canonical_sha256(
+            [[phase, counts[phase]] for phase in PHASES]
+        ),
+        "elapsed_seconds": time.perf_counter() - started,
+        "access_audit": {
+            "research_exploration_raw_replays": sum(access.successful.values()),
+            "research_confirmation_content_reads": 0,
+            "official_selection_content_reads": 0,
+            "official_confirmation_content_reads": 0,
+            "official_final_test_content_reads": 0,
+            "source_pool_2eb04f54_reads_or_consumption": 0,
+            "human_estimator_prediction_reads": 0,
+            "malom_queries": 0,
+            "sanmill_search_queries": 0,
         },
     }
 
@@ -576,7 +752,9 @@ def run_determinism_gate(
 ) -> dict[str, Any]:
     states = {row["state_id"]: row for row in pool["states"]}
     fixtures = plan["determinism_gate"]["fixtures"]
-    budgets = plan["preprobe"]["node_budgets"]
+    budgets = plan["determinism_gate"].get("budgets")
+    if budgets is None:
+        budgets = plan["preprobe"]["node_budgets"]
     seed = int(plan["sanmill_contract"]["seed"])
     protocol_timeout = float(plan["sanmill_contract"]["protocol_timeout_seconds"])
     search_timeout = float(plan["sanmill_contract"]["search_timeout_seconds"])
@@ -802,6 +980,214 @@ def summarize_measurements(
     return result
 
 
+def summarize_main_measurements(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Summarize the v2 main cells without changing the v1 estimands."""
+    interval = plan["main_experiment"]["interval"]
+    repetitions = int(interval["repetitions"])
+    seed = str(interval["seed"])
+    result: dict[str, Any] = {}
+    for raw_budget in plan["main_experiment"]["node_budgets"]:
+        budget = int(raw_budget)
+        selected = [row for row in rows if int(row["node_budget"]) == budget]
+        result[str(budget)] = {
+            "overall": _summarize_group(
+                selected,
+                bootstrap_seed=f"{seed}:{budget}:overall",
+                bootstrap_repetitions=repetitions,
+            ),
+            "by_phase": {
+                phase: _summarize_group(
+                    [row for row in selected if row["phase"] == phase],
+                    bootstrap_seed=f"{seed}:{budget}:phase:{phase}",
+                    bootstrap_repetitions=repetitions,
+                )
+                for phase in PHASES
+            },
+            "by_engine_reply_state_tier": {
+                tier: _summarize_group(
+                    [
+                        row
+                        for row in selected
+                        if row["engine_reply_state_tier"] == tier
+                    ],
+                    bootstrap_seed=f"{seed}:{budget}:tier:{tier}",
+                    bootstrap_repetitions=repetitions,
+                )
+                for tier in ("W", "D", "L")
+            },
+        }
+    return result
+
+
+def decompose_budget_stability(
+    rows: Sequence[Mapping[str, Any]],
+    *,
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Classify safe actions as invariant, budget-sensitive, or never inducing."""
+    budgets = tuple(int(value) for value in plan["main_experiment"]["node_budgets"])
+    cells: dict[tuple[str, int], dict[int, Mapping[str, Any]]] = defaultdict(dict)
+    state_phase: dict[str, str] = {}
+    for row in rows:
+        state_id = str(row["state_id"])
+        key = (state_id, int(row["a_pos_index"]))
+        budget = int(row["node_budget"])
+        if budget in cells[key]:
+            raise SafeInducementError("duplicate main measurement cell")
+        cells[key][budget] = row
+        state_phase[state_id] = str(row["phase"])
+    action_classes: Counter[str] = Counter()
+    state_flags: dict[str, dict[str, bool]] = defaultdict(
+        lambda: {"invariant": False, "sensitive": False}
+    )
+    for (state_id, _action_index), by_budget in cells.items():
+        if tuple(sorted(by_budget)) != tuple(sorted(budgets)):
+            raise SafeInducementError("budget decomposition cell is incomplete")
+        if any(row.get("abstained") for row in by_budget.values()):
+            raise SafeInducementError("budget decomposition contains abstention")
+        outcomes = [
+            bool(by_budget[budget].get("downgrade_transition")) for budget in budgets
+        ]
+        if all(outcomes):
+            action_class = "budget_invariant"
+            state_flags[state_id]["invariant"] = True
+        elif any(outcomes):
+            action_class = "budget_sensitive"
+            state_flags[state_id]["sensitive"] = True
+        else:
+            action_class = "never_inducing"
+        action_classes[action_class] += 1
+    state_rows = []
+    for state_id, flags in sorted(state_flags.items()):
+        invariant = bool(flags["invariant"])
+        sensitive_only = not invariant and bool(flags["sensitive"])
+        state_rows.append(
+            {
+                "state_id": state_id,
+                "phase": state_phase[state_id],
+                "o_inv": float(invariant),
+                "o_sens": float(sensitive_only),
+                "o_union": float(invariant or sensitive_only),
+            }
+        )
+
+    def group(values: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+        count = len(values)
+        inv = sum(float(row["o_inv"]) for row in values)
+        sens = sum(float(row["o_sens"]) for row in values)
+        union = sum(float(row["o_union"]) for row in values)
+        return {
+            "states": count,
+            "o_inv": inv / count if count else None,
+            "o_sens": sens / count if count else None,
+            "o_union": union / count if count else None,
+            "invariant_share_of_induced_states": inv / union if union else None,
+            "identity_check_o_union_equals_o_inv_plus_o_sens": (
+                math.isclose(union, inv + sens)
+            ),
+        }
+
+    overall = group(state_rows)
+    threshold = float(
+        plan["main_experiment"]["budget_decomposition"][
+            "fixed_blind_spot_interpretation_threshold"
+        ]
+    )
+    share = overall["invariant_share_of_induced_states"]
+    interpretation = (
+        "fixed_engine_evaluation_blind_spot"
+        if share is not None and share >= threshold
+        else "budget_sensitive_component_not_negligible"
+    )
+    return {
+        "action_classes": {
+            name: action_classes[name]
+            for name in ("budget_invariant", "budget_sensitive", "never_inducing")
+        },
+        "overall": overall,
+        "by_phase": {
+            phase: group([row for row in state_rows if row["phase"] == phase])
+            for phase in PHASES
+        },
+        "state_observations": state_rows,
+        "interpretation_threshold": threshold,
+        "interpretation": interpretation,
+    }
+
+
+def frequency_weighted_gain(
+    summaries: Mapping[str, Any],
+    *,
+    plan: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compute the source-frequency weighted secondary 100k-node gain."""
+    frequencies = plan["main_experiment"]["frequency_weighted_secondary"]
+    weights = frequencies["weights"]
+    primary_budget = str(plan["main_experiment"]["primary_node_budget"])
+    phase_gains = {
+        phase: summaries[primary_budget]["by_phase"][phase]["estimates"][
+            "o_minus_b"
+        ]["mean"]
+        for phase in PHASES
+    }
+    if any(value is None for value in phase_gains.values()):
+        raise SafeInducementError("frequency-weighted gain has an empty phase")
+    estimate = sum(float(weights[phase]) * phase_gains[phase] for phase in PHASES)
+    return {
+        "node_budget": int(primary_budget),
+        "phase_counts": frequencies["phase_counts"],
+        "weights": weights,
+        "phase_o_minus_b": phase_gains,
+        "weighted_o_minus_b": estimate,
+        "threshold": None,
+        "can_flip_primary_decision": False,
+        "population_boundary": "observed PlayOK-like source domain only",
+    }
+
+
+def classify_main(
+    summaries: Mapping[str, Any],
+    *,
+    plan: Mapping[str, Any],
+    determinism_passed: bool,
+) -> dict[str, Any]:
+    """Apply only the frozen conjunctive v1 main gate at 100,000 nodes."""
+    if not determinism_passed:
+        return {
+            "decision": "execution_incomplete",
+            "failures": ["determinism_gate_failed"],
+        }
+    main = plan["main_experiment"]
+    primary = summaries[str(main["primary_node_budget"])]["overall"]
+    gate = main["mechanism_success_gate"]
+    point = primary["estimates"]["o_minus_b"]["mean"]
+    interval = primary["estimates"]["o_minus_b"][
+        "state_bootstrap_percentile_95"
+    ]
+    failures: list[str] = []
+    if primary["states_evaluable"] < int(gate["minimum_evaluable_states"]):
+        failures.append("insufficient_evaluable_states")
+    if point is None or point < float(gate["minimum_point_o_minus_b"]):
+        failures.append("point_o_minus_b_below_5pp")
+    if interval is None or interval["lower_95"] < float(
+        gate["minimum_lower_95_o_minus_b"]
+    ):
+        failures.append("lower_95_o_minus_b_below_5pp")
+    return {
+        "decision": "mechanism_gate_passed" if not failures else "mechanism_gate_failed",
+        "failures": failures,
+        "primary_node_budget": int(main["primary_node_budget"]),
+        "evaluable_states": primary["states_evaluable"],
+        "point_o_minus_b": point,
+        "lower_95_o_minus_b": interval["lower_95"] if interval else None,
+        "gate": gate,
+    }
+
+
 def classify_preprobe(
     summaries: Mapping[str, Any],
     *,
@@ -992,15 +1378,192 @@ def run_preprobe(
     }
 
 
+def run_main_experiment(
+    *,
+    installation: SanmillInstallation,
+    database: MalomDB,
+    pool: Mapping[str, Any],
+    plan: Mapping[str, Any],
+    preflight: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Execute the frozen v2 measurement once without retry or resumption."""
+    main = plan["main_experiment"]
+    envelope = main["resource_envelope"]
+    maximum_engine = int(envelope["maximum_engine_single_step_queries"])
+    maximum_malom = int(envelope["maximum_malom_queries"])
+    maximum_seconds = float(envelope["maximum_active_seconds"])
+    if int(pool["state_count"]) > int(envelope["maximum_states"]):
+        raise SafeInducementError("state ceiling exceeded before execution")
+    prior = preflight["aggregate_resource_use_before_measurement"]
+    engine_queries = int(prior["engine_single_step_queries"])
+    malom_queries = int(prior["malom_queries"])
+    prior_seconds = float(prior["active_seconds"])
+    if (
+        engine_queries >= maximum_engine
+        or malom_queries >= maximum_malom
+        or prior_seconds >= maximum_seconds
+    ):
+        raise SafeInducementError("resource ceiling reached before execution")
+
+    started = time.perf_counter()
+
+    def active_seconds() -> float:
+        return prior_seconds + time.perf_counter() - started
+
+    states = {str(row["state_id"]): row for row in pool["states"]}
+    cells: list[tuple[str, int, int]] = []
+    for state in pool["states"]:
+        for action_index in range(int(state["a_pos_cardinality"])):
+            for budget in main["node_budgets"]:
+                cells.append((str(state["state_id"]), action_index, int(budget)))
+    order_seed = str(main["measurement_order_seed"])
+    cells.sort(
+        key=lambda row: (
+            hashlib.sha256(
+                f"{order_seed}\0{row[0]}\0{row[1]}\0{row[2]}".encode()
+            ).digest(),
+            row,
+        )
+    )
+    seed = int(plan["sanmill_contract"]["seed"])
+    protocol_timeout = float(plan["sanmill_contract"]["protocol_timeout_seconds"])
+    search_timeout = float(plan["sanmill_contract"]["search_timeout_seconds"])
+    rows: list[dict[str, Any]] = []
+    execution_malom_seconds = 0.0
+    for state_id, action_index, budget in cells:
+        if engine_queries >= maximum_engine:
+            raise SafeInducementError("engine query ceiling reached before completion")
+        if malom_queries >= maximum_malom:
+            raise SafeInducementError("Malom query ceiling reached before completion")
+        if active_seconds() >= maximum_seconds:
+            raise SafeInducementError("active-time ceiling reached before completion")
+        state = states[state_id]
+        action = state["a_pos"][action_index]
+        observed = _search_once(
+            installation,
+            seed=seed,
+            state_row=state,
+            action_row=action,
+            node_budget=budget,
+            protocol_timeout=protocol_timeout,
+            search_timeout=search_timeout,
+        )
+        transition: str | None = None
+        chosen_tier: str | None = None
+        parent_tier = str(action["engine_reply_state_tier"])
+        if observed["searched"]:
+            engine_queries += 1
+            if engine_queries > maximum_engine:
+                raise SafeInducementError("engine query ceiling exceeded")
+            if malom_queries + 2 > maximum_malom:
+                raise SafeInducementError("Malom query ceiling would be exceeded")
+            malom_started = time.perf_counter()
+            labelled_parent, chosen_tier, transition, queries = _label_response(
+                BoardState.from_fen_string(str(action["successor_fen"])),
+                observed["model_action"],
+                database,
+            )
+            execution_malom_seconds += time.perf_counter() - malom_started
+            malom_queries += queries
+            if labelled_parent != parent_tier:
+                raise SafeInducementError("frozen and measured response tiers differ")
+        if active_seconds() > maximum_seconds:
+            raise SafeInducementError("active-time ceiling exceeded")
+        rows.append(
+            {
+                "state_id": state_id,
+                "session_id": state["session_id"],
+                "logical_ply": state["logical_ply"],
+                "phase": state["phase"],
+                "engine_reply_state_tier": parent_tier,
+                "a_pos_index": action_index,
+                "a_pos_cardinality": state["a_pos_cardinality"],
+                "safe_action": {
+                    "move": action["move"],
+                    "actions": action["actions"],
+                    "successor_fen": action["successor_fen"],
+                },
+                "node_budget": budget,
+                "searched": observed["searched"],
+                "strict_terminal": observed["strict_terminal"],
+                "strict_terminal_reason": observed["strict_terminal_reason"],
+                "engine_model_action": observed["model_action"],
+                "engine_chosen_tier": chosen_tier,
+                "downgrade_transition": transition,
+                "search_elapsed_seconds": observed["search_elapsed_seconds"],
+                "cell_elapsed_seconds": observed["elapsed_seconds"],
+                "semantic_search": observed["semantic_search"],
+                "abstained": False,
+            }
+        )
+    summaries = summarize_main_measurements(rows, plan=plan)
+    decomposition = decompose_budget_stability(rows, plan=plan)
+    weighted = frequency_weighted_gain(summaries, plan=plan)
+    decision = classify_main(
+        summaries,
+        plan=plan,
+        determinism_passed=bool(preflight["determinism"]["passed"]),
+    )
+    return {
+        "measurements": rows,
+        "summaries": summaries,
+        "budget_decomposition": decomposition,
+        "frequency_weighted_secondary": weighted,
+        "decision": decision,
+        "resource_use": {
+            "pool_construction": preflight["resource_components"][
+                "pool_construction"
+            ],
+            "preflight": preflight["resource_components"]["preflight"],
+            "measurement": {
+                "engine_single_step_queries": engine_queries
+                - int(prior["engine_single_step_queries"]),
+                "malom_queries": malom_queries - int(prior["malom_queries"]),
+                "active_seconds": time.perf_counter() - started,
+                "malom_elapsed_seconds": execution_malom_seconds,
+                "cells": len(rows),
+            },
+            "aggregate": {
+                "engine_single_step_queries": engine_queries,
+                "malom_queries": malom_queries,
+                "active_seconds": active_seconds(),
+                "states": int(pool["state_count"]),
+                "complete_games": 0,
+                "model_loads": 0,
+                "training_updates": 0,
+                "database_writes": 0,
+                "maximum_concurrent_evaluators": 1,
+                "maximum_concurrent_sanmill_processes": 1,
+            },
+            "envelope": envelope,
+        },
+    }
+
+
 __all__ = [
+    "MAIN_AUTHORIZATION_SCHEMA",
+    "MAIN_PLAN_SCHEMA",
+    "MAIN_POOL_SCHEMA",
+    "MAIN_POOL_SELECTION_SEED",
+    "MAIN_PREFLIGHT_SCHEMA",
+    "MAIN_RESULT_SCHEMA",
     "PLAN_SCHEMA",
     "POOL_SCHEMA",
     "RESULT_SCHEMA",
     "SafeInducementError",
     "build_state_pool",
+    "classify_main",
     "classify_preprobe",
+    "count_source_phase_frequencies",
+    "decompose_budget_stability",
+    "frequency_weighted_gain",
+    "load_main_authorization",
+    "load_main_plan",
+    "load_main_preflight",
     "load_plan",
     "load_state_pool",
     "run_preprobe",
+    "run_main_experiment",
+    "summarize_main_measurements",
     "summarize_measurements",
 ]

@@ -10,9 +10,14 @@ from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
     EstimatorReadinessError,
 )
 from learned_ai.evaluation.sanmill_safe_inducement import (
+    MAIN_PLAN_SCHEMA,
     PLAN_SCHEMA,
     SafeInducementError,
+    classify_main,
     classify_preprobe,
+    decompose_budget_stability,
+    frequency_weighted_gain,
+    load_main_plan,
     load_plan,
     summarize_measurements,
 )
@@ -65,6 +70,59 @@ def _row(state: str, *, downgraded: bool, action: int) -> dict:
         "downgrade_transition": "D->L" if downgraded else None,
         "search_elapsed_seconds": 0.01,
         "abstained": False,
+    }
+
+
+def _main_plan() -> dict:
+    return {
+        "schema_version": MAIN_PLAN_SCHEMA,
+        "status": "frozen_protocol_v2_execution_unlaunched",
+        "claim_boundary": {
+            "safe_set": "A_pos",
+            "positional_only": True,
+            "A_allow_claim": False,
+            "human_trap_claim": False,
+        },
+        "main_experiment": {
+            "node_budgets": [1_000, 100_000, 500_000],
+            "primary_node_budget": 100_000,
+            "interval": {"repetitions": 100, "seed": "main"},
+            "mechanism_success_gate": {
+                "minimum_point_o_minus_b": 0.05,
+                "minimum_lower_95_o_minus_b": 0.05,
+                "minimum_evaluable_states": 330,
+                "determinism_gate": True,
+                "all_conditions_conjunctive": True,
+            },
+            "budget_decomposition": {
+                "fixed_blind_spot_interpretation_threshold": 0.80,
+            },
+            "frequency_weighted_secondary": {
+                "phase_counts": {
+                    "placement": 2,
+                    "movement": 1,
+                    "flying": 1,
+                },
+                "weights": {
+                    "placement": 0.5,
+                    "movement": 0.25,
+                    "flying": 0.25,
+                },
+            },
+            "resource_envelope": {
+                "maximum_states": 360,
+                "maximum_engine_single_step_queries": 40_000,
+                "maximum_malom_queries": 250_000,
+                "maximum_active_seconds": 14_400,
+                "maximum_concurrent_evaluators": 1,
+                "maximum_concurrent_sanmill_processes": 1,
+                "maximum_complete_games": 0,
+                "maximum_model_loads": 0,
+                "maximum_training_updates": 0,
+                "stop_at_any_limit": True,
+                "automatic_retry_or_extension": False,
+            },
+        },
     }
 
 
@@ -184,3 +242,90 @@ def test_protected_research_confirmation_cannot_enter_allowlist() -> None:
             research,
             allowed_sessions=["confirm"],
         )
+
+
+def test_budget_decomposition_separates_invariant_and_sensitive_states() -> None:
+    plan = _main_plan()
+    rows = []
+    for state, phase in (("invariant", "placement"), ("sensitive", "flying")):
+        for action in range(2):
+            for budget in plan["main_experiment"]["node_budgets"]:
+                downgraded = state == "invariant" and action == 0
+                if state == "sensitive" and action == 1 and budget == 100_000:
+                    downgraded = True
+                rows.append(
+                    {
+                        "state_id": state,
+                        "phase": phase,
+                        "a_pos_index": action,
+                        "node_budget": budget,
+                        "downgrade_transition": "D->L" if downgraded else None,
+                        "abstained": False,
+                    }
+                )
+    result = decompose_budget_stability(rows, plan=plan)
+    assert result["overall"]["o_inv"] == pytest.approx(0.5)
+    assert result["overall"]["o_sens"] == pytest.approx(0.5)
+    assert result["overall"]["o_union"] == pytest.approx(1.0)
+    assert result["overall"][
+        "identity_check_o_union_equals_o_inv_plus_o_sens"
+    ]
+    assert result["interpretation"] == "budget_sensitive_component_not_negligible"
+
+
+def test_frequency_weighted_gain_is_secondary_and_cannot_flip_primary() -> None:
+    plan = _main_plan()
+    summaries = {
+        "100000": {
+            "by_phase": {
+                "placement": {"estimates": {"o_minus_b": {"mean": 0.10}}},
+                "movement": {"estimates": {"o_minus_b": {"mean": 0.02}}},
+                "flying": {"estimates": {"o_minus_b": {"mean": 0.30}}},
+            }
+        }
+    }
+    result = frequency_weighted_gain(summaries, plan=plan)
+    assert result["weighted_o_minus_b"] == pytest.approx(0.13)
+    assert result["threshold"] is None
+    assert result["can_flip_primary_decision"] is False
+
+
+def test_main_gate_remains_conjunctive_at_100k() -> None:
+    plan = _main_plan()
+    summaries = {
+        "100000": {
+            "overall": {
+                "states_evaluable": 350,
+                "estimates": {
+                    "o_minus_b": {
+                        "mean": 0.08,
+                        "state_bootstrap_percentile_95": {
+                            "lower_95": 0.049,
+                            "upper_95": 0.12,
+                        },
+                    }
+                },
+            }
+        }
+    }
+    result = classify_main(summaries, plan=plan, determinism_passed=True)
+    assert result["decision"] == "mechanism_gate_failed"
+    assert result["failures"] == ["lower_95_o_minus_b_below_5pp"]
+
+
+def test_main_plan_loader_rejects_threshold_drift(tmp_path: Path) -> None:
+    plan = _main_plan()
+    plan["plan_identity"] = canonical_sha256(plan)
+    path = tmp_path / "plan-v2.json"
+    path.write_text(json.dumps(plan), encoding="utf-8")
+    loaded, _file_sha = load_main_plan(path)
+    assert loaded["plan_identity"] == plan["plan_identity"]
+
+    changed = _main_plan()
+    changed["main_experiment"]["mechanism_success_gate"][
+        "minimum_point_o_minus_b"
+    ] = 0.049
+    changed["plan_identity"] = canonical_sha256(changed)
+    path.write_text(json.dumps(changed), encoding="utf-8")
+    with pytest.raises(SafeInducementError, match="mechanism gate differs"):
+        load_main_plan(path)
