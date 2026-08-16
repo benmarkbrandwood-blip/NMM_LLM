@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -17,11 +19,20 @@ from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     SafeGuidanceGameplayIncomplete,
     SafeGuidanceGameplayError,
     _assert_canary_selection,
+    _checked_position_state,
+    _checked_search_result,
     _pooled_action_key,
     analyze_games,
     build_schedule,
     load_plan,
     load_pool,
+    load_resource_checkpoints,
+    select_schedule_excluding_starts,
+    validate_game_record,
+)
+from learned_ai.evaluation.sanmill_uci import (
+    UciLogicalTurnResult,
+    UciPositionState,
 )
 
 
@@ -52,13 +63,53 @@ def _games(full_score: float = 1.0, random_score: float = 0.5) -> list[dict]:
             "full-guided": full_score,
             "geometry-guided": 0.5,
         }[item["arm"]]
+        winner = None
+        if score == 1.0:
+            winner = item["candidate_color"]
+        elif score == 0.0:
+            winner = "B" if item["candidate_color"] == "W" else "W"
+        winner_name = {None: None, "W": "white", "B": "black"}[winner]
+        reason = "drawThreefoldRepetition" if score == 0.5 else "win"
         rows.append(
             {
                 **item,
+                "schema_version": (
+                    "nmm.sanmill-safe-guidance-gameplay-game.v1"
+                ),
+                "unit_index": item["unit_index"],
+                "oof_fold": 0,
+                "strict_start": {"history_sha256": "history"},
+                "post_start_logical_plies": 1,
                 "termination_class": "rules_terminal",
-                "outcome_reason": "drawThreefoldRepetition" if score == 0.5 else "win",
+                "outcome_reason": reason,
+                "winner": winner,
                 "candidate_score": score,
+                "final_state": {
+                    "outcome": {
+                        "terminal": True,
+                        "winner": winner_name,
+                        "winner_code": None,
+                        "reason": reason,
+                        "reason_code": reason,
+                    }
+                },
+                "final_positional": {
+                    "side_to_move": "W",
+                    "side_to_move_wdl": "D",
+                    "history_aware": False,
+                },
+                "turns": [
+                    {
+                        "post_start_ply": 1,
+                        "mover_color": item["candidate_color"],
+                        "actions": ["a7"],
+                        "move": {"from": None, "to": "a7", "capture": None},
+                        "candidate_choice": None,
+                        "engine_response": None,
+                    }
+                ],
                 "induced_events": [],
+                "game_elapsed_seconds": 0.1,
             }
         )
     return rows
@@ -90,6 +141,36 @@ def test_schedule_is_adjacent_by_start_color_and_arm() -> None:
         "B",
     ]
     assert len({row["game_id"] for row in schedule}) == EXPECTED_GAMES
+
+
+def test_attempt_exclusion_preserves_surviving_game_identities() -> None:
+    original = build_schedule(_states())
+    selected = select_schedule_excluding_starts(
+        original,
+        excluded_start_ids=["state-000"],
+    )
+    assert len(selected) == EXPECTED_GAMES - 6
+    assert min(row["ordinal"] for row in selected) == 6
+    assert [row["game_id"] for row in selected] == [
+        row["game_id"] for row in original[6:]
+    ]
+
+
+def test_attempt_reduced_analysis_requires_exact_surviving_starts() -> None:
+    records = [row for row in _games() if row["start_id"] != "state-000"]
+    expected = [row["state_id"] for row in _states()[1:]]
+    report = analyze_games(records, _plan(), expected_start_ids=expected)
+    assert report["completed_starts"] == EXPECTED_STARTS - 1
+    assert report["completed_games"] == EXPECTED_GAMES - 6
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="analysis start membership differs",
+    ):
+        analyze_games(
+            records,
+            _plan(),
+            expected_start_ids=[*expected[:-1], "wrong-start"],
+        )
 
 
 def test_tracked_start_pool_is_complete_history_and_candidate_blind() -> None:
@@ -174,7 +255,17 @@ def test_safety_cap_cannot_enter_primary_as_draw() -> None:
         **rows[0],
         "termination_class": "safety_cap_incomplete",
         "outcome_reason": "safety_cap_incomplete",
+        "winner": None,
         "candidate_score": None,
+        "final_state": {
+            "outcome": {
+                "terminal": False,
+                "winner": None,
+                "winner_code": None,
+                "reason": "ongoing",
+                "reason_code": "ongoing",
+            }
+        },
     }
     with pytest.raises(SafeGuidanceGameplayIncomplete, match="incomplete game"):
         analyze_games(rows, _plan())
@@ -193,6 +284,161 @@ def test_resource_ledger_fails_closed_at_any_ceiling() -> None:
     ledger.add_malom(1)
     with pytest.raises(SafeGuidanceGameplayIncomplete, match="engine-search"):
         ledger.add_engine()
+
+
+def _terminal_state() -> UciPositionState:
+    return UciPositionState(
+        status="ok",
+        ruleset_id="rules",
+        rules_identity_sha256="rules-sha",
+        rules_options={},
+        history_origin="startpos",
+        fen="fen",
+        side_to_move=None,
+        phase="gameover",
+        action="none",
+        pending_removal_count=0,
+        pending_removals=(0, 0),
+        legal_actions=(),
+        action_token_count=3,
+        logical_ply_count=3,
+        logical_plies_by_side=(2, 1),
+        no_capture_count=0,
+        repetition_current_count=3,
+        repetition_history_length=3,
+        snapshot_history_length=3,
+        history_sha256="history",
+        terminal=True,
+        winner=None,
+        winner_code=2,
+        outcome_reason="drawThreefoldRepetition",
+        outcome_reason_code="5",
+        raw_line="state_json {}",
+    )
+
+
+def test_terminal_contract_requires_nested_portable_outcome(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = _terminal_state()
+    assert _checked_position_state(state)["outcome"]["winner"] is None
+
+    def old_broken_portable(_self: UciPositionState) -> dict:
+        return {
+            "terminal": True,
+            "winner": None,
+            "outcome_reason": "drawThreefoldRepetition",
+            "history_sha256": "history",
+            "logical_ply_count": 3,
+            "no_capture_count": 0,
+            "repetition_current_count": 3,
+        }
+
+    monkeypatch.setattr(UciPositionState, "portable_record", old_broken_portable)
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="portable Sanmill outcome is absent",
+    ):
+        _checked_position_state(state)
+
+
+def test_game_record_rejects_top_level_nested_winner_mismatch() -> None:
+    record = _games()[0]
+    record["final_state"]["outcome"]["winner"] = "black"
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="terminal game outcome contract differs",
+    ):
+        validate_game_record(record)
+
+
+def test_game_record_requires_inducement_decomposition_before_analysis() -> None:
+    record = _games()[0]
+    record["induced_events"] = [
+        {
+            "event_index": 0,
+            "transition": "D->L",
+            "history_actions_before": [],
+            "primary_semantic_search": {},
+            "budget_flags": {"100000": True},
+            "budget_type": None,
+        }
+    ]
+    validate_game_record(record)
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="induced-event decomposition contract differs",
+    ):
+        validate_game_record(record, require_decomposition=True)
+
+
+def test_logical_search_contract_rejects_wrong_budget() -> None:
+    result = UciLogicalTurnResult(
+        status="ok",
+        full_turn_actions=("a7",),
+        logical_move_id="a7",
+        model_action={"from": None, "to": "a7", "capture": None},
+        logical_ply_delta=1,
+        resulting_fen="fen",
+        resulting_side_to_move="black",
+        terminal=False,
+        winner=None,
+        winner_code=None,
+        outcome_reason="ongoing",
+        effective_depth=1,
+        completed_depth=1,
+        score_kind="cp",
+        score=0,
+        score_perspective="white",
+        node_budget=1_000,
+        primary_nodes=1_000,
+        removal_nodes=0,
+        total_nodes=1_000,
+        search_calls=1,
+        elapsed_seconds=0.1,
+        raw_line="bestmove_json {}",
+    )
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="logical result contract differs",
+    ):
+        _checked_search_result(result, expected_node_budget=100_000)
+
+
+def test_resource_journal_survives_abnormal_subprocess_exit(
+    tmp_path: Path,
+) -> None:
+    journal = tmp_path / "resource-journal.jsonl"
+    root = Path(__file__).resolve().parent.parent
+    code = f"""
+import os
+from learned_ai.evaluation.sanmill_safe_guidance_gameplay import append_resource_checkpoint
+p = {str(journal)!r}
+r0 = {{'engine_single_step_searches': 0, 'malom_read_only_queries': 0, 'active_seconds': 0.0}}
+r1 = {{'engine_single_step_searches': 2, 'malom_read_only_queries': 11, 'active_seconds': 1.0}}
+r2 = {{'engine_single_step_searches': 5, 'malom_read_only_queries': 29, 'active_seconds': 2.5}}
+h1 = append_resource_checkpoint(p, completion_index=0, complete_games_before=4, game_record={{'ordinal': 7, 'game_id': 'game-1'}}, resources_before=r0, resources_after=r1, previous_checkpoint_sha256=None)
+append_resource_checkpoint(p, completion_index=1, complete_games_before=4, game_record={{'ordinal': 8, 'game_id': 'game-2'}}, resources_before=r1, resources_after=r2, previous_checkpoint_sha256=h1)
+os._exit(73)
+"""
+    result = subprocess.run([sys.executable, "-c", code], cwd=root, check=False)
+    assert result.returncode == 73
+    recovered = load_resource_checkpoints(
+        journal,
+        expected_baseline={
+            "engine_single_step_searches": 0,
+            "malom_read_only_queries": 0,
+            "active_seconds": 0.0,
+        },
+        complete_games_before=4,
+    )
+    assert recovered["checkpoint_count"] == 2
+    assert recovered["complete_games_after"] == 6
+    assert recovered["last_resources"] == {
+        "engine_single_step_searches": 5,
+        "malom_read_only_queries": 29,
+        "active_seconds": 2.5,
+    }
 
 
 def test_protected_guard_raises_before_any_content_producer(tmp_path: Path) -> None:

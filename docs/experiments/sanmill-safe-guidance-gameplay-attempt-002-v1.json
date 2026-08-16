@@ -1,0 +1,195 @@
+{
+  "schema_version": "nmm.sanmill-safe-guidance-gameplay-attempt-002.v1",
+  "attempt_identity": "1610b74f48bd0b65c164b184e154376979fce274f0c58cbbc28c8322c3cc80e4",
+  "status": "frozen_before_attempt_002_rehearsal",
+  "frozen_on": "2026-08-16",
+  "authorization_basis": "Direct product-owner authorization for one new attempt-002 after all four stated preconditions pass.",
+  "plan_identity": "1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6",
+  "plan_file_sha256": "7b6620768fb5caab455abb4db9b831d45cf33960aeb1d660223babecf1a37403",
+  "start_pool_identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9",
+  "start_pool_membership_identity": "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15",
+  "start_pool_file_sha256": "ca6e8473faa7d1c27293bb520a8e1e7274c72e092dc51a23a1c9c8a6f9a7d093",
+  "attempt_001_preservation": {
+    "authorization_identity": "806e7b674c96ca3f5dd98067a09b6c76bda3db2cca12c75d92ba3cc5f7b495e2",
+    "authorization_file_sha256": "dbf1feb176651023afdf60dc548514423da437e0b0dba77603c29d347efb8a5c",
+    "preflight_failure_file_sha256": "6542fbc029094672bd35af956dc500e0c29a31b5a8ee324b8835162d7772b969",
+    "successful_preflight_file_sha256": "af4a2e393dccd78becfd8f1286ff4d177fd5afdc149140e67a80f7f0f46943bf",
+    "execution_failure_identity": "7aa4f771c3871cfd48c6935167c5f8c1ad40534281bcf2069c2ad3d36a2dc55f",
+    "execution_failure_file_sha256": "867e4a9ce0e4b07131b3085bddce04561a73fb39a7cf2a3ed494c0175c306d5c",
+    "first_output_tree": {
+      "path": "out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-001",
+      "files": 22,
+      "bytes": 500998,
+      "file_manifest_identity": "0f5e115f00f6f426f508b04a141039a881dc5224a25a8f567801a0c3b49caa37"
+    },
+    "consumed_output_tree": {
+      "path": "out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-002",
+      "files": 24,
+      "bytes": 501457,
+      "file_manifest_identity": "a402bd038242d5ee8516ffbe6ddae577d0a705b29bb643753121bcb14e919f11",
+      "measurement_marker_sha256": "63757921dad4b3e6ff52194b1d9542898d2c184f40dff4256b4a4d2ccd22f5e2"
+    },
+    "must_remain_byte_identical": true,
+    "reuse_or_repair_in_place": false
+  },
+  "sunk_cost_outside_attempt_002_envelope": {
+    "exact_sealed_engine_single_step_searches": 72,
+    "exact_sealed_malom_read_only_queries": 12638,
+    "first_failed_game_increment_exactly_recoverable": false,
+    "first_failed_game_increment_is_not_reclassified_or_estimated": true
+  },
+  "pollution_audit": {
+    "failed_start_id": "00092c974cabf05874f066b8948e791f9fdc82d84a65759da1ba78f212a643b0",
+    "persisted_raw_game_ledger": false,
+    "persisted_progress": false,
+    "persisted_result": false,
+    "persisted_stdout_result_or_move": false,
+    "traceback_exposed_only_exception_and_code_locations": true,
+    "terminal_state_existed_in_exited_process_memory": true,
+    "absolute_process_visibility_exclusion_proven": false,
+    "fail_closed_disposition": "exclude_the_entire_start_from_attempt_002"
+  },
+  "formal_execution": {
+    "schedule_rule": "build the original 1530-game schedule, then remove only the six rows whose start_id is the excluded failed start; preserve all surviving ordinals, game IDs, arms, colors, and random-safe seeds",
+    "excluded_start_ids": [
+      "00092c974cabf05874f066b8948e791f9fdc82d84a65759da1ba78f212a643b0"
+    ],
+    "starts": 254,
+    "games": 1524,
+    "phase_starts": {
+      "placement": 84,
+      "movement": 85,
+      "flying": 85
+    },
+    "conservative_sd": 0.12,
+    "expected_95_half_width": 0.014757760536849488,
+    "frozen_maximum_half_width_unchanged": 0.015,
+    "run_output_namespace": "out/evaluation/sanmill-safe-guidance-gameplay-attempt-002-20260816-001",
+    "tracked_result": "docs/evidence/sanmill-safe-guidance-gameplay-attempt-002-manifest-2026-08-16.json"
+  },
+  "rehearsal": {
+    "status": "preregistered_non_evidence_technical_validation",
+    "games": 4,
+    "independent_starts": 2,
+    "run_output_namespace": "out/evaluation/sanmill-safe-guidance-gameplay-attempt-002-rehearsal-20260816-001",
+    "tracked_result": "docs/evidence/sanmill-safe-guidance-gameplay-attempt-002-rehearsal-2026-08-16.json",
+    "formal_result_eligibility": false,
+    "required_coverage": {
+      "rules_terminal_games": 4,
+      "at_least_one_draw": true,
+      "at_least_one_decisive": true,
+      "at_least_one_rule_draw_or_safety_cap": true,
+      "result_packaging": true,
+      "resource_checkpoint_before_game_record": true,
+      "completion_record": true,
+      "analysis_output": true
+    },
+    "starts": [
+      {
+        "rehearsal_start_id": "f616475cacf4c867e50a2aab736bd0036996b9f9848ec3b6b12c0c4e5f59b8ef",
+        "kind": "phase_process_001_full_history",
+        "source_corpus": "docs/experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json",
+        "source_corpus_sha256": "8353ff3e52465bf99f7cf468a9cbcb4681a673ac2cebcdae00c253df8a22670b",
+        "source_record_identity": "a1c9285edd203f9ff7e911365aa583e449550e314509592d0b1ed33ffc8f6063",
+        "source_start_id": "phase-process-001",
+        "history_actions_identity": "441b91faf39c627dc08cd33ad9c89bd374c177a60dc4a08f42800947d4870069",
+        "strict_history_sha256": "5150ab6b9b21fe6537df06a628a191754d06b5b562936d2f7207d63ddcabfe28",
+        "exact_fen_overlap_with_frozen_pool": false,
+        "exact_history_overlap_with_frozen_pool": false
+      },
+      {
+        "rehearsal_start_id": "1bb6ebaa0d95b4fa8a00e0b6a79d735e556b146482d462c7021565aabb11fa99",
+        "kind": "strict_threefold_prefix",
+        "history_actions_identity": "20f167e886c512f202fc6b166ad07d7f714601d3b0e45e2e1f5bc3afa836e542",
+        "history_action_count": 29,
+        "fen": "W.BW.B.BBWWB.W.W.BWWBBWB|B|9|9",
+        "terminal_action": "g7-d7",
+        "exact_fen_overlap_with_frozen_pool": false,
+        "exact_history_overlap_with_frozen_pool": false
+      }
+    ],
+    "cases": [
+      {
+        "ordinal": 0,
+        "start_kind": "phase_process_001_full_history",
+        "mode": "live_random_safe_vs_100000_node_sanmill",
+        "candidate_color": "W"
+      },
+      {
+        "ordinal": 1,
+        "start_kind": "phase_process_001_full_history",
+        "mode": "live_full_guided_vs_100000_node_sanmill",
+        "candidate_color": "W"
+      },
+      {
+        "ordinal": 2,
+        "start_kind": "phase_process_001_full_history",
+        "mode": "scripted_known_decisive_strict_replay",
+        "candidate_color": "B",
+        "source_game_ledger": "learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-phase-process-generalization-v1/games.jsonl",
+        "source_game_ledger_sha256": "45506e5cedf5ab9bdcba9dd687349869b639fb8bd46fd8990cbaf4bb79ef3211",
+        "source_game_id": "phase-process-game:c443a38ef4122889ace1df3b3a2dc84520a5624f00f77775881a891ab4970f82",
+        "source_record_sha256": "140c38d90969b203e21119b7f38fcefe99b48c80ec4bf1583139a6077cc959e4"
+      },
+      {
+        "ordinal": 3,
+        "start_kind": "strict_threefold_prefix",
+        "mode": "scripted_threefold_rules_draw",
+        "candidate_color": "B"
+      }
+    ]
+  },
+  "resource_envelope": {
+    "maximum_independent_starts": 256,
+    "maximum_complete_games": 1536,
+    "maximum_engine_single_step_searches": 80000,
+    "maximum_malom_queries": 20000000,
+    "maximum_active_seconds": 21600,
+    "maximum_concurrent_evaluators": 1,
+    "maximum_concurrent_sanmill_processes": 1,
+    "maximum_training_updates": 0,
+    "maximum_database_writes": 0,
+    "stop_at_any_limit": true,
+    "attempt_002_includes_rehearsal_preflight_and_formal_execution": true,
+    "planned_total_complete_games": 1528,
+    "planned_total_independent_starts": 256
+  },
+  "durability_contract": {
+    "per_completed_game_fsynced_resource_checkpoint": true,
+    "checkpoint_precedes_raw_game_record": true,
+    "raw_game_record_is_fsynced": true,
+    "progress_record_is_atomic": true,
+    "abnormal_subprocess_exit_recovery_test_required": true,
+    "automatic_resume_authorized": false
+  },
+  "cross_component_contract_audit": {
+    "boundaries": [
+      "frozen pool state to strict Sanmill history replay",
+      "Malom oracle inventory to NMM legal move set and WDL values",
+      "Sanmill logical result dataclass to semantic record and NMM move actions",
+      "Sanmill position-state dataclass to nested portable outcome",
+      "candidate policy choice to A_pos move",
+      "game record to compaction and analysis",
+      "resource ledger to fsynced checkpoint chain",
+      "attempt schedule exclusion to surviving frozen game identities"
+    ],
+    "every_boundary_requires_runtime_assertion_or_typed_contract": true,
+    "focused_negative_tests_required": true
+  },
+  "execution_policy": {
+    "new_authorization_identity_required": true,
+    "formal_measurement_marker_forbidden_until_all_preconditions_pass": true,
+    "execution_count": 1,
+    "automatic_retry_resume_batching_or_extension": false,
+    "host_interruption_recovery_authorized": false,
+    "attempt_003_authorized": false
+  },
+  "claim_boundary": {
+    "positional_only": true,
+    "safe_set": "A_pos",
+    "A_allow_claim": false,
+    "human_trap_or_product_claim": false,
+    "other_engine_or_human_generalization": false,
+    "training_promotion_deployment_publication_or_release": false
+  }
+}

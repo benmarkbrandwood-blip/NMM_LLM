@@ -43,6 +43,10 @@ from learned_ai.evaluation.sanmill_safe_inducement import (
     _label_response,
     _move_key,
 )
+from learned_ai.evaluation.sanmill_uci import (
+    UciLogicalTurnResult,
+    UciPositionState,
+)
 from learned_ai.training.run_contract import canonical_json_bytes
 from learned_ai.training.sanmill_referee import (
     SanmillTrainingGame,
@@ -56,6 +60,13 @@ AUTHORIZATION_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-authorization.v1"
 PREFLIGHT_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-preflight.v1"
 GAME_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-game.v1"
 RESULT_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-result.v1"
+ATTEMPT_SPEC_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-attempt-002.v1"
+REHEARSAL_RESULT_SCHEMA = (
+    "nmm.sanmill-safe-guidance-gameplay-attempt-002-rehearsal.v1"
+)
+RESOURCE_CHECKPOINT_SCHEMA = (
+    "nmm.sanmill-safe-guidance-gameplay-resource-checkpoint.v1"
+)
 
 ARMS = ("random-safe", "full-guided", "geometry-guided")
 PHASES = ("placement", "movement", "flying")
@@ -186,6 +197,30 @@ def load_preflight(path: str | Path) -> tuple[dict[str, Any], str]:
     return value, file_sha
 
 
+def load_attempt_spec(path: str | Path) -> tuple[dict[str, Any], str]:
+    value, file_sha = load_sealed(
+        path, schema=ATTEMPT_SPEC_SCHEMA, identity_field="attempt_identity"
+    )
+    execution = value.get("formal_execution", {})
+    rehearsal = value.get("rehearsal", {})
+    if (
+        value.get("status") != "frozen_before_attempt_002_rehearsal"
+        or value.get("plan_identity")
+        != "1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6"
+        or value.get("start_pool_identity")
+        != "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9"
+        or value.get("start_pool_membership_identity")
+        != "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15"
+        or len(execution.get("excluded_start_ids", [])) != 1
+        or execution.get("starts") != 254
+        or execution.get("games") != 1524
+        or rehearsal.get("games") != 4
+        or rehearsal.get("independent_starts") != 2
+    ):
+        raise SafeGuidanceGameplayError("attempt-002 frozen specification differs")
+    return value, file_sha
+
+
 def build_schedule(states: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     if len(states) != EXPECTED_STARTS:
         raise SafeGuidanceGameplayError("schedule start count differs")
@@ -217,6 +252,32 @@ def build_schedule(states: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     if len(schedule) != EXPECTED_GAMES:
         raise SafeGuidanceGameplayError("schedule game count differs")
     return schedule
+
+
+def select_schedule_excluding_starts(
+    schedule: Sequence[Mapping[str, Any]],
+    *,
+    excluded_start_ids: Sequence[str],
+) -> list[dict[str, Any]]:
+    """Exclude only named starts while preserving every surviving game identity."""
+    excluded = set(excluded_start_ids)
+    if len(excluded) != len(excluded_start_ids):
+        raise SafeGuidanceGameplayError("excluded start IDs are duplicated")
+    available = {str(row["start_id"]) for row in schedule}
+    if not excluded or not excluded <= available:
+        raise SafeGuidanceGameplayError("excluded start ID is absent from schedule")
+    selected = [dict(row) for row in schedule if str(row["start_id"]) not in excluded]
+    expected = len(schedule) - len(excluded) * 2 * len(ARMS)
+    if len(selected) != expected:
+        raise SafeGuidanceGameplayError("excluded schedule size differs")
+    surviving_ids = {
+        str(row["game_id"])
+        for row in schedule
+        if str(row["start_id"]) not in excluded
+    }
+    if {str(row["game_id"]) for row in selected} != surviving_ids:
+        raise SafeGuidanceGameplayError("surviving game identities changed")
+    return selected
 
 
 @dataclass
@@ -262,6 +323,146 @@ class ResourceLedger:
             "malom_read_only_queries": self.malom_queries,
             "active_seconds": self.active_seconds,
         }
+
+
+def _resource_values(value: Mapping[str, Any]) -> dict[str, int | float]:
+    required = {
+        "engine_single_step_searches",
+        "malom_read_only_queries",
+        "active_seconds",
+    }
+    if not required <= value.keys():
+        raise SafeGuidanceGameplayError("resource snapshot fields are absent")
+    record = {
+        "engine_single_step_searches": int(value["engine_single_step_searches"]),
+        "malom_read_only_queries": int(value["malom_read_only_queries"]),
+        "active_seconds": float(value["active_seconds"]),
+    }
+    if any(item < 0 for item in record.values()):
+        raise SafeGuidanceGameplayError("resource snapshot is negative")
+    return record
+
+
+def append_resource_checkpoint(
+    path: str | Path,
+    *,
+    completion_index: int,
+    complete_games_before: int,
+    game_record: Mapping[str, Any],
+    resources_before: Mapping[str, Any],
+    resources_after: Mapping[str, Any],
+    previous_checkpoint_sha256: str | None,
+) -> str:
+    """Fsync one completed game's exact resource increment before its record."""
+    if completion_index < 0 or complete_games_before < 0:
+        raise SafeGuidanceGameplayError("resource checkpoint index is invalid")
+    before = _resource_values(resources_before)
+    after = _resource_values(resources_after)
+    delta = {key: after[key] - before[key] for key in before}
+    if any(value < 0 for value in delta.values()):
+        raise SafeGuidanceGameplayError("resource checkpoint regressed")
+    game_identity = canonical_sha256(game_record)
+    body = {
+        "schema_version": RESOURCE_CHECKPOINT_SCHEMA,
+        "completion_index": completion_index,
+        "schedule_ordinal": int(game_record["ordinal"]),
+        "game_id": str(game_record["game_id"]),
+        "game_record_identity": game_identity,
+        "complete_games_before": complete_games_before + completion_index,
+        "complete_games_after": complete_games_before + completion_index + 1,
+        "resources_before": before,
+        "resources_after": after,
+        "resource_increment": delta,
+        "previous_checkpoint_sha256": previous_checkpoint_sha256,
+    }
+    checkpoint_sha = canonical_sha256(body)
+    wrapper = {"checkpoint": body, "checkpoint_sha256": checkpoint_sha}
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("xb" if completion_index == 0 else "ab") as handle:
+        handle.write(canonical_json_bytes(wrapper) + b"\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    return checkpoint_sha
+
+
+def load_resource_checkpoints(
+    path: str | Path,
+    *,
+    expected_baseline: Mapping[str, Any],
+    complete_games_before: int,
+) -> dict[str, Any]:
+    """Recover and validate the exact fsynced checkpoint prefix after a crash."""
+    target = Path(path)
+    try:
+        raw = target.read_bytes()
+    except OSError as exc:
+        raise SafeGuidanceGameplayError("resource checkpoint journal is absent") from exc
+    if raw and not raw.endswith(b"\n"):
+        raise SafeGuidanceGameplayError("resource checkpoint journal is partial")
+    baseline = _resource_values(expected_baseline)
+    previous_resources = baseline
+    previous_sha: str | None = None
+    rows: list[dict[str, Any]] = []
+    for index, encoded in enumerate(raw.splitlines()):
+        try:
+            wrapper = json.loads(encoded)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SafeGuidanceGameplayError(
+                "resource checkpoint line is malformed"
+            ) from exc
+        if not isinstance(wrapper, dict) or set(wrapper) != {
+            "checkpoint",
+            "checkpoint_sha256",
+        }:
+            raise SafeGuidanceGameplayError("resource checkpoint wrapper differs")
+        row = wrapper["checkpoint"]
+        if not isinstance(row, dict):
+            raise SafeGuidanceGameplayError("resource checkpoint body differs")
+        if (
+            row.get("schema_version") != RESOURCE_CHECKPOINT_SCHEMA
+            or row.get("completion_index") != index
+            or row.get("complete_games_before") != complete_games_before + index
+            or row.get("complete_games_after") != complete_games_before + index + 1
+            or row.get("previous_checkpoint_sha256") != previous_sha
+            or row.get("resources_before") != previous_resources
+        ):
+            raise SafeGuidanceGameplayError("resource checkpoint chain differs")
+        observed_sha = wrapper["checkpoint_sha256"]
+        if not isinstance(observed_sha, str) or canonical_sha256(row) != observed_sha:
+            raise SafeGuidanceGameplayError("resource checkpoint identity differs")
+        after = _resource_values(row.get("resources_after", {}))
+        increment = _resource_values(row.get("resource_increment", {}))
+        expected_increment = {
+            key: after[key] - previous_resources[key] for key in previous_resources
+        }
+        if increment != expected_increment or any(
+            value < 0 for value in expected_increment.values()
+        ):
+            raise SafeGuidanceGameplayError("resource checkpoint increment differs")
+        rows.append(row)
+        previous_resources = after
+        previous_sha = observed_sha
+    return {
+        "checkpoints": rows,
+        "checkpoint_count": len(rows),
+        "tail_checkpoint_sha256": previous_sha,
+        "last_resources": previous_resources,
+        "complete_games_after": complete_games_before + len(rows),
+        "file_sha256": sha256_file(target),
+    }
+
+
+def write_json_atomic(path: str | Path, value: Mapping[str, Any]) -> None:
+    """Atomically publish a small progress or completion record."""
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(f"{target.name}.partial")
+    with partial.open("wb") as handle:
+        handle.write(canonical_json_bytes(value))
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(partial, target)
 
 
 def _normal_move(move: Mapping[str, Any]) -> dict[str, str | None]:
@@ -331,9 +532,15 @@ def replay_start(
         raise SafeGuidanceGameplayError("replayed start action history differs")
     if game.state.logical_ply_count != state["logical_ply"]:
         raise SafeGuidanceGameplayError("replayed start logical ply differs")
+    expected_strict_history = state.get("strict_history_sha256")
+    if (
+        expected_strict_history is not None
+        and game.state.history_sha256 != expected_strict_history
+    ):
+        raise SafeGuidanceGameplayError("replayed strict history identity differs")
     if game.state.terminal:
         raise SafeGuidanceGameplayError("frozen start is strict-terminal")
-    return board, game.state.portable_record()
+    return board, dict(_checked_position_state(game.state))
 
 
 class FrozenSafePolicy:
@@ -364,7 +571,7 @@ class FrozenSafePolicy:
         )
 
     def choose(self, board: BoardState) -> tuple[Mapping[str, Any], dict[str, Any]]:
-        parent, inventory, queries = _oracle_inventory(board, self.database)
+        parent, inventory, queries = _checked_oracle_inventory(board, self.database)
         self.ledger.add_malom(queries)
         best_rank = max(WDL_RANK[value.outcome] for _move, value in inventory)
         safe = sorted(
@@ -438,6 +645,263 @@ def _final_positional_tier(board: BoardState, database: MalomDB) -> tuple[str, i
     return value.outcome, 1
 
 
+def _checked_oracle_inventory(
+    board: BoardState, database: MalomDB
+) -> tuple[str, list[tuple[Mapping[str, Any], Any]], int]:
+    """Validate the HumanDB/Malom inventory boundary at every live call."""
+    parent, inventory, queries = _oracle_inventory(board, database)
+    legal_keys = Counter(_move_key(move) for move in get_all_legal_moves(board))
+    inventory_keys = Counter(_move_key(move) for move, _value in inventory)
+    if parent not in WDL_RANK or queries < 1 or legal_keys != inventory_keys:
+        raise SafeGuidanceGameplayError("oracle inventory contract differs")
+    if any(value.outcome not in WDL_RANK for _move, value in inventory):
+        raise SafeGuidanceGameplayError("oracle move-value contract differs")
+    return parent, inventory, queries
+
+
+def _checked_search_result(
+    result: UciLogicalTurnResult,
+    *,
+    expected_node_budget: int,
+) -> Mapping[str, Any]:
+    """Validate the Sanmill logical-search dataclass and its portable record."""
+    if not isinstance(result, UciLogicalTurnResult):
+        raise SafeGuidanceGameplayError("Sanmill logical result type differs")
+    semantic = result.semantic_record()
+    if (
+        result.status != "ok"
+        or result.model_action is None
+        or result.logical_ply_delta != 1
+        or result.node_budget != expected_node_budget
+        or semantic.get("model_action") != dict(result.model_action)
+        or semantic.get("full_turn_actions") != list(result.full_turn_actions)
+        or semantic.get("terminal") != result.terminal
+        or semantic.get("winner") != result.winner
+        or semantic.get("outcome_reason") != result.outcome_reason
+        or result.total_nodes != result.primary_nodes + result.removal_nodes
+    ):
+        raise SafeGuidanceGameplayError("Sanmill logical result contract differs")
+    if tuple(result.full_turn_actions) != nmm_move_actions(result.model_action):
+        raise SafeGuidanceGameplayError("Sanmill logical move/action contract differs")
+    return semantic
+
+
+def _checked_position_state(state: UciPositionState) -> Mapping[str, Any]:
+    """Validate direct state fields against the nested portable outcome."""
+    if not isinstance(state, UciPositionState):
+        raise SafeGuidanceGameplayError("Sanmill position-state type differs")
+    portable = state.portable_record()
+    outcome = portable.get("outcome")
+    if not isinstance(outcome, Mapping):
+        raise SafeGuidanceGameplayError("portable Sanmill outcome is absent")
+    expected_outcome = {
+        "terminal": state.terminal,
+        "winner": state.winner,
+        "winner_code": state.winner_code,
+        "reason": state.outcome_reason,
+        "reason_code": state.outcome_reason_code,
+    }
+    if dict(outcome) != expected_outcome:
+        raise SafeGuidanceGameplayError("portable Sanmill outcome differs")
+    if (
+        portable.get("terminal") != state.terminal
+        or portable.get("history_sha256") != state.history_sha256
+        or portable.get("logical_ply_count") != state.logical_ply_count
+        or portable.get("no_capture_count") != state.no_capture_count
+        or portable.get("repetition_current_count")
+        != state.repetition_current_count
+    ):
+        raise SafeGuidanceGameplayError("portable Sanmill state contract differs")
+    return portable
+
+
+def _strict_terminal_outcome(state: UciPositionState) -> tuple[str | None, str]:
+    """Read terminal fields from the typed state and cross-check its payload."""
+    _checked_position_state(state)
+    if not state.terminal or state.outcome_reason == "ongoing":
+        raise SafeGuidanceGameplayError("strict terminal state is absent")
+    if state.winner not in {None, "white", "black"}:
+        raise SafeGuidanceGameplayError("strict winner differs")
+    winner = {None: None, "white": "W", "black": "B"}[state.winner]
+    return winner, str(state.outcome_reason)
+
+
+def validate_game_record(
+    record: Mapping[str, Any],
+    *,
+    require_decomposition: bool = False,
+) -> None:
+    """Fail closed before journaling any cross-component gameplay payload."""
+    required = {
+        "schema_version",
+        "ordinal",
+        "game_id",
+        "unit_index",
+        "start_id",
+        "phase",
+        "arm",
+        "candidate_color",
+        "oof_fold",
+        "strict_start",
+        "post_start_logical_plies",
+        "termination_class",
+        "outcome_reason",
+        "winner",
+        "candidate_score",
+        "final_state",
+        "final_positional",
+        "turns",
+        "induced_events",
+        "game_elapsed_seconds",
+    }
+    if not required <= record.keys() or record.get("schema_version") != GAME_SCHEMA:
+        raise SafeGuidanceGameplayError("game record contract fields differ")
+    if record["candidate_color"] not in {"W", "B"}:
+        raise SafeGuidanceGameplayError("game record candidate color differs")
+    rehearsal_only = record.get("rehearsal_only") is True
+    if not rehearsal_only and record["arm"] not in ARMS:
+        raise SafeGuidanceGameplayError("game record arm differs")
+    if record["termination_class"] == "rules_terminal":
+        if record["candidate_score"] not in {0.0, 0.5, 1.0}:
+            raise SafeGuidanceGameplayError("terminal game score differs")
+        outcome = record["final_state"].get("outcome")
+        winner = record["winner"]
+        expected_winner_name = {None: None, "W": "white", "B": "black"}.get(
+            winner, object()
+        )
+        expected_score = (
+            0.5
+            if winner is None
+            else float(winner == record["candidate_color"])
+        )
+        if (
+            not isinstance(outcome, Mapping)
+            or outcome.get("terminal") is not True
+            or outcome.get("reason") != record["outcome_reason"]
+            or outcome.get("winner") != expected_winner_name
+            or record["candidate_score"] != expected_score
+        ):
+            raise SafeGuidanceGameplayError("terminal game outcome contract differs")
+    elif record["termination_class"] == "safety_cap_incomplete":
+        if record["candidate_score"] is not None or record["winner"] is not None:
+            raise SafeGuidanceGameplayError("safety cap was converted to a result")
+        outcome = record["final_state"].get("outcome")
+        if not isinstance(outcome, Mapping) or outcome.get("terminal") is not False:
+            raise SafeGuidanceGameplayError("safety-cap state contract differs")
+    else:
+        raise SafeGuidanceGameplayError("game termination class differs")
+    if (
+        not isinstance(record["turns"], list)
+        or not record["turns"]
+        or record["post_start_logical_plies"] != len(record["turns"])
+    ):
+        raise SafeGuidanceGameplayError("game turn contract differs")
+    for expected_ply, turn in enumerate(record["turns"], start=1):
+        if (
+            turn.get("post_start_ply") != expected_ply
+            or turn.get("mover_color") not in {"W", "B"}
+            or not isinstance(turn.get("actions"), list)
+            or not isinstance(turn.get("move"), Mapping)
+            or "candidate_choice" not in turn
+            or "engine_response" not in turn
+        ):
+            raise SafeGuidanceGameplayError("game turn payload differs")
+    if not isinstance(record["induced_events"], list):
+        raise SafeGuidanceGameplayError("induced-event collection differs")
+    for event_index, event in enumerate(record["induced_events"]):
+        required_event = {
+            "event_index",
+            "transition",
+            "history_actions_before",
+            "primary_semantic_search",
+            "budget_flags",
+            "budget_type",
+        }
+        if (
+            not isinstance(event, Mapping)
+            or not required_event <= event.keys()
+            or event.get("event_index") != event_index
+            or event.get("transition") not in {"W->D", "W->L", "D->L"}
+            or not isinstance(event.get("history_actions_before"), list)
+            or not isinstance(event.get("primary_semantic_search"), Mapping)
+            or not isinstance(event.get("budget_flags"), Mapping)
+        ):
+            raise SafeGuidanceGameplayError("induced-event payload differs")
+        if require_decomposition and (
+            event.get("budget_type")
+            not in {"budget-invariant", "budget-sensitive"}
+            or set(event["budget_flags"]) != {"1000", "100000", "500000"}
+            or any(
+                not isinstance(event.get(f"semantic_search_{budget}"), Mapping)
+                for budget in (1_000, 500_000)
+            )
+        ):
+            raise SafeGuidanceGameplayError(
+                "induced-event decomposition contract differs"
+            )
+
+
+def _finalize_game_record(
+    *,
+    schedule_item: Mapping[str, Any],
+    start_state: Mapping[str, Any],
+    candidate_color: str,
+    strict_start: Mapping[str, Any],
+    turns: list[dict[str, Any]],
+    induced_events: list[dict[str, Any]],
+    terminal_state: UciPositionState,
+    board: BoardState,
+    safety_cap: bool,
+    database: MalomDB,
+    ledger: ResourceLedger,
+    game_started: float,
+    rehearsal_only: bool = False,
+) -> dict[str, Any]:
+    final_state = _checked_position_state(terminal_state)
+    if safety_cap:
+        if terminal_state.terminal:
+            raise SafeGuidanceGameplayError("terminal state reached at safety cap")
+        winner = None
+        score = None
+        termination_class = "safety_cap_incomplete"
+        outcome_reason = "safety_cap_incomplete"
+    else:
+        winner, outcome_reason = _strict_terminal_outcome(terminal_state)
+        score = 0.5 if winner is None else float(winner == candidate_color)
+        termination_class = "rules_terminal"
+    final_tier, final_queries = _final_positional_tier(board, database)
+    ledger.add_malom(final_queries)
+    record = {
+        "schema_version": GAME_SCHEMA,
+        "ordinal": int(schedule_item["ordinal"]),
+        "game_id": str(schedule_item["game_id"]),
+        "unit_index": int(schedule_item["unit_index"]),
+        "start_id": str(schedule_item["start_id"]),
+        "phase": str(schedule_item["phase"]),
+        "arm": str(schedule_item["arm"]),
+        "candidate_color": candidate_color,
+        "oof_fold": int(start_state["oof_fold"]),
+        "strict_start": dict(strict_start),
+        "post_start_logical_plies": len(turns),
+        "termination_class": termination_class,
+        "outcome_reason": outcome_reason,
+        "winner": winner,
+        "candidate_score": score,
+        "final_state": dict(final_state),
+        "final_positional": {
+            "side_to_move": board.turn,
+            "side_to_move_wdl": final_tier,
+            "history_aware": False,
+        },
+        "turns": turns,
+        "induced_events": induced_events,
+        "game_elapsed_seconds": time.perf_counter() - game_started,
+        "rehearsal_only": rehearsal_only,
+    }
+    validate_game_record(record)
+    return record
+
+
 def play_game(
     *,
     schedule_item: Mapping[str, Any],
@@ -480,14 +944,17 @@ def play_game(
                 engine_label = None
             else:
                 actor = "sanmill"
-                parent, inventory, inventory_queries = _oracle_inventory(board, database)
+                parent, inventory, inventory_queries = _checked_oracle_inventory(
+                    board, database
+                )
                 ledger.add_malom(inventory_queries)
                 result = game.session.search_logical_turn(PRIMARY_NODE_BUDGET)
                 ledger.add_engine()
-                if result.status != "ok" or result.model_action is None:
-                    raise SafeGuidanceGameplayIncomplete(
-                        "ongoing Sanmill root produced no move"
-                    )
+                semantic_search = _checked_search_result(
+                    result,
+                    expected_node_budget=PRIMARY_NODE_BUDGET,
+                )
+                assert result.model_action is not None
                 move = result.model_action
                 selected_values = [
                     value
@@ -511,7 +978,7 @@ def play_game(
                     "downgrade_transition": transition,
                     "induced_after_candidate_action": induced,
                     "primary_node_budget": PRIMARY_NODE_BUDGET,
-                    "semantic_search": result.semantic_record(),
+                    "semantic_search": semantic_search,
                 }
                 applied = game.apply_nmm_move(board, move, search_result=result)
                 choice = None
@@ -525,13 +992,14 @@ def play_game(
                             "board_fen_before": board.to_fen_string(),
                             "history_actions_before": list(game.history[:-len(applied.actions)]),
                             "primary_move": _normal_move(move),
-                            "primary_semantic_search": result.semantic_record(),
+                            "primary_semantic_search": semantic_search,
                             "budget_flags": {"100000": True},
                             "budget_type": None,
                         }
                     )
                 candidate_has_acted = False
             board = board.apply_move(applied.move)
+            _checked_position_state(game.state)
             turns.append(
                 {
                     "post_start_ply": post_start_ply,
@@ -556,49 +1024,131 @@ def play_game(
                 break
         else:
             safety_cap = True
-        final_state = game.state.portable_record()
+        terminal_state = game.state
 
-    if safety_cap:
-        winner = None
-        score = None
-        termination_class = "safety_cap_incomplete"
-        outcome_reason = "safety_cap_incomplete"
-    else:
-        winner = {None: None, "white": "W", "black": "B"}.get(
-            final_state["winner"]
-        )
-        if final_state["winner"] not in {None, "white", "black"}:
-            raise SafeGuidanceGameplayError("strict winner differs")
-        score = 0.5 if winner is None else float(winner == candidate_color)
-        termination_class = "rules_terminal"
-        outcome_reason = str(final_state["outcome_reason"])
-    final_tier, final_queries = _final_positional_tier(board, database)
-    ledger.add_malom(final_queries)
+    return _finalize_game_record(
+        schedule_item=schedule_item,
+        start_state=start_state,
+        candidate_color=candidate_color,
+        strict_start=strict_start,
+        turns=turns,
+        induced_events=induced_events,
+        terminal_state=terminal_state,
+        board=board,
+        safety_cap=safety_cap,
+        database=database,
+        ledger=ledger,
+        game_started=game_started,
+    )
+
+
+def replay_scripted_rehearsal_game(
+    *,
+    schedule_item: Mapping[str, Any],
+    start_state: Mapping[str, Any],
+    continuation_turns: Sequence[Sequence[str]],
+    plan: Mapping[str, Any],
+    database: MalomDB,
+    installation: Any,
+    ledger: ResourceLedger,
+) -> dict[str, Any]:
+    """Replay a known complete history through the exact packaging boundary."""
+    if not continuation_turns:
+        raise SafeGuidanceGameplayError("scripted rehearsal continuation is empty")
+    game_started = time.perf_counter()
+    candidate_color = str(schedule_item["candidate_color"])
+    turns: list[dict[str, Any]] = []
+    seed = int(plan["sanmill_contract"]["seed"])
+    with SanmillTrainingGame(installation, seed=seed) as game:
+        board, strict_start = replay_start(game, start_state, ledger)
+        for post_start_ply, actions in enumerate(continuation_turns, start=1):
+            if game.state.terminal:
+                raise SafeGuidanceGameplayError(
+                    "scripted rehearsal reached terminal before its final turn"
+                )
+            ledger.require_within()
+            mover = board.turn
+            phase = _phase(board, mover)
+            before_history = game.state.history_sha256
+            move = _matching_move(board, actions)
+            applied = game.apply_nmm_move(board, move)
+            board = board.apply_move(applied.move)
+            _checked_position_state(game.state)
+            turns.append(
+                {
+                    "post_start_ply": post_start_ply,
+                    "absolute_logical_ply": game.state.logical_ply_count,
+                    "mover_color": mover,
+                    "actor": "scripted-rehearsal",
+                    "phase": phase,
+                    "move": _normal_move(applied.move),
+                    "actions": list(applied.actions),
+                    "history_sha256_before": before_history,
+                    "history_sha256_after": game.state.history_sha256,
+                    "no_capture_count": game.state.no_capture_count,
+                    "repetition_current_count": game.state.repetition_current_count,
+                    "repetition_history_length": game.state.repetition_history_length,
+                    "terminal": game.state.terminal,
+                    "outcome_reason": game.state.outcome_reason,
+                    "candidate_choice": None,
+                    "engine_response": None,
+                }
+            )
+        if not game.state.terminal:
+            raise SafeGuidanceGameplayError(
+                "scripted rehearsal did not reach a strict rules terminal"
+            )
+        terminal_state = game.state
+    return _finalize_game_record(
+        schedule_item=schedule_item,
+        start_state=start_state,
+        candidate_color=candidate_color,
+        strict_start=strict_start,
+        turns=turns,
+        induced_events=[],
+        terminal_state=terminal_state,
+        board=board,
+        safety_cap=False,
+        database=database,
+        ledger=ledger,
+        game_started=game_started,
+        rehearsal_only=True,
+    )
+
+
+def analyze_rehearsal_records(
+    records: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Confirm only technical rehearsal coverage, never an experiment effect."""
+    if not 4 <= len(records) <= 8:
+        raise SafeGuidanceGameplayError("rehearsal game count is outside 4..8")
+    for record in records:
+        validate_game_record(record)
+        compact_game(record)
+    rules = [row for row in records if row["termination_class"] == "rules_terminal"]
+    draws = [row for row in rules if row["winner"] is None]
+    decisive = [row for row in rules if row["winner"] is not None]
+    rule_draws = [
+        row
+        for row in draws
+        if str(row["outcome_reason"])
+        in {"drawThreefoldRepetition", "drawFiftyMove", "drawFiftyMoveLegacy"}
+    ]
+    if len(rules) != len(records) or not draws or not decisive or not rule_draws:
+        raise SafeGuidanceGameplayError("rehearsal terminal coverage is incomplete")
     return {
-        "schema_version": GAME_SCHEMA,
-        "ordinal": int(schedule_item["ordinal"]),
-        "game_id": str(schedule_item["game_id"]),
-        "unit_index": int(schedule_item["unit_index"]),
-        "start_id": str(schedule_item["start_id"]),
-        "phase": str(schedule_item["phase"]),
-        "arm": str(schedule_item["arm"]),
-        "candidate_color": candidate_color,
-        "oof_fold": int(start_state["oof_fold"]),
-        "strict_start": strict_start,
-        "post_start_logical_plies": len(turns),
-        "termination_class": termination_class,
-        "outcome_reason": outcome_reason,
-        "winner": winner,
-        "candidate_score": score,
-        "final_state": final_state,
-        "final_positional": {
-            "side_to_move": board.turn,
-            "side_to_move_wdl": final_tier,
-            "history_aware": False,
-        },
-        "turns": turns,
-        "induced_events": induced_events,
-        "game_elapsed_seconds": time.perf_counter() - game_started,
+        "status": "technical_rehearsal_passed_non_evidence",
+        "games": len(records),
+        "rules_terminal_games": len(rules),
+        "draws": len(draws),
+        "decisive_games": len(decisive),
+        "rule_draw_games": len(rule_draws),
+        "termination_reasons": dict(
+            sorted(Counter(str(row["outcome_reason"]) for row in records).items())
+        ),
+        "result_packaging_exercised": True,
+        "compact_analysis_exercised": True,
+        "experimental_effect_claim_allowed": False,
     }
 
 
@@ -630,17 +1180,18 @@ def classify_induced_events(
             ) as session:
                 result = session.search_logical_turn(budget)
             ledger.add_engine()
+            semantic_search = _checked_search_result(
+                result,
+                expected_node_budget=budget,
+            )
+            assert result.model_action is not None
             move = result.model_action
-            if result.status != "ok" or move is None:
-                raise SafeGuidanceGameplayIncomplete(
-                    "budget decomposition produced no engine move"
-                )
             _before, _after, transition, queries = _label_response(
                 board, move, database
             )
             ledger.add_malom(queries)
             event["budget_flags"][str(budget)] = transition is not None
-            event[f"semantic_search_{budget}"] = result.semantic_record()
+            event[f"semantic_search_{budget}"] = semantic_search
         flags = [bool(event["budget_flags"][str(value)]) for value in DECOMPOSITION_BUDGETS]
         event["budget_type"] = "budget-invariant" if all(flags) else "budget-sensitive"
 
@@ -817,10 +1368,22 @@ def _arm_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def analyze_games(
-    records: Sequence[Mapping[str, Any]], plan: Mapping[str, Any]
+    records: Sequence[Mapping[str, Any]],
+    plan: Mapping[str, Any],
+    *,
+    expected_start_ids: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    if len(records) != EXPECTED_GAMES:
+    expected_ids = (
+        None if expected_start_ids is None else tuple(sorted(expected_start_ids))
+    )
+    expected_starts = EXPECTED_STARTS if expected_ids is None else len(expected_ids)
+    expected_games = expected_starts * 2 * len(ARMS)
+    if expected_ids is not None and len(set(expected_ids)) != len(expected_ids):
+        raise SafeGuidanceGameplayError("expected analysis start IDs are duplicated")
+    if len(records) != expected_games:
         raise SafeGuidanceGameplayIncomplete("complete game count differs")
+    for record in records:
+        validate_game_record(record, require_decomposition=True)
     if any(row["termination_class"] != "rules_terminal" for row in records):
         decision = "execution_incomplete_safety_cap"
     else:
@@ -829,9 +1392,13 @@ def analyze_games(
         (str(row["start_id"]), str(row["candidate_color"]), str(row["arm"])): row
         for row in records
     }
-    if len(by_key) != EXPECTED_GAMES:
+    if len(by_key) != expected_games:
         raise SafeGuidanceGameplayError("game pairing keys differ")
     starts = sorted({str(row["start_id"]) for row in records})
+    if len(starts) != expected_starts or (
+        expected_ids is not None and tuple(starts) != expected_ids
+    ):
+        raise SafeGuidanceGameplayError("analysis start membership differs")
 
     def differences(left: str, right: str) -> list[float]:
         values = []
@@ -895,6 +1462,7 @@ def analyze_games(
 
 def compact_game(record: Mapping[str, Any]) -> dict[str, Any]:
     """Strip bulky semantic search objects while preserving the move audit."""
+    validate_game_record(record, require_decomposition=True)
     turns = []
     for row in record["turns"]:
         engine = row["engine_response"]
@@ -934,6 +1502,7 @@ def compact_game(record: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "ARMS",
+    "ATTEMPT_SPEC_SCHEMA",
     "AUTHORIZATION_SCHEMA",
     "DECOMPOSITION_BUDGETS",
     "EXPECTED_GAMES",
@@ -946,20 +1515,30 @@ __all__ = [
     "PREFLIGHT_SCHEMA",
     "PRIMARY_NODE_BUDGET",
     "RESULT_SCHEMA",
+    "REHEARSAL_RESULT_SCHEMA",
+    "RESOURCE_CHECKPOINT_SCHEMA",
     "ResourceLedger",
     "SafeGuidanceGameplayError",
     "SafeGuidanceGameplayIncomplete",
+    "analyze_rehearsal_records",
     "analyze_games",
     "append_game_record",
+    "append_resource_checkpoint",
     "build_schedule",
     "classify_induced_events",
     "compact_game",
     "load_authorization",
+    "load_attempt_spec",
     "load_plan",
     "load_pool",
     "load_preflight",
+    "load_resource_checkpoints",
     "load_sealed",
     "play_game",
+    "replay_scripted_rehearsal_game",
     "run_guide_canary",
     "sha256_file",
+    "select_schedule_excluding_starts",
+    "validate_game_record",
+    "write_json_atomic",
 ]
