@@ -23,12 +23,16 @@ from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     _checked_search_result,
     _pooled_action_key,
     analyze_games,
+    append_game_record,
+    append_resource_checkpoint,
     build_schedule,
+    load_game_records,
     load_plan,
     load_pool,
     load_resource_checkpoints,
     select_schedule_excluding_starts,
     validate_game_record,
+    verify_resource_game_alignment,
 )
 from learned_ai.evaluation.sanmill_uci import (
     UciLogicalTurnResult,
@@ -439,6 +443,49 @@ os._exit(73)
         "malom_read_only_queries": 29,
         "active_seconds": 2.5,
     }
+
+
+def test_resource_and_game_journals_recover_the_same_completed_game(
+    tmp_path: Path,
+) -> None:
+    record = _games()[0]
+    baseline = {
+        "engine_single_step_searches": 0,
+        "malom_read_only_queries": 0,
+        "active_seconds": 0.0,
+    }
+    after = {
+        "engine_single_step_searches": 1,
+        "malom_read_only_queries": 9,
+        "active_seconds": 0.5,
+    }
+    resource_path = tmp_path / "resources.jsonl"
+    games_path = tmp_path / "games.jsonl"
+    append_resource_checkpoint(
+        resource_path,
+        completion_index=0,
+        complete_games_before=4,
+        game_record=record,
+        resources_before=baseline,
+        resources_after=after,
+        previous_checkpoint_sha256=None,
+    )
+    append_game_record(games_path, record, previous_record_sha256=None)
+    resources = load_resource_checkpoints(
+        resource_path,
+        expected_baseline=baseline,
+        complete_games_before=4,
+    )
+    games = load_game_records(games_path)
+    verify_resource_game_alignment(resources, games)
+    assert games["record_count"] == 1
+
+    games["records"][0]["game_id"] = "wrong-game"
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="resource/game recovery alignment differs",
+    ):
+        verify_resource_game_alignment(resources, games)
 
 
 def test_protected_guard_raises_before_any_content_producer(tmp_path: Path) -> None:

@@ -1299,6 +1299,72 @@ def append_game_record(
     return record_hash
 
 
+def load_game_records(path: str | Path) -> dict[str, Any]:
+    """Recover and validate one complete fsynced gameplay-record prefix."""
+    target = Path(path)
+    try:
+        raw = target.read_bytes()
+    except OSError as exc:
+        raise SafeGuidanceGameplayError("game record ledger is absent") from exc
+    if raw and not raw.endswith(b"\n"):
+        raise SafeGuidanceGameplayError("game record ledger is partial")
+    previous_sha: str | None = None
+    records: list[dict[str, Any]] = []
+    for encoded in raw.splitlines():
+        try:
+            wrapper = json.loads(encoded)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SafeGuidanceGameplayError("game record line is malformed") from exc
+        if not isinstance(wrapper, dict) or set(wrapper) != {
+            "record",
+            "record_sha256",
+        }:
+            raise SafeGuidanceGameplayError("game record wrapper differs")
+        body = wrapper["record"]
+        observed_sha = wrapper["record_sha256"]
+        if (
+            not isinstance(body, dict)
+            or not isinstance(observed_sha, str)
+            or body.get("previous_record_sha256") != previous_sha
+            or canonical_sha256(body) != observed_sha
+        ):
+            raise SafeGuidanceGameplayError("game record chain differs")
+        record = dict(body)
+        record.pop("previous_record_sha256")
+        validate_game_record(record, require_decomposition=True)
+        records.append(record)
+        previous_sha = observed_sha
+    return {
+        "records": records,
+        "record_count": len(records),
+        "tail_record_sha256": previous_sha,
+        "file_sha256": sha256_file(target),
+    }
+
+
+def verify_resource_game_alignment(
+    resource_recovery: Mapping[str, Any],
+    game_recovery: Mapping[str, Any],
+) -> None:
+    """Prove that each recovered resource row names the same completed game."""
+    checkpoints = resource_recovery.get("checkpoints")
+    records = game_recovery.get("records")
+    if (
+        not isinstance(checkpoints, list)
+        or not isinstance(records, list)
+        or len(checkpoints) != len(records)
+    ):
+        raise SafeGuidanceGameplayError("resource/game recovery lengths differ")
+    for checkpoint, record in zip(checkpoints, records, strict=True):
+        if (
+            checkpoint.get("schedule_ordinal") != record.get("ordinal")
+            or checkpoint.get("game_id") != record.get("game_id")
+            or checkpoint.get("game_record_identity")
+            != canonical_sha256(record)
+        ):
+            raise SafeGuidanceGameplayError("resource/game recovery alignment differs")
+
+
 def _mean_interval(values: Sequence[float]) -> dict[str, Any]:
     if not values:
         raise SafeGuidanceGameplayError("primary values are empty")
@@ -1528,6 +1594,7 @@ __all__ = [
     "classify_induced_events",
     "compact_game",
     "load_authorization",
+    "load_game_records",
     "load_attempt_spec",
     "load_plan",
     "load_pool",
@@ -1540,5 +1607,6 @@ __all__ = [
     "sha256_file",
     "select_schedule_excluding_starts",
     "validate_game_record",
+    "verify_resource_game_alignment",
     "write_json_atomic",
 ]
