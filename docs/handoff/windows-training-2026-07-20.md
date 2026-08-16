@@ -2,6 +2,39 @@
 
 ## Executive Summary
 
+### Safe-guidance gameplay execution failed -- 16 August 2026
+
+The product owner explicitly authorized one corrected, final zero-game
+preflight under the unchanged plan, pool, membership, authorization, and
+resource envelope.  It passed under preflight identity
+`2af758a0d51c5eb7e0e84a6e552f8759cbc424f4df0481df2fb9dec542509401`.
+The canary's negative regression rejected a genuinely mismatched move, the
+focused and mandatory test groups and Ruff passed, the exact runtime and
+corrected Malom identities matched, determinism passed, and all 255 strict
+histories replayed.  The cumulative pre-measurement ledger was 72 engine
+searches, 12,638 Malom queries, and 116.4832933 active seconds.
+
+The once-only gameplay execution then wrote its game-zero marker and failed
+closed while packaging the first rules-terminal game.  The evaluator read
+`winner` as a top-level key of `UciPositionState.portable_record()`, although
+that record nests terminal fields under `outcome`.  It raised
+`KeyError: 'winner'` before serializing a game or progress record.  Exactly one
+rules-terminal game was reached, but no accepted game ledger, result, or
+completion marker exists.  The in-memory execution resource increments are
+not exactly recoverable and are not estimated.
+
+Authorization `806e7b67...` is consumed.  No retry, resume, repair,
+continuation, batching, or second execution was attempted or is authorized.
+See the [execution failure evidence](../evidence/sanmill-safe-guidance-gameplay-execution-failure-2026-08-16.md).
+No score, conversion, human-trap, product, promotion, deployment,
+publication, release, or training conclusion exists.  A future attempt needs
+a new explicit product-owner decision after both terminal-result packaging
+and durable resource journaling are corrected and tested.
+
+Process note: commit `342d589` has two body lines longer than 72 ASCII
+characters.  Do not amend or rewrite it; preserve the deviation as recorded
+here because this experiment forbids history rewrites.
+
 ### Safe-guidance gameplay preflight stopped -- 16 August 2026
 
 The complete-game protocol was frozen at plan identity

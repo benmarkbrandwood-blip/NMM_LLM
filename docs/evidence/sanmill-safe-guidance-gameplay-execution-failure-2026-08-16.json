@@ -1,0 +1,107 @@
+{
+  "schema_version": "nmm.sanmill-safe-guidance-gameplay-execution-failure.v1",
+  "failure_identity": "7aa4f771c3871cfd48c6935167c5f8c1ad40534281bcf2069c2ad3d36a2dc55f",
+  "status": "failed_closed_after_game_zero_before_first_serialized_record",
+  "occurred_on": "2026-08-16",
+  "plan_identity": "1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6",
+  "plan_file_sha256": "7b6620768fb5caab455abb4db9b831d45cf33960aeb1d660223babecf1a37403",
+  "start_pool_identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9",
+  "start_pool_membership_identity": "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15",
+  "start_pool_file_sha256": "ca6e8473faa7d1c27293bb520a8e1e7274c72e092dc51a23a1c9c8a6f9a7d093",
+  "authorization_identity": "806e7b674c96ca3f5dd98067a09b6c76bda3db2cca12c75d92ba3cc5f7b495e2",
+  "authorization_file_sha256": "dbf1feb176651023afdf60dc548514423da437e0b0dba77603c29d347efb8a5c",
+  "preflight_identity": "2af758a0d51c5eb7e0e84a6e552f8759cbc424f4df0481df2fb9dec542509401",
+  "preflight_file_sha256": "af4a2e393dccd78becfd8f1286ff4d177fd5afdc149140e67a80f7f0f46943bf",
+  "source_commit": "ee9b01dadacd89533e416b5519af5790bfbcdfa4",
+  "source_tree": "34b78703f0c9adbb93dc66fd5e82266a4dea2954",
+  "run_output_namespace": "out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-002",
+  "measurement_started_marker": {
+    "exists": true,
+    "file_sha256": "63757921dad4b3e6ff52194b1d9542898d2c184f40dff4256b4a4d2ccd22f5e2",
+    "authorization_consumed": true,
+    "recovery_authorized": false
+  },
+  "failed_schedule_item": {
+    "ordinal": 0,
+    "unit_index": 0,
+    "start_index": 0,
+    "start_id": "00092c974cabf05874f066b8948e791f9fdc82d84a65759da1ba78f212a643b0",
+    "source_session_id": "ml11783797",
+    "phase": "placement",
+    "source_logical_ply": 10,
+    "candidate_color": "W",
+    "arm": "random-safe",
+    "game_id": "e9675dfb7f0954ae4a0585788663f2d74b7999a3f15404c0214c3e5c7c38e19c"
+  },
+  "failure": {
+    "exception": "KeyError: 'winner'",
+    "location": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py:568",
+    "stage": "first_game_terminal_result_packaging_before_final_positional_query_or_ledger_append",
+    "root_cause": "UciPositionState.portable_record() stores winner and reason under final_state['outcome']; the gameplay evaluator incorrectly read final_state['winner'] and final_state['outcome_reason'] as top-level keys.",
+    "independent_code_evidence": "Existing held-out and retained diagnostic evaluators read game.state.winner and game.state.outcome_reason while retaining portable_record() only as the payload.",
+    "semantic_result_failure": true,
+    "sanmill_or_malom_component_failure": false,
+    "repair_or_retry_performed": false
+  },
+  "completion_inference": {
+    "rules_terminal_games_reached": 1,
+    "accepted_or_serialized_games": 0,
+    "basis": "The failing branch is reachable only when safety_cap is false; the loop sets safety_cap false only by breaking after game.state.terminal became true.",
+    "inference_not_a_game_result": true
+  },
+  "artifact_state_after_failure": {
+    "raw_game_ledger_exists": false,
+    "progress_record_exists": false,
+    "measurement_completed_marker_exists": false,
+    "tracked_result_manifest_exists": false,
+    "evaluator_lock_exists": false,
+    "sanmill_processes_after_exit": 0
+  },
+  "resource_accounting": {
+    "last_sealed_exact_baseline_before_measurement": {
+      "engine_single_step_searches": 72,
+      "malom_read_only_queries": 12638,
+      "active_seconds": 116.48329329999407,
+      "complete_games": 0
+    },
+    "execution_increment": {
+      "rules_terminal_games_reached": 1,
+      "accepted_or_serialized_games": 0,
+      "engine_single_step_searches": null,
+      "malom_read_only_queries": null,
+      "active_seconds": null,
+      "orchestrator_process_wall_seconds_observed": 12.4696033,
+      "exact_increment_recoverable": false,
+      "reason": "The live ResourceLedger was memory-only and the first progress journal would have been written only after terminal packaging and game serialization."
+    },
+    "exact_cumulative_total_available": false,
+    "hard_ceiling_exception_observed": false,
+    "no_estimate_substituted_for_missing_exact_counts": true
+  },
+  "authorization_disposition": {
+    "once_only_gameplay_authorization_consumed": true,
+    "execution_completed": false,
+    "automatic_retry_resume_batching_or_extension_performed": false,
+    "automatic_retry_resume_batching_or_extension_allowed": false,
+    "host_interruption_recovery_authorized": false,
+    "next_action": "stop; any repair, new preflight, restart, replay, or missing-suffix continuation requires a new explicit product-owner decision"
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "model_loads": 0,
+    "estimator_refits_or_tuning": 0,
+    "training_or_weight_updates": 0,
+    "database_writes": 0
+  },
+  "claim_boundary": {
+    "gameplay_result_exists": false,
+    "score_difference_claim_allowed": false,
+    "conversion_rate_claim_allowed": false,
+    "human_trap_or_product_claim_allowed": false,
+    "promotion_deployment_publication_training_or_release": false
+  }
+}
