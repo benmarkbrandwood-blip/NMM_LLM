@@ -3345,6 +3345,39 @@ verified fast-forward pushes of Codex-created `dev` commits are separately
 authorized under the standing Git grant recorded in the executive summary;
 all other Git history operations remain outside it.
 
+## Safe-Guidance Gameplay Attempt-002 (2026-08-16)
+
+The directly authorized attempt-002 completed once.  Its immutable protocol
+remained `1d368c33...`, and its original start pool remained `385a376d...`.
+The failed attempt-001 start was excluded because process-memory visibility
+could not be disproved, leaving 254 starts and 1,524 formal games.  The new
+authorization identity is `4ac976a9...`, the stable preflight identity is
+`87f0cb63...`, and the result identity is `f7abf95c...`.
+
+The formal execution completed all 1,524 games with strict rules terminals and
+zero safety-cap incomplete games.  Full-guided minus random-safe score was
+-0.5906 percentage points with a start-clustered 95-percent interval of
+[-1.6468, +0.4657] points.  The 1.0562-point half-width passed the frozen
+1.5-point precision limit, but the interval crossed zero.  The only decision
+is `inconclusive_no_score_difference_resolved`; this is neither superiority
+nor equivalence.
+
+Full guidance produced 128 induced downgrade events in 126 games, with two
+wins in those games.  Random-safe produced 131 events in 131 games, with 13
+wins.  These conversion proportions are secondary selected-subset
+diagnostics, not causal comparisons.  About 70 percent of events in each arm
+were budget invariant.  Full and geometry guidance shifted rules draws toward
+threefold repetition but did not improve strict score.
+
+Attempt-002 cumulative use, including its four-game non-evidence rehearsal,
+was 1,528 games, 256 starts, 50,404 engine searches, 6,257,569 Malom queries,
+and 2,254.03 active seconds.  All were inside the one-shot envelope.  The old
+72 searches and 12,638 queries remain separately disclosed attempt-001 sunk
+cost.  No retry, resume, attempt-003, training, promotion, deployment,
+publication, or release is authorized.  See
+[`docs/evidence/sanmill-safe-guidance-gameplay-attempt-002-2026-08-16.md`](../evidence/sanmill-safe-guidance-gameplay-attempt-002-2026-08-16.md)
+for the full audit and claim boundary.
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
