@@ -612,6 +612,84 @@ def classify_induced_events(
         event["budget_type"] = "budget-invariant" if all(flags) else "budget-sensitive"
 
 
+def run_guide_canary(
+    *,
+    main_pool: Mapping[str, Any],
+    transfer_result: Mapping[str, Any],
+    readiness: Mapping[str, Any],
+    database: MalomDB,
+    states_per_phase: int = 2,
+) -> dict[str, Any]:
+    """Reproduce persisted transfer selections without fitting any estimator."""
+    pool_by_id = {str(row["state_id"]): row for row in main_pool["states"]}
+    result_rows = transfer_result.get("analysis", {}).get("state_rows")
+    if not isinstance(result_rows, list) or len(result_rows) != 360:
+        raise SafeGuidanceGameplayError("transfer canary result rows differ")
+    result_by_id = {str(row["state_id"]): row for row in result_rows}
+    parameters = _fold_parameters(readiness)
+    contract = NumericalContract.from_plan(readiness["frozen_contract"])
+    fixtures: list[Mapping[str, Any]] = []
+    for phase in PHASES:
+        rows = sorted(
+            (row for row in main_pool["states"] if row["phase"] == phase),
+            key=lambda row: row["state_id"],
+        )
+        fixtures.extend(rows[:states_per_phase])
+    query_count = 0
+    observations = []
+    for state in fixtures:
+        expected = result_by_id.get(str(state["state_id"]))
+        if expected is None or str(state["state_id"]) not in pool_by_id:
+            raise SafeGuidanceGameplayError("guide canary fixture is absent")
+        fold = int(expected["fold"])
+        actions = sorted(state["a_pos"], key=_move_key)
+        full_risks = []
+        geometry_risks = []
+        for action in actions:
+            board = BoardState.from_fen_string(str(action["successor_fen"]))
+            full, geometry, _tier, queries, _responses = _successor_response_risks(
+                board,
+                learner_tier=str(state["learner_parent_tier"]),
+                parameters=parameters[fold],
+                contract=contract,
+                database=database,
+            )
+            query_count += queries
+            full_risks.append(float(full))
+            geometry_risks.append(float(geometry))
+        full_index = int(np.argmax(np.asarray(full_risks, dtype=np.float64)))
+        geometry_index = int(np.argmax(np.asarray(geometry_risks, dtype=np.float64)))
+        passed = (
+            _move_key(actions[full_index])
+            == _move_key(expected["full"]["selected_action"])
+            and _move_key(actions[geometry_index])
+            == _move_key(expected["geometry"]["selected_action"])
+            and full_risks[full_index] == float(expected["full"]["maximum_risk"])
+            and geometry_risks[geometry_index]
+            == float(expected["geometry"]["maximum_risk"])
+        )
+        observations.append(
+            {
+                "state_id": state["state_id"],
+                "phase": state["phase"],
+                "fold": fold,
+                "passed": passed,
+                "full_selected_move": _normal_move(actions[full_index]),
+                "geometry_selected_move": _normal_move(actions[geometry_index]),
+                "full_risk": full_risks[full_index],
+                "geometry_risk": geometry_risks[geometry_index],
+            }
+        )
+    return {
+        "passed": all(row["passed"] for row in observations),
+        "states": len(observations),
+        "states_per_phase": states_per_phase,
+        "malom_queries": query_count,
+        "estimator_refits": 0,
+        "observations": observations,
+    }
+
+
 def append_game_record(
     path: str | Path,
     record: Mapping[str, Any],
@@ -793,6 +871,9 @@ def compact_game(record: Mapping[str, Any]) -> dict[str, Any]:
     events = []
     for event in record["induced_events"]:
         value = dict(event)
+        history = value.pop("history_actions_before")
+        value["history_actions_before_count"] = len(history)
+        value["history_actions_before_identity"] = canonical_sha256(history)
         value["primary_semantic_search_sha256"] = canonical_sha256(
             value.pop("primary_semantic_search")
         )
@@ -839,5 +920,6 @@ __all__ = [
     "load_preflight",
     "load_sealed",
     "play_game",
+    "run_guide_canary",
     "sha256_file",
 ]
