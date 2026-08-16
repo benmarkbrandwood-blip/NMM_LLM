@@ -1,0 +1,161 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
+    EstimatorAccess,
+    EstimatorReadinessError,
+)
+from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
+    ARMS,
+    EXPECTED_GAMES,
+    EXPECTED_STARTS,
+    ResourceLedger,
+    SafeGuidanceGameplayIncomplete,
+    analyze_games,
+    build_schedule,
+    load_plan,
+)
+
+
+def _states() -> list[dict]:
+    phases = ("placement", "movement", "flying")
+    rows = []
+    for index in range(EXPECTED_STARTS):
+        rows.append(
+            {
+                "state_id": f"state-{index:03d}",
+                "phase": phases[index // 85],
+            }
+        )
+    return rows
+
+
+def _plan() -> dict:
+    return {
+        "primary_decision": {"maximum_half_width": 0.015},
+    }
+
+
+def _games(full_score: float = 1.0, random_score: float = 0.5) -> list[dict]:
+    rows = []
+    for item in build_schedule(_states()):
+        score = {
+            "random-safe": random_score,
+            "full-guided": full_score,
+            "geometry-guided": 0.5,
+        }[item["arm"]]
+        rows.append(
+            {
+                **item,
+                "termination_class": "rules_terminal",
+                "outcome_reason": "drawThreefoldRepetition" if score == 0.5 else "win",
+                "candidate_score": score,
+                "induced_events": [],
+            }
+        )
+    return rows
+
+
+def test_tracked_protocol_is_canonical_and_bounded() -> None:
+    root = Path(__file__).resolve().parent.parent
+    plan, _file_sha = load_plan(
+        root / "docs/experiments/sanmill-safe-guidance-gameplay-v1.json"
+    )
+    assert plan["experiment"]["starts"] == 255
+    assert plan["experiment"]["games"] == 1530
+    assert plan["precision_preregistration"]["maximum_95_half_width"] == 0.015
+    assert plan["resource_envelope"]["maximum_complete_games"] == 1536
+    assert plan["resource_envelope"]["maximum_engine_single_step_searches"] == 80000
+    assert plan["claim_boundary"]["human_trap_claim"] is False
+
+
+def test_schedule_is_adjacent_by_start_color_and_arm() -> None:
+    schedule = build_schedule(_states())
+    assert len(schedule) == EXPECTED_GAMES
+    assert [row["arm"] for row in schedule[:3]] == list(ARMS)
+    assert [row["candidate_color"] for row in schedule[:6]] == [
+        "W",
+        "W",
+        "W",
+        "B",
+        "B",
+        "B",
+    ]
+    assert len({row["game_id"] for row in schedule}) == EXPECTED_GAMES
+
+
+def test_primary_analysis_clusters_both_colors_at_start() -> None:
+    report = analyze_games(_games(), _plan())
+    primary = report["primary_full_minus_random_start_clustered_score"]
+    assert primary["support"] == EXPECTED_STARTS
+    assert primary["mean"] == 0.5
+    assert primary["half_width"] == 0.0
+    assert report["decision"] == "full_guidance_higher_fixed_runtime_score"
+
+
+def test_safety_cap_cannot_enter_primary_as_draw() -> None:
+    rows = _games()
+    rows[0] = {
+        **rows[0],
+        "termination_class": "safety_cap_incomplete",
+        "outcome_reason": "safety_cap_incomplete",
+        "candidate_score": None,
+    }
+    with pytest.raises(SafeGuidanceGameplayIncomplete, match="incomplete game"):
+        analyze_games(rows, _plan())
+
+
+def test_resource_ledger_fails_closed_at_any_ceiling() -> None:
+    ledger = ResourceLedger(
+        engine_searches=0,
+        malom_queries=0,
+        active_seconds_before_run=0.0,
+        maximum_engine_searches=1,
+        maximum_malom_queries=1,
+        maximum_active_seconds=60.0,
+    )
+    ledger.add_engine()
+    ledger.add_malom(1)
+    with pytest.raises(SafeGuidanceGameplayIncomplete, match="engine-search"):
+        ledger.add_engine()
+
+
+def test_protected_guard_raises_before_any_content_producer(tmp_path: Path) -> None:
+    access = EstimatorAccess(
+        official_partition_by_session={
+            "selection": "selection",
+            "confirmation": "confirmation",
+            "final": "final-test",
+            "internal": "train",
+        },
+        research_partition_by_session={
+            "internal": "research-confirmation",
+        },
+        allowed_sessions=frozenset(),
+    )
+    called = False
+
+    def producer() -> str:
+        nonlocal called
+        called = True
+        return str(tmp_path)
+
+    for session in ("selection", "confirmation", "final", "internal"):
+        with pytest.raises(EstimatorReadinessError, match="denied"):
+            access.derive(session, access_kind="gameplay", producer=producer)
+    assert called is False
+
+
+def test_protocol_file_contains_no_result_surface() -> None:
+    root = Path(__file__).resolve().parent.parent
+    value = json.loads(
+        (root / "docs/experiments/sanmill-safe-guidance-gameplay-v1.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "result" not in value
+    assert value["status"] == "frozen_before_start_pool_or_gameplay"
