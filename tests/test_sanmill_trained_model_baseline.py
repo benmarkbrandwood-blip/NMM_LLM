@@ -7,14 +7,18 @@ import numpy as np
 import pytest
 
 import learned_ai.evaluation.sanmill_trained_model_baseline as baseline
+from ai.malom_db import MalomDB
+from game.board import BoardState
 from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
     EstimatorAccess,
     EstimatorReadinessError,
 )
 from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
+    ResourceLedger,
     append_resource_checkpoint,
     load_resource_checkpoints,
 )
+from learned_ai.sentinel.db_teacher import ExternalSolvedDB
 
 
 def _terminal_record() -> dict:
@@ -144,23 +148,75 @@ def test_allowed_argmax_rejects_a_truly_missing_move() -> None:
         )
 
 
-def test_counting_malom_proxy_records_each_completed_query() -> None:
-    class Delegate:
-        def query(self, board: object) -> str:
-            assert board == "board"
-            return "value"
+def test_counting_malom_proxy_records_each_completed_query(tmp_path: Path) -> None:
+    """Retain the red-green regression after removing the faulty proxy."""
+    ledger = ResourceLedger(
+        engine_searches=0,
+        malom_queries=0,
+        active_seconds_before_run=0.0,
+        maximum_engine_searches=1,
+        maximum_malom_queries=2,
+        maximum_active_seconds=60.0,
+    )
+    database = MalomDB(tmp_path, query_observer=ledger.add_malom)
+    try:
+        assert database.query_value(BoardState.new_game()) is None
+        assert ledger.malom_queries == 1
+        assert database.query(BoardState.new_game()) is None
+        assert ledger.malom_queries == 2
+    finally:
+        database.close()
 
-    class Ledger:
-        def __init__(self) -> None:
-            self.queries = 0
 
-        def add_malom(self, count: int) -> None:
-            self.queries += count
+def test_instrumentation_surface_is_complete_and_signature_compatible() -> None:
+    report = baseline.audit_instrumentation_surface()
+    assert report["transparent_proxy_classes"] == []
+    assert report["malom_delegate_rebindings"] == []
+    assert report["attribute_interceptors"] == [
+        "scripts/preflight_sanmill_trained_model_baseline.py:"
+        "_PoisonGameAI.__getattribute__"
+    ]
+    assert report["mismatches"] == []
+    assert report["passed"] is True
 
-    ledger = Ledger()
-    proxy = baseline._CountingMalomProxy(Delegate(), ledger)
-    assert proxy.query("board") == "value"
-    assert ledger.queries == 1
+
+def test_instrumentation_surface_rejects_generic_signature_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def incompatible_query_all_moves(self: object, board: object) -> list[dict]:
+        del self, board
+        return []
+
+    monkeypatch.setattr(
+        ExternalSolvedDB,
+        "query_all_moves",
+        incompatible_query_all_moves,
+    )
+    report = baseline.audit_instrumentation_surface()
+    failed = {
+        row["name"] for row in report["signature_checks"] if not row["passed"]
+    }
+    assert failed == {"ExternalSolvedDB.query_all_moves"}
+    assert "one or more callable signatures reject the real call shape" in report[
+        "mismatches"
+    ]
+    assert report["passed"] is False
+
+
+def test_instrumentation_surface_rejects_unregistered_intercept_method(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def query_batch(self: object, boards: list[object]) -> list[object]:
+        del self
+        return boards
+
+    monkeypatch.setattr(ExternalSolvedDB, "query_batch", query_batch, raising=False)
+    report = baseline.audit_instrumentation_surface()
+    assert "public method or property surface differs" in report["mismatches"]
+    assert "query_batch" in report["observed_surfaces"]["ExternalSolvedDB"][
+        "methods"
+    ]
+    assert report["passed"] is False
 
 
 def test_game_record_rejects_truly_mismatched_terminal_winner() -> None:

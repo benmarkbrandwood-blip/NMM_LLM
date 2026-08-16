@@ -301,10 +301,18 @@ class ResourceLedger:
         return self.active_seconds_before_run + time.perf_counter() - self.started
 
     def add_engine(self, count: int = 1) -> None:
+        if count < 0:
+            raise SafeGuidanceGameplayError("engine-search increment is negative")
+        if self.engine_searches + count > self.maximum_engine_searches:
+            raise SafeGuidanceGameplayIncomplete("engine-search ceiling exceeded")
         self.engine_searches += count
         self.require_within()
 
     def add_malom(self, count: int) -> None:
+        if count < 0:
+            raise SafeGuidanceGameplayError("Malom-query increment is negative")
+        if self.malom_queries + count > self.maximum_malom_queries:
+            raise SafeGuidanceGameplayIncomplete("Malom-query ceiling exceeded")
         self.malom_queries += count
         self.require_within()
 

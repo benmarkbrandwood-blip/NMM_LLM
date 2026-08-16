@@ -94,7 +94,7 @@ import struct
 from dataclasses import dataclass
 from math import comb
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -774,8 +774,14 @@ class MalomDB:
             # result = {"outcome": "W"|"L"|"D", "dtw": int} or None
     """
 
-    def __init__(self, db_dir: str | Path) -> None:
+    def __init__(
+        self,
+        db_dir: str | Path,
+        *,
+        query_observer: Callable[[int], None] | None = None,
+    ) -> None:
         self._db_dir = Path(db_dir)
+        self._query_observer = query_observer
         self._virt_win = 299
         self._virt_loss = -299
         self._secvals: dict[tuple[int,int,int,int], int] = {}
@@ -845,6 +851,8 @@ class MalomDB:
         Its ordering semantics depend on the complete Malom comparator; callers
         must not assume that bare key2 is always a monotonic depth-to-win.
         """
+        if self._query_observer is not None:
+            self._query_observer(1)
         if not self._available:
             if not self._warned:
                 self._warned = True

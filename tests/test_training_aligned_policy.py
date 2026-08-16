@@ -49,9 +49,10 @@ class _SpecialistDB:
 
 
 class _Malom:
-    def __init__(self, path, *, strict):
+    def __init__(self, path, *, strict, query_observer=None):
         self.path = path
         self.strict = strict
+        self.query_observer = query_observer
 
     def is_available(self):
         return True
@@ -121,6 +122,8 @@ def test_loader_binds_read_only_resources_and_exact_route(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(route_policy, "encode_position_with_lookahead", _encode)
+    def observer(count: int) -> None:
+        del count
     loaded = route_policy.load_training_aligned_policy(
         "route-bundle",
         human_db_path="human.sqlite",
@@ -128,6 +131,7 @@ def test_loader_binds_read_only_resources_and_exact_route(monkeypatch) -> None:
         malom_path="malom",
         malom_manifest_path="malom.json",
         device="cpu",
+        malom_query_observer=observer,
     )
 
     legal, logits = loaded.score_moves(BoardState.new_game())
@@ -139,6 +143,7 @@ def test_loader_binds_read_only_resources_and_exact_route(monkeypatch) -> None:
     assert loaded.specialist_db.read_only is True
     assert loaded.specialist_db.trusted is True
     assert loaded.malom.strict is True
+    assert loaded.malom.query_observer is observer
     assert observed["strict"] is True
     assert observed["sdb_min_samples"] == 3
     assert observed["specialist_db"] is loaded.specialist_db

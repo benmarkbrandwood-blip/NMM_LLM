@@ -40,7 +40,8 @@ from learned_ai.evaluation.sanmill_trained_model_baseline import (
     build_schedule,
     compact_game,
     formal_states,
-    load_authorization,
+    load_attempt_authorization,
+    load_attempt_spec,
     load_game_records,
     load_model_policies,
     load_plan,
@@ -214,23 +215,31 @@ def main() -> int:
         "--plan", default="docs/experiments/sanmill-trained-model-baseline-v1.json"
     )
     parser.add_argument(
+        "--attempt",
+        default=(
+            "docs/experiments/sanmill-trained-model-baseline-"
+            "attempt-002.json"
+        ),
+    )
+    parser.add_argument(
         "--authorization",
         default=(
-            "docs/experiments/sanmill-trained-model-baseline-v1/authorization.json"
+            "docs/experiments/sanmill-trained-model-baseline-attempt-002/"
+            "authorization.json"
         ),
     )
     parser.add_argument(
         "--rehearsal",
         default=(
             "docs/evidence/sanmill-trained-model-baseline-v1-"
-            "rehearsal-2026-08-16.json"
+            "attempt-002-rehearsal-2026-08-16.json"
         ),
     )
     parser.add_argument(
         "--preflight",
         default=(
             "docs/evidence/sanmill-trained-model-baseline-v1-"
-            "preflight-2026-08-16.json"
+            "attempt-002-preflight-2026-08-16.json"
         ),
     )
     parser.add_argument(
@@ -250,14 +259,20 @@ def main() -> int:
     if _running_tgf_processes() != 0:
         parser.error("a Sanmill process is already running")
     plan, plan_sha = load_plan(_ROOT / args.plan)
-    authorization, authorization_sha = load_authorization(_ROOT / args.authorization)
+    attempt, attempt_sha = load_attempt_spec(_ROOT / args.attempt)
+    authorization, authorization_sha = load_attempt_authorization(
+        _ROOT / args.authorization
+    )
     rehearsal, rehearsal_sha = load_rehearsal(_ROOT / args.rehearsal)
     preflight, preflight_sha = load_preflight(_ROOT / args.preflight)
     pool, pool_sha = load_pool(_ROOT / args.pool)
     if (
-        authorization["plan"]["identity"] != plan["plan_identity"]
-        or authorization["plan"]["file_sha256"] != plan_sha
+        attempt["plan"]["identity"] != plan["plan_identity"]
+        or attempt["plan"]["file_sha256"] != plan_sha
+        or authorization["attempt"]["identity"] != attempt["attempt_identity"]
+        or authorization["attempt"]["file_sha256"] != attempt_sha
         or authorization["status"] != "authorized_once_measurement_unconsumed"
+        or rehearsal["attempt_identity"] != attempt["attempt_identity"]
         or rehearsal["authorization_identity"]
         != authorization["authorization_identity"]
         or preflight["authorization_identity"]
@@ -266,16 +281,22 @@ def main() -> int:
         or preflight["status"] != "ready_for_one_authorized_execution"
         or pool["pool_identity"] != plan["start_pool"]["pool_identity"]
         or pool_sha != plan["start_pool"]["pool_file_sha256"]
+        or preflight["attempt_identity"] != attempt["attempt_identity"]
+        or attempt["resource_envelope"] != plan["resource_envelope"]
     ):
         parser.error("formal execution bindings differ")
     if _tree_identity(
-        _ROOT / str(plan["rehearsal"]["output_namespace"])
+        _ROOT / str(attempt["outputs"]["rehearsal_namespace"])
     ) != preflight["rehearsal_output_tree"]:
         parser.error("rehearsal output changed after preflight")
     implementation = {
         path: sha256_file(_ROOT / path) for path in preflight["implementation_files"]
     }
-    if implementation != preflight["implementation_files"]:
+    if (
+        implementation != preflight["implementation_files"]
+        or implementation != authorization["implementation_files"]
+        or implementation != attempt["implementation_files"]
+    ):
         parser.error("formal implementation changed after preflight")
 
     states = formal_states(
@@ -293,8 +314,8 @@ def main() -> int:
     if len(schedule) != preflight["formal_games"]:
         parser.error("formal schedule changed after preflight")
 
-    run_output = _ROOT / str(plan["outputs"]["formal_output_namespace"])
-    result_path = _ROOT / str(plan["outputs"]["formal_result"])
+    run_output = _ROOT / str(attempt["outputs"]["formal_output_namespace"])
+    result_path = _ROOT / str(attempt["outputs"]["formal_result"])
     binding_path = run_output / "authorization-binding.json"
     marker_path = run_output / "measurement-started.json"
     completed_marker = run_output / "measurement-completed.json"
@@ -324,6 +345,7 @@ def main() -> int:
     binding = json.loads(binding_path.read_text(encoding="utf-8"))
     if (
         binding.get("plan_identity") != plan["plan_identity"]
+        or binding.get("attempt_identity") != attempt["attempt_identity"]
         or binding.get("authorization_identity")
         != authorization["authorization_identity"]
         or binding.get("preflight_identity") != preflight["preflight_identity"]
@@ -378,6 +400,7 @@ def main() -> int:
             marker_path,
             {
                 "plan_identity": plan["plan_identity"],
+                "attempt_identity": attempt["attempt_identity"],
                 "authorization_identity": authorization["authorization_identity"],
                 "preflight_identity": preflight["preflight_identity"],
                 "source_commit": _git("rev-parse", "HEAD"),
@@ -400,7 +423,7 @@ def main() -> int:
         resources_before = formal_baseline
         previous_game = None
         previous_checkpoint = None
-        database = MalomDB(malom_path)
+        database = MalomDB(malom_path, query_observer=ledger.add_malom)
         try:
             with load_model_policies(
                 plan=plan,
@@ -499,6 +522,8 @@ def main() -> int:
             "status": "completed_once_bounded_trained_model_baseline_experiment",
             "plan_identity": plan["plan_identity"],
             "plan_file_sha256": plan_sha,
+            "attempt_identity": attempt["attempt_identity"],
+            "attempt_file_sha256": attempt_sha,
             "authorization_identity": authorization["authorization_identity"],
             "authorization_file_sha256": authorization_sha,
             "rehearsal_identity": rehearsal["rehearsal_identity"],
@@ -586,6 +611,7 @@ def main() -> int:
         failure = {
             "status": "failed_closed_after_measurement_marker",
             "plan_identity": plan["plan_identity"],
+            "attempt_identity": attempt["attempt_identity"],
             "authorization_identity": authorization["authorization_identity"],
             "preflight_identity": preflight["preflight_identity"],
             "exception_type": type(exc).__name__,

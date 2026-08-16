@@ -771,6 +771,7 @@ def run_determinism_gate(
         for fixture, budget in ordered:
             state = states[str(fixture["state_id"])]
             action = state["a_pos"][int(fixture["a_pos_index"])]
+            query_counter()
             value = _search_once(
                 installation,
                 seed=seed,
@@ -782,7 +783,6 @@ def run_determinism_gate(
             )
             if not value["searched"]:
                 raise SafeInducementError("determinism fixture has no engine response")
-            query_counter()
             key = f"{state['state_id']}:{fixture['a_pos_index']}:{budget}"
             observations[key].append(
                 {"order": order_name, "semantic": value["semantic_search"]}
@@ -791,6 +791,8 @@ def run_determinism_gate(
     for fixture, budget in cells:
         state = states[str(fixture["state_id"])]
         action = state["a_pos"][int(fixture["a_pos_index"])]
+        query_counter()
+        query_counter()
         pair = _search_twice_same_process(
             installation,
             seed=seed,
@@ -800,8 +802,6 @@ def run_determinism_gate(
             protocol_timeout=protocol_timeout,
             search_timeout=search_timeout,
         )
-        query_counter()
-        query_counter()
         same_process.append(
             {
                 "state_id": state["state_id"],

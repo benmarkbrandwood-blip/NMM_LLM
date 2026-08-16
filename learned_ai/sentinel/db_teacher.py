@@ -43,7 +43,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from game.rules import get_all_legal_moves, terminal_wdl
 
@@ -64,6 +64,7 @@ class ExternalSolvedDB:
         enabled: bool = True,
         *,
         strict: bool = False,
+        query_observer: Callable[[int], None] | None = None,
     ) -> None:
         """Open the Malom DB at db_path.
 
@@ -81,6 +82,7 @@ class ExternalSolvedDB:
         self._enabled = bool(enabled)
         self._strict = bool(strict)
         self._warned = False
+        self._query_observer = query_observer
         self._malom: Optional[_MalomDB] = None  # type: ignore[type-arg]
         self.db_dir: Optional[Path] = None
         self.format_probe: Dict[str, Any] = {}
@@ -114,7 +116,10 @@ class ExternalSolvedDB:
             logger.warning("[ExternalSolvedDB] ai.malom_db not importable; DB unavailable")
             return
 
-        self._malom = _MalomDB(self.db_dir)
+        self._malom = _MalomDB(
+            self.db_dir,
+            query_observer=self._query_observer,
+        )
         self.format_probe["available"] = self._malom.is_available()
         if self._malom.is_available():
             logger.info("[ExternalSolvedDB] Malom DB ready at %s", self.db_dir)

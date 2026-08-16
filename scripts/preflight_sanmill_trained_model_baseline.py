@@ -45,9 +45,11 @@ from learned_ai.evaluation import sanmill_trained_model_baseline as baseline
 from learned_ai.evaluation.sanmill_trained_model_baseline import (
     PREFLIGHT_SCHEMA,
     TrainedModelBaselineError,
+    audit_instrumentation_surface,
     audit_specialist_gameai_dependency,
     formal_states,
-    load_authorization,
+    load_attempt_authorization,
+    load_attempt_spec,
     load_model_policies,
     load_plan,
     load_rehearsal,
@@ -190,8 +192,12 @@ def _candidate_determinism(
     ]
     for state in fixture_states:
         board = BoardState.from_fen_string(str(state["fen"]))
+        queries_before = ledger.malom_queries
         parent, inventory, queries = _checked_oracle_inventory(board, database)
-        ledger.add_malom(queries)
+        if ledger.malom_queries - queries_before != queries:
+            raise TrainedModelBaselineError(
+                "candidate determinism Malom accounting differs"
+            )
         best_rank = max(WDL_RANK[value.outcome] for _move, value in inventory)
         safe_keys = {
             baseline._move_key(move)
@@ -400,16 +406,24 @@ def main() -> int:
         "--plan", default="docs/experiments/sanmill-trained-model-baseline-v1.json"
     )
     parser.add_argument(
+        "--attempt",
+        default=(
+            "docs/experiments/sanmill-trained-model-baseline-"
+            "attempt-002.json"
+        ),
+    )
+    parser.add_argument(
         "--authorization",
         default=(
-            "docs/experiments/sanmill-trained-model-baseline-v1/authorization.json"
+            "docs/experiments/sanmill-trained-model-baseline-attempt-002/"
+            "authorization.json"
         ),
     )
     parser.add_argument(
         "--rehearsal",
         default=(
             "docs/evidence/sanmill-trained-model-baseline-v1-"
-            "rehearsal-2026-08-16.json"
+            "attempt-002-rehearsal-2026-08-16.json"
         ),
     )
     parser.add_argument(
@@ -420,7 +434,7 @@ def main() -> int:
         "--output",
         default=(
             "docs/evidence/sanmill-trained-model-baseline-v1-"
-            "preflight-2026-08-16.json"
+            "attempt-002-preflight-2026-08-16.json"
         ),
     )
     parser.add_argument("--paths-config", default="data/training_paths.local.json")
@@ -436,13 +450,21 @@ def main() -> int:
     if _running_tgf_processes() != 0:
         parser.error("a Sanmill process is already running")
     plan, plan_sha = load_plan(_ROOT / args.plan)
-    authorization, authorization_sha = load_authorization(_ROOT / args.authorization)
+    attempt, attempt_sha = load_attempt_spec(_ROOT / args.attempt)
+    authorization, authorization_sha = load_attempt_authorization(
+        _ROOT / args.authorization
+    )
     rehearsal, rehearsal_sha = load_rehearsal(_ROOT / args.rehearsal)
     pool, pool_sha = load_pool(_ROOT / args.pool)
     if (
-        authorization["plan"]["identity"] != plan["plan_identity"]
-        or authorization["plan"]["file_sha256"] != plan_sha
+        attempt["plan"]["identity"] != plan["plan_identity"]
+        or attempt["plan"]["file_sha256"] != plan_sha
+        or authorization["attempt"]["identity"] != attempt["attempt_identity"]
+        or authorization["attempt"]["file_sha256"] != attempt_sha
+        or authorization["status"] != "authorized_once_measurement_unconsumed"
+        or attempt["resource_envelope"] != plan["resource_envelope"]
         or rehearsal["plan_identity"] != plan["plan_identity"]
+        or rehearsal["attempt_identity"] != attempt["attempt_identity"]
         or rehearsal["authorization_identity"]
         != authorization["authorization_identity"]
         or rehearsal["status"] != "passed_non_evidence_technical_rehearsal"
@@ -461,7 +483,7 @@ def main() -> int:
         "formal_membership_identity"
     ]:
         parser.error("preflight formal membership differs")
-    rehearsal_output = _ROOT / str(plan["rehearsal"]["output_namespace"])
+    rehearsal_output = _ROOT / str(attempt["outputs"]["rehearsal_namespace"])
     rehearsal_tree = _tree_identity(rehearsal_output)
     rehearsal_baseline = json.loads(
         (rehearsal_output / "resource-baseline.json").read_text(encoding="utf-8")
@@ -469,10 +491,13 @@ def main() -> int:
     rehearsal_recovery = load_resource_checkpoints(
         rehearsal_output / "resource-checkpoints.jsonl",
         expected_baseline=rehearsal_baseline,
-        complete_games_before=0,
+        complete_games_before=int(
+            attempt["cumulative_sunk_resources_before_attempt_002"]["complete_games"]
+        ),
     )
     if (
-        rehearsal_recovery["checkpoint_count"] != 10
+        rehearsal_recovery["checkpoint_count"]
+        != int(attempt["rehearsal"]["complete_games"])
         or rehearsal_recovery["last_resources"]["engine_single_step_searches"]
         != rehearsal["resource_use"]["engine_single_step_searches"]
         or rehearsal_recovery["last_resources"]["malom_read_only_queries"]
@@ -481,7 +506,9 @@ def main() -> int:
         parser.error("rehearsal durable resource record differs")
 
     output_path = _ROOT / args.output
-    run_output = _ROOT / str(plan["outputs"]["formal_output_namespace"])
+    run_output = _ROOT / str(attempt["outputs"]["formal_output_namespace"])
+    if output_path != _ROOT / str(attempt["outputs"]["preflight_result"]):
+        parser.error("preflight output differs from frozen attempt")
     if output_path.exists() or run_output.exists():
         parser.error("preflight result or formal output namespace already exists")
     run_output.mkdir(parents=True, exist_ok=False)
@@ -491,6 +518,10 @@ def main() -> int:
         "test_allowed_argmax_rejects_a_truly_missing_move",
         "test_game_record_rejects_truly_mismatched_terminal_winner",
         "test_resource_checkpoint_survives_before_game_record_crash",
+        "test_counting_malom_proxy_records_each_completed_query",
+        "test_instrumentation_surface_is_complete_and_signature_compatible",
+        "test_instrumentation_surface_rejects_generic_signature_drift",
+        "test_instrumentation_surface_rejects_unregistered_intercept_method",
         "test_specialist_gameai_audit_proves_no_score_path_read",
         "test_protected_guard_fails_before_any_content_producer",
     ]
@@ -534,17 +565,22 @@ def main() -> int:
         ]
     )
     ruff_targets = [
+        "ai/malom_db.py",
+        "learned_ai/sentinel/db_teacher.py",
+        "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "learned_ai/evaluation/sanmill_safe_inducement.py",
         "learned_ai/evaluation/training_aligned_policy.py",
         "learned_ai/evaluation/sanmill_trained_model_baseline.py",
-        "scripts/freeze_sanmill_trained_model_baseline_plan.py",
-        "scripts/authorize_sanmill_trained_model_baseline.py",
-        "scripts/rehearse_sanmill_trained_model_baseline.py",
+        "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py",
         "scripts/preflight_sanmill_trained_model_baseline.py",
         "scripts/run_sanmill_trained_model_baseline.py",
         "tests/test_training_aligned_policy.py",
         "tests/test_sanmill_trained_model_baseline.py",
     ]
     ruff = _run_gate(["ruff", "check", *ruff_targets])
+    instrumentation = audit_instrumentation_surface(_ROOT)
+    if instrumentation["passed"] is not True:
+        raise TrainedModelBaselineError("instrumentation surface audit failed")
 
     paths = _paths(_ROOT / args.paths_config)
     checkout = _local_path(paths.get("sanmill_training_checkout"), key="sanmill")
@@ -595,7 +631,7 @@ def main() -> int:
     if sanmill_determinism["passed"] is not True:
         raise TrainedModelBaselineError("Sanmill determinism gate failed")
 
-    database = MalomDB(malom_path)
+    database = MalomDB(malom_path, query_observer=ledger.add_malom)
     try:
         with load_model_policies(
             plan=plan,
@@ -655,7 +691,10 @@ def main() -> int:
     observed_implementation = {
         path: sha256_file(_ROOT / path) for path in implementation_files
     }
-    if observed_implementation != implementation_files:
+    if (
+        observed_implementation != implementation_files
+        or implementation_files != attempt["implementation_files"]
+    ):
         raise TrainedModelBaselineError("authorized implementation files changed")
     source_commit = _git("rev-parse", "HEAD")
     source_tree = _git("rev-parse", "HEAD^{tree}")
@@ -667,6 +706,8 @@ def main() -> int:
         "measurement_marker_created": False,
         "plan_identity": plan["plan_identity"],
         "plan_file_sha256": plan_sha,
+        "attempt_identity": attempt["attempt_identity"],
+        "attempt_file_sha256": attempt_sha,
         "authorization_identity": authorization["authorization_identity"],
         "authorization_file_sha256": authorization_sha,
         "rehearsal_identity": rehearsal["rehearsal_identity"],
@@ -679,13 +720,14 @@ def main() -> int:
         "formal_games": int(plan["experiment"]["formal_games"]),
         "source_commit": source_commit,
         "source_tree": source_tree,
-        "run_output_namespace": plan["outputs"]["formal_output_namespace"],
+        "run_output_namespace": attempt["outputs"]["formal_output_namespace"],
         "run_output_was_absent_before_preflight": True,
         "verification": {
             "contract_and_crash_regressions": regression,
             "focused_pytest": focused,
             "mandatory_malom_db_teacher_provenance": mandatory,
             "task_scope_ruff": ruff,
+            "instrumentation_surface_audit": instrumentation,
         },
         "sanmill_runtime": runtime,
         "sanmill_runtime_matches_attempt_002": True,
@@ -749,6 +791,7 @@ def main() -> int:
         run_output / "authorization-binding.json",
         {
             "plan_identity": plan["plan_identity"],
+            "attempt_identity": attempt["attempt_identity"],
             "authorization_identity": authorization["authorization_identity"],
             "preflight_identity": sealed["preflight_identity"],
             "formal_start_membership_identity": canonical_sha256(formal_ids),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -229,6 +229,7 @@ def load_training_aligned_policy(
     malom_path: str | Path,
     malom_manifest_path: str | Path,
     device: str = "cpu",
+    malom_query_observer: Callable[[int], None] | None = None,
 ) -> TrainingAlignedPolicy:
     """Verify a route bundle and its machine-local dependencies, then load it."""
     policy, target, manifest = load_training_route_models(
@@ -258,6 +259,7 @@ def load_training_aligned_policy(
         malom = ExternalSolvedDB(
             str(tablebase_path),
             strict=True,
+            query_observer=malom_query_observer,
         )
         if not malom.is_available():
             raise TrainingAlignedPolicyError("Malom strict decoder is unavailable")
