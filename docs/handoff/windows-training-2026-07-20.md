@@ -3378,6 +3378,28 @@ publication, or release is authorized.  See
 [`docs/evidence/sanmill-safe-guidance-gameplay-attempt-002-2026-08-16.md`](../evidence/sanmill-safe-guidance-gameplay-attempt-002-2026-08-16.md)
 for the full audit and claim boundary.
 
+## Trained-Model Baseline Rehearsal Failure (2026-08-16)
+
+The frozen four-arm protocol identity is `35a27d27...`; its direct one-shot
+authorization identity is `3f30c558...`.  The required non-evidence rehearsal
+failed closed before its first complete game because the new retained-v4
+Malom counting proxy called `ResourceLedger.add_malom()` without the required
+count argument.  No formal measurement marker exists and no candidate result
+was observed.
+
+The failed attempt consumed exactly 23 Malom read-only queries, zero engine
+searches, and zero complete games.  Charge 8.057233 seconds as a conservative
+active-time bound because the failure preceded the first per-game checkpoint.
+Preserve the failed output namespace byte-for-byte and never reuse it.
+
+The defect now has a red-then-green regression and the repaired focused suite
+passes 13 tests with task-scope Ruff clean.  The repair changes an
+authorization-bound implementation hash, so the old authorization cannot be
+used even though its formal marker rule was never consumed.  Do not rerun the
+rehearsal or start formal measurement without a new direct product-owner
+authorization bound to the repair and a fresh rehearsal namespace.  See
+[`docs/evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.md`](../evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.md).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):

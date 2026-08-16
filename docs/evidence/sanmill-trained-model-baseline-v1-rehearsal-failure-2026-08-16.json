@@ -1,0 +1,77 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-rehearsal-failure.v1",
+  "failure_identity": "76f7256d03c7265295f2d4f00b9a8ae492c137deaa0d034a6b530b1734a2a615",
+  "status": "failed_closed_before_first_complete_rehearsal_game",
+  "plan_identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+  "plan_file_sha256": "559d7cb4c163605389774ecbc0f7ad07a3211d58779491dd61b180bb0ead85b5",
+  "authorization_identity": "3f30c558ec5710fa96392ec92af4fb3da300c5d04ca0a925de1ee9518fd5a54f",
+  "authorization_file_sha256": "0cd43b78daae6e3fd2263d008e8c13f755a0bf881832038dc42a19ee6f4000d7",
+  "authorization_status_at_failure": "authorized_once_measurement_unconsumed",
+  "source_commit": "8f13763934b6cb284b64639b56e66b0ba42eca65",
+  "source_tree": "341046f3dbb7955f2475495ffa7f5f7789740d9f",
+  "rehearsal_output_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-rehearsal-20260816-001",
+  "preserve_output_byte_for_byte": true,
+  "output_artifacts": {
+    "NON-EVIDENCE.json": {
+      "bytes": 258,
+      "sha256": "f7410c0dc36f95812f8b30dd385f84f36be1820ea614a91bde2e7fae0f48fa83"
+    },
+    "resource-baseline.json": {
+      "bytes": 98,
+      "sha256": "a2b92e69e7d3fe4b4dcac4b14c56acd96866b8b68b0aab06f2f95c2a12d84cbe"
+    }
+  },
+  "formal_measurement_started": false,
+  "formal_measurement_marker_exists": false,
+  "complete_rehearsal_games": 0,
+  "complete_formal_games": 0,
+  "resource_use": {
+    "engine_single_step_searches": 0,
+    "malom_read_only_queries": 23,
+    "complete_games": 0,
+    "active_seconds_exactly_persisted": false,
+    "conservative_active_seconds_charged": 8.057233,
+    "query_derivation": {
+      "first_state_id": "trained-model-rehearsal-phase-process-001",
+      "legal_moves": 21,
+      "nonterminal_successors": 21,
+      "oracle_inventory_queries": 22,
+      "completed_retained_v4_lookahead_queries_before_exception": 1
+    }
+  },
+  "failure": {
+    "exception_type": "TypeError",
+    "exception_message": "ResourceLedger.add_malom() missing 1 required positional argument: 'count'",
+    "component": "_CountingMalomProxy.query",
+    "cause": "the proxy completed a Malom query and then called add_malom without the required count argument",
+    "model_or_runtime_result": false
+  },
+  "repair": {
+    "implementation_file": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+    "authorized_file_sha256": "71cc35dd6ad2992b4019e9eee85e1c043054486454f587e1aed4919e6c44460c",
+    "repaired_file_sha256": "f0a5fb20b5b5e3684adc87cae8d7bd985d94b9a5a0984e3e41c67c1bb1eb4df2",
+    "change": "call ResourceLedger.add_malom(1) after each completed proxy query",
+    "regression_test": "test_counting_malom_proxy_records_each_completed_query",
+    "red_result": "failed with the recorded TypeError",
+    "green_result": "passed",
+    "focused_suite_after_repair": "13 passed",
+    "task_scope_ruff_after_repair": "passed"
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "training_or_weight_updates": 0,
+    "checkpoint_edits_copies_renames_or_alias_changes": 0,
+    "database_writes": 0
+  },
+  "disposition": {
+    "automatic_retry_or_resume": false,
+    "original_authorization_usable_with_repaired_implementation": false,
+    "fresh_rehearsal_namespace_required": true,
+    "new_direct_product_owner_authorization_required": true,
+    "formal_result_or_candidate_claim_available": false
+  }
+}
