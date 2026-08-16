@@ -2,6 +2,41 @@
 
 ## Executive Summary
 
+### Fixed-engine safe-inducement main experiment -- 16 August 2026
+
+The directly authorised, once-only Sanmill safe-inducement main experiment
+completed under protocol-v2 identity
+`22f79951080afe01f11e0d9f2bbd16e8421fd92f2e96841da3627405271b89bf`,
+state-pool identity
+`261bd980acda6018f6c7fe4c268b1e00f190e33ae5c055ceb466d43c77dcc53c`,
+and raw result identity
+`fa3e5d6afa6a0816022909e287c0ab51d05311e3ad66ceac69c4441e9a981d3f`.
+All 18,549 frozen state/action/budget cells completed with no abstention.
+
+The unchanged 100,000-node main gate passed: 360 states were evaluable,
+state-uniform `o - b` was 14.678%, and its frozen-state bootstrap 95% lower
+bound was 11.363%, above the 5% threshold.  The source-frequency-weighted
+secondary value was 8.361% and had no decision threshold.
+
+A post-run audit found that the first budget-decomposition display omitted
+the 275 never-inducing states from its denominator.  Preserve the raw result
+unchanged and apply correction identity
+`85b04c9681ce8cf9fbd340885944c8d6da69831e00adfad410ebfef7018a199b`.
+Correct values are `o_inv=12.500%`, `o_sens=11.111%`, and
+`o_union=23.611%`.  Invariant states are 52.941% of union-induced states,
+below the frozen 80% overall fixed-blind-spot threshold.  Flying alone is
+91.892% invariant and remains a fixed-evaluation-blind-spot concentration.
+
+Aggregate use was 18,597 engine single-step searches, 48,563 read-only Malom
+queries, and 1,759.97 active seconds, with zero complete games, model loads,
+training updates, or database writes.  All protected content reads remained
+zero.  See the
+[main evidence](../evidence/sanmill-safe-inducement-main-v2-2026-08-16.md),
+raw manifest, and analysis correction.  This is positional-only evidence for
+the exact pinned runtime, not human-trap, strength, product, promotion,
+deployment, publication, release, or training authority.  F0-H0,
+`B_not_ready_fail_closed`, and `C_conversion_not_established` remain binding.
+
 ### Fixed-engine safe-inducement preprobe -- 16 August 2026
 
 The product-authorised, bounded single-step Sanmill preprobe completed under
