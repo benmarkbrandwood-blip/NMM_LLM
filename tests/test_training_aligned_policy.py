@@ -130,6 +130,9 @@ def test_loader_binds_read_only_resources_and_exact_route(monkeypatch) -> None:
         device="cpu",
     )
 
+    legal, logits = loaded.score_moves(BoardState.new_game())
+    assert legal == [{"to": "a1"}, {"to": "a4"}]
+    assert logits.tolist() == [0.0, 1.0]
     assert loaded.choose_move(BoardState.new_game()) == {"to": "a4"}
     assert loaded.bundle_identity == "b" * 64
     assert loaded.human_db.read_only is True

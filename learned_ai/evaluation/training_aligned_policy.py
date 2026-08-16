@@ -144,8 +144,16 @@ class TrainingAlignedPolicy:
     def bundle_identity(self) -> str:
         return str(self.manifest["bundle_identity"])
 
-    def choose_move(self, board) -> dict[str, Any]:
-        """Choose the final policy argmax or fail on route degradation."""
+    def score_moves(
+        self,
+        board,
+    ) -> tuple[list[dict[str, Any]], np.ndarray]:
+        """Return the exact-route legal moves and their policy logits.
+
+        The ordering is the frozen encoder ordering.  Exposing the complete
+        score vector lets read-only evaluations restrict the final argmax to a
+        preregistered subset without changing any feature or route component.
+        """
         encoded = encode_position_with_lookahead(
             board,
             board.turn,
@@ -158,7 +166,7 @@ class TrainingAlignedPolicy:
             strict=True,
         )
         if encoded is None or not encoded.legal_moves:
-            return {}
+            return [], np.empty((0,), dtype=np.float32)
         features = np.asarray(encoded.feat_matrix, dtype=np.float32)
         expected_width = int(self.manifest["route"]["feature_width"])
         if features.ndim != 2 or features.shape != (
@@ -187,7 +195,17 @@ class TrainingAlignedPolicy:
             raise TrainingAlignedPolicyError(
                 "training-route policy returned non-finite logits"
             )
-        return encoded.legal_moves[int(torch.argmax(logits).item())]
+        return (
+            [dict(move) for move in encoded.legal_moves],
+            logits.detach().to(device="cpu", dtype=torch.float32).numpy(),
+        )
+
+    def choose_move(self, board) -> dict[str, Any]:
+        """Choose the final policy argmax or fail on route degradation."""
+        legal_moves, logits = self.score_moves(board)
+        if not legal_moves:
+            return {}
+        return legal_moves[int(np.argmax(logits))]
 
     def close(self) -> None:
         if self._closed:
