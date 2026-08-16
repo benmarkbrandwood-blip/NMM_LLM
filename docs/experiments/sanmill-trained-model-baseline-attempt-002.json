@@ -1,0 +1,237 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-attempt.v2",
+  "attempt_identity": "e92c2095d2a0bbcaf892fb8e6be707a9b8ca71d73b332bf9d7ce5dcae0f51d29",
+  "attempt_id": "sanmill-trained-model-baseline-v1-attempt-002",
+  "status": "frozen_before_attempt_002_rehearsal",
+  "frozen_at_utc": "2026-08-16T00:00:00Z",
+  "authorization_basis": "Direct product-owner authorization titled 'baseline-v1 attempt-002 补充规格与彩排重跑'.",
+  "plan": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-v1.json",
+    "identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+    "file_sha256": "559d7cb4c163605389774ecbc0f7ad07a3211d58779491dd61b180bb0ead85b5"
+  },
+  "repair_base": {
+    "commit": "0f1b0a818d0465bc447dc44c004d18a6d76b951a",
+    "tree": "15035deb091a5f8572eb1fcfffc130a9ff9debed",
+    "meaning": "The product-owner-named repair commit from which the attempt-002 instrumentation audit was developed."
+  },
+  "implementation_freeze": {
+    "commit": "a5829f540afddda367ec7e343c95cae78ee53114",
+    "tree": "f1dc3503e3a9a42de0ec6e33e49490c5657ce144",
+    "implementation_file_hashes_are_authoritative": true
+  },
+  "scientific_contract_preserved": {
+    "candidates_unchanged": true,
+    "formal_start_pool_unchanged": true,
+    "arms_unchanged": true,
+    "primary_estimand_unchanged": true,
+    "precision_target_unchanged": true,
+    "thresholds_unchanged": true,
+    "resource_ceiling_unchanged": true,
+    "formal_starts": 254,
+    "formal_games": 2032,
+    "formal_membership_identity": "610f62e74b4a70500adfcaa3e0c19769dd178b480ef9765115ae6ab9a5af13d2",
+    "start_pool_identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9"
+  },
+  "resource_envelope": {
+    "automatic_retry_resume_batching_or_extension": false,
+    "host_interruption_recovery_authorized": false,
+    "maximum_active_seconds": 21600,
+    "maximum_complete_games": 2540,
+    "maximum_concurrent_evaluators": 1,
+    "maximum_concurrent_sanmill_processes": 1,
+    "maximum_database_writes": 0,
+    "maximum_engine_single_step_searches": 120000,
+    "maximum_malom_queries": 25000000,
+    "maximum_reused_formal_starts": 254,
+    "maximum_training_updates": 0,
+    "planned_formal_games": 2032,
+    "planned_rehearsal_games": 10,
+    "planned_total_complete_games": 2042,
+    "stop_at_any_limit": true
+  },
+  "cumulative_sunk_resources_before_attempt_002": {
+    "engine_single_step_searches": 0,
+    "malom_read_only_queries": 23,
+    "active_seconds": 8.057233,
+    "complete_games": 0,
+    "charged_to_unchanged_aggregate_envelope": true
+  },
+  "failed_attempt_001": {
+    "failure_identity": "76f7256d03c7265295f2d4f00b9a8ae492c137deaa0d034a6b530b1734a2a615",
+    "evidence_path": "docs/evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.json",
+    "evidence_file_sha256": "775f368c2622c97f868d084f55be6bdde7248453e433d50ee394d94fae91f23c",
+    "authorization_identity": "3f30c558ec5710fa96392ec92af4fb3da300c5d04ca0a925de1ee9518fd5a54f",
+    "authorization_path": "docs/experiments/sanmill-trained-model-baseline-v1/authorization.json",
+    "authorization_file_sha256": "0cd43b78daae6e3fd2263d008e8c13f755a0bf881832038dc42a19ee6f4000d7",
+    "authorization_status": "void_for_repaired_implementation_never_reuse",
+    "output_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-rehearsal-20260816-001",
+    "output_artifacts": {
+      "NON-EVIDENCE.json": {
+        "bytes": 258,
+        "sha256": "f7410c0dc36f95812f8b30dd385f84f36be1820ea614a91bde2e7fae0f48fa83"
+      },
+      "resource-baseline.json": {
+        "bytes": 98,
+        "sha256": "a2b92e69e7d3fe4b4dcac4b14c56acd96866b8b68b0aab06f2f95c2a12d84cbe"
+      }
+    },
+    "preserve_byte_for_byte": true,
+    "formal_marker_created": false
+  },
+  "instrumentation_design": {
+    "resource_counting": "single-throat observer on the real MalomDB.query_value implementation",
+    "transparent_malom_proxies": 0,
+    "delegate_rebinding_after_construction": false,
+    "generic_surface_audit_required": true,
+    "generic_signature_drift_negative_test_required": true,
+    "new_intercept_method_negative_test_required": true,
+    "per_completed_game_resource_checkpoint_fsync_before_game_record": true,
+    "preflight_retry_limit_after_this_repair": 0
+  },
+  "implementation_files": {
+    "ai/malom_db.py": "dbec87cc589b087653fb540a1b084418eaa750ffc9b34ac41c560632852442ae",
+    "game/board.py": "a54421e8b099523ea7e4255e46fd6e6b8fe068595438aa107512b61fc1eb5377",
+    "game/rules.py": "1e93a87ee4f29a26787ecb1590d3d8a178033fd2fee1d6d95f17a925d2eac19a",
+    "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py": "a22db8eefa52b9914c5b456857be4c73a341775d6618474f166e104ffd6fc7e2",
+    "learned_ai/evaluation/human_f0h0_feasibility.py": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95",
+    "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py": "8f781370f6bf6d1c77e55fc2849de875cfab54e378f2a5a57b78e9bd364efd48",
+    "learned_ai/evaluation/sanmill_safe_inducement.py": "e9cf9abb4290473e5edcd63a7c75f182ad416722915f7ea2cafa42926ca022f3",
+    "learned_ai/evaluation/sanmill_trained_model_baseline.py": "6b68cde86a9836c7d8f7d37fd3528a1814180ec8fbbcd47412be09e6c7267572",
+    "learned_ai/evaluation/sanmill_uci.py": "f8e4e3984391d299e1a466860be52388bf39bfdd36d0d746dd8deb8e8e617441",
+    "learned_ai/evaluation/training_aligned_policy.py": "801db8eb26e9037eb7ef66ac31ca8802eb6eadecfb4c11a6054199982c7575df",
+    "learned_ai/sentinel/db_teacher.py": "18f55e96cf7041879d1df275a4c99ce406ff46e32044a2546be300cab245781d",
+    "learned_ai/training/sanmill_referee.py": "1ff9c0de59e2815e6c027f1391360172086b1da07642c4448ad72cc87a1d00f3",
+    "scripts/preflight_sanmill_trained_model_baseline.py": "9ecd195cf9b634abc1f5c65a2496f06eb5bf988d353190843dba1804a79b021a",
+    "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py": "bfeff2b53843597f5538d485f97b8ab3d03233cf1ffa9ee3691c84aa8b2d0324",
+    "scripts/run_sanmill_trained_model_baseline.py": "22d8c11648d30c13fac7e711307f3400e4a2c849d4ad302457e6f801c2795214",
+    "tests/test_sanmill_trained_model_baseline.py": "091247c2517823981629643f6972a33f96e26d02bb22ddca8e9534d4410cbeae",
+    "tests/test_training_aligned_policy.py": "75e78a15019a5e88301b3a115e76277309293766cfab1d59b7e9f21158b06d9c"
+  },
+  "rehearsal": {
+    "formal_result_eligibility": false,
+    "complete_games": 27,
+    "live_model_games": 24,
+    "scripted_strict_terminal_games": 3,
+    "live_matrix": "three phases x four frozen arms x two candidate colors",
+    "phase_corpus": {
+      "path": "docs/experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json",
+      "identity": "3be3d76c34511e0f78d0f5bfe4a338c415c393306a955538bb85823e9d62c080",
+      "file_sha256": "8353ff3e52465bf99f7cf468a9cbcb4681a673ac2cebcdae00c253df8a22670b"
+    },
+    "live_starts": [
+      {
+        "source_start_id": "phase-process-001",
+        "phase": "placement",
+        "record_identity": "a1c9285edd203f9ff7e911365aa583e449550e314509592d0b1ed33ffc8f6063",
+        "strict_history_sha256": "5150ab6b9b21fe6537df06a628a191754d06b5b562936d2f7207d63ddcabfe28"
+      },
+      {
+        "source_start_id": "phase-process-019",
+        "phase": "movement",
+        "record_identity": "2944fadda1026aae9dec5cafd1bdb42f7402e68d06d1e6643f6699931f30923a",
+        "strict_history_sha256": "135b36efb72856f9140f3bf2a2bdf20a3f52fce04ac990533179ac04970e220c"
+      },
+      {
+        "source_start_id": "phase-process-033",
+        "phase": "flying",
+        "record_identity": "a7638c48fdce9da0cce96efc2e4012a0f9c8eac81e64fab510ff4f5015b1f2fd",
+        "strict_history_sha256": "3eb920b40eea3d5b45a7e3d2b9ed4cb7fee549373db8b9c40f8a2d478db64284"
+      }
+    ],
+    "scripted_source_ledger": {
+      "path": "learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-phase-process-generalization-v1/games.jsonl",
+      "file_sha256": "45506e5cedf5ab9bdcba9dd687349869b639fb8bd46fd8990cbaf4bb79ef3211"
+    },
+    "scripted_cases": [
+      {
+        "case_id": "strict-threefold",
+        "arm": "contract-threefold",
+        "outcome_class": "draw",
+        "outcome_reason": "drawThreefoldRepetition",
+        "source_game_id": "phase-process-game:ad4799bb475153abafb8b86748e5c10d27ba542601b173ec6fd7f7203f072d9b",
+        "source_record_sha256": "27cb2b3121017424a85c221e1db998acb4290cb1d7a67ec691e4aae1388b93fd",
+        "start": {
+          "source_start_id": "phase-process-023",
+          "phase": "movement",
+          "record_identity": "4dd8dec6ec3a398c280b2776c834631a95fa2de1f1926987b3fa05fec479b365",
+          "strict_history_sha256": "059346e8d605d19a3a2edbe1d663bdf7d24a74b4870d8b73b0a5e924a2a2bc5a"
+        }
+      },
+      {
+        "case_id": "strict-fifty-move",
+        "arm": "contract-fifty-move",
+        "outcome_class": "draw",
+        "outcome_reason": "drawFiftyMove",
+        "source_game_id": "phase-process-game:1da5b3622b33159d617cab6d4d0a7347395afb088cd6ca72d0a160b8f7ca2961",
+        "source_record_sha256": "e329916030746aaecbda78a8ab4c27896a61108cf7db3f781a5cc5750a4130c7",
+        "start": {
+          "source_start_id": "phase-process-030",
+          "phase": "movement",
+          "record_identity": "07e3787732d53739d35d4daacb8af50c367393fecb8e459352a12fa2b923d6b4",
+          "strict_history_sha256": "4deb33f78d439abb9323001a61b8399bc56960a3d1ddd592ebfab06b92b2f2cb"
+        }
+      },
+      {
+        "case_id": "strict-decisive",
+        "arm": "contract-decisive",
+        "outcome_class": "decisive",
+        "outcome_reason": "loseFewerThanThree",
+        "source_game_id": "phase-process-game:c2e53e45b45f6a998cf21c8ed16a367513b5098514140739a274702259caea32",
+        "source_record_sha256": "5bf719b4f4811b7a243dc86191232787d0a5ed08cb0302eec5c0f71ba0de7b11",
+        "start": {
+          "source_start_id": "phase-process-035",
+          "phase": "flying",
+          "record_identity": "d03567026c0a133fc3b13496bd33e5f7a2359b828eae070598978b53dd0e73b7",
+          "strict_history_sha256": "f2d058731a32da550b4a64ab2376dfc1e77c78eef75a9b0b1c8981820bec8bbb"
+        }
+      }
+    ],
+    "required_coverage": {
+      "all_four_arms": true,
+      "both_candidate_colors": true,
+      "placement_movement_and_flying_starts": true,
+      "placement_movement_and_flying_turns": true,
+      "strict_decisive_terminal": true,
+      "strict_threefold_terminal": true,
+      "strict_fifty_move_terminal": true,
+      "free_and_A_pos_constrained_choice_paths": true,
+      "all_enumerated_intercept_methods": true,
+      "resource_checkpoint_recovery": true
+    }
+  },
+  "protected_guard_canary": {
+    "membership_path": "docs/experiments/f0-h0-design-b2-frozen-membership-v1.json",
+    "membership_file_sha256": "06c3be92c87927d506dc36eb908aec3064220f4ead2ebb3b5ff3dfb7bf5032cb",
+    "protected_partition": "final-test",
+    "protected_session_id": "ml11851743",
+    "membership_only_not_content": true
+  },
+  "outputs": {
+    "rehearsal_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-20260816-001",
+    "rehearsal_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-2026-08-16.json",
+    "preflight_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-preflight-2026-08-16.json",
+    "formal_output_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-002-20260816-001",
+    "formal_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-manifest-2026-08-16.json",
+    "evidence_document": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-2026-08-16.md"
+  },
+  "failure_rule": {
+    "instrumentation_or_contract_rehearsal_failure": "stop_without_any_further_point_fix_and_publish_structural_tooling_analysis",
+    "corrected_preflight_failure": "stop_without_third_preflight_retry",
+    "formal_failure_after_marker": "stop_without_retry_resume_or_attempt_003"
+  },
+  "protected_access": {
+    "official_selection_confirmation_final_test": "unopened",
+    "research_confirmation": "unopened",
+    "source_pool_2eb04f54_remaining_108": "unread_and_unconsumed"
+  },
+  "claim_boundary": {
+    "fixed_runtime_start_pool_and_candidate_routes_only": true,
+    "positional_only": true,
+    "playing_strength_population_claim": false,
+    "human_trap_or_product_user_claim": false,
+    "equivalence_claim": false,
+    "training_value_claim": false,
+    "promotion_deployment_publication_release_or_training": false
+  }
+}
