@@ -1,0 +1,73 @@
+{
+  "schema_version": "nmm.sanmill-safe-guidance-gameplay-preflight-failure.v1",
+  "status": "failed_closed_before_any_gameplay",
+  "failure_identity": "2368b1f3b32457fc98d85db583c910e31e037c4d17af7751d75d0cfd395e22de",
+  "occurred_on": "2026-08-16",
+  "plan_identity": "1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6",
+  "start_pool_identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9",
+  "start_pool_membership_identity": "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15",
+  "authorization_identity": "806e7b674c96ca3f5dd98067a09b6c76bda3db2cca12c75d92ba3cc5f7b495e2",
+  "authorization_file_sha256": "dbf1feb176651023afdf60dc548514423da437e0b0dba77603c29d347efb8a5c",
+  "authorization_status": "authorized_once_gameplay_unconsumed",
+  "source_commit": "2edfbfe02abbd059d54cf2d7068ce04fedca3859",
+  "source_tree": "41f065d235f409ea9d17f7f8cc22724e03c68b64",
+  "failed_gate": {
+    "name": "frozen_guide_canary",
+    "result": "failed",
+    "failure_class": "preflight_harness_false_negative",
+    "exception": "SafeGuidanceGameplayError: frozen guide canary failed",
+    "root_cause": "The canary passed an A_pos action envelope to the direct-move key helper. The helper therefore compared ('','','') with the persisted selected move rather than comparing action['move'].",
+    "stored_artifact_reproduction": {
+      "state_id": "000a54fb708bde99ad719d2b6be07b307ab3497b95ad71b34a610ebe9e4be3dc",
+      "incorrect_envelope_key": ["", "", ""],
+      "nested_move_key": ["", "b4", ""],
+      "persisted_expected_key": ["", "b4", ""],
+      "diagnosis_requires_no_malom_or_sanmill_query": true
+    },
+    "estimator_or_contract_mismatch_established": false,
+    "corrected_comparator_executed": false
+  },
+  "gates_completed_before_failure": {
+    "focused_tests": "process returned success; transient stdout was not persisted because the failed preflight had no failure journal",
+    "mandatory_malom_db_teacher_provenance_tests": "process returned success; transient stdout was not persisted because the failed preflight had no failure journal",
+    "task_scope_ruff": "process returned success",
+    "sanmill_runtime_identity_checked": "705eabcc3ff7a878071737b7dde19f22a94ac5c32aab177812667267cadde5ea",
+    "malom_trust_level_checked": "sector-corrected-v1"
+  },
+  "resource_accounting": {
+    "pool_construction_malom_queries": 10638,
+    "failed_canary_malom_queries": 1000,
+    "aggregate_malom_queries": 11638,
+    "engine_single_step_searches": 0,
+    "complete_games": 0,
+    "model_loads": 0,
+    "estimator_refits_or_tuning": 0,
+    "training_or_weight_updates": 0,
+    "database_writes": 0,
+    "pool_construction_active_seconds": 68.32447289999982,
+    "failed_preflight_process_wall_seconds_from_orchestrator": 8.8789242,
+    "active_seconds_not_claimed_exact": true
+  },
+  "once_only_state": {
+    "run_output_namespace": "out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-001",
+    "measurement_started_marker_exists": false,
+    "raw_game_ledger_exists": false,
+    "preflight_success_record_exists": false,
+    "authorization_consumed": false,
+    "automatic_retry_or_execution_performed": false,
+    "disposition": "stop; no corrected preflight or gameplay may start without a new explicit retry decision"
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0
+  },
+  "claim_boundary": {
+    "gameplay_result_exists": false,
+    "score_or_conversion_claim_allowed": false,
+    "human_trap_claim_allowed": false,
+    "promotion_deployment_publication_training_or_release": false
+  }
+}

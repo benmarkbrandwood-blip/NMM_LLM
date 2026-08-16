@@ -2,6 +2,33 @@
 
 ## Executive Summary
 
+### Safe-guidance gameplay preflight stopped -- 16 August 2026
+
+The complete-game protocol was frozen at plan identity
+`1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6`.
+It preregisters 255 starts, 1,530 games, the full-minus-random start-clustered
+score contrast, and a 1.5 percentage-point maximum 95% half-width.  The blind
+start pool froze at identity
+`385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9`,
+with 85 starts per phase, complete histories, unique source games, and zero
+overlap with the 396 preprobe/main coordinates.
+
+The once-only authorization identity is
+`806e7b674c96ca3f5dd98067a09b6c76bda3db2cca12c75d92ba3cc5f7b495e2`,
+but the zero-game preflight failed closed at its guide canary.  The failure was
+a harness false negative: a nested persisted action envelope was passed to a
+direct-move key helper.  Stored evidence shows the nested and expected move
+keys agree.  The comparison code and a regression assertion are corrected,
+but the corrected canary has not been run because automatic retry is
+forbidden.  No measurement-started marker, engine search, game ledger, or
+complete game exists, so the gameplay authorization remains unconsumed.
+
+See the [failure evidence](../evidence/sanmill-safe-guidance-gameplay-preflight-failure-2026-08-16.md)
+and machine record.  A new explicit product-owner retry decision is required
+before another preflight or any gameplay.  No score, conversion, human-trap,
+product, promotion, deployment, publication, release, or training conclusion
+exists from this stopped attempt.
+
 ### Sanmill-to-human-risk transfer test -- 16 August 2026
 
 The zero-engine post-hoc transfer test completed under frozen plan identity
