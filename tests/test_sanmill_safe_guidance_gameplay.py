@@ -18,6 +18,7 @@ from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     analyze_games,
     build_schedule,
     load_plan,
+    load_pool,
 )
 
 
@@ -86,6 +87,28 @@ def test_schedule_is_adjacent_by_start_color_and_arm() -> None:
         "B",
     ]
     assert len({row["game_id"] for row in schedule}) == EXPECTED_GAMES
+
+
+def test_tracked_start_pool_is_complete_history_and_candidate_blind() -> None:
+    root = Path(__file__).resolve().parent.parent
+    pool, _file_sha = load_pool(
+        root
+        / "docs/experiments/sanmill-safe-guidance-gameplay-start-pool-v1.json"
+    )
+    assert pool["pool_identity"] == (
+        "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9"
+    )
+    assert pool["state_membership_identity"] == (
+        "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15"
+    )
+    assert pool["prior_coordinate_exclusion"]["coordinates"] == 396
+    assert pool["prior_coordinate_exclusion"]["selected_overlap"] == 0
+    assert pool["selection_blindness"]["human_estimator_prediction_reads"] == 0
+    assert pool["selection_blindness"]["sanmill_observations"] == 0
+    assert all(
+        len(row["logical_turns"]) == row["logical_ply"] for row in pool["states"]
+    )
+    assert pool["access_audit"]["official_final_test_content_reads"] == 0
 
 
 def test_primary_analysis_clusters_both_colors_at_start() -> None:
