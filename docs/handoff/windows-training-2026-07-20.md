@@ -1,6 +1,34 @@
-# Windows Training Handover — 20 July 2026 (updated 15 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 16 August 2026)
 
 ## Executive Summary
+
+### Fixed-engine safe-inducement preprobe -- 16 August 2026
+
+The product-authorised, bounded single-step Sanmill preprobe completed under
+plan identity `ad36a467e87bda62cd57e9e55bf862c3e3d8c9678960b85307f8a5a72964aaec`
+and result identity
+`14aa42310611a033bca9e22da829e2f8c8cead5f422a285f273ddd30c6aa7155`.
+Its 36 source-game-unique states contain 540 complete positional-only `A_pos`
+actions.  All 96 within- and cross-process determinism searches matched.
+
+The 10,000- and 100,000-node cells passed the frozen preprobe signal gate;
+the highest-passing rule selects 100,000 nodes.  At that budget, state-uniform
+baseline `b` is 1.048%, oracle rate `o` is 11.111%, and `o - b` is 10.063%
+with a fixed-pool bootstrap interval of `[2.083%, 20.316%]`.  All movement
+states had zero events; the signal is concentrated in placement and flying.
+This is conclusion `A_signal_region_main_experiment_worth_authorizing`, not a
+main mechanism claim.
+
+The separately specified 360-state main protocol remains unlaunched and
+requires a new exact child-pool identity plus explicit product-owner
+authority.  It permits no complete game, model load, or training.  Preserve
+the [preprobe evidence](../evidence/sanmill-safe-inducement-preprobe-2026-08-16.md)
+and machine manifest.  This fixed-engine result is not human-trap, playing-
+strength, product, promotion, deployment, publication, or release evidence.
+The F0-H0 stop, estimator `B_not_ready_fail_closed`, and conversion
+`C_conversion_not_established` decisions remain unchanged.  Official
+selection, confirmation, final-test, research confirmation, and source pool
+`2eb04f54` remained unopened; the remaining 108 records are unconsumed.
 
 ### Product disposition -- 14 August 2026
 
