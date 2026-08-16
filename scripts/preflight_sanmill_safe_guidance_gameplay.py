@@ -25,11 +25,11 @@ from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
     RESULT_SCHEMA as READINESS_SCHEMA,
 )
 from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
-    AUTHORIZATION_SCHEMA,
     PHASES,
     PREFLIGHT_SCHEMA,
     ResourceLedger,
     SafeGuidanceGameplayError,
+    load_authorization,
     load_plan,
     load_pool,
     load_sealed,
@@ -49,6 +49,22 @@ from learned_ai.training.sanmill_referee import (
 
 
 TRANSFER_RESULT_SCHEMA = "nmm.sanmill-human-transfer-result.v1"
+FAILURE_SCHEMA = "nmm.sanmill-safe-guidance-gameplay-preflight-failure.v1"
+EXPECTED_PLAN_IDENTITY = (
+    "1d368c336db5f49493a2abf3c9e7d507c013d9fed3d14cd928ee988575969cc6"
+)
+EXPECTED_POOL_IDENTITY = (
+    "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9"
+)
+EXPECTED_MEMBERSHIP_IDENTITY = (
+    "cb84ed8180b103d7c25d56a5051fb2476047788505ed0cb9f437c39c9048fb15"
+)
+EXPECTED_AUTHORIZATION_IDENTITY = (
+    "806e7b674c96ca3f5dd98067a09b6c76bda3db2cca12c75d92ba3cc5f7b495e2"
+)
+EXPECTED_FAILURE_IDENTITY = (
+    "2368b1f3b32457fc98d85db583c910e31e037c4d17af7751d75d0cfd395e22de"
+)
 
 
 def _git(*arguments: str) -> str:
@@ -169,8 +185,15 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--prior-failure",
+        default=(
+            "docs/evidence/sanmill-safe-guidance-gameplay-preflight-"
+            "failure-2026-08-16.json"
+        ),
+    )
+    parser.add_argument(
         "--run-output-dir",
-        default="out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-001",
+        default="out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-002",
     )
     parser.add_argument(
         "--readiness-result",
@@ -198,13 +221,76 @@ def main() -> int:
     pool_path = _ROOT / args.pool
     authorization_path = _ROOT / args.authorization
     preflight_path = _ROOT / args.preflight_output
+    prior_failure_path = _ROOT / args.prior_failure
     run_output = _ROOT / args.run_output_dir
-    if authorization_path.exists() or preflight_path.exists() or run_output.exists():
-        parser.error("authorization, preflight, and run namespace must be new")
+    prior_run_output = (
+        _ROOT / "out/evaluation/sanmill-safe-guidance-gameplay-v1-20260816-001"
+    )
+    if not authorization_path.is_file() or not prior_failure_path.is_file():
+        parser.error("existing authorization and first failure record are required")
+    if preflight_path.exists() or run_output.exists():
+        parser.error("corrected preflight record and run namespace must be new")
     plan, plan_sha = load_plan(plan_path)
     pool, pool_sha = load_pool(pool_path)
+    authorization, authorization_sha = load_authorization(authorization_path)
+    prior_failure, prior_failure_sha = load_sealed(
+        prior_failure_path,
+        schema=FAILURE_SCHEMA,
+        identity_field="failure_identity",
+    )
+    identities = {
+        "plan": plan["plan_identity"],
+        "pool": pool["pool_identity"],
+        "membership": pool["state_membership_identity"],
+        "authorization": authorization["authorization_identity"],
+        "failure": prior_failure["failure_identity"],
+    }
+    expected_identities = {
+        "plan": EXPECTED_PLAN_IDENTITY,
+        "pool": EXPECTED_POOL_IDENTITY,
+        "membership": EXPECTED_MEMBERSHIP_IDENTITY,
+        "authorization": EXPECTED_AUTHORIZATION_IDENTITY,
+        "failure": EXPECTED_FAILURE_IDENTITY,
+    }
+    if identities != expected_identities:
+        parser.error("frozen gameplay identities differ from the retry grant")
     if pool["plan_binding"]["plan_identity"] != plan["plan_identity"]:
         parser.error("plan and start pool differ")
+    if (
+        authorization["plan"]["identity"] != plan["plan_identity"]
+        or authorization["plan"]["file_sha256"] != plan_sha
+        or authorization["start_pool"]["identity"] != pool["pool_identity"]
+        or authorization["start_pool"]["membership_identity"]
+        != pool["state_membership_identity"]
+        or authorization["start_pool"]["file_sha256"] != pool_sha
+        or prior_failure["plan_identity"] != plan["plan_identity"]
+        or prior_failure["start_pool_identity"] != pool["pool_identity"]
+        or prior_failure["start_pool_membership_identity"]
+        != pool["state_membership_identity"]
+        or prior_failure["authorization_identity"]
+        != authorization["authorization_identity"]
+        or prior_failure["authorization_file_sha256"] != authorization_sha
+    ):
+        parser.error("plan, pool, authorization, and first failure bindings differ")
+    prior_once_only = prior_failure["once_only_state"]
+    if (
+        prior_failure["status"] != "failed_closed_before_any_gameplay"
+        or prior_once_only["authorization_consumed"] is not False
+        or prior_once_only["measurement_started_marker_exists"] is not False
+        or prior_once_only["raw_game_ledger_exists"] is not False
+        or (prior_run_output / "measurement-started.json").exists()
+        or (prior_run_output / "games.jsonl").exists()
+    ):
+        parser.error("the once-only gameplay authorization is no longer unconsumed")
+    previous_resources = prior_failure["resource_accounting"]
+    if (
+        int(previous_resources["pool_construction_malom_queries"]) != 10_638
+        or int(previous_resources["failed_canary_malom_queries"]) != 1_000
+        or int(previous_resources["aggregate_malom_queries"]) != 11_638
+        or int(previous_resources["engine_single_step_searches"]) != 0
+        or int(previous_resources["complete_games"]) != 0
+    ):
+        parser.error("first-attempt cumulative resource ledger differs")
     if _git("branch", "--show-current") != "dev":
         parser.error("preflight requires dev")
     if _git("status", "--short", "--untracked-files=no"):
@@ -215,60 +301,24 @@ def main() -> int:
     source_commit = _git("rev-parse", "HEAD")
     source_tree = _git("rev-parse", "HEAD^{tree}")
     envelope = plan["resource_envelope"]
-    authorization_payload = {
-        "schema_version": AUTHORIZATION_SCHEMA,
-        "status": "authorized_once_gameplay_unconsumed",
-        "operator": "product-owner-direct",
-        "authorized_on": "2026-08-16",
-        "authorization_basis": (
-            "Direct product-owner authorization in the task titled Freeze and "
-            "execute one safe-guidance versus random-safe gameplay experiment."
-        ),
-        "grant_count": 1,
-        "plan": {
-            "identity": plan["plan_identity"],
-            "file_sha256": plan_sha,
-            "tracked_file": args.plan,
-        },
-        "start_pool": {
-            "identity": pool["pool_identity"],
-            "membership_identity": pool["state_membership_identity"],
-            "file_sha256": pool_sha,
-            "tracked_file": args.pool,
-            "starts": pool["state_count"],
-        },
-        "execution_scope": envelope,
-        "permitted": [
-            "one zero-game preflight with bounded determinism searches",
-            "one exact execution of 1530 strict complete games",
-            "read-only Sanmill searches and corrected Malom queries",
-        ],
-        "prohibited": [
-            "automatic retry, resume, recovery, batching, or extension",
-            "second execution",
-            "training, fitting, tuning, model loading, or weight updates",
-            "database writes, promotion, deployment, publication, or release",
-        ],
-        "consumption_rule": (
-            "consumed when measurement-started.json is created before game zero"
-        ),
-        "host_interruption": (
-            "no recovery authorized; exact missing-suffix continuation requires "
-            "separate product-owner authorization"
-        ),
-        "source_commit_at_freeze": source_commit,
-        "source_tree_at_freeze": source_tree,
-    }
-    authorization_path.parent.mkdir(parents=True, exist_ok=False)
-    authorization = write_sealed_json(
-        authorization_path,
-        authorization_payload,
-        identity_field="authorization_identity",
-    )
     run_output.mkdir(parents=True, exist_ok=False)
 
     verification_started = time.perf_counter()
     python = str(_ROOT / ".venv/Scripts/python.exe")
+    negative_canary_regression = _run_gate(
+        [
+            python,
+            "-m",
+            "pytest",
+            (
+                "tests/test_sanmill_safe_guidance_gameplay.py::"
+                "test_canary_rejects_a_genuinely_mismatched_move"
+            ),
+            "-q",
+            "--basetemp",
+            str(run_output / "pytest-negative-canary"),
+        ]
+    )
     focused = _run_gate(
         [
             python,
@@ -347,8 +397,10 @@ def main() -> int:
             database=database,
             states_per_phase=2,
         )
-        if not guide_canary["passed"]:
-            raise SafeGuidanceGameplayError("frozen guide canary failed")
+        if guide_canary["passed"] is not True:
+            raise SafeGuidanceGameplayError("corrected frozen guide canary failed")
+        if int(guide_canary["malom_queries"]) != 1_000:
+            raise SafeGuidanceGameplayError("corrected canary query count differs")
     finally:
         database.close()
 
@@ -374,11 +426,15 @@ def main() -> int:
     if not determinism["passed"]:
         raise SafeGuidanceGameplayError("Sanmill determinism gate failed")
 
+    prior_active_seconds = float(
+        previous_resources["pool_construction_active_seconds"]
+    ) + float(previous_resources["failed_preflight_process_wall_seconds_from_orchestrator"])
+    elapsed_before_start_replay = time.perf_counter() - verification_started
     validation_ledger = ResourceLedger(
         engine_searches=engine_queries,
-        malom_queries=int(pool["resource_use"]["malom_queries"])
+        malom_queries=int(previous_resources["aggregate_malom_queries"])
         + int(guide_canary["malom_queries"]),
-        active_seconds_before_run=float(pool["resource_use"]["construction_active_seconds"]),
+        active_seconds_before_run=prior_active_seconds + elapsed_before_start_replay,
         maximum_engine_searches=int(envelope["maximum_engine_single_step_searches"]),
         maximum_malom_queries=int(envelope["maximum_malom_queries"]),
         maximum_active_seconds=float(envelope["maximum_active_seconds"]),
@@ -402,24 +458,33 @@ def main() -> int:
         raise SafeGuidanceGameplayError("strict start validation count differs")
 
     preflight_seconds = time.perf_counter() - verification_started
-    pool_resource = {
-        "engine_single_step_searches": 0,
-        "malom_queries": int(pool["resource_use"]["malom_queries"]),
-        "active_seconds": float(pool["resource_use"]["construction_active_seconds"]),
+    prior_resource = {
+        "engine_single_step_searches": int(
+            previous_resources["engine_single_step_searches"]
+        ),
+        "malom_queries": int(previous_resources["aggregate_malom_queries"]),
+        "active_seconds": prior_active_seconds,
+        "active_seconds_policy": (
+            "conservative sum of pool construction active time and failed "
+            "preflight orchestrator wall time"
+        ),
     }
-    preflight_resource = {
+    corrected_preflight_resource = {
         "engine_single_step_searches": engine_queries,
         "malom_queries": int(guide_canary["malom_queries"]),
         "active_seconds": preflight_seconds,
     }
     aggregate = {
-        "engine_single_step_searches": engine_queries,
-        "malom_queries": pool_resource["malom_queries"]
-        + preflight_resource["malom_queries"],
-        "active_seconds": pool_resource["active_seconds"]
-        + preflight_resource["active_seconds"],
+        "engine_single_step_searches": prior_resource["engine_single_step_searches"]
+        + corrected_preflight_resource["engine_single_step_searches"],
+        "malom_queries": prior_resource["malom_queries"]
+        + corrected_preflight_resource["malom_queries"],
+        "active_seconds": prior_resource["active_seconds"]
+        + corrected_preflight_resource["active_seconds"],
         "complete_games": 0,
     }
+    if aggregate["malom_queries"] != 12_638:
+        raise SafeGuidanceGameplayError("corrected cumulative Malom ledger differs")
     if (
         aggregate["engine_single_step_searches"]
         >= int(envelope["maximum_engine_single_step_searches"])
@@ -436,6 +501,10 @@ def main() -> int:
     preflight_payload = {
         "schema_version": PREFLIGHT_SCHEMA,
         "status": "ready_for_one_authorized_execution",
+        "preflight_attempt": 2,
+        "third_preflight_attempt_authorized": False,
+        "supersedes_failed_preflight_identity": prior_failure["failure_identity"],
+        "prior_failure_file_sha256": prior_failure_sha,
         "complete_games": 0,
         "measurement_searches": 0,
         "plan_identity": plan["plan_identity"],
@@ -444,11 +513,34 @@ def main() -> int:
         "start_pool_membership_identity": pool["state_membership_identity"],
         "start_pool_file_sha256": pool_sha,
         "authorization_identity": authorization["authorization_identity"],
+        "authorization_file_sha256": authorization_sha,
+        "correction_authorization": {
+            "operator": "product-owner-direct",
+            "authorized_on": "2026-08-16",
+            "scope": (
+                "one corrected zero-game preflight under the unchanged plan, "
+                "pool, membership, authorization, guide contract, and envelope; "
+                "if all gates pass, consume the existing once-only gameplay grant"
+            ),
+            "only_preflight_tool_repair_allowed": True,
+            "cumulative_resource_accounting_required": True,
+            "second_failure_disposition": (
+                "fail closed with no third preflight attempt"
+            ),
+            "gameplay_retry_resume_batching_or_extension_authorized": False,
+        },
         "source_commit": source_commit,
         "source_tree": source_tree,
         "run_output_namespace": args.run_output_dir,
         "run_output_was_absent_before_preflight": True,
         "verification": {
+            "negative_canary_regression": {
+                **negative_canary_regression,
+                "assertion": (
+                    "a genuinely mismatched selected move raises "
+                    "SafeGuidanceGameplayError"
+                ),
+            },
             "focused_pytest": focused,
             "mandatory_malom_db_teacher_provenance": mandatory,
             "task_scope_ruff": ruff,
@@ -472,8 +564,8 @@ def main() -> int:
             "clock_records_identity": canonical_sha256(start_clock_counts),
         },
         "resource_components": {
-            "pool_construction": pool_resource,
-            "preflight": preflight_resource,
+            "pool_construction_and_failed_first_canary": prior_resource,
+            "corrected_second_preflight": corrected_preflight_resource,
         },
         "aggregate_resource_use_before_measurement": aggregate,
         "protected_access": {

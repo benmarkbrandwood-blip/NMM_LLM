@@ -15,6 +15,8 @@ from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     EXPECTED_STARTS,
     ResourceLedger,
     SafeGuidanceGameplayIncomplete,
+    SafeGuidanceGameplayError,
+    _assert_canary_selection,
     _pooled_action_key,
     analyze_games,
     build_schedule,
@@ -116,6 +118,45 @@ def test_tracked_start_pool_is_complete_history_and_candidate_blind() -> None:
         str(first_action["move"].get("to") or ""),
         str(first_action["move"].get("capture") or ""),
     )
+
+
+def test_canary_accepts_matching_nested_move_envelope() -> None:
+    actions = [
+        {"move": {"from": None, "to": "a7", "capture": None}},
+        {"move": {"from": None, "to": "b6", "capture": None}},
+    ]
+    _assert_canary_selection(
+        specification="full",
+        actions=actions,
+        selected_index=1,
+        selected_risk=0.25,
+        expected={
+            "selected_action": {"from": None, "to": "b6", "capture": None},
+            "maximum_risk": 0.25,
+        },
+    )
+
+
+def test_canary_rejects_a_genuinely_mismatched_move() -> None:
+    """This must fail if the corrected canary loses move discrimination."""
+    actions = [
+        {"move": {"from": None, "to": "a7", "capture": None}},
+        {"move": {"from": None, "to": "b6", "capture": None}},
+    ]
+    with pytest.raises(
+        SafeGuidanceGameplayError,
+        match="full guide canary selected move differs",
+    ):
+        _assert_canary_selection(
+            specification="full",
+            actions=actions,
+            selected_index=0,
+            selected_risk=0.25,
+            expected={
+                "selected_action": {"from": None, "to": "b6", "capture": None},
+                "maximum_risk": 0.25,
+            },
+        )
 
 
 def test_primary_analysis_clusters_both_colors_at_start() -> None:

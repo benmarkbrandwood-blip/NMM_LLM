@@ -280,6 +280,31 @@ def _pooled_action_key(action: Mapping[str, Any]) -> tuple[str, str, str]:
     return _move_key(move)
 
 
+def _assert_canary_selection(
+    *,
+    specification: str,
+    actions: Sequence[Mapping[str, Any]],
+    selected_index: int,
+    selected_risk: float,
+    expected: Mapping[str, Any],
+) -> None:
+    """Fail closed when a recomputed canary selection truly differs."""
+    if not 0 <= selected_index < len(actions):
+        raise SafeGuidanceGameplayError(
+            f"{specification} guide canary selected index differs"
+        )
+    if _pooled_action_key(actions[selected_index]) != _move_key(
+        expected["selected_action"]
+    ):
+        raise SafeGuidanceGameplayError(
+            f"{specification} guide canary selected move differs"
+        )
+    if selected_risk != float(expected["maximum_risk"]):
+        raise SafeGuidanceGameplayError(
+            f"{specification} guide canary maximum risk differs"
+        )
+
+
 def _matching_move(board: BoardState, actions: Sequence[str]) -> Mapping[str, Any]:
     expected = tuple(actions)
     matches = [
@@ -667,21 +692,26 @@ def run_guide_canary(
             geometry_risks.append(float(geometry))
         full_index = int(np.argmax(np.asarray(full_risks, dtype=np.float64)))
         geometry_index = int(np.argmax(np.asarray(geometry_risks, dtype=np.float64)))
-        passed = (
-            _pooled_action_key(actions[full_index])
-            == _move_key(expected["full"]["selected_action"])
-            and _pooled_action_key(actions[geometry_index])
-            == _move_key(expected["geometry"]["selected_action"])
-            and full_risks[full_index] == float(expected["full"]["maximum_risk"])
-            and geometry_risks[geometry_index]
-            == float(expected["geometry"]["maximum_risk"])
+        _assert_canary_selection(
+            specification="full",
+            actions=actions,
+            selected_index=full_index,
+            selected_risk=full_risks[full_index],
+            expected=expected["full"],
+        )
+        _assert_canary_selection(
+            specification="geometry",
+            actions=actions,
+            selected_index=geometry_index,
+            selected_risk=geometry_risks[geometry_index],
+            expected=expected["geometry"],
         )
         observations.append(
             {
                 "state_id": state["state_id"],
                 "phase": state["phase"],
                 "fold": fold,
-                "passed": passed,
+                "passed": True,
                 "full_selected_move": _normal_move(actions[full_index]["move"]),
                 "geometry_selected_move": _normal_move(
                     actions[geometry_index]["move"]
