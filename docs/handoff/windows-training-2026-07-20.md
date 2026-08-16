@@ -3400,6 +3400,35 @@ rehearsal or start formal measurement without a new direct product-owner
 authorization bound to the repair and a fresh rehearsal namespace.  See
 [`docs/evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.md`](../evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.md).
 
+## Trained-Model Baseline Attempt-002 Acceptance Failure (2026-08-16)
+
+The product owner authorized supplement `e92c2095...` once under new
+authorization `785079e4...`.  The transparent Malom proxy was removed and
+resource counting was moved to the real `MalomDB.query_value` throat.  Static
+surface and signature tests passed, including negative tests for signature
+drift and an unregistered interception method.
+
+The new 27-game non-evidence rehearsal completed all four arms, both colors,
+all three phases, and strict threefold, fifty-move, and decisive paths.  Its
+machine record identity is `a1287906...`.  Cumulative use was 248 engine
+searches, 6,792 Malom queries, 27 games, and 114.31433940000716 active seconds,
+including the attempt-001 sunk resources.
+
+Post-run acceptance found that four methods named in the frozen interception
+inventory were not dynamically executed: `search_and_apply`,
+`EstimatorAccess.load_decisions`, the preflight-only poison interceptor, and
+the separate specialist dependency audit.  The rehearsal's hand-written
+coverage gate did not compare runtime calls with that inventory.  Therefore
+the machine `passed` status is not accepted; failure identity is
+`57f90937...`.
+
+No zero-game preflight, formal namespace, or measurement marker exists.  Per
+the product owner's precommitment, do not make another point repair, rerun the
+rehearsal, start preflight, or start formal measurement.  A structural tooling
+analysis is recorded in
+[`docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-tooling-structural-analysis-2026-08-16.md`](../evidence/sanmill-trained-model-baseline-v1-attempt-002-tooling-structural-analysis-2026-08-16.md).
+Any future work requires an explicit product-owner decision.
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):

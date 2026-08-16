@@ -1,0 +1,124 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-rehearsal-acceptance-failure.v1",
+  "failure_identity": "57f90937b336acb16ad09afae40fef3cafd9c806a001c428890f2f9ff426428a",
+  "status": "failed_closed_after_dynamic_coverage_acceptance_audit",
+  "plan_identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+  "attempt_identity": "e92c2095d2a0bbcaf892fb8e6be707a9b8ca71d73b332bf9d7ce5dcae0f51d29",
+  "authorization_identity": "785079e4aa59195ae94fad870128672a5bf266e7a5bd42e4d6cb19290c25adf1",
+  "rehearsal_machine_record": {
+    "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-2026-08-16.json",
+    "identity": "a1287906883c1c85c09e4922b62b9ec2d1cf7830f88079e904ab0fbaf39054cc",
+    "file_sha256": "d0f1a935498adf04c8f6a34026d100a1f459e85a39599a6f17b137b7a8cbdefb",
+    "recorded_status": "passed_non_evidence_technical_rehearsal",
+    "acceptance_disposition": "not_accepted_because_frozen_dynamic_coverage_requirement_was_not_verified_or_met",
+    "preserve_byte_for_byte": true
+  },
+  "completed_non_evidence_games": 27,
+  "formal_measurement_started": false,
+  "formal_measurement_marker_exists": false,
+  "formal_complete_games": 0,
+  "preflight_started": false,
+  "resource_use": {
+    "engine_single_step_searches": 248,
+    "malom_read_only_queries": 6792,
+    "active_seconds": 114.31433940000716,
+    "complete_games": 27,
+    "includes_attempt_001_sunk_resources": true,
+    "within_unchanged_envelope": true
+  },
+  "coverage_that_did_execute": {
+    "four_arms_both_colors_three_source_phases": true,
+    "live_matrix_cells": 24,
+    "strict_rules_terminal_games": 27,
+    "strict_threefold_path": true,
+    "strict_fifty_move_path": true,
+    "strict_decisive_path": true,
+    "free_and_A_pos_constrained_choices": true,
+    "MalomDB.query_value": true,
+    "ExternalSolvedDB.query_state": true,
+    "ExternalSolvedDB.query": true,
+    "ExternalSolvedDB.query_move_quality": true,
+    "ExternalSolvedDB.query_all_moves": true,
+    "ExternalSolvedDB.query_trajectory": true,
+    "durable_resource_and_game_recovery_alignment": true,
+    "protected_guard_derive_and_assert_allowed": true
+  },
+  "missing_frozen_dynamic_paths": [
+    {
+      "method": "SanmillTrainingGame.search_and_apply",
+      "reason": "The live baseline path deliberately calls search_logical_turn and apply_nmm_move separately; no rehearsal call site invokes the combined adapter."
+    },
+    {
+      "method": "EstimatorAccess.load_decisions",
+      "reason": "The rehearsal exercised derive/assert_allowed with a protected session but never entered the load_decisions method itself."
+    },
+    {
+      "method": "_PoisonGameAI.__getattribute__",
+      "reason": "The poison canary exists only in the later preflight and was not executed by the rehearsal."
+    },
+    {
+      "method": "audit_specialist_gameai_dependency",
+      "reason": "The rehearsal executed audit_instrumentation_surface but did not call the separately enumerated specialist dependency audit."
+    }
+  ],
+  "acceptance_failure": {
+    "frozen_requirement": "every enumerated intercepted method must execute at least once in the rehearsal before a formal marker",
+    "instrumentation_inventory_was_frozen_before_execution": true,
+    "runtime_coverage_was_not_generated_from_that_inventory": true,
+    "rehearsal_acceptance_code_checked_outcomes_but_not_inventory_to_trace_equality": true,
+    "machine_pass_status_is_insufficient": true,
+    "failure_class": "tooling_structure_and_contract_coverage_mismatch"
+  },
+  "rehearsal_output": {
+    "namespace": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-20260816-001",
+    "files": 6,
+    "bytes": 734189,
+    "file_manifest_identity": "76dc2f3ccfe37e5148eed0ce34ffabbdc68390110199bd1cf5721bff0f2423fa",
+    "preserve_byte_for_byte": true,
+    "artifacts": {
+      "NON-EVIDENCE.json": {
+        "bytes": 357,
+        "sha256": "b3cc3e9fce7be8eec90bbe56d628a8b18846b1caaf1dec085e8a21a600a16c31"
+      },
+      "progress.json": {
+        "bytes": 371,
+        "sha256": "f64d3b603fad9fd50a7afdebff645aba59089e0f84e49fa08bd94977fe074a4d"
+      },
+      "rehearsal-completed.json": {
+        "bytes": 238,
+        "sha256": "0b050e1a3439481acdcbbf5446baa6ec1d0f5c6f7ab79647f1b00fee713118b0"
+      },
+      "rehearsal-games.jsonl": {
+        "bytes": 708826,
+        "sha256": "9599b6fbbcfa0c61e8afd8ecbb79d416e69a13df67cf5c99a0057ba0a9ed6293"
+      },
+      "resource-baseline.json": {
+        "bytes": 97,
+        "sha256": "0e7922df0aeef6a73a2873ad3e93a99f47b668061c005f8c25a2f0bfda1bb989"
+      },
+      "resource-checkpoints.jsonl": {
+        "bytes": 24300,
+        "sha256": "7cea5489751c7f6fb445f395d979ef513821a8a93d4cc19f1054fb24a1e4f133"
+      }
+    }
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "training_or_weight_updates": 0,
+    "checkpoint_edits_copies_renames_or_alias_changes": 0,
+    "database_writes": 0
+  },
+  "disposition": {
+    "zero_game_preflight_authorized_to_start": false,
+    "formal_execution_authorized_to_start": false,
+    "automatic_retry_or_resume": false,
+    "another_point_fix_allowed": false,
+    "rehearsal_rerun_allowed": false,
+    "structural_tooling_analysis_required": true,
+    "explicit_product_owner_decision_required_for_any_future_work": true
+  }
+}
