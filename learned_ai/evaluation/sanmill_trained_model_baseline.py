@@ -205,7 +205,7 @@ class _CountingMalomProxy:
 
     def query(self, board: BoardState) -> Any:
         value = self._delegate.query(board)
-        self._ledger.add_malom()
+        self._ledger.add_malom(1)
         return value
 
     def is_available(self) -> bool:

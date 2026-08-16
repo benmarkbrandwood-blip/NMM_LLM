@@ -144,6 +144,25 @@ def test_allowed_argmax_rejects_a_truly_missing_move() -> None:
         )
 
 
+def test_counting_malom_proxy_records_each_completed_query() -> None:
+    class Delegate:
+        def query(self, board: object) -> str:
+            assert board == "board"
+            return "value"
+
+    class Ledger:
+        def __init__(self) -> None:
+            self.queries = 0
+
+        def add_malom(self, count: int) -> None:
+            self.queries += count
+
+    ledger = Ledger()
+    proxy = baseline._CountingMalomProxy(Delegate(), ledger)
+    assert proxy.query("board") == "value"
+    assert ledger.queries == 1
+
+
 def test_game_record_rejects_truly_mismatched_terminal_winner() -> None:
     record = _terminal_record()
     baseline.validate_game_record(record)
