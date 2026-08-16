@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,7 @@ from learned_ai.evaluation.sanmill_safe_inducement import (
     summarize_measurements,
 )
 from learned_ai.training.run_contract import canonical_sha256
+from scripts import run_sanmill_safe_inducement_main_v2 as main_runner
 
 
 def _plan() -> dict:
@@ -329,3 +331,30 @@ def test_main_plan_loader_rejects_threshold_drift(tmp_path: Path) -> None:
     path.write_text(json.dumps(changed), encoding="utf-8")
     with pytest.raises(SafeInducementError, match="mechanism gate differs"):
         load_main_plan(path)
+
+
+def test_sanmill_process_check_accepts_windows_zero_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        main_runner.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="0\n",
+            stderr="",
+        ),
+    )
+    assert main_runner._running_tgf_processes() == 0
+
+
+def test_sanmill_process_check_fails_closed_on_malformed_count(monkeypatch) -> None:
+    monkeypatch.setattr(
+        main_runner.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="no process\n",
+            stderr="",
+        ),
+    )
+    with pytest.raises(SafeInducementError, match="count is malformed"):
+        main_runner._running_tgf_processes()

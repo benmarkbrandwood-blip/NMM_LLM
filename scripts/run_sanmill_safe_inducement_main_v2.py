@@ -65,7 +65,12 @@ def _git(*arguments: str) -> str:
 
 def _running_tgf_processes() -> int:
     result = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq tgf.exe", "/FO", "CSV", "/NH"],
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "@(Get-Process -Name tgf -ErrorAction SilentlyContinue).Count",
+        ],
         check=False,
         capture_output=True,
         text=True,
@@ -74,11 +79,13 @@ def _running_tgf_processes() -> int:
     )
     if result.returncode:
         raise SafeInducementError("cannot inspect existing Sanmill processes")
-    return sum(
-        1
-        for line in result.stdout.splitlines()
-        if line.strip().lower().startswith('"tgf.exe"')
-    )
+    try:
+        count = int(result.stdout.strip())
+    except ValueError as exc:
+        raise SafeInducementError("Sanmill process count is malformed") from exc
+    if count < 0:
+        raise SafeInducementError("Sanmill process count is negative")
+    return count
 
 
 def main() -> int:
@@ -105,7 +112,7 @@ def main() -> int:
         "--preflight",
         default=(
             "docs/evidence/sanmill-safe-inducement-main-v2-"
-            "preflight-2026-08-16.json"
+            "preflight-v2-2026-08-16.json"
         ),
     )
     parser.add_argument(

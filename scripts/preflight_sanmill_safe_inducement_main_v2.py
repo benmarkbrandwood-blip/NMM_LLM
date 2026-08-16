@@ -28,6 +28,7 @@ from learned_ai.evaluation.sanmill_safe_inducement import (
     SafeInducementError,
     load_main_authorization,
     load_main_plan,
+    load_main_preflight,
     load_state_pool,
     run_determinism_gate,
 )
@@ -137,6 +138,7 @@ def main() -> int:
             "preflight-2026-08-16.json"
         ),
     )
+    parser.add_argument("--prior-preflight")
     parser.add_argument(
         "--run-output-dir",
         default=(
@@ -156,8 +158,13 @@ def main() -> int:
     authorization_path = _ROOT / args.authorization
     preflight_path = _ROOT / args.preflight_output
     run_output = _ROOT / args.run_output_dir
-    if authorization_path.exists() or preflight_path.exists() or run_output.exists():
-        parser.error("authorization, preflight, and run output must all be absent")
+    if preflight_path.exists() or run_output.exists():
+        parser.error("new preflight and run output must both be absent")
+    if args.prior_preflight:
+        if not authorization_path.is_file():
+            parser.error("existing authorization is required for a correction")
+    elif authorization_path.exists():
+        parser.error("authorization must be absent for an initial preflight")
 
     plan, plan_file_sha = load_main_plan(plan_path)
     pool, pool_file_sha = load_state_pool(pool_path, schema=MAIN_POOL_SCHEMA)
@@ -214,19 +221,35 @@ def main() -> int:
         "source_commit_at_freeze": source_commit,
         "source_tree_at_freeze": source_tree,
     }
-    authorization_path.parent.mkdir(parents=True, exist_ok=False)
-    authorization = write_sealed_json(
-        authorization_path,
-        authorization_payload,
-        identity_field="authorization_identity",
-    )
-    loaded_authorization, authorization_file_sha = load_main_authorization(
-        authorization_path
-    )
-    if loaded_authorization["authorization_identity"] != authorization[
-        "authorization_identity"
-    ]:
-        raise SafeInducementError("authorization verification differs")
+    prior_preflight = None
+    if args.prior_preflight:
+        authorization, authorization_file_sha = load_main_authorization(
+            authorization_path
+        )
+        prior_preflight, _prior_file_sha = load_main_preflight(
+            _ROOT / args.prior_preflight
+        )
+        prior_marker = (
+            _ROOT
+            / str(prior_preflight["run_output_namespace"])
+            / "measurement-started.json"
+        )
+        if prior_marker.exists():
+            parser.error("prior preflight has a consumed measurement marker")
+    else:
+        authorization_path.parent.mkdir(parents=True, exist_ok=False)
+        authorization = write_sealed_json(
+            authorization_path,
+            authorization_payload,
+            identity_field="authorization_identity",
+        )
+        loaded_authorization, authorization_file_sha = load_main_authorization(
+            authorization_path
+        )
+        if loaded_authorization["authorization_identity"] != authorization[
+            "authorization_identity"
+        ]:
+            raise SafeInducementError("authorization verification differs")
 
     run_output.mkdir(parents=True, exist_ok=False)
     verification_started = time.perf_counter()
@@ -274,31 +297,43 @@ def main() -> int:
     ):
         raise SafeInducementError("Malom snapshot differs from protocol")
 
-    runtime_plan = dict(plan)
-    runtime_plan["determinism_gate"] = {
-        **plan["determinism_gate"],
-        "fixtures": _fixtures(pool),
-    }
-    engine_queries = 0
+    if prior_preflight is None:
+        runtime_plan = dict(plan)
+        runtime_plan["determinism_gate"] = {
+            **plan["determinism_gate"],
+            "fixtures": _fixtures(pool),
+        }
+        engine_queries = 0
 
-    def count_query() -> None:
-        nonlocal engine_queries
-        engine_queries += 1
-        if engine_queries > int(
-            plan["main_experiment"]["resource_envelope"][
-                "maximum_engine_single_step_queries"
+        def count_query() -> None:
+            nonlocal engine_queries
+            engine_queries += 1
+            if engine_queries > int(
+                plan["main_experiment"]["resource_envelope"][
+                    "maximum_engine_single_step_queries"
+                ]
+            ):
+                raise SafeInducementError("preflight engine query ceiling exceeded")
+
+        determinism = run_determinism_gate(
+            installation=installation,
+            pool=pool,
+            plan=runtime_plan,
+            query_counter=count_query,
+        )
+        if not determinism["passed"]:
+            raise SafeInducementError("determinism gate failed")
+        previous_preflight_seconds = 0.0
+    else:
+        determinism = prior_preflight["determinism"]
+        engine_queries = int(
+            prior_preflight["resource_components"]["preflight"][
+                "engine_single_step_queries"
             ]
-        ):
-            raise SafeInducementError("preflight engine query ceiling exceeded")
-
-    determinism = run_determinism_gate(
-        installation=installation,
-        pool=pool,
-        plan=runtime_plan,
-        query_counter=count_query,
-    )
-    if not determinism["passed"]:
-        raise SafeInducementError("determinism gate failed")
+        )
+        previous_preflight_seconds = float(
+            prior_preflight["resource_components"]["preflight"]["active_seconds"]
+        )
     preflight_seconds = time.perf_counter() - verification_started
     pool_resource = {
         "engine_single_step_queries": 0,
@@ -310,7 +345,7 @@ def main() -> int:
     preflight_resource = {
         "engine_single_step_queries": engine_queries,
         "malom_queries": 0,
-        "active_seconds": preflight_seconds,
+        "active_seconds": previous_preflight_seconds + preflight_seconds,
     }
     aggregate = {
         key: pool_resource[key] + preflight_resource[key]
@@ -328,6 +363,22 @@ def main() -> int:
         "schema_version": MAIN_PREFLIGHT_SCHEMA,
         "status": "ready_for_one_authorized_execution",
         "measurement_searches": 0,
+        "supersedes_preflight_identity": (
+            prior_preflight["preflight_identity"] if prior_preflight else None
+        ),
+        "technical_correction": (
+            {
+                "reason": (
+                    "pre-measurement tasklist process inspection was denied; "
+                    "the replacement uses fail-closed PowerShell Get-Process"
+                ),
+                "prior_measurement_marker_absent": True,
+                "additional_determinism_searches": 0,
+                "additional_measurement_searches": 0,
+            }
+            if prior_preflight
+            else None
+        ),
         "plan_identity": plan["plan_identity"],
         "plan_file_sha256": plan_file_sha,
         "state_pool_identity": pool["pool_identity"],
