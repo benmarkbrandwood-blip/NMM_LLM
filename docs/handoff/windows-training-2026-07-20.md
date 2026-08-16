@@ -2,6 +2,31 @@
 
 ## Executive Summary
 
+### Sanmill-to-human-risk transfer test -- 16 August 2026
+
+The zero-engine post-hoc transfer test completed under frozen plan identity
+`51b477b576a9d29c602ac70b35aa175dd40e4c1a953494e113bea633cebe80ba`
+and result identity
+`c6dce5690a138361238ddd4661cce78251e67fb0f9d8003a0473a0b12c1a2700`.
+All 360 main-pool states had valid acting-player OOF fold coverage.  The full
+human-risk model produced `A=12.500%` against `b=2.822%` and `o=17.500%`.
+Its `A-b` was 9.678 percentage points [6.785, 12.777], and transfer was
+65.936% [52.131%, 78.823%].  This passes the pre-frozen substantive rule that
+the transfer lower bound be at least 25%, yielding decision
+`A_substantive_transfer_exists`.
+
+The geometry control transferred 45.119% [30.329%, 59.724%].  The full model
+selected 3.056 percentage points more inducing actions than geometry, with a
+paired interval of [1.111, 5.000] points.  Movement remained unresolved;
+placement and flying carry the aggregate signal.  Exact recomputation used
+112,920 read-only Malom queries and zero Sanmill queries, games, fits, model
+loads, training updates, or database writes.  See the
+[transfer evidence](../evidence/sanmill-human-transfer-2026-08-16.md) and
+machine manifest.  This indicates shared one-step positional ranking
+structure only.  F0-H0, `B_not_ready_fail_closed`, and
+`C_conversion_not_established` remain binding, and no human-trap, product,
+promotion, deployment, publication, release, or training authority follows.
+
 ### Fixed-engine safe-inducement main experiment -- 16 August 2026
 
 The directly authorised, once-only Sanmill safe-inducement main experiment

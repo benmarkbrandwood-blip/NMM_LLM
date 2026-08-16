@@ -13,6 +13,7 @@ from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
 from learned_ai.evaluation.sanmill_human_transfer import (
     AUDIT_SCHEMA,
     PLAN_SCHEMA,
+    RESULT_SCHEMA,
     TransferError,
     _auc,
     _bootstrap,
@@ -27,6 +28,7 @@ AUDIT = (
     / "docs/evidence/sanmill-human-transfer-coverage-audit-2026-08-16.json"
 )
 PLAN = ROOT / "docs/experiments/sanmill-human-transfer-v1.json"
+RESULT = ROOT / "docs/evidence/sanmill-human-transfer-manifest-2026-08-16.json"
 
 
 def _state(state_id: str, session_id: str, side: str = "W") -> dict:
@@ -178,3 +180,25 @@ def test_bootstrap_fails_closed_without_oracle_headroom() -> None:
             seed="test",
             repetitions=10,
         )
+
+
+def test_completed_result_is_sealed_and_respects_frozen_boundaries() -> None:
+    if not RESULT.exists():
+        pytest.skip("result is produced only after the plan is frozen")
+    result, _result_sha = load_sealed(
+        RESULT, identity_field="result_identity", schema=RESULT_SCHEMA
+    )
+    analysis = result["analysis"]
+
+    assert result["plan_identity"] == (
+        "51b477b576a9d29c602ac70b35aa175dd40e4c1a953494e113bea633cebe80ba"
+    )
+    assert analysis["primary_full"]["states"] == 360
+    assert analysis["primary_full"]["b"] == pytest.approx(
+        0.028217808079306187
+    )
+    assert analysis["primary_full"]["o"] == pytest.approx(0.175)
+    assert analysis["resource_use"]["sanmill_queries"] == 0
+    assert analysis["resource_use"]["malom_queries"] <= 500_000
+    assert result["access_audit"]["official_final_test_content_reads"] == 0
+    assert result["access_audit"]["research_confirmation_content_reads"] == 0
