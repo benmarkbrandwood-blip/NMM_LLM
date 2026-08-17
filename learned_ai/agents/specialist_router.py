@@ -13,9 +13,9 @@ Routing rule (matches ScaffoldedAgent.choose_move_for_phase):
   * else                        → midgame specialist
 
 At inference each specialist sees:
-  * feat_matrix (k, 122) — base 62 + 15-ply lookahead (h/vn/sent/gap)
+  * feat_matrix (k, 134) — base 62 + 12-ply lookahead (h/vn/sent/gap)
   * The specialist's forward pass is instant; wall time is dominated by the
-    LookaheadAdvisor's 15-ply sentinel calls.
+    LookaheadAdvisor's 12-ply sentinel calls.
 
 Checkpoint search:
   learned_ai/checkpoints/scaffolded/{s_open_v2,s_mid_v2,s_end_v2}/best.pt
@@ -27,14 +27,19 @@ the classical coordinator.
 from __future__ import annotations
 
 import logging
+import threading
+from dataclasses import asdict
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import torch
 
 from game.board import BoardState
 from game.rules import get_game_phase
+from learned_ai.agents.positional_safety import (
+    PositionalSafetyError,
+    PositionalSafetyFilter,
+)
 from learned_ai.training.checkpoint_envelope import (
     is_checkpoint_envelope,
     load_checkpoint,
@@ -108,6 +113,19 @@ class SpecialistRouter:
         self._la_end    = lookahead_advisor_end
         self._specialist_db = specialist_db
         self._runtime_quarantine = runtime_quarantine
+        self._positional_safety_filter: PositionalSafetyFilter | None = None
+        self._positional_safety_disabled_reason = "not configured"
+        self._positional_safety_lock = threading.Lock()
+        self._positional_safety_query_lock = threading.Lock()
+        self._positional_safety_counters = {
+            "requests": 0,
+            "interventions": 0,
+            "runtime_failures": 0,
+            "model_score_failures": 0,
+            "unavailable_requests": 0,
+        }
+        self._positional_safety_last_error = ""
+        self._positional_safety_last_decision: dict | None = None
 
     # ── OverseerAdvisor-compatible surface ────────────────────────────────────
 
@@ -123,6 +141,66 @@ class SpecialistRouter:
 
     def set_db(self, db) -> None:
         self._db = db
+
+    def configure_positional_safety(
+        self,
+        oracle,
+        *,
+        label_version: str,
+        manifest_sha256: str,
+        content_sha256: str | None = None,
+    ) -> None:
+        """Enable the production-only, position-level Malom final filter."""
+        safety_filter = PositionalSafetyFilter(
+            oracle,
+            label_version=label_version,
+            manifest_sha256=manifest_sha256,
+            content_sha256=content_sha256,
+        )
+        with self._positional_safety_lock:
+            self._positional_safety_filter = safety_filter
+            self._positional_safety_disabled_reason = ""
+            self._positional_safety_last_error = ""
+        log.info(
+            "Specialist A_pos filter enabled label=%s manifest=%s content=%s",
+            label_version,
+            manifest_sha256,
+            content_sha256 or "unrecorded",
+        )
+
+    def disable_positional_safety(self, reason: str) -> None:
+        """Disable specialist filtering with a diagnostic reason."""
+        reason = reason.strip() or "unspecified startup failure"
+        with self._positional_safety_lock:
+            self._positional_safety_filter = None
+            self._positional_safety_disabled_reason = reason
+            self._positional_safety_last_error = reason
+        log.error("Specialist A_pos filter disabled: %s", reason)
+
+    def positional_safety_status(self) -> dict:
+        """Return JSON-safe runtime diagnostics for the product status API."""
+        with self._positional_safety_lock:
+            safety_filter = self._positional_safety_filter
+            return {
+                "configured": safety_filter is not None,
+                "enabled": safety_filter is not None,
+                "mode": "A_pos",
+                "positional_only": True,
+                "history_aware": False,
+                "label_version": (
+                    safety_filter.label_version if safety_filter is not None else None
+                ),
+                "manifest_sha256": (
+                    safety_filter.manifest_sha256 if safety_filter is not None else None
+                ),
+                "content_sha256": (
+                    safety_filter.content_sha256 if safety_filter is not None else None
+                ),
+                "disabled_reason": self._positional_safety_disabled_reason,
+                **self._positional_safety_counters,
+                "last_error": self._positional_safety_last_error,
+                "last_decision": self._positional_safety_last_decision,
+            }
 
     def set_value_net(self, value_net) -> None:
         self._value_net = value_net
@@ -225,6 +303,80 @@ class SpecialistRouter:
         except Exception as e:
             log.warning("SpecialistRouter.score_moves failed: %s", e, exc_info=True)
             return None
+
+    def score_moves_positional_safe(
+        self,
+        board: BoardState,
+        candidates: list[dict],
+        color: str,
+    ) -> Optional[list[float]]:
+        """Score all legal moves, then retain only positional ``A_pos`` moves.
+
+        Any unavailable or failed Malom query returns ``None`` after recording
+        an error. The web caller may visibly fall back to its classical move,
+        but this method never returns the unfiltered specialist argmax.
+        """
+        with self._positional_safety_lock:
+            self._positional_safety_counters["requests"] += 1
+            safety_filter = self._positional_safety_filter
+            disabled_reason = self._positional_safety_disabled_reason
+            if safety_filter is None:
+                self._positional_safety_counters["unavailable_requests"] += 1
+                self._positional_safety_last_error = disabled_reason
+        if safety_filter is None:
+            log.error(
+                "Specialist A_pos request rejected because filter is disabled: %s",
+                disabled_reason,
+            )
+            return None
+
+        raw_scores = self.score_moves(board, candidates, color)
+        if raw_scores is None:
+            with self._positional_safety_lock:
+                self._positional_safety_counters["model_score_failures"] += 1
+                self._positional_safety_last_error = "specialist scoring failed"
+            log.error("Specialist A_pos request rejected because scoring failed")
+            return None
+
+        try:
+            with self._positional_safety_query_lock:
+                filtered, decision = safety_filter.filter_scores(
+                    board,
+                    candidates,
+                    raw_scores,
+                )
+        except PositionalSafetyError as exc:
+            with self._positional_safety_lock:
+                self._positional_safety_counters["runtime_failures"] += 1
+                self._positional_safety_last_error = str(exc)
+            log.error("Specialist A_pos failed closed: %s", exc, exc_info=True)
+            return None
+        except Exception as exc:
+            detail = f"unexpected positional safety failure: {type(exc).__name__}"
+            with self._positional_safety_lock:
+                self._positional_safety_counters["runtime_failures"] += 1
+                self._positional_safety_last_error = detail
+            log.error("Specialist A_pos failed closed: %s", detail, exc_info=True)
+            return None
+
+        decision_record = asdict(decision)
+        with self._positional_safety_lock:
+            if decision.intervened:
+                self._positional_safety_counters["interventions"] += 1
+            self._positional_safety_last_error = ""
+            self._positional_safety_last_decision = decision_record
+        if decision.intervened:
+            log.info(
+                "Specialist A_pos intervention original=%s selected=%s "
+                "tier=%s safe=%d/%d elapsed_ms=%.3f",
+                decision.original_move,
+                decision.selected_move,
+                decision.parent_tier,
+                decision.safe_move_count,
+                decision.legal_move_count,
+                decision.elapsed_ms,
+            )
+        return filtered
 
 
 # ── generalist (single model, no phase routing) ───────────────────────────────

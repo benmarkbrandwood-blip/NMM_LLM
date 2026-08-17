@@ -134,6 +134,16 @@ class ExternalSolvedDB:
         """True when the Malom DB files are present and queryable."""
         return self._available
 
+    def require_complete_oracle(self):
+        """Return the lossless read-only oracle or raise if unavailable.
+
+        Callers must independently validate the dataset manifest and label
+        version before using this surface for a trusted decision.
+        """
+        if not self._available or self._malom is None:
+            raise RuntimeError("complete Malom oracle is unavailable")
+        return self._malom
+
     def _warn_unavailable_once(self) -> None:
         if not self._warned:
             self._warned = True

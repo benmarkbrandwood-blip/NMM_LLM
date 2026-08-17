@@ -335,8 +335,9 @@
           <div style="font-size:.72rem; color:var(--text-dim); margin-top:4px;">
             Diff 1-8: classical heuristic with your selected blends (VN / gap net / sentinel).
             Diff 9-10: phase-routed specialist AI — the classical engine's 30 s / 60 s
-            search feeds the top-K candidates to the specialist, which re-ranks them
-            using its own sentinel + gap + VN + trajectory + human-frequency features.
+            search runs first, then the specialist scores every legal move and chooses
+            inside the position-only Malom W/D/L-preserving set (A_pos)
+            using its frozen sentinel, gap, value, and human-frequency features.
           </div>
         </div>
 
@@ -435,10 +436,10 @@
         </div>
 
         <div class="form-row" id="row-overseer-player" style="flex-direction:row; align-items:center; gap:8px;">
-          <input type="checkbox" id="chk-overseer-player">
+          <input type="checkbox" id="chk-overseer-player" disabled>
           <label for="chk-overseer-player" style="color:#f5a623; font-size:.9rem;">
             Specialist AI
-            <span style="font-size:.75rem; color:var(--text-dim);">(phase-routed specialists — diff 9/10 auto-enable)</span>
+            <span id="specialist-safety-hint" style="font-size:.75rem; color:var(--text-dim);">(checking positional A_pos safety…)</span>
           </label>
         </div>
 
@@ -479,7 +480,10 @@
           </div>
           <div style="font-size:.75rem; color:var(--text-dim); margin-bottom:2px;">
             Controls max search depth for difficulty levels 1–8 (classical heuristic).
-            Difficulty 9-10 are specialist-AI modes with fixed 30 s / 60 s heuristic search feeding the specialists — this depth control does not apply to them.
+            Difficulty 9-10 are specialist-AI modes with fixed 30 s / 60 s
+            heuristic search followed by position-only Malom A_pos filtering.
+            If that filter is unavailable, the product visibly uses the classical
+            search result instead. This depth control does not apply to them.
           </div>
           <div style="display:flex; gap:10px; align-items:flex-end;">
             <div style="flex:1; display:flex; flex-direction:column; gap:2px;">

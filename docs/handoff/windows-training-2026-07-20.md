@@ -1,6 +1,37 @@
-# Windows Training Handover — 20 July 2026 (updated 16 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 18 August 2026)
 
 ## Executive Summary
+
+### Production specialist A_pos filter -- 18 August 2026
+
+The active difficulty 9/10 specialist override on `dev` now scores every legal
+move and performs final selection only inside the position-level Malom W/D/L
+preserving set `A_pos`. It trusts only the tracked
+`sector-corrected-v1` manifest. It is explicitly not history-aware `A_allow`.
+Missing or failed Malom input disables or fails the override visibly; it never
+returns the unfiltered specialist argmax. The classical coordinator move keeps
+the user game alive, while the server log, `/api/overseer_status`, and UI expose
+the disabled/fallback state and runtime counters.
+
+Three real D-to-L events sampled from the 732-event lightweight ledger now form
+a tracked regression fixture. The exact active product component load
+reproduced the original placement, movement, and flying argmaxes and the filter
+replaced all three with live-Malom `A_pos` moves. The focused plus mandatory
+provenance run passed 138 tests and 498 subtests. No game, training, checkpoint
+change, database write, protected-partition read, or source-pool read occurred.
+
+The feature audit found no direct Malom feature forced to zero: the checkpoints
+use 134 inputs and direct `db_moves` are reward-only. Current trainer code can,
+however, give movement/endgame lookahead a Malom early-exit DB while product
+construction does not. Because these weights-only checkpoints lack exact
+training-resource provenance, this remains a code-backed skew risk rather than
+a proved artifact fact. The filter is independent and does not change inputs.
+
+Cold first use of previously unseen Malom piece-count sectors added up to
+2.75 seconds in the three-state probe; warm filtering was below 0.9 ms. This is
+accepted only inside the existing 30/60-second difficulty 9/10 envelope and is
+recorded per decision. See the
+[product safety evidence](../evidence/production-specialist-malom-positional-safety-2026-08-18.md).
 
 ### Safe-guidance gameplay execution failed -- 16 August 2026
 

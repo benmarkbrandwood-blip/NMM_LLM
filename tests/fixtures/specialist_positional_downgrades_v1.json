@@ -1,0 +1,62 @@
+{
+  "schema_version": "nmm.specialist-positional-downgrade-fixtures.v1",
+  "source": {
+    "candidate_ledger_sha256": "4d5292bc8748832f01a79541cd0babef007c750b8af92900f33bc98ba83825c2",
+    "evidence": "docs/evidence/sanmill-trained-model-lightweight-v1-2026-08-17.md",
+    "runtime_identity": "2199c5b8e98881885b8d2c2377d062e658d4d05cfc3c3459b90725fc2bb3137f",
+    "selection": "first recorded D-to-L event in each action phase",
+    "trust_level": "sector-corrected-v1"
+  },
+  "cases": [
+    {
+      "absolute_logical_ply": 16,
+      "board_fen": "..WWW....BBWWWWB..WBB...|B|8|7",
+      "legal_move_count": 12,
+      "parent_tier": "D",
+      "phase": "placement",
+      "safe_moves": [
+        {"capture": null, "from": null, "to": "d7"},
+        {"capture": null, "from": null, "to": "d5"},
+        {"capture": null, "from": null, "to": "d3"},
+        {"capture": null, "from": null, "to": "c4"}
+      ],
+      "source_game_id": "8499e2c28d5125adb0622b64ca7db8c58e429b5fb955507597151a5b5fc10455",
+      "source_record_sha256": "980ac76f2234a2c4b7ab2e590ddcf302f332373760a6ed87441588be6e23a080",
+      "source_start_id": "04ee2604f76b38c0bc4d85e361204313783b07d2a153658a07658d30b0a833d2",
+      "transition": "D->L",
+      "unsafe_move": {"capture": null, "from": null, "to": "d1"}
+    },
+    {
+      "absolute_logical_ply": 27,
+      "board_fen": "BWBW.BWWWBWB.WBB.WB...WB|W|9|9",
+      "legal_move_count": 5,
+      "parent_tier": "D",
+      "phase": "movement",
+      "safe_moves": [
+        {"capture": null, "from": "d5", "to": "c5"},
+        {"capture": null, "from": "c3", "to": "d3"}
+      ],
+      "source_game_id": "af4472825917b2a6c643f79347e6ccee9f98ddfb5aa4b0166baf5957b24bf058",
+      "source_record_sha256": "8f97d89b95eddd6040570a1c6ed5f6cfeed0020eee73f5285949c38cdd2518ed",
+      "source_start_id": "01dda399bfaa98623652faec417ad13bfe2d25b037f250e380c94e136197b7f9",
+      "transition": "D->L",
+      "unsafe_move": {"capture": null, "from": "d2", "to": "d3"}
+    },
+    {
+      "absolute_logical_ply": 78,
+      "board_fen": "..BW.......W......BW.B..|B|9|9",
+      "legal_move_count": 54,
+      "parent_tier": "D",
+      "phase": "flying",
+      "safe_moves": [
+        {"capture": null, "from": "d3", "to": "a7"},
+        {"capture": null, "from": "d3", "to": "c5"}
+      ],
+      "source_game_id": "ed0e6396659f35cdccabe49f6cfaf61a016319500cc3a207e9edb929e3960cbf",
+      "source_record_sha256": "cff296fd69920daa217f77373ac5e2dd388160cf8e4cc253f2bfc05a18eaafb7",
+      "source_start_id": "3b137d264bb8833c5fe2b55b9bfc4e0d31e155a5d3c7c923689e426cbb0205da",
+      "transition": "D->L",
+      "unsafe_move": {"capture": null, "from": "g7", "to": "d2"}
+    }
+  ]
+}

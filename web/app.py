@@ -397,6 +397,56 @@ if _overseer_advisor is not None and _malom_db is not None:
 if _generalist_advisor is not None and _malom_db is not None:
     _generalist_advisor.set_db(_malom_db)
 
+# Production specialist choices use Malom only as a final position-level W/D/L
+# filter (A_pos). This is not full-rule A_allow: repetition and no-progress
+# history are deliberately outside the pure-board Malom query.
+if _overseer_advisor is not None:
+    if _malom_db is None:
+        _overseer_advisor.disable_positional_safety(
+            "Malom DB is unavailable at startup"
+        )
+    else:
+        try:
+            from learned_ai.data.data_contract import (
+                load_dataset_manifest as _load_dataset_manifest,
+                verify_dataset_snapshot as _verify_dataset_snapshot,
+            )
+            from learned_ai.data.malom_label_provenance import (
+                CURRENT_MALOM_LABEL_VERSION as _CURRENT_MALOM_LABEL_VERSION,
+            )
+
+            _malom_manifest_path = (
+                _ROOT / "data" / "manifests" / "malom-sector-corrected-v1.json"
+            )
+            _malom_manifest = _load_dataset_manifest(_malom_manifest_path)
+            if (
+                _malom_manifest.logical_name != "malom_tablebase"
+                or _malom_manifest.trust_level != _CURRENT_MALOM_LABEL_VERSION
+                or "theoretical_wdl" not in _malom_manifest.label_kinds
+                or "malom_oracle" not in _malom_manifest.allowed_consumers
+            ):
+                raise RuntimeError(
+                    "Malom manifest does not authorize a trusted oracle"
+                )
+            _verify_dataset_snapshot(
+                _malom_db_path,
+                _malom_manifest,
+                full_hash=False,
+            )
+            _overseer_advisor.configure_positional_safety(
+                _malom_db.require_complete_oracle(),
+                label_version=_malom_manifest.trust_level,
+                manifest_sha256=_malom_manifest.manifest_sha256,
+                content_sha256=_malom_manifest.content_sha256,
+            )
+        except Exception as _safety_exc:
+            _overseer_advisor.disable_positional_safety(str(_safety_exc))
+            log.error(
+                "Specialist positional safety startup validation failed: %s",
+                _safety_exc,
+                exc_info=True,
+            )
+
 # Probability that sentinel (or DB fallback) intervenes, by difficulty level.
 SENTINEL_PROB_BY_DIFF: dict[int, float] = {
     1: 0.0, 2: 0.0, 3: 0.10, 4: 0.22, 5: 0.33,
@@ -975,8 +1025,23 @@ async def sentinel_status():
 
 @app.get("/api/overseer_status")
 async def overseer_status():
+    available = _overseer_advisor is not None and _overseer_advisor.is_loaded()
+    positional_safety = (
+        _overseer_advisor.positional_safety_status()
+        if _overseer_advisor is not None
+        else {
+            "configured": False,
+            "enabled": False,
+            "mode": "A_pos",
+            "positional_only": True,
+            "history_aware": False,
+            "disabled_reason": "specialist router is unavailable",
+        }
+    )
     return {
-        "available": _overseer_advisor is not None and _overseer_advisor.is_loaded(),
+        "available": available,
+        "playable": available and bool(positional_safety["enabled"]),
+        "positional_safety": positional_safety,
     }
 
 
@@ -2944,10 +3009,12 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
 
     # Specialist AI mode: triggered by difficulty 9 or 10 (or by the legacy
     # use_overseer_player toggle, kept as a hidden test hook).  In specialist
-    # mode the coordinator's alpha-beta search (30 s @ diff 9 / 60 s @ diff 10)
-    # provides the top-K candidates; the phase-routed specialist re-ranks them
-    # and its argmax is the played move.  On specialist failure we fall back
-    # to the coordinator's move but print loudly to stderr so the user sees it.
+    # mode the coordinator's alpha-beta search still runs first, then the
+    # phase-routed specialist scores every legal move. Its original argmax is
+    # retained for diagnostics, while the played specialist move is the argmax
+    # within positional A_pos. A failed or disabled safety filter never returns
+    # an unfiltered specialist argmax; the persistent log and status API expose
+    # the resulting classical-coordinator fallback.
     _spec_by_diff = (session.game_ai is not None
                      and int(getattr(session.game_ai, "difficulty", 0)) >= 9)
     _spec_by_legacy = bool(session.use_overseer_player)
@@ -2967,15 +3034,25 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
             legal = get_all_legal_moves(board)
             if legal:
                 ov_cands = [{"from": m.get("from"), "to": m.get("to"), "capture": m.get("capture")} for m in legal]
-                ov_probs = await asyncio.to_thread(_overseer_advisor.score_moves, board, ov_cands, board.turn)
+                ov_probs = await asyncio.to_thread(
+                    _overseer_advisor.score_moves_positional_safe,
+                    board,
+                    ov_cands,
+                    board.turn,
+                )
                 if ov_probs:
                     best = max(range(len(ov_probs)), key=lambda i: ov_probs[i])
                     move = legal[best]
                     _mode_tag = f"diff{session.game_ai.difficulty}" if _spec_by_diff else "legacy_toggle"
                     log.info("Specialist AI (%s): %s (prob=%.3f)", _mode_tag, move, ov_probs[best])
                 else:
+                    log.warning(
+                        "Specialist AI positional-safe scoring unavailable at "
+                        "diff %s; using coordinator move",
+                        session.game_ai.difficulty if session.game_ai else "?",
+                    )
                     import sys as _sys
-                    print(f"\n[Specialist AI] score_moves returned None at diff "
+                    print(f"\n[Specialist AI] positional-safe scoring returned None at diff "
                           f"{session.game_ai.difficulty if session.game_ai else '?'} — "
                           f"falling back to coordinator move.",
                           file=_sys.stderr, flush=True)
