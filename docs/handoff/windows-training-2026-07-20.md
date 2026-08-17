@@ -3456,6 +3456,41 @@ of this cleanup-boundary requirement, accepting the documented lifecycle
 risk, and abandonment of the measurement.  See
 [`docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-coverage-failure-2026-08-17.md`](../evidence/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-coverage-failure-2026-08-17.md).
 
+## Trained-Model Baseline Classification-Correction Stop (2026-08-17)
+
+The product owner classified the missing cleanup event as a registry error,
+not a waiver, and required a full static rederivation.  All 68 old
+rehearsal-required rows and the other 20 rows were reviewed.  Four rows moved
+from rehearsal-required to static-audit-only: `solved-db.close`,
+`solved-db.query-all-moves`, `solved-db.query-move-quality`, and
+`solved-db.query-trajectory`.  No false-negative row moved in the opposite
+direction.  Corrected registry identity is `7ef7b1b1...`; it has 64 dynamic
+rehearsal requirements, all represented in the old immutable 67-event
+ledger.
+
+The old rehearsal and failure remain unchanged: it is still 67/68 under v1,
+is not passed, and retains ledger `1957ea99...` and failure `f28adacc...`.
+New authorization `89457fc1...` binds the old registry and ledger, corrected
+registry, and one-to-one mapping.  It was not consumed by a formal marker but
+is operationally closed and must not be reused.
+
+The measurement was abandoned before zero-game preflight.  The frozen
+`audit_instrumentation_surface` implementation hard-codes registry v1, while
+the same preflight requires its returned identity to equal the requested v2
+identity.  It therefore cannot pass without a tooling change, and this round
+explicitly prohibited tooling changes and required abandonment after another
+tooling or contract-consistency stop.  No preflight, candidate load, formal
+namespace, marker, search, query, or game was started.  Cumulative resources
+remain 496 searches, 13,561 Malom queries, 54 non-evidence games, and
+482.0538405000116 seconds.
+
+`ExternalSolvedDB` is owned by `TrainingAlignedPolicy`, not a shared external
+owner.  Its missing close is a cleanup omission that retains mappings and
+handles until process teardown.  It was not fixed.  Since the formal process
+never started, no peak-RSS or handle monitor exists.  Stop identity is
+`962894a0...`; see
+[`docs/evidence/sanmill-trained-model-baseline-v1-classification-correction-readiness-stop-2026-08-17.md`](../evidence/sanmill-trained-model-baseline-v1-classification-correction-readiness-stop-2026-08-17.md).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
