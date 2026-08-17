@@ -1,0 +1,163 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-attempt-authorization.v2",
+  "authorization_identity": "89457fc102a58b2e8c12ef7541643fcca0e6865c2da6f896db06921d4cfc1805",
+  "status": "authorized_once_measurement_unconsumed",
+  "operator": "product-owner-direct",
+  "authorized_on": "2026-08-17",
+  "authorization_basis": "Direct product-owner authorization titled 'baseline-v1 registry classification correction and formal execution'.",
+  "grant_count": 1,
+  "plan": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-v1.json",
+    "identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+    "file_sha256": "559d7cb4c163605389774ecbc0f7ad07a3211d58779491dd61b180bb0ead85b5"
+  },
+  "attempt": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-attempt-003-classification-correction-v1.json",
+    "identity": "199e8ea4c3db17ea9815053edf7917726c7c7658885dfea1c3dd953dbeca8c49",
+    "file_sha256": "f71dc5565e6de5dd90535476bffe95a3fc584e05290aef647baef5533c0804da"
+  },
+  "source_at_authorization": {
+    "commit": "289af51a79bf34065b5a392cdfc3eb070d37267d",
+    "tree": "9cc9cb17e214aca0c4ef98d02e5f9c1afbcc70c2",
+    "implementation_commit": "286e2fe3a0681f10ca96709961e2d8f45cf3158f"
+  },
+  "classification_correction_bindings": {
+    "old_registry": {
+      "path": "docs/experiments/sanmill-trained-model-baseline-boundary-registry-v1.json",
+      "identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+      "file_sha256": "2a11dcc5464174e8cc8feb42ced29c955dfe08e0e0deee0898f93298f89286df"
+    },
+    "old_coverage_ledger": {
+      "path": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-20260817-001/boundary-coverage-events.jsonl",
+      "identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+      "file_sha256": "cc74928bcccbe698da15ddedf29f89e30cdfbe6c1d591a6e66bd7d1b3ec02a0d",
+      "tail_event_sha256": "10a996c8f09d765bad58708f217d8bf3ca19a54c83f1b4692d0181eee6f939d0",
+      "observed_required_events": 67,
+      "old_required_events": 68,
+      "old_missing_boundary_ids": [
+        "solved-db.close"
+      ],
+      "old_failure_identity": "f28adaccaaacefed0bcb2c2a4cc98feff5061c9b24e2d9f113b14ee8a7c7d17b",
+      "old_rehearsal_remains_failed": true,
+      "old_rehearsal_is_not_68_of_68_or_passed": true
+    },
+    "new_registry": {
+      "path": "docs/experiments/sanmill-trained-model-baseline-boundary-registry-v2.json",
+      "identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+      "file_sha256": "23a2ef1066d27efa55ef77784cbf30060a7a9e3147b3cc4dc83b713dea5cfa91",
+      "rehearsal_required_events": 64
+    },
+    "mapping_record": {
+      "path": "docs/evidence/sanmill-trained-model-baseline-boundary-registry-v2-classification-correction-2026-08-17.json",
+      "identity": "1f51e4f92e51301e0e958b710503f0691b83e4b510da2db24d1ae9c3bff69477",
+      "file_sha256": "f7bc031eca8299aa3c15581ffce1593c35f3664390ff0cb4148be9a19487d2ca"
+    },
+    "classification_rebased_coverage": {
+      "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-rebased-coverage-2026-08-17.jsonl",
+      "identity": "2b0ef88576a805b71bb694e73ebc86090a8433358ebcab57aed32724ee6abc1a",
+      "file_sha256": "eee835138121834e7fbe7cbb07293043a6f46a471e0d70f87ec78f37d65183f8",
+      "tail_event_sha256": "b3f470acb4e4aaccd8ee2b223db83ffde0d13ceca61110d508de3525f4c1b9fc",
+      "mapping": "one-to-one reseal of all 67 immutable old-ledger events with source event SHA and old-ledger identity embedded",
+      "runtime_reexecution": false,
+      "new_required_events_covered": 64,
+      "new_missing_boundary_ids": []
+    }
+  },
+  "boundary_registry": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-boundary-registry-v2.json",
+    "identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+    "file_sha256": "23a2ef1066d27efa55ef77784cbf30060a7a9e3147b3cc4dc83b713dea5cfa91",
+    "classification_corrected_after_missing_event_observed": true,
+    "classification_statically_rederived_for_all_88_rows": true
+  },
+  "coverage_contract": {
+    "identity": "5824252c90416781889ff44e10a89e89c2441a78d786e2becfad2014df11f787",
+    "expected_rehearsal_real_code_events": 64,
+    "expected_preflight_explicit_canaries": 6,
+    "old_failed_coverage_not_relabelled_as_passed": true
+  },
+  "implementation_files": {
+    "ai/malom_db.py": "dbec87cc589b087653fb540a1b084418eaa750ffc9b34ac41c560632852442ae",
+    "game/board.py": "a54421e8b099523ea7e4255e46fd6e6b8fe068595438aa107512b61fc1eb5377",
+    "game/rules.py": "1e93a87ee4f29a26787ecb1590d3d8a178033fd2fee1d6d95f17a925d2eac19a",
+    "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py": "a22db8eefa52b9914c5b456857be4c73a341775d6618474f166e104ffd6fc7e2",
+    "learned_ai/evaluation/human_f0h0_feasibility.py": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95",
+    "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py": "8f781370f6bf6d1c77e55fc2849de875cfab54e378f2a5a57b78e9bd364efd48",
+    "learned_ai/evaluation/sanmill_safe_inducement.py": "e9cf9abb4290473e5edcd63a7c75f182ad416722915f7ea2cafa42926ca022f3",
+    "learned_ai/evaluation/sanmill_trained_model_baseline.py": "111f4aec2824a18ec944d05815503c2c96074b05e8179a9a80995bc985692b2b",
+    "learned_ai/evaluation/sanmill_trained_model_boundary_registry.py": "a4b4b8002fc1d594cd75f15ba01ffabd06f8cedb7db995db9fd580df371378ec",
+    "learned_ai/evaluation/sanmill_uci.py": "f8e4e3984391d299e1a466860be52388bf39bfdd36d0d746dd8deb8e8e617441",
+    "learned_ai/evaluation/training_aligned_policy.py": "801db8eb26e9037eb7ef66ac31ca8802eb6eadecfb4c11a6054199982c7575df",
+    "learned_ai/sentinel/db_teacher.py": "18f55e96cf7041879d1df275a4c99ce406ff46e32044a2546be300cab245781d",
+    "learned_ai/training/sanmill_referee.py": "1ff9c0de59e2815e6c027f1391360172086b1da07642c4448ad72cc87a1d00f3",
+    "scripts/preflight_sanmill_trained_model_baseline.py": "b84c60eb08cad87258350616aeadb6334f80200f29f7b8ae1f1d7e9ed3a31f77",
+    "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py": "d546e375f26068ccdd69bca2c1ff91c8108766bd8f98b583f08dbfcdd9300086",
+    "scripts/run_sanmill_trained_model_baseline.py": "e472142f4e7176dbe2c3a3c972b23ada10c04c0c4be635ed7af76ba3fae31111",
+    "tests/test_sanmill_trained_model_baseline.py": "4549704dea8dd417abaf6582016e903d90c861ecbce21a096a9386bc12d4213b",
+    "tests/test_sanmill_trained_model_boundary_registry.py": "ab33d9c75d45cc6711628165c99103f2e8240ebb5b91417a4657dff4e6e157f8",
+    "tests/test_training_aligned_policy.py": "75e78a15019a5e88301b3a115e76277309293766cfab1d59b7e9f21158b06d9c"
+  },
+  "execution_scope": {
+    "automatic_retry_resume_batching_or_extension": false,
+    "host_interruption_recovery_authorized": false,
+    "maximum_active_seconds": 21600,
+    "maximum_complete_games": 2540,
+    "maximum_concurrent_evaluators": 1,
+    "maximum_concurrent_sanmill_processes": 1,
+    "maximum_database_writes": 0,
+    "maximum_engine_single_step_searches": 120000,
+    "maximum_malom_queries": 25000000,
+    "maximum_reused_formal_starts": 254,
+    "maximum_training_updates": 0,
+    "planned_formal_games": 2032,
+    "stop_at_any_limit": true
+  },
+  "cumulative_sunk_resources": {
+    "engine_single_step_searches": 496,
+    "malom_read_only_queries": 13561,
+    "active_seconds": 482.0538405000116,
+    "complete_non_evidence_games": 54,
+    "counts_against_unchanged_envelope": true
+  },
+  "lifecycle_risk": {
+    "ExternalSolvedDB_owned_by_TrainingAlignedPolicy": true,
+    "shared_external_owner": false,
+    "close_omission_is_resource_lifecycle_leak_until_process_teardown": true,
+    "code_fix_authorized": false,
+    "formal_process_must_record_peak_rss_and_open_handle_counts": true,
+    "resource_exhaustion_signal_fails_closed": true
+  },
+  "permitted": [
+    "use the immutable 27-game attempt-003 rehearsal evidence without rerunning it",
+    "one zero-formal-game preflight under the corrected registry",
+    "one exact 2032-game formal execution only after every preflight gate passes",
+    "read-only loading of the two frozen candidate routes",
+    "read-only sector-corrected-v1 Malom, HumanDB, SpecialistDB, and pinned Sanmill use"
+  ],
+  "prohibited": [
+    "rehearsal rerun or relabelling the old rehearsal as 68/68 or passed",
+    "new validation layers, instrumentation architecture, or gameplay tooling changes",
+    "automatic retry, resume, recovery, batching around a limit, or extension",
+    "a second formal execution or attempt-004",
+    "training, fitting, tuning, weight updates, or checkpoint changes",
+    "database writes, promotion, deployment, publication, or release"
+  ],
+  "consumption_rule": "consumed when the fresh corrected-attempt measurement-started marker is durably created before the first formal game",
+  "preflight_does_not_consume_formal_execution": true,
+  "host_interruption": "no recovery authorized",
+  "failure_rule": "any preflight or formal instrumentation or contract failure abandons this measurement without retry or repair proposal",
+  "protected_access": {
+    "official_selection_confirmation_final_test": "unopened",
+    "research_confirmation": "unopened",
+    "source_pool_2eb04f54_remaining_108": "unread_and_unconsumed"
+  },
+  "claim_boundary": {
+    "fixed_runtime_start_pool_and_candidate_routes_only": true,
+    "positional_only": true,
+    "playing_strength_population_claim": false,
+    "human_trap_or_product_user_claim": false,
+    "equivalence_claim": false,
+    "training_value_claim": false,
+    "promotion_deployment_publication_release_or_training": false
+  }
+}
