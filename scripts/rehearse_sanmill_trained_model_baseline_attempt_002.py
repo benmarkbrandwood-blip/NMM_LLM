@@ -377,12 +377,11 @@ def _verify_prior_attempts_preserved(
         path = _ROOT / str(frozen["path"])
         if sha256_file(path) != frozen["file_sha256"]:
             raise TrainedModelBaselineError("prior tracked evidence differs")
-        value = json.loads(path.read_text(encoding="utf-8"))
         identity_field = frozen.get("identity_field")
-        if identity_field is not None and value.get(identity_field) != frozen.get(
-            "identity"
-        ):
-            raise TrainedModelBaselineError("prior tracked identity differs")
+        if identity_field is not None:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            if value.get(identity_field) != frozen.get("identity"):
+                raise TrainedModelBaselineError("prior tracked identity differs")
         observed_files.append(str(frozen["path"]))
 
     observed_namespaces = []
