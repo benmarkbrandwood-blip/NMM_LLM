@@ -2,6 +2,25 @@
 
 ## Executive Summary
 
+### Product deployment-path audit -- 18 August 2026
+
+No local NMM Web product instance was running during the bounded deployment
+audit, and no repository-native release/deployment pipeline was found. The
+only complete candidate manual source is the current `dev` worktree: it holds
+`30390bf`, the launcher, and all three exact specialist checkpoints. It has no
+server-start log, however, and its tracked Web setting names a nonexistent
+WSL-style Malom path. Starting it unchanged would visibly disable `A_pos` and
+use the classical difficulty 9/10 fallback.
+
+`origin/main` is the GitHub default branch but is not a deployment record. It
+diverged from `dev` after `67af016`, deleted the three specialist checkpoints,
+and intentionally hard-coded the specialist route off as a failed experiment.
+Porting `30390bf` there would require a product decision, manual conflict
+resolution, explicit checkpoint transport, valid runtime Malom configuration,
+and a delivery mechanism. The bounded machine evidence, exclusions, and short
+product-owner checklist are in the
+[deployment-path audit](../evidence/product-deployment-path-2026-08-18.md).
+
 ### Production specialist A_pos filter -- 18 August 2026
 
 The active difficulty 9/10 specialist override on `dev` now scores every legal
