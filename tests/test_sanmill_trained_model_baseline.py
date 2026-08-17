@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 import learned_ai.evaluation.sanmill_trained_model_baseline as baseline
+import scripts.preflight_sanmill_trained_model_baseline as baseline_preflight
 from ai.malom_db import MalomDB
 from game.board import BoardState
 from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
@@ -194,10 +195,12 @@ def test_instrumentation_surface_rejects_generic_signature_drift(
     )
     report = baseline.audit_instrumentation_surface()
     failed = {
-        row["name"] for row in report["signature_checks"] if not row["passed"]
+        row["boundary_id"]
+        for row in report["signature_checks"]
+        if not row["passed"]
     }
-    assert failed == {"ExternalSolvedDB.query_all_moves"}
-    assert "one or more callable signatures reject the real call shape" in report[
+    assert failed == {"solved-db.query-all-moves"}
+    assert "one or more reflected signatures differ" in report[
         "mismatches"
     ]
     assert report["passed"] is False
@@ -213,9 +216,8 @@ def test_instrumentation_surface_rejects_unregistered_intercept_method(
     monkeypatch.setattr(ExternalSolvedDB, "query_batch", query_batch, raising=False)
     report = baseline.audit_instrumentation_surface()
     assert "public method or property surface differs" in report["mismatches"]
-    assert "query_batch" in report["observed_surfaces"]["ExternalSolvedDB"][
-        "methods"
-    ]
+    owner = "learned_ai.sentinel.db_teacher:ExternalSolvedDB"
+    assert "query_batch" in report["observed_public_surfaces"][owner]["methods"]
     assert report["passed"] is False
 
 
@@ -264,6 +266,12 @@ def test_specialist_gameai_audit_proves_no_score_path_read() -> None:
     assert result["read_methods"] == []
     assert result["score_path_reads_gameai"] is False
     assert result["presearch_effect_on_successful_argmax"] is False
+
+
+def test_poison_gameai_canary_rejects_a_real_attribute_read() -> None:
+    poison = baseline_preflight._PoisonGameAI()
+    with pytest.raises(AssertionError, match="warmed GameAI was read"):
+        poison.forbidden_attribute
 
 
 def test_protected_guard_fails_before_any_content_producer() -> None:

@@ -50,6 +50,11 @@ from learned_ai.evaluation.sanmill_trained_model_baseline import (
     play_game,
     verify_resource_game_alignment,
 )
+from learned_ai.evaluation.sanmill_trained_model_boundary_registry import (
+    coverage_contract,
+    load_boundary_registry,
+    verify_rehearsal_coverage,
+)
 from learned_ai.training.sanmill_referee import (
     inspect_sanmill_training_installation,
     training_installation_record,
@@ -250,6 +255,13 @@ def main() -> int:
     parser.add_argument(
         "--malom-manifest", default="data/manifests/malom-sector-corrected-v1.json"
     )
+    parser.add_argument(
+        "--boundary-registry",
+        default=(
+            "docs/experiments/"
+            "sanmill-trained-model-baseline-boundary-registry-v1.json"
+        ),
+    )
     args = parser.parse_args()
 
     if _git("branch", "--show-current") != "dev":
@@ -258,6 +270,8 @@ def main() -> int:
         parser.error("tracked worktree must be clean before formal execution")
     if _running_tgf_processes() != 0:
         parser.error("a Sanmill process is already running")
+    if sys.getprofile() is not None:
+        parser.error("formal execution forbids the rehearsal profiling hook")
     plan, plan_sha = load_plan(_ROOT / args.plan)
     attempt, attempt_sha = load_attempt_spec(_ROOT / args.attempt)
     authorization, authorization_sha = load_attempt_authorization(
@@ -266,6 +280,8 @@ def main() -> int:
     rehearsal, rehearsal_sha = load_rehearsal(_ROOT / args.rehearsal)
     preflight, preflight_sha = load_preflight(_ROOT / args.preflight)
     pool, pool_sha = load_pool(_ROOT / args.pool)
+    registry, registry_sha = load_boundary_registry(_ROOT / args.boundary_registry)
+    contract = coverage_contract(registry)
     if (
         attempt["plan"]["identity"] != plan["plan_identity"]
         or attempt["plan"]["file_sha256"] != plan_sha
@@ -283,8 +299,34 @@ def main() -> int:
         or pool_sha != plan["start_pool"]["pool_file_sha256"]
         or preflight["attempt_identity"] != attempt["attempt_identity"]
         or attempt["resource_envelope"] != plan["resource_envelope"]
+        or attempt["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or attempt["boundary_registry"]["file_sha256"] != registry_sha
+        or attempt["coverage_contract"] != contract
+        or authorization["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or authorization["coverage_contract"]["identity"]
+        != contract["coverage_contract_identity"]
+        or rehearsal["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or preflight["verification"]["boundary_registry"]["identity"]
+        != registry["registry_identity"]
     ):
         parser.error("formal execution bindings differ")
+    coverage_record = rehearsal["boundary_coverage_event_ledger"]
+    dynamic_coverage = verify_rehearsal_coverage(
+        _ROOT / str(coverage_record["path"]),
+        registry,
+    )
+    if (
+        dynamic_coverage["coverage_ledger_identity"]
+        != coverage_record["coverage_ledger_identity"]
+        or dynamic_coverage
+        != preflight["verification"]["boundary_registry"][
+            "rehearsal_dynamic_coverage"
+        ]
+    ):
+        parser.error("formal rehearsal boundary coverage differs")
     if _tree_identity(
         _ROOT / str(attempt["outputs"]["rehearsal_namespace"])
     ) != preflight["rehearsal_output_tree"]:
@@ -351,6 +393,10 @@ def main() -> int:
         or binding.get("preflight_identity") != preflight["preflight_identity"]
         or binding.get("formal_start_membership_identity")
         != preflight["formal_start_membership_identity"]
+        or binding.get("boundary_registry_identity")
+        != registry["registry_identity"]
+        or binding.get("rehearsal_coverage_ledger_identity")
+        != dynamic_coverage["coverage_ledger_identity"]
     ):
         parser.error("formal output namespace binding differs")
 
@@ -403,6 +449,10 @@ def main() -> int:
                 "attempt_identity": attempt["attempt_identity"],
                 "authorization_identity": authorization["authorization_identity"],
                 "preflight_identity": preflight["preflight_identity"],
+                "boundary_registry_identity": registry["registry_identity"],
+                "rehearsal_coverage_ledger_identity": dynamic_coverage[
+                    "coverage_ledger_identity"
+                ],
                 "source_commit": _git("rev-parse", "HEAD"),
                 "execution_count": 1,
                 "recovery_authorized": False,
@@ -530,6 +580,13 @@ def main() -> int:
             "rehearsal_file_sha256": rehearsal_sha,
             "preflight_identity": preflight["preflight_identity"],
             "preflight_file_sha256": preflight_sha,
+            "boundary_registry": {
+                "identity": registry["registry_identity"],
+                "file_sha256": registry_sha,
+                "coverage_contract": contract,
+                "rehearsal_coverage": dynamic_coverage,
+                "profiling_enabled_during_formal": False,
+            },
             "start_pool_identity": pool["pool_identity"],
             "start_pool_file_sha256": pool_sha,
             "formal_start_membership_identity": preflight[

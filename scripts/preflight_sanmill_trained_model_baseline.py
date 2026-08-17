@@ -63,6 +63,160 @@ from learned_ai.training.sanmill_referee import (
 )
 
 
+class _PoisonGameAI:
+    """Fail if the successful specialist score path reads warmed GameAI state."""
+
+    def __getattribute__(self, name: str) -> Any:
+        if name.startswith("__"):
+            return object.__getattribute__(self, name)
+        raise AssertionError(f"warmed GameAI was read: {name}")
+
+
+from learned_ai.evaluation.sanmill_trained_model_boundary_registry import (
+    coverage_contract,
+    load_boundary_registry,
+    verify_rehearsal_coverage,
+    verify_explicit_stage_evidence,
+)
+
+
+def _protected_boundary_canary(
+    *,
+    attempt: Mapping[str, Any],
+    registry: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Exercise every registry-declared preflight boundary without content reads."""
+    from types import SimpleNamespace
+
+    from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
+        EstimatorAccess,
+        EstimatorReadinessError,
+    )
+
+    spec = attempt["protected_guard_canary"]
+    membership_path = _ROOT / str(spec["membership_path"])
+    if baseline.sha256_file(membership_path) != spec["membership_file_sha256"]:
+        raise TrainedModelBaselineError("protected membership identity differs")
+    membership = json.loads(membership_path.read_text(encoding="utf-8"))
+    session_id = str(spec["protected_session_id"])
+    partition = str(spec["protected_partition"])
+    if session_id not in membership["partitions"][partition]["session_ids"]:
+        raise TrainedModelBaselineError("protected session membership differs")
+
+    access = EstimatorAccess(
+        official_partition_by_session={session_id: partition},
+        research_partition_by_session={session_id: "outside"},
+        allowed_sessions=frozenset(),
+    )
+    producer_called = False
+
+    def producer() -> str:
+        nonlocal producer_called
+        producer_called = True
+        return "forbidden"
+
+    denied_calls = 0
+    for call in (
+        lambda: access.assert_allowed(
+            session_id,
+            access_kind="attempt-003-preflight-direct",
+        ),
+        lambda: access.derive(
+            session_id,
+            access_kind="attempt-003-preflight-derived",
+            producer=producer,
+        ),
+        lambda: access.load_decisions(
+            _ROOT,
+            SimpleNamespace(session_id=session_id),
+            object(),
+        ),
+    ):
+        try:
+            call()
+        except EstimatorReadinessError:
+            denied_calls += 1
+        else:
+            raise TrainedModelBaselineError("protected boundary did not fail closed")
+    if producer_called:
+        raise TrainedModelBaselineError("protected content producer was called")
+
+    poison = _PoisonGameAI()
+    try:
+        poison.forbidden_attribute
+    except AssertionError:
+        poison_discrimination = True
+    else:
+        raise TrainedModelBaselineError("GameAI poison canary lost discrimination")
+    gameai_audit = audit_specialist_gameai_dependency()
+    if gameai_audit["score_path_reads_gameai"] is not False:
+        raise TrainedModelBaselineError("specialist score path reads warmed GameAI")
+
+    proved_callables = {
+        (
+            "learned_ai.evaluation.human_feature_deviation_estimator_readiness:"
+            "EstimatorAccess.__init__"
+        ): "deny-all guard constructed from protected membership metadata",
+        (
+            "learned_ai.evaluation.human_feature_deviation_estimator_readiness:"
+            "EstimatorAccess.assert_allowed"
+        ): "direct protected-session denial observed",
+        (
+            "learned_ai.evaluation.human_feature_deviation_estimator_readiness:"
+            "EstimatorAccess.derive"
+        ): "derived-content producer rejected before invocation",
+        (
+            "learned_ai.evaluation.human_feature_deviation_estimator_readiness:"
+            "EstimatorAccess.load_decisions"
+        ): "decision loader rejected before source-game access",
+        (
+            "scripts.preflight_sanmill_trained_model_baseline:"
+            "_PoisonGameAI.__getattribute__"
+        ): "deliberate forbidden attribute read raised",
+        (
+            "learned_ai.evaluation.sanmill_trained_model_baseline:"
+            "audit_specialist_gameai_dependency"
+        ): "static dependency audit proved successful score path does not read GameAI",
+    }
+    preflight_rows = [
+        row
+        for row in registry["boundaries"]
+        if row["required_stage"] == "preflight"
+        and row["dynamic_required"] is True
+        and row["evidence_mode"] == "explicit-canary"
+    ]
+    unproved = sorted(
+        str(row["callable"])
+        for row in preflight_rows
+        if str(row["callable"]) not in proved_callables
+    )
+    if unproved:
+        raise TrainedModelBaselineError(
+            "registry preflight callable has no canary proof: " + ", ".join(unproved)
+        )
+    observed = [str(row["boundary_id"]) for row in preflight_rows]
+    evidence = verify_explicit_stage_evidence(
+        registry,
+        stage="preflight",
+        observed_boundary_ids=observed,
+    )
+    return {
+        "passed": True,
+        "partition": partition,
+        "session_identity": canonical_sha256(session_id),
+        "denied_boundary_calls": denied_calls,
+        "producer_called": producer_called,
+        "poison_discrimination": poison_discrimination,
+        "specialist_gameai_audit": gameai_audit,
+        "proofs_by_callable": {
+            str(row["callable"]): proved_callables[str(row["callable"])]
+            for row in preflight_rows
+        },
+        "explicit_stage_evidence": evidence,
+        "protected_content_reads": 0,
+    }
+
+
 def _git(*arguments: str) -> str:
     result = subprocess.run(
         ["git", *arguments],
@@ -259,12 +413,6 @@ def _candidate_determinism(
             }
         )
 
-    class _PoisonGameAI:
-        def __getattribute__(self, name: str) -> Any:
-            if name.startswith("__"):
-                return object.__getattribute__(self, name)
-            raise AssertionError(f"warmed GameAI was read: {name}")
-
     specialist = policies._scorers["active-specialists"]
     board = BoardState.from_fen_string(str(fixture_states[0]["fen"]))
     before = _score_snapshot(specialist, board)
@@ -441,6 +589,13 @@ def main() -> int:
     parser.add_argument(
         "--malom-manifest", default="data/manifests/malom-sector-corrected-v1.json"
     )
+    parser.add_argument(
+        "--boundary-registry",
+        default=(
+            "docs/experiments/"
+            "sanmill-trained-model-baseline-boundary-registry-v1.json"
+        ),
+    )
     args = parser.parse_args()
 
     if _git("branch", "--show-current") != "dev":
@@ -456,6 +611,8 @@ def main() -> int:
     )
     rehearsal, rehearsal_sha = load_rehearsal(_ROOT / args.rehearsal)
     pool, pool_sha = load_pool(_ROOT / args.pool)
+    registry, registry_sha = load_boundary_registry(_ROOT / args.boundary_registry)
+    contract = coverage_contract(registry)
     if (
         attempt["plan"]["identity"] != plan["plan_identity"]
         or attempt["plan"]["file_sha256"] != plan_sha
@@ -471,8 +628,30 @@ def main() -> int:
         or rehearsal["formal_result_eligibility"] is not False
         or pool["pool_identity"] != plan["start_pool"]["pool_identity"]
         or pool_sha != plan["start_pool"]["pool_file_sha256"]
+        or attempt["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or attempt["boundary_registry"]["file_sha256"] != registry_sha
+        or attempt["coverage_contract"] != contract
+        or authorization["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or authorization["coverage_contract"]["identity"]
+        != contract["coverage_contract_identity"]
+        or rehearsal["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or rehearsal["boundary_registry"]["coverage_contract"] != contract
     ):
         parser.error("preflight frozen bindings differ")
+
+    coverage_record = rehearsal["boundary_coverage_event_ledger"]
+    coverage_path = _ROOT / str(coverage_record["path"])
+    dynamic_coverage = verify_rehearsal_coverage(coverage_path, registry)
+    if (
+        dynamic_coverage["coverage_ledger_identity"]
+        != coverage_record["coverage_ledger_identity"]
+        or dynamic_coverage["file_sha256"] != coverage_record["file_sha256"]
+        or dynamic_coverage != rehearsal["boundary_registry"]["dynamic_coverage"]
+    ):
+        parser.error("preflight rehearsal boundary coverage differs")
 
     formal = formal_states(
         pool,
@@ -492,7 +671,7 @@ def main() -> int:
         rehearsal_output / "resource-checkpoints.jsonl",
         expected_baseline=rehearsal_baseline,
         complete_games_before=int(
-            attempt["cumulative_sunk_resources_before_attempt_002"]["complete_games"]
+            attempt["cumulative_sunk_resources_before_attempt"]["complete_games"]
         ),
     )
     if (
@@ -514,16 +693,23 @@ def main() -> int:
     run_output.mkdir(parents=True, exist_ok=False)
     verification_started = time.perf_counter()
     python = str(_ROOT / ".venv/Scripts/python.exe")
-    regression_nodes = [
+    baseline_regression_nodes = [
         "test_allowed_argmax_rejects_a_truly_missing_move",
         "test_game_record_rejects_truly_mismatched_terminal_winner",
         "test_resource_checkpoint_survives_before_game_record_crash",
         "test_counting_malom_proxy_records_each_completed_query",
         "test_instrumentation_surface_is_complete_and_signature_compatible",
-        "test_instrumentation_surface_rejects_generic_signature_drift",
-        "test_instrumentation_surface_rejects_unregistered_intercept_method",
         "test_specialist_gameai_audit_proves_no_score_path_read",
+        "test_poison_gameai_canary_rejects_a_real_attribute_read",
         "test_protected_guard_fails_before_any_content_producer",
+    ]
+    registry_regression_nodes = [
+        "test_registry_rejects_signature_drift",
+        "test_registry_rejects_an_unregistered_public_method",
+        "test_new_unexecuted_rehearsal_boundary_fails_dynamic_gate",
+        "test_preflight_only_event_cannot_satisfy_rehearsal_coverage",
+        "test_profile_event_maps_to_the_registered_real_code_object",
+        "test_crash_keeps_exact_completed_game_resources",
     ]
     regression = _run_gate(
         [
@@ -532,7 +718,11 @@ def main() -> int:
             "pytest",
             *[
                 "tests/test_sanmill_trained_model_baseline.py::" + node
-                for node in regression_nodes
+                for node in baseline_regression_nodes
+            ],
+            *[
+                "tests/test_sanmill_trained_model_boundary_registry.py::" + node
+                for node in registry_regression_nodes
             ],
             "-q",
             "--basetemp",
@@ -545,6 +735,7 @@ def main() -> int:
             "-m",
             "pytest",
             "tests/test_sanmill_trained_model_baseline.py",
+            "tests/test_sanmill_trained_model_boundary_registry.py",
             "tests/test_training_aligned_policy.py",
             "-q",
             "--basetemp",
@@ -571,16 +762,26 @@ def main() -> int:
         "learned_ai/evaluation/sanmill_safe_inducement.py",
         "learned_ai/evaluation/training_aligned_policy.py",
         "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "learned_ai/evaluation/sanmill_trained_model_boundary_registry.py",
         "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py",
         "scripts/preflight_sanmill_trained_model_baseline.py",
         "scripts/run_sanmill_trained_model_baseline.py",
         "tests/test_training_aligned_policy.py",
         "tests/test_sanmill_trained_model_baseline.py",
+        "tests/test_sanmill_trained_model_boundary_registry.py",
     ]
     ruff = _run_gate(["ruff", "check", *ruff_targets])
     instrumentation = audit_instrumentation_surface(_ROOT)
-    if instrumentation["passed"] is not True:
+    if (
+        instrumentation["passed"] is not True
+        or instrumentation["registry_identity"] != registry["registry_identity"]
+        or instrumentation["registry_file_sha256"] != registry_sha
+    ):
         raise TrainedModelBaselineError("instrumentation surface audit failed")
+    protected_boundary_evidence = _protected_boundary_canary(
+        attempt=attempt,
+        registry=registry,
+    )
 
     paths = _paths(_ROOT / args.paths_config)
     checkout = _local_path(paths.get("sanmill_training_checkout"), key="sanmill")
@@ -672,7 +873,9 @@ def main() -> int:
     aggregate = ledger.record()
     aggregate.update(
         {
-            "complete_games": int(rehearsal_resources["complete_games"]),
+            "complete_games": int(
+                rehearsal_resources["cumulative_complete_games"]
+            ),
             "formal_reused_starts": 0,
         }
     )
@@ -728,6 +931,15 @@ def main() -> int:
             "mandatory_malom_db_teacher_provenance": mandatory,
             "task_scope_ruff": ruff,
             "instrumentation_surface_audit": instrumentation,
+            "boundary_registry": {
+                "identity": registry["registry_identity"],
+                "file_sha256": registry_sha,
+                "coverage_contract": contract,
+                "rehearsal_dynamic_coverage": dynamic_coverage,
+                "preflight_explicit_boundary_evidence": (
+                    protected_boundary_evidence
+                ),
+            },
         },
         "sanmill_runtime": runtime,
         "sanmill_runtime_matches_attempt_002": True,
@@ -760,6 +972,7 @@ def main() -> int:
         "aggregate_resource_use_before_measurement": aggregate,
         "protected_access": {
             "guard_test_executed_and_failed_closed": True,
+            "boundary_evidence": protected_boundary_evidence,
             "official_selection_content_reads": 0,
             "official_confirmation_content_reads": 0,
             "official_final_test_content_reads": 0,
@@ -795,6 +1008,10 @@ def main() -> int:
             "authorization_identity": authorization["authorization_identity"],
             "preflight_identity": sealed["preflight_identity"],
             "formal_start_membership_identity": canonical_sha256(formal_ids),
+            "boundary_registry_identity": registry["registry_identity"],
+            "rehearsal_coverage_ledger_identity": dynamic_coverage[
+                "coverage_ledger_identity"
+            ],
         },
     )
     print(sealed["preflight_identity"])

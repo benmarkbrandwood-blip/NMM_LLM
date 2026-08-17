@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the attempt-002 all-surface non-evidence technical rehearsal."""
+"""Run an authorization-bound all-surface non-evidence rehearsal."""
 
 # ruff: noqa: E402
 
@@ -23,10 +23,6 @@ from learned_ai.evaluation.human_f0h0_feasibility import (
     canonical_sha256,
     verify_malom_snapshot,
     write_sealed_json,
-)
-from learned_ai.evaluation.human_feature_deviation_estimator_readiness import (
-    EstimatorAccess,
-    EstimatorReadinessError,
 )
 from learned_ai.evaluation.sanmill_safe_guidance_gameplay import (
     ResourceLedger,
@@ -53,6 +49,12 @@ from learned_ai.evaluation.sanmill_trained_model_baseline import (
     play_game,
     replay_scripted_terminal_game,
     verify_resource_game_alignment,
+)
+from learned_ai.evaluation.sanmill_trained_model_boundary_registry import (
+    BoundaryCoverageRecorder,
+    coverage_contract,
+    load_boundary_registry,
+    verify_rehearsal_coverage,
 )
 from learned_ai.training.sanmill_referee import (
     inspect_sanmill_training_installation,
@@ -109,16 +111,18 @@ def _load_phase_corpus(attempt: Mapping[str, Any]) -> dict[str, Any]:
     spec = attempt["rehearsal"]["phase_corpus"]
     path = _ROOT / str(spec["path"])
     if sha256_file(path) != spec["file_sha256"]:
-        raise TrainedModelBaselineError("attempt-002 phase corpus file differs")
+        raise TrainedModelBaselineError("rehearsal phase corpus file differs")
     value = json.loads(path.read_text(encoding="utf-8"))
     if value.get("corpus_identity") != spec["identity"]:
-        raise TrainedModelBaselineError("attempt-002 phase corpus identity differs")
+        raise TrainedModelBaselineError("rehearsal phase corpus identity differs")
     return value
 
 
-def _state_from_record(record: Mapping[str, Any]) -> dict[str, Any]:
+def _state_from_record(
+    record: Mapping[str, Any], *, attempt_id: str
+) -> dict[str, Any]:
     return {
-        "state_id": f"trained-model-attempt-002:{record['start_id']}",
+        "state_id": f"{attempt_id}:{record['start_id']}",
         "source_start_id": str(record["start_id"]),
         "phase": str(record["phase"]),
         "fen": str(record["fen"]),
@@ -154,8 +158,11 @@ def _rehearsal_states(
             or record.get("strict_start", {}).get("history_sha256")
             != spec["strict_history_sha256"]
         ):
-            raise TrainedModelBaselineError("attempt-002 phase start differs")
-        states[source_id] = _state_from_record(record)
+            raise TrainedModelBaselineError("rehearsal phase start differs")
+        states[source_id] = _state_from_record(
+            record,
+            attempt_id=str(attempt["attempt_id"]),
+        )
 
     formal = formal_states(
         pool,
@@ -168,7 +175,7 @@ def _rehearsal_states(
         or tuple(state["history_actions"]) in formal_histories
         for state in states.values()
     ):
-        raise TrainedModelBaselineError("attempt-002 rehearsal overlaps formal pool")
+        raise TrainedModelBaselineError("rehearsal overlaps formal pool")
     return states
 
 
@@ -205,12 +212,13 @@ def _source_games(attempt: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
 def _item(
     *,
     ordinal: int,
+    attempt_id: str,
     state: Mapping[str, Any],
     arm: str,
     candidate_color: str,
 ) -> dict[str, Any]:
     body = {
-        "namespace": "sanmill-trained-model-baseline-attempt-002-rehearsal-game",
+        "namespace": f"{attempt_id}-rehearsal-game",
         "ordinal": ordinal,
         "start_id": state["state_id"],
         "arm": arm,
@@ -291,6 +299,11 @@ def _malom_surface_canary(
             lambda: external.query_trajectory([board, after]),
         )
         direct = observe("MalomDB.query_value", 1, lambda: database.query_value(board))
+        terminal_value = observe(
+            "MalomDB.terminal_move_value",
+            0,
+            lambda: database.terminal_move_value(direct, "L"),
+        )
         if (
             state_value is None
             or alias_value is None
@@ -299,6 +312,7 @@ def _malom_surface_canary(
             or len(trajectory) != 2
             or any(value is None for value in trajectory)
             or direct is None
+            or terminal_value is None
         ):
             raise TrainedModelBaselineError("Malom canary return shape differs")
         rows.append(
@@ -353,93 +367,52 @@ def _terminal_malom_canary(
     }
 
 
-def _protected_guard_canary(attempt: Mapping[str, Any]) -> dict[str, Any]:
-    spec = attempt["protected_guard_canary"]
-    path = _ROOT / str(spec["membership_path"])
-    if sha256_file(path) != spec["membership_file_sha256"]:
-        raise TrainedModelBaselineError("protected membership file differs")
-    membership = json.loads(path.read_text(encoding="utf-8"))
-    session_id = str(spec["protected_session_id"])
-    partition = str(spec["protected_partition"])
-    if session_id not in membership["partitions"][partition]["session_ids"]:
-        raise TrainedModelBaselineError("protected guard session differs")
-    access = EstimatorAccess(
-        official_partition_by_session={session_id: partition},
-        research_partition_by_session={session_id: "outside"},
-        allowed_sessions=frozenset(),
-    )
-    producer_called = False
-
-    def producer() -> str:
-        nonlocal producer_called
-        producer_called = True
-        return "forbidden"
-
-    try:
-        access.derive(
-            session_id,
-            access_kind="attempt-002-rehearsal-guard",
-            producer=producer,
-        )
-    except EstimatorReadinessError:
-        pass
-    else:
-        raise TrainedModelBaselineError("protected guard did not fail")
-    if producer_called:
-        raise TrainedModelBaselineError("protected content producer was called")
-    return {
-        "passed": True,
-        "partition": partition,
-        "session_identity": canonical_sha256(session_id),
-        "assert_allowed_exercised": True,
-        "derive_exercised": True,
-        "producer_called": False,
-        "content_reads": 0,
-    }
-
-
-def _verify_failed_attempt_preserved(attempt: Mapping[str, Any]) -> dict[str, Any]:
-    spec = attempt["failed_attempt_001"]
-    evidence_path = _ROOT / str(spec["evidence_path"])
-    authorization_path = _ROOT / str(spec["authorization_path"])
-    output_dir = _ROOT / str(spec["output_namespace"])
-    if (
-        sha256_file(evidence_path) != spec["evidence_file_sha256"]
-        or sha256_file(authorization_path) != spec["authorization_file_sha256"]
-        or not output_dir.is_dir()
-    ):
-        raise TrainedModelBaselineError("failed attempt-001 identity differs")
-    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
-    authorization = json.loads(authorization_path.read_text(encoding="utf-8"))
-    if (
-        evidence.get("failure_identity") != spec["failure_identity"]
-        or authorization.get("authorization_identity")
-        != spec["authorization_identity"]
-    ):
-        raise TrainedModelBaselineError("failed attempt-001 sealed identity differs")
-    observed_files = sorted(
-        str(path.relative_to(output_dir)).replace("\\", "/")
-        for path in output_dir.rglob("*")
-        if path.is_file()
-    )
-    if observed_files != sorted(spec["output_artifacts"]):
-        raise TrainedModelBaselineError("failed attempt-001 output tree differs")
-    for relative, expected in spec["output_artifacts"].items():
-        path = output_dir / relative
-        if (
-            path.stat().st_size != int(expected["bytes"])
-            or sha256_file(path) != expected["sha256"]
+def _verify_prior_attempts_preserved(
+    attempt: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify every frozen prior record and output byte for byte."""
+    spec = attempt["preserved_history"]
+    observed_files = []
+    for frozen in spec["tracked_files"]:
+        path = _ROOT / str(frozen["path"])
+        if sha256_file(path) != frozen["file_sha256"]:
+            raise TrainedModelBaselineError("prior tracked evidence differs")
+        value = json.loads(path.read_text(encoding="utf-8"))
+        identity_field = frozen.get("identity_field")
+        if identity_field is not None and value.get(identity_field) != frozen.get(
+            "identity"
         ):
-            raise TrainedModelBaselineError("failed attempt-001 artifact differs")
-    return {
+            raise TrainedModelBaselineError("prior tracked identity differs")
+        observed_files.append(str(frozen["path"]))
+
+    observed_namespaces = []
+    for frozen in spec["output_namespaces"]:
+        output_dir = _ROOT / str(frozen["path"])
+        if not output_dir.is_dir():
+            raise TrainedModelBaselineError("prior output namespace is absent")
+        actual = sorted(
+            path.relative_to(output_dir).as_posix()
+            for path in output_dir.rglob("*")
+            if path.is_file()
+        )
+        if actual != sorted(frozen["artifacts"]):
+            raise TrainedModelBaselineError("prior output tree differs")
+        for relative, expected in frozen["artifacts"].items():
+            path = output_dir / relative
+            if (
+                path.stat().st_size != int(expected["bytes"])
+                or sha256_file(path) != expected["sha256"]
+            ):
+                raise TrainedModelBaselineError("prior output artifact differs")
+        observed_namespaces.append(str(frozen["path"]))
+    summary = {
         "passed": True,
-        "failure_identity": spec["failure_identity"],
-        "authorization_identity": spec["authorization_identity"],
-        "output_namespace": spec["output_namespace"],
-        "output_files": observed_files,
+        "tracked_files": sorted(observed_files),
+        "output_namespaces": sorted(observed_namespaces),
         "preserved_byte_for_byte": True,
         "authorization_reused": False,
     }
+    return {**summary, "preservation_identity": canonical_sha256(summary)}
 
 
 def main() -> int:
@@ -469,10 +442,17 @@ def main() -> int:
     parser.add_argument(
         "--malom-manifest", default="data/manifests/malom-sector-corrected-v1.json"
     )
+    parser.add_argument(
+        "--boundary-registry",
+        default=(
+            "docs/experiments/"
+            "sanmill-trained-model-baseline-boundary-registry-v1.json"
+        ),
+    )
     args = parser.parse_args()
 
     if _git("branch", "--show-current") != "dev":
-        parser.error("attempt-002 rehearsal requires dev")
+        parser.error("trained-model rehearsal requires dev")
     if _git("status", "--short", "--untracked-files=no"):
         parser.error("tracked worktree must be clean before rehearsal")
     if _running_tgf_processes() != 0:
@@ -483,6 +463,8 @@ def main() -> int:
         _ROOT / args.authorization
     )
     pool, pool_sha = load_pool(_ROOT / args.pool)
+    registry, registry_sha = load_boundary_registry(_ROOT / args.boundary_registry)
+    contract = coverage_contract(registry)
     if (
         attempt["plan"]["identity"] != plan["plan_identity"]
         or attempt["plan"]["file_sha256"] != plan_sha
@@ -491,8 +473,16 @@ def main() -> int:
         or authorization["status"] != "authorized_once_measurement_unconsumed"
         or pool["pool_identity"] != plan["start_pool"]["pool_identity"]
         or pool_sha != plan["start_pool"]["pool_file_sha256"]
+        or attempt["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or attempt["boundary_registry"]["file_sha256"] != registry_sha
+        or attempt["coverage_contract"] != contract
+        or authorization["boundary_registry"]["identity"]
+        != registry["registry_identity"]
+        or authorization["coverage_contract"]["identity"]
+        != contract["coverage_contract_identity"]
     ):
-        parser.error("attempt-002 rehearsal bindings differ")
+        parser.error("trained-model rehearsal bindings differ")
     implementation_files = authorization["implementation_files"]
     observed_implementation = {
         path: sha256_file(_ROOT / path) for path in implementation_files
@@ -502,17 +492,16 @@ def main() -> int:
         or observed_implementation != implementation_files
         or attempt["resource_envelope"] != plan["resource_envelope"]
     ):
-        parser.error("attempt-002 implementation or resource envelope differs")
+        parser.error("trained-model implementation or resource envelope differs")
 
     output_dir = _ROOT / str(attempt["outputs"]["rehearsal_namespace"])
     result_path = _ROOT / str(attempt["outputs"]["rehearsal_result"])
     if output_dir.exists() or result_path.exists():
-        parser.error("attempt-002 rehearsal namespace or result already exists")
+        parser.error("trained-model rehearsal namespace or result already exists")
     instrumentation = audit_instrumentation_surface(_ROOT)
     if instrumentation["passed"] is not True:
         parser.error("instrumentation surface audit failed")
-    failed_attempt = _verify_failed_attempt_preserved(attempt)
-    guard = _protected_guard_canary(attempt)
+    preserved_history = _verify_prior_attempts_preserved(attempt)
 
     states = _rehearsal_states(attempt=attempt, plan=plan, pool=pool)
     sources = _source_games(attempt)
@@ -529,6 +518,7 @@ def main() -> int:
                     (
                         _item(
                             ordinal=ordinal,
+                            attempt_id=str(attempt["attempt_id"]),
                             state=state,
                             arm=arm,
                             candidate_color=color,
@@ -545,6 +535,7 @@ def main() -> int:
             (
                 _item(
                     ordinal=ordinal,
+                    attempt_id=str(attempt["attempt_id"]),
                     state=state,
                     arm=str(case["arm"]),
                     candidate_color=str(source["candidate_color"]),
@@ -558,7 +549,7 @@ def main() -> int:
         ordinal += 1
     expected_games = int(attempt["rehearsal"]["complete_games"])
     if len(live_cases) != 24 or len(scripted_cases) != 3 or ordinal != expected_games:
-        parser.error("attempt-002 rehearsal schedule differs")
+        parser.error("trained-model rehearsal schedule differs")
 
     output_dir.mkdir(parents=True, exist_ok=False)
     write_json_atomic(
@@ -568,12 +559,19 @@ def main() -> int:
             "attempt_identity": attempt["attempt_identity"],
             "authorization_identity": authorization["authorization_identity"],
             "formal_result_eligibility": False,
-            "purpose": "attempt-002 all-surface technical rehearsal only",
+            "purpose": "boundary-registry all-surface technical rehearsal only",
         },
     )
 
+    coverage_ledger = output_dir / "boundary-coverage-events.jsonl"
+    coverage_recorder = BoundaryCoverageRecorder(
+        registry,
+        coverage_ledger,
+        formal_result_eligibility=False,
+    )
+    coverage_recorder.__enter__()
     envelope = plan["resource_envelope"]
-    sunk = attempt["cumulative_sunk_resources_before_attempt_002"]
+    sunk = attempt["cumulative_sunk_resources_before_attempt"]
     ledger = ResourceLedger(
         engine_searches=int(sunk["engine_single_step_searches"]),
         malom_queries=int(sunk["malom_read_only_queries"]),
@@ -590,7 +588,7 @@ def main() -> int:
         installation, seed=int(plan["sanmill_contract"]["seed"])
     )
     if runtime["identity"] != plan["sanmill_contract"]["runtime_identity"]:
-        raise TrainedModelBaselineError("attempt-002 Sanmill runtime differs")
+        raise TrainedModelBaselineError("trained-model Sanmill runtime differs")
     malom = verify_malom_snapshot(
         malom_path=malom_path,
         manifest_path=_ROOT / args.malom_manifest,
@@ -600,7 +598,7 @@ def main() -> int:
         malom["trust_level"] != "sector-corrected-v1"
         or malom["content_sha256"] != plan["malom_contract"]["content_sha256"]
     ):
-        raise TrainedModelBaselineError("attempt-002 Malom snapshot differs")
+        raise TrainedModelBaselineError("trained-model Malom snapshot differs")
 
     raw_games = output_dir / "rehearsal-games.jsonl"
     resource_journal = output_dir / "resource-checkpoints.jsonl"
@@ -730,7 +728,7 @@ def main() -> int:
         or game_recovery["record_count"] != expected_games
         or resource_recovery["last_resources"] != resources_before
     ):
-        raise TrainedModelBaselineError("attempt-002 durable recovery differs")
+        raise TrainedModelBaselineError("rehearsal durable recovery differs")
 
     live = [row for row in records if row["arm"] in ARMS]
     scripted = [row for row in records if row["arm"] not in ARMS]
@@ -770,7 +768,26 @@ def main() -> int:
         or malom_canary is None
         or terminal_canary is None
     ):
-        raise TrainedModelBaselineError("attempt-002 required coverage failed")
+        raise TrainedModelBaselineError("trained-model required coverage failed")
+
+    compact_games = [compact_game(row) for row in records]
+    sealed_writer_canary = write_sealed_json(
+        output_dir / "sealed-writer-canary.json",
+        {
+            "schema_version": "nmm.boundary-sealed-writer-canary.v1",
+            "formal_result_eligibility": False,
+            "attempt_identity": attempt["attempt_identity"],
+        },
+        identity_field="canary_identity",
+    )
+    coverage_recorder.__exit__(None, None, None)
+    dynamic_coverage = verify_rehearsal_coverage(coverage_ledger, registry)
+    if (
+        dynamic_coverage["passed"] is not True
+        or dynamic_coverage["expected_boundary_ids"]
+        != contract["expected_boundary_ids"]
+    ):
+        raise TrainedModelBaselineError("registry dynamic coverage differs")
 
     payload = {
         "schema_version": REHEARSAL_SCHEMA,
@@ -789,10 +806,16 @@ def main() -> int:
         "sanmill_runtime": runtime,
         "malom_snapshot": malom,
         "instrumentation_audit": instrumentation,
-        "failed_attempt_001_preservation": failed_attempt,
+        "boundary_registry": {
+            "identity": registry["registry_identity"],
+            "file_sha256": registry_sha,
+            "coverage_contract": contract,
+            "dynamic_coverage": dynamic_coverage,
+            "sealed_writer_canary": sealed_writer_canary,
+        },
+        "prior_failed_attempts_preservation": preserved_history,
         "malom_surface_canary": malom_canary,
         "terminal_malom_canary": terminal_canary,
-        "protected_guard_canary": guard,
         "coverage": {
             "live_model_games": len(live),
             "scripted_terminal_games": len(scripted),
@@ -819,7 +842,18 @@ def main() -> int:
             "durable_recovery_and_alignment": True,
             "completion_and_analysis": True,
         },
-        "games": [compact_game(row) for row in records],
+        "games": compact_games,
+        "boundary_coverage_event_ledger": {
+            "path": str(coverage_ledger.relative_to(_ROOT)).replace("\\", "/"),
+            "records": dynamic_coverage["event_count"],
+            "file_sha256": dynamic_coverage["file_sha256"],
+            "tail_event_sha256": dynamic_coverage["tail_event_sha256"],
+            "coverage_ledger_identity": dynamic_coverage[
+                "coverage_ledger_identity"
+            ],
+            "tracked": False,
+            "formal_result_eligibility": False,
+        },
         "raw_game_ledger": {
             "path": str(raw_games.relative_to(_ROOT)).replace("\\", "/"),
             "records": game_recovery["record_count"],
