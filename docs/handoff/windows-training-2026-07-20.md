@@ -3429,6 +3429,33 @@ analysis is recorded in
 [`docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-tooling-structural-analysis-2026-08-16.md`](../evidence/sanmill-trained-model-baseline-v1-attempt-002-tooling-structural-analysis-2026-08-16.md).
 Any future work requires an explicit product-owner decision.
 
+## Trained-Model Baseline Attempt-003 Coverage Failure (2026-08-17)
+
+The product owner authorized the boundary-registry attempt once.  Protocol
+identity `60fcb471...`, registry identity `1ceb23f5...`, coverage-contract
+identity `164aa632...`, and authorization identity `7e7aeb57...` were frozen
+before the new rehearsal.  The successful-turn semantic audit found the
+manual `search_logical_turn` plus `apply_nmm_move` path equivalent to
+`search_and_apply` for strict state transitions, so the published
+safe-guidance terminal-reason distribution needs no correction.
+
+All 27 new non-evidence games completed with aligned durable resource and
+game ledgers.  The real code-object event ledger observed 67 of 68 required
+boundaries.  `ExternalSolvedDB.close` was absent.  Read-only inspection shows
+that `TrainingAlignedPolicy.close` closes SpecialistDB and HumanDB but does
+not call that adapter's close method; the frozen formal route would not call
+it either.  The frozen coverage gate nevertheless requires it, so attempt-003
+failed closed with identity `f28adacc...`.
+
+Cumulative use across the three failed attempts is 496 engine searches,
+13,561 Malom queries, 54 non-evidence games, and 482.0538405000116 active
+seconds.  No preflight, formal namespace, measurement marker, or candidate
+result exists.  Stop all further tooling construction and do not rerun the
+rehearsal.  The product owner must choose between an explicit narrow waiver
+of this cleanup-boundary requirement, accepting the documented lifecycle
+risk, and abandonment of the measurement.  See
+[`docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-coverage-failure-2026-08-17.md`](../evidence/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-coverage-failure-2026-08-17.md).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):

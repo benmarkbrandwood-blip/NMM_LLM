@@ -1,0 +1,140 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-rehearsal-coverage-failure.v1",
+  "failure_identity": "f28adaccaaacefed0bcb2c2a4cc98feff5061c9b24e2d9f113b14ee8a7c7d17b",
+  "status": "failed_closed_after_registry_dynamic_coverage_gate",
+  "plan_identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+  "attempt_identity": "60fcb471fa818dfc4eb2de5acc4a8aa8b932f93e6d13aeeadff3faa9dbe74819",
+  "authorization_identity": "7e7aeb57ed963beb9c3a5dabf82aae81012fe8442c5b907c717ffcc62ddacab3",
+  "source_commit": "c726f42fb4acd1ab19598ba6039f0d7772b5e55a",
+  "formal_result_eligibility": false,
+  "formal_measurement_started": false,
+  "formal_measurement_marker_exists": false,
+  "formal_complete_games": 0,
+  "preflight_started": false,
+  "rehearsal": {
+    "completed_non_evidence_games": 27,
+    "expected_non_evidence_games": 27,
+    "rules_terminal_games": 27,
+    "draw_games": 7,
+    "decisive_games": 20,
+    "termination_reasons": {
+      "drawFiftyMove": 2,
+      "drawThreefoldRepetition": 5,
+      "loseFewerThanThree": 10,
+      "loseNoLegalMoves": 10
+    },
+    "four_arms_both_colors_three_source_phases": true,
+    "strict_threefold_fifty_move_and_decisive_paths": true,
+    "free_and_A_pos_constrained_paths": true,
+    "durable_game_resource_alignment": true,
+    "sealed_rehearsal_result_written": false
+  },
+  "dynamic_coverage": {
+    "registry_identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+    "coverage_contract_identity": "164aa632b05ab6faad889937ac0afbec1333d0d048f96e9d384a4f865634fd07",
+    "required_boundary_events": 68,
+    "observed_boundary_events": 67,
+    "missing_boundary_ids": [
+      "solved-db.close"
+    ],
+    "unexpected_boundary_ids": [],
+    "coverage_ledger_identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+    "coverage_ledger_file_sha256": "cc74928bcccbe698da15ddedf29f89e30cdfbe6c1d591a6e66bd7d1b3ec02a0d",
+    "tail_event_sha256": "10a996c8f09d765bad58708f217d8bf3ca19a54c83f1b4692d0181eee6f939d0",
+    "failure_reason": "ExternalSolvedDB.close produced no real Python return event during the complete rehearsal."
+  },
+  "structural_observation": {
+    "TrainingAlignedPolicy.close_closes_specialist_db": true,
+    "TrainingAlignedPolicy.close_closes_human_db": true,
+    "TrainingAlignedPolicy.close_calls_ExternalSolvedDB_close": false,
+    "formal_route_would_execute_ExternalSolvedDB_close": false,
+    "interpretation": "The frozen registry classified a cleanup method as rehearsal-required even though the frozen formal route does not call it. Changing that classification after this result would be a post-hoc contract change."
+  },
+  "resource_use": {
+    "cumulative": {
+      "engine_single_step_searches": 496,
+      "malom_read_only_queries": 13561,
+      "active_seconds": 482.0538405000116,
+      "complete_games": 54
+    },
+    "attempt_003_increment": {
+      "engine_single_step_searches": 248,
+      "malom_read_only_queries": 6769,
+      "active_seconds": 367.73950110000444,
+      "complete_games": 27
+    },
+    "within_unchanged_envelope": true
+  },
+  "durable_ledgers": {
+    "game_records": 27,
+    "game_ledger_file_sha256": "778df498b514f91da909c653d697b457eab9482479973ac5c94785c0876b923e",
+    "game_ledger_tail_sha256": "b96ee758e1666982dbeaa16557f6730cf1a91b2836797abeae89581044951476",
+    "resource_checkpoints": 27,
+    "resource_ledger_file_sha256": "c41958ff2c6a073d2338c7239ce9683721b3a7707729c5df4304ca9f1de20915",
+    "resource_ledger_tail_sha256": "6984f08bfbad56c0fb3663816415dc94cc2445422e571262bd3cbd3e769e644c",
+    "complete_games_after": 54,
+    "recovery_alignment_passed": true
+  },
+  "output_namespace": {
+    "path": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-20260817-001",
+    "files": 7,
+    "bytes": 801955,
+    "file_manifest_identity": "7fe885631a9e4a7319bafd935f8a2a30bc581f7fd1d8f4a9ad6e2c6f6e67524c",
+    "preserve_byte_for_byte": true,
+    "artifacts": {
+      "boundary-coverage-events.jsonl": {
+        "bytes": 67159,
+        "sha256": "cc74928bcccbe698da15ddedf29f89e30cdfbe6c1d591a6e66bd7d1b3ec02a0d"
+      },
+      "NON-EVIDENCE.json": {
+        "bytes": 363,
+        "sha256": "d5538b698334cd282714690e156dd12a17afb24b03f719206fa63c51e54d4b2f"
+      },
+      "progress.json": {
+        "bytes": 371,
+        "sha256": "b44b408c90ec1f6253d346d2d5a92e637f62e81e4564808fdbf615bc2e237973"
+      },
+      "rehearsal-games.jsonl": {
+        "bytes": 709357,
+        "sha256": "778df498b514f91da909c653d697b457eab9482479973ac5c94785c0876b923e"
+      },
+      "resource-baseline.json": {
+        "bytes": 101,
+        "sha256": "30276a0fd7f26aa5fbc7c0857d4a7cba9d09347ab606bf1c352a375c977e815e"
+      },
+      "resource-checkpoints.jsonl": {
+        "bytes": 24342,
+        "sha256": "c41958ff2c6a073d2338c7239ce9683721b3a7707729c5df4304ca9f1de20915"
+      },
+      "sealed-writer-canary.json": {
+        "bytes": 262,
+        "sha256": "06b73403186383101ba6c6ef5e83a1b11a5ea6990c518a74115efa63b4cccc1f"
+      }
+    }
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0,
+    "training_or_weight_updates": 0,
+    "checkpoint_edits_copies_renames_or_alias_changes": 0,
+    "database_writes": 0
+  },
+  "disposition": {
+    "zero_game_preflight_authorized_to_start": false,
+    "formal_execution_authorized_to_start": false,
+    "automatic_retry_or_resume": false,
+    "further_tooling_construction": false,
+    "rehearsal_rerun_allowed": false,
+    "decision_required": "product owner must choose either an explicitly lowered acceptance contract or abandonment of this measurement"
+  },
+  "claim_boundary": {
+    "candidate_result": false,
+    "playing_strength_population_claim": false,
+    "human_trap_or_product_user_claim": false,
+    "training_value_claim": false,
+    "promotion_deployment_publication_release_or_training": false
+  }
+}
