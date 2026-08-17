@@ -1,0 +1,438 @@
+{
+  "attempt_id": "sanmill-trained-model-baseline-v1-attempt-003-classification-correction-v1",
+  "attempt_identity": "199e8ea4c3db17ea9815053edf7917726c7c7658885dfea1c3dd953dbeca8c49",
+  "authorization_basis": "Direct product-owner authorization titled 'baseline-v1 registry classification correction and formal execution'.",
+  "boundary_registry": {
+    "file_sha256": "23a2ef1066d27efa55ef77784cbf30060a7a9e3147b3cc4dc83b713dea5cfa91",
+    "full_rederivation_after_observation": true,
+    "identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+    "not_required_with_reason": 8,
+    "path": "docs/experiments/sanmill-trained-model-baseline-boundary-registry-v2.json",
+    "preflight_required": 6,
+    "rehearsal_required": 64,
+    "rows": 88,
+    "static_audit_only": 10
+  },
+  "claim_boundary": {
+    "equivalence_claim": false,
+    "fixed_runtime_start_pool_and_candidate_routes_only": true,
+    "human_trap_or_product_user_claim": false,
+    "playing_strength_population_claim": false,
+    "positional_only": true,
+    "promotion_deployment_publication_release_or_training": false,
+    "training_value_claim": false
+  },
+  "classification_correction": {
+    "classification_rebased_coverage": {
+      "corrected_missing_required": [],
+      "corrected_required_events": 64,
+      "coverage_ledger_identity": "2b0ef88576a805b71bb694e73ebc86090a8433358ebcab57aed32724ee6abc1a",
+      "derivation": "One-to-one re-sealing of the 67 immutable source events under the new registry identity; every event embeds its source event SHA. No Python function was re-executed and no runtime observation was added.",
+      "file_sha256": "eee835138121834e7fbe7cbb07293043a6f46a471e0d70f87ec78f37d65183f8",
+      "observed_events": 67,
+      "observed_newly_static_canary_events": [
+        "solved-db.query-all-moves",
+        "solved-db.query-move-quality",
+        "solved-db.query-trajectory"
+      ],
+      "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-rebased-coverage-2026-08-17.jsonl",
+      "registry_identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+      "source_coverage_ledger_identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+      "tail_event_sha256": "b3f470acb4e4aaccd8ee2b223db83ffde0d13ceca61110d508de3525f4c1b9fc"
+    },
+    "kind": "static-principle-classification-correction_not_failure_waiver",
+    "mapping_record": {
+      "file_sha256": "f7bc031eca8299aa3c15581ffce1593c35f3664390ff0cb4148be9a19487d2ca",
+      "identity": "1f51e4f92e51301e0e958b710503f0691b83e4b510da2db24d1ae9c3bff69477",
+      "path": "docs/evidence/sanmill-trained-model-baseline-boundary-registry-v2-classification-correction-2026-08-17.json"
+    },
+    "new_registry_identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+    "old_coverage_ledger_identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+    "old_failure_identity": "f28adaccaaacefed0bcb2c2a4cc98feff5061c9b24e2d9f113b14ee8a7c7d17b",
+    "old_registry_identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+    "old_rehearsal_not_68_of_68_or_passed": true,
+    "old_rehearsal_remains_failed": true,
+    "rehearsal_rerun": false,
+    "runtime_reexecution": false
+  },
+  "coverage_contract": {
+    "coverage_contract_identity": "5824252c90416781889ff44e10a89e89c2441a78d786e2becfad2014df11f787",
+    "expected_boundary_ids": [
+      "candidate.choice",
+      "candidate.load-model-policies",
+      "candidate.select-scored-move",
+      "game.append-record",
+      "game.compact-record",
+      "game.finalize",
+      "game.load-records",
+      "game.validate-record",
+      "game.verify-resource-alignment",
+      "malom.close",
+      "malom.db-init",
+      "malom.is-available",
+      "malom.move-value",
+      "malom.query",
+      "malom.query-value",
+      "malom.terminal-move-value",
+      "policy-set.close",
+      "policy-set.init",
+      "policy-set.scorer",
+      "referee.checked-position-state",
+      "referee.checked-search-result",
+      "referee.oracle-inventory",
+      "referee.replay-start",
+      "referee.strict-terminal-outcome",
+      "resource-ledger.active-seconds",
+      "resource-ledger.add-engine",
+      "resource-ledger.add-malom",
+      "resource-ledger.init",
+      "resource-ledger.record",
+      "resource-ledger.require-within",
+      "resource.append-checkpoint",
+      "resource.load-checkpoints",
+      "resource.write-json-atomic",
+      "resource.write-sealed-json",
+      "retained-scorer.close",
+      "retained-scorer.identity",
+      "retained-scorer.init",
+      "retained-scorer.score",
+      "sanmill-game.apply-move",
+      "sanmill-game.assert-board",
+      "sanmill-game.close",
+      "sanmill-game.history",
+      "sanmill-game.init",
+      "sanmill-game.session",
+      "sanmill-game.state",
+      "sanmill-session.close",
+      "sanmill-session.configure-strict",
+      "sanmill-session.init",
+      "sanmill-session.new-game",
+      "sanmill-session.position-startpos",
+      "sanmill-session.search-logical-turn",
+      "sanmill-session.state-json",
+      "solved-db.init",
+      "solved-db.is-available",
+      "solved-db.query",
+      "solved-db.query-state",
+      "specialist-scorer.close",
+      "specialist-scorer.identity",
+      "specialist-scorer.init",
+      "specialist-scorer.score",
+      "training-policy.bundle-identity",
+      "training-policy.close",
+      "training-policy.init",
+      "training-policy.score-moves"
+    ],
+    "formal_result_eligibility": false,
+    "observation": "real Python return event by frozen code object",
+    "registry_identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+    "schema_version": "nmm.sanmill-trained-model-boundary-coverage-contract.v1",
+    "stage": "rehearsal"
+  },
+  "cumulative_sunk_resources_before_attempt": {
+    "active_seconds": 114.31433940000716,
+    "charged_to_unchanged_aggregate_envelope": true,
+    "complete_games": 27,
+    "engine_single_step_searches": 248,
+    "malom_read_only_queries": 6792
+  },
+  "failure_rule": {
+    "automatic_retry_or_resume": false,
+    "formal_failure_after_marker": "stop_without_retry_resume_or_new_attempt",
+    "preflight_or_formal_tooling_or_contract_stop": "abandon_measurement_without_further_fix_proposal",
+    "rehearsal_rerun": false
+  },
+  "frozen_at_utc": "2026-08-17T00:00:00Z",
+  "implementation_files": {
+    "ai/malom_db.py": "dbec87cc589b087653fb540a1b084418eaa750ffc9b34ac41c560632852442ae",
+    "game/board.py": "a54421e8b099523ea7e4255e46fd6e6b8fe068595438aa107512b61fc1eb5377",
+    "game/rules.py": "1e93a87ee4f29a26787ecb1590d3d8a178033fd2fee1d6d95f17a925d2eac19a",
+    "learned_ai/evaluation/human_f0h0_feasibility.py": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95",
+    "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py": "a22db8eefa52b9914c5b456857be4c73a341775d6618474f166e104ffd6fc7e2",
+    "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py": "8f781370f6bf6d1c77e55fc2849de875cfab54e378f2a5a57b78e9bd364efd48",
+    "learned_ai/evaluation/sanmill_safe_inducement.py": "e9cf9abb4290473e5edcd63a7c75f182ad416722915f7ea2cafa42926ca022f3",
+    "learned_ai/evaluation/sanmill_trained_model_baseline.py": "111f4aec2824a18ec944d05815503c2c96074b05e8179a9a80995bc985692b2b",
+    "learned_ai/evaluation/sanmill_trained_model_boundary_registry.py": "a4b4b8002fc1d594cd75f15ba01ffabd06f8cedb7db995db9fd580df371378ec",
+    "learned_ai/evaluation/sanmill_uci.py": "f8e4e3984391d299e1a466860be52388bf39bfdd36d0d746dd8deb8e8e617441",
+    "learned_ai/evaluation/training_aligned_policy.py": "801db8eb26e9037eb7ef66ac31ca8802eb6eadecfb4c11a6054199982c7575df",
+    "learned_ai/sentinel/db_teacher.py": "18f55e96cf7041879d1df275a4c99ce406ff46e32044a2546be300cab245781d",
+    "learned_ai/training/sanmill_referee.py": "1ff9c0de59e2815e6c027f1391360172086b1da07642c4448ad72cc87a1d00f3",
+    "scripts/preflight_sanmill_trained_model_baseline.py": "b84c60eb08cad87258350616aeadb6334f80200f29f7b8ae1f1d7e9ed3a31f77",
+    "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py": "d546e375f26068ccdd69bca2c1ff91c8108766bd8f98b583f08dbfcdd9300086",
+    "scripts/run_sanmill_trained_model_baseline.py": "e472142f4e7176dbe2c3a3c972b23ada10c04c0c4be635ed7af76ba3fae31111",
+    "tests/test_sanmill_trained_model_baseline.py": "4549704dea8dd417abaf6582016e903d90c861ecbce21a096a9386bc12d4213b",
+    "tests/test_sanmill_trained_model_boundary_registry.py": "ab33d9c75d45cc6711628165c99103f2e8240ebb5b91417a4657dff4e6e157f8",
+    "tests/test_training_aligned_policy.py": "75e78a15019a5e88301b3a115e76277309293766cfab1d59b7e9f21158b06d9c"
+  },
+  "implementation_freeze": {
+    "commit": "286e2fe3a0681f10ca96709961e2d8f45cf3158f",
+    "implementation_file_hashes_are_authoritative": true,
+    "tree": "9894ebae6a7c5a1053b5e65fd815212129162135"
+  },
+  "lifecycle_risk_monitoring": {
+    "ExternalSolvedDB_owned_by_TrainingAlignedPolicy": true,
+    "adapter_close_missing_is_cleanup_omission": true,
+    "adapter_open_until_evaluator_process_teardown": true,
+    "fix_in_this_round": false,
+    "record_evaluator_peak_rss_and_open_handles": true,
+    "record_sanmill_peak_rss_and_open_handles": true,
+    "resource_exhaustion_signal": "fail_closed"
+  },
+  "outputs": {
+    "evidence_document": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-correction-result-2026-08-17.md",
+    "formal_output_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-003-classification-correction-20260817-001",
+    "formal_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-correction-manifest-2026-08-17.json",
+    "lifecycle_monitor": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-003-classification-correction-20260817-001-lifecycle-monitor.json",
+    "preflight_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-correction-preflight-2026-08-17.json",
+    "rehearsal_namespace": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-003-rehearsal-20260817-001",
+    "rehearsal_result": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-003-classification-corrected-rehearsal-2026-08-17.json"
+  },
+  "plan": {
+    "file_sha256": "559d7cb4c163605389774ecbc0f7ad07a3211d58779491dd61b180bb0ead85b5",
+    "identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+    "path": "docs/experiments/sanmill-trained-model-baseline-v1.json"
+  },
+  "preserved_history": {
+    "output_namespaces": [
+      {
+        "artifacts": {
+          "NON-EVIDENCE.json": {
+            "bytes": 258,
+            "sha256": "f7410c0dc36f95812f8b30dd385f84f36be1820ea614a91bde2e7fae0f48fa83"
+          },
+          "resource-baseline.json": {
+            "bytes": 98,
+            "sha256": "a2b92e69e7d3fe4b4dcac4b14c56acd96866b8b68b0aab06f2f95c2a12d84cbe"
+          }
+        },
+        "path": "out/evaluation/sanmill-trained-model-baseline-v1-rehearsal-20260816-001"
+      },
+      {
+        "artifacts": {
+          "NON-EVIDENCE.json": {
+            "bytes": 357,
+            "sha256": "b3cc3e9fce7be8eec90bbe56d628a8b18846b1caaf1dec085e8a21a600a16c31"
+          },
+          "progress.json": {
+            "bytes": 371,
+            "sha256": "f64d3b603fad9fd50a7afdebff645aba59089e0f84e49fa08bd94977fe074a4d"
+          },
+          "rehearsal-completed.json": {
+            "bytes": 238,
+            "sha256": "0b050e1a3439481acdcbbf5446baa6ec1d0f5c6f7ab79647f1b00fee713118b0"
+          },
+          "rehearsal-games.jsonl": {
+            "bytes": 708826,
+            "sha256": "9599b6fbbcfa0c61e8afd8ecbb79d416e69a13df67cf5c99a0057ba0a9ed6293"
+          },
+          "resource-baseline.json": {
+            "bytes": 97,
+            "sha256": "0e7922df0aeef6a73a2873ad3e93a99f47b668061c005f8c25a2f0bfda1bb989"
+          },
+          "resource-checkpoints.jsonl": {
+            "bytes": 24300,
+            "sha256": "7cea5489751c7f6fb445f395d979ef513821a8a93d4cc19f1054fb24a1e4f133"
+          }
+        },
+        "path": "out/evaluation/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-20260816-001"
+      }
+    ],
+    "tracked_files": [
+      {
+        "file_sha256": "775f368c2622c97f868d084f55be6bdde7248453e433d50ee394d94fae91f23c",
+        "identity": "76f7256d03c7265295f2d4f00b9a8ae492c137deaa0d034a6b530b1734a2a615",
+        "identity_field": "failure_identity",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.json"
+      },
+      {
+        "file_sha256": "8cf5ae35ab046bb3b4bc5b29ff5cd567e3729e19ff5d69556e2a21f66814f2d6",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-rehearsal-failure-2026-08-16.md"
+      },
+      {
+        "file_sha256": "0cd43b78daae6e3fd2263d008e8c13f755a0bf881832038dc42a19ee6f4000d7",
+        "identity": "3f30c558ec5710fa96392ec92af4fb3da300c5d04ca0a925de1ee9518fd5a54f",
+        "identity_field": "authorization_identity",
+        "path": "docs/experiments/sanmill-trained-model-baseline-v1/authorization.json"
+      },
+      {
+        "file_sha256": "22da6432bc8921b1f0fa0c3fe38327f00d0fa95783263746f0a64a843b8c644f",
+        "identity": "e92c2095d2a0bbcaf892fb8e6be707a9b8ca71d73b332bf9d7ce5dcae0f51d29",
+        "identity_field": "attempt_identity",
+        "path": "docs/experiments/sanmill-trained-model-baseline-attempt-002.json"
+      },
+      {
+        "file_sha256": "7efe5d9a87ce5fd6a643845d14cd69a724a6256bf490f98fcfb354819a6a47a0",
+        "identity": "785079e4aa59195ae94fad870128672a5bf266e7a5bd42e4d6cb19290c25adf1",
+        "identity_field": "authorization_identity",
+        "path": "docs/experiments/sanmill-trained-model-baseline-attempt-002/authorization.json"
+      },
+      {
+        "file_sha256": "d0f1a935498adf04c8f6a34026d100a1f459e85a39599a6f17b137b7a8cbdefb",
+        "identity": "a1287906883c1c85c09e4922b62b9ec2d1cf7830f88079e904ab0fbaf39054cc",
+        "identity_field": "rehearsal_identity",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-2026-08-16.json"
+      },
+      {
+        "file_sha256": "57b1bff5ebe9d2fa0cd315bf30ad2414d67469bbf36ce3283ea66eeeda7f2561",
+        "identity": "57f90937b336acb16ad09afae40fef3cafd9c806a001c428890f2f9ff426428a",
+        "identity_field": "failure_identity",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-rehearsal-acceptance-failure-2026-08-16.json"
+      },
+      {
+        "file_sha256": "4dff44f3381f1b4c12448add2d95e358bc34ba2dba94379c7d1b3801c5d631e7",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-instrumentation-audit-2026-08-16.md"
+      },
+      {
+        "file_sha256": "e999ba06aca349805bbcf3bf0223c22ed3563519a03bfe2ec8e2c148e47419cb",
+        "path": "docs/evidence/sanmill-trained-model-baseline-v1-attempt-002-tooling-structural-analysis-2026-08-16.md"
+      }
+    ]
+  },
+  "protected_access": {
+    "official_selection_confirmation_final_test": "unopened",
+    "research_confirmation": "unopened",
+    "source_pool_2eb04f54_remaining_108": "unread_and_unconsumed"
+  },
+  "protected_guard_canary": {
+    "membership_file_sha256": "06c3be92c87927d506dc36eb908aec3064220f4ead2ebb3b5ff3dfb7bf5032cb",
+    "membership_only_not_content": true,
+    "membership_path": "docs/experiments/f0-h0-design-b2-frozen-membership-v1.json",
+    "protected_partition": "final-test",
+    "protected_session_id": "ml11851743"
+  },
+  "rehearsal": {
+    "complete_games": 27,
+    "formal_result_eligibility": false,
+    "live_matrix": "three phases x four frozen arms x two candidate colors",
+    "live_model_games": 24,
+    "live_starts": [
+      {
+        "phase": "placement",
+        "record_identity": "a1c9285edd203f9ff7e911365aa583e449550e314509592d0b1ed33ffc8f6063",
+        "source_start_id": "phase-process-001",
+        "strict_history_sha256": "5150ab6b9b21fe6537df06a628a191754d06b5b562936d2f7207d63ddcabfe28"
+      },
+      {
+        "phase": "movement",
+        "record_identity": "2944fadda1026aae9dec5cafd1bdb42f7402e68d06d1e6643f6699931f30923a",
+        "source_start_id": "phase-process-019",
+        "strict_history_sha256": "135b36efb72856f9140f3bf2a2bdf20a3f52fce04ac990533179ac04970e220c"
+      },
+      {
+        "phase": "flying",
+        "record_identity": "a7638c48fdce9da0cce96efc2e4012a0f9c8eac81e64fab510ff4f5015b1f2fd",
+        "source_start_id": "phase-process-033",
+        "strict_history_sha256": "3eb920b40eea3d5b45a7e3d2b9ed4cb7fee549373db8b9c40f8a2d478db64284"
+      }
+    ],
+    "phase_corpus": {
+      "file_sha256": "8353ff3e52465bf99f7cf468a9cbcb4681a673ac2cebcdae00c253df8a22670b",
+      "identity": "3be3d76c34511e0f78d0f5bfe4a338c415c393306a955538bb85823e9d62c080",
+      "path": "docs/experiments/sanmill-retained-v3-v4-phase-process-corpus-v1.json"
+    },
+    "required_coverage": {
+      "all_four_arms": true,
+      "both_candidate_colors": true,
+      "free_and_A_pos_constrained_choice_paths": true,
+      "placement_movement_and_flying_starts": true,
+      "placement_movement_and_flying_turns": true,
+      "registry_generated_dynamic_coverage": true,
+      "resource_checkpoint_recovery": true,
+      "strict_decisive_terminal": true,
+      "strict_fifty_move_terminal": true,
+      "strict_threefold_terminal": true
+    },
+    "scripted_cases": [
+      {
+        "arm": "contract-threefold",
+        "case_id": "strict-threefold",
+        "outcome_class": "draw",
+        "outcome_reason": "drawThreefoldRepetition",
+        "source_game_id": "phase-process-game:ad4799bb475153abafb8b86748e5c10d27ba542601b173ec6fd7f7203f072d9b",
+        "source_record_sha256": "27cb2b3121017424a85c221e1db998acb4290cb1d7a67ec691e4aae1388b93fd",
+        "start": {
+          "phase": "movement",
+          "record_identity": "4dd8dec6ec3a398c280b2776c834631a95fa2de1f1926987b3fa05fec479b365",
+          "source_start_id": "phase-process-023",
+          "strict_history_sha256": "059346e8d605d19a3a2edbe1d663bdf7d24a74b4870d8b73b0a5e924a2a2bc5a"
+        }
+      },
+      {
+        "arm": "contract-fifty-move",
+        "case_id": "strict-fifty-move",
+        "outcome_class": "draw",
+        "outcome_reason": "drawFiftyMove",
+        "source_game_id": "phase-process-game:1da5b3622b33159d617cab6d4d0a7347395afb088cd6ca72d0a160b8f7ca2961",
+        "source_record_sha256": "e329916030746aaecbda78a8ab4c27896a61108cf7db3f781a5cc5750a4130c7",
+        "start": {
+          "phase": "movement",
+          "record_identity": "07e3787732d53739d35d4daacb8af50c367393fecb8e459352a12fa2b923d6b4",
+          "source_start_id": "phase-process-030",
+          "strict_history_sha256": "4deb33f78d439abb9323001a61b8399bc56960a3d1ddd592ebfab06b92b2f2cb"
+        }
+      },
+      {
+        "arm": "contract-decisive",
+        "case_id": "strict-decisive",
+        "outcome_class": "decisive",
+        "outcome_reason": "loseFewerThanThree",
+        "source_game_id": "phase-process-game:c2e53e45b45f6a998cf21c8ed16a367513b5098514140739a274702259caea32",
+        "source_record_sha256": "5bf719b4f4811b7a243dc86191232787d0a5ed08cb0302eec5c0f71ba0de7b11",
+        "start": {
+          "phase": "flying",
+          "record_identity": "d03567026c0a133fc3b13496bd33e5f7a2359b828eae070598978b53dd0e73b7",
+          "source_start_id": "phase-process-035",
+          "strict_history_sha256": "f2d058731a32da550b4a64ab2376dfc1e77c78eef75a9b0b1c8981820bec8bbb"
+        }
+      }
+    ],
+    "scripted_source_ledger": {
+      "file_sha256": "45506e5cedf5ab9bdcba9dd687349869b639fb8bd46fd8990cbaf4bb79ef3211",
+      "path": "learned_ai/checkpoints/evaluation/sanmill-retained-v3-v4-phase-process-generalization-v1/games.jsonl"
+    },
+    "scripted_strict_terminal_games": 3
+  },
+  "resource_envelope": {
+    "automatic_retry_resume_batching_or_extension": false,
+    "host_interruption_recovery_authorized": false,
+    "maximum_active_seconds": 21600,
+    "maximum_complete_games": 2540,
+    "maximum_concurrent_evaluators": 1,
+    "maximum_concurrent_sanmill_processes": 1,
+    "maximum_database_writes": 0,
+    "maximum_engine_single_step_searches": 120000,
+    "maximum_malom_queries": 25000000,
+    "maximum_reused_formal_starts": 254,
+    "maximum_training_updates": 0,
+    "planned_formal_games": 2032,
+    "planned_rehearsal_games": 10,
+    "planned_total_complete_games": 2042,
+    "stop_at_any_limit": true
+  },
+  "reused_rehearsal_resource_semantics": {
+    "cumulative_after_rehearsal": {
+      "active_seconds": 482.0538405000116,
+      "complete_games": 54,
+      "engine_single_step_searches": 496,
+      "malom_read_only_queries": 13561
+    },
+    "durable_rehearsal_checkpoint_count": 27,
+    "resource_baseline_complete_games": 27,
+    "resource_baseline_is_before_attempt_003_rehearsal": true
+  },
+  "schema_version": "nmm.sanmill-trained-model-baseline-attempt.v2",
+  "scientific_contract_preserved": {
+    "arms_unchanged": true,
+    "candidates_unchanged": true,
+    "formal_games": 2032,
+    "formal_membership_identity": "610f62e74b4a70500adfcaa3e0c19769dd178b480ef9765115ae6ab9a5af13d2",
+    "formal_start_pool_unchanged": true,
+    "formal_starts": 254,
+    "precision_target_unchanged": true,
+    "primary_estimand_unchanged": true,
+    "resource_ceiling_unchanged": true,
+    "start_pool_identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9",
+    "thresholds_unchanged": true
+  },
+  "status": "frozen_classification_correction_before_zero_game_preflight"
+}

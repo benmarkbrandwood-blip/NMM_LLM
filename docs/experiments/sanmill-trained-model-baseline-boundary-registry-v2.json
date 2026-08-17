@@ -1,0 +1,4767 @@
+{
+  "boundaries": [
+    {
+      "boundary_id": "malom.db-init",
+      "callable": "ai.malom_db:MalomDB.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 777,
+        "identity": "f28359f1c6432e32097317781cf7073fe1a8b8ad45b321bea0c2ffc06e27486b",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "28ad0b44851ee7d9493b3b7e0e840b7d50071c3d82c2961978c596c0b1f06780",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.__init__",
+          "source_sha256": "cd0094527fb54f0e947ad3934fa2c1c819565b990424ae1b5b126f541c280cce"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "reason": "Formal and rehearsal Malom access constructs the real read-only database with the resource observer.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Installs the single query observer; performs no counted table query.",
+      "result_shape_validator": "none",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "db_dir"
+          },
+          {
+            "annotation": "'Callable[[int], None] | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "query_observer"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, db_dir: 'str | Path', *, query_observer: 'Callable[[int], None] | None' = None) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "malom.close",
+      "callable": "ai.malom_db:MalomDB.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1000,
+        "identity": "46e456169a9fdee2ed51a8a0aa94b4ef45acccc7a2c9a47a66fa0a97a63158e1",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "a92fce253c67cd775ca1ae21142868696d090a2480746f3c3b85360047a17272",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.close",
+          "source_sha256": "f0e6dc6a5c6e2fc10e54d43214c2ee86c548c0b9127a82aaf15b4f8ec2193480"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "Formal and rehearsal execution close the real Malom database through this durability boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Closes read-only sector handles; no query increment.",
+      "result_shape_validator": "none",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "malom.is-available",
+      "callable": "ai.malom_db:MalomDB.is_available",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 812,
+        "identity": "b36570e83b961bf5e635c082d3baed99d02fee1daf64f9f906ec64939e47dd76",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "4a2918454966be2c1b2cbd3890ec30ed8d68a3e2802919c00de7411a960fcd7b",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "is_available",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.is_available",
+          "source_sha256": "4187ee55756cc172ae96f19e31d73f324a0264c6e6250cd9efbb2ea2b7a38319"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "is_available",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "The real candidate and canary paths test availability before relying on Malom data.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Availability check only; no query increment.",
+      "result_shape_validator": "bool",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'bool'",
+        "text": "(self) -> 'bool'"
+      }
+    },
+    {
+      "boundary_id": "malom.move-value",
+      "callable": "ai.malom_db:MalomDB.move_value",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 974,
+        "identity": "b2294f7ae9cdbbe8439bdf577b27fa4ab627afd2f61b02d556989190bde292b0",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "f8a4afcf6c21f7d0717bc8b4d214ea9c90235cf06b1ea07812ba20f40162dbfe",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "move_value",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.move_value",
+          "source_sha256": "e2a6d23aa10302d70eef88bff8ecbd5d96a7701cad996b154da383b01a1666ce"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "move_value",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "The all-surface Malom canary and move-quality adapter exercise this exact comparator used after table reads.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Pure value comparison; no table query increment.",
+      "result_shape_validator": "any",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'OracleValue'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "parent"
+          },
+          {
+            "annotation": "'OracleValue'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "child"
+          }
+        ],
+        "return_annotation": "'OracleMoveValue'",
+        "text": "(self, parent: 'OracleValue', child: 'OracleValue') -> 'OracleMoveValue'"
+      }
+    },
+    {
+      "boundary_id": "malom.query",
+      "callable": "ai.malom_db:MalomDB.query",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 967,
+        "identity": "3156071d966f9d090330807f47980d769be80d20a722d814b7ced46cd07c219b",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "11062d58b4c424dca5c89e3604c4e8bf0056607f7ba8df7196bc6cb6ff4cde23",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.query",
+          "source_sha256": "40e177a96f55098fad67f18daa499f250537d3a5ad9648f37be572f3256c3251"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "query",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "The required all-surface Malom rehearsal exercises the legacy mapping entry point and its delegation to the throat.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Delegates to query_value; exactly one query when the throat is reached.",
+      "result_shape_validator": "mapping-or-none",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'Optional[dict]'",
+        "text": "(self, board) -> 'Optional[dict]'"
+      }
+    },
+    {
+      "boundary_id": "malom.query-value",
+      "callable": "ai.malom_db:MalomDB.query_value",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 836,
+        "identity": "0f23fd4bf37319c387b32310db9444ec6fc48b2bfab121b742f3126b0193f86e",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "0cf5fcf802811d41372778b1e29b1c4a61baafd630de8dcf5540d52e1ae89c67",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query_value",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.query_value",
+          "source_sha256": "25c7a88452cf85692cad056ffbe2c99aaecfde9d29cc377984abad40e80f3766"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "query_value",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "This is the unique physical Malom lookup throat used by every formal positional label.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Reserves exactly one Malom query before a physical table lookup.",
+      "result_shape_validator": "oracle-or-none",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'Optional[OracleValue]'",
+        "text": "(self, board) -> 'Optional[OracleValue]'"
+      }
+    },
+    {
+      "boundary_id": "malom.terminal-move-value",
+      "callable": "ai.malom_db:MalomDB.terminal_move_value",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 987,
+        "identity": "95cde2134d9f0839ef498c1f167bd535fc6979ca6a93f4f50ff2747199bff040",
+        "source_path": "ai/malom_db.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "f8a4afcf6c21f7d0717bc8b4d214ea9c90235cf06b1ea07812ba20f40162dbfe",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "terminal_move_value",
+          "posonlyargcount": 0,
+          "qualname": "MalomDB.terminal_move_value",
+          "source_sha256": "6fa88b0e46104b963b13442e526f101996a939cd043fa67e77d1a28e8a12cb9c"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "ai.malom_db",
+      "public_member": "terminal_move_value",
+      "public_member_kind": "method",
+      "public_owner": "ai.malom_db:MalomDB",
+      "reason": "The terminal and move-quality canaries must test the no-table terminal value route used by the adapter.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Pure terminal comparison; no table query increment.",
+      "result_shape_validator": "any",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'OracleValue'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "parent"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "child_outcome"
+          }
+        ],
+        "return_annotation": "'OracleMoveValue'",
+        "text": "(self, parent: 'OracleValue', child_outcome: 'str') -> 'OracleMoveValue'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.init",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 61,
+        "identity": "060fb35caec6e182d20fd4d3b021f1905b8e22178111572b32b214309c5157a0",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "0a298af47db267f428bc32044c22d2d7c44140a5aafa51f9fe3c2cb9119187f6",
+          "flags": 16777219,
+          "kwonlyargcount": 2,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.__init__",
+          "source_sha256": "6a773e640b18937291eacead69a102db44184bf7d114746b99f25c5285ac14ce"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.sentinel.db_teacher",
+      "reason": "The retained-v4 formal route constructs this real solved-database adapter with the same query observer.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Constructs the adapter; performs no counted lookup.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": "''",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "db_path"
+          },
+          {
+            "annotation": "'bool'",
+            "default": "True",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "enabled"
+          },
+          {
+            "annotation": "'bool'",
+            "default": "False",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "strict"
+          },
+          {
+            "annotation": "'Callable[[int], None] | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "query_observer"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, db_path: 'str' = '', enabled: 'bool' = True, *, strict: 'bool' = False, query_observer: 'Callable[[int], None] | None' = None) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.best-move-result",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.best_move_result",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 383,
+        "identity": "7025aa50325c32c7629f436db04c4f63e76c4f3314f6de208b176628f8a0e145",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "13a7048f45ea358729a05d5f761ff43e9e80bd25a6460ccd64a7d6e25c1ef7c7",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "best_move_result",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.best_move_result",
+          "source_sha256": "4e4946504efc5a093dace6ecd758b607bb3f3766d18bf92b09a3c8cd6f6ce65b"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "best_move_result",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "This public utility is not called by the frozen formal scorer or durability path, so its signature and code are audited without manufacturing a rehearsal call.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Pure selection over supplied rows.",
+      "result_shape_validator": "mapping-or-none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'List[Dict[str, Any]]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "results"
+          }
+        ],
+        "return_annotation": "'Optional[Dict[str, Any]]'",
+        "text": "(results: 'List[Dict[str, Any]]') -> 'Optional[Dict[str, Any]]'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.close",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.close",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 448,
+        "identity": "65c42e1b2c5a8ebf3b70bf5b89737890eb173b3981dd9cc8ffeaedd797757b72",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "d3813ac9a5d0bb9ede96839220535b2737adc4519acce64154b296e03c2efa95",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.close",
+          "source_sha256": "e974e0ff97653ae1a6d56bd17e3a05c47fc554dbd5ffd6eaec2ede654ffbda7e"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "TrainingAlignedPolicy.close does not call ExternalSolvedDB.close, and the frozen formal route has no other caller; this owned-but-unclosed cleanup surface is audited statically and tracked as a bounded lifecycle risk.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Closes the delegated read-only Malom handle.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.is-available",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.is_available",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 133,
+        "identity": "218c1caff314d1be7bd900839c5f50574f71b9fe7d5b1311ad0e71b1a4809284",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "4a2918454966be2c1b2cbd3890ec30ed8d68a3e2802919c00de7411a960fcd7b",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "is_available",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.is_available",
+          "source_sha256": "1797e42fae8bb87b9242972d212e9a5d5eed9e1afc12353e3be0fffaebd3f950"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "is_available",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "The retained-v4 route and all-surface canary validate solved-database availability.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Availability check only.",
+      "result_shape_validator": "bool",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'bool'",
+        "text": "(self) -> 'bool'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.query",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.query",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 174,
+        "identity": "a48e61158fee74afafd1255b640766cde50f4c5b57b5c5c61f43c021385db36f",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "e1f51f7835a88e18d7eda9b1dcb7bc52bc9082707e509622eb08a9ded6286f8a",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.query",
+          "source_sha256": "4dfa88d3e76b086b0cf600cdbc89022e02b97cc82002dfb98e8a24f089d93f8d"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "query",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "The required all-surface rehearsal exercises the EndgameSolvedDB-compatible query alias.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Delegates to query_state; terminal short circuits count zero, otherwise one throat query.",
+      "result_shape_validator": "str-or-none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'Optional[str]'",
+        "text": "(self, board) -> 'Optional[str]'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.query-all-moves",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.query_all_moves",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 285,
+        "identity": "1e0e6a0da1ae78df6b45e2882fd59b7d3ba9769a75541265d46d1352d4956d97",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "92bd10b771dd365a627692112e4814076ce6043fd87c035d560065b67c698153",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query_all_moves",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.query_all_moves",
+          "source_sha256": "bf18bd18e9b81616c7c566f2badb0607df3b81601635c0190e4af0435d46ec96"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "query_all_moves",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "The frozen TrainingAlignedPolicy passes db=None to the scaffolded encoder and its lookahead advisor calls query rather than query_all_moves; this canary-only public surface is outside formal gameplay and durability.",
+      "required_stage": "static-audit",
+      "resource_semantics": "One parent query plus one query per nonterminal legal child.",
+      "result_shape_validator": "list",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "player"
+          }
+        ],
+        "return_annotation": "'List[Dict[str, Any]]'",
+        "text": "(self, board, player) -> 'List[Dict[str, Any]]'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.query-move-quality",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.query_move_quality",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 205,
+        "identity": "b8bb88f1135941432715a303d03b66c94d9affb8a8152de6b2a10bf80e5b5931",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "83c57f649189a0af495aadc46467c4d05e7aed669fc5077f59dc145a4c115a20",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query_move_quality",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.query_move_quality",
+          "source_sha256": "de7f34d8ad58914241b4fb27b10f6ac26aa4737ed7caba4ba90ee6c5a09e35d3"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "query_move_quality",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "No frozen formal baseline call path invokes ExternalSolvedDB.query_move_quality; the method was reached only by the all-surface canary and remains under static signature and code audit.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Queries the parent and nonterminal child through the single throat.",
+      "result_shape_validator": "number-or-none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "'Dict[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "move"
+          }
+        ],
+        "return_annotation": "'Optional[float]'",
+        "text": "(self, board, move: 'Dict[str, Any]') -> 'Optional[float]'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.query-state",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.query_state",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 167,
+        "identity": "2c906c795d59e271abdf86515e8ceecd9ca996984597ab579b4d345fc8a64ce4",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "27119ec11d2a1b484d5cc4902ce14392914707d59363f1446453d8ef43fc2d63",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query_state",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.query_state",
+          "source_sha256": "4052de6a1478487b909569054187373798313b6e21258e294c315dbf8d1c1dd9"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "query_state",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "The retained-v4 lookahead route and terminal canary use this state-label adapter.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Terminal short circuit counts zero; nonterminal lookup reaches the throat once.",
+      "result_shape_validator": "str-or-none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'Optional[str]'",
+        "text": "(self, board) -> 'Optional[str]'"
+      }
+    },
+    {
+      "boundary_id": "solved-db.query-trajectory",
+      "callable": "learned_ai.sentinel.db_teacher:ExternalSolvedDB.query_trajectory",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 431,
+        "identity": "d532eb1eb2e633b888b3057c6e374f121e341f5e20401ed26170076c5e393ab2",
+        "source_path": "learned_ai/sentinel/db_teacher.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "c9bf26842f3d5bf9e9db8130a65fc6aab98ebaa8755ecf5562597d11832b741a",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "query_trajectory",
+          "posonlyargcount": 0,
+          "qualname": "ExternalSolvedDB.query_trajectory",
+          "source_sha256": "937a5742d7d741250e72b336e5aab1093b7c0c6e12be26b57f5dbc09eb530dc9"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.sentinel.db_teacher",
+      "public_member": "query_trajectory",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.sentinel.db_teacher:ExternalSolvedDB",
+      "reason": "No frozen formal baseline call path invokes ExternalSolvedDB.query_trajectory; the method was reached only by the all-surface canary and remains under static signature and code audit.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Delegates each state to query_state with terminal-aware accounting.",
+      "result_shape_validator": "list",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'List[Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "states"
+          }
+        ],
+        "return_annotation": "'List[Optional[str]]'",
+        "text": "(self, states: 'List[Any]') -> 'List[Optional[str]]'"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.init",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 2,
+        "identity": "492b26d32fc856d1e01e4117994d9e601e79f233f10883d558c5f07123ff641a",
+        "source_path": "<string>",
+        "structural": {
+          "argcount": 8,
+          "bytecode_sha256": "1897020eb5365308b1e0883e02de376b2e5105c1c652eda9c7883ca768dc235a",
+          "flags": 19,
+          "kwonlyargcount": 0,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "__create_fn__.<locals>.__init__",
+          "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every rehearsal and formal run begins from a cumulative, bounded resource ledger.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Initializes cumulative counters and immutable ceilings.",
+      "result_shape_validator": "none",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "engine_searches"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "malom_queries"
+          },
+          {
+            "annotation": "'float'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "active_seconds_before_run"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "maximum_engine_searches"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "maximum_malom_queries"
+          },
+          {
+            "annotation": "'float'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "maximum_active_seconds"
+          },
+          {
+            "annotation": "'float'",
+            "default": "0.0",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "started"
+          }
+        ],
+        "return_annotation": "None",
+        "text": "(self, engine_searches: 'int', malom_queries: 'int', active_seconds_before_run: 'float', maximum_engine_searches: 'int', maximum_malom_queries: 'int', maximum_active_seconds: 'float', started: 'float' = 0.0) -> None"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.active-seconds",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.active_seconds",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 299,
+        "identity": "03299d288a837b4ccabf949d6fd356a0bccc687a3703e7fe60f730080d385b36",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "26e6d7a0477c95b731b3c5029a06317c5f327d0a52c9868487a1a6fea433299e",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "active_seconds",
+          "posonlyargcount": 0,
+          "qualname": "ResourceLedger.active_seconds",
+          "source_sha256": "f9c0076020b72cee214fe1dc86fb722166fb52818a95f77fc166b1a382550474"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "public_member": "active_seconds",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger",
+      "reason": "Every resource snapshot reads this cumulative active-time property.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Reads elapsed active time without resetting it.",
+      "result_shape_validator": "number",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'float'",
+        "text": "(self) -> 'float'"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.add-engine",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.add_engine",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 303,
+        "identity": "987612bdd61f5a2f8f7fad655aeb2e4767aa6d9359d20df460a110ca97b0bcd8",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "d9ccfb277670809f39784e7192270f188401b8840787c2215fdc268497f5f48e",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "add_engine",
+          "posonlyargcount": 0,
+          "qualname": "ResourceLedger.add_engine",
+          "source_sha256": "1ff81e3c2be4d8a55ae65587f1eeaadec1cf84c7d6a230afb1d46afc4946966c"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "public_member": "add_engine",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger",
+      "reason": "Formal and rehearsal engine calls reserve their searches at this boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Increments engine-search count and fails at the frozen ceiling.",
+      "result_shape_validator": "none",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": "1",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "count"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, count: 'int' = 1) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.add-malom",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.add_malom",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 311,
+        "identity": "84806c2befaa1e714738824084884f2bf635a794c4c16b84709a8d0dd5e98b8c",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "d9ccfb277670809f39784e7192270f188401b8840787c2215fdc268497f5f48e",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "add_malom",
+          "posonlyargcount": 0,
+          "qualname": "ResourceLedger.add_malom",
+          "source_sha256": "4cba7889971ee54251027fbd8ed2f4917c8b6b2eda8164c507eb46628e9926fa"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "public_member": "add_malom",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger",
+      "reason": "The real Malom query observer reserves every physical lookup here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Increments Malom-query count and fails before exceeding the ceiling.",
+      "result_shape_validator": "none",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "count"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, count: 'int') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.record",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.record",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 327,
+        "identity": "1e9954a4cebe09eb7e9040cef7dfba4146cf378d0e42c6a3ca808a1a135baea3",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "9e53a776e4a662b0e2a05091afb8709937c8a5b7d989bb42fc8784f5b431d478",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "record",
+          "posonlyargcount": 0,
+          "qualname": "ResourceLedger.record",
+          "source_sha256": "7b4980f046ba15b09dfee9998e79f155c47c148a9cca7e22bebf6564e44094ed"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "public_member": "record",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger",
+      "reason": "Per-game resource checkpoints and final evidence use this cumulative snapshot.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Returns cumulative counters without resetting them.",
+      "result_shape_validator": "mapping",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(self) -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "resource-ledger.require-within",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger.require_within",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 319,
+        "identity": "df9f6891337613e34b4489c0feb65055f2a2a0ccdcdb834884c8abc11b42e5d9",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "b815133892d6cdd97ba9df9970865829ae77303477436509842f0e93a1d14bc3",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "require_within",
+          "posonlyargcount": 0,
+          "qualname": "ResourceLedger.require_within",
+          "source_sha256": "1e9681b0d2768c5af4fbabff1b935da4c27acbabc3ce52693f59db8747123635"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "public_member": "require_within",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:ResourceLedger",
+      "reason": "Every logical ply checks all resource ceilings before continuing.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Fails closed at any resource ceiling; changes no counter.",
+      "result_shape_validator": "none",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "training-policy.init",
+      "callable": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 106,
+        "identity": "b9ee97285794cb6ce705926a3b0736f0c8e163137f1d6315bf33b75dd29b36cb",
+        "source_path": "learned_ai/evaluation/training_aligned_policy.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "ac09df737aec9939901d3f41cc85c7e8a7da16030f889d2fcd1f13d007efc4e4",
+          "flags": 16777219,
+          "kwonlyargcount": 8,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "TrainingAlignedPolicy.__init__",
+          "source_sha256": "19034f4a44e53eed90b2ec86bee5a9544354237edabc271feba77f7c9468f922"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.training_aligned_policy",
+      "reason": "The exact retained-v4 route is constructed in both rehearsal and formal execution.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only policy construction; no fitting or update.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'torch.nn.Module'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "policy"
+          },
+          {
+            "annotation": "'torch.nn.Module'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "target"
+          },
+          {
+            "annotation": "'dict[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "manifest"
+          },
+          {
+            "annotation": "'HumanDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "human_db"
+          },
+          {
+            "annotation": "'SpecialistDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "specialist_db"
+          },
+          {
+            "annotation": "'ExternalSolvedDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "malom"
+          },
+          {
+            "annotation": "'dict[str, dict[str, Any]]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "resource_reports"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "device"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, *, policy: 'torch.nn.Module', target: 'torch.nn.Module', manifest: 'dict[str, Any]', human_db: 'HumanDB', specialist_db: 'SpecialistDB', malom: 'ExternalSolvedDB', resource_reports: 'dict[str, dict[str, Any]]', device: 'str') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "training-policy.bundle-identity",
+      "callable": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy.bundle_identity",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 143,
+        "identity": "aa884ff9fd5f7296b98fac5cc59d1bf1d6780280af848acf1c1260a1806d8594",
+        "source_path": "learned_ai/evaluation/training_aligned_policy.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "9801c00745f663c39e607639c88e07e24df14a23348af026205bc8cbf96d29e5",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "bundle_identity",
+          "posonlyargcount": 0,
+          "qualname": "TrainingAlignedPolicy.bundle_identity",
+          "source_sha256": "3304a3748588a4efff80ca6491fd2ac144630f3e0c71eeec8de6ec969e129b1e"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.training_aligned_policy",
+      "public_member": "bundle_identity",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy",
+      "reason": "Runtime identity checks read this property before accepting candidate output.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Identity read only.",
+      "result_shape_validator": "str",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "training-policy.choose-move",
+      "callable": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy.choose_move",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 203,
+        "identity": "66ecb59eaa09f5c6dbfcc08b606c8124cd7ceeabcc452982e0025f5bff110969",
+        "source_path": "learned_ai/evaluation/training_aligned_policy.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "dc797682455f8c6b05e3e60ca5a0c02de45443e3ef2f6994e95b1ef0dc4701da",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "choose_move",
+          "posonlyargcount": 0,
+          "qualname": "TrainingAlignedPolicy.choose_move",
+          "source_sha256": "2618826b100cddf1681644b478b62f656eabd5aad6b3706d15c15eaa2bfff8d1"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.training_aligned_policy",
+      "public_member": "choose_move",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy",
+      "reason": "The frozen baseline scores all legal moves through score_moves and never calls the convenience choose_move method; forcing it would not cover a formal path.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "mapping",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(self, board) -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "training-policy.close",
+      "callable": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 210,
+        "identity": "3346c5da878f68971e1c8cb06cdbdfb274def7f9820f044f553b4adf03a7dbef",
+        "source_path": "learned_ai/evaluation/training_aligned_policy.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "be17551f0f45a0faaaa9a2167a933142dd97663cf9bfb024ccbeb71a2eb905e7",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "TrainingAlignedPolicy.close",
+          "source_sha256": "636141786a6d1f919a467f1146f4b4e89bea169d64729579c110e59a95a93391"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.training_aligned_policy",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy",
+      "reason": "Rehearsal and formal policy context cleanup uses this exact close path.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Closes read-only model-route resources.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "training-policy.score-moves",
+      "callable": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy.score_moves",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 147,
+        "identity": "ab417b1fbb77696c5ea2174ab32ba006ee313e3a55fc293e51317e4d463758d7",
+        "source_path": "learned_ai/evaluation/training_aligned_policy.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "aa2adcc81f7ddc4dffbf655aa96c6864709eab2ee2d84ebe153ee760eb09ae1b",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "score_moves",
+          "posonlyargcount": 0,
+          "qualname": "TrainingAlignedPolicy.score_moves",
+          "source_sha256": "1a62285f7117c5a95938fa6455bdba60194ca724559721cf37e61b6429189b83"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.training_aligned_policy",
+      "public_member": "score_moves",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.training_aligned_policy:TrainingAlignedPolicy",
+      "reason": "Every retained-v4 candidate decision in formal execution enters this scorer.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only inference; Malom lookahead queries count at the throat.",
+      "result_shape_validator": "score-pair",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'tuple[list[dict[str, Any]], np.ndarray]'",
+        "text": "(self, board) -> 'tuple[list[dict[str, Any]], np.ndarray]'"
+      }
+    },
+    {
+      "boundary_id": "retained-scorer.init",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 222,
+        "identity": "090cbaa949914dfadca8d496434678d8321b7305a2a82066b2786d6e6db2e0ca",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "bffd00620b13ec1f22c06921efbc379676604b5fdb99d89bda59bd1df17c0fc3",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "_RetainedV4Scorer.__init__",
+          "source_sha256": "b4686b6c0c8d1840e4a0f705a8df9f51a360749c51926b75166ec646481204f6"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "The formal retained route is wrapped by this exact non-delegating adapter.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Stores the read-only policy reference.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'TrainingAlignedPolicy'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "policy"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, policy: 'TrainingAlignedPolicy') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "retained-scorer.close",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 233,
+        "identity": "be09f85e913b7922fe485150282d6018297e195f9d248bb673c38b750d1382f7",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "453f6f61554000ee1e108c7825cadf78a42042b8c87577ea95506742358f64d2",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "_RetainedV4Scorer.close",
+          "source_sha256": "9b1b4ee6265b94c0f88deccb4e43704b74851852489402d31f9624514461c954"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer",
+      "reason": "Formal and rehearsal cleanup closes the retained scorer through this adapter.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Delegates cleanup only.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "retained-scorer.identity",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer.identity",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 225,
+        "identity": "f1ee0730377ec2d48d10905aadaa189e79981d8a2489bb40ed2fa8bb49ae22b1",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "250877d268b87a86881c7e4f76da7227288f95062e8304055e248ce90c118a86",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "identity",
+          "posonlyargcount": 0,
+          "qualname": "_RetainedV4Scorer.identity",
+          "source_sha256": "c42541bac2fa1b9a4798ec1cd01e7e09ddaee83849b00ab9e529606c49ecb7df"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "identity",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer",
+      "reason": "Every candidate choice records and checks this frozen runtime identity.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Identity read only.",
+      "result_shape_validator": "str",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "retained-scorer.score",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer.score",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 229,
+        "identity": "cc24d149efdbc25f4f05a2c4095aec49d8e5b803d51eaa00e3a6028209804659",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "c1963b589097e2beb8b23642e75a5e7cad40874ce3b81f5f0c9fa8dec0e0ccf8",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "score",
+          "posonlyargcount": 0,
+          "qualname": "_RetainedV4Scorer.score",
+          "source_sha256": "754e0a29f090d716462b612cd69c5603dd1497554daa090cbaca68fb61738a7b"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "score",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_RetainedV4Scorer",
+      "reason": "Every retained-v4 formal decision reaches this adapter and the underlying policy scorer.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only scoring; no model update.",
+      "result_shape_validator": "score-triple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'tuple[list[dict[str, Any]], np.ndarray, str]'",
+        "text": "(self, board: 'BoardState') -> 'tuple[list[dict[str, Any]], np.ndarray, str]'"
+      }
+    },
+    {
+      "boundary_id": "specialist-scorer.init",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 240,
+        "identity": "afec9c47267da6a02ad336c36444a605f1cb08ee34ac6923cb5969dd02bb75c5",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "1cc52445126f7b164278a693a5de9f0222829e9a869d7724495b788994a0fa86",
+          "flags": 16777219,
+          "kwonlyargcount": 3,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "_ProductSpecialistScorer.__init__",
+          "source_sha256": "cad7a06ab97f5dd95a3ab76a471656975d3a56b33b6c297c6b4faa716c8b4396"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "The active three-specialist formal route is constructed through this adapter.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Stores read-only router and HumanDB references.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'SpecialistRouter'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "router"
+          },
+          {
+            "annotation": "'HumanDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "human_db"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "identity"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, *, router: 'SpecialistRouter', human_db: 'HumanDB', identity: 'str') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "specialist-scorer.close",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 307,
+        "identity": "afc78ea723cb3093a9db1449166947fcbf333b350a2a5f9f4ef32d3a6b0df4d5",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "453f6f61554000ee1e108c7825cadf78a42042b8c87577ea95506742358f64d2",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "_ProductSpecialistScorer.close",
+          "source_sha256": "8888bbf2655258fec92f918aaf4b0748087029d67862f82b95222fab552002ba"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer",
+      "reason": "Formal and rehearsal cleanup closes the active specialist resources here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Closes read-only specialist and HumanDB resources.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "specialist-scorer.identity",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer.identity",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 255,
+        "identity": "9dbe5cb1121d9a7e62cac16c85115d46abbf094b6f25cac7d549994ff4af303d",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "4a2918454966be2c1b2cbd3890ec30ed8d68a3e2802919c00de7411a960fcd7b",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "identity",
+          "posonlyargcount": 0,
+          "qualname": "_ProductSpecialistScorer.identity",
+          "source_sha256": "148c138a8479011e46700f256f4a49c686ea0af065e5c2c7f820e794d8edd1f7"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "identity",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer",
+      "reason": "Every specialist choice records and checks the frozen product-route identity.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Identity read only.",
+      "result_shape_validator": "str",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "specialist-scorer.score",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer.score",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 259,
+        "identity": "a3e02b563b714369481a888bc5e73ddcf6a28dce1185d92dbff639dc0745d91e",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "fb70feade0a1f562294d367c3159a0be02d9b5aff790586dad0d62321d94ebe7",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "score",
+          "posonlyargcount": 0,
+          "qualname": "_ProductSpecialistScorer.score",
+          "source_sha256": "5a77988db9ad05c91b87536417cbb841be551fda2755c7afec6b74f2df38dad8"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "score",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:_ProductSpecialistScorer",
+      "reason": "Every active-specialist formal decision reaches this adapter and exact product scoring route.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only scoring; no model update.",
+      "result_shape_validator": "score-triple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          }
+        ],
+        "return_annotation": "'tuple[list[dict[str, Any]], np.ndarray, str]'",
+        "text": "(self, board: 'BoardState') -> 'tuple[list[dict[str, Any]], np.ndarray, str]'"
+      }
+    },
+    {
+      "boundary_id": "policy-set.init",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:ModelPolicySet.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 314,
+        "identity": "f8c27f1affaf65c2e17970c77dd67d4fcd71d35e7be23d01e3f490eb3c748226",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "654889b91d7a018b01f9fa3dda70d5b36e774693fb7efddc9b77fc9e81b44751",
+          "flags": 16777219,
+          "kwonlyargcount": 2,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "ModelPolicySet.__init__",
+          "source_sha256": "6f12c65afe04805c01d4d6b63b1f273f6e01ccb3f15f73b58d43cfd38bcb7fcd"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "The frozen two-candidate context is created in rehearsal and formal execution.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Stores exact read-only scorer routes.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'_RetainedV4Scorer'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "retained_v4"
+          },
+          {
+            "annotation": "'_ProductSpecialistScorer'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "specialists"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, *, retained_v4: '_RetainedV4Scorer', specialists: '_ProductSpecialistScorer') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "policy-set.close",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:ModelPolicySet.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 328,
+        "identity": "e17b0ee0ea9de7b2f55821f727e89e48b7ad2197e44fec02764ccaf2d9c7d0d0",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "b73e0e2cca2eb34d513543ad1cebd5c4b91c8f77997fe6525e63cca167686f50",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "ModelPolicySet.close",
+          "source_sha256": "d8ae6e60694932834bea8e26cb72041aa70991d08e46cbdbbd78369187b2e1e1"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:ModelPolicySet",
+      "reason": "Context exit closes both candidate routes in rehearsal and formal execution.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Cleanup only.",
+      "result_shape_validator": "none",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "policy-set.scorer",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:ModelPolicySet.scorer",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 325,
+        "identity": "065d7aede62a58301c7b04146a98e2c293c7dd84736aa956c2b9fd2dc588d69c",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "0c955d1d10554a7f17b8d315bb68d0e4453c04b97dc6addad7cc043b187166b0",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "scorer",
+          "posonlyargcount": 0,
+          "qualname": "ModelPolicySet.scorer",
+          "source_sha256": "fed83c2ffa84dc932fd237ba2ca025fe1ca6e25c89c011903410256b2001fb2e"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "public_member": "scorer",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_trained_model_baseline:ModelPolicySet",
+      "reason": "Every formal arm resolves its exact candidate through this arm-to-scorer boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Route selection only.",
+      "result_shape_validator": "any",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "arm"
+          }
+        ],
+        "return_annotation": "'Any'",
+        "text": "(self, arm: 'str') -> 'Any'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.init",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1670,
+        "identity": "187f4acb22da5f731dd74d027db9d5b762d0b56513abce8ae127d9c8948850c8",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "dacb90647b3a1d56f2da11d5b2a9fcd425d64610bb367afc72b50518ead4df45",
+          "flags": 16777219,
+          "kwonlyargcount": 3,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.__init__",
+          "source_sha256": "de0dba4b76ecba852881b186716f4d75b194ef3d5871e98e6847d03546487266"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "reason": "Each rehearsal and formal game starts the exact pinned Sanmill process through this constructor.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Starts one process; no search is counted until a go command.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'SanmillInstallation'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "installation"
+          },
+          {
+            "annotation": "'int'",
+            "default": "42",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "seed"
+          },
+          {
+            "annotation": "'float'",
+            "default": "10.0",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "protocol_timeout"
+          },
+          {
+            "annotation": "'float'",
+            "default": "120.0",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "search_timeout"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, installation: 'SanmillInstallation', *, seed: 'int' = 42, protocol_timeout: 'float' = 10.0, search_timeout: 'float' = 120.0) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.close",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1880,
+        "identity": "434a173f911c808f6ee59fe608514c52e3c60eccb9e49b3483549de9a43bcd2f",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "994f309a100ac439187db0eea2b0c3e31104f1c8627238fdb6e4606614421c0a",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.close",
+          "source_sha256": "57cfc8717f3d71f17c519a92d07629217fcde3175c15605aaf74ebf5421d7eee"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Every game closes the exact Sanmill process through this boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Process cleanup only.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.configure-strict",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.configure_strict_referee_profile",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1900,
+        "identity": "875d148b487eb3bdfb7386decdbf310d3dc8358fe71c0cdeb4c425696ca341a1",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "7bad6e1fa1546ae8114299f8bf6893f18ae5c8bcaceb956cd7ff77037fb15562",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "configure_strict_referee_profile",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.configure_strict_referee_profile",
+          "source_sha256": "83afa685613fe48a1cac0da89bc0762461b4aa3ec4ffca538380b6464ed08d46"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "configure_strict_referee_profile",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Every game explicitly selects the frozen strict referee profile.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Engine option synchronization; no search.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": "'mif-stable-moving-v1'",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "profile"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, profile: 'str' = 'mif-stable-moving-v1') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.debug-outcome",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.debug_outcome",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1970,
+        "identity": "b6193c7c8a127b3a24b5e9186ee21ff70d22f3f9a8fe0c253385832710f08a38",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "6b181fb6991d08fc22be7fb77c23853e87059e44ea702e8c2deb53262c2291f5",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "debug_outcome",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.debug_outcome",
+          "source_sha256": "135033f55323dcf0aeb22949f28b53f17c24045fcc7d5a2814ef4201daac7328"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "debug_outcome",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "The frozen game path uses authoritative statejson and never calls the human-readable debug command.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "any",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'UciOutcomeState'",
+        "text": "(self) -> 'UciOutcomeState'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.export-fen",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.export_fen",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1938,
+        "identity": "017000b90941bb0001fa13520be2d6dc5a3aef3562517d34634b2ab8870c6b38",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "ce4c8eeafade52fc73c464d03b0d93cd79f594826e42783527ad1e780d889856",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "export_fen",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.export_fen",
+          "source_sha256": "b1b8144d3c7c6e23db78a24515a8778f07682775ca4629fd42f4830b86be7eab"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "export_fen",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "The frozen game path reads FEN from statejson and does not use the standalone export command.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "str",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.history-summary",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.history_summary",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1961,
+        "identity": "94946b357ae849fcc2600690ef1bd2c2d634e4d40511e1bd0d7e85bbf2e11226",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "61d5fc934caf91a7dd3d588709199c59e9f4fa75ce6dbdd958e17dd4565717e7",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "history_summary",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.history_summary",
+          "source_sha256": "e44101f9d3a3baa5947969be6fc716b226e510e4b1abc21c10ed82cbf254da15"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "history_summary",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "The frozen game path uses statejson history fields and never calls the text history summary.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "str",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.legal-moves",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.legal_moves",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1947,
+        "identity": "82e430f436b18c77e0eee0a4b8f98fa6e5da534f814345678153af03f32bf8aa",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "934fdc045cc2367a82e200aa5e9b8f9a2848ae40c54bdec6bb1a76f5e652ffb0",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "legal_moves",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.legal_moves",
+          "source_sha256": "e9aac6276e2e18de409ddfb0d8aa43713b402d0fc6a6a5832db435bfd6be8faa"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "legal_moves",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Legal actions are carried by statejson and parity-checked there; the standalone command is outside formal execution.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "tuple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'tuple[str, ...]'",
+        "text": "(self) -> 'tuple[str, ...]'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.new-game",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.new_game",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1895,
+        "identity": "8f05d69537f340917bf46abcf289b5e8253453e2a47afed10c75f4a545208344",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "f63554dd4208b8930a454f91ccd2549e626548c36688fa46db8a6c3b1eb87075",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "new_game",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.new_game",
+          "source_sha256": "1f78d88cc75f426b6a680adb95cff02aa228fbe2b6f5a5a12380e11b1f3006ff"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "new_game",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Every rehearsal and formal process resets game and repetition state through this command.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Rule-state reset; no search.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.position-fen",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.position_fen",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1928,
+        "identity": "76977f758c5196426ebcaae0e20cdccda442c7b9505601ffc79dc4e9ee041bef",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "79ac979c875d57bd8449d3bd6c4fbc00ee7e073740409465d4af17da6c73b4a9",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "position_fen",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.position_fen",
+          "source_sha256": "e0ac0ad59ce5dde1ccbb31f42e92ba5b9381dc66c323451950338659aa648064"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "position_fen",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "All frozen starts are replayed from startpos with complete history; position_fen is deliberately outside the formal path.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "fen"
+          },
+          {
+            "annotation": "'Sequence[str]'",
+            "default": "()",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "actions"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, fen: 'str', actions: 'Sequence[str]' = ()) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.position-startpos",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.position_startpos",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1920,
+        "identity": "73204c39f2f8cac5792f218219bf6fef4584ceb9b1718593a1225e76b868f556",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "bde7b6fb182a08113e42e506fd2f49da8733b7216ddb0f221796ec804f778a88",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "position_startpos",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.position_startpos",
+          "source_sha256": "6162c96bbaf790170b11e3056106282a5002201146a9f5c6e9f1eefa259023ad"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "position_startpos",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Every start and every committed move reconstructs strict rule history through this exact command.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Replays rule history; no search increment.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'Sequence[str]'",
+            "default": "()",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "actions"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, actions: 'Sequence[str]' = ()) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.position-state",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.position_state",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 1980,
+        "identity": "cc348f157cb6b82f289cbba128d275c4d619954a992c69c685a3e7eecc795810",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "a50c30767d19f28807f76cda3ff43e0b1ff26a871abb0a7199686bb2c839d8ad",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "position_state",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.position_state",
+          "source_sha256": "e94e2c29a90affa5963ead65b41bd06d55a3dc8b9e9b5d5ef42ba94ef2489a4a"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "position_state",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "This compatibility alias is not called; the formal path calls state_json directly.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "uci-position-state",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'UciPositionState'",
+        "text": "(self) -> 'UciPositionState'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.probe-terminal-draw",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.probe_terminal_draw",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 2116,
+        "identity": "fad5cd0e75fc0b2c2634253cf59cade470488f5a46d79df6969c4087e8c3ea3a",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "937dc772e2ab92cb89797fc891e61ed29dcef8fc34a9f4e92995c23fcddebda4",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "probe_terminal_draw",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.probe_terminal_draw",
+          "source_sha256": "ba17e16302e8628dff2112e607a51bf602102d595962a8d2f9337d9eda7323f8"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "probe_terminal_draw",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "This diagnostic helper is outside formal gameplay; strict terminal coverage uses real replay and statejson.",
+      "required_stage": "static-audit",
+      "resource_semantics": "No formal resource semantics.",
+      "result_shape_validator": "any",
+      "role": "canary",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "node_budget"
+          }
+        ],
+        "return_annotation": "'UciSearchResult'",
+        "text": "(self, node_budget: 'int') -> 'UciSearchResult'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.search-fixed-nodes",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.search_fixed_nodes",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 2102,
+        "identity": "a28870cf5accdc6cb349aece20149823a8c106d4504c76525ede82691dcdde56",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "e6d3dfc80c9fe42ec4500be3080a64c5c67e731f8ffc6ecadaf7b8800aaaa79e",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "search_fixed_nodes",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.search_fixed_nodes",
+          "source_sha256": "e7ee8550b6b049a4e256df819258b5ecaa21ea805c5cf263aa8da49f11c241a6"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "search_fixed_nodes",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "The frozen protocol exclusively uses complete logical-turn search; atomic fixed-node search is outside formal execution.",
+      "required_stage": "static-audit",
+      "resource_semantics": "No formal resource semantics.",
+      "result_shape_validator": "any",
+      "role": "canary",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "node_budget"
+          }
+        ],
+        "return_annotation": "'UciSearchResult'",
+        "text": "(self, node_budget: 'int') -> 'UciSearchResult'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.search-logical-turn",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.search_logical_turn",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1993,
+        "identity": "6281c7e5c243c5504bb1310edc148c65594f07614da4062cbab2f9a5e8054e8e",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "a0e09b517c813bb0889d4c0c6e1360fe7fa300debc842424c0094705fafebc62",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "search_logical_turn",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.search_logical_turn",
+          "source_sha256": "af3d0b9184e38a32f44a5c4f1e155cca08879f8e68bd812c9c47ee10af0b2897"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "search_logical_turn",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "Every Sanmill formal move uses this complete logical-turn search boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Exactly one engine single-step search is reserved by the caller.",
+      "result_shape_validator": "uci-logical-turn",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "node_budget"
+          },
+          {
+            "annotation": "'int | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "depth"
+          }
+        ],
+        "return_annotation": "'UciLogicalTurnResult'",
+        "text": "(self, node_budget: 'int', *, depth: 'int | None' = None) -> 'UciLogicalTurnResult'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.state-json",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.state_json",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1984,
+        "identity": "4db6fb4fe1be03f420816bb03c27141d7b6b08f9989ac8e627a152eb4b143b49",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "d81c2614eb1825c80fa6d7557ef48019cde3ada277ab24295a5103089e5695ee",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "state_json",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.state_json",
+          "source_sha256": "0b8891d784d28e8e4e55bfbd068ed8231a011712a141ded33a3fe9e9c9a87346"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "state_json",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "All strict clocks, repetition history, legal actions, and terminal results come from this authoritative state boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Rule-state query; no engine search increment.",
+      "result_shape_validator": "uci-position-state",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'UciPositionState'",
+        "text": "(self) -> 'UciPositionState'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-session.stderr-text",
+      "callable": "learned_ai.evaluation.sanmill_uci:SanmillUciSession.stderr_text",
+      "callable_kind": "property-getter",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 1740,
+        "identity": "0e249698796374c1c556c7bb366ef4ce8f7b61d9437c2776a3ecf5fed9608bcb",
+        "source_path": "learned_ai/evaluation/sanmill_uci.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "b73ba91b387c8a16efd1325b9889af4683076034d7932da347e066e246eac708",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "stderr_text",
+          "posonlyargcount": 0,
+          "qualname": "SanmillUciSession.stderr_text",
+          "source_sha256": "77d5737c74a7914d66e789547367d411324841248fd5e7edda80a0e7df2caf6c"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.evaluation.sanmill_uci",
+      "public_member": "stderr_text",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.evaluation.sanmill_uci:SanmillUciSession",
+      "reason": "This diagnostic property is consulted only when reporting a failure, not on the successful formal path.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Diagnostic read only.",
+      "result_shape_validator": "str",
+      "role": "canary",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(self) -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.init",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.__init__",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 283,
+        "identity": "97d1062b22ad291b55584a39746cfc81eaeaceb34e70604fdd5a7b4252e3cbcb",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "6eb64d73cf2b9aebcb003d3a2cbadca20d3319e533675dbf7afd6fd0a5d5ab66",
+          "flags": 16777219,
+          "kwonlyargcount": 5,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.__init__",
+          "source_sha256": "a7a3f457f6e34ee7d2110c1d7f9b27aba0ca7dda3107a855d7d8a22b8100cce4"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "reason": "Every rehearsal and formal game creates the same history-bearing referee wrapper.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Stores immutable runtime settings; process starts on context entry.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'SanmillInstallation'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "installation"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "seed"
+          },
+          {
+            "annotation": "'Callable[..., SanmillUciSession]'",
+            "default": "<class 'learned_ai.evaluation.sanmill_uci.SanmillUciSession'>",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "session_factory"
+          },
+          {
+            "annotation": "'float'",
+            "default": "10.0",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "protocol_timeout"
+          },
+          {
+            "annotation": "'float'",
+            "default": "120.0",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "search_timeout"
+          },
+          {
+            "annotation": "'Callable[[str, float], None] | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "timing_observer"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, installation: 'SanmillInstallation', *, seed: 'int', session_factory: 'Callable[..., SanmillUciSession]' = <class 'learned_ai.evaluation.sanmill_uci.SanmillUciSession'>, protocol_timeout: 'float' = 10.0, search_timeout: 'float' = 120.0, timing_observer: 'Callable[[str, float], None] | None' = None) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.apply-move",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.apply_nmm_move",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 434,
+        "identity": "f6473fa5f1ee030197fd157f5a2e425fbddb2dc0814e36a9806b0e96770dbbe5",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "5f4ae2aadeade0d787154bf2a1cbf29be94dc0d1c8853c9ebcfbe54a99a0e8d7",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "apply_nmm_move",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.apply_nmm_move",
+          "source_sha256": "f2854aa030f26cb159632f9eb523b8037d3ec83623c8a9b8aeb91124054a4812"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "apply_nmm_move",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "Every candidate and engine move commits through this sole strict-rule transition boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Replays complete history and advances exactly one logical ply.",
+      "result_shape_validator": "sanmill-applied-turn",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "move"
+          },
+          {
+            "annotation": "'UciLogicalTurnResult | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "search_result"
+          }
+        ],
+        "return_annotation": "'SanmillAppliedTurn'",
+        "text": "(self, board: 'BoardState', move: 'Mapping[str, Any]', *, search_result: 'UciLogicalTurnResult | None' = None) -> 'SanmillAppliedTurn'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.assert-board",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.assert_current_board",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 382,
+        "identity": "05659161392b513001049743e5f6ca6761169f535c1d59f101fe0c6b7f9ea508",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "52621be958376f37d8863ebf1f7c38b84a64270f9c70d81451c7fa06172d3d26",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "assert_current_board",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.assert_current_board",
+          "source_sha256": "c8523d3ebc56648ec34dcc1d428c0ceea0ead142232a130171b60bb576a020d2"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "assert_current_board",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "Every strict transition verifies local/Sanmill mirror and legal-action parity here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Validation only.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "'Mapping[str, Any] | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "transition"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, board: 'BoardState', *, transition: 'Mapping[str, Any] | None' = None) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.close",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.close",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 340,
+        "identity": "2e725690a8ca09c4cc0d045aab254a4a28bc21f70a86d2d5819027accdcda370",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "7a31120cb7867912e1d88a14ad58830627ef9ef52d679411127b8e87676c9ce7",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "close",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.close",
+          "source_sha256": "e7e2d835d7b624621f3163b9b3380a7d62e4a572c9baedac59c5c00130f93e05"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "close",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "Every rehearsal and formal game closes its sole Sanmill session here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Process cleanup only.",
+      "result_shape_validator": "none",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self) -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.history",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.history",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 345,
+        "identity": "a4e8e4b7cb0da3674774b7dd6e0d1bf508f6d6481937f8a7a521b7b093ebaf8d",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "57c8ae217ee7834b321001384f51709daa5cde7e56208365436e2ce5a0fe70c0",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "history",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.history",
+          "source_sha256": "219a55b2abcf1739325d96bb56771264be42be6fdcf1377f138fcf8505240ee0"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "history",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "Replay and induced-event evidence read the exact complete action history here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "History read only.",
+      "result_shape_validator": "tuple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'tuple[str, ...]'",
+        "text": "(self) -> 'tuple[str, ...]'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.search-and-apply",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.search_and_apply",
+      "callable_kind": "callable",
+      "classification": "not-required-with-reason",
+      "code_identity": {
+        "first_line": 508,
+        "identity": "aa5ed35096f6df77ac87fc66ac32ed64a2fe4cdd6905191790704f055297769c",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "9773944ec20cbfb600b68f7e80f6ba0e6d8d4f465b0570d51369e48e619d0dd9",
+          "flags": 16777219,
+          "kwonlyargcount": 2,
+          "name": "search_and_apply",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.search_and_apply",
+          "source_sha256": "61d5c83c86d1b9afebc07d0cc50bdbd29304747d6bad2405e99d492639a1ecb6"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "none",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "search_and_apply",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "The frozen baseline intentionally composes search_logical_turn and apply_nmm_move to retain and validate the semantic report; the 2026-08-17 audit proves successful transition equivalence, and this helper is not on formal execution.",
+      "required_stage": "not-required",
+      "resource_semantics": "Not used by the frozen formal baseline.",
+      "result_shape_validator": "sanmill-applied-turn",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "node_budget"
+          },
+          {
+            "annotation": "'int | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "KEYWORD_ONLY",
+            "name": "depth"
+          }
+        ],
+        "return_annotation": "'SanmillAppliedTurn'",
+        "text": "(self, board: 'BoardState', *, node_budget: 'int', depth: 'int | None' = None) -> 'SanmillAppliedTurn'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.session",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.session",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 355,
+        "identity": "a6d9366f9f66caea5915ce520756c486e5d17eaa289b2a158181d2afecec1cd0",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "2a6b3b392aeacbadbc136ca49fd5e6cb33a090f83684695827f11bcad2adbf3f",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "session",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.session",
+          "source_sha256": "a16ecd5d04b4b0348079a1eec139373a05167752de4be2da475700aff51eed92"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "session",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "The formal manual search composition obtains the exact live UCI session through this property.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Session reference read only.",
+      "result_shape_validator": "any",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'SanmillUciSession'",
+        "text": "(self) -> 'SanmillUciSession'"
+      }
+    },
+    {
+      "boundary_id": "sanmill-game.state",
+      "callable": "learned_ai.training.sanmill_referee:SanmillTrainingGame.state",
+      "callable_kind": "property-getter",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 349,
+        "identity": "deb20e17758223695e8a58fa294b3ba3533dbb73c3c636e6ab865dc37af7e0aa",
+        "source_path": "learned_ai/training/sanmill_referee.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "2a6b3b392aeacbadbc136ca49fd5e6cb33a090f83684695827f11bcad2adbf3f",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "state",
+          "posonlyargcount": 0,
+          "qualname": "SanmillTrainingGame.state",
+          "source_sha256": "5d8b3069bfbf41a326be99011aea101f835627e972380ea649bd16cecaad922f"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.training.sanmill_referee",
+      "public_member": "state",
+      "public_member_kind": "property",
+      "public_owner": "learned_ai.training.sanmill_referee:SanmillTrainingGame",
+      "reason": "Every turn and terminal package reads the authoritative typed strict state here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "State reference read only.",
+      "result_shape_validator": "uci-position-state",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          }
+        ],
+        "return_annotation": "'UciPositionState'",
+        "text": "(self) -> 'UciPositionState'"
+      }
+    },
+    {
+      "boundary_id": "protected-access.init",
+      "callable": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess.__init__",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 2,
+        "identity": "5f0708f8652549b8d5b59d8c9e2e697da1b4cd12b742bf6d33c89d72eb944a7d",
+        "source_path": "<string>",
+        "structural": {
+          "argcount": 6,
+          "bytecode_sha256": "dbb6cebe189aa1f599a380c98d65a6eae5ca72c585521e3ca922e3926268af15",
+          "flags": 19,
+          "kwonlyargcount": 0,
+          "name": "__init__",
+          "posonlyargcount": 0,
+          "qualname": "__create_fn__.<locals>.__init__",
+          "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "learned_ai.evaluation.human_feature_deviation_estimator_readiness",
+      "reason": "The zero-game preflight constructs an empty allowlist guard before exercising denial paths.",
+      "required_stage": "preflight",
+      "resource_semantics": "No protected content read.",
+      "result_shape_validator": "none",
+      "role": "protected-guard",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'Mapping[str, str]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "official_partition_by_session"
+          },
+          {
+            "annotation": "'Mapping[str, str]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "research_partition_by_session"
+          },
+          {
+            "annotation": "'frozenset[str]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "allowed_sessions"
+          },
+          {
+            "annotation": "'Counter[tuple[str, str]]'",
+            "default": "<factory>",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "successful"
+          },
+          {
+            "annotation": "'Counter[tuple[str, str]]'",
+            "default": "<factory>",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "denied"
+          }
+        ],
+        "return_annotation": "None",
+        "text": "(self, official_partition_by_session: 'Mapping[str, str]', research_partition_by_session: 'Mapping[str, str]', allowed_sessions: 'frozenset[str]', successful: 'Counter[tuple[str, str]]' = <factory>, denied: 'Counter[tuple[str, str]]' = <factory>) -> None"
+      }
+    },
+    {
+      "boundary_id": "protected-access.assert-allowed",
+      "callable": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess.assert_allowed",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 1808,
+        "identity": "4ac8fe2857b6e0656ff9eafd368193e3e7672fe19870040c6df4731feee98c9a",
+        "source_path": "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "2ff8083f46086a6035e0c038b4a120f35603cd30a91b6d68b9e8dbee5f175554",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "assert_allowed",
+          "posonlyargcount": 0,
+          "qualname": "EstimatorAccess.assert_allowed",
+          "source_sha256": "4a52ccc4953601d5e564573f5da956a51efd1b1dbed873181a125065a2b0f768"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "learned_ai.evaluation.human_feature_deviation_estimator_readiness",
+      "public_member": "assert_allowed",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess",
+      "reason": "The poison preflight must dynamically prove protected sessions are rejected before content access.",
+      "required_stage": "preflight",
+      "resource_semantics": "Denial accounting only; no protected content read.",
+      "result_shape_validator": "none",
+      "role": "protected-guard",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "session_id"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "access_kind"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(self, session_id: 'str', *, access_kind: 'str') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "protected-access.derive",
+      "callable": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess.derive",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 1822,
+        "identity": "72b71b485ba520069d845f0cd4c93d410805f82271eee419f23076f9f41fa179",
+        "source_path": "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "1c236b8f74dc19c6d5dde028681daeb296678b7133d73c834952cb5e020e270a",
+          "flags": 16777219,
+          "kwonlyargcount": 2,
+          "name": "derive",
+          "posonlyargcount": 0,
+          "qualname": "EstimatorAccess.derive",
+          "source_sha256": "92b51fb020f5f7062cad6d2bc6bd647319be57e09f88492d083dae11f2e13261"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "learned_ai.evaluation.human_feature_deviation_estimator_readiness",
+      "public_member": "derive",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess",
+      "reason": "The poison preflight must enter the generic producer gate and prove its producer is never called.",
+      "required_stage": "preflight",
+      "resource_semantics": "No protected content read when denial succeeds.",
+      "result_shape_validator": "any",
+      "role": "protected-guard",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "session_id"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "access_kind"
+          },
+          {
+            "annotation": "'Callable[[], Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "producer"
+          }
+        ],
+        "return_annotation": "'Any'",
+        "text": "(self, session_id: 'str', *, access_kind: 'str', producer: 'Callable[[], Any]') -> 'Any'"
+      }
+    },
+    {
+      "boundary_id": "protected-access.from-memberships",
+      "callable": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess.from_memberships",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 1777,
+        "identity": "c2bd4cf783adff893eb202bf3e31dbcea36e42743ea0f8d8b28cbedd11c28111",
+        "source_path": "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "9145a01534b95b02291741e400fac0cef3388bed53e3a275f46b51f5225c109d",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "from_memberships",
+          "posonlyargcount": 0,
+          "qualname": "EstimatorAccess.from_memberships",
+          "source_sha256": "1c3fc82506cae8e8ac4213bd188a29a6e64ded3eeafbfc61569a3567e2bc170a"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.evaluation.human_feature_deviation_estimator_readiness",
+      "public_member": "from_memberships",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess",
+      "reason": "The baseline preflight constructs a minimal guard directly and does not need to open either frozen membership to test denial.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Static surface only; opening protected memberships is unnecessary.",
+      "result_shape_validator": "any",
+      "role": "protected-guard",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "official_membership"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "research_split"
+          },
+          {
+            "annotation": "'Sequence[str]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "allowed_sessions"
+          }
+        ],
+        "return_annotation": "\"'EstimatorAccess'\"",
+        "text": "(official_membership: 'Mapping[str, Any]', research_split: 'Mapping[str, Any]', *, allowed_sessions: 'Sequence[str]') -> \"'EstimatorAccess'\""
+      }
+    },
+    {
+      "boundary_id": "protected-access.load-decisions",
+      "callable": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess.load_decisions",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 1834,
+        "identity": "794b77085892f5c5704960251967892c77621de6a57b0e3e06de9fba54b558e7",
+        "source_path": "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py",
+        "structural": {
+          "argcount": 4,
+          "bytecode_sha256": "759960c0b2ac1feb0a3a6667e6f5750fbeda51255ce9ba5cfc6b20105595862a",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "load_decisions",
+          "posonlyargcount": 0,
+          "qualname": "EstimatorAccess.load_decisions",
+          "source_sha256": "8f7464815dad79174a05334295cead0e33d3f89aafe730f679f7dbf801212337"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "learned_ai.evaluation.human_feature_deviation_estimator_readiness",
+      "public_member": "load_decisions",
+      "public_member_kind": "method",
+      "public_owner": "learned_ai.evaluation.human_feature_deviation_estimator_readiness:EstimatorAccess",
+      "reason": "The poison preflight must enter the real content-loading boundary and prove denial occurs before its producer reads a raw game.",
+      "required_stage": "preflight",
+      "resource_semantics": "Must fail before protected content read.",
+      "result_shape_validator": "list",
+      "role": "protected-guard",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "repository_root"
+          },
+          {
+            "annotation": "'CorpusRecord'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "record"
+          },
+          {
+            "annotation": "'F0D0Boundary'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "boundary"
+          }
+        ],
+        "return_annotation": "'list[Any]'",
+        "text": "(self, repository_root: 'Path', record: 'CorpusRecord', boundary: 'F0D0Boundary') -> 'list[Any]'"
+      }
+    },
+    {
+      "boundary_id": "candidate.load-model-policies",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:load_model_policies",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 348,
+        "identity": "063e8427d01f9ff208a24aebcf6222c371f3b07fdbe6a4b5f75c41363d7b649f",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 0,
+          "bytecode_sha256": "b99f7702b627a09fe5571baacf08b8d4546ca9b89cff689d89c84f73acf6c626",
+          "flags": 16777219,
+          "kwonlyargcount": 5,
+          "name": "load_model_policies",
+          "posonlyargcount": 0,
+          "qualname": "load_model_policies",
+          "source_sha256": "386b545ecb8db40710799b121a184741291799121783ce11ebecbac84ca43dfd"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Rehearsal must traverse the exact read-only candidate loading path formal execution will use.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only model and database loading; no fit or update.",
+      "result_shape_validator": "any",
+      "role": "candidate-adapter",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "plan"
+          },
+          {
+            "annotation": "'Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "root"
+          },
+          {
+            "annotation": "'Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "malom_path"
+          },
+          {
+            "annotation": "'Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "malom_manifest_path"
+          },
+          {
+            "annotation": "'ResourceLedger'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "ledger"
+          }
+        ],
+        "return_annotation": "'ModelPolicySet'",
+        "text": "(*, plan: 'Mapping[str, Any]', root: 'Path', malom_path: 'Path', malom_manifest_path: 'Path', ledger: 'ResourceLedger') -> 'ModelPolicySet'"
+      }
+    },
+    {
+      "boundary_id": "candidate.select-scored-move",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_select_scored_move",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 503,
+        "identity": "6e5465e86ffbf854bf8edaf820cad30b81923b97bea5f9be48c294b66b270386",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 0,
+          "bytecode_sha256": "7c9893da65e9902e9cdfb3f5f6872ef58c5a449df016020d650fa7aab9c27765",
+          "flags": 16777219,
+          "kwonlyargcount": 3,
+          "name": "_select_scored_move",
+          "posonlyargcount": 0,
+          "qualname": "_select_scored_move",
+          "source_sha256": "5cbcc216706f45d2b2c8008daec774c75333b728dd34a6fa0b8bb0491a7b00f0"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Every free and A_pos-constrained formal candidate choice uses this validated argmax boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Pure selection; no query or search.",
+      "result_shape_validator": "move-choice-pair",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Sequence[Mapping[str, Any]]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "legal_moves"
+          },
+          {
+            "annotation": "'np.ndarray'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "scores"
+          },
+          {
+            "annotation": "'set[tuple[str, str, str]]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "allowed_keys"
+          }
+        ],
+        "return_annotation": "'tuple[dict[str, Any], dict[str, Any]]'",
+        "text": "(*, legal_moves: 'Sequence[Mapping[str, Any]]', scores: 'np.ndarray', allowed_keys: 'set[tuple[str, str, str]]') -> 'tuple[dict[str, Any], dict[str, Any]]'"
+      }
+    },
+    {
+      "boundary_id": "candidate.choice",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_candidate_choice",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 541,
+        "identity": "48ffca4910717663bcd827902eedc0740b01fb2d58ecce2c6951b2b354d9bb15",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 0,
+          "bytecode_sha256": "57028698dea32be5262c7fa52c6f742afc121291689c1a7be315a0a28ab0a4d6",
+          "flags": 16777219,
+          "kwonlyargcount": 5,
+          "name": "_candidate_choice",
+          "posonlyargcount": 0,
+          "qualname": "_candidate_choice",
+          "source_sha256": "93a9307c8cbff2990b933e6a4d247a12d62512d922287b842d770c48c2c6b3a6"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Every formal candidate turn scores, labels, constrains, and packages its move here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Malom inventory queries count through the single throat.",
+      "result_shape_validator": "move-choice-pair",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "board"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "arm"
+          },
+          {
+            "annotation": "'ModelPolicySet'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "policies"
+          },
+          {
+            "annotation": "'MalomDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "database"
+          },
+          {
+            "annotation": "'ResourceLedger'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "ledger"
+          }
+        ],
+        "return_annotation": "'tuple[dict[str, Any], dict[str, Any]]'",
+        "text": "(*, board: 'BoardState', arm: 'str', policies: 'ModelPolicySet', database: 'MalomDB', ledger: 'ResourceLedger') -> 'tuple[dict[str, Any], dict[str, Any]]'"
+      }
+    },
+    {
+      "boundary_id": "candidate.specialist-gameai-audit",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:audit_specialist_gameai_dependency",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 443,
+        "identity": "e05501b8e8ae11c9edd31be6bebed37856bd30232bd0e087e224a4dcbdcfd3df",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 0,
+          "bytecode_sha256": "8a0528dd21b438c07320c2900cd5f56545c753b2a7b4a62b2fcfd242cbfbee88",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "audit_specialist_gameai_dependency",
+          "posonlyargcount": 0,
+          "qualname": "audit_specialist_gameai_dependency",
+          "source_sha256": "e67dea8c660af19338ae73084df8f45d5264101011089e1e1fd968482d3a3ad1"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "The zero-game preflight must prove the product specialist score path does not read warmed GameAI state.",
+      "required_stage": "preflight",
+      "resource_semantics": "Static source canary; no game or query.",
+      "result_shape_validator": "mapping",
+      "role": "canary",
+      "signature": {
+        "parameters": [],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "() -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "candidate.boundary-static-audit",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:audit_instrumentation_surface",
+      "callable_kind": "callable",
+      "classification": "static-audit-only",
+      "code_identity": {
+        "first_line": 473,
+        "identity": "ac7e830e81b91f4510b65ff074d09f71fdb3616a69b8820b79eae67d34fd8f82",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "e4c412b18d4b5d27241851ad10e644c29f8f77baf1cb1b9eaa8de39375bf9581",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "audit_instrumentation_surface",
+          "posonlyargcount": 0,
+          "qualname": "audit_instrumentation_surface",
+          "source_sha256": "0ed7ad8f95b8e9dde9488c7a097afefc631cc492918ee187d182d68067b52137"
+        }
+      },
+      "dynamic_required": false,
+      "evidence_mode": "static-audit",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "The registry-generated static audit validates itself before rehearsal and preflight; manufacturing a profile event would add no formal path coverage.",
+      "required_stage": "static-audit",
+      "resource_semantics": "Static reflection and source inspection only.",
+      "result_shape_validator": "mapping",
+      "role": "canary",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Path | None'",
+            "default": "None",
+            "has_default": true,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "root"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(root: 'Path | None' = None) -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "candidate.poison-gameai",
+      "callable": "scripts.preflight_sanmill_trained_model_baseline:_PoisonGameAI.__getattribute__",
+      "callable_kind": "callable",
+      "classification": "preflight-required",
+      "code_identity": {
+        "first_line": 69,
+        "identity": "37ee1187531956a582f25d8ea17b30f4007eb43e4b23e121cb7a403c32a8019e",
+        "source_path": "scripts/preflight_sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "232a239a33196ff1d1baf277c030bc743a0b2fe3e9c2cb65a46ce48c3b64bf9c",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "__getattribute__",
+          "posonlyargcount": 0,
+          "qualname": "_PoisonGameAI.__getattribute__",
+          "source_sha256": "1bb8c38a72baa131421f0ef6db630ccd04ffeea1751aef48ac6b14b3c01b6606"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "explicit-canary",
+      "module": "scripts.preflight_sanmill_trained_model_baseline",
+      "reason": "The zero-game preflight must execute the poison attribute interceptor and prove the successful specialist score path never reads it.",
+      "required_stage": "preflight",
+      "resource_semantics": "No game, search, query, or protected read.",
+      "result_shape_validator": "any",
+      "role": "canary",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "<empty>",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "self"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "name"
+          }
+        ],
+        "return_annotation": "'Any'",
+        "text": "(self, name: 'str') -> 'Any'"
+      },
+      "source_interceptor": "scripts/preflight_sanmill_trained_model_baseline.py:_PoisonGameAI.__getattribute__"
+    },
+    {
+      "boundary_id": "referee.checked-search-result",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:_checked_search_result",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 670,
+        "identity": "a6b186ecb18e3cc993a4c4f10e47f86c4811e6748c97ce349c242ffcd0ed9f21",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "e0d25f838043f48fa81b81d5762d6d9925668d903c08fdefef1d173039b98962",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "_checked_search_result",
+          "posonlyargcount": 0,
+          "qualname": "_checked_search_result",
+          "source_sha256": "7b291fefd87068cd3f9901954caa1693c16d215a281ef04173d2d8e67d79e1b2"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every formal Sanmill response is validated against its typed and portable semantic contract here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Validation only.",
+      "result_shape_validator": "mapping",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'UciLogicalTurnResult'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "result"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "expected_node_budget"
+          }
+        ],
+        "return_annotation": "'Mapping[str, Any]'",
+        "text": "(result: 'UciLogicalTurnResult', *, expected_node_budget: 'int') -> 'Mapping[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "referee.checked-position-state",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:_checked_position_state",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 697,
+        "identity": "8c514a1e4441c21042f214b8e8267f5b5227801d5fb738c21d44d4113284850f",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "c14c68ac27c0b8056d9d8fddd303f20a98f5c5082ed88d6620c7b77220d9f9ba",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "_checked_position_state",
+          "posonlyargcount": 0,
+          "qualname": "_checked_position_state",
+          "source_sha256": "8ffefb529ef204cb46772f4ae047ed2e41ddb9ab131c72dfa1cd8c12114de0a2"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every committed turn and terminal package cross-checks typed strict state here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Validation only.",
+      "result_shape_validator": "mapping",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'UciPositionState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "state"
+          }
+        ],
+        "return_annotation": "'Mapping[str, Any]'",
+        "text": "(state: 'UciPositionState') -> 'Mapping[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "referee.strict-terminal-outcome",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:_strict_terminal_outcome",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 726,
+        "identity": "f562ce907d8a3ce27c1d7074cf03cd25f6e1915ded6a88f72dcae9c7e1bb31d9",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "6faeb9f2dfbb5fb29cb6a5f1f6f039a7469aff494cf2319e8e2a832f6215476b",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "_strict_terminal_outcome",
+          "posonlyargcount": 0,
+          "qualname": "_strict_terminal_outcome",
+          "source_sha256": "e95cc69db2e840a8c0a594c6e1c88ff5acca4e90f643e3b3c7ca0939c0c89f97"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every completed formal game derives winner and strict reason through this boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Strict state read only; Malom cannot replace it.",
+      "result_shape_validator": "tuple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'UciPositionState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "state"
+          }
+        ],
+        "return_annotation": "'tuple[str | None, str]'",
+        "text": "(state: 'UciPositionState') -> 'tuple[str | None, str]'"
+      }
+    },
+    {
+      "boundary_id": "referee.replay-start",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:replay_start",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 527,
+        "identity": "098c71c63165e871abce7e1e078a0a6f430834167b080e95f4e880f627a8376b",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 3,
+          "bytecode_sha256": "60abf9e246e0d28dbdf3b452ea48733ddbb71a87bf7661169567b04afbfc107c",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "replay_start",
+          "posonlyargcount": 0,
+          "qualname": "replay_start",
+          "source_sha256": "aa4f70ec3dfcbb0aaa9d39bb74357b1febc9fe87bd36bb23f3a31d2faf425899"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every rehearsal and formal start reconstructs complete strict history through this boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "No search; rule-history replay only.",
+      "result_shape_validator": "tuple",
+      "role": "formal-gameplay",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'SanmillTrainingGame'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "game"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "state"
+          },
+          {
+            "annotation": "'ResourceLedger'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "ledger"
+          }
+        ],
+        "return_annotation": "'tuple[BoardState, dict[str, Any]]'",
+        "text": "(game: 'SanmillTrainingGame', state: 'Mapping[str, Any]', ledger: 'ResourceLedger') -> 'tuple[BoardState, dict[str, Any]]'"
+      }
+    },
+    {
+      "boundary_id": "referee.oracle-inventory",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:_checked_oracle_inventory",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 656,
+        "identity": "cc092b517339817c65738afa8a82642724b8e558e26ee798eff3ca97084ddb02",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "a1802f35f916b3be9b3cefefc3011f8b2717d273e3e96ab2582ee522e7e54374",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "_checked_oracle_inventory",
+          "posonlyargcount": 0,
+          "qualname": "_checked_oracle_inventory",
+          "source_sha256": "2aa89a0e3fb51067a5e4a436cfd692dbe5ee270542d949484d558fd6177bd04f"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Formal A_pos constraints and positional labels enumerate the complete legal Malom inventory here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "One parent query plus each legal successor query, all through query_value.",
+      "result_shape_validator": "tuple",
+      "role": "resource-throat",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "board"
+          },
+          {
+            "annotation": "'MalomDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "database"
+          }
+        ],
+        "return_annotation": "'tuple[str, list[tuple[Mapping[str, Any], Any]], int]'",
+        "text": "(board: 'BoardState', database: 'MalomDB') -> 'tuple[str, list[tuple[Mapping[str, Any], Any]], int]'"
+      }
+    },
+    {
+      "boundary_id": "game.finalize",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:_finalize_game",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 700,
+        "identity": "b6455820d6212f632a6b85f3ed373672a801036d7797ff17e90865e695d506a3",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 0,
+          "bytecode_sha256": "6cf5f65c2400307ead77bb485f67fc57d8d3597aff6521a5f86478c71af63439",
+          "flags": 16777219,
+          "kwonlyargcount": 11,
+          "name": "_finalize_game",
+          "posonlyargcount": 0,
+          "qualname": "_finalize_game",
+          "source_sha256": "3c6619b80cf300b3c8723900f753efda59e12ebe0792f9e9973e4412654f06ac"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Every rehearsal and formal game packages strict terminal, positional diagnostic, and event fields here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "May perform final positional Malom query through the throat.",
+      "result_shape_validator": "mapping",
+      "role": "result-packaging",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "schedule_item"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "start_state"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "strict_start"
+          },
+          {
+            "annotation": "'list[dict[str, Any]]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "turns"
+          },
+          {
+            "annotation": "'BoardState'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "board"
+          },
+          {
+            "annotation": "'Any'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "terminal_state"
+          },
+          {
+            "annotation": "'bool'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "safety_cap"
+          },
+          {
+            "annotation": "'MalomDB'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "database"
+          },
+          {
+            "annotation": "'ResourceLedger'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "ledger"
+          },
+          {
+            "annotation": "'float'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "started"
+          },
+          {
+            "annotation": "'bool'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "rehearsal_only"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(*, schedule_item: 'Mapping[str, Any]', start_state: 'Mapping[str, Any]', strict_start: 'Mapping[str, Any]', turns: 'list[dict[str, Any]]', board: 'BoardState', terminal_state: 'Any', safety_cap: 'bool', database: 'MalomDB', ledger: 'ResourceLedger', started: 'float', rehearsal_only: 'bool') -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "game.validate-record",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:validate_game_record",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 597,
+        "identity": "3f3993d6af85dab69f24eb304286d1522eb2331b9b36eba9cc4bc16179b52910",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "5d17a9828e54bb64599cbdda8a780a309fe7726a4e8b42b812b6b8c84107946a",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "validate_game_record",
+          "posonlyargcount": 0,
+          "qualname": "validate_game_record",
+          "source_sha256": "4c34b8a1069a0ed5961aea3e98f64b565596fb6bcb875a89356d6f5b9761b643"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Every record is fail-closed validated before journal append and on recovery.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Validation only.",
+      "result_shape_validator": "none",
+      "role": "result-packaging",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "record"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(record: 'Mapping[str, Any]') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "game.compact-record",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:compact_game",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 1239,
+        "identity": "10b404c1a806468317a867707f32b1d6c19fe2dcab30a0ed6f022e38e6b05066",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "1b3a23ef4d2b8fd9498dbb914919de4dfa964a0b1820488a5d6137269ad56148",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "compact_game",
+          "posonlyargcount": 0,
+          "qualname": "compact_game",
+          "source_sha256": "4a8eb099500b2b6880dbab13d372fb3374e54bbcae0e1c5cd647e3c792b54ab4"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Rehearsal and formal evidence derive compact summaries through this exact boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Pure packaging.",
+      "result_shape_validator": "mapping",
+      "role": "result-packaging",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "record"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(record: 'Mapping[str, Any]') -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "game.append-record",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:append_game_record",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 936,
+        "identity": "94968c06cddca948a2161a409409acdf181346eab6c481879b620892c97a5b98",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "c6383b6ca8f4d3d4e84118f653d1d61330ab81372e4492df548fd4ff51ae650e",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "append_game_record",
+          "posonlyargcount": 0,
+          "qualname": "append_game_record",
+          "source_sha256": "56f1ce213c829f66fc1f0a52a07cc26ce4cf9a2320992ec7f3a82285d432ca66"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Every completed formal game is fsynced into the chained game ledger here after its resource checkpoint.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Durable append; no counter reset.",
+      "result_shape_validator": "hex-sha256",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "record"
+          },
+          {
+            "annotation": "'str | None'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "previous_record_sha256"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(path: 'str | Path', record: 'Mapping[str, Any]', *, previous_record_sha256: 'str | None') -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "game.load-records",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:load_game_records",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 955,
+        "identity": "772376634547aa7cf335e0d1bf19c553e8668a3f0c53a2fc542d7b308e74608b",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "d64a8d079237eb5e4707a610757dc3d055d79e035d79e5abad74d11e0ffc6f05",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "load_game_records",
+          "posonlyargcount": 0,
+          "qualname": "load_game_records",
+          "source_sha256": "f7adbdf7201cb23d80263df5bbe427f3655fcd0110c4e18f827a010e10ca1178"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Crash recovery and final analysis reload and verify the complete chained ledger here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only ledger recovery.",
+      "result_shape_validator": "mapping",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(path: 'str | Path') -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "game.verify-resource-alignment",
+      "callable": "learned_ai.evaluation.sanmill_trained_model_baseline:verify_resource_game_alignment",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 990,
+        "identity": "956b8bd77c4cbbb9549f2c29e64937b2af42e8cbe3436c7349c51671fab8a7d9",
+        "source_path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "a59f562720cf1738274f7cd3b83bf7c8f69ddf46c9cbcf1769220e08cd682c03",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "verify_resource_game_alignment",
+          "posonlyargcount": 0,
+          "qualname": "verify_resource_game_alignment",
+          "source_sha256": "c6919f6ad384db412a2a5816d24223d53009742d30c2735a46e11c9e10e79f15"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_trained_model_baseline",
+      "reason": "Rehearsal and formal completion prove one exact resource checkpoint per game here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only chain alignment.",
+      "result_shape_validator": "none",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "resource_recovery"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "game_recovery"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(resource_recovery: 'Mapping[str, Any]', game_recovery: 'Mapping[str, Any]') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "resource.append-checkpoint",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:append_resource_checkpoint",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 354,
+        "identity": "4504977fedaf38d979d588cd3b067e030eabee51400699e8e643d9cee2a9d153",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "4f5baca5b579e25c55854acbe70d4fc40ecd3d7d31b278992759065ee32bfb99",
+          "flags": 16777219,
+          "kwonlyargcount": 6,
+          "name": "append_resource_checkpoint",
+          "posonlyargcount": 0,
+          "qualname": "append_resource_checkpoint",
+          "source_sha256": "86286370db9ba763647b95918c449c8707627bdd184b985c351296fc6874bc14"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Every completed game fsyncs its cumulative resources before the game record through this boundary.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Durable cumulative checkpoint; counters never reset.",
+      "result_shape_validator": "hex-sha256",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "completion_index"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "complete_games_before"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "game_record"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "resources_before"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "resources_after"
+          },
+          {
+            "annotation": "'str | None'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "previous_checkpoint_sha256"
+          }
+        ],
+        "return_annotation": "'str'",
+        "text": "(path: 'str | Path', *, completion_index: 'int', complete_games_before: 'int', game_record: 'Mapping[str, Any]', resources_before: 'Mapping[str, Any]', resources_after: 'Mapping[str, Any]', previous_checkpoint_sha256: 'str | None') -> 'str'"
+      }
+    },
+    {
+      "boundary_id": "resource.load-checkpoints",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:load_resource_checkpoints",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 397,
+        "identity": "03e177f69982dacd9ab21788757aeeb26d05beb6e5fbd7cb096aa9b42f962351",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 1,
+          "bytecode_sha256": "166a72dc9db24a7f1d4b6a0954092da3d7281d462a0706c81e14e1d4317a70e0",
+          "flags": 16777219,
+          "kwonlyargcount": 2,
+          "name": "load_resource_checkpoints",
+          "posonlyargcount": 0,
+          "qualname": "load_resource_checkpoints",
+          "source_sha256": "1b678e63ff1f87c0ee5257b97c54cb4742145c8b07f56ef77cee02687e5507cb"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Crash recovery and completion reload the cumulative checkpoint chain here.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Read-only resource recovery.",
+      "result_shape_validator": "mapping",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "expected_baseline"
+          },
+          {
+            "annotation": "'int'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "complete_games_before"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(path: 'str | Path', *, expected_baseline: 'Mapping[str, Any]', complete_games_before: 'int') -> 'dict[str, Any]'"
+      }
+    },
+    {
+      "boundary_id": "resource.write-json-atomic",
+      "callable": "learned_ai.evaluation.sanmill_safe_guidance_gameplay:write_json_atomic",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 464,
+        "identity": "97c6676744ad71160bf764b66ed04cba8f8780e6ac844e2dd7b6bef309c7dde0",
+        "source_path": "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "b089aacbd616522806542cdf399f11dd9da0763f3356363d3edba4028d1d07f8",
+          "flags": 16777219,
+          "kwonlyargcount": 0,
+          "name": "write_json_atomic",
+          "posonlyargcount": 0,
+          "qualname": "write_json_atomic",
+          "source_sha256": "b871b62ddc0af1c3e921b1afe3d2cc59ae7560a0377be6fc6017b0e147dee700"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.sanmill_safe_guidance_gameplay",
+      "reason": "Progress, markers, and cumulative baseline records use this atomic durable write path.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Atomic metadata write; no database write.",
+      "result_shape_validator": "none",
+      "role": "durability",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "value"
+          }
+        ],
+        "return_annotation": "'None'",
+        "text": "(path: 'str | Path', value: 'Mapping[str, Any]') -> 'None'"
+      }
+    },
+    {
+      "boundary_id": "resource.write-sealed-json",
+      "callable": "learned_ai.evaluation.human_f0h0_feasibility:write_sealed_json",
+      "callable_kind": "callable",
+      "classification": "rehearsal-required",
+      "code_identity": {
+        "first_line": 129,
+        "identity": "9e77c604988f8bcdacb3a762c29af2290d4a6d3c4561ceeadde9375f5d7bec99",
+        "source_path": "learned_ai/evaluation/human_f0h0_feasibility.py",
+        "structural": {
+          "argcount": 2,
+          "bytecode_sha256": "52204958c58b9378b09359da451a1c2149f4f1f4c625e98d6a0bc661191f3c26",
+          "flags": 16777219,
+          "kwonlyargcount": 1,
+          "name": "write_sealed_json",
+          "posonlyargcount": 0,
+          "qualname": "write_sealed_json",
+          "source_sha256": "4659900ccb69b5ab80644938ba107479695bd784b698b37eaaec009c367abe1e"
+        }
+      },
+      "dynamic_required": true,
+      "evidence_mode": "profile-event",
+      "module": "learned_ai.evaluation.human_f0h0_feasibility",
+      "reason": "The rehearsal must exercise the same sealed evidence writer used by preflight and formal analysis.",
+      "required_stage": "rehearsal",
+      "resource_semantics": "Writes repository evidence JSON, not a database.",
+      "result_shape_validator": "mapping",
+      "role": "result-packaging",
+      "signature": {
+        "parameters": [
+          {
+            "annotation": "'str | Path'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "path"
+          },
+          {
+            "annotation": "'Mapping[str, Any]'",
+            "default": null,
+            "has_default": false,
+            "kind": "POSITIONAL_OR_KEYWORD",
+            "name": "payload"
+          },
+          {
+            "annotation": "'str'",
+            "default": null,
+            "has_default": false,
+            "kind": "KEYWORD_ONLY",
+            "name": "identity_field"
+          }
+        ],
+        "return_annotation": "'dict[str, Any]'",
+        "text": "(path: 'str | Path', payload: 'Mapping[str, Any]', *, identity_field: 'str') -> 'dict[str, Any]'"
+      }
+    }
+  ],
+  "classification_principle": {
+    "derived_independently_of_attempt_002_missing_methods": true,
+    "dynamic_hook_scope": "non-evidence rehearsal only",
+    "dynamic_observation": "real Python return event matched by frozen code object",
+    "rehearsal_required_if_and_only_if": [
+      "the boundary lies on formal gameplay or formal durability execution",
+      "the boundary is reachable in rehearsal without weakening a guard or opening protected data",
+      "omitting it would leave a formal runtime path untested"
+    ]
+  },
+  "frozen_at_utc": "2026-08-17T00:00:00Z",
+  "registry_id": "sanmill-trained-model-baseline-boundary-registry-v2",
+  "registry_identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+  "schema_version": "nmm.sanmill-trained-model-boundary-registry.v1"
+}
