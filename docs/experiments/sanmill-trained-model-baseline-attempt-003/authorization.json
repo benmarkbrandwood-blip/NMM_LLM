@@ -1,0 +1,153 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-attempt-authorization.v2",
+  "authorization_identity": "7e7aeb57ed963beb9c3a5dabf82aae81012fe8442c5b907c717ffcc62ddacab3",
+  "status": "authorized_once_measurement_unconsumed",
+  "operator": "product-owner-direct",
+  "authorized_on": "2026-08-17",
+  "authorization_basis": "Direct product-owner authorization titled 'baseline-v1 boundary registry structural refactor and protocol re-freeze'.",
+  "grant_count": 1,
+  "plan": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-v1.json",
+    "identity": "35a27d27eefefbfe9c3d93a2f23615ffcd3bfe0fab1404cfd9269c1dadd2107f",
+    "file_sha256": "559d7cb4c163605389774ecbc0f7ad07a3211d58779491dd61b180bb0ead85b5"
+  },
+  "attempt": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-attempt-003.json",
+    "identity": "60fcb471fa818dfc4eb2de5acc4a8aa8b932f93e6d13aeeadff3faa9dbe74819",
+    "file_sha256": "934e9c76a72cf4bdc7a90d5e88f7d7997321b9eb4aac277b4eb701f9712603be"
+  },
+  "source_at_authorization": {
+    "commit": "1e2ca022b81a61e80097c9b25fbe8444eb3a2884",
+    "tree": "d101cc41a9362f99c1910e02802185a8c8a59143",
+    "implementation_commit": "286e2fe3a0681f10ca96709961e2d8f45cf3158f"
+  },
+  "boundary_registry": {
+    "path": "docs/experiments/sanmill-trained-model-baseline-boundary-registry-v1.json",
+    "identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+    "file_sha256": "2a11dcc5464174e8cc8feb42ced29c955dfe08e0e0deee0898f93298f89286df",
+    "classification_frozen_before_rehearsal": true
+  },
+  "coverage_contract": {
+    "identity": "164aa632b05ab6faad889937ac0afbec1333d0d048f96e9d384a4f865634fd07",
+    "expected_rehearsal_real_code_events": 68,
+    "expected_preflight_explicit_canaries": 6,
+    "actual_coverage_ledger_identity_created_only_after_rehearsal": true
+  },
+  "implementation_files": {
+    "ai/malom_db.py": "dbec87cc589b087653fb540a1b084418eaa750ffc9b34ac41c560632852442ae",
+    "game/board.py": "a54421e8b099523ea7e4255e46fd6e6b8fe068595438aa107512b61fc1eb5377",
+    "game/rules.py": "1e93a87ee4f29a26787ecb1590d3d8a178033fd2fee1d6d95f17a925d2eac19a",
+    "learned_ai/evaluation/human_feature_deviation_estimator_readiness.py": "a22db8eefa52b9914c5b456857be4c73a341775d6618474f166e104ffd6fc7e2",
+    "learned_ai/evaluation/human_f0h0_feasibility.py": "ecef9f1472c057c5a609d44f2dd2b5f0b5ff979c2803acd40b2cc3fcc39f9f95",
+    "learned_ai/evaluation/sanmill_safe_guidance_gameplay.py": "8f781370f6bf6d1c77e55fc2849de875cfab54e378f2a5a57b78e9bd364efd48",
+    "learned_ai/evaluation/sanmill_safe_inducement.py": "e9cf9abb4290473e5edcd63a7c75f182ad416722915f7ea2cafa42926ca022f3",
+    "learned_ai/evaluation/sanmill_trained_model_baseline.py": "111f4aec2824a18ec944d05815503c2c96074b05e8179a9a80995bc985692b2b",
+    "learned_ai/evaluation/sanmill_trained_model_boundary_registry.py": "a4b4b8002fc1d594cd75f15ba01ffabd06f8cedb7db995db9fd580df371378ec",
+    "learned_ai/evaluation/sanmill_uci.py": "f8e4e3984391d299e1a466860be52388bf39bfdd36d0d746dd8deb8e8e617441",
+    "learned_ai/evaluation/training_aligned_policy.py": "801db8eb26e9037eb7ef66ac31ca8802eb6eadecfb4c11a6054199982c7575df",
+    "learned_ai/sentinel/db_teacher.py": "18f55e96cf7041879d1df275a4c99ce406ff46e32044a2546be300cab245781d",
+    "learned_ai/training/sanmill_referee.py": "1ff9c0de59e2815e6c027f1391360172086b1da07642c4448ad72cc87a1d00f3",
+    "scripts/preflight_sanmill_trained_model_baseline.py": "b84c60eb08cad87258350616aeadb6334f80200f29f7b8ae1f1d7e9ed3a31f77",
+    "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py": "d546e375f26068ccdd69bca2c1ff91c8108766bd8f98b583f08dbfcdd9300086",
+    "scripts/run_sanmill_trained_model_baseline.py": "e472142f4e7176dbe2c3a3c972b23ada10c04c0c4be635ed7af76ba3fae31111",
+    "tests/test_sanmill_trained_model_baseline.py": "4549704dea8dd417abaf6582016e903d90c861ecbce21a096a9386bc12d4213b",
+    "tests/test_sanmill_trained_model_boundary_registry.py": "ab33d9c75d45cc6711628165c99103f2e8240ebb5b91417a4657dff4e6e157f8",
+    "tests/test_training_aligned_policy.py": "75e78a15019a5e88301b3a115e76277309293766cfab1d59b7e9f21158b06d9c"
+  },
+  "execution_scope": {
+    "automatic_retry_resume_batching_or_extension": false,
+    "host_interruption_recovery_authorized": false,
+    "maximum_active_seconds": 21600,
+    "maximum_complete_games": 2540,
+    "maximum_concurrent_evaluators": 1,
+    "maximum_concurrent_sanmill_processes": 1,
+    "maximum_database_writes": 0,
+    "maximum_engine_single_step_searches": 120000,
+    "maximum_malom_queries": 25000000,
+    "maximum_reused_formal_starts": 254,
+    "maximum_training_updates": 0,
+    "planned_formal_games": 2032,
+    "planned_rehearsal_games": 10,
+    "planned_total_complete_games": 2042,
+    "stop_at_any_limit": true
+  },
+  "attempt_003_supplement": {
+    "required_registry_rehearsal_games": 27,
+    "formal_games": 2032,
+    "maximum_possible_cumulative_complete_games": 2086,
+    "still_within_unchanged_maximum_complete_games": true,
+    "cumulative_sunk_resources": {
+      "engine_single_step_searches": 248,
+      "malom_read_only_queries": 6792,
+      "active_seconds": 114.31433940000716,
+      "complete_games": 27
+    },
+    "resource_accounting_is_cumulative": true
+  },
+  "preserved_prior_attempts": {
+    "attempt_001_authorization_identity": "3f30c558ec5710fa96392ec92af4fb3da300c5d04ca0a925de1ee9518fd5a54f",
+    "attempt_002_authorization_identity": "785079e4aa59195ae94fad870128672a5bf266e7a5bd42e4d6cb19290c25adf1",
+    "disposition": "failed_records_and_output_namespaces_preserved_byte_for_byte_and_never_reused"
+  },
+  "start_pool": {
+    "path": "docs/experiments/sanmill-safe-guidance-gameplay-start-pool-v1.json",
+    "identity": "385a376dd82953c23c232f34e3dd5a84e5887b978c60627657eccfa6821eb6e9",
+    "file_sha256": "ca6e8473faa7d1c27293bb520a8e1e7274c72e092dc51a23a1c9c8a6f9a7d093",
+    "formal_membership_identity": "610f62e74b4a70500adfcaa3e0c19769dd178b480ef9765115ae6ab9a5af13d2",
+    "formal_starts": 254,
+    "excluded_start_ids": [
+      "00092c974cabf05874f066b8948e791f9fdc82d84a65759da1ba78f212a643b0"
+    ]
+  },
+  "candidate_bindings": {
+    "retained_v4_bundle_identity": "817d2e36fbd0b614c5c48737ee987f684b99eb6ff697591618123ec7307a2d0f",
+    "retained_v4_checkpoint_sha256": "295b268e697255908f9c7517f4697ca251a10ec0f13d922cbcbab2260fb5105d",
+    "retained_v4_checkpoint_payload_sha256": "ed7932bc7c11b1aa41274ea0de7bd08902812b1188ca4739b6d0d8dc15e46727",
+    "retained_v4_specialist_db_identity": "3d69d1acb007dbd26a48ae1c6acec4bb29f905ffedd21c816ad1771a6cf942ed",
+    "active_specialist_runtime_identity": "2199c5b8e98881885b8d2c2377d062e658d4d05cfc3c3459b90725fc2bb3137f"
+  },
+  "baseline": {
+    "kind": "zero-training uniform-random A_pos",
+    "result_path": "docs/evidence/sanmill-safe-guidance-gameplay-attempt-002-manifest-2026-08-16.json",
+    "result_identity": "f7abf95ca688860fa3b871757f42397b351a3c00701ba27363028f800a9222f0",
+    "result_file_sha256": "71ce03fecbe2c76347ca9d66e2aeb3082eca7d91ceeba48bcab2f958af52a10c",
+    "starts": 254,
+    "games": 508,
+    "random_safe_score_rate": 0.44881889763779526,
+    "known_before_candidate_measurement": true
+  },
+  "permitted": [
+    "one 27-game registry-covered non-evidence rehearsal in the frozen fresh namespace",
+    "one zero-formal-game preflight after the rehearsal passes",
+    "one exact 2032-game formal execution after every gate passes",
+    "read-only loading of the two frozen candidate routes",
+    "read-only sector-corrected-v1 Malom, HumanDB, SpecialistDB, and pinned Sanmill use"
+  ],
+  "prohibited": [
+    "automatic retry, resume, recovery, batching around a limit, or extension",
+    "a second formal execution or attempt-004",
+    "a third tooling architecture or further tooling construction after another instrumentation or contract failure",
+    "training, fitting, tuning, or weight updates",
+    "checkpoint edits, copies, renames, or alias changes",
+    "database writes or rebuilds",
+    "promotion, deployment, publication, release, or new training authorization"
+  ],
+  "consumption_rule": "consumed when the fresh attempt-003 measurement-started marker is durably created before the first formal game",
+  "rehearsal_and_preflight_do_not_consume_formal_execution": true,
+  "host_interruption": "no recovery authorized; any continuation requires a new direct product-owner authorization",
+  "failure_rule": "any rehearsal, preflight, or formal failure fails closed; a tooling or contract failure ends tooling construction",
+  "protected_access": {
+    "official_selection_confirmation_final_test": "unopened",
+    "research_confirmation": "unopened",
+    "source_pool_2eb04f54_remaining_108": "unread_and_unconsumed"
+  },
+  "claim_boundary": {
+    "fixed_runtime_start_pool_and_candidate_routes_only": true,
+    "positional_only": true,
+    "playing_strength_population_claim": false,
+    "human_trap_or_product_user_claim": false,
+    "equivalence_claim": false,
+    "training_value_claim": false,
+    "promotion_deployment_publication_release_or_training": false
+  }
+}
