@@ -3491,6 +3491,33 @@ never started, no peak-RSS or handle monitor exists.  Stop identity is
 `962894a0...`; see
 [`docs/evidence/sanmill-trained-model-baseline-v1-classification-correction-readiness-stop-2026-08-17.md`](../evidence/sanmill-trained-model-baseline-v1-classification-correction-readiness-stop-2026-08-17.md).
 
+## Trained-Model Baseline Final Authorization Stop (2026-08-17)
+
+The product owner's final authorization permitted only mechanical v1-to-v2
+registry reference alignment and required a complete static forward walk
+before any change.  That walk found five forward hard-coded paths: the shared
+instrumentation audit, preflight default, rehearsal default, formal-runner
+default, and boundary-registry test fixture.  Historical v1 plans and evidence
+remain provenance and were not forward-alignment candidates.
+
+No reference was changed because the same walk found two independent contract
+conflicts.  Preflight requires a same-attempt, same-authorization record with
+status `passed_non_evidence_technical_rehearsal`, while the final authorization
+requires the existing 27-game record to remain failed and never be described
+as passed.  Changing that predicate or rerunning rehearsal was forbidden.
+Separately, the frozen corrected attempt requires evaluator and Sanmill peak
+RSS and open-handle evidence, but the formal runner has no collection or
+recording path; adding one would exceed reference-only alignment.
+
+The final ceiling requires abandonment on any non-completion.  The measurement
+is therefore permanently abandoned under stop identity `45692cea...`.  No new
+attempt or machine authorization was frozen, and no preflight, model load,
+formal namespace, marker, Sanmill process, query, search, or game started.
+Cumulative use remains 496 searches, 13,561 Malom queries, 54 non-evidence
+games, and 482.0538405000116 seconds.  Do not request or create another
+authorization for this measurement.  See the
+[final static-conflict evidence](../evidence/sanmill-trained-model-baseline-final-authorization-static-conflict-stop-2026-08-17.md).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):

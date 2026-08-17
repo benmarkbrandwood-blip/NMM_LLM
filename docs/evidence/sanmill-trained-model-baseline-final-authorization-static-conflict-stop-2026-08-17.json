@@ -1,0 +1,182 @@
+{
+  "schema_version": "nmm.sanmill-trained-model-baseline-final-authorization-static-conflict-stop.v1",
+  "stop_identity": "45692cea9b5ecb69163e287ea2a97586b75b810296782b3ebc8caa0da4363ba6",
+  "status": "final_measurement_abandoned_before_reference_alignment",
+  "recorded_on": "2026-08-17",
+  "source": {
+    "branch": "dev",
+    "commit": "7084e93c2d0e5dbc29798d28aca8818ca169da5e",
+    "tree": "23c6a09e907707011e1c80a92e065161e6a18485",
+    "origin_dev_equal": true,
+    "tracked_worktree_clean_before_audit": true
+  },
+  "authorization_basis": "Direct product-owner final authorization titled 'baseline-v1 registry reference alignment and formal execution'.",
+  "static_forward_reference_inventory": {
+    "search_scope": [
+      "learned_ai",
+      "scripts",
+      "tools",
+      "tests"
+    ],
+    "searched_old_registry_path": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+    "searched_old_registry_identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+    "searched_old_coverage_contract_identity": "164aa632b05ab6faad889937ac0afbec1333d0d048f96e9d384a4f865634fd07",
+    "hardcoded_path_references": 5,
+    "hardcoded_old_identity_references_in_code_or_tests": 0,
+    "rows": [
+      {
+        "path": "learned_ai/evaluation/sanmill_trained_model_baseline.py",
+        "line": 490,
+        "role": "shared instrumentation-surface audit registry path",
+        "current_reference": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+        "authorized_mechanical_target": "sanmill-trained-model-baseline-boundary-registry-v2.json",
+        "semantic_change_if_only_reference_is_replaced": false
+      },
+      {
+        "path": "scripts/preflight_sanmill_trained_model_baseline.py",
+        "line": 596,
+        "role": "zero-game preflight CLI default",
+        "current_reference": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+        "authorized_mechanical_target": "sanmill-trained-model-baseline-boundary-registry-v2.json",
+        "semantic_change_if_only_reference_is_replaced": false
+      },
+      {
+        "path": "scripts/rehearse_sanmill_trained_model_baseline_attempt_002.py",
+        "line": 448,
+        "role": "rehearsal acceptance CLI default",
+        "current_reference": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+        "authorized_mechanical_target": "sanmill-trained-model-baseline-boundary-registry-v2.json",
+        "semantic_change_if_only_reference_is_replaced": false
+      },
+      {
+        "path": "scripts/run_sanmill_trained_model_baseline.py",
+        "line": 262,
+        "role": "formal execution and result-manifest registry default",
+        "current_reference": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+        "authorized_mechanical_target": "sanmill-trained-model-baseline-boundary-registry-v2.json",
+        "semantic_change_if_only_reference_is_replaced": false
+      },
+      {
+        "path": "tests/test_sanmill_trained_model_boundary_registry.py",
+        "line": 30,
+        "role": "frozen registry static and dynamic contract test fixture",
+        "current_reference": "sanmill-trained-model-baseline-boundary-registry-v1.json",
+        "authorized_mechanical_target": "sanmill-trained-model-baseline-boundary-registry-v2.json",
+        "semantic_change_if_only_reference_is_replaced": false
+      }
+    ],
+    "historical_records_excluded_from_alignment": true,
+    "historical_exclusion_reason": "Frozen v1 plans, authorizations, registries, ledgers, failures, and correction evidence are provenance and must remain byte-for-byte unchanged.",
+    "registry_schema_v1_constant_is_not_a_registry_instance_reference": true,
+    "registry_schema_not_changed": true,
+    "reference_alignment_applied": false
+  },
+  "fatal_conflicts": [
+    {
+      "conflict_id": "required-passed-rehearsal-versus-explicit-no-pass-rule",
+      "preflight_path": "scripts/preflight_sanmill_trained_model_baseline.py",
+      "preflight_required_status_line": 627,
+      "required_status": "passed_non_evidence_technical_rehearsal",
+      "same_attempt_binding_lines": [
+        619,
+        624
+      ],
+      "same_authorization_binding_lines": [
+        625,
+        626
+      ],
+      "available_attempt_003_record_status": "failed_closed_after_registry_dynamic_coverage_gate",
+      "available_attempt_003_failure_identity": "f28adaccaaacefed0bcb2c2a4cc98feff5061c9b24e2d9f113b14ee8a7c7d17b",
+      "available_attempt_003_coverage_ledger_identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+      "new_same_attempt_same_authorization_pass_record_exists": false,
+      "why_no_authorized_resolution_exists": [
+        "Creating a passed record from the existing 27 games would describe the existing rehearsal as passed, which this authorization explicitly forbids.",
+        "Changing or removing the required status check would modify validation logic, which this authorization explicitly forbids.",
+        "Rerunning the rehearsal is explicitly forbidden."
+      ]
+    },
+    {
+      "conflict_id": "frozen-lifecycle-monitor-requirement-has-no-formal-runtime-path",
+      "attempt_path": "docs/experiments/sanmill-trained-model-baseline-attempt-003-classification-correction-v1.json",
+      "attempt_file_sha256": "f71dc5565e6de5dd90535476bffe95a3fc584e05290aef647baef5533c0804da",
+      "attempt_requires_evaluator_peak_rss_and_open_handles": true,
+      "attempt_requires_sanmill_peak_rss_and_open_handles": true,
+      "prior_authorization_path": "docs/experiments/sanmill-trained-model-baseline-attempt-003-classification-correction-v1/authorization.json",
+      "prior_authorization_identity": "89457fc102a58b2e8c12ef7541643fcca0e6865c2da6f896db06921d4cfc1805",
+      "prior_authorization_file_sha256": "4539974a426cda8340a59f1b009d0d0115e400ffafd332d28065dcd8479569a8",
+      "formal_runner_path": "scripts/run_sanmill_trained_model_baseline.py",
+      "formal_runner_file_sha256": "e472142f4e7176dbe2c3a3c972b23ada10c04c0c4be635ed7af76ba3fae31111",
+      "formal_runner_peak_rss_or_handle_collection_paths": 0,
+      "formal_runner_lifecycle_monitor_writes": 0,
+      "why_no_authorized_resolution_exists": "Adding or externally constructing lifecycle instrumentation exceeds reference-only alignment and would add a validation or instrumentation layer."
+    }
+  ],
+  "known_todos": [
+    {
+      "todo": "Remove repeated hardcoded boundary-registry version references through a separately authorized single-source design.",
+      "implemented_this_round": false,
+      "reason": "The authorization forbids a parser, single source of truth, or new mechanism."
+    },
+    {
+      "todo": "Close the TrainingAlignedPolicy-owned ExternalSolvedDB adapter on the evaluation route.",
+      "implemented_this_round": false,
+      "classification": "independent evaluation-path resource lifecycle defect"
+    }
+  ],
+  "frozen_history": {
+    "v1_registry_identity": "1ceb23f52ffd722919940f0471ec32e4e5e63199549a675ce86b25ac4f7055f7",
+    "v2_registry_identity": "7ef7b1b17d1f0baa94159c0161a6c5082f39f8571941e2c7e47e4d97f98405e7",
+    "v2_registry_file_sha256": "23a2ef1066d27efa55ef77784cbf30060a7a9e3147b3cc4dc83b713dea5cfa91",
+    "old_coverage_ledger_identity": "1957ea999654f39610f7c9611ec6943a30af69bb59a81149dd665cb5400166f2",
+    "mapping_identity": "1f51e4f92e51301e0e958b710503f0691b83e4b510da2db24d1ae9c3bff69477",
+    "old_failure_identity": "f28adaccaaacefed0bcb2c2a4cc98feff5061c9b24e2d9f113b14ee8a7c7d17b",
+    "old_failure_withdrawn": false,
+    "old_rehearsal_relabelled_as_passed": false,
+    "v2_registry_modified": false
+  },
+  "execution_state": {
+    "new_attempt_frozen": false,
+    "new_machine_authorization_created": false,
+    "zero_game_preflight_started": false,
+    "formal_namespace_created": false,
+    "formal_measurement_marker_created": false,
+    "candidate_models_loaded": false,
+    "sanmill_process_started": false,
+    "formal_games": 0,
+    "new_engine_searches": 0,
+    "new_malom_queries": 0,
+    "training_or_weight_updates": 0,
+    "database_writes": 0
+  },
+  "resource_accounting": {
+    "cumulative_engine_single_step_searches": 496,
+    "cumulative_malom_read_only_queries": 13561,
+    "cumulative_non_evidence_games": 54,
+    "cumulative_active_seconds": 482.0538405000116,
+    "this_round_increment_is_zero": true
+  },
+  "access_audit": {
+    "official_selection_content_reads": 0,
+    "official_confirmation_content_reads": 0,
+    "official_final_test_content_reads": 0,
+    "research_confirmation_content_reads": 0,
+    "source_pool_2eb04f54_reads_or_consumption": 0
+  },
+  "disposition": {
+    "verdict": "fatal_stop",
+    "measurement_abandoned": true,
+    "reference_changes_committed": false,
+    "new_authorization_requested_or_expected": false,
+    "repair_proposal_included": false,
+    "future_attempt_under_this_measurement": false,
+    "reason": "The final authorization requires abandonment for any non-completion and forbids self-resolution of authorization conflicts."
+  },
+  "claim_boundary": {
+    "candidate_result_exists": false,
+    "baseline_comparison_result_exists": false,
+    "all_trained_models_below_baseline_claim": false,
+    "strength_or_equivalence_claim": false,
+    "human_trap_or_product_value_claim": false,
+    "promotion_deployment_publication_release_or_training": false
+  }
+}
