@@ -409,7 +409,12 @@ def calibration_summary(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
                 "maximum": max(elapsed),
             },
             "mapped_node_budget": mapped,
-            "completed_depths": dict(Counter(int(row["completed_depth"]) for row in searched)),
+            "completed_depths": {
+                str(depth): count
+                for depth, count in Counter(
+                    int(row["completed_depth"]) for row in searched
+                ).items()
+            },
         }
     return by_difficulty
 
@@ -780,7 +785,12 @@ def analyze_games(
                     "median": statistics.median(int(row["nodes"]) for row in searches),
                     "maximum": max(int(row["nodes"]) for row in searches),
                 },
-                "completed_depths": dict(Counter(int(row["completed_depth"]) for row in searches)),
+                "completed_depths": {
+                    str(depth): count
+                    for depth, count in Counter(
+                        int(row["completed_depth"]) for row in searches
+                    ).items()
+                },
                 "elapsed_seconds": {
                     "median": statistics.median(float(row["elapsed_seconds"]) for row in searches),
                     "maximum": max(float(row["elapsed_seconds"]) for row in searches),

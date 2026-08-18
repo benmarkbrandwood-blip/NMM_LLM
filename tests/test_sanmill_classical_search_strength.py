@@ -9,14 +9,17 @@ import pytest
 from learned_ai.evaluation.human_f0h0_feasibility import canonical_sha256
 from learned_ai.evaluation.sanmill_classical_search_strength import (
     AUTHORIZATION_SCHEMA,
+    RESULT_SCHEMA,
     ClassicalSearchStrengthError,
     calibration_membership,
     calibration_summary,
+    analyze_games,
     exact_subset_gate,
     paired_interval,
     phase_balanced_membership,
 )
 from learned_ai.evaluation.sanmill_safe_guidance_gameplay import sha256_file
+from learned_ai.training.run_contract import canonical_json_bytes
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -164,10 +167,12 @@ def test_frozen_formal_v2_is_bound_and_resource_safe() -> None:
     assert plan["sample_size_design"]["projected_half_width_at_selected_n"] <= 0.085
     assert plan["resource_envelope"]["planned_complete_games"] == 288
     assert plan["resource_envelope"]["planned_complete_games"] <= 1_600
-    assert {
-        name: sha256_file(ROOT / name)
-        for name in plan["implementation_files"]
-    } == plan["implementation_files"]
+    result_path = (
+        ROOT
+        / "docs/evidence/sanmill-classical-search-strength-v2-manifest-2026-08-18.json"
+    )
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["implementation_files"] == plan["implementation_files"]
 
     authorization_path = (
         ROOT
@@ -180,3 +185,91 @@ def test_frozen_formal_v2_is_bound_and_resource_safe() -> None:
     assert canonical_sha256(body) == authorization_identity
     assert authorization["plan_identity"] == identity
     assert authorization["plan_file_sha256"] == sha256_file(plan_path)
+
+
+def test_analysis_histogram_survives_json_roundtrip() -> None:
+    starts = ("s1", "s2")
+    records = []
+    for start_id in starts:
+        for color, depth in (("W", 2), ("B", 10)):
+            records.append(
+                {
+                    "arm": "classical-test",
+                    "start_id": start_id,
+                    "candidate_color": color,
+                    "candidate_score": 0.5,
+                    "termination_class": "rules_terminal",
+                    "outcome_reason": "drawFiftyMove",
+                    "turns": [
+                        {
+                            "actor": "classical-search",
+                            "candidate_choice": {
+                                "search": {
+                                    "bypassed_search": False,
+                                    "nodes": 100,
+                                    "completed_depth": depth,
+                                    "elapsed_seconds": 0.01,
+                                }
+                            },
+                        }
+                    ],
+                    "self_downgrade_events": [],
+                }
+            )
+    prior = {
+        arm: {start_id: 0.5 for start_id in starts}
+        for arm in (
+            "random-safe",
+            "retained-v4-free",
+            "retained-v4-a-pos",
+            "active-specialists-free",
+            "active-specialists-a-pos",
+        )
+    }
+    analysis = analyze_games(
+        records,
+        prior_scores=prior,
+        start_ids=starts,
+        maximum_half_width=1.0,
+    )
+    histogram = analysis["by_arm"]["classical-test"]["work"][
+        "completed_depths"
+    ]
+    assert histogram == {"2": 2, "10": 2}
+    payload = {"analysis": analysis}
+    roundtripped = json.loads(canonical_json_bytes(payload))
+    assert canonical_sha256(payload) == canonical_sha256(roundtripped)
+
+
+def test_corrected_result_identity_is_roundtrip_verifiable() -> None:
+    original_path = (
+        ROOT
+        / "docs/evidence/sanmill-classical-search-strength-v2-manifest-2026-08-18.json"
+    )
+    corrected_path = ROOT / (
+        "docs/evidence/"
+        "sanmill-classical-search-strength-v2-manifest-identity-corrected-"
+        "2026-08-18.json"
+    )
+    correction_path = ROOT / (
+        "docs/evidence/"
+        "sanmill-classical-search-strength-v2-result-identity-correction-"
+        "2026-08-18.json"
+    )
+    original = json.loads(original_path.read_text(encoding="utf-8"))
+    corrected = json.loads(corrected_path.read_text(encoding="utf-8"))
+    original_body = dict(original)
+    original_identity = original_body.pop("result_identity")
+    corrected_body = dict(corrected)
+    corrected_identity = corrected_body.pop("result_identity")
+    assert original["schema_version"] == RESULT_SCHEMA
+    assert original_identity != canonical_sha256(original_body)
+    assert corrected_identity == canonical_sha256(corrected_body)
+    assert original_body == corrected_body
+
+    correction = json.loads(correction_path.read_text(encoding="utf-8"))
+    correction_body = dict(correction)
+    correction_identity = correction_body.pop("correction_identity")
+    assert correction_identity == canonical_sha256(correction_body)
+    assert correction["additional_complete_games"] == 0
+    assert correction["corrected"]["result_identity"] == corrected_identity

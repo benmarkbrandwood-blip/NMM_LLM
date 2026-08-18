@@ -3601,6 +3601,39 @@ history, no-progress, and repetition state exactly.  A mismatch is the only
 hard task stop.  Do not retry or resume automatically.  See the
 [readiness evidence](../evidence/sanmill-classical-search-strength-v2-readiness-2026-08-18.md).
 
+## Classical-Search Strength v2 Completed (2026-08-18)
+
+The one authorized execution completed all 288 planned games in 4,734.32
+active seconds, including calibration.  The 96-game known-answer gate matched
+exactly at identity `45b4ed7c...`.  Formal work used 10,520 Sanmill searches
+and 264,270 Malom read-only queries; database writes and protected-data reads
+were zero, and all read-only resource snapshots were unchanged.
+
+On the same 48 starts, difficulty 9 scored 29.69% (11/35/50) and difficulty 10
+scored 31.77% (13/35/48).  Retained-v4 scored 55.73%, active specialists with
+`A_pos` 51.56%, random-safe 43.23%, and free active specialists 31.25%.
+Classical search is directionally below all three safe/full routes and is
+indistinguishable from free specialists.  Difficulty 10 minus difficulty 9 is
++2.08pp with a 95% interval of -0.37 to +4.54pp, so extra work did not produce
+a resolved gain.  The learning-route stopping premise was not met.
+
+Classical self-downgrade rates were 61/1,690 (3.61%) and 56/1,673 (3.35%).
+Placement and movement scored poorly and accounted for every downgrade;
+flying scored 53.13% at both budgets with zero observed downgrade because the
+product endgame paths dominated.
+
+Post-run verification found that the first manifest's `completed_depths`
+integer keys made its reported identity non-roundtrippable after JSON coerced
+the keys to strings.  Preserve that original file and identity `1bdeadbf...`.
+The semantic payload was resealed without any game or query at verified result
+identity `fe77312f...`; correction identity is `26c72999...`.  Both raw ledger
+chains were independently verified, and the histogram generator now has a
+round-trip regression.
+
+See the [result evidence](../evidence/sanmill-classical-search-strength-v2-2026-08-18.md),
+the [corrected machine manifest](../evidence/sanmill-classical-search-strength-v2-manifest-identity-corrected-2026-08-18.json),
+and the [identity correction](../evidence/sanmill-classical-search-strength-v2-result-identity-correction-2026-08-18.json).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
