@@ -27,6 +27,8 @@ exact frozen `main` runtime and blocked by live Malom. The focused run passed
 training, checkpoint change, database write, protected-data read, or source-pool
 read occurred. See the
 [product classical safety evidence](../evidence/product-classical-malom-positional-safety-2026-08-18.md).
+The implementation is commit `0f64de4`; its ordinary fast-forward publication
+to `origin/dev` succeeded on 18 August 2026.
 
 ### Product deployment-path audit -- 18 August 2026
 
@@ -3663,15 +3665,15 @@ and the [identity correction](../evidence/sanmill-classical-search-strength-v2-r
 The product-owner identity correction replaced the four local measurement
 commits without changing their trees or commit-message bytes. They are now
 `0b8207b`, `8bedc00`, `73cacaa`, and `34fc9d8`, with both author and committer
-set to `Calcitem <calcitem@outlook.com>`. Local `dev` contains those four
-verified measurement commits beyond `origin/dev` at `1e92dbac...`. An
-ordinary fast-forward push was attempted after fetch but the remote rejected
-the machine's `albert-molansen` credential for
-`benmarkbrandwood-blip/NMM_LLM.git`.  Do not describe the result as published
-to `origin/dev` until a credential with write access performs that ordinary
-push. The result commit body still contains literal `\n` text rather than
-physical line wrapping because its message bytes were deliberately preserved;
-the content and evidence files are unaffected.
+set to `Calcitem <calcitem@outlook.com>`. The first ordinary fast-forward push
+after that rewrite was attempted after fetch, but the remote rejected the
+machine's `albert-molansen` credential for
+`benmarkbrandwood-blip/NMM_LLM.git`. That rejection is historical: after the
+credential was corrected, an ordinary fast-forward push from `1e92dba`
+through product-safety implementation `0f64de4` succeeded on 18 August 2026.
+The result commit body still contains literal `\n` text rather than physical
+line wrapping because its message bytes were deliberately preserved; the
+content and evidence files are unaffected.
 
 ## Reference Material
 
