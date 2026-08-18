@@ -30,6 +30,10 @@ read occurred. See the
 The implementation is commit `0f64de4`; its ordinary fast-forward publication
 to `origin/dev` succeeded on 18 August 2026.
 
+Process note: commit `0f64de4` has one 114-character body line. It was
+published unchanged because no history-rewrite authority exists; do not amend
+or otherwise rewrite it merely to correct that formatting deviation.
+
 ### Product deployment-path audit -- 18 August 2026
 
 No local NMM Web product instance was running during the bounded deployment
