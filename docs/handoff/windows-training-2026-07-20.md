@@ -3634,6 +3634,17 @@ See the [result evidence](../evidence/sanmill-classical-search-strength-v2-2026-
 the [corrected machine manifest](../evidence/sanmill-classical-search-strength-v2-manifest-identity-corrected-2026-08-18.json),
 and the [identity correction](../evidence/sanmill-classical-search-strength-v2-result-identity-correction-2026-08-18.json).
 
+The result is committed locally at `caa3bb27...`; local `dev` contains three
+verified measurement commits beyond `origin/dev` at `1e92dbac...`.  An
+ordinary fast-forward push was attempted after fetch but the remote rejected
+the machine's `albert-molansen` credential for
+`benmarkbrandwood-blip/NMM_LLM.git`.  Do not describe the result as published
+to `origin/dev` until a credential with write access performs that ordinary
+push.  The result commit body contains literal `\n` text rather than physical
+line wrapping because of PowerShell argument handling.  The commit is local
+and must not be amended or otherwise rewritten without explicit authority;
+the content and evidence files are unaffected.
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
