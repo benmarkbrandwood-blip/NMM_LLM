@@ -3568,6 +3568,39 @@ games, and 482.0538405000116 seconds.  Do not request or create another
 authorization for this measurement.  See the
 [final static-conflict evidence](../evidence/sanmill-trained-model-baseline-final-authorization-static-conflict-stop-2026-08-17.md).
 
+## Classical-Search Strength v2 Ready (2026-08-18)
+
+The product owner authorized one bounded measurement of the `origin/main`
+difficulty 9 and 10 classical coordinators against the pinned 100,000-node
+Sanmill runtime.  Exact-main source and native code are held in ignored
+`tmp/classical-search-main-snapshot-4e4a724/`; their hashes and every read-only
+product resource are bound by the frozen plan.
+
+Timing-only calibration plan `71dbfcbe...` completed with result `84a4c363...`
+in 433.487563600007 seconds, zero games, and zero Sanmill processes.  The
+product 30-second and 60-second settings map to deterministic single-thread
+ceilings of 13,887,000 and 18,367,000 nodes.  Fresh-instance canaries were
+move-identical at both budgets.  A warm Rust transposition table changed work
+but not the canary move, so formal play uses a fresh AI per game and retains
+its table within the game.
+
+Unexecuted v1 plan `5e6768a6...` selected 32 starts but projected a 9.97pp
+half-width against a 7.5pp precision gate.  It and authorization `6aba86ff...`
+remain immutable and unconsumed.  Before reading any known-answer or candidate
+outcome, v2 corrected that timing-only inconsistency.
+
+Frozen v2 plan `0bbe5145...` and authorization `a5e3941a...` use 48
+phase-balanced starts, two colors, and two node budgets.  Planned work is 96
+known-answer games plus 192 classical games, 288 total.  Projected half-width
+is 8.14pp against a frozen 8.5pp gate; projected formal time is 52,614.67
+seconds within the 64,800-second authorization.
+
+The readiness verdict is `ready_for_smoke`.  The known-answer gate runs before
+the product runtime is loaded and must reproduce moves, terminal reason,
+history, no-progress, and repetition state exactly.  A mismatch is the only
+hard task stop.  Do not retry or resume automatically.  See the
+[readiness evidence](../evidence/sanmill-classical-search-strength-v2-readiness-2026-08-18.md).
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):

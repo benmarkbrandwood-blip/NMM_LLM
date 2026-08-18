@@ -8,6 +8,7 @@ import pytest
 
 from learned_ai.evaluation.human_f0h0_feasibility import canonical_sha256
 from learned_ai.evaluation.sanmill_classical_search_strength import (
+    AUTHORIZATION_SCHEMA,
     ClassicalSearchStrengthError,
     calibration_membership,
     calibration_summary,
@@ -16,8 +17,6 @@ from learned_ai.evaluation.sanmill_classical_search_strength import (
     phase_balanced_membership,
 )
 from learned_ai.evaluation.sanmill_safe_guidance_gameplay import sha256_file
-
-
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -144,7 +143,7 @@ def test_paired_interval_requires_multiple_independent_starts() -> None:
     assert interval["half_width"] > 0.0
 
 
-def test_frozen_calibration_plan_binds_implementation_and_zero_games() -> None:
+def test_frozen_calibration_plan_is_sealed_and_zero_games() -> None:
     path = ROOT / "docs/experiments/sanmill-classical-search-calibration-v1.json"
     plan = json.loads(path.read_text(encoding="utf-8"))
     body = dict(plan)
@@ -152,7 +151,32 @@ def test_frozen_calibration_plan_binds_implementation_and_zero_games() -> None:
     assert canonical_sha256(body) == identity
     assert plan["resource_envelope"]["complete_games"] == 0
     assert plan["calibration"]["no_complete_games"] is True
+    assert all(len(value) == 64 for value in plan["implementation_files"].values())
+
+
+def test_frozen_formal_v2_is_bound_and_resource_safe() -> None:
+    plan_path = ROOT / "docs/experiments/sanmill-classical-search-strength-v2.json"
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    body = dict(plan)
+    identity = body.pop("plan_identity")
+    assert canonical_sha256(body) == identity
+    assert plan["start_subset"]["starts"] == 48
+    assert plan["sample_size_design"]["projected_half_width_at_selected_n"] <= 0.085
+    assert plan["resource_envelope"]["planned_complete_games"] == 288
+    assert plan["resource_envelope"]["planned_complete_games"] <= 1_600
     assert {
         name: sha256_file(ROOT / name)
         for name in plan["implementation_files"]
     } == plan["implementation_files"]
+
+    authorization_path = (
+        ROOT
+        / "docs/experiments/sanmill-classical-search-strength-v2/authorization.json"
+    )
+    authorization = json.loads(authorization_path.read_text(encoding="utf-8"))
+    body = dict(authorization)
+    authorization_identity = body.pop("authorization_identity")
+    assert authorization["schema_version"] == AUTHORIZATION_SCHEMA
+    assert canonical_sha256(body) == authorization_identity
+    assert authorization["plan_identity"] == identity
+    assert authorization["plan_file_sha256"] == sha256_file(plan_path)

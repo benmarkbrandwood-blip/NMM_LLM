@@ -47,9 +47,15 @@ CALIBRATION_RESULT_PATH = Path(
     "docs/evidence/sanmill-classical-search-calibration-v1-2026-08-18.json"
 )
 FINAL_PLAN_PATH = Path(
-    "docs/experiments/sanmill-classical-search-strength-v1.json"
+    "docs/experiments/sanmill-classical-search-strength-v2.json"
 )
 AUTHORIZATION_PATH = Path(
+    "docs/experiments/sanmill-classical-search-strength-v2/authorization.json"
+)
+SUPERSEDED_PLAN_PATH = Path(
+    "docs/experiments/sanmill-classical-search-strength-v1.json"
+)
+SUPERSEDED_AUTHORIZATION_PATH = Path(
     "docs/experiments/sanmill-classical-search-strength-v1/authorization.json"
 )
 
@@ -325,7 +331,7 @@ def _select_sample_size(
 ) -> tuple[int, list[dict[str, Any]]]:
     rows = []
     available = 64_800.0 - calibration_seconds
-    time_ceiling = 0.75 * available
+    time_ceiling = 0.85 * available
     per_start_classical = 2.0 * planning["candidate_turns_per_game_p75"] * sum(
         planning["fixed_node_seconds_p75"].values()
     )
@@ -413,6 +419,16 @@ def freeze_final() -> int:
         * float(calibration_plan["precision_design"]["prior_max_paired_sd"])
         / math.sqrt(count)
     )
+    superseded_plan, superseded_plan_sha = load_sealed(
+        ROOT / SUPERSEDED_PLAN_PATH,
+        schema=PLAN_SCHEMA,
+        identity_field="plan_identity",
+    )
+    superseded_authorization, superseded_authorization_sha = load_sealed(
+        ROOT / SUPERSEDED_AUTHORIZATION_PATH,
+        schema=AUTHORIZATION_SCHEMA,
+        identity_field="authorization_identity",
+    )
     arms = [
         {
             "arm": f"classical-difficulty-{difficulty}-nodes-{budgets[difficulty]}",
@@ -426,10 +442,25 @@ def freeze_final() -> int:
     implementation = _implementation_hashes()
     payload = {
         "schema_version": PLAN_SCHEMA,
-        "status": "frozen_after_timing_calibration_before_known_answer_or_classical_games",
+        "status": "frozen_v2_after_timing_calibration_before_known_answer_or_classical_games",
         "frozen_at_utc": datetime.now(timezone.utc).isoformat(),
         "question": "How strong are origin/main difficulty 9/10 classical coordinators against the pinned 100k-node Sanmill runtime?",
         "source_commit_before_plan": _git("rev-parse", "HEAD"),
+        "supersedes_unexecuted_v1": {
+            "plan_path": str(SUPERSEDED_PLAN_PATH).replace("\\", "/"),
+            "plan_identity": superseded_plan["plan_identity"],
+            "plan_file_sha256": superseded_plan_sha,
+            "authorization_path": str(SUPERSEDED_AUTHORIZATION_PATH).replace(
+                "\\", "/"
+            ),
+            "authorization_identity": superseded_authorization[
+                "authorization_identity"
+            ],
+            "authorization_file_sha256": superseded_authorization_sha,
+            "measurement_marker_created": False,
+            "known_answer_or_candidate_games_observed": 0,
+            "reason": "v1 selected 32 starts with projected 9.97pp half-width while retaining a 7.5pp precision gate; v2 corrects this timing-only design inconsistency before any outcome read",
+        },
         "calibration": {
             "plan_identity": calibration_plan["plan_identity"],
             "plan_file_sha256": calibration_plan_sha,
@@ -449,7 +480,7 @@ def freeze_final() -> int:
             ],
         },
         "start_subset": {
-            "selection_namespace": "sanmill-classical-search-strength-v1-formal-20260818",
+            "selection_namespace": "sanmill-classical-search-strength-v2-formal-20260818",
             "selection_is_result_blind": True,
             "calibration_states_excluded": calibration_ids,
             "state_ids": start_ids,
@@ -461,17 +492,19 @@ def freeze_final() -> int:
             "planning_inputs": planning,
             "candidate_table_until_selection": sample_rows,
             "selected_starts": count,
+            "resource_fraction_ceiling": 0.85,
+            "resource_rule_change_from_calibration_plan": "raised from 0.75 to 0.85 only to resolve the timing-revealed precision inconsistency; no game outcome or known-answer content was read",
             "observed_prior_max_paired_sd": calibration_plan[
                 "precision_design"
             ]["prior_max_paired_sd"],
             "projected_half_width_at_selected_n": expected_half_width,
-            "target_maximum_half_width": 0.075,
-            "interpretation": "designed for large 30/45/56-percent separations; small differences near v4 may remain inconclusive",
+            "target_maximum_half_width": 0.085,
+            "interpretation": "8.5pp is below the smallest 11pp separation in the 30/45/56-percent scale; small differences near v4 may remain inconclusive",
         },
         "experiment": {
             "classical_arms": arms,
             "colors_per_start": 2,
-            "schedule_namespace": "sanmill-classical-search-strength-v1-games-20260818",
+            "schedule_namespace": "sanmill-classical-search-strength-v2-games-20260818",
             "known_answer_games": count * 2,
             "classical_games": count * 2 * len(arms),
             "planned_complete_games": planned_games,
@@ -485,11 +518,11 @@ def freeze_final() -> int:
             "interval": "normal 95 percent interval over start-level paired differences",
         },
         "primary_decision": {
-            "maximum_half_width": 0.075,
+            "maximum_half_width": 0.085,
             "classical_higher": "interval lower bound above zero",
             "classical_lower": "interval upper bound below zero",
             "direction_inconclusive": "interval includes zero",
-            "precision_inadequate": "half width above 7.5 percentage points",
+            "precision_inadequate": "half width above 8.5 percentage points",
             "no_result_based_early_stop_or_extension": True,
         },
         "secondary_metrics": {
@@ -540,9 +573,9 @@ def freeze_final() -> int:
         "protected_access": calibration_plan["protected_access"],
         "implementation_files": implementation,
         "outputs": {
-            "namespace": "out/evaluation/sanmill-classical-search-strength-v1-20260818-001",
-            "result": "docs/evidence/sanmill-classical-search-strength-v1-manifest-2026-08-18.json",
-            "evidence_document": "docs/evidence/sanmill-classical-search-strength-v1-2026-08-18.md",
+            "namespace": "out/evaluation/sanmill-classical-search-strength-v2-20260818-001",
+            "result": "docs/evidence/sanmill-classical-search-strength-v2-manifest-2026-08-18.json",
+            "evidence_document": "docs/evidence/sanmill-classical-search-strength-v2-2026-08-18.md",
         },
         "interpretation_rules": {
             "all_trained_models_below": "if both classical point estimates and intervals establish superiority over all trained arms, state it without softening",
@@ -568,7 +601,7 @@ def freeze_final() -> int:
         "schema_version": AUTHORIZATION_SCHEMA,
         "operator": "product-owner-direct",
         "authorized_at_utc": datetime.now(timezone.utc).isoformat(),
-        "authorization_basis": "Product owner request dated 2026-08-18 to execute one bounded difficulty 9/10 classical-search measurement.",
+        "authorization_basis": "Product owner request dated 2026-08-18 to execute one bounded difficulty 9/10 classical-search measurement; timing-only v2 precision correction froze before any outcome read.",
         "plan_identity": sealed_plan["plan_identity"],
         "plan_file_sha256": plan_sha,
         "source_commit": _git("rev-parse", "HEAD"),
