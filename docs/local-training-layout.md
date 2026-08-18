@@ -395,10 +395,14 @@ The trainer resolves configuration in this order:
 4. repository default.
 
 The tracked `data/settings.json` still contains the previous maintainer's WSL
-Malom path. That does not affect `train_s_gen_v2.py` when the local overlay is
-present. Tools that read only `settings.json` may still need their own portable
-path work; do not replace shared settings merely to make one training command
-work.
+Malom path. That does not affect `train_s_gen_v2.py` or the Web product when the
+local overlay is present. The Web resolver checks `NMM_MALOM_DB`, this ignored
+registry, shared settings, and Sentinel configuration in that order; it
+validates every configured candidate against the tracked
+`sector-corrected-v1` component inventory and selects the first passing source.
+Rejected candidates and reasons are exposed in the status endpoints. The Tools
+page persists the Malom field only to this ignored registry. Do not replace
+shared settings merely to make one machine work.
 
 ## Data-handling Rules
 

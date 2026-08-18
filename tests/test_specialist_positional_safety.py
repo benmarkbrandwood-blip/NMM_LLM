@@ -276,7 +276,7 @@ def test_real_malom_recomputes_frozen_safe_sets_when_available() -> None:
         database.close()
 
 
-def test_product_specialist_route_cannot_call_unfiltered_scorer() -> None:
+def test_product_specialist_route_converges_on_final_product_safety_gate() -> None:
     tree = ast.parse((ROOT / "web" / "app.py").read_text(encoding="utf-8"))
     ai_turn = next(
         node
@@ -290,8 +290,15 @@ def test_product_specialist_route_cannot_call_unfiltered_scorer() -> None:
         and isinstance(node.value, ast.Name)
         and node.value.id == "_overseer_advisor"
     ]
-    assert "score_moves_positional_safe" in specialist_attributes
-    assert "score_moves" not in specialist_attributes
+    assert "score_moves" in specialist_attributes
+    choke_calls = [
+        node
+        for node in ast.walk(ai_turn)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_finalize_product_ai_move"
+    ]
+    assert len(choke_calls) == 1
 
 
 def test_product_ui_fails_closed_when_safety_status_is_unavailable() -> None:
@@ -301,4 +308,4 @@ def test_product_ui_fails_closed_when_safety_status_is_unavailable() -> None:
     script = (ROOT / "web" / "static" / "game.js").read_text(encoding="utf-8")
     assert 'id="chk-overseer-player" disabled' in template
     assert "chkPlayer.disabled = !s.playable" in script
-    assert "A_pos unavailable; diff 9/10 use classical fallback" in script
+    assert "A_pos unavailable; classic continues visibly unfiltered" in script

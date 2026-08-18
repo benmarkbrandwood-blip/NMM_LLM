@@ -61,6 +61,8 @@ from ai.value_net import ValueNet, PhaseValueNet
 from ai.starting_play import combined_family_summary
 from ai.ponder import PonderManager
 from ai.player_profile import PlayerProfile, load_profile, save_profile, is_valid_name
+from ai.malom_runtime import resolve_product_malom_runtime
+from learned_ai.agents.positional_safety import ProductPositionalSafetyGate
 
 _GAMES_PATH = _ROOT / "data" / "games"
 _GAMES_PATH.mkdir(parents=True, exist_ok=True)
@@ -363,33 +365,73 @@ if _overseer_advisor is None:
     except Exception as _oe:
         log.warning("Overseer advisor unavailable: %s", _oe)
 
-# ── Malom perfect DB (ExternalSolvedDB) — used for DB Lines overlay and DB fallback ──
-# Path is read from settings.json "malom_db_path" (user-configurable via Tools page);
-# falls back to the sentinel config's external_db_path when the setting is absent.
-# _malom_puzzle_db (MalomDB) and hash-cache prewarm are deferred to the startup event
-# so they don't block or pollute the console before the server is ready.
-_malom_db = None        # ExternalSolvedDB — WDL string, used by game AI + validate
-_malom_puzzle_db = None  # MalomDB          — WDL dict with dtw, used by puzzle generators
-_malom_db_path: str = ""  # stored for deferred puzzle-DB init in startup event
+# ── Malom perfect DB — validated portable manifest + machine-local path ───────
+# Candidate paths are validated in priority order.  The ignored local registry
+# is intentionally ahead of legacy shared settings so a stale path in tracked
+# settings cannot mask a valid machine-local configuration.  The runtime uses
+# the first candidate whose exact inventory and sizes match the tracked
+# sector-corrected-v1 manifest; rejected candidates remain visible via status.
+_malom_db = None         # ExternalSolvedDB; read-only product adapter
+_malom_puzzle_db = None  # MalomDB; deferred read-only puzzle adapter
+_malom_db_path: str = ""
+_product_positional_safety = ProductPositionalSafetyGate(
+    high_difficulty_minimum=9
+)
+_malom_runtime_status: dict = {
+    "schema_version": "nmm.product-malom-runtime-status.v1",
+    "validation": "failed",
+    "selected_source": None,
+    "selected_path": None,
+    "candidates": [],
+    "disabled_reason": "Malom runtime resolution did not run",
+}
+_malom_resolution = None
 try:
-    from learned_ai.sentinel.db_teacher import ExternalSolvedDB as _ExternalSolvedDB
-    _malom_db_path = _load_settings().get("malom_db_path") or ""
-    if not _malom_db_path:
+    _sentinel_malom_path = ""
+    try:
         from learned_ai.sentinel.config import load_config as _load_sentinel_config_malom
+
         _mcfg = _load_sentinel_config_malom()
-        _malom_db_path = getattr(_mcfg, "external_db_path", "") or ""
-    if _malom_db_path:
-        _malom_db = _ExternalSolvedDB(_malom_db_path)
-        if _malom_db.is_available():
-            log.info("Malom perfect DB loaded from %s", _malom_db_path)
-        else:
-            log.warning("Malom DB path configured but unavailable: %s", _malom_db_path)
-            _malom_db = None
-            _malom_db_path = ""
+        _sentinel_malom_path = getattr(_mcfg, "external_db_path", "") or ""
+    except Exception as _sentinel_path_exc:
+        log.warning("Sentinel Malom fallback path unavailable: %s", _sentinel_path_exc)
+
+    _malom_resolution = resolve_product_malom_runtime(
+        repo_root=_ROOT,
+        settings=_load_settings(),
+        sentinel_path=_sentinel_malom_path,
+        local_paths_path=_ROOT / "data" / "training_paths.local.json",
+        manifest_path=(
+            _ROOT / "data" / "manifests" / "malom-sector-corrected-v1.json"
+        ),
+    )
+    _malom_runtime_status = _malom_resolution.status
+    _malom_db = _malom_resolution.database
+    _malom_db_path = _malom_runtime_status.get("selected_path") or ""
+    if _malom_db is not None:
+        log.info(
+            "Malom product runtime selected source=%s path=%s manifest=%s",
+            _malom_runtime_status.get("selected_source"),
+            _malom_db_path,
+            _malom_runtime_status.get("manifest_sha256"),
+        )
     else:
-        log.info("Malom DB not configured (no malom_db_path in settings)")
+        for _candidate in _malom_runtime_status.get("candidates", []):
+            if _candidate.get("status") == "rejected":
+                log.error(
+                    "Malom candidate rejected source=%s path=%s reason=%s",
+                    _candidate.get("source"),
+                    _candidate.get("path"),
+                    _candidate.get("reason"),
+                )
+        log.error("No validated Malom product runtime is available")
 except Exception as _e:
-    log.warning("Malom DB load failed (non-fatal): %s", _e)
+    _malom_runtime_status = {
+        **_malom_runtime_status,
+        "validation": "failed",
+        "disabled_reason": f"unexpected resolver failure: {type(_e).__name__}",
+    }
+    log.error("Malom runtime resolution failed: %s", _e, exc_info=True)
 
 # Wire Malom DB into Overseer/Generalist now that both are loaded.
 if _overseer_advisor is not None and _malom_db is not None:
@@ -397,55 +439,42 @@ if _overseer_advisor is not None and _malom_db is not None:
 if _generalist_advisor is not None and _malom_db is not None:
     _generalist_advisor.set_db(_malom_db)
 
-# Production specialist choices use Malom only as a final position-level W/D/L
-# filter (A_pos). This is not full-rule A_allow: repetition and no-progress
-# history are deliberately outside the pure-board Malom query.
-if _overseer_advisor is not None:
-    if _malom_db is None:
-        _overseer_advisor.disable_positional_safety(
-            "Malom DB is unavailable at startup"
+# Every product-owned AI move converges on one final position-only W/D/L gate.
+# This is A_pos, not full-rule A_allow: repetition and no-progress history are
+# absent from Malom's pure-board query.  SpecialistRouter keeps its legacy
+# status surface, but final enforcement occurs only at the product choke.
+if _malom_resolution is None or _malom_resolution.oracle is None:
+    _safety_startup_error = (
+        _malom_runtime_status.get("disabled_reason")
+        or "Malom DB is unavailable at startup"
+    )
+    _product_positional_safety.disable(_safety_startup_error)
+    if _overseer_advisor is not None:
+        _overseer_advisor.disable_positional_safety(_safety_startup_error)
+else:
+    try:
+        _product_positional_safety.configure(
+            _malom_resolution.oracle,
+            label_version=_malom_runtime_status["label_version"],
+            manifest_sha256=_malom_runtime_status["manifest_sha256"],
+            content_sha256=_malom_runtime_status["content_sha256"],
         )
-    else:
-        try:
-            from learned_ai.data.data_contract import (
-                load_dataset_manifest as _load_dataset_manifest,
-                verify_dataset_snapshot as _verify_dataset_snapshot,
-            )
-            from learned_ai.data.malom_label_provenance import (
-                CURRENT_MALOM_LABEL_VERSION as _CURRENT_MALOM_LABEL_VERSION,
-            )
-
-            _malom_manifest_path = (
-                _ROOT / "data" / "manifests" / "malom-sector-corrected-v1.json"
-            )
-            _malom_manifest = _load_dataset_manifest(_malom_manifest_path)
-            if (
-                _malom_manifest.logical_name != "malom_tablebase"
-                or _malom_manifest.trust_level != _CURRENT_MALOM_LABEL_VERSION
-                or "theoretical_wdl" not in _malom_manifest.label_kinds
-                or "malom_oracle" not in _malom_manifest.allowed_consumers
-            ):
-                raise RuntimeError(
-                    "Malom manifest does not authorize a trusted oracle"
-                )
-            _verify_dataset_snapshot(
-                _malom_db_path,
-                _malom_manifest,
-                full_hash=False,
-            )
+        if _overseer_advisor is not None:
             _overseer_advisor.configure_positional_safety(
-                _malom_db.require_complete_oracle(),
-                label_version=_malom_manifest.trust_level,
-                manifest_sha256=_malom_manifest.manifest_sha256,
-                content_sha256=_malom_manifest.content_sha256,
+                _malom_resolution.oracle,
+                label_version=_malom_runtime_status["label_version"],
+                manifest_sha256=_malom_runtime_status["manifest_sha256"],
+                content_sha256=_malom_runtime_status["content_sha256"],
             )
-        except Exception as _safety_exc:
+    except Exception as _safety_exc:
+        _product_positional_safety.disable(str(_safety_exc))
+        if _overseer_advisor is not None:
             _overseer_advisor.disable_positional_safety(str(_safety_exc))
-            log.error(
-                "Specialist positional safety startup validation failed: %s",
-                _safety_exc,
-                exc_info=True,
-            )
+        log.error(
+            "Product positional safety startup validation failed: %s",
+            _safety_exc,
+            exc_info=True,
+        )
 
 # Probability that sentinel (or DB fallback) intervenes, by difficulty level.
 SENTINEL_PROB_BY_DIFF: dict[int, float] = {
@@ -865,6 +894,16 @@ templates = Jinja2Templates(directory=str(_WEB / "templates"))
 
 
 _SETTINGS_PATH = _ROOT / "data" / "settings.json"
+_LOCAL_PATHS_PATH = _ROOT / "data" / "training_paths.local.json"
+
+
+def _load_local_paths() -> dict:
+    if not _LOCAL_PATHS_PATH.is_file():
+        return {}
+    value = json.loads(_LOCAL_PATHS_PATH.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("machine-local path registry must be a JSON object")
+    return value
 
 
 def _static_ver() -> str:
@@ -1020,13 +1059,15 @@ async def sentinel_status():
         "available":    _sentinel_advisor is not None and _sentinel_advisor.is_loaded(),
         "checkpoint":   str(_sentinel_ckpt) if _sentinel_advisor else "",
         "malom_db":     _malom_db is not None and _malom_db.is_available(),
+        "malom_runtime": _malom_runtime_status,
+        "product_positional_safety": _product_positional_safety.status(),
     }
 
 
 @app.get("/api/overseer_status")
 async def overseer_status():
     available = _overseer_advisor is not None and _overseer_advisor.is_loaded()
-    positional_safety = (
+    specialist_filter = (
         _overseer_advisor.positional_safety_status()
         if _overseer_advisor is not None
         else {
@@ -1038,10 +1079,14 @@ async def overseer_status():
             "disabled_reason": "specialist router is unavailable",
         }
     )
+    positional_safety = _product_positional_safety.status()
     return {
         "available": available,
         "playable": available and bool(positional_safety["enabled"]),
         "positional_safety": positional_safety,
+        "product_positional_safety": positional_safety,
+        "specialist_filter": specialist_filter,
+        "malom_runtime": _malom_runtime_status,
     }
 
 
@@ -1685,7 +1730,7 @@ async def api_malom_puzzle_random(
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
+            content={"error": "Malom DB not available. Configure the machine-local Malom path."},
         )
 
     if _malom_puzzle_db is None:
@@ -1893,7 +1938,7 @@ async def api_placement_puzzle_random(
         from fastapi.responses import JSONResponse
         return JSONResponse(
             status_code=503,
-            content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
+            content={"error": "Malom DB not available. Configure the machine-local Malom path."},
         )
 
     if _malom_puzzle_db is None:
@@ -2231,7 +2276,11 @@ async def tool_status():
     busy = _TOOLS_LOCK.locked()
 
     # Malom perfect DB
-    malom_info = {"status": "not loaded", "path": str(_load_settings().get("malom_db_path", ""))}
+    malom_info = {
+        **_malom_runtime_status,
+        "status": "not loaded",
+        "product_positional_safety": _product_positional_safety.status(),
+    }
     if _malom_db is not None and _malom_db.is_available():
         malom_info["status"] = "loaded"
 
@@ -2251,6 +2300,8 @@ async def tool_status():
             "games_since": _games_since_evolve,
         },
         "malom_db":       malom_info,
+        "malom_runtime": _malom_runtime_status,
+        "product_positional_safety": _product_positional_safety.status(),
     })
 
 
@@ -2276,10 +2327,12 @@ async def set_auto_evolve(request: Request):
 @app.get("/api/db_settings")
 async def get_db_settings():
     settings = _load_settings()
+    local_paths = _load_local_paths()
     return _JSONResponse({
         "fullgame_db_path":    settings.get("fullgame_db_path", ""),
         "endgame_solved_dir":  settings.get("endgame_solved_dir", ""),
-        "malom_db_path":       settings.get("malom_db_path", ""),
+        "malom_db_path":       local_paths.get("malom_db_path", ""),
+        "malom_path_store":    "data/training_paths.local.json (ignored)",
         "playok_archive_path": settings.get("playok_archive_path", "~/playok_archive/games"),
     })
 
@@ -2289,13 +2342,26 @@ async def set_db_settings(request: Request):
     body = await request.json()
     settings = _load_settings()
     changed = False
-    for key in ("fullgame_db_path", "endgame_solved_dir", "malom_db_path", "playok_archive_path"):
+    for key in ("fullgame_db_path", "endgame_solved_dir", "playok_archive_path"):
         if key in body:
             settings[key] = str(body[key]).strip()
             changed = True
     if changed:
         _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
-    return _JSONResponse({"ok": True})
+    local_changed = False
+    if "malom_db_path" in body:
+        local_paths = _load_local_paths()
+        local_paths["malom_db_path"] = str(body["malom_db_path"]).strip()
+        _LOCAL_PATHS_PATH.write_text(
+            json.dumps(local_paths, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        local_changed = True
+    return _JSONResponse({
+        "ok": True,
+        "shared_settings_changed": changed,
+        "machine_local_paths_changed": local_changed,
+    })
 
 
 @app.websocket("/ws/tools")
@@ -2706,6 +2772,83 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
     return _gai
 
 
+async def _finalize_product_ai_move(
+    board: BoardState,
+    original_move: dict,
+    *,
+    game_ai: GameAI | None,
+    difficulty: int,
+    source: str,
+    candidate_scores: list[float] | None = None,
+    classical_fallback_move: dict | None = None,
+) -> tuple[dict, dict]:
+    """Apply the single final ``A_pos`` choke to a product-owned AI move.
+
+    Malom unavailability or query failure leaves the classical result in
+    place, exactly as before this feature, but records that play was
+    unfiltered.  Once Malom has produced ``A_pos``, an unsafe classic result is
+    re-ranked only inside that set with deterministic fixed-depth search.
+    """
+
+    def _restricted_root_research(safe_moves: list[dict]) -> dict:
+        if game_ai is None:
+            raise RuntimeError("GameAI is unavailable for restricted root research")
+        ranked = game_ai.score_root_moves(
+            board,
+            depth=2,
+            time_budget=None,
+            preserve_tt=False,
+            candidate_moves=safe_moves,
+        )
+        if not ranked:
+            raise RuntimeError("restricted root research returned no move")
+        best_score = max(float(score) for _move, score in ranked)
+        tied = [move for move, score in ranked if float(score) == best_score]
+        return min(
+            tied,
+            key=lambda move: tuple(
+                str(move.get(field) or "")
+                for field in ("from", "to", "capture")
+            ),
+        )
+
+    outcome = await asyncio.to_thread(
+        _product_positional_safety.constrain,
+        board,
+        original_move,
+        source=source,
+        difficulty=int(difficulty),
+        candidate_scores=candidate_scores,
+        safe_selector=_restricted_root_research,
+        query_failure_move=classical_fallback_move or original_move,
+    )
+    decision = outcome.decision
+    if decision.get("status") in {
+        "unfiltered-malom-unavailable",
+        "unfiltered-query-failure",
+    }:
+        log.error(
+            "Product move continued without A_pos status=%s source=%s reason=%s",
+            decision.get("status"),
+            source,
+            decision.get("failure"),
+        )
+    elif decision.get("status") == "bypassed-low-difficulty":
+        log.debug(
+            "Product A_pos bypassed by difficulty policy source=%s difficulty=%s",
+            source,
+            difficulty,
+        )
+    elif decision.get("intervened"):
+        log.warning(
+            "Product final A_pos gate changed source=%s original=%s selected=%s",
+            source,
+            decision.get("original_move"),
+            decision.get("selected_move"),
+        )
+    return outcome.move, decision
+
+
 async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
     """Drive an AI-vs-AI game: alternate moves for W and B until the game ends."""
     import time as _time
@@ -2744,8 +2887,21 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
                 await _send(ws, {"type": "error", "message": f"AI error: {exc}"})
                 return
 
+            move, _ava_safety = await _finalize_product_ai_move(
+                board,
+                move,
+                game_ai=game_ai,
+                difficulty=diff,
+                source=("classical-coordinator" if coord else "classical-game-ai"),
+                classical_fallback_move=move,
+            )
             elapsed = _time.time() - t0
-            log.info("AI-vs-AI move  color=%s move=%s elapsed=%.2fs", color, move, elapsed)
+            log.info(
+                "AI-vs-AI move  color=%s move=%s elapsed=%.2fs",
+                color,
+                move,
+                elapsed,
+            )
 
             # Check board identity (shouldn't change, but guard anyway)
             if session.engine.board is not board:
@@ -2761,6 +2917,7 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
                 "capture":     move.get("capture"),
                 "was_blunder": bool(game_ai.last_was_blunder),
                 "can_mark_bad": False,
+                "positional_safety": _ava_safety,
             }
             _ava_thinking = (
                 (coord.last_thinking if coord else "")
@@ -2987,6 +3144,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
     t0 = _time.time()
     try:
         if _ponder_hit is not None:
+            _move_source = "classical-ponder"
             if _ponder_ai_done is not None:
                 # B-94: deepen on pre-warmed TT from completed ponder search.
                 _ponder_ai_done._force_stop = False
@@ -3000,21 +3158,24 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                 session.game_ai.last_was_blunder = False
                 session.game_ai.last_thinking    = "pondered"
         elif session.coordinator:
+            _move_source = "classical-coordinator"
             move = await asyncio.to_thread(session.coordinator.deliberate, board)
         else:
+            _move_source = "classical-game-ai"
             move = await asyncio.to_thread(_nollm_choose_move, session, board)
     except Exception as exc:
         log.error("AI deliberation failed: %s", exc, exc_info=True)
         raise
 
+    _classical_move = dict(move)
+    _candidate_scores: list[float] | None = None
+
     # Specialist AI mode: triggered by difficulty 9 or 10 (or by the legacy
     # use_overseer_player toggle, kept as a hidden test hook).  In specialist
     # mode the coordinator's alpha-beta search still runs first, then the
-    # phase-routed specialist scores every legal move. Its original argmax is
-    # retained for diagnostics, while the played specialist move is the argmax
-    # within positional A_pos. A failed or disabled safety filter never returns
-    # an unfiltered specialist argmax; the persistent log and status API expose
-    # the resulting classical-coordinator fallback.
+    # phase-routed specialist scores every legal move. The product-wide final
+    # choke below, not the router, retains the model argmax for diagnostics and
+    # constrains the played move to positional A_pos.
     _spec_by_diff = (session.game_ai is not None
                      and int(getattr(session.game_ai, "difficulty", 0)) >= 9)
     _spec_by_legacy = bool(session.use_overseer_player)
@@ -3035,7 +3196,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
             if legal:
                 ov_cands = [{"from": m.get("from"), "to": m.get("to"), "capture": m.get("capture")} for m in legal]
                 ov_probs = await asyncio.to_thread(
-                    _overseer_advisor.score_moves_positional_safe,
+                    _overseer_advisor.score_moves,
                     board,
                     ov_cands,
                     board.turn,
@@ -3043,16 +3204,18 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                 if ov_probs:
                     best = max(range(len(ov_probs)), key=lambda i: ov_probs[i])
                     move = legal[best]
+                    _candidate_scores = list(ov_probs)
+                    _move_source = "specialist"
                     _mode_tag = f"diff{session.game_ai.difficulty}" if _spec_by_diff else "legacy_toggle"
                     log.info("Specialist AI (%s): %s (prob=%.3f)", _mode_tag, move, ov_probs[best])
                 else:
                     log.warning(
-                        "Specialist AI positional-safe scoring unavailable at "
+                        "Specialist AI scoring unavailable at "
                         "diff %s; using coordinator move",
                         session.game_ai.difficulty if session.game_ai else "?",
                     )
                     import sys as _sys
-                    print(f"\n[Specialist AI] positional-safe scoring returned None at diff "
+                    print(f"\n[Specialist AI] scoring returned None at diff "
                           f"{session.game_ai.difficulty if session.game_ai else '?'} — "
                           f"falling back to coordinator move.",
                           file=_sys.stderr, flush=True)
@@ -3083,6 +3246,8 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                 if gen_probs:
                     best = max(range(len(gen_probs)), key=lambda i: gen_probs[i])
                     move = legal[best]
+                    _candidate_scores = list(gen_probs)
+                    _move_source = "generalist"
                     log.info("Generalist AI: %s (prob=%.3f)", move, gen_probs[best])
                 else:
                     import sys as _sys
@@ -3094,6 +3259,16 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                   file=_sys.stderr, flush=True)
             _tb.print_exc(file=_sys.stderr)
             log.warning("Generalist AI override failed: %s", _ge, exc_info=True)
+
+    move, _product_safety_decision = await _finalize_product_ai_move(
+        board,
+        move,
+        game_ai=session.game_ai,
+        difficulty=diff,
+        source=_move_source,
+        candidate_scores=_candidate_scores,
+        classical_fallback_move=_classical_move,
+    )
 
     elapsed = _time.time() - t0
     log.info("AI turn end    move=%s elapsed=%.2fs ponder_hit=%s", move, elapsed, _ponder_hit is not None)
@@ -3138,6 +3313,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         "was_blunder":  bool(session.game_ai and session.game_ai.last_was_blunder),
         "can_mark_bad": True,
         "depth_reached": _depth_reached,
+        "positional_safety": _product_safety_decision,
     }
     _thinking = (
         (session.coordinator.last_thinking if session.coordinator else "")

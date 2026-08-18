@@ -959,10 +959,11 @@ class GameAI:
         self,
         board: BoardState,
         depth: int = 3,
-        time_budget: float = 2.0,
+        time_budget: float | None = 2.0,
         preserve_tt: bool = False,
+        candidate_moves: list[dict] | None = None,
     ) -> list:
-        """Score all legal moves with alpha-beta search at `depth`.
+        """Score legal root candidates with alpha-beta search at `depth`.
 
         Returns list of (move_dict, score_norm) sorted best-first, where
         score_norm is normalised to [0, 1] relative to the best/worst score
@@ -975,14 +976,44 @@ class GameAI:
         SpecialistRouter to reuse the state populated by the coordinator's
         just-completed search.  With warm TT most probes hit and the ordering
         pass finishes near-instantly.
+
+        ``candidate_moves`` is an optional complete atomic-action whitelist.
+        It is used by the product's final ``A_pos`` choke only after Malom has
+        proved that each supplied move preserves the position's W/D/L tier.
+        ``time_budget=None`` makes this fixed-depth re-ranking deterministic.
         """
-        moves = get_all_legal_moves(board)
-        if not moves:
+        legal = get_all_legal_moves(board)
+        if not legal:
             return []
+        if candidate_moves is None:
+            moves = legal
+        else:
+            moves = [
+                {
+                    "from": move.get("from"),
+                    "to": move.get("to"),
+                    "capture": move.get("capture"),
+                }
+                for move in candidate_moves
+            ]
+            keys = {
+                (move.get("from"), move.get("to"), move.get("capture"))
+                for move in moves
+            }
+            legal_keys = {
+                (move.get("from"), move.get("to"), move.get("capture"))
+                for move in legal
+            }
+            if not moves or len(keys) != len(moves) or not keys <= legal_keys:
+                raise ValueError(
+                    "candidate_moves must be a unique non-empty legal subset"
+                )
 
         # Minimal state setup — mirrors choose_move preamble
         self._force_stop        = False
-        self._deadline          = time.time() + time_budget
+        self._deadline          = (
+            math.inf if time_budget is None else time.time() + time_budget
+        )
         if not preserve_tt:
             self._tt.clear()
             self._gap_leaf_cache.clear()

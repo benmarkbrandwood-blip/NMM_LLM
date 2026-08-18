@@ -1,0 +1,46 @@
+{
+  "schema_version": "nmm.classical-positional-downgrade-fixtures.v1",
+  "source": {
+    "classical_ledger_sha256": "b27903f745bda6bcf4200308b96a978e5acb1d1c4f2230737c597e26f9a11701",
+    "evidence": "docs/evidence/sanmill-classical-search-strength-v2-2026-08-18.md",
+    "selection": "first recorded W-to-D event in placement and movement",
+    "trust_level": "sector-corrected-v1"
+  },
+  "cases": [
+    {
+      "absolute_logical_ply": 10,
+      "board_fen": "........WB.W.W.B.W..B.BW|B|5|4",
+      "difficulty": 9,
+      "legal_move_count": 19,
+      "node_budget": 13887000,
+      "parent_tier": "W",
+      "phase": "placement",
+      "safe_moves": [
+        {"capture": null, "from": null, "to": "g4"},
+        {"capture": null, "from": null, "to": "e5"}
+      ],
+      "source_game_id": "69184cf57cfd1d160690fa7565788fef3b6dd6bba8a9f9db1baf704d01c48b0c",
+      "source_record_sha256": "2439c09aa4920d7e064e63b2f41d30e18688d5c53d45b2168a08710ff55fcc69",
+      "source_start_id": "50ad7e40e9a0e93bcfcf00b3daf49bd8c2a81d7d2a0f255a8ef134ee3c9b916c",
+      "transition": "W->D",
+      "unsafe_move": {"capture": null, "from": null, "to": "a1"}
+    },
+    {
+      "absolute_logical_ply": 31,
+      "board_fen": "WB.BWBBWW.BWB..BWWBWBW..|W|9|9",
+      "difficulty": 9,
+      "legal_move_count": 5,
+      "node_budget": 13887000,
+      "parent_tier": "W",
+      "phase": "movement",
+      "safe_moves": [
+        {"capture": null, "from": "d3", "to": "d2"}
+      ],
+      "source_game_id": "ca7d77ca8ece1fbf64ede55f7a448d1ab1680dc4d7f30cb78da22e56bf972cee",
+      "source_record_sha256": "351ec3f76e0b34dcda63766d5854e31bcdfb3bec5b9e9f8f99268ee60ac0fdf9",
+      "source_start_id": "0a09fe8d82ec1c73c6eff93f572d8a22895ad73b292b13b6dd8980ac9241d504",
+      "transition": "W->D",
+      "unsafe_move": {"capture": null, "from": "c5", "to": "c4"}
+    }
+  ]
+}

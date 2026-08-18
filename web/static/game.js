@@ -253,6 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const rowPlayer = $("row-overseer-player");
     const chkPlayer = $("chk-overseer-player");
     const safetyHint = $("specialist-safety-hint");
+    const generalistHint = $("generalist-safety-hint");
     if (s.available) {
       if (row) row.style.display = "flex";
       if (chk) chk.disabled = false;
@@ -263,8 +264,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       if (safetyHint) {
         safetyHint.textContent = s.playable
-          ? "(phase-routed specialists + positional A_pos; diff 9/10 auto-enable)"
-          : `(A_pos unavailable; diff 9/10 use classical fallback: ${
+          ? "(phase-routed specialists + final positional A_pos; diff 9/10 all AI sources protected)"
+          : `(A_pos unavailable; classic continues visibly unfiltered: ${
               s.positional_safety?.disabled_reason || "unknown startup failure"
             })`;
         safetyHint.style.color = s.playable ? "var(--text-dim)" : "#e67e22";
@@ -273,6 +274,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (chip)   { chip.disabled = true; chip.title = "Overseer model not loaded"; }
       if (status) status.style.display = "inline";
       if (chkPlayer) { chkPlayer.disabled = true; chkPlayer.checked = false; }
+    }
+    if (generalistHint) {
+      const gateEnabled = Boolean(s.product_positional_safety?.enabled);
+      generalistHint.textContent = gateEnabled
+        ? "(single full-game model + final positional A_pos)"
+        : "(A_pos unavailable; request falls back to visible classic play)";
+      generalistHint.style.color = gateEnabled ? "var(--text-dim)" : "#e67e22";
     }
   }).catch(() => {});
 
