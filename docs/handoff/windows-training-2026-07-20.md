@@ -3679,6 +3679,38 @@ The result commit body still contains literal `\n` text rather than physical
 line wrapping because its message bytes were deliberately preserved; the
 content and evidence files are unaffected.
 
+## Current-Dev Classical `A_pos` Strength Completed (2026-08-20)
+
+The one product-owner-authorized execution under plan `87aebf86...` and
+authorization `bbc4be15...` completed all 480 planned games in 929.83 active
+seconds.  The 96-game random-safe known-answer gate reproduced identity
+`45b4ed7c...` exactly.  Formal work used 18,674 Sanmill searches and 372,321
+Malom read-only queries; database writes and protected-data reads were zero,
+all resource snapshots were unchanged, and every bound was respected.
+
+On the same 48 starts, current-`dev` difficulty 9 and 10 each scored 66.67%
+(47/34/15) in both unfiltered and final-`A_pos` forms.  The filtered-minus-
+unfiltered difference was exactly zero for all 48 paired start units at both
+difficulties.  More strongly, all 96 game trajectories per difficulty were
+identical.  The delivered final gate checked 3,739 classical turns and
+intervened zero times because the internal `GameAI` Malom full-value path had
+already selected every move inside `A_pos`.
+
+The current-`dev` unfiltered path did not reproduce the old `origin/main` v2
+classical route: 166 of 192 records differed, including 156 move-sequence
+differences.  The old 29.69% and 31.77% scores therefore do not transfer to
+`dev`.  The active internal Malom route is a confirmed relevant difference,
+but the branch score change is not attributable to one commit because the
+trees differ broadly.
+
+Result identity is `0e811277...`.  See the
+[result evidence](../evidence/sanmill-classical-positional-safety-strength-v1-2026-08-20.md)
+and the
+[machine manifest](../evidence/sanmill-classical-positional-safety-strength-v1-manifest-2026-08-20.json).
+The result is limited to this fixed runtime and reused development pool; it is
+not an equivalence, population, human-opponent, promotion, or deployment
+claim.
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
