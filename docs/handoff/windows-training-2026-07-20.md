@@ -2,6 +2,31 @@
 
 ## Executive Summary
 
+### Classical-first runtime smoke failed before HTTP -- 21 August 2026
+
+The directly authorized loopback-only product smoke at `dev == origin/dev ==
+6b48b73` failed closed before any HTTP request.  `web.app:app` did not finish
+import/startup or bind `127.0.0.1:50256` within the ten-minute window.  The
+process remained active for about 603.67 seconds through confirmed exit, so
+the run also exceeded the 600-second bound by about 3.67 seconds and must not
+be described as passed or in budget.  No second attempt was made.
+
+The last application records were HumanDB availability and the skipped
+TrajectoryDB scan.  The high-confidence diagnosis is the next synchronous
+startup step: `data/ngram_model.json` is absent, so the app recursively parses
+94,527 human-game JSONL files totalling 751,334,698 bytes before it reaches
+specialist, Malom, route-status, or Uvicorn initialization.  No GET, WebSocket,
+session, game, move inference, Sanmill process, browser, Ollama launch, model
+change, or database-main-file change occurred.  The main resource hashes and
+mtimes were unchanged.  Opening HumanDB did update the mtime of its 32 KiB
+SQLite SHM sidecar; this side effect is explicitly preserved in the evidence.
+
+Both smoke-owned Python PIDs were terminated and the port was released.  The
+static route implementation and tests at `6b48b73` remain intact, but this run
+provides no runtime acceptance evidence for Malom enablement, the status
+endpoint, or the rendered homepage.  Preserve the
+[failed runtime-smoke evidence](../evidence/product-classical-first-runtime-smoke-2026-08-21.md).
+
 ### D9/D10 default is classical-first plus A_pos -- 21 August 2026
 
 The product owner directly authorized the held-out route candidate to become
