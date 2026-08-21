@@ -1,6 +1,38 @@
-# Windows Training Handover — 20 July 2026 (updated 18 August 2026)
+# Windows Training Handover — 20 July 2026 (updated 21 August 2026)
 
 ## Executive Summary
+
+### Held-out specialist-first versus classical-first product routes -- 21 August 2026
+
+The final 108 never-consumed records in frozen source pool `2eb04f54` were
+used once, in existing order, for the directly authorized current-product
+route comparison. D9 and D10 each compared specialist-first plus final
+position-only `A_pos` against classical-first plus the same final `A_pos`,
+with both candidate colours on every start. All 864 games reached strict-rule
+terminals in one execution. There was no retry, recovery, resume, extension,
+training, model update, database write, or protected-segment read.
+
+At both D9 and D10, specialist-first scored 25 wins / 137 draws / 54 losses
+(`43.2870%`), while classical-first scored 83 / 84 / 49 (`57.8704%`). The
+start-clustered classical-minus-specialist difference was `+14.5833pp`, 95%
+interval `[+11.4834pp, +17.6832pp]`, half-width `3.0999pp`. Both difficulties
+therefore receive the frozen classification
+`classical_first_material_route_candidate`. This is a candidate for a
+separate owner decision, not an automatic route change or deployment.
+
+All final `A_pos` applications succeeded. Specialist coverage was 5,135 of
+5,135 turns with zero fallback in each difficulty; the final gate rewrote 637
+specialist choices and zero classical choices. Independent raw-ledger
+recomputation matched both primary objects with no difference. Result identity
+is `89d24d3`, recomputation identity `7d4685ac`, and the source pool now has
+zero unconsumed records. Preserve the
+[held-out route evidence](../evidence/sanmill-product-route-heldout-v1-2026-08-21.md),
+[machine result](../evidence/sanmill-product-route-heldout-v1-manifest-2026-08-21.json),
+frozen plan `bae8e6ad`, and consumed authorization `9b28bdda`.
+
+Process note: implementation commit `0ba1dc4` contains literal `\n` text in
+its message body. It was published before execution and must not be amended or
+rewritten merely to correct that formatting deviation.
 
 ### Product-wide classical A_pos filter -- 18 August 2026
 
@@ -845,20 +877,19 @@ promotion, deployment, publication or release. Preserve the
    final checkpoint, database, controller ledger and consumed authorization.
    Do not rerun, resume, extend, overwrite, promote or publish it.
 9. Preserve the completed v3/v4 development and phase-process diagnostics,
-   their ledgers, reports, web evidence and consumed authorizations. Preserve
-   candidate-blind held-out source pool `2eb04f54` and selected 253-record
-   prefix `99951a69` exactly; do not import its 406-game source universe into
-   the active HumanDB, reorder the prefix, or describe the unevaluated suffix
-   as result evidence. Preserve frozen plan `6620821e`, consumed prefix
-   `99951a69`, result `8d7a4a0a` and completion `8949a8fd`. The independent
-   score unit remains one start after averaging both colours, and the 1.5pp
-   target was fixed-width rather than equivalence. Do not rerun or extend the
-   consumed prefix. Retained-v4 is now the product-selected preferred research
-   candidate and retained-v3 remains its frozen comparator. Promotion or
-   release still needs a separately frozen absolute acceptance gate and
-   authority; the deployment slot and minimum acceptable absolute performance
-   are not yet selected. Do not launch the existing early
-   mature-fork checkpoints as a passivity shortcut. Preserve the updated
+   their ledgers, reports, web evidence and consumed authorizations. The
+   candidate-blind source pool `2eb04f54` is now fully consumed: preserve its
+   253-record prefix `99951a69`, its final 108-record suffix membership
+   `98532911`, and their order exactly. Do not reuse any record as fresh
+   held-out evidence or import the 406-game source universe into the active
+   HumanDB. Preserve v3/v4 plan `6620821e`, result `8d7a4a0a`, completion
+   `8949a8fd`, and product-route plan `bae8e6ad`, result `89d24d3`, and
+   recomputation `7d4685ac`. The product-route result separately classifies
+   D9 and D10 as `classical_first_material_route_candidate`; it does not
+   automatically change the default route. Retained-v4 remains the selected
+   research candidate and retained-v3 its frozen comparator. Do not launch the
+   existing early mature-fork checkpoints as a passivity shortcut. Preserve
+   the updated
    [evaluation decision brief](../experiments/sanmill-retained-v3-v4-evaluation-decision-brief.md)
    and
    [candidate decision](../experiments/sanmill-retained-v4-preferred-research-candidate-v1.md).
