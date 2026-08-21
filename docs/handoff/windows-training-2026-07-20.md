@@ -2,6 +2,35 @@
 
 ## Executive Summary
 
+### Web startup side effects fixed; one-time smoke failed closed -- 21 August 2026
+
+Web startup at implementation commit `718c7ef8` now loads N-gram only from an
+existing valid cache, explicitly disables it when the cache is absent, and
+never builds it from raw game records.  HumanDB is opened as an immutable
+read-only query snapshot, raw human-game startup/status scanning is removed,
+and `/api/overseer_status` exposes the N-gram and HumanDB runtime states.
+Focused verification passed 57 tests with one existing isolated-process skip;
+the mandatory Malom/DB-teacher/provenance group passed 103 tests and 498
+subtests.  The implementation was ordinarily fast-forwarded to `origin/dev`.
+
+The single authorized loopback smoke started Uvicorn in about three seconds,
+logged N-gram disabled, immutable HumanDB, and validated
+`sector-corrected-v1` product Malom.  GET `/api/ping`, GET
+`/api/overseer_status`, and GET `/` each returned HTTP 200 exactly once.
+However, a PowerShell `$home`/`$HOME` variable collision discarded all three
+response bodies, so the required runtime JSON and rendered-control assertions
+cannot be proved.  No request or service attempt was repeated.  The smoke is
+therefore `failed_closed_response_capture`, not passed.
+
+Ctrl+C released the loopback port, but the Python PID remained without a
+listener and required exact-PID termination.  HumanDB main/WAL/SHM bytes,
+sizes, existence, hashes, and high-resolution mtimes were unchanged; all
+snapshotted models, checkpoints, registry/configuration files, and source were
+also unchanged.  Only the permitted server log appended.  No game, WebSocket,
+session, move inference, Sanmill, training, database write, model change, or
+raw human-corpus scan occurred.  Preserve the
+[fix and failed-smoke evidence](../evidence/web-startup-side-effect-fix-and-runtime-smoke-2026-08-21.md).
+
 ### Classical-first runtime smoke failed before HTTP -- 21 August 2026
 
 The directly authorized loopback-only product smoke at `dev == origin/dev ==
