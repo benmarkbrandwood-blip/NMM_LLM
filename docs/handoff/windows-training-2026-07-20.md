@@ -2,6 +2,39 @@
 
 ## Executive Summary
 
+### Second Web smoke proved HTTP state but failed shutdown -- 21 August 2026
+
+The separately authorized response-capture attempt ran once at exact
+`dev == origin/dev == f4d08283` with product implementation `718c7ef8`.
+Three loopback responses were persisted immediately and independently
+recomputed: `/api/ping`, `/api/overseer_status`, and `/` each returned 200
+exactly once.  The actual bodies prove cache-only N-gram visibly disabled for
+its missing cache, immutable read-only HumanDB, D9/D10 `classical-first`,
+explicit-only Specialist, final `ProductPositionalSafetyGate`, enabled
+position-only `A_pos` under `sector-corrected-v1`, null decision source, and
+the correct unchecked Specialist control and D9/D10 labels on the home page.
+
+The temporary collector's original acceptance record remains failed because
+its offline fixture expected ping `{"status":"ok"}` while the persisted real
+body was `{"ok":true}`.  No response was lost or repeated.  A separate
+read-only audit of the same three bodies accepts the HTTP runtime contract;
+it does not rewrite the original collector record.
+
+The smoke as a whole is `failed_closed_shutdown_gate`.  Ctrl+C did not end
+PID `76456` naturally.  Exact-PID termination was requested 29.395 seconds
+after the stop request; PID and port disappearance were observed after
+30.384 seconds, exceeding the 30-second confirmation limit by 0.384 seconds.
+There was no restart or retry.
+
+HumanDB main/WAL/SHM existence, size, hash, and high-resolution mtime were
+identical before and after.  The checkpoints, Malom manifest, registry,
+settings, source files, and missing N-gram cache were also unchanged.  Only
+the permitted server log appended.  There was no game, WebSocket, session,
+move inference, Sanmill, training, database write, model change, or raw human
+corpus read.  Preserve the
+[attempt-002 smoke evidence](../evidence/web-runtime-smoke-response-capture-attempt-002-2026-08-21.md)
+and do not initiate another smoke without new authority.
+
 ### Web startup side effects fixed; one-time smoke failed closed -- 21 August 2026
 
 Web startup at implementation commit `718c7ef8` now loads N-gram only from an
