@@ -377,6 +377,17 @@ _malom_db_path: str = ""
 _product_positional_safety = ProductPositionalSafetyGate(
     high_difficulty_minimum=9
 )
+_PRODUCT_ROUTE_CONTRACT = {
+    "schema_version": "nmm.product-route-contract.v1",
+    "default_difficulty_1_8": "classical-first",
+    "default_difficulty_9_10": "classical-first",
+    "specialist_override": "explicit-use_overseer_player-only",
+    "generalist_override": "explicit-use_generalist_player-only",
+    "final_choke": "ProductPositionalSafetyGate",
+    "safe_set": "A_pos",
+    "positional_only": True,
+    "history_aware": False,
+}
 _malom_runtime_status: dict = {
     "schema_version": "nmm.product-malom-runtime-status.v1",
     "validation": "failed",
@@ -1080,9 +1091,15 @@ async def overseer_status():
         }
     )
     positional_safety = _product_positional_safety.status()
+    last_decision = positional_safety.get("last_decision") or {}
     return {
         "available": available,
         "playable": available and bool(positional_safety["enabled"]),
+        "product_route": {
+            **_PRODUCT_ROUTE_CONTRACT,
+            "specialist_available": available,
+            "last_decision_source": last_decision.get("source"),
+        },
         "positional_safety": positional_safety,
         "product_positional_safety": positional_safety,
         "specialist_filter": specialist_filter,
@@ -3170,16 +3187,13 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
     _classical_move = dict(move)
     _candidate_scores: list[float] | None = None
 
-    # Specialist AI mode: triggered by difficulty 9 or 10 (or by the legacy
-    # use_overseer_player toggle, kept as a hidden test hook).  In specialist
-    # mode the coordinator's alpha-beta search still runs first, then the
-    # phase-routed specialist scores every legal move. The product-wide final
-    # choke below, not the router, retains the model argmax for diagnostics and
-    # constrains the played move to positional A_pos.
-    _spec_by_diff = (session.game_ai is not None
-                     and int(getattr(session.game_ai, "difficulty", 0)) >= 9)
-    _spec_by_legacy = bool(session.use_overseer_player)
-    _spec_mode = ((_spec_by_diff or _spec_by_legacy)
+    # D9/D10 use the classical coordinator by default.  SpecialistRouter is
+    # retained as an explicit non-default route through use_overseer_player.
+    # When selected, it still scores every legal move after classical search,
+    # and the same product-wide final choke below constrains the played move to
+    # position-only A_pos.
+    _spec_by_explicit = bool(session.use_overseer_player)
+    _spec_mode = (_spec_by_explicit
                   and _overseer_advisor is not None
                   and _overseer_advisor.is_loaded())
     if _spec_mode:
@@ -3206,7 +3220,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                     move = legal[best]
                     _candidate_scores = list(ov_probs)
                     _move_source = "specialist"
-                    _mode_tag = f"diff{session.game_ai.difficulty}" if _spec_by_diff else "legacy_toggle"
+                    _mode_tag = "explicit-use_overseer_player"
                     log.info("Specialist AI (%s): %s (prob=%.3f)", _mode_tag, move, ov_probs[best])
                 else:
                     log.warning(
@@ -3271,7 +3285,16 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
     )
 
     elapsed = _time.time() - t0
-    log.info("AI turn end    move=%s elapsed=%.2fs ponder_hit=%s", move, elapsed, _ponder_hit is not None)
+    log.info(
+        "AI turn end source=%s difficulty=%s safety=%s move=%s "
+        "elapsed=%.2fs ponder_hit=%s",
+        _move_source,
+        diff,
+        _product_safety_decision.get("status"),
+        move,
+        elapsed,
+        _ponder_hit is not None,
+    )
 
     # Latch whether the coordinator wants to resign (cleared so it only fires once).
     resignation_offered = bool(

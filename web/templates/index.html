@@ -329,15 +329,14 @@
             <option value="6" selected>6 — Expert</option>
             <option value="7">7 — Master</option>
             <option value="8">8 — Grandmaster</option>
-            <option value="9">9 — Specialist AI (30 s)</option>
-            <option value="10">10 — Specialist AI (60 s)</option>
+            <option value="9">9 — Classical AI + positional safety (30 s)</option>
+            <option value="10">10 — Classical AI + positional safety (60 s)</option>
           </select>
           <div style="font-size:.72rem; color:var(--text-dim); margin-top:4px;">
             Diff 1-8: classical heuristic with your selected blends (VN / gap net / sentinel).
-            Diff 9-10: phase-routed specialist AI — the classical engine's 30 s / 60 s
-            search runs first, then the specialist scores every legal move and chooses
-            inside the position-only Malom W/D/L-preserving set (A_pos)
-            using its frozen sentinel, gap, value, and human-frequency features.
+            Diff 9-10: classical engine search at 30 s / 60 s, followed by the
+            final position-only Malom W/D/L-preserving gate (A_pos). Specialist
+            AI remains available through its separate explicit checkbox.
           </div>
         </div>
 

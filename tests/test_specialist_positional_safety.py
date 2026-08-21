@@ -301,6 +301,116 @@ def test_product_specialist_route_converges_on_final_product_safety_gate() -> No
     assert len(choke_calls) == 1
 
 
+def test_d9_d10_default_route_does_not_enable_specialist_override() -> None:
+    tree = ast.parse((ROOT / "web" / "app.py").read_text(encoding="utf-8"))
+    ai_turn = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_ai_turn"
+    )
+    assigned_names = {
+        target.id
+        for node in ast.walk(ai_turn)
+        if isinstance(node, ast.Assign)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+
+    assert "_spec_by_diff" not in assigned_names
+    spec_mode = next(
+        node
+        for node in ast.walk(ai_turn)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "_spec_mode"
+            for target in node.targets
+        )
+    )
+    spec_mode_names = {
+        node.id for node in ast.walk(spec_mode.value) if isinstance(node, ast.Name)
+    }
+    assert "_spec_by_explicit" in spec_mode_names
+    assert "_spec_by_diff" not in spec_mode_names
+    assert "difficulty" not in spec_mode_names
+
+    explicit_guard = next(
+        node
+        for node in ast.walk(ai_turn)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id == "_spec_mode"
+    )
+    guarded_attributes = {
+        node.attr for node in ast.walk(explicit_guard) if isinstance(node, ast.Attribute)
+    }
+    assert "score_moves" in guarded_attributes
+
+
+def test_product_route_contract_preserves_classical_ladder_and_specialist_opt_in() -> None:
+    tree = ast.parse((ROOT / "web" / "app.py").read_text(encoding="utf-8"))
+    assignment = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name)
+            and target.id == "_PRODUCT_ROUTE_CONTRACT"
+            for target in node.targets
+        )
+    )
+    contract = ast.literal_eval(assignment.value)
+
+    assert contract["default_difficulty_1_8"] == "classical-first"
+    assert contract["default_difficulty_9_10"] == "classical-first"
+    assert contract["specialist_override"] == "explicit-use_overseer_player-only"
+    assert contract["generalist_override"] == "explicit-use_generalist_player-only"
+    assert contract["final_choke"] == "ProductPositionalSafetyGate"
+    assert contract["safe_set"] == "A_pos"
+    assert contract["positional_only"] is True
+    assert contract["history_aware"] is False
+
+
+def test_explicit_learned_override_precedence_is_preserved() -> None:
+    tree = ast.parse((ROOT / "web" / "app.py").read_text(encoding="utf-8"))
+    ai_turn = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "_ai_turn"
+    )
+    generalist_guard = next(
+        node
+        for node in ast.walk(ai_turn)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.BoolOp)
+        and any(
+            isinstance(term, ast.Name) and term.id == "_gen_mode"
+            for term in node.test.values
+        )
+    )
+    guard_source = ast.unparse(generalist_guard.test)
+
+    assert "_gen_mode" in guard_source
+    assert "not _spec_mode" in guard_source
+    assert any(
+        isinstance(node, ast.Attribute) and node.attr == "score_moves"
+        for node in ast.walk(generalist_guard)
+    )
+
+
+def test_product_status_and_turn_log_report_real_decision_source() -> None:
+    source = (ROOT / "web" / "app.py").read_text(encoding="utf-8")
+    template = (ROOT / "web" / "templates" / "index.html").read_text(
+        encoding="utf-8"
+    )
+
+    assert '"product_route": {' in source
+    assert '"last_decision_source": last_decision.get("source")' in source
+    assert '"AI turn end source=%s difficulty=%s safety=%s move=%s "' in source
+    assert "9 — Classical AI + positional safety (30 s)" in template
+    assert "10 — Classical AI + positional safety (60 s)" in template
+    assert "Diff 9-10: classical engine search" in template
+
+
 def test_product_ui_fails_closed_when_safety_status_is_unavailable() -> None:
     template = (ROOT / "web" / "templates" / "index.html").read_text(
         encoding="utf-8"
