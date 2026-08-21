@@ -2,6 +2,29 @@
 
 ## Executive Summary
 
+### D9/D10 default is classical-first plus A_pos -- 21 August 2026
+
+The product owner directly authorized the held-out route candidate to become
+the `dev` default. Human-versus-AI D9 and D10 now retain the classical
+coordinator decision source and send it through the existing single final
+`ProductPositionalSafetyGate`. The automatic difficulty-based specialist
+override was removed. SpecialistRouter and all three checkpoints remain
+available through the explicit, non-default specialist control; the explicit
+generalist path is also unchanged. D1-D8 behavior is unchanged.
+
+The gate still trusts only `sector-corrected-v1` and provides position-only
+`A_pos`, not history-aware `A_allow`. Malom unavailability retains the visible
+unfiltered-classical fallback. The status endpoint and turn log now expose the
+actual route source and safety state, and the difficulty selector accurately
+labels the classical default.
+
+Implementation commit `21e4a97` follows held-out result `89d24d3` and
+independent recomputation `7d4685ac`. Focused product-route tests passed 38;
+the required Malom/DB-teacher/provenance group passed 103 tests and 498
+subtests. No game, training, checkpoint or alias change, database write,
+protected-data read, deployment, or release occurred. See the
+[product default-route evidence](../evidence/product-d9-d10-classical-first-default-2026-08-21.md).
+
 ### Held-out specialist-first versus classical-first product routes -- 21 August 2026
 
 The final 108 never-consumed records in frozen source pool `2eb04f54` were
