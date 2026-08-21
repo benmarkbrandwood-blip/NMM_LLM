@@ -52,8 +52,6 @@ from ai.opening_recognizer import OpeningRecognizer
 from ai.move_guidance import build_choose_move_kwargs, pick_target_opening
 from ai.endgame_recognizer import EndgameRecognizer
 from ai.trajectory_db import TrajectoryDB
-from ai.human_db import HumanDB
-from ai.ngram_opponent_model import NGramOpponentModel
 from ai.endgame_db import EndgameDB
 from ai.fullgame_db import FullGameDB
 from ai.endgame_solved_db import EndgameSolvedDB
@@ -63,6 +61,11 @@ from ai.ponder import PonderManager
 from ai.player_profile import PlayerProfile, load_profile, save_profile, is_valid_name
 from ai.malom_runtime import resolve_product_malom_runtime
 from learned_ai.agents.positional_safety import ProductPositionalSafetyGate
+from web.startup_resources import (
+    ReadOnlyHumanDBRuntimeView,
+    load_cached_ngram_model,
+    open_web_human_db,
+)
 
 _GAMES_PATH = _ROOT / "data" / "games"
 _GAMES_PATH.mkdir(parents=True, exist_ok=True)
@@ -116,55 +119,35 @@ def _persist_game_record(record: dict) -> None:
     log.info("Game saved (no-LLM): %s", fname.name)
 
 
-# HumanDB: if the pre-built SQLite exists, use it in place of the slow file-scan
-# TrajectoryDB for human-corpus positions.  Falls back to TrajectoryDB when absent.
-_human_games_dir = _ROOT / "data" / "human_games"
-_human_db_path   = _ROOT / "data" / "human_db.sqlite"
-_human_db: "HumanDB | None" = None
-try:
-    _hdb = HumanDB(_human_db_path)
-    if _hdb.is_available():
-        _human_db = _hdb
-        log.info("HumanDB: %d positions, %d games — skipping TrajectoryDB file scan.",
-                 _human_db.entry_count, _human_db.game_count)
-except Exception as _exc:
-    log.warning("HumanDB: load failed — %s", _exc)
-
-# TrajectoryDB: only do the expensive file scan when HumanDB is not available.
-_trajectory_db   = TrajectoryDB(
-    _ROOT / "data" / "games",
-    extra_dirs=[_human_games_dir] if _human_games_dir.exists() else [],
+# The human corpus is a query-only runtime snapshot.  Web startup never scans
+# raw human-game records and never mutates SQLite or its WAL/SHM sidecars.
+_human_db_path = _ROOT / "data" / "human_db.sqlite"
+_human_db_snapshot, _human_db_runtime_status = open_web_human_db(_human_db_path)
+_human_db = (
+    ReadOnlyHumanDBRuntimeView(_human_db_snapshot)
+    if _human_db_snapshot is not None
+    else None
 )
+
+# Keep an empty in-memory fallback, but do not populate it by scanning
+# historical files during import.
+_trajectory_db = TrajectoryDB(_ROOT / "data" / "games")
 if _human_db is None:
-    try:
-        _trajectory_db.load()
-        log.info(
-            "TrajectoryDB: %d games, %d state entries",
-            _trajectory_db.game_count, _trajectory_db.entry_count,
-        )
-    except Exception as _exc:
-        log.warning("TrajectoryDB: load failed — %s", _exc)
+    log.warning(
+        "TrajectoryDB historical startup scan disabled because HumanDB is "
+        "unavailable; product play continues without historical trajectory data."
+    )
 else:
-    log.info("TrajectoryDB: file scan skipped (HumanDB active).")
+    log.info("TrajectoryDB: historical file scan skipped (HumanDB active).")
 
 # _effective_tdb is what gets passed to GameAI as trajectory_db=.
 # It is HumanDB when available (duck-compatible), otherwise TrajectoryDB.
 _effective_tdb = _human_db if _human_db is not None else _trajectory_db
 
-# SE-13: load n-gram opponent model from the same games directories.
-_ngram_model: NGramOpponentModel = NGramOpponentModel()
-try:
-    _ngram_model_path = _ROOT / "data" / "ngram_model.json"
-    if _ngram_model_path.exists():
-        _ngram_model.load(_ngram_model_path)
-        log.info("NGramOpponentModel: loaded %d games", _ngram_model.game_count)
-    else:
-        _ngram_model.load_from_games(_ROOT / "data" / "games")
-        if _human_games_dir.exists():
-            _ngram_model.load_from_games(_human_games_dir)
-        log.info("NGramOpponentModel: built from %d games", _ngram_model.game_count)
-except Exception as _exc:
-    log.warning("NGramOpponentModel: load failed — %s", _exc)
+# SE-13 is optional at runtime.  Product startup may load a frozen cache, but
+# must never build one by enumerating raw game records.
+_ngram_model_path = _ROOT / "data" / "ngram_model.json"
+_ngram_model, _ngram_runtime_status = load_cached_ngram_model(_ngram_model_path)
 
 # Load evolved weights if available — produced by tools/evolve_weights.py.
 _WEIGHTS_DIR = _ROOT / "data" / "weights"
@@ -518,10 +501,7 @@ async def _consolidate_libraries(ws: "WebSocket", game_count: int) -> None:
     global _trajectory_db, _endgame_db, _effective_tdb
     try:
         log.info("Library consolidation: %d games", game_count)
-        new_tdb = TrajectoryDB(
-            _ROOT / "data" / "games",
-            extra_dirs=[_human_games_dir] if _human_games_dir.exists() else [],
-        )
+        new_tdb = TrajectoryDB(_ROOT / "data" / "games")
         await asyncio.to_thread(new_tdb.load)
         _trajectory_db = new_tdb
         if _human_db is None:
@@ -1104,6 +1084,8 @@ async def overseer_status():
         "product_positional_safety": positional_safety,
         "specialist_filter": specialist_filter,
         "malom_runtime": _malom_runtime_status,
+        "ngram_opponent_model": _ngram_runtime_status,
+        "human_db_runtime": _human_db_runtime_status,
     }
 
 
@@ -2271,24 +2253,9 @@ async def tool_status():
     games_earliest = games_files[0].split("game_")[1][:10] if games_files else None
     games_latest   = games_files[-1].split("game_")[1][:10] if games_files else None
 
-    # Human games dir stats
-    hg_files = sorted(_glob.glob(str(_ROOT / "data" / "human_games" / "human_*.jsonl")))
-    hg_count = len(hg_files)
-    hg_players: set = set()
-    hg_earliest: str | None = None
-    hg_latest:   str | None = None
-    if hg_files:
-        for hgf in hg_files[:5] + hg_files[-5:]:
-            try:
-                rec = json.loads(Path(hgf).read_text(encoding="utf-8"))
-                if rec.get("date") and (hg_earliest is None or rec["date"] < hg_earliest):
-                    hg_earliest = rec["date"]
-                if rec.get("date") and (hg_latest is None or rec["date"] > hg_latest):
-                    hg_latest = rec["date"]
-                if rec.get("white_player"): hg_players.add(rec["white_player"])
-                if rec.get("black_player"): hg_players.add(rec["black_player"])
-            except Exception:
-                pass
+    # Raw human-game records are never enumerated by the Web product.  This
+    # status uses only the already-open aggregate HumanDB snapshot.
+    hg_count = int(_human_db_runtime_status.get("game_count", 0))
 
     busy = _TOOLS_LOCK.locked()
 
@@ -2310,7 +2277,14 @@ async def tool_status():
         "value_net":      vnet_info,
         "opening_book":   {"total": ob_total, "named": ob_named},
         "games":          {"count": games_count, "earliest": games_earliest, "latest": games_latest},
-        "human_games":    {"count": hg_count, "earliest": hg_earliest, "latest": hg_latest, "players": len(hg_players)},
+        "human_games":    {
+            "count": hg_count,
+            "earliest": None,
+            "latest": None,
+            "players": None,
+            "source": "human_db_aggregate",
+            "raw_corpus_scanned": False,
+        },
         "busy":           busy,
         "auto_evolve":    {
             "after_games": _load_settings().get("auto_evolve_after_games", 0),
