@@ -35,6 +35,9 @@ CHECKPOINT_ROLES = frozenset(
         "development_measurement_candidate",
         "target_refresh_fork",
         "transition_diagnostic_candidate",
+        "supervised_seed_latest",
+        "supervised_seed_complete",
+        "supervised_smoke_disposable",
     }
 )
 CHECKPOINT_START_MODES = frozenset({"fresh", "weights-only", "exact-resume"})
