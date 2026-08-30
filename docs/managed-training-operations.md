@@ -95,6 +95,18 @@ later evidence-specific decision and cannot be smuggled into a training launch.
 The local `data/training_paths.local.json` remains ignored and
 machine-specific. The plan records its file identity, while trainer preflight
 resolves and verifies the actual Malom, HumanDB, SpecialistDB, and output paths.
+HumanDB preflight opens the main database through SQLite's immutable read-only
+mode, so a technical readiness check cannot create or replay sidecars.
+
+Every prepare, readiness, launch, and exact-resume gate uses the same Git
+cleanliness contract. Tracked changes always fail closed. Untracked paths also
+fail closed except for descendants of the repository's top-level `tmp/`
+namespace, which is reserved for operator-owned evidence and staging and is
+not a trainer import or configuration root. Similar-looking paths such as
+`tmp.py`, and untracked files under `scripts/` or `learned_ai/`, remain unsafe.
+The preflight and readiness records bind the policy name, allowed root, allowed
+path count, and a canonical digest of the allowed paths so that preparation and
+launch cannot silently apply different definitions of clean.
 
 ## Completed Managed v4 Technical Default
 
@@ -126,7 +138,8 @@ new plan and a new product authorization.
 
 ### 1. Agent prepares a plan
 
-From a clean committed worktree, the Agent runs a command equivalent to:
+From a committed worktree satisfying the shared training Git contract, the
+Agent runs a command equivalent to:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py prepare `
@@ -195,8 +208,9 @@ segment.
 ### 3b. Host-reboot recovery
 
 If the host reboots while a segment is marked `running`, do not treat the
-incomplete segment as completed. From a clean worktree that is the frozen plan
-commit or a descendant that only adds recovery tooling, run:
+incomplete segment as completed. From a worktree satisfying the shared
+training Git contract that is the frozen plan commit or a descendant that only
+adds recovery tooling, run:
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\manage_generalist_run.py recover-interrupted `
@@ -230,7 +244,8 @@ The top-level response is intentionally small:
 
 ## Stop and Escalation Policy
 
-The supervisor stops automatically for a dirty or different Git commit,
+The supervisor stops automatically for tracked changes, untracked paths
+outside the explicit top-level `tmp/` allowance, a different Git commit,
 changed path configuration, missing authorization, output reuse, incompatible
 resume state, checkpoint corruption, wrong game count, non-zero trainer exit,
 timeout, or broken evidence chain.

@@ -11,6 +11,11 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
+from learned_ai.training.generalist_preflight import (
+    PreflightConfigurationError,
+    read_training_git_state,
+    training_git_state_record,
+)
 from learned_ai.training.generalist_run_manifest import utc_now_text
 from learned_ai.training.managed_generalist import (
     CONTROLLER_LEDGER_NAME,
@@ -114,9 +119,10 @@ def inspect_published_source(
     head = _git_output(root, "rev-parse", "HEAD")
     origin_dev = _git_output(root, "rev-parse", "origin/dev")
     origin_main = _git_output(root, "rev-parse", "origin/main")
-    status = _git_output(
-        root, "status", "--porcelain=v1", "--untracked-files=no"
-    )
+    try:
+        git_state = read_training_git_state(root)
+    except PreflightConfigurationError as exc:
+        raise ManagedReadinessError("Git worktree audit failed") from exc
     if branch != "dev":
         raise ManagedReadinessError("managed readiness requires branch dev")
     if head != origin_dev or head != plan.git_commit:
@@ -125,8 +131,11 @@ def inspect_published_source(
         )
     if origin_main != reviewed_main:
         raise ManagedReadinessError("origin/main moved after source review")
-    if status:
-        raise ManagedReadinessError("tracked worktree must be clean")
+    if git_state.commit != head or git_state.dirty:
+        raise ManagedReadinessError(
+            "tracked files must be clean and untracked files must stay "
+            "inside the explicit non-runtime allowance"
+        )
     diff_check = subprocess.run(
         ["git", "diff", "--check"],
         cwd=root,
@@ -135,12 +144,14 @@ def inspect_published_source(
     )
     if diff_check.returncode != 0:
         raise ManagedReadinessError("git diff --check failed")
+    git_record = training_git_state_record(git_state)
     return {
         "branch": branch,
         "head": head,
         "origin_dev": origin_dev,
         "origin_main_reviewed": origin_main,
         "tracked_worktree_clean": True,
+        "untracked_policy": git_record["untracked_policy"],
         "git_diff_check": "passed",
     }
 
@@ -340,7 +351,7 @@ def _validate_preflight(
     preflight: Mapping[str, Any],
     *,
     plan: ManagedPlan,
-    source_commit: str,
+    source: Mapping[str, Any],
 ) -> None:
     if preflight.get("schema_version") != "nmm.generalist-preflight.v1":
         raise ManagedReadinessError("preflight schema differs")
@@ -361,8 +372,9 @@ def _validate_preflight(
     git = preflight.get("git")
     if (
         not isinstance(git, Mapping)
-        or git.get("commit") != source_commit
+        or git.get("commit") != source.get("head")
         or git.get("dirty") is not False
+        or git.get("untracked_policy") != source.get("untracked_policy")
     ):
         raise ManagedReadinessError("preflight source identity differs")
     config = preflight.get("resolved_config")
@@ -549,7 +561,7 @@ def generate_readiness(
     if not isinstance(stdout, bytes) or not isinstance(stderr, bytes):
         raise ManagedReadinessError("preflight runner must return raw bytes")
     preflight = _strict_json_bytes(stdout, label="first-segment preflight")
-    _validate_preflight(preflight, plan=plan, source_commit=source["head"])
+    _validate_preflight(preflight, plan=plan, source=source)
 
     command_record = {
         "schema_version": COMMAND_SCHEMA,

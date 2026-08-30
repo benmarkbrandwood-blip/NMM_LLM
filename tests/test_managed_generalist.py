@@ -18,6 +18,7 @@ from learned_ai.training.checkpoint_envelope import (
     load_checkpoint,
     save_checkpoint,
 )
+from learned_ai.training.generalist_preflight import GitState
 from learned_ai.training.managed_generalist import (
     ManagedContractError,
     ManagedInitialResume,
@@ -34,6 +35,22 @@ from learned_ai.training.managed_generalist import (
     verify_managed_launch,
 )
 from scripts import manage_generalist_run as manager
+
+
+def _git(root: Path, *arguments: str) -> str:
+    completed = subprocess.run(
+        ["git", *arguments],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    return completed.stdout.strip()
+
+
+def _clean_git_state(commit: str) -> GitState:
+    return GitState(commit=commit, dirty=False, diff_sha256=None)
 
 
 def _managed_checkpoint_payload(
@@ -467,7 +484,13 @@ def test_manager_prepares_a_hash_bound_initial_exact_resume(
     monkeypatch.setattr(
         manager,
         "_git_state",
-        lambda: ("a" * 40, False),
+        lambda: GitState(
+            commit="a" * 40,
+            dirty=False,
+            diff_sha256=None,
+            tracked_dirty=False,
+            allowed_untracked_paths=("tmp/evidence.json",),
+        ),
     )
 
     result = manager._prepare(args)
@@ -479,6 +502,14 @@ def test_manager_prepares_a_hash_bound_initial_exact_resume(
     ).hexdigest()
     assert plan.initial_resume.completed_games == 50
     assert plan.resume_config_sha256 == config_sha256
+    assert result["source_worktree"]["tracked_dirty"] is False
+    assert result["source_worktree"]["untracked_policy"]["allowed_roots"] == [
+        "tmp"
+    ]
+    assert result["source_worktree"]["untracked_policy"][
+        "allowed_path_count"
+    ] == 1
+    assert result["source_worktree"]["untracked_policy"]["unsafe_paths"] == []
 
 
 def test_authorization_is_separate_and_bound_to_exact_plan(tmp_path: Path) -> None:
@@ -677,7 +708,11 @@ def test_supervisor_completes_initial_branch_on_post_fork_transition_bound(
         decision_note="Approve one transition-bounded branch segment.",
         authorized_at_utc="2026-07-20T12:15:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     candidate = tmp_path / "transition-complete.pt"
     descriptor = CheckpointDescriptor(
         checkpoint_id="managed-v4-test-segment-0001:transition:8192",
@@ -801,6 +836,47 @@ def test_launch_verification_accepts_exact_authorized_segment(tmp_path: Path) ->
     assert verified == plan
 
 
+def _managed_git_test_repository(tmp_path: Path) -> tuple[Path, str]:
+    root = tmp_path / "repository"
+    root.mkdir()
+    _git(root, "init")
+    _git(root, "config", "user.name", "Managed Training Test")
+    _git(root, "config", "user.email", "managed-test@example.invalid")
+    (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+    _git(root, "add", "tracked.txt")
+    _git(root, "commit", "-m", "Create managed training test repository")
+    return root, _git(root, "rev-parse", "HEAD")
+
+
+def test_controller_git_gate_allows_only_top_level_tmp_descendants(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, commit = _managed_git_test_repository(tmp_path)
+    evidence = root / "tmp" / "evidence" / "controller.json"
+    evidence.parent.mkdir(parents=True)
+    evidence.write_text("{}\n", encoding="utf-8")
+    plan = replace(_plan(tmp_path), git_commit=commit)
+    monkeypatch.setattr(managed, "_repository_root", lambda: root)
+
+    assert managed._assert_managed_git_state(plan) == commit
+
+
+def test_controller_git_gate_rejects_untracked_source_outside_tmp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, commit = _managed_git_test_repository(tmp_path)
+    source = root / "scripts" / "untracked_runner.py"
+    source.parent.mkdir()
+    source.write_text("raise SystemExit('unsafe')\n", encoding="utf-8")
+    plan = replace(_plan(tmp_path), git_commit=commit)
+    monkeypatch.setattr(managed, "_repository_root", lambda: root)
+
+    with pytest.raises(ManagedContractError, match="explicit non-runtime allowance"):
+        managed._assert_managed_git_state(plan)
+
+
 def test_supervisor_never_runs_without_product_authorization(tmp_path: Path) -> None:
     plan = _plan(tmp_path)
     plan_path = tmp_path / "control" / "plan.json"
@@ -837,7 +913,11 @@ def test_supervisor_runs_one_bounded_segment_and_publishes_progress(
         decision_note="Approved.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
     monkeypatch.setattr(
         managed,
@@ -897,7 +977,11 @@ def test_supervisor_stops_at_completion_bound_not_schedule_horizon(
         decision_note="Approve one bounded comparison segment.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
     monkeypatch.setattr(
         managed,
@@ -960,7 +1044,11 @@ def test_supervisor_stops_at_optimizer_update_bound_before_game_ceiling(
         decision_note="Approve one optimizer-bounded diagnostic segment.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = tmp_path / "optimizer-bounded-latest.pt"
     descriptor = CheckpointDescriptor(
         checkpoint_id="managed-v4-test-segment-0001:checkpoint:1",
@@ -1029,7 +1117,11 @@ def test_supervisor_requires_passing_policy_health_before_completion(
         decision_note="Approved.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
     monkeypatch.setattr(
         managed,
@@ -1084,7 +1176,11 @@ def test_policy_health_threshold_failure_quarantines_and_blocks_retry(
         decision_note="Approved.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
     monkeypatch.setattr(
         managed,
@@ -1154,7 +1250,11 @@ def test_invalid_policy_health_report_fails_closed(
         decision_note="Approved.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     checkpoint = Path(plan.control_dir) / "segments" / "segment-0001" / "latest.pt"
     monkeypatch.setattr(
         managed,
@@ -1205,7 +1305,11 @@ def test_supervisor_never_removes_a_lock_it_does_not_own(
         decision_note="Approved.",
         authorized_at_utc="2026-07-20T12:05:00Z",
     )
-    monkeypatch.setattr(managed, "_git_state", lambda _root: (plan.git_commit, False))
+    monkeypatch.setattr(
+        managed,
+        "_git_state",
+        lambda _root: _clean_git_state(plan.git_commit),
+    )
     lock = Path(plan.control_dir) / managed.CONTROLLER_LOCK_NAME
     lock.write_text("pid=123\n", encoding="ascii")
 

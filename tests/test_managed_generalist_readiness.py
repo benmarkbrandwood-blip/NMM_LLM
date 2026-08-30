@@ -22,6 +22,13 @@ from learned_ai.validation import managed_generalist_readiness as readiness
 
 SOURCE_COMMIT = "a" * 40
 REVIEWED_MAIN = "b" * 40
+UNTRACKED_POLICY = {
+    "schema": "explicit-nonruntime-roots-v1",
+    "allowed_roots": ["tmp"],
+    "allowed_path_count": 0,
+    "allowed_paths_sha256": canonical_sha256([]),
+    "unsafe_paths": [],
+}
 
 
 def _sha256(path: Path) -> str:
@@ -81,7 +88,11 @@ def _preflight(plan: ManagedPlan) -> dict[str, object]:
         "resume_config_sha256": plan.resume_config_sha256,
         "config_sha256": "d" * 64,
         "experimentDigest": "sha256:" + "e" * 64,
-        "git": {"commit": SOURCE_COMMIT, "dirty": False},
+        "git": {
+            "commit": SOURCE_COMMIT,
+            "dirty": False,
+            "untracked_policy": UNTRACKED_POLICY,
+        },
         "resolved_config": {
             "experiment_id": plan.experiment_id,
             "run_id": f"{plan.plan_id}-segment-0001",
@@ -230,7 +241,35 @@ def test_preflight_rejects_a_non_authority_decision(tmp_path: Path) -> None:
         readiness._validate_preflight(
             report,
             plan=plan,
-            source_commit=SOURCE_COMMIT,
+            source={
+                "head": SOURCE_COMMIT,
+                "untracked_policy": UNTRACKED_POLICY,
+            },
+        )
+
+
+def test_preflight_rejects_a_different_untracked_policy_snapshot(
+    tmp_path: Path,
+) -> None:
+    plan, _plan_path = _plan(tmp_path)
+    report = _preflight(plan)
+    report["git"]["untracked_policy"] = {
+        **UNTRACKED_POLICY,
+        "allowed_path_count": 1,
+        "allowed_paths_sha256": canonical_sha256(["tmp/new-evidence.json"]),
+    }
+
+    with pytest.raises(
+        readiness.ManagedReadinessError,
+        match="source identity differs",
+    ):
+        readiness._validate_preflight(
+            report,
+            plan=plan,
+            source={
+                "head": SOURCE_COMMIT,
+                "untracked_policy": UNTRACKED_POLICY,
+            },
         )
 
 
@@ -256,6 +295,7 @@ def test_generate_persists_raw_report_command_and_canonical_identity(
             "origin_dev": SOURCE_COMMIT,
             "origin_main_reviewed": REVIEWED_MAIN,
             "tracked_worktree_clean": True,
+            "untracked_policy": UNTRACKED_POLICY,
             "git_diff_check": "passed",
         },
     )
@@ -329,6 +369,7 @@ def test_verifier_rejects_a_changed_raw_preflight(
             "origin_dev": SOURCE_COMMIT,
             "origin_main_reviewed": REVIEWED_MAIN,
             "tracked_worktree_clean": True,
+            "untracked_policy": UNTRACKED_POLICY,
             "git_diff_check": "passed",
         },
     )

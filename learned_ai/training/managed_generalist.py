@@ -22,6 +22,10 @@ from learned_ai.training.checkpoint_envelope import (
     load_checkpoint,
     save_checkpoint,
 )
+from learned_ai.training.generalist_preflight import (
+    GitState,
+    read_training_git_state,
+)
 from learned_ai.training.generalist_run_manifest import (
     RUN_EVENT_LEDGER_NAME,
     utc_now_text,
@@ -1635,24 +1639,8 @@ def _repository_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _git_state(root: Path) -> tuple[str, bool]:
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=root,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    dirty = bool(
-        subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-    )
-    return commit, dirty
+def _git_state(root: Path) -> GitState:
+    return read_training_git_state(root)
 
 
 def _git_is_ancestor(root: Path, ancestor: str, commit: str) -> bool:
@@ -1673,16 +1661,19 @@ def _assert_managed_git_state(
 ) -> str:
     """Require a clean worktree on the frozen plan commit, or a recovery descendant."""
     root = _repository_root()
-    commit, dirty = _git_state(root)
-    if dirty:
-        raise ManagedContractError("managed training requires a clean Git worktree")
-    if commit == plan.git_commit:
-        return commit
+    state = _git_state(root)
+    if state.dirty:
+        raise ManagedContractError(
+            "managed training requires clean tracked files and no untracked "
+            "files outside the explicit non-runtime allowance"
+        )
+    if state.commit == plan.git_commit:
+        return state.commit
     if (
         allow_recovery_descendant
-        and _git_is_ancestor(root, plan.git_commit, commit)
+        and _git_is_ancestor(root, plan.git_commit, state.commit)
     ):
-        return commit
+        return state.commit
     raise ManagedContractError("managed training Git commit has changed")
 
 

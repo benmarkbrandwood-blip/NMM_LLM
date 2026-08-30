@@ -10,7 +10,7 @@ import sqlite3
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import torch
@@ -52,6 +52,14 @@ from learned_ai.training.training_identity import (
 
 
 PREFLIGHT_SCHEMA = "nmm.generalist-preflight.v1"
+
+# Untracked files can shadow trainer modules or alter an experiment contract.
+# The repository's top-level tmp/ directory is the sole exception: it is an
+# operator-owned evidence/staging namespace and is never added to the trainer's
+# import or configuration search paths. Ignored paths remain governed by
+# .gitignore plus the explicit input identities captured by preflight.
+TRAINING_ALLOWED_UNTRACKED_ROOTS = ("tmp",)
+TRAINING_UNTRACKED_POLICY = "explicit-nonruntime-roots-v1"
 
 TRAINER_PATH_KEYS = frozenset(
     {
@@ -142,6 +150,55 @@ class GitState:
     commit: str
     dirty: bool
     diff_sha256: str | None
+    tracked_dirty: bool | None = None
+    allowed_untracked_paths: tuple[str, ...] = ()
+    unsafe_untracked_paths: tuple[str, ...] = ()
+
+
+def classify_training_untracked_paths(
+    paths: tuple[str, ...] | list[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Separate the explicit non-runtime tmp/ namespace from unsafe paths."""
+    allowed: list[str] = []
+    blocked: list[str] = []
+    for raw in paths:
+        candidate = str(raw).replace("\\", "/")
+        parsed = PurePosixPath(candidate)
+        parts = parsed.parts
+        is_safe_relative = (
+            bool(parts)
+            and not parsed.is_absolute()
+            and all(part not in {"", ".", ".."} for part in parts)
+        )
+        if (
+            is_safe_relative
+            and len(parts) > 1
+            and parts[0] in TRAINING_ALLOWED_UNTRACKED_ROOTS
+        ):
+            allowed.append(parsed.as_posix())
+        else:
+            blocked.append(candidate)
+    return tuple(sorted(set(allowed))), tuple(sorted(set(blocked)))
+
+
+def training_git_state_record(state: GitState) -> dict[str, Any]:
+    """Return the shared, evidence-safe Git cleanliness contract."""
+    tracked_dirty = state.dirty if state.tracked_dirty is None else state.tracked_dirty
+    allowed = tuple(state.allowed_untracked_paths)
+    unsafe = tuple(state.unsafe_untracked_paths)
+    return {
+        "commit": state.commit,
+        "dirty": state.dirty,
+        "diff_sha256": state.diff_sha256,
+        "tracked_dirty": tracked_dirty,
+        "untracked_policy": {
+            "schema": TRAINING_UNTRACKED_POLICY,
+            "allowed_roots": list(TRAINING_ALLOWED_UNTRACKED_ROOTS),
+            "allowed_path_count": len(allowed),
+            "allowed_paths_sha256": canonical_sha256(list(allowed)),
+            "unsafe_paths": list(unsafe),
+        },
+    }
 
 
 def _strict_json_object(path: Path) -> dict[str, Any]:
@@ -830,7 +887,7 @@ def validate_generalist_configuration(args: Any) -> None:
         )
 
 
-def _read_git_state(root: Path) -> GitState:
+def read_training_git_state(root: Path) -> GitState:
     def run_git(*arguments: str) -> bytes:
         try:
             return subprocess.check_output(
@@ -842,14 +899,33 @@ def _read_git_state(root: Path) -> GitState:
             ) from exc
 
     commit = run_git("rev-parse", "HEAD").decode("ascii").strip()
-    status = run_git("status", "--porcelain=v1")
-    dirty = bool(status.strip())
+    tracked_status = run_git(
+        "status", "--porcelain=v1", "--untracked-files=no"
+    )
+    untracked_raw = run_git(
+        "ls-files", "--others", "--exclude-standard", "-z"
+    )
+    untracked_paths = tuple(
+        item
+        for item in untracked_raw.decode("utf-8", errors="surrogateescape").split(
+            "\0"
+        )
+        if item
+    )
+    allowed_untracked, unsafe_untracked = classify_training_untracked_paths(
+        untracked_paths
+    )
+    tracked_dirty = bool(tracked_status.strip())
+    dirty = tracked_dirty or bool(unsafe_untracked)
     return GitState(
         commit=commit,
         dirty=dirty,
         diff_sha256=canonical_sha256(
             {
-                "status": status.decode("utf-8", errors="replace"),
+                "tracked_status": tracked_status.decode(
+                    "utf-8", errors="replace"
+                ),
+                "unsafe_untracked_paths": list(unsafe_untracked),
                 "diff": run_git("diff", "--binary").decode(
                     "utf-8", errors="replace"
                 ),
@@ -860,7 +936,15 @@ def _read_git_state(root: Path) -> GitState:
         )
         if dirty
         else None,
+        tracked_dirty=tracked_dirty,
+        allowed_untracked_paths=allowed_untracked,
+        unsafe_untracked_paths=unsafe_untracked,
     )
+
+
+def _read_git_state(root: Path) -> GitState:
+    """Backward-compatible internal name for the shared Git-state audit."""
+    return read_training_git_state(root)
 
 
 def _sqlite_read_only(
@@ -1656,11 +1740,7 @@ def run_generalist_preflight(
         "schema_version": PREFLIGHT_SCHEMA,
         "mode": mode,
         "verdict": verdict,
-        "git": {
-            "commit": state.commit,
-            "dirty": state.dirty,
-            "diff_sha256": state.diff_sha256,
-        },
+        "git": training_git_state_record(state),
         "resolved_config": config,
         "config_sha256": canonical_sha256(config),
         "resume_config_sha256": expected_resume_config_sha256,

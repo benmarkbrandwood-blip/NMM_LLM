@@ -90,6 +90,30 @@ def test_human_db_probe_supports_an_immutable_main_file_read(
     assert report["trust"] == "empirical_frequencies_and_outcomes"
 
 
+def test_training_untracked_policy_allows_only_the_explicit_tmp_root() -> None:
+    allowed, blocked = preflight_module.classify_training_untracked_paths(
+        (
+            "tmp/evidence/report.json",
+            "tmp/classical-snapshot/tree/module.py",
+            "TMP/evidence/report.json",
+            "tmp.py",
+            "scripts/untracked_runner.py",
+            "learned_ai/untracked_policy.py",
+        )
+    )
+
+    assert allowed == (
+        "tmp/classical-snapshot/tree/module.py",
+        "tmp/evidence/report.json",
+    )
+    assert blocked == (
+        "TMP/evidence/report.json",
+        "learned_ai/untracked_policy.py",
+        "scripts/untracked_runner.py",
+        "tmp.py",
+    )
+
+
 def _write_malom(path: Path) -> None:
     path.mkdir()
     (path / "std.secval").write_text(

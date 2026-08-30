@@ -30,7 +30,10 @@ from learned_ai.training.managed_generalist import (  # noqa: E402
     run_next_segment,
 )
 from learned_ai.training.generalist_preflight import (  # noqa: E402
+    GitState,
+    read_training_git_state,
     resume_config_sha256,
+    training_git_state_record,
     validate_generalist_configuration,
 )
 from learned_ai.training.generalist_run_manifest import utc_now_text  # noqa: E402
@@ -59,7 +62,7 @@ def _file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _git_state() -> tuple[str, bool]:
+def _git_state() -> GitState:
     top = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=_ROOT,
@@ -69,23 +72,7 @@ def _git_state() -> tuple[str, bool]:
     ).stdout.strip()
     if Path(top).resolve() != _ROOT.resolve():
         raise ManagedContractError("the primary workspace is not the repository root")
-    commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    dirty = bool(
-        subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-    )
-    return commit, dirty
+    return read_training_git_state(_ROOT)
 
 
 def _default_plan_id(commit: str) -> str:
@@ -241,9 +228,12 @@ def _common_trainer_args(args: argparse.Namespace, paths_config: Path) -> list[s
 
 
 def _prepare(args: argparse.Namespace) -> dict:
-    commit, dirty = _git_state()
-    if dirty:
-        raise ManagedContractError("prepare requires a clean Git worktree")
+    git_state = _git_state()
+    if git_state.dirty:
+        raise ManagedContractError(
+            "prepare requires clean tracked files and no untracked files "
+            "outside the explicit non-runtime allowance"
+        )
     paths_config = Path(args.paths_config).resolve(strict=True)
     control_dir = Path(args.control_dir).resolve(strict=False)
     plan_path = control_dir / "plan.json"
@@ -323,11 +313,11 @@ def _prepare(args: argparse.Namespace) -> dict:
             device=args.policy_health_device,
         )
     plan = ManagedPlan(
-        plan_id=args.plan_id or _default_plan_id(commit),
+        plan_id=args.plan_id or _default_plan_id(git_state.commit),
         created_at_utc=utc_now_text(),
         objective=args.objective,
         experiment_id=args.experiment_id,
-        git_commit=commit,
+        git_commit=git_state.commit,
         control_dir=str(control_dir),
         paths_config=str(paths_config),
         paths_config_sha256=_file_sha256(paths_config),
@@ -352,6 +342,7 @@ def _prepare(args: argparse.Namespace) -> dict:
         "plan_path": str(plan_path),
         "authorization_path": str(control_dir / "authorization.json"),
         "plan_sha256": plan.plan_sha256,
+        "source_worktree": training_git_state_record(git_state),
         "resource_envelope": {
             "max_games": plan.game_bound,
             "schedule_max_games": plan.max_games,
