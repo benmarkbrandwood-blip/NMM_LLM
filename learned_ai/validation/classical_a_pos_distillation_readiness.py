@@ -47,6 +47,19 @@ REQUESTED_RESOURCE_SCHEMA = "nmm.classical-a-pos-requested-resource.v1"
 ZERO_AUTHORIZATION_SCHEMA = "nmm.classical-a-pos-zero-authorization.v1"
 READINESS_RECEIPT_SCHEMA = "nmm.classical-a-pos-readiness-receipt.v1"
 
+UNRESOLVED_BINDINGS: tuple[str, ...] = (
+    "production_d9_teacher_issuer",
+    "supervised_plan_issuer",
+    "state_freeze_teacher_order_event_chain",
+    "supervised_controller",
+    "supervised_smoke_authority",
+    "production_corpus_loader_binding",
+    "device_throughput_measurement",
+    "launch_path_binding",
+    "managed_git_state",
+    "product_owner_authorization",
+)
+
 _TRAINING_SEMANTICS = "offline-supervised-hard-a-pos-masked-one-hot-cross-entropy"
 _HEX = frozenset("0123456789abcdef")
 _RUN_MANIFEST_BODY_KEYS = {
@@ -276,47 +289,53 @@ def validate_training_profile(profile: Mapping[str, Any]) -> Mapping[str, Any]:
     return _freeze(_thaw(profile), field="profile")
 
 
-_REQUESTED_RESOURCE_PACKAGE: dict[str, Any] = {
-    "schema_version": REQUESTED_RESOURCE_SCHEMA,
-    "recommendation_only": True,
-    "counts_as_authorization": False,
-    "state_generation": {
-        "games": 1_024,
-        "active_seconds": 3_600,
-    },
-    "teacher": {
-        "active_seconds": 14_400,
-        "nodes": 4_000_000_000,
-        "positive_search_labels": 1_280,
-    },
-    "smoke": {"active_seconds": 3_600},
-    "seed": {
-        "per_seed_active_seconds": 21_600,
-        "aggregate_active_seconds": 64_800,
-    },
-    "sequence_active_seconds": 86_400,
-    "evaluation_games": 0,
-}
-
-_ZERO_AUTHORIZATION: dict[str, Any] = {
-    "schema_version": ZERO_AUTHORIZATION_SCHEMA,
-    "status": "unauthorized",
-    "authorization_identity": None,
-    "authorized_by": None,
-    "issued_at_utc": None,
-    "expires_at_utc": None,
-    "standing_delegation_identity": None,
-    "consumption_limit": 0,
-    "allowed_operations": [],
-    "allow_exact_resume": False,
-    "authorized_resources": {
-        "games": 0,
-        "active_seconds": 0,
-        "teacher_nodes": 0,
-        "positive_search_labels": 0,
+REQUESTED_RESOURCE_PACKAGE: Mapping[str, Any] = _freeze(
+    {
+        "schema_version": REQUESTED_RESOURCE_SCHEMA,
+        "recommendation_only": True,
+        "counts_as_authorization": False,
+        "state_generation": {
+            "games": 1_024,
+            "active_seconds": 3_600,
+        },
+        "teacher": {
+            "active_seconds": 14_400,
+            "nodes": 4_000_000_000,
+            "positive_search_labels": 1_280,
+        },
+        "smoke": {"active_seconds": 3_600},
+        "seed": {
+            "per_seed_active_seconds": 21_600,
+            "aggregate_active_seconds": 64_800,
+        },
+        "sequence_active_seconds": 86_400,
         "evaluation_games": 0,
     },
-}
+    field="requested resource package",
+)
+
+ZERO_AUTHORIZATION_ENVELOPE: Mapping[str, Any] = _freeze(
+    {
+        "schema_version": ZERO_AUTHORIZATION_SCHEMA,
+        "status": "unauthorized",
+        "authorization_identity": None,
+        "authorized_by": None,
+        "issued_at_utc": None,
+        "expires_at_utc": None,
+        "standing_delegation_identity": None,
+        "consumption_limit": 0,
+        "allowed_operations": [],
+        "allow_exact_resume": False,
+        "authorized_resources": {
+            "games": 0,
+            "active_seconds": 0,
+            "teacher_nodes": 0,
+            "positive_search_labels": 0,
+            "evaluation_games": 0,
+        },
+    },
+    field="authorization envelope",
+)
 
 
 def validate_requested_resource_package(
@@ -326,7 +345,7 @@ def validate_requested_resource_package(
         raise DistillationReadinessError("requested resource package must be an object")
     _require_exact_contract(
         value,
-        _REQUESTED_RESOURCE_PACKAGE,
+        REQUESTED_RESOURCE_PACKAGE,
         field="requested resource package",
     )
     return _freeze(_thaw(value), field="requested resource package")
@@ -337,7 +356,7 @@ def validate_authorization_envelope(value: Mapping[str, Any]) -> Mapping[str, An
         raise DistillationReadinessError("authorization envelope must be an object")
     _require_exact_contract(
         value,
-        _ZERO_AUTHORIZATION,
+        ZERO_AUTHORIZATION_ENVELOPE,
         field="authorization envelope",
     )
     return _freeze(_thaw(value), field="authorization envelope")
@@ -370,8 +389,8 @@ def _manifest_body(
         "rl": copied_profile["rl"],
         "forbidden": copied_profile["forbidden"],
         "device": copied_profile["device"],
-        "requested_resource_package": _thaw(_REQUESTED_RESOURCE_PACKAGE),
-        "authorization_envelope": _thaw(_ZERO_AUTHORIZATION),
+        "requested_resource_package": _thaw(REQUESTED_RESOURCE_PACKAGE),
+        "authorization_envelope": _thaw(ZERO_AUTHORIZATION_ENVELOPE),
     }
 
 
@@ -865,18 +884,6 @@ def run_distillation_preflight(
         corpus_identity=checked_corpus.corpus_identity,
         split_identity=checked_corpus.split_identity,
     )
-    unresolved = [
-        "production_d9_teacher_issuer",
-        "supervised_plan_issuer",
-        "state_freeze_teacher_order_event_chain",
-        "supervised_controller",
-        "supervised_smoke_authority",
-        "production_corpus_loader_binding",
-        "device_throughput_measurement",
-        "launch_path_binding",
-        "managed_git_state",
-        "product_owner_authorization",
-    ]
     body = {
         "schema_version": READINESS_RECEIPT_SCHEMA,
         "verdict": "fatal_stop",
@@ -900,7 +907,7 @@ def run_distillation_preflight(
             "online_teacher_during_training": False,
             "output_isolated_and_unwritten": True,
         },
-        "unresolved": unresolved,
+        "unresolved": list(UNRESOLVED_BINDINGS),
     }
     receipt = {**body, "readiness_identity": canonical_sha256(body)}
     return _freeze(receipt, field="readiness receipt")
