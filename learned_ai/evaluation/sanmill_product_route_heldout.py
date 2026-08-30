@@ -278,6 +278,7 @@ def choose_product_route_move(
     ledger.add_engine()
     original = dict(classical.move)
     source = "classical-coordinator"
+    candidate_moves: list[dict[str, Any]] | None = None
     candidate_scores: list[float] | None = None
     specialist_record = {
         "attempted": route == "specialist-first",
@@ -318,6 +319,7 @@ def choose_product_route_move(
                 )
             best = max(range(len(scores)), key=lambda index: scores[index])
             original = legal[best]
+            candidate_moves = legal
             candidate_scores = scores
             source = "specialist"
             specialist_record["succeeded"] = True
@@ -347,6 +349,7 @@ def choose_product_route_move(
         original,
         source=source,
         difficulty=int(difficulty),
+        candidate_moves=candidate_moves,
         candidate_scores=candidate_scores,
         safe_selector=safe_selector,
         query_failure_move=classical.move,

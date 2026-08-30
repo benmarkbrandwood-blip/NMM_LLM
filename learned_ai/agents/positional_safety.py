@@ -7,8 +7,10 @@ no-progress history and therefore must not be described as full-rule safety.
 
 from __future__ import annotations
 
-import math
+import hashlib
+import json
 import logging
+import math
 import threading
 import time
 from dataclasses import dataclass
@@ -20,6 +22,7 @@ from learned_ai.data.malom_label_provenance import CURRENT_MALOM_LABEL_VERSION
 
 
 _WDL_RANK = {"L": 0, "D": 1, "W": 2}
+_ATOMIC_ACTION_FIELDS = ("from", "to", "capture")
 _LOG = logging.getLogger("nmm.positional_safety")
 
 
@@ -28,7 +31,38 @@ class PositionalSafetyError(RuntimeError):
 
 
 def _move_key(move: Mapping[str, Any]) -> tuple[Any, Any, Any]:
-    return move.get("from"), move.get("to"), move.get("capture")
+    if not isinstance(move, Mapping) or any(
+        field not in move for field in _ATOMIC_ACTION_FIELDS
+    ):
+        raise PositionalSafetyError(
+            "atomic action must contain from, to, capture fields"
+        )
+    return move["from"], move["to"], move["capture"]
+
+
+def legal_inventory_identity(moves: Sequence[Mapping[str, Any]]) -> str:
+    """Return an order-sensitive identity over atomic legal actions."""
+    actions: list[dict[str, Any]] = []
+    for index, move in enumerate(moves):
+        from_square, to_square, capture = _move_key(move)
+        actions.append(
+            {
+                "index": index,
+                "from": from_square,
+                "to": to_square,
+                "capture": capture,
+            }
+        )
+    payload = json.dumps(
+        {
+            "schema": "nmm.ordered-atomic-legal-inventory.v1",
+            "actions": actions,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -354,6 +388,7 @@ class ProductPositionalSafetyGate:
         *,
         source: str,
         difficulty: int,
+        candidate_moves: Sequence[Mapping[str, Any]] | None = None,
         candidate_scores: Sequence[float] | None = None,
         safe_selector: Callable[[list[dict[str, Any]]], Mapping[str, Any]] | None = None,
         query_failure_move: Mapping[str, Any] | None = None,
@@ -361,9 +396,46 @@ class ProductPositionalSafetyGate:
         """Return the final move after applying the product ``A_pos`` gate."""
         started = time.perf_counter()
         legal = [dict(move) for move in get_all_legal_moves(board)]
-        legal_keys = {_move_key(move) for move in legal}
+        legal_order = [_move_key(move) for move in legal]
+        legal_keys = set(legal_order)
+        if len(legal_keys) != len(legal_order):
+            raise PositionalSafetyError("legal move inventory contains duplicates")
+        inventory_identity = legal_inventory_identity(legal)
+        if (candidate_moves is None) != (candidate_scores is None):
+            raise PositionalSafetyError(
+                "candidate moves and scores must be supplied as a paired inventory"
+            )
+        candidate_order_verified = False
+        if candidate_moves is not None and candidate_scores is not None:
+            try:
+                raw_moves = list(candidate_moves)
+                score_count = len(candidate_scores)
+            except (TypeError, ValueError) as exc:
+                raise PositionalSafetyError(
+                    "candidate moves and scores must be a paired inventory"
+                ) from exc
+            if any(not isinstance(move, Mapping) for move in raw_moves):
+                raise PositionalSafetyError(
+                    "candidate move order contains a non-mapping action"
+                )
+            supplied_moves = [dict(move) for move in raw_moves]
+            supplied_order = [_move_key(move) for move in supplied_moves]
+            if len(supplied_moves) != len(legal) or score_count != len(legal):
+                raise PositionalSafetyError(
+                    "paired candidate inventory length differs from legal moves"
+                )
+            if (
+                len(set(supplied_order)) != len(supplied_order)
+                or supplied_order != legal_order
+            ):
+                raise PositionalSafetyError(
+                    "candidate move order differs from the complete legal order"
+                )
+            candidate_order_verified = True
         original = dict(original_move)
-        fallback = dict(query_failure_move or original_move)
+        fallback = dict(
+            original_move if query_failure_move is None else query_failure_move
+        )
         if _move_key(original) not in legal_keys:
             raise PositionalSafetyError("original product move is not legal")
         if _move_key(fallback) not in legal_keys:
@@ -386,6 +458,9 @@ class ProductPositionalSafetyGate:
             "mode": "A_pos",
             "positional_only": True,
             "history_aware": False,
+            "legal_inventory_identity": inventory_identity,
+            "candidate_order_verified": candidate_order_verified,
+            "selected_tier": None,
         }
         if not enforced:
             with self._state_lock:
@@ -504,6 +579,16 @@ class ProductPositionalSafetyGate:
             for index, move in enumerate(inventory.legal_moves)
             if _move_key(move) == _move_key(original)
         )
+        selected_index = next(
+            index
+            for index, move in enumerate(inventory.legal_moves)
+            if _move_key(move) == _move_key(selected)
+        )
+        selected_tier = inventory.move_tiers[selected_index]
+        if selected_tier != inventory.parent_tier:
+            raise PositionalSafetyError(
+                "final positional safety move is outside A_pos"
+            )
         decision = {
             **base,
             "status": "applied",
@@ -513,6 +598,7 @@ class ProductPositionalSafetyGate:
             "selection_error": selection_error or None,
             "parent_tier": inventory.parent_tier,
             "original_tier": inventory.move_tiers[original_index],
+            "selected_tier": selected_tier,
             "legal_move_count": len(inventory.legal_moves),
             "safe_move_count": len(inventory.safe_indices),
             "query_count": inventory.query_count,

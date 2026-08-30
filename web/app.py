@@ -2770,6 +2770,7 @@ async def _finalize_product_ai_move(
     game_ai: GameAI | None,
     difficulty: int,
     source: str,
+    candidate_moves: list[dict] | None = None,
     candidate_scores: list[float] | None = None,
     classical_fallback_move: dict | None = None,
 ) -> tuple[dict, dict]:
@@ -2809,9 +2810,14 @@ async def _finalize_product_ai_move(
         original_move,
         source=source,
         difficulty=int(difficulty),
+        candidate_moves=candidate_moves,
         candidate_scores=candidate_scores,
         safe_selector=_restricted_root_research,
-        query_failure_move=classical_fallback_move or original_move,
+        query_failure_move=(
+            original_move
+            if classical_fallback_move is None
+            else classical_fallback_move
+        ),
     )
     decision = outcome.decision
     if decision.get("status") in {
@@ -3159,6 +3165,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         raise
 
     _classical_move = dict(move)
+    _candidate_moves: list[dict] | None = None
     _candidate_scores: list[float] | None = None
 
     # D9/D10 use the classical coordinator by default.  SpecialistRouter is
@@ -3192,6 +3199,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                 if ov_probs:
                     best = max(range(len(ov_probs)), key=lambda i: ov_probs[i])
                     move = legal[best]
+                    _candidate_moves = ov_cands
                     _candidate_scores = list(ov_probs)
                     _move_source = "specialist"
                     _mode_tag = "explicit-use_overseer_player"
@@ -3234,6 +3242,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
                 if gen_probs:
                     best = max(range(len(gen_probs)), key=lambda i: gen_probs[i])
                     move = legal[best]
+                    _candidate_moves = gen_cands
                     _candidate_scores = list(gen_probs)
                     _move_source = "generalist"
                     log.info("Generalist AI: %s (prob=%.3f)", move, gen_probs[best])
@@ -3254,6 +3263,7 @@ async def _ai_turn(ws: WebSocket, session: Session) -> None:
         game_ai=session.game_ai,
         difficulty=diff,
         source=_move_source,
+        candidate_moves=_candidate_moves,
         candidate_scores=_candidate_scores,
         classical_fallback_move=_classical_move,
     )

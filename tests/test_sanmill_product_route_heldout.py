@@ -229,7 +229,11 @@ class _FakeSpecialist:
 
 
 class _FakeGate:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
     def constrain(self, _board: BoardState, original: dict, **kwargs: object) -> object:
+        self.calls.append(dict(kwargs))
         return SimpleNamespace(
             move=dict(original),
             decision={
@@ -249,20 +253,22 @@ def test_route_choice_uses_specialist_override_only_for_specialist_first() -> No
         classical=_FakeClassical(), specialist=_FakeSpecialist()
     )
     ledger = ResourceLedger(0, 0, 0.0, 10, 10, 10.0)
+    specialist_gate = _FakeGate()
     specialist_move, specialist = heldout.choose_product_route_move(
         board=board,
         ai=object(),
         route_runtime=runtime,
-        gate=_FakeGate(),
+        gate=specialist_gate,
         route="specialist-first",
         difficulty=9,
         ledger=ledger,
     )
+    classical_gate = _FakeGate()
     classical_move, classical = heldout.choose_product_route_move(
         board=board,
         ai=object(),
         route_runtime=runtime,
-        gate=_FakeGate(),
+        gate=classical_gate,
         route="classical-first",
         difficulty=9,
         ledger=ledger,
@@ -270,5 +276,11 @@ def test_route_choice_uses_specialist_override_only_for_specialist_first() -> No
     legal = get_all_legal_moves(board)
     assert specialist_move == legal[1]
     assert specialist["product_source"] == "specialist"
+    assert specialist_gate.calls[0]["candidate_moves"] == legal
+    assert specialist_gate.calls[0]["candidate_scores"] == [
+        float(index == 1) for index in range(len(legal))
+    ]
     assert classical_move == legal[0]
     assert classical["product_source"] == "classical-coordinator"
+    assert classical_gate.calls[0]["candidate_moves"] is None
+    assert classical_gate.calls[0]["candidate_scores"] is None

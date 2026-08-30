@@ -9,9 +9,13 @@ from pathlib import Path
 
 import pytest
 
+import learned_ai.agents.positional_safety as positional_safety
 from game.board import BoardState
 from game.rules import get_all_legal_moves
-from learned_ai.agents.positional_safety import ProductPositionalSafetyGate
+from learned_ai.agents.positional_safety import (
+    PositionalSafetyError,
+    ProductPositionalSafetyGate,
+)
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -149,6 +153,11 @@ def test_real_classical_downgrade_is_replaced_inside_a_pos(case: dict) -> None:
     assert outcome.decision["selection_rule"] == "restricted-root-research"
     assert outcome.decision["positional_only"] is True
     assert outcome.decision["history_aware"] is False
+    assert outcome.decision["candidate_order_verified"] is False
+    assert outcome.decision["legal_inventory_identity"] == (
+        positional_safety.legal_inventory_identity(get_all_legal_moves(board))
+    )
+    assert outcome.decision["selected_tier"] == outcome.decision["parent_tier"]
 
 
 def test_low_difficulty_classical_move_is_not_queried_or_filtered() -> None:
@@ -217,6 +226,141 @@ def test_generalist_is_filtered_even_below_default_high_difficulty() -> None:
         _move_key(move) for move in case["safe_moves"]
     }
     assert outcome.decision["status"] == "applied"
+
+
+def test_gate_binds_ordered_candidate_inventory_and_selected_tier() -> None:
+    case = _cases()[0]
+    board = BoardState.from_fen_string(case["board_fen"])
+    legal = get_all_legal_moves(board)
+    scores = [1.0] * len(legal)
+    gate = _gate(_RecordedOracle(case))
+
+    outcome = gate.constrain(
+        board,
+        case["unsafe_move"],
+        source="generalist-classical-d9-distilled-v1",
+        difficulty=9,
+        candidate_moves=legal,
+        candidate_scores=scores,
+        query_failure_move=case["unsafe_move"],
+    )
+
+    decision = outcome.decision
+    assert decision["status"] == "applied"
+    assert decision["candidate_order_verified"] is True
+    assert decision["legal_inventory_identity"] == (
+        positional_safety.legal_inventory_identity(legal)
+    )
+    assert decision["selected_tier"] == decision["parent_tier"]
+    assert _move_key(outcome.move) in {
+        _move_key(move) for move in case["safe_moves"]
+    }
+
+
+def test_candidate_moves_and_scores_are_paired_in_exact_legal_order() -> None:
+    case = _cases()[0]
+    board = BoardState.from_fen_string(case["board_fen"])
+    legal = get_all_legal_moves(board)
+    scores = [1.0] * len(legal)
+
+    with pytest.raises(PositionalSafetyError, match="paired"):
+        _gate(_RecordedOracle(case)).constrain(
+            board,
+            case["unsafe_move"],
+            source="generalist-classical-d9-distilled-v1",
+            difficulty=9,
+            candidate_scores=scores,
+        )
+    with pytest.raises(PositionalSafetyError, match="paired"):
+        _gate(_RecordedOracle(case)).constrain(
+            board,
+            case["unsafe_move"],
+            source="generalist-classical-d9-distilled-v1",
+            difficulty=9,
+            candidate_moves=legal,
+        )
+    with pytest.raises(PositionalSafetyError, match="order"):
+        _gate(_RecordedOracle(case)).constrain(
+            board,
+            case["unsafe_move"],
+            source="generalist-classical-d9-distilled-v1",
+            difficulty=9,
+            candidate_moves=list(reversed(legal)),
+            candidate_scores=scores,
+        )
+    with pytest.raises(PositionalSafetyError, match="paired"):
+        _gate(_RecordedOracle(case)).constrain(
+            board,
+            case["unsafe_move"],
+            source="generalist-classical-d9-distilled-v1",
+            difficulty=9,
+            candidate_moves=legal,
+            candidate_scores=scores[:-1],
+        )
+
+
+def test_legal_inventory_identity_is_order_sensitive_and_atomic() -> None:
+    legal = get_all_legal_moves(BoardState.new_game())
+    identity = positional_safety.legal_inventory_identity(legal)
+
+    assert positional_safety.legal_inventory_identity([dict(move) for move in legal]) == (
+        identity
+    )
+    assert positional_safety.legal_inventory_identity(list(reversed(legal))) != (
+        identity
+    )
+    with_extra_fields = [{**move, "ignored": index} for index, move in enumerate(legal)]
+    assert positional_safety.legal_inventory_identity(with_extra_fields) == identity
+
+
+@pytest.mark.parametrize("missing_field", ["from", "to", "capture"])
+def test_atomic_inventory_and_candidate_pair_reject_missing_action_field(
+    missing_field: str,
+) -> None:
+    case = _cases()[0]
+    board = BoardState.from_fen_string(case["board_fen"])
+    legal = [dict(move) for move in get_all_legal_moves(board)]
+    incomplete = [dict(move) for move in legal]
+    incomplete[0].pop(missing_field)
+
+    with pytest.raises(PositionalSafetyError, match="from.*to.*capture"):
+        positional_safety.legal_inventory_identity(incomplete)
+    with pytest.raises(PositionalSafetyError, match="from.*to.*capture"):
+        _gate(_RecordedOracle(case)).constrain(
+            board,
+            case["unsafe_move"],
+            source="generalist-classical-d9-distilled-v1",
+            difficulty=9,
+            candidate_moves=incomplete,
+            candidate_scores=[1.0] * len(incomplete),
+        )
+
+
+@pytest.mark.parametrize(
+    "query_failure_move",
+    [
+        pytest.param({}, id="empty"),
+        pytest.param({"to": "a1", "capture": None}, id="missing-from"),
+        pytest.param({"from": None, "capture": None}, id="missing-to"),
+        pytest.param({"from": None, "to": "a1"}, id="missing-capture"),
+    ],
+)
+def test_explicit_incomplete_query_failure_move_never_defaults_to_original(
+    query_failure_move: dict,
+) -> None:
+    case = _cases()[0]
+    board = BoardState.from_fen_string(case["board_fen"])
+    oracle = _RecordedOracle(case)
+
+    with pytest.raises(PositionalSafetyError, match="from.*to.*capture"):
+        _gate(oracle).constrain(
+            board,
+            case["unsafe_move"],
+            source="classical-coordinator",
+            difficulty=9,
+            query_failure_move=query_failure_move,
+        )
+    assert oracle.calls == 0
 
 
 def test_live_malom_recomputes_classical_fixture_a_pos_when_available() -> None:
@@ -316,6 +460,37 @@ def test_all_product_machine_move_routes_cross_the_final_safety_choke() -> None:
         assert len(choke_calls) == 1
         assert apply_calls
         assert choke_calls[0].lineno < min(node.lineno for node in apply_calls)
+        if function_name == "_ai_turn":
+            assert {keyword.arg for keyword in choke_calls[0].keywords} >= {
+                "candidate_moves",
+                "candidate_scores",
+            }
+
+    finalize = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.AsyncFunctionDef)
+        and node.name == "_finalize_product_ai_move"
+    )
+    gate_call = next(
+        node
+        for node in ast.walk(finalize)
+        if isinstance(node, ast.Call)
+        and any(
+            isinstance(argument, ast.Attribute) and argument.attr == "constrain"
+            for argument in node.args
+        )
+    )
+    assert {keyword.arg for keyword in gate_call.keywords} >= {
+        "candidate_moves",
+        "candidate_scores",
+    }
+    fallback_keyword = next(
+        keyword
+        for keyword in gate_call.keywords
+        if keyword.arg == "query_failure_move"
+    )
+    assert isinstance(fallback_keyword.value, ast.IfExp)
 
 
 def test_status_endpoints_expose_resolution_and_final_gate() -> None:
