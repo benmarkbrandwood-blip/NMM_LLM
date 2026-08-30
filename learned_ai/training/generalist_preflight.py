@@ -1530,7 +1530,7 @@ def run_generalist_preflight(
         "error": "Malom path is not configured",
     }
     specialist_report = _probe_specialist_db(Path(args.specialist_db))
-    human_report = _probe_human_db(Path(args.human_db))
+    human_report = _probe_human_db(Path(args.human_db), immutable=True)
     opening_report = _probe_opening_sources(args, root=root)
     ruleset_report = _probe_ruleset(Path(args.ruleset_manifest))
     sanmill_report: dict[str, Any] = {"enabled": False}

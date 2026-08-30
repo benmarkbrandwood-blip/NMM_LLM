@@ -644,6 +644,35 @@ def test_smoke_preflight_is_read_only_and_ready_for_corrected_baseline(
     }
 
 
+def test_complete_preflight_forces_an_immutable_human_db_probe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    args = _smoke_args(tmp_path)
+    _write_malom(Path(args.malom))
+    _write_human_db(Path(args.human_db))
+    _write_specialist_db(Path(args.specialist_db), CURRENT_MALOM_LABEL_VERSION)
+    immutable_arguments: list[bool] = []
+    original_probe = preflight_module._probe_human_db
+
+    def recording_probe(path: Path, *, immutable: bool = False):
+        immutable_arguments.append(immutable)
+        return original_probe(path, immutable=immutable)
+
+    monkeypatch.setattr(preflight_module, "_probe_human_db", recording_probe)
+
+    report = run_generalist_preflight(
+        args,
+        mode="smoke",
+        root=tmp_path,
+        path_sources={"out_dir": "cli"},
+        git_state=GitState(commit="a" * 40, dirty=False, diff_sha256=None),
+    )
+
+    assert report["verdict"] == "ready_for_smoke"
+    assert immutable_arguments == [True]
+
+
 def test_fresh_preflight_does_not_create_specialist_db_sidecars(
     tmp_path: Path,
 ) -> None:
