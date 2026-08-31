@@ -8,6 +8,7 @@ Production-shaped capabilities therefore cannot be created in this slice.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import weakref
@@ -2268,12 +2269,21 @@ _PRODUCTION_PENDING_AUTH_TOKEN = object()
 _PRODUCTION_CONSUMED_AUTH_TOKEN = object()
 _PRODUCTION_PENDING_OPERATION_TOKEN = object()
 _PRODUCTION_OPERATION_TOKEN = object()
+_PRODUCTION_STORE_BOOTSTRAP_TOKEN = object()
 _TEST_PLAN_TOKEN = object()
 _TEST_AUTHORIZATION_TOKEN = object()
 _TEST_PENDING_AUTH_TOKEN = object()
 _TEST_CONSUMED_AUTH_TOKEN = object()
 _TEST_PENDING_OPERATION_TOKEN = object()
 _TEST_OPERATION_TOKEN = object()
+_TEST_STORE_BOOTSTRAP_TOKEN = object()
+
+_PRODUCTION_STORE_BOOTSTRAP_CLAIM_SCHEMA = (
+    "nmm.classical-a-pos-production-store-bootstrap-claim.v1"
+)
+_PRODUCTION_STORE_OPEN_CONTEXT_SCHEMA = (
+    "nmm.classical-a-pos-production-store-open-context.v1"
+)
 
 
 class _OpaquePermit:
@@ -2408,10 +2418,29 @@ class _TestOperationPermit(_OpaquePermit):
     _description = "test operation permit"
 
 
+class _ProductionStoreBootstrapClaim(_OpaquePermit):
+    __slots__ = ()
+    _creation_token = _PRODUCTION_STORE_BOOTSTRAP_TOKEN
+    _description = "production governance-store bootstrap claim"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError(
+            "production governance-store bootstrap claim cannot be subclassed"
+        )
+
+
+class _TestStoreBootstrapClaim(_OpaquePermit):
+    __slots__ = ()
+    _creation_token = _TEST_STORE_BOOTSTRAP_TOKEN
+    _description = "test governance-store bootstrap claim"
+
+
 @dataclass(slots=True)
 class _PlanPermitContext:
     plan: RuntimePlanRecord
     spent: bool = False
+    store_claim_identity: str | None = None
 
 
 @dataclass(slots=True)
@@ -2419,6 +2448,26 @@ class _AuthorizationPermitContext:
     plan_identity: str
     authorization: SingleUseAuthorizationRecord
     spent: bool = False
+    store_claim_identity: str | None = None
+
+
+@dataclass(slots=True)
+class _StoreBootstrapClaimContext:
+    plan: RuntimePlanRecord
+    authorization: SingleUseAuthorizationRecord
+    store_spec_identity: str
+    bootstrap_ledger_bytes: bytes
+    bootstrap_ledger_sha256: str
+    claim_identity: str
+    spent: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _ProductionStoreOpenContext:
+    plan: RuntimePlanRecord
+    authorization: SingleUseAuthorizationRecord
+    store_spec_identity: str
+    open_context_identity: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -2491,6 +2540,18 @@ _PRODUCTION_OPERATION_CONTEXTS: weakref.WeakKeyDictionary[
     ProductionOperationPermit,
     _OperationPermitContext,
 ] = weakref.WeakKeyDictionary()
+_PRODUCTION_STORE_BOOTSTRAP_CONTEXTS: weakref.WeakKeyDictionary[
+    _ProductionStoreBootstrapClaim,
+    _StoreBootstrapClaimContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_STORE_PERMIT_PAIRS: weakref.WeakKeyDictionary[
+    ProductionRuntimePlanPermit,
+    ProductionAuthorizationPermit,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_STORE_CLAIMS_BY_PLAN: weakref.WeakKeyDictionary[
+    ProductionRuntimePlanPermit,
+    _ProductionStoreBootstrapClaim,
+] = weakref.WeakKeyDictionary()
 
 _TEST_PLAN_CONTEXTS: weakref.WeakKeyDictionary[
     _TestRuntimePlanPermit,
@@ -2515,6 +2576,18 @@ _TEST_PENDING_OPERATION_CONTEXTS: weakref.WeakKeyDictionary[
 _TEST_OPERATION_CONTEXTS: weakref.WeakKeyDictionary[
     _TestOperationPermit,
     _OperationPermitContext,
+] = weakref.WeakKeyDictionary()
+_TEST_STORE_BOOTSTRAP_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestStoreBootstrapClaim,
+    _StoreBootstrapClaimContext,
+] = weakref.WeakKeyDictionary()
+_TEST_STORE_PERMIT_PAIRS: weakref.WeakKeyDictionary[
+    _TestRuntimePlanPermit,
+    _TestAuthorizationPermit,
+] = weakref.WeakKeyDictionary()
+_TEST_STORE_CLAIMS_BY_PLAN: weakref.WeakKeyDictionary[
+    _TestRuntimePlanPermit,
+    _TestStoreBootstrapClaim,
 ] = weakref.WeakKeyDictionary()
 
 
@@ -2582,6 +2655,401 @@ def _make_event(
 
 def _event_bytes(event: GovernanceEvent) -> bytes:
     return encode_governance_ledger((event,))
+
+
+def _store_bootstrap_ledger(
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+) -> bytes:
+    timestamp = authorization["issued_at_utc"]
+    readiness_identity = authorization["readiness_identity"]
+    authorization_identity = authorization["authorization_identity"]
+    events: list[GovernanceEvent] = []
+
+    def append(
+        event_type: str,
+        from_state: str,
+        to_state: str,
+        *,
+        include_authorization: bool,
+    ) -> GovernanceEvent:
+        event = _make_event(
+            sequence=len(events),
+            timestamp_utc=timestamp,
+            event_type=event_type,
+            from_state=from_state,
+            to_state=to_state,
+            plan=plan,
+            readiness_identity=readiness_identity,
+            authorization_identity=(
+                authorization_identity if include_authorization else None
+            ),
+            authorization_consumption_identity=None,
+            operation=None,
+            prerequisite_event_identity=(
+                None if not events else events[-1]["event_identity"]
+            ),
+            evidence=None,
+            resource_reservation=None,
+            resource_observation=None,
+            reason_code=None,
+            previous_event_identity=(
+                None if not events else events[-1]["event_identity"]
+            ),
+        )
+        events.append(event)
+        return event
+
+    append(
+        "plan_frozen",
+        "no_events",
+        "plan_frozen",
+        include_authorization=False,
+    )
+    append(
+        "readiness_frozen",
+        "plan_frozen",
+        "ready_unauthorized",
+        include_authorization=False,
+    )
+    append(
+        "authorization_registered",
+        "ready_unauthorized",
+        "authorized_unconsumed",
+        include_authorization=True,
+    )
+    replay = replay_governance_ledger(
+        events,
+        plan=plan,
+        authorization=authorization,
+    )
+    if replay.state != "authorized_unconsumed" or len(replay.events) != 3:
+        raise GovernanceContractError("store bootstrap genesis differs")
+    return encode_governance_ledger(events)
+
+
+def _store_claim_body(
+    *,
+    domain: str,
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+    store_spec_identity: str,
+    bootstrap_ledger_sha256: str,
+) -> dict[str, Any]:
+    return {
+        "schema_version": _PRODUCTION_STORE_BOOTSTRAP_CLAIM_SCHEMA,
+        "domain": domain,
+        "plan_identity": plan["plan_identity"],
+        "readiness_identity": authorization["readiness_identity"],
+        "authorization_identity": authorization["authorization_identity"],
+        "store_spec_identity": store_spec_identity,
+        "bootstrap_ledger_sha256": bootstrap_ledger_sha256,
+    }
+
+
+def _claim_store_bootstrap_core(
+    plan_permit: object,
+    authorization_permit: object,
+    *,
+    store_spec_identity: str,
+    domain: str,
+    plan_type: type,
+    authorization_type: type,
+    claim_type: type,
+    claim_token: object,
+    plan_contexts: Mapping[object, _PlanPermitContext],
+    authorization_contexts: Mapping[object, _AuthorizationPermitContext],
+    permit_pairs: Mapping[object, object],
+    claims_by_plan: weakref.WeakKeyDictionary,
+    claim_contexts: weakref.WeakKeyDictionary,
+) -> object:
+    if type(plan_permit) is not plan_type or type(authorization_permit) is not (
+        authorization_type
+    ):
+        raise GovernanceContractError("store bootstrap permit type/domain differs")
+    plan_context = plan_contexts.get(plan_permit)
+    authorization_context = authorization_contexts.get(authorization_permit)
+    if (
+        plan_context is None
+        or authorization_context is None
+        or permit_pairs.get(plan_permit) is not authorization_permit
+        or plan_context.plan["plan_identity"] != authorization_context.plan_identity
+        or plan_context.spent
+        or authorization_context.spent
+        or plan_context.store_claim_identity is not None
+        or authorization_context.store_claim_identity is not None
+        or claims_by_plan.get(plan_permit) is not None
+    ):
+        raise GovernanceContractError("store bootstrap permit pair is unavailable")
+    checked_spec_identity = _require_sha256(
+        store_spec_identity,
+        field_name="store bootstrap spec identity",
+    )
+    bootstrap = _store_bootstrap_ledger(
+        plan_context.plan,
+        authorization_context.authorization,
+    )
+    bootstrap_sha = hashlib.sha256(bootstrap).hexdigest()
+    body = _store_claim_body(
+        domain=domain,
+        plan=plan_context.plan,
+        authorization=authorization_context.authorization,
+        store_spec_identity=checked_spec_identity,
+        bootstrap_ledger_sha256=bootstrap_sha,
+    )
+    context = _StoreBootstrapClaimContext(
+        plan=plan_context.plan,
+        authorization=authorization_context.authorization,
+        store_spec_identity=checked_spec_identity,
+        bootstrap_ledger_bytes=bootstrap,
+        bootstrap_ledger_sha256=bootstrap_sha,
+        claim_identity=canonical_sha256(body),
+    )
+    claim = claim_type(claim_token)
+    claim_contexts[claim] = context
+    claims_by_plan[plan_permit] = claim
+    plan_context.store_claim_identity = context.claim_identity
+    authorization_context.store_claim_identity = context.claim_identity
+    return claim
+
+
+def _consume_store_bootstrap_claim_core(
+    claim: object,
+    *,
+    domain: str,
+    claim_type: type,
+    claim_contexts: Mapping[object, _StoreBootstrapClaimContext],
+    plan_contexts: Mapping[object, _PlanPermitContext],
+    authorization_contexts: Mapping[object, _AuthorizationPermitContext],
+) -> _StoreBootstrapClaimContext:
+    if type(claim) is not claim_type:
+        raise GovernanceContractError("store bootstrap claim type/domain differs")
+    context = claim_contexts.get(claim)
+    if context is None or context.spent:
+        raise GovernanceContractError("store bootstrap claim is unavailable")
+    expected_bootstrap = _store_bootstrap_ledger(context.plan, context.authorization)
+    expected_sha = hashlib.sha256(expected_bootstrap).hexdigest()
+    expected_identity = canonical_sha256(
+        _store_claim_body(
+            domain=domain,
+            plan=context.plan,
+            authorization=context.authorization,
+            store_spec_identity=context.store_spec_identity,
+            bootstrap_ledger_sha256=expected_sha,
+        )
+    )
+    matching_plan_contexts = [
+        candidate
+        for candidate in plan_contexts.values()
+        if candidate.plan is context.plan
+        and candidate.store_claim_identity == context.claim_identity
+    ]
+    matching_authorization_contexts = [
+        candidate
+        for candidate in authorization_contexts.values()
+        if candidate.authorization is context.authorization
+        and candidate.store_claim_identity == context.claim_identity
+    ]
+    if (
+        context.bootstrap_ledger_bytes != expected_bootstrap
+        or context.bootstrap_ledger_sha256 != expected_sha
+        or context.claim_identity != expected_identity
+        or len(matching_plan_contexts) != 1
+        or len(matching_authorization_contexts) != 1
+    ):
+        raise GovernanceContractError("store bootstrap claim binding differs")
+    decoded = decode_governance_ledger(context.bootstrap_ledger_bytes)
+    if (
+        len(decoded) != 3
+        or tuple(event["event_type"] for event in decoded)
+        != ("plan_frozen", "readiness_frozen", "authorization_registered")
+        or any(
+            event["timestamp_utc"] != context.authorization["issued_at_utc"]
+            for event in decoded
+        )
+    ):
+        raise GovernanceContractError("store bootstrap genesis differs")
+    context.spent = True
+    return context
+
+
+def _inspect_store_open_context_core(
+    plan_permit: object,
+    authorization_permit: object,
+    *,
+    store_spec_identity: str,
+    domain: str,
+    plan_type: type,
+    authorization_type: type,
+    plan_contexts: Mapping[object, _PlanPermitContext],
+    authorization_contexts: Mapping[object, _AuthorizationPermitContext],
+    permit_pairs: Mapping[object, object],
+) -> _ProductionStoreOpenContext:
+    if type(plan_permit) is not plan_type or type(authorization_permit) is not (
+        authorization_type
+    ):
+        raise GovernanceContractError("store open permit type/domain differs")
+    plan_context = plan_contexts.get(plan_permit)
+    authorization_context = authorization_contexts.get(authorization_permit)
+    checked_spec_identity = _require_sha256(
+        store_spec_identity,
+        field_name="store open spec identity",
+    )
+    if plan_context is not None and authorization_context is not None:
+        bootstrap = _store_bootstrap_ledger(
+            plan_context.plan,
+            authorization_context.authorization,
+        )
+        expected_claim_identity = canonical_sha256(
+            _store_claim_body(
+                domain=domain,
+                plan=plan_context.plan,
+                authorization=authorization_context.authorization,
+                store_spec_identity=checked_spec_identity,
+                bootstrap_ledger_sha256=hashlib.sha256(bootstrap).hexdigest(),
+            )
+        )
+    else:
+        expected_claim_identity = None
+    if (
+        plan_context is None
+        or authorization_context is None
+        or permit_pairs.get(plan_permit) is not authorization_permit
+        or expected_claim_identity is None
+        or plan_context.store_claim_identity != expected_claim_identity
+        or authorization_context.store_claim_identity != expected_claim_identity
+    ):
+        raise GovernanceContractError("store open permit binding differs")
+    body = {
+        "schema_version": _PRODUCTION_STORE_OPEN_CONTEXT_SCHEMA,
+        "domain": domain,
+        "plan_identity": plan_context.plan["plan_identity"],
+        "readiness_identity": authorization_context.authorization["readiness_identity"],
+        "authorization_identity": authorization_context.authorization[
+            "authorization_identity"
+        ],
+        "store_spec_identity": checked_spec_identity,
+    }
+    return _ProductionStoreOpenContext(
+        plan=plan_context.plan,
+        authorization=authorization_context.authorization,
+        store_spec_identity=checked_spec_identity,
+        open_context_identity=canonical_sha256(body),
+    )
+
+
+def _claim_production_store_bootstrap(
+    plan_permit: ProductionRuntimePlanPermit,
+    authorization_permit: ProductionAuthorizationPermit,
+    *,
+    store_spec_identity: str,
+) -> _ProductionStoreBootstrapClaim:
+    claim = _claim_store_bootstrap_core(
+        plan_permit,
+        authorization_permit,
+        store_spec_identity=store_spec_identity,
+        domain="production",
+        plan_type=ProductionRuntimePlanPermit,
+        authorization_type=ProductionAuthorizationPermit,
+        claim_type=_ProductionStoreBootstrapClaim,
+        claim_token=_PRODUCTION_STORE_BOOTSTRAP_TOKEN,
+        plan_contexts=_PRODUCTION_PLAN_CONTEXTS,
+        authorization_contexts=_PRODUCTION_AUTH_CONTEXTS,
+        permit_pairs=_PRODUCTION_STORE_PERMIT_PAIRS,
+        claims_by_plan=_PRODUCTION_STORE_CLAIMS_BY_PLAN,
+        claim_contexts=_PRODUCTION_STORE_BOOTSTRAP_CONTEXTS,
+    )
+    assert type(claim) is _ProductionStoreBootstrapClaim
+    return claim
+
+
+def _consume_production_store_bootstrap_claim(
+    claim: _ProductionStoreBootstrapClaim,
+) -> _StoreBootstrapClaimContext:
+    return _consume_store_bootstrap_claim_core(
+        claim,
+        domain="production",
+        claim_type=_ProductionStoreBootstrapClaim,
+        claim_contexts=_PRODUCTION_STORE_BOOTSTRAP_CONTEXTS,
+        plan_contexts=_PRODUCTION_PLAN_CONTEXTS,
+        authorization_contexts=_PRODUCTION_AUTH_CONTEXTS,
+    )
+
+
+def _inspect_production_store_open_context(
+    plan_permit: ProductionRuntimePlanPermit,
+    authorization_permit: ProductionAuthorizationPermit,
+    *,
+    store_spec_identity: str,
+) -> _ProductionStoreOpenContext:
+    return _inspect_store_open_context_core(
+        plan_permit,
+        authorization_permit,
+        store_spec_identity=store_spec_identity,
+        domain="production",
+        plan_type=ProductionRuntimePlanPermit,
+        authorization_type=ProductionAuthorizationPermit,
+        plan_contexts=_PRODUCTION_PLAN_CONTEXTS,
+        authorization_contexts=_PRODUCTION_AUTH_CONTEXTS,
+        permit_pairs=_PRODUCTION_STORE_PERMIT_PAIRS,
+    )
+
+
+def _test_claim_store_bootstrap(
+    plan_permit: _TestRuntimePlanPermit,
+    authorization_permit: _TestAuthorizationPermit,
+    *,
+    store_spec_identity: str,
+) -> _TestStoreBootstrapClaim:
+    claim = _claim_store_bootstrap_core(
+        plan_permit,
+        authorization_permit,
+        store_spec_identity=store_spec_identity,
+        domain="internal-test",
+        plan_type=_TestRuntimePlanPermit,
+        authorization_type=_TestAuthorizationPermit,
+        claim_type=_TestStoreBootstrapClaim,
+        claim_token=_TEST_STORE_BOOTSTRAP_TOKEN,
+        plan_contexts=_TEST_PLAN_CONTEXTS,
+        authorization_contexts=_TEST_AUTH_CONTEXTS,
+        permit_pairs=_TEST_STORE_PERMIT_PAIRS,
+        claims_by_plan=_TEST_STORE_CLAIMS_BY_PLAN,
+        claim_contexts=_TEST_STORE_BOOTSTRAP_CONTEXTS,
+    )
+    assert type(claim) is _TestStoreBootstrapClaim
+    return claim
+
+
+def _test_consume_store_bootstrap_claim(
+    claim: _TestStoreBootstrapClaim,
+) -> _StoreBootstrapClaimContext:
+    return _consume_store_bootstrap_claim_core(
+        claim,
+        domain="internal-test",
+        claim_type=_TestStoreBootstrapClaim,
+        claim_contexts=_TEST_STORE_BOOTSTRAP_CONTEXTS,
+        plan_contexts=_TEST_PLAN_CONTEXTS,
+        authorization_contexts=_TEST_AUTH_CONTEXTS,
+    )
+
+
+def _test_inspect_store_open_context(
+    plan_permit: _TestRuntimePlanPermit,
+    authorization_permit: _TestAuthorizationPermit,
+    *,
+    store_spec_identity: str,
+) -> _ProductionStoreOpenContext:
+    return _inspect_store_open_context_core(
+        plan_permit,
+        authorization_permit,
+        store_spec_identity=store_spec_identity,
+        domain="internal-test",
+        plan_type=_TestRuntimePlanPermit,
+        authorization_type=_TestAuthorizationPermit,
+        plan_contexts=_TEST_PLAN_CONTEXTS,
+        authorization_contexts=_TEST_AUTH_CONTEXTS,
+        permit_pairs=_TEST_STORE_PERMIT_PAIRS,
+    )
 
 
 def _prepared_governance_event_bytes_core(
@@ -2852,6 +3320,26 @@ def prepare_authorization_consumption(
     timestamp_utc: str,
 ) -> tuple[PendingAuthorizationConsumption, bytes]:
     """Spend production permits and return write-ahead consumption bytes."""
+    plan_context = _PRODUCTION_PLAN_CONTEXTS.get(plan_permit)
+    authorization_context = _PRODUCTION_AUTH_CONTEXTS.get(authorization_permit)
+    if (
+        plan_context is None
+        or authorization_context is None
+        or plan_context.store_claim_identity is None
+        or authorization_context.store_claim_identity
+        != plan_context.store_claim_identity
+    ):
+        raise GovernanceContractError(
+            "production authorization consumption requires a shared store claim"
+        )
+    store_claim_identity = _require_sha256(
+        plan_context.store_claim_identity,
+        field_name="production store claim identity",
+    )
+    if store_claim_identity == "0" * 64:
+        raise GovernanceContractError(
+            "production store claim identity must not be an unbound placeholder"
+        )
     pending, payload = _prepare_authorization_consumption_core(
         plan_permit,
         authorization_permit,
@@ -3560,6 +4048,7 @@ def _issue_test_governance_fixture() -> _TestGovernanceFixture:
         plan_identity=plan["plan_identity"],
         authorization=authorization,
     )
+    _TEST_STORE_PERMIT_PAIRS[plan_permit] = authorization_permit
     return _TestGovernanceFixture(
         plan=plan,
         authorization=authorization,

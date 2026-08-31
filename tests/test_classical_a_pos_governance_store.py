@@ -7,6 +7,7 @@ import json
 import os
 import pickle
 import sqlite3
+import weakref
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,7 @@ from typing import Any
 import pytest
 
 import learned_ai.training.classical_a_pos_governance as governance
+import learned_ai.training.classical_a_pos_corpus as corpus_module
 import learned_ai.training.classical_a_pos_governance_store as store_module
 from game.board import POSITIONS, BoardState
 from game.rules import get_all_legal_moves, terminal_result
@@ -49,9 +51,12 @@ EXPECTED_PUBLIC_API = (
     "DurableGovernanceStore",
     "ProductionAPosInventoryBinding",
     "ProductionStrictRefereeBinding",
+    "ProductionStateGenerationRuntimePreflight",
     "ActiveStateGenerationAttempt",
+    "RuntimeBoundStateGenerationAttempt",
     "PendingStateGenerationCommit",
     "ConfirmedStateGenerationCompletion",
+    "ProductionStateGenerationRuntimeCompletion",
     "DurableStateFreezeBinding",
     "build_governance_store_spec",
     "initialize_governance_store",
@@ -62,6 +67,7 @@ EXPECTED_PUBLIC_API = (
     "prepare_state_generation_commit",
     "commit_state_generation",
     "commit_state_freeze",
+    "restore_durable_state_freeze",
     "verify_durable_state_freeze",
 )
 
@@ -109,6 +115,306 @@ def test_c4a_source_games_and_domain_stream_schema_are_v2() -> None:
         "CHECK (record_identity = record_bytes_sha256)",
     ):
         assert required in domain_ddl
+
+
+def test_c5a_store_completion_freeze_and_meta_contracts_are_v2() -> None:
+    assert store_module._SPEC_SCHEMA == "nmm.classical-a-pos-governance-store-spec.v2"
+    assert (
+        store_module._STORE_META_SCHEMA
+        == "nmm.classical-a-pos-governance-store-meta.v2"
+    )
+    assert (
+        store_module._COMPLETION_SCHEMA
+        == "nmm.classical-a-pos-state-generation-completion.v2"
+    )
+    assert (
+        store_module._FREEZE_RECEIPT_SCHEMA
+        == "nmm.classical-a-pos-durable-state-freeze.v2"
+    )
+    assert store_module._COMPLETION_RUNTIME_KEYS == {
+        "host_preflight_identity",
+        "state_generator_session_identity",
+        "strict_referee_binding_identity",
+        "a_pos_inventory_binding_identity",
+        "runtime_evidence_stream_identity",
+        "resource_snapshot_before_identity",
+        "resource_snapshot_after_identity",
+        "resource_stability_identity",
+    }
+    assert {
+        "runtime_evidence_stream_identity",
+        "resource_stability_identity",
+    } < store_module._FREEZE_GOVERNANCE_KEYS
+
+
+def test_c5a_public_store_entrypoints_accept_only_exact_production_permits() -> None:
+    initialize = inspect.signature(store_module.initialize_governance_store).parameters
+    open_store = inspect.signature(store_module.open_governance_store).parameters
+    assert tuple(initialize) == (
+        "output_root",
+        "spec",
+        "plan_permit",
+        "authorization_permit",
+    )
+    assert tuple(open_store) == (
+        "output_root",
+        "spec",
+        "plan_permit",
+        "authorization_permit",
+    )
+    assert "plan" not in open_store
+    assert "authorization" not in open_store
+
+
+def test_c5a_runtime_completion_is_opaque_unissued_and_restore_is_public() -> None:
+    completion_type = store_module.ProductionStateGenerationRuntimeCompletion
+    assert "ProductionStateGenerationRuntimeCompletion" in store_module.__all__
+    assert "restore_durable_state_freeze" in store_module.__all__
+    with pytest.raises((TypeError, GovernanceStoreContractError)):
+        completion_type(object())
+    rogue = object.__new__(completion_type)
+    assert not hasattr(rogue, "__dict__")
+    with pytest.raises(AttributeError):
+        rogue.context = object()  # type: ignore[attr-defined]
+    with pytest.raises(TypeError):
+        copy.copy(rogue)
+    with pytest.raises(TypeError):
+        pickle.dumps(rogue)
+    assert not hasattr(
+        store_module,
+        "issue_production_state_generation_runtime_completion",
+    )
+
+
+def test_c5a_runtime_preflight_and_bound_attempt_are_opaque_and_unissued() -> None:
+    for capability_type in (
+        store_module.ProductionStateGenerationRuntimePreflight,
+        store_module.RuntimeBoundStateGenerationAttempt,
+    ):
+        assert "__dict__" not in capability_type.__dict__
+        with pytest.raises((TypeError, GovernanceStoreContractError)):
+            capability_type(object())
+        rogue = object.__new__(capability_type)
+        with pytest.raises(AttributeError):
+            rogue.context = object()  # type: ignore[attr-defined]
+        with pytest.raises(TypeError):
+            copy.copy(rogue)
+        with pytest.raises(TypeError):
+            pickle.dumps(rogue)
+    assert not hasattr(
+        store_module, "issue_production_state_generation_runtime_preflight"
+    )
+    assert not hasattr(store_module, "bind_production_state_generation_attempt")
+
+
+def test_c5a_postcommit_runtime_before_error_is_private_and_fatal() -> None:
+    error_type = store_module._DurableRuntimeBeforePostCommitError
+    assert issubclass(error_type, GovernanceStoreContractError)
+    assert "_DurableRuntimeBeforePostCommitError" not in store_module.__all__
+
+
+def test_c5a_runtime_stream_allowlist_is_before_after_stability_in_order() -> None:
+    assert store_module._RUNTIME_STREAM_KIND == "state-generation-runtime"
+    assert store_module._RUNTIME_RECORD_TYPES == (
+        "state-generation-resource-before",
+        "state-generation-resource-after",
+        "state-generation-resource-stability",
+    )
+    assert (
+        store_module._RESOURCE_SNAPSHOT_SCHEMA
+        == "nmm.classical-a-pos-state-generation-resource-snapshot.v1"
+    )
+    assert store_module._RUNTIME_RECORD_SCHEMAS == {
+        "state-generation-resource-before": (
+            "nmm.classical-a-pos-state-generation-resource-before.v1"
+        ),
+        "state-generation-resource-after": (
+            "nmm.classical-a-pos-state-generation-resource-after.v1"
+        ),
+        "state-generation-resource-stability": (
+            "nmm.classical-a-pos-state-generation-resource-stability.v1"
+        ),
+    }
+    assert (
+        store_module._RUNTIME_STREAM_SCHEMA
+        == "nmm.classical-a-pos-state-generation-runtime-stream.v1"
+    )
+    assert store_module._RESOURCE_SNAPSHOT_KEYS == {
+        "schema_version",
+        "stage",
+        "experiment_id",
+        "proposal_identity",
+        "profile_identity",
+        "store_spec_identity",
+        "plan_identity",
+        "readiness_identity",
+        "attempt_identity",
+        "observed_at_utc",
+        "host",
+        "path_registry",
+        "repository",
+        "output_root",
+        "malom",
+        "sanmill",
+        "generator",
+        "snapshot_identity",
+    }
+    assert store_module._HOST_SNAPSHOT_KEYS == {
+        "schema_version",
+        "platform",
+        "machine_identity",
+        "python_executable_sha256",
+        "python_version",
+        "torch_version",
+        "device",
+        "cuda_initialized",
+        "available_memory_bytes",
+    }
+    assert store_module._PATH_REGISTRY_SNAPSHOT_KEYS == {
+        "schema_version",
+        "registry_role",
+        "file_sha256",
+        "canonical_object_identity",
+        "required_lookup_keys",
+        "resolved_path_identities",
+    }
+    assert store_module._REPOSITORY_SNAPSHOT_KEYS == {
+        "schema_version",
+        "root_identity",
+        "head_commit",
+        "head_tree",
+        "status_identity",
+        "implementation_files_identity",
+        "allowed_untracked_roots",
+    }
+    assert store_module._OUTPUT_ROOT_SNAPSHOT_KEYS == {
+        "schema_version",
+        "lookup_key",
+        "canonical_path_identity",
+        "root_identity",
+        "volume_identity",
+        "file_identity",
+        "governance_database_identity",
+        "artifact_namespace_identity",
+        "free_bytes",
+    }
+    assert store_module._MALOM_SNAPSHOT_KEYS == {
+        "schema_version",
+        "lookup_key",
+        "path_identity",
+        "label_version",
+        "manifest_file_sha256",
+        "manifest_sha256",
+        "content_sha256",
+        "component_count",
+        "size_bytes",
+        "component_metadata_identity",
+        "full_hash_evidence_identity",
+        "full_hash_verified",
+        "oracle_implementation_identity",
+    }
+    assert store_module._SANMILL_SNAPSHOT_KEYS == {
+        "schema_version",
+        "lookup_key",
+        "checkout_path_identity",
+        "installation_identity",
+        "runtime_identity",
+        "commit",
+        "tree",
+        "binary_sha256",
+        "binary_size",
+        "license_sha256",
+        "strict_referee_semantic_digest",
+        "checkout_clean",
+        "referee_implementation_identity",
+    }
+    assert store_module._GENERATOR_SNAPSHOT_KEYS == {
+        "schema_version",
+        "contract_identity",
+        "model_implementation_identity",
+        "encoder_implementation_identity",
+        "initial_policy_state_sha256",
+        "initial_rng_state_identity",
+        "current_rng_state_identity",
+        "model_config",
+        "sampler_config",
+    }
+    assert store_module._RUNTIME_RECORD_CONTEXT_KEYS == {
+        "experiment_id",
+        "proposal_identity",
+        "profile_identity",
+        "store_spec_identity",
+        "plan_identity",
+        "readiness_identity",
+        "authorization_identity",
+        "authorization_consumption_identity",
+        "attempt_identity",
+        "reservation_event_identity",
+        "state_generator_session_identity",
+        "host_preflight_identity",
+    }
+    assert store_module._STABILITY_COMPARISON_FIELDS == (
+        "host.platform",
+        "host.machine_identity",
+        "host.python_executable_sha256",
+        "host.python_version",
+        "host.torch_version",
+        "host.device",
+        "host.cuda_initialized",
+        "path_registry.file_sha256",
+        "path_registry.canonical_object_identity",
+        "repository.head_commit",
+        "repository.head_tree",
+        "repository.status_identity",
+        "repository.implementation_files_identity",
+        "output_root.root_identity",
+        "output_root.volume_identity",
+        "output_root.file_identity",
+        "malom.label_version",
+        "malom.manifest_file_sha256",
+        "malom.manifest_sha256",
+        "malom.content_sha256",
+        "malom.component_count",
+        "malom.size_bytes",
+        "malom.component_metadata_identity",
+        "malom.full_hash_evidence_identity",
+        "sanmill.installation_identity",
+        "sanmill.runtime_identity",
+        "sanmill.commit",
+        "sanmill.tree",
+        "sanmill.binary_sha256",
+        "sanmill.binary_size",
+        "sanmill.license_sha256",
+        "sanmill.strict_referee_semantic_digest",
+        "sanmill.checkout_clean",
+        "generator.contract_identity",
+        "generator.model_implementation_identity",
+        "generator.encoder_implementation_identity",
+        "generator.initial_policy_state_sha256",
+        "generator.initial_rng_state_identity",
+    )
+
+
+def test_c5a_internal_store_helpers_remove_raw_records_and_bootstrap_bytes() -> None:
+    initialize = inspect.signature(
+        store_module._test_initialize_governance_store
+    ).parameters
+    open_store = inspect.signature(store_module._test_open_governance_store).parameters
+    assert tuple(initialize) == (
+        "output_root",
+        "spec",
+        "plan_permit",
+        "authorization_permit",
+    )
+    assert tuple(open_store) == (
+        "output_root",
+        "spec",
+        "plan_permit",
+        "authorization_permit",
+    )
+    for forbidden in ("plan", "authorization", "bootstrap_ledger_bytes"):
+        assert forbidden not in initialize
+        assert forbidden not in open_store
 
 
 def test_c4a_declares_unissued_production_strict_referee_binding() -> None:
@@ -173,7 +479,9 @@ def test_store_spec_is_exact_plan_bound_deeply_immutable_and_nonce_free() -> Non
         DurableGovernanceStore,
         ProductionAPosInventoryBinding,
         store_module.ProductionStrictRefereeBinding,
+        store_module.ProductionStateGenerationRuntimePreflight,
         ActiveStateGenerationAttempt,
+        store_module.RuntimeBoundStateGenerationAttempt,
         PendingStateGenerationCommit,
         ConfirmedStateGenerationCompletion,
         DurableStateFreezeBinding,
@@ -224,8 +532,8 @@ def test_production_store_cannot_bootstrap_from_an_empty_namespace(
         store_module.open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
     assert not (tmp_path / "governance").exists()
 
@@ -261,9 +569,55 @@ def test_c4a_public_open_cannot_upgrade_a_disk_relabelled_test_database(
         store_module.open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
+
+
+def test_c5a_bootstrap_failure_spends_claim_and_cannot_mutate_second_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = governance._issue_test_governance_fixture()
+    spec = build_governance_store_spec(
+        fixture.plan,
+        readiness_identity=fixture.authorization["readiness_identity"],
+        output_root_identity=_sha("failed-bootstrap-output-root"),
+    )
+    original_create = store_module._create_store_database
+
+    def reject_first_mutation(*_args: Any, **_kwargs: Any) -> None:
+        raise GovernanceStoreContractError("injected first SQLite mutation failure")
+
+    monkeypatch.setattr(
+        store_module,
+        "_create_store_database",
+        reject_first_mutation,
+    )
+    first_root = tmp_path / "first"
+    first_root.mkdir()
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_initialize_governance_store(
+            first_root,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+
+    monkeypatch.setattr(store_module, "_create_store_database", original_create)
+    second_root = tmp_path / "second"
+    second_root.mkdir()
+    sentinel = second_root / "owner-sentinel.txt"
+    sentinel.write_text("preserve", encoding="utf-8")
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_initialize_governance_store(
+            second_root,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert not (second_root / "governance").exists()
 
 
 def _test_layout() -> dict[str, dict[str, dict[str, int]]]:
@@ -690,18 +1044,16 @@ def _initialize_test_store(tmp_path: Path):
         readiness_identity=fixture.authorization["readiness_identity"],
         output_root_identity=_sha("test-output-root"),
     )
-    bootstrap = governance.encode_governance_ledger(fixture.events[:3])
     store = store_module._test_initialize_governance_store(
         tmp_path,
         spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
-        bootstrap_ledger_bytes=bootstrap,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
     )
     return fixture, spec, store
 
 
-def _advance_test_store_to_active(tmp_path: Path):
+def _advance_test_store_to_reserved(tmp_path: Path):
     fixture, spec, store = _initialize_test_store(tmp_path)
     context = store_module._TEST_STORE_CONTEXTS[store]
     pending_auth, _ = governance._test_prepare_authorization_consumption(
@@ -724,11 +1076,30 @@ def _advance_test_store_to_active(tmp_path: Path):
         store,
         pending_operation,
     )
+    return fixture, spec, store, operation_permit
+
+
+def _advance_test_store_to_active(tmp_path: Path):
+    fixture, spec, store, operation_permit = _advance_test_store_to_reserved(tmp_path)
     active = store_module._test_begin_state_generation_attempt(
         store,
         operation_permit,
     )
     return fixture, spec, store, active
+
+
+def _advance_test_store_to_bound(tmp_path: Path):
+    fixture, spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    bound = store_module._test_bind_state_generation_attempt(
+        preflight,
+        store,
+        active,
+    )
+    return fixture, spec, store, active, bound
 
 
 def _write_artifacts(
@@ -794,7 +1165,7 @@ def _test_strict_referee_binding(attempt_identity: str):
 
 
 def _prepare_valid_state_commit(tmp_path: Path):
-    fixture, spec, store, active = _advance_test_store_to_active(tmp_path)
+    fixture, spec, store, active, bound = _advance_test_store_to_bound(tmp_path)
     verifier_identity = _sha("live-a-pos-verifier")
     inventory = _test_inventory_binding(verifier_identity)
     attempt_identity = store_module._TEST_ACTIVE_CONTEXTS[active].attempt_identity
@@ -804,10 +1175,14 @@ def _prepare_valid_state_commit(tmp_path: Path):
         verifier_identity,
         attempt_identity,
     )
+    runtime_completion = store_module._issue_test_state_generation_runtime_completion(
+        bound
+    )
     pending = store_module._test_prepare_state_generation_commit(
-        active,
+        bound,
         inventory,
         strict_referee,
+        runtime_completion,
         source_games_path=source_path,
         state_split_path=state_path,
         singleton_ledger_path=singleton_path,
@@ -825,6 +1200,220 @@ def _prepare_valid_state_commit(tmp_path: Path):
         state_path,
         singleton_path,
     )
+
+
+def _assert_exact_lone_runtime_before(database: Path) -> str:
+    connection = sqlite3.connect(database)
+    try:
+        artifacts, records = store_module._verify_blob_tables(connection)
+        rows = connection.execute(
+            "SELECT sequence, record_type, previous_record_identity, "
+            "record_identity FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime'"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert artifacts == {}
+    assert set(records) == {"state-generation-resource-before"}
+    assert len(rows) == 1
+    sequence, record_type, previous, record_identity = rows[0]
+    assert sequence == 0
+    assert record_type == "state-generation-resource-before"
+    assert previous is None
+    assert records[record_type][0] == record_identity
+    return record_identity
+
+
+def test_c5a_store_runtime_is_none_until_explicit_bind_and_after_nonrunning_open(
+    tmp_path: Path,
+) -> None:
+    fixture, spec, store = _initialize_test_store(tmp_path)
+    assert store_module._TEST_STORE_CONTEXTS[store].runtime is None
+    reopened = store_module._test_open_governance_store(
+        tmp_path,
+        spec,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
+    )
+    assert store_module._TEST_STORE_CONTEXTS[reopened].runtime is None
+
+    generated_root = tmp_path / "generated"
+    generated_root.mkdir()
+    prepared = _prepare_valid_state_commit(generated_root)
+    generated_fixture, generated_spec, generated_store, pending = (
+        prepared[0],
+        prepared[1],
+        prepared[2],
+        prepared[5],
+    )
+    store_module._test_commit_state_generation(generated_store, pending)
+    generated_reopened = store_module._test_open_governance_store(
+        generated_root,
+        generated_spec,
+        plan_permit=generated_fixture.plan_permit,
+        authorization_permit=generated_fixture.authorization_permit,
+    )
+    generated_context = store_module._TEST_STORE_CONTEXTS[generated_reopened]
+    assert generated_context.replay.state == "state_generated"
+    assert generated_context.runtime is None
+    database = generated_root / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute(
+            "SELECT sequence, record_type FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall() == [
+            (0, "state-generation-resource-before"),
+            (1, "state-generation-resource-after"),
+            (2, "state-generation-resource-stability"),
+        ]
+    finally:
+        connection.close()
+
+
+def test_c5a_postcommit_replay_failure_preserves_seq0_and_is_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture, spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    real_replay = store_module._read_and_replay
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+
+    def fail_after_runtime_before_commit(*args: Any, **kwargs: Any):
+        replay = real_replay(*args, **kwargs)
+        connection = sqlite3.connect(database)
+        try:
+            count = connection.execute(
+                "SELECT COUNT(*) FROM domain_records "
+                "WHERE stream_kind='state-generation-runtime'"
+            ).fetchone()[0]
+        finally:
+            connection.close()
+        if count == 1:
+            raise GovernanceStoreContractError("injected post-COMMIT replay failure")
+        return replay
+
+    monkeypatch.setattr(
+        store_module, "_read_and_replay", fail_after_runtime_before_commit
+    )
+    with pytest.raises(
+        store_module._DurableRuntimeBeforePostCommitError,
+        match="fatal post-commit runtime-before capability loss; no resume or retry",
+    ):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+    monkeypatch.setattr(store_module, "_read_and_replay", real_replay)
+
+    before_identity = _assert_exact_lone_runtime_before(database)
+    store_context = store_module._TEST_STORE_CONTEXTS[store]
+    active_context = store_module._TEST_ACTIVE_CONTEXTS[active]
+    preflight_context = store_module._TEST_RUNTIME_PREFLIGHT_CONTEXTS[preflight]
+    assert store_context.runtime is None
+    assert active_context.bind_consumed is True
+    assert active_context.spent is True
+    assert preflight_context.spent is True
+    assert all(
+        context.active is not active
+        for context in store_module._TEST_BOUND_ATTEMPT_CONTEXTS.values()
+    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+    with pytest.raises(
+        store_module._DurableRuntimeBeforePostCommitError,
+        match="fatal post-commit runtime-before capability loss; no resume or retry",
+    ):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_completion(
+            {"before_record_identity": before_identity}
+        )
+    rogue_bound = object.__new__(store_module._TestRuntimeBoundStateGenerationAttempt)
+    rogue_completion = object.__new__(
+        store_module._TestStateGenerationRuntimeCompletion
+    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_completion(rogue_bound)
+    verifier_identity = _sha("postcommit-loss-verifier")
+    inventory = _test_inventory_binding(verifier_identity)
+    strict_referee = _test_strict_referee_binding(active_context.attempt_identity)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_prepare_state_generation_commit(
+            rogue_bound,
+            inventory,
+            strict_referee,
+            rogue_completion,
+            source_games_path=tmp_path / "must-not-read-source.jsonl",
+            state_split_path=tmp_path / "must-not-read-state.jsonl",
+            singleton_ledger_path=tmp_path / "must-not-read-singletons.json",
+            timestamp_utc="2026-09-01T00:00:05Z",
+            active_seconds=0,
+        )
+    for forbidden in (
+        "execute_state_generation",
+        "resume_state_generation_from_runtime_before",
+        "restore_runtime_bound_state_generation_attempt",
+    ):
+        assert not hasattr(store_module, forbidden)
+
+
+def test_c5a_bound_registration_failure_is_postcommit_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture, spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    original_registry = store_module._TEST_BOUND_ATTEMPT_CONTEXTS
+
+    class _FailingBoundRegistry(weakref.WeakKeyDictionary):
+        def __setitem__(self, key: object, value: object) -> None:
+            super().__setitem__(key, value)
+            raise RuntimeError("injected WeakKey registration failure")
+
+    failing_registry = _FailingBoundRegistry()
+    monkeypatch.setattr(
+        store_module,
+        "_TEST_BOUND_ATTEMPT_CONTEXTS",
+        failing_registry,
+    )
+    with pytest.raises(
+        store_module._DurableRuntimeBeforePostCommitError,
+        match="fatal post-commit runtime-before capability loss; no resume or retry",
+    ):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+    monkeypatch.setattr(
+        store_module,
+        "_TEST_BOUND_ATTEMPT_CONTEXTS",
+        original_registry,
+    )
+
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    _assert_exact_lone_runtime_before(database)
+    assert not failing_registry
+    assert store_module._TEST_STORE_CONTEXTS[store].runtime is None
+    assert store_module._TEST_ACTIVE_CONTEXTS[active].spent is True
+    assert store_module._TEST_RUNTIME_PREFLIGHT_CONTEXTS[preflight].spent is True
+    with pytest.raises(
+        store_module._DurableRuntimeBeforePostCommitError,
+        match="fatal post-commit runtime-before capability loss; no resume or retry",
+    ):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
 
 
 def test_source_game_v2_rejects_legacy_empty_nonterminal_records() -> None:
@@ -1219,7 +1808,7 @@ def _mutated_artifact_bytes(
 def test_internal_test_store_durably_completes_and_freezes_state_generation(
     tmp_path: Path,
 ) -> None:
-    fixture, spec, store, active = _advance_test_store_to_active(tmp_path)
+    fixture, spec, store, active, bound = _advance_test_store_to_bound(tmp_path)
     context = store_module._TEST_STORE_CONTEXTS[store]
 
     verifier_identity = _sha("live-a-pos-verifier")
@@ -1239,10 +1828,14 @@ def test_internal_test_store_durably_completes_and_freezes_state_generation(
         attempt_identity,
     )
 
+    runtime_completion = store_module._issue_test_state_generation_runtime_completion(
+        bound
+    )
     pending_state = store_module._test_prepare_state_generation_commit(
-        active,
+        bound,
         inventory_binding,
         strict_referee,
+        runtime_completion,
         source_games_path=source_path,
         state_split_path=state_path,
         singleton_ledger_path=singleton_path,
@@ -1269,16 +1862,16 @@ def test_internal_test_store_durably_completes_and_freezes_state_generation(
     reopened = store_module._test_open_governance_store(
         tmp_path,
         spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
     )
     assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == "state_frozen"
     with pytest.raises(GovernanceStoreContractError):
         store_module.open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
     with pytest.raises(GovernanceStoreContractError):
         store_module.verify_durable_state_freeze(store, freeze)
@@ -1302,7 +1895,8 @@ def test_completion_and_freeze_records_have_exact_flat_contracts(
         rows = connection.execute(
             "SELECT stream_identity, stream_kind, sequence, record_type, "
             "previous_record_identity, record_identity, record_bytes, "
-            "record_bytes_sha256 FROM domain_records ORDER BY sequence"
+            "record_bytes_sha256 FROM domain_records "
+            "WHERE stream_kind='controller' ORDER BY sequence"
         ).fetchall()
     finally:
         connection.close()
@@ -1414,6 +2008,7 @@ def test_domain_record_stream_gap_cross_stream_and_unknown_types_fail_closed(
         elif attack in {"unknown-teacher-stream", "unknown-teacher-record"}:
             prior = connection.execute(
                 "SELECT stream_identity, record_identity FROM domain_records "
+                "WHERE stream_kind='controller' "
                 "ORDER BY sequence DESC LIMIT 1"
             ).fetchone()
             if attack == "unknown-teacher-stream":
@@ -1493,8 +2088,8 @@ def test_domain_record_stream_gap_cross_stream_and_unknown_types_fail_closed(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1519,7 +2114,8 @@ def test_fully_resigned_wrong_controller_stream_identity_fails_closed(
         record = json.loads(
             bytes(
                 connection.execute(
-                    "SELECT record_bytes FROM domain_records WHERE sequence=0"
+                    "SELECT record_bytes FROM domain_records "
+                    "WHERE stream_kind='controller' AND sequence=0"
                 ).fetchone()[0]
             )
         )
@@ -1529,7 +2125,8 @@ def test_fully_resigned_wrong_controller_stream_identity_fails_closed(
         connection.execute("DROP TRIGGER domain_records_reject_update")
         connection.execute(
             "UPDATE domain_records SET stream_identity=?, record_identity=?, "
-            "record_bytes=?, size_bytes=?, record_bytes_sha256=? WHERE sequence=0",
+            "record_bytes=?, size_bytes=?, record_bytes_sha256=? "
+            "WHERE stream_kind='controller' AND sequence=0",
             (
                 record["stream_identity"],
                 identity,
@@ -1550,8 +2147,8 @@ def test_fully_resigned_wrong_controller_stream_identity_fails_closed(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1568,7 +2165,8 @@ def test_domain_record_raw_bytes_and_row_hash_attacks_fail_closed(
     try:
         original = bytes(
             connection.execute(
-                "SELECT record_bytes FROM domain_records WHERE sequence=0"
+                "SELECT record_bytes FROM domain_records "
+                "WHERE stream_kind='controller' AND sequence=0"
             ).fetchone()[0]
         )
         if raw_attack == "bom":
@@ -1586,13 +2184,14 @@ def test_domain_record_raw_bytes_and_row_hash_attacks_fail_closed(
         if raw_attack == "stale-row-hash":
             connection.execute(
                 "UPDATE domain_records SET record_bytes=?, size_bytes=? "
-                "WHERE sequence=0",
+                "WHERE stream_kind='controller' AND sequence=0",
                 (payload, len(payload)),
             )
         else:
             connection.execute(
                 "UPDATE domain_records SET record_identity=?, record_bytes=?, "
-                "size_bytes=?, record_bytes_sha256=? WHERE sequence=0",
+                "size_bytes=?, record_bytes_sha256=? "
+                "WHERE stream_kind='controller' AND sequence=0",
                 (identity, payload, len(payload), identity),
             )
         trigger = next(
@@ -1607,8 +2206,8 @@ def test_domain_record_raw_bytes_and_row_hash_attacks_fail_closed(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1621,7 +2220,8 @@ def test_domain_record_duplicate_sequence_and_identity_are_sqlite_rejected(
         row = connection.execute(
             "SELECT stream_identity, stream_kind, sequence, record_type, "
             "previous_record_identity, record_identity, record_bytes, size_bytes, "
-            "record_bytes_sha256 FROM domain_records WHERE sequence=0"
+            "record_bytes_sha256 FROM domain_records "
+            "WHERE stream_kind='controller' AND sequence=0"
         ).fetchone()
         with pytest.raises(sqlite3.IntegrityError):
             connection.execute(
@@ -1710,8 +2310,8 @@ def test_resigned_completion_missing_null_zero_or_drifting_identity_fails(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1773,8 +2373,8 @@ def test_resigned_freeze_missing_zero_or_placeholder_governance_fails_closed(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1792,8 +2392,19 @@ def test_durable_capabilities_are_opaque_noncopyable_and_one_use(
         state_path,
         singleton_path,
     ) = _prepare_valid_state_commit(tmp_path)
-    strict_referee = store_module._TEST_PENDING_CONTEXTS[pending].strict_referee_binding
-    for capability in (store, active, inventory, strict_referee, pending):
+    pending_context = store_module._TEST_PENDING_CONTEXTS[pending]
+    bound = pending_context.active
+    strict_referee = pending_context.strict_referee_binding
+    runtime_completion = pending_context.runtime_completion
+    for capability in (
+        store,
+        active,
+        bound,
+        inventory,
+        strict_referee,
+        runtime_completion,
+        pending,
+    ):
         assert not hasattr(capability, "__dict__")
         with pytest.raises(AttributeError):
             capability.context = object()  # type: ignore[attr-defined]
@@ -1805,9 +2416,10 @@ def test_durable_capabilities_are_opaque_noncopyable_and_one_use(
             pickle.dumps(capability)
     with pytest.raises(GovernanceStoreContractError):
         store_module._test_prepare_state_generation_commit(
-            active,
+            bound,
             inventory,
             strict_referee,
+            runtime_completion,
             source_games_path=source_path,
             state_split_path=state_path,
             singleton_ledger_path=singleton_path,
@@ -1845,8 +2457,8 @@ def test_any_sqlite_sidecar_fails_closed_without_deleting_it(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
     assert sidecar.read_bytes() == b"unexpected-sidecar"
 
@@ -1869,8 +2481,8 @@ def test_sqlite_pragmas_schema_and_immutability_triggers_are_exact(
     reopened = store_module._test_open_governance_store(
         tmp_path,
         spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
     )
     assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == (
         "authorized_unconsumed"
@@ -1901,8 +2513,8 @@ def test_schema_or_meta_drift_fails_after_attacker_restores_trigger_text(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1918,8 +2530,8 @@ def test_missing_immutability_trigger_fails_exact_schema_check(tmp_path: Path) -
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1935,8 +2547,8 @@ def test_extra_schema_object_fails_closed(tmp_path: Path) -> None:
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1959,8 +2571,8 @@ def test_event_gap_fails_after_attacker_restores_delete_trigger(tmp_path: Path) 
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -1990,8 +2602,8 @@ def test_locked_commit_fails_immediately_and_pending_is_permanently_spent(
     reopened = store_module._test_open_governance_store(
         tmp_path,
         spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
     )
     assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == (
         "authorized_unconsumed"
@@ -2036,22 +2648,24 @@ def test_injected_event_insert_fault_rolls_back_artifacts_and_spends_pending(
         store_module._test_commit_state_generation(store, pending)
     monkeypatch.setattr(store_module, "_open_write_connection", real_open)
 
-    reopened = store_module._test_open_governance_store(
-        tmp_path,
-        spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
-    )
-    assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == (
-        "state_generation_running"
-    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
     database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
     connection = sqlite3.connect(database, isolation_level=None)
     try:
         assert connection.execute("SELECT COUNT(*) FROM artifacts").fetchone() == (0,)
-        assert connection.execute("SELECT COUNT(*) FROM domain_records").fetchone() == (
-            0,
-        )
+        assert connection.execute(
+            "SELECT COUNT(*) FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime'"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM domain_records WHERE stream_kind='controller'"
+        ).fetchone() == (0,)
     finally:
         connection.close()
 
@@ -2086,8 +2700,8 @@ def test_state_freeze_lock_failure_spends_completion_without_partial_freeze(
     reopened = store_module._test_open_governance_store(
         tmp_path,
         spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
     )
     assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == (
         "state_generated"
@@ -2113,15 +2727,26 @@ def test_artifact_toctou_fails_before_sqlite_insert_and_cannot_retry(
         store_module._test_commit_state_generation(store, pending)
     with pytest.raises(GovernanceStoreContractError):
         store_module._test_commit_state_generation(store, pending)
-    reopened = store_module._test_open_governance_store(
-        tmp_path,
-        spec,
-        plan=fixture.plan,
-        authorization=fixture.authorization,
-    )
-    assert store_module._TEST_STORE_CONTEXTS[reopened].replay.state == (
-        "state_generation_running"
-    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM artifacts").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime'"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM domain_records WHERE stream_kind='controller'"
+        ).fetchone() == (0,)
+    finally:
+        connection.close()
 
 
 @pytest.mark.parametrize(
@@ -2145,7 +2770,7 @@ def test_artifact_contract_mutations_fail_closed_and_consume_attempt(
     tmp_path: Path,
     mutation: str,
 ) -> None:
-    _fixture, _spec, _store, active = _advance_test_store_to_active(tmp_path)
+    _fixture, _spec, _store, active, bound = _advance_test_store_to_bound(tmp_path)
     verifier_identity = _sha("live-a-pos-verifier")
     inventory = _test_inventory_binding(verifier_identity)
     attempt_identity = store_module._TEST_ACTIVE_CONTEXTS[active].attempt_identity
@@ -2163,11 +2788,15 @@ def test_artifact_contract_mutations_fail_closed_and_consume_attempt(
         state_bytes=state_bytes,
         singleton_bytes=singleton_bytes,
     )
+    runtime_completion = store_module._issue_test_state_generation_runtime_completion(
+        bound
+    )
     with pytest.raises(GovernanceStoreContractError):
         store_module._test_prepare_state_generation_commit(
-            active,
+            bound,
             inventory,
             strict_referee,
+            runtime_completion,
             source_games_path=source_path,
             state_split_path=state_path,
             singleton_ledger_path=singleton_path,
@@ -2184,9 +2813,10 @@ def test_artifact_contract_mutations_fail_closed_and_consume_attempt(
     singleton_path.write_bytes(valid_singleton)
     with pytest.raises(GovernanceStoreContractError):
         store_module._test_prepare_state_generation_commit(
-            active,
+            bound,
             inventory,
             strict_referee,
+            runtime_completion,
             source_games_path=source_path,
             state_split_path=state_path,
             singleton_ledger_path=singleton_path,
@@ -2277,8 +2907,8 @@ def test_fully_resigned_state_blob_and_completion_still_fail_event_binding(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2317,8 +2947,8 @@ def test_fully_resigned_completion_literal_drift_fails_closed(tmp_path: Path) ->
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2372,9 +3002,1069 @@ def test_fully_resigned_freeze_receipt_still_fails_frozen_event_binding(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
+
+
+def test_c5a_begin_is_unbound_and_persists_no_runtime_evidence(
+    tmp_path: Path,
+) -> None:
+    _fixture, _spec, store, _active = _advance_test_store_to_active(tmp_path)
+    assert store_module._TEST_STORE_CONTEXTS[store].runtime is None
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        rows = connection.execute(
+            "SELECT stream_kind, sequence, record_type FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert rows == []
+
+
+def test_c5a_explicit_test_preflight_bind_persists_runtime_before(
+    tmp_path: Path,
+) -> None:
+    _fixture, _spec, _store, _active, _bound = _advance_test_store_to_bound(tmp_path)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        rows = connection.execute(
+            "SELECT stream_kind, sequence, record_type FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert rows == [("state-generation-runtime", 0, "state-generation-resource-before")]
+
+
+def test_c5a_completion_appends_runtime_after_stability_and_controller_atomically(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    store = prepared[2]
+    pending = prepared[5]
+    store_module._test_commit_state_generation(store, pending)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        runtime_rows = connection.execute(
+            "SELECT sequence, record_type FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall()
+        controller_rows = connection.execute(
+            "SELECT sequence, record_type FROM domain_records "
+            "WHERE stream_kind='controller' ORDER BY sequence"
+        ).fetchall()
+    finally:
+        connection.close()
+    assert runtime_rows == [
+        (0, "state-generation-resource-before"),
+        (1, "state-generation-resource-after"),
+        (2, "state-generation-resource-stability"),
+    ]
+    assert controller_rows == [(0, "state-generation-completion")]
+
+
+def test_c5a_runtime_records_and_completion_have_exact_identity_chain(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    store = prepared[2]
+    pending = prepared[5]
+    store_module._test_commit_state_generation(store, pending)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        rows = connection.execute(
+            "SELECT record_identity, record_bytes FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall()
+        completion_bytes = bytes(
+            connection.execute(
+                "SELECT record_bytes FROM domain_records "
+                "WHERE record_type='state-generation-completion'"
+            ).fetchone()[0]
+        )
+    finally:
+        connection.close()
+
+    assert len(rows) == 3
+    before, after, stability = [json.loads(bytes(row[1])) for row in rows]
+    before_keys = (
+        store_module._DOMAIN_ENVELOPE_KEYS
+        | store_module._RUNTIME_RECORD_CONTEXT_KEYS
+        | {"snapshot", "snapshot_identity"}
+    )
+    stability_keys = (
+        store_module._DOMAIN_ENVELOPE_KEYS
+        | store_module._RUNTIME_RECORD_CONTEXT_KEYS
+        | {
+            "before_record_identity",
+            "after_record_identity",
+            "before_snapshot_identity",
+            "after_snapshot_identity",
+            "comparison_fields",
+            "differences",
+            "stable",
+        }
+    )
+    assert set(before) == before_keys
+    assert set(after) == before_keys
+    assert set(stability) == stability_keys
+    assert before["sequence"] == 0
+    assert before["previous_record_identity"] is None
+    assert after["sequence"] == 1
+    assert after["previous_record_identity"] == rows[0][0]
+    assert stability["sequence"] == 2
+    assert stability["previous_record_identity"] == rows[1][0]
+    assert stability["before_record_identity"] == rows[0][0]
+    assert stability["after_record_identity"] == rows[1][0]
+    assert stability["comparison_fields"] == list(
+        store_module._STABILITY_COMPARISON_FIELDS
+    )
+    assert stability["differences"] == []
+    assert stability["stable"] is True
+    before_snapshot_body = {
+        key: value
+        for key, value in before["snapshot"].items()
+        if key != "snapshot_identity"
+    }
+    after_snapshot_body = {
+        key: value
+        for key, value in after["snapshot"].items()
+        if key != "snapshot_identity"
+    }
+    assert before["snapshot_identity"] == before["snapshot"]["snapshot_identity"]
+    assert after["snapshot_identity"] == after["snapshot"]["snapshot_identity"]
+    assert before["snapshot_identity"] == canonical_sha256(before_snapshot_body)
+    assert after["snapshot_identity"] == canonical_sha256(after_snapshot_body)
+    assert before["snapshot"]["stage"] == "before-execution"
+    assert after["snapshot"]["stage"] == "after-execution"
+    before_generator = before["snapshot"]["generator"]
+    frozen_generator = corpus_module._generator_contract(
+        before_generator["initial_policy_state_sha256"]
+    )
+    assert before_generator["model_config"] == {
+        key: frozen_generator[key]
+        for key in (
+            "policy",
+            "policy_hidden",
+            "value_hidden",
+            "dropout",
+            "model_init_seed",
+        )
+    }
+    assert before_generator["sampler_config"] == {
+        key: frozen_generator[key]
+        for key in (
+            "sampling",
+            "temperature",
+            "cpu_generator_seed",
+            "initial_state",
+            "candidate_colours",
+            "max_games",
+            "informative_only",
+        )
+    }
+    assert before_generator["contract_identity"] == canonical_sha256(frozen_generator)
+    assert (
+        before_generator["current_rng_state_identity"]
+        == before_generator["initial_rng_state_identity"]
+    )
+    stream_body = {
+        "schema_version": store_module._RUNTIME_STREAM_SCHEMA,
+        "stream_kind": store_module._RUNTIME_STREAM_KIND,
+        "experiment_id": before["experiment_id"],
+        "proposal_identity": before["proposal_identity"],
+        "profile_identity": before["profile_identity"],
+        "store_spec_identity": before["store_spec_identity"],
+        "plan_identity": before["plan_identity"],
+        "readiness_identity": before["readiness_identity"],
+        "authorization_identity": before["authorization_identity"],
+        "authorization_consumption_identity": before[
+            "authorization_consumption_identity"
+        ],
+        "attempt_identity": before["attempt_identity"],
+        "reservation_event_identity": before["reservation_event_identity"],
+    }
+    assert before["stream_identity"] == canonical_sha256(stream_body)
+    assert after["stream_identity"] == before["stream_identity"]
+    assert stability["stream_identity"] == before["stream_identity"]
+    assert stability["before_snapshot_identity"] == before["snapshot_identity"]
+    assert stability["after_snapshot_identity"] == after["snapshot_identity"]
+
+    completion = json.loads(completion_bytes)
+    assert completion["runtime_evidence_stream_identity"] == before["stream_identity"]
+    assert (
+        completion["resource_snapshot_before_identity"] == before["snapshot_identity"]
+    )
+    assert completion["resource_snapshot_after_identity"] == after["snapshot_identity"]
+    assert completion["resource_stability_identity"] == rows[2][0]
+
+
+def _resign_runtime_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
+    body = {key: value for key, value in snapshot.items() if key != "snapshot_identity"}
+    snapshot["snapshot_identity"] = canonical_sha256(body)
+    return snapshot
+
+
+def _after_snapshot_for_bound(bound: object) -> dict[str, Any]:
+    context = store_module._TEST_BOUND_ATTEMPT_CONTEXTS[bound]
+    snapshot = _mutable(context.resource_snapshot_before)
+    snapshot["stage"] = "after-execution"
+    snapshot["observed_at_utc"] = "2026-09-01T00:00:05Z"
+    snapshot["generator"]["current_rng_state_identity"] = _sha("after-rng")
+    return _resign_runtime_snapshot(snapshot)
+
+
+def _before_snapshot_for_active(active: object) -> dict[str, Any]:
+    active_context = store_module._TEST_ACTIVE_CONTEXTS[active]
+    store_context = store_module._TEST_STORE_CONTEXTS[active_context.store]
+    return store_module._test_resource_snapshot(
+        store_context.spec,
+        attempt_identity=active_context.attempt_identity,
+        stage="before-execution",
+        observed_at_utc=store_context.replay.events[-1]["timestamp_utc"],
+    )
+
+
+_BOUND_SNAPSHOT_IDENTITY_PATHS = (
+    ("host", "machine_identity"),
+    ("host", "python_executable_sha256"),
+    ("path_registry", "file_sha256"),
+    ("path_registry", "canonical_object_identity"),
+    ("path_registry", "resolved_path_identities", "malom_db_path"),
+    ("path_registry", "resolved_path_identities", "sanmill_training_checkout"),
+    ("path_registry", "resolved_path_identities", "classical_a_pos_output_root"),
+    ("repository", "root_identity"),
+    ("repository", "status_identity"),
+    ("repository", "implementation_files_identity"),
+    ("output_root", "canonical_path_identity"),
+    ("output_root", "root_identity"),
+    ("output_root", "volume_identity"),
+    ("output_root", "file_identity"),
+    ("output_root", "governance_database_identity"),
+    ("output_root", "artifact_namespace_identity"),
+    ("malom", "path_identity"),
+    ("malom", "manifest_file_sha256"),
+    ("malom", "manifest_sha256"),
+    ("malom", "content_sha256"),
+    ("malom", "component_metadata_identity"),
+    ("malom", "full_hash_evidence_identity"),
+    ("malom", "oracle_implementation_identity"),
+    ("sanmill", "checkout_path_identity"),
+    ("sanmill", "installation_identity"),
+    ("sanmill", "runtime_identity"),
+    ("sanmill", "binary_sha256"),
+    ("sanmill", "license_sha256"),
+    ("sanmill", "referee_implementation_identity"),
+    ("generator", "contract_identity"),
+    ("generator", "model_implementation_identity"),
+    ("generator", "encoder_implementation_identity"),
+    ("generator", "initial_policy_state_sha256"),
+    ("generator", "initial_rng_state_identity"),
+    ("generator", "current_rng_state_identity"),
+)
+
+
+@pytest.mark.parametrize("path", _BOUND_SNAPSHOT_IDENTITY_PATHS)
+def test_c5a_runtime_snapshot_rejects_every_zero_bound_identity(
+    tmp_path: Path,
+    path: tuple[str, ...],
+) -> None:
+    _fixture, _spec, store, active = _advance_test_store_to_active(tmp_path)
+    snapshot = _before_snapshot_for_active(active)
+    target: dict[str, Any] = snapshot
+    for component in path[:-1]:
+        target = target[component]
+    target[path[-1]] = "0" * 64
+    _resign_runtime_snapshot(snapshot)
+
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_preflight(
+            store,
+            active,
+            resource_snapshot_before=snapshot,
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        ((owner, field), replacement)
+        for owner, fields in (
+            ("repository", ("head_commit", "head_tree")),
+            ("sanmill", ("commit", "tree")),
+        )
+        for field in fields
+        for replacement in ("A" * 40, "a" * 39, "g" * 40, "0" * 40)
+    ],
+)
+def test_c5a_runtime_snapshot_rejects_malformed_repository_and_sanmill_oids(
+    tmp_path: Path,
+    path: tuple[str, str],
+    replacement: str,
+) -> None:
+    _fixture, _spec, store, active = _advance_test_store_to_active(tmp_path)
+    snapshot = _before_snapshot_for_active(active)
+    snapshot[path[0]][path[1]] = replacement
+    _resign_runtime_snapshot(snapshot)
+
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_preflight(
+            store,
+            active,
+            resource_snapshot_before=snapshot,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("host_preflight_identity", _sha("wrong-host-preflight")),
+        ("host_preflight_identity", "0" * 64),
+        ("state_generator_session_identity", "0" * 64),
+    ],
+)
+def test_c5a_runtime_bind_rechecks_preflight_identities_before_sqlite_write(
+    tmp_path: Path,
+    field: str,
+    replacement: str,
+) -> None:
+    _fixture, _spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    context = store_module._TEST_RUNTIME_PREFLIGHT_CONTEXTS[preflight]
+    setattr(context, field, replacement)
+
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        assert connection.execute(
+            "SELECT COUNT(*) FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime'"
+        ).fetchone() == (0,)
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        "top-missing",
+        "top-unknown",
+        "host-missing",
+        "host-unknown",
+        "host-custom-mapping",
+        "path-required-tuple",
+        "repository-allowed-set",
+        "host-nonfinite",
+        "component-count-bool",
+        "component-count-float",
+        "checkout-clean-int",
+        "cuda-initialized-int",
+        "wrong-fixed-lookup",
+        "wrong-model-config",
+        "wrong-sampler-config",
+    ],
+)
+def test_c5a_resigned_runtime_snapshot_contract_attacks_fail_closed(
+    tmp_path: Path,
+    attack: str,
+) -> None:
+    _fixture, _spec, _store, _active, bound = _advance_test_store_to_bound(tmp_path)
+    after = _after_snapshot_for_bound(bound)
+
+    if attack == "top-missing":
+        del after["repository"]
+    elif attack == "top-unknown":
+        after["attacker"] = "field"
+    elif attack == "host-missing":
+        del after["host"]["platform"]
+    elif attack == "host-unknown":
+        after["host"]["attacker"] = "field"
+    elif attack == "host-custom-mapping":
+
+        class _CustomMapping(dict[str, Any]):
+            pass
+
+        after["host"] = _CustomMapping(after["host"])
+    elif attack == "path-required-tuple":
+        after["path_registry"]["required_lookup_keys"] = tuple(
+            after["path_registry"]["required_lookup_keys"]
+        )
+    elif attack == "repository-allowed-set":
+        after["repository"]["allowed_untracked_roots"] = {"tmp"}
+    elif attack == "host-nonfinite":
+        after["host"]["available_memory_bytes"] = float("nan")
+    elif attack == "component-count-bool":
+        after["malom"]["component_count"] = True
+    elif attack == "component-count-float":
+        after["malom"]["component_count"] = float(after["malom"]["component_count"])
+    elif attack == "checkout-clean-int":
+        after["sanmill"]["checkout_clean"] = 1
+    elif attack == "cuda-initialized-int":
+        after["host"]["cuda_initialized"] = 0
+    elif attack == "wrong-fixed-lookup":
+        after["malom"]["lookup_key"] = "attacker_malom_path"
+    elif attack == "wrong-model-config":
+        after["generator"]["model_config"]["dropout"] = 0
+    elif attack == "wrong-sampler-config":
+        after["generator"]["sampler_config"]["temperature"] = 1
+    else:  # pragma: no cover - the parameter list is exhaustive
+        raise AssertionError(attack)
+    if attack not in {"repository-allowed-set", "host-nonfinite"}:
+        _resign_runtime_snapshot(after)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_completion(
+            bound,
+            resource_snapshot_after=after,
+        )
+
+
+@pytest.mark.parametrize(
+    ("path", "replacement"),
+    [
+        (("host", "machine_identity"), _sha("different-machine")),
+        (("repository", "head_commit"), "f" * 40),
+        (("output_root", "file_identity"), _sha("different-output-file")),
+        (("malom", "content_sha256"), _sha("different-malom-content")),
+        (("sanmill", "binary_sha256"), _sha("different-sanmill-binary")),
+        (("generator", "initial_rng_state_identity"), _sha("different-initial-rng")),
+    ],
+)
+def test_c5a_type_sensitive_stability_drift_cannot_issue_runtime_completion(
+    tmp_path: Path,
+    path: tuple[str, str],
+    replacement: Any,
+) -> None:
+    _fixture, _spec, _store, _active, bound = _advance_test_store_to_bound(tmp_path)
+    after = _after_snapshot_for_bound(bound)
+    after[path[0]][path[1]] = replacement
+    _resign_runtime_snapshot(after)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_completion(
+            bound,
+            resource_snapshot_after=after,
+        )
+
+
+def _rewrite_runtime_record(
+    database: Path,
+    *,
+    record_type: str,
+    payload: bytes,
+    row_stream_identity: str | None = None,
+    row_stream_kind: str | None = None,
+    row_sequence: int | None = None,
+    row_record_type: str | None = None,
+    row_previous_identity: str | None | object = Ellipsis,
+) -> None:
+    connection = sqlite3.connect(database, isolation_level=None)
+    try:
+        row = connection.execute(
+            "SELECT stream_identity, stream_kind, sequence, record_type, "
+            "previous_record_identity FROM domain_records WHERE record_type=?",
+            (record_type,),
+        ).fetchone()
+        assert row is not None
+        identity = hashlib.sha256(payload).hexdigest()
+        previous = (
+            row[4] if row_previous_identity is Ellipsis else row_previous_identity
+        )
+        connection.execute("DROP TRIGGER domain_records_reject_update")
+        connection.execute(
+            "UPDATE domain_records SET stream_identity=?, stream_kind=?, sequence=?, "
+            "record_type=?, previous_record_identity=?, record_identity=?, "
+            "record_bytes=?, size_bytes=?, record_bytes_sha256=? "
+            "WHERE record_type=?",
+            (
+                row[0] if row_stream_identity is None else row_stream_identity,
+                row[1] if row_stream_kind is None else row_stream_kind,
+                row[2] if row_sequence is None else row_sequence,
+                row[3] if row_record_type is None else row_record_type,
+                previous,
+                identity,
+                payload,
+                len(payload),
+                identity,
+                record_type,
+            ),
+        )
+        trigger = next(
+            statement
+            for statement in store_module._DDL_STATEMENTS
+            if statement.startswith("CREATE TRIGGER domain_records_reject_update")
+        )
+        connection.execute(trigger)
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize(
+    "attack",
+    [
+        "bom",
+        "duplicate-key",
+        "nan",
+        "noncanonical",
+        "resigned-unstable",
+        "old-v1",
+        "unknown-type",
+        "wrong-stream-kind",
+        "gap",
+        "wrong-prev",
+        "cross-stream",
+    ],
+)
+def test_c5a_runtime_stream_corruption_and_resigning_fail_closed(
+    tmp_path: Path,
+    attack: str,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    fixture, spec, store, pending = prepared[0], prepared[1], prepared[2], prepared[5]
+    store_module._test_commit_state_generation(store, pending)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        original = bytes(
+            connection.execute(
+                "SELECT record_bytes FROM domain_records "
+                "WHERE record_type='state-generation-resource-stability'"
+            ).fetchone()[0]
+        )
+    finally:
+        connection.close()
+    stability = json.loads(original)
+    rewrite: dict[str, Any] = {}
+    if attack == "bom":
+        payload = b"\xef\xbb\xbf" + original
+    elif attack == "duplicate-key":
+        payload = original[:-1] + b',"stable":true}'
+    elif attack == "nan":
+        payload = original[:-1] + b',"attacker":NaN}'
+    elif attack == "noncanonical":
+        payload = json.dumps(stability, indent=2, sort_keys=True).encode("utf-8")
+    elif attack == "resigned-unstable":
+        stability["stable"] = False
+        stability["differences"] = ["repository.head_commit"]
+        payload = canonical_json_bytes(stability)
+    elif attack == "old-v1":
+        stability["schema_version"] = (
+            "nmm.classical-a-pos-state-generation-resource-stability.v0"
+        )
+        payload = canonical_json_bytes(stability)
+    elif attack == "unknown-type":
+        stability["record_type"] = "teacher-label-reserved"
+        stability["schema_version"] = "nmm.classical-a-pos-teacher-label.v1"
+        payload = canonical_json_bytes(stability)
+        rewrite["row_record_type"] = "teacher-label-reserved"
+    elif attack == "wrong-stream-kind":
+        stability["stream_kind"] = "attacker-runtime"
+        payload = canonical_json_bytes(stability)
+        rewrite["row_stream_kind"] = "attacker-runtime"
+    elif attack == "gap":
+        stability["sequence"] = 4
+        payload = canonical_json_bytes(stability)
+        rewrite["row_sequence"] = 4
+    elif attack == "wrong-prev":
+        stability["previous_record_identity"] = _sha("wrong-runtime-prev")
+        payload = canonical_json_bytes(stability)
+        rewrite["row_previous_identity"] = stability["previous_record_identity"]
+    elif attack == "cross-stream":
+        stability["stream_identity"] = _sha("cross-runtime-stream")
+        payload = canonical_json_bytes(stability)
+        rewrite["row_stream_identity"] = stability["stream_identity"]
+    else:  # pragma: no cover - the parameter list is exhaustive
+        raise AssertionError(attack)
+    _rewrite_runtime_record(
+        database,
+        record_type="state-generation-resource-stability",
+        payload=payload,
+        **rewrite,
+    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+
+
+def test_c5a_runtime_stream_duplicate_identity_is_rejected_by_sqlite(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    store = prepared[2]
+    pending = prepared[5]
+    store_module._test_commit_state_generation(store, pending)
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database, isolation_level=None)
+    try:
+        row = connection.execute(
+            "SELECT stream_kind, record_type, record_identity, record_bytes, "
+            "size_bytes, record_bytes_sha256 FROM domain_records "
+            "WHERE record_type='state-generation-resource-before'"
+        ).fetchone()
+        assert row is not None
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO domain_records(stream_identity, stream_kind, sequence, "
+                "record_type, previous_record_identity, record_identity, "
+                "record_bytes, size_bytes, record_bytes_sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    _sha("duplicate-runtime-stream"),
+                    row[0],
+                    0,
+                    row[1],
+                    None,
+                    row[2],
+                    row[3],
+                    row[4],
+                    row[5],
+                ),
+            )
+    finally:
+        connection.close()
+
+
+@pytest.mark.parametrize("artifact", ["spec", "meta", "completion", "freeze"])
+def test_c5a_resigned_v1_store_artifacts_fail_closed(
+    tmp_path: Path,
+    artifact: str,
+) -> None:
+    if artifact in {"completion", "freeze"}:
+        prepared = _prepare_valid_state_commit(tmp_path)
+        fixture, spec, store, pending = (
+            prepared[0],
+            prepared[1],
+            prepared[2],
+            prepared[5],
+        )
+        completion = store_module._test_commit_state_generation(store, pending)
+        if artifact == "freeze":
+            store_module._test_commit_state_freeze(
+                store,
+                completion,
+                timestamp_utc="2026-09-01T00:00:06Z",
+            )
+    else:
+        fixture, spec, _store = _initialize_test_store(tmp_path)
+    if artifact == "spec":
+        raw_spec = _mutable(spec)
+        raw_spec["schema_version"] = "nmm.classical-a-pos-governance-store-spec.v1"
+        body = {key: value for key, value in raw_spec.items() if key != "spec_identity"}
+        raw_spec["spec_identity"] = canonical_sha256(body)
+        old_spec = GovernanceStoreSpec(raw_spec)
+        with pytest.raises(GovernanceStoreContractError):
+            store_module._test_open_governance_store(
+                tmp_path,
+                old_spec,
+                plan_permit=fixture.plan_permit,
+                authorization_permit=fixture.authorization_permit,
+            )
+        return
+
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    if artifact == "meta":
+        connection = sqlite3.connect(database, isolation_level=None)
+        try:
+            payload = bytes(
+                connection.execute(
+                    "SELECT value FROM meta WHERE key='store_meta'"
+                ).fetchone()[0]
+            )
+            meta = json.loads(payload)
+            meta["schema_version"] = "nmm.classical-a-pos-governance-store-meta.v1"
+            connection.execute("DROP TRIGGER meta_reject_update")
+            connection.execute(
+                "UPDATE meta SET value=? WHERE key='store_meta'",
+                (canonical_json_bytes(meta),),
+            )
+            trigger = next(
+                statement
+                for statement in store_module._DDL_STATEMENTS
+                if statement.startswith("CREATE TRIGGER meta_reject_update")
+            )
+            connection.execute(trigger)
+        finally:
+            connection.close()
+    else:
+        record_type = (
+            "state-generation-completion"
+            if artifact == "completion"
+            else "state-freeze"
+        )
+        connection = sqlite3.connect(database)
+        try:
+            payload = bytes(
+                connection.execute(
+                    "SELECT record_bytes FROM domain_records WHERE record_type=?",
+                    (record_type,),
+                ).fetchone()[0]
+            )
+        finally:
+            connection.close()
+        record = json.loads(payload)
+        record["schema_version"] = (
+            "nmm.classical-a-pos-state-generation-completion.v1"
+            if artifact == "completion"
+            else "nmm.classical-a-pos-durable-state-freeze.v1"
+        )
+        resigned_v1 = canonical_json_bytes(record)
+        _rewrite_runtime_record(
+            database,
+            record_type=record_type,
+            payload=resigned_v1,
+        )
+        connection = store_module._open_read_connection(database)
+        try:
+            with pytest.raises(GovernanceStoreContractError):
+                store_module._verify_blob_tables(connection)
+        finally:
+            connection.close()
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+
+
+def test_c5a_running_store_reopen_fails_closed(tmp_path: Path) -> None:
+    fixture, spec, _store, _active = _advance_test_store_to_active(tmp_path)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_open_governance_store(
+            tmp_path,
+            spec,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
+        )
+
+
+def test_c5a_runtime_bind_failure_spends_preflight_and_active_without_rows(
+    tmp_path: Path,
+) -> None:
+    _fixture, _spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    lock = sqlite3.connect(database, timeout=0, isolation_level=None)
+    try:
+        lock.execute("BEGIN IMMEDIATE")
+        with pytest.raises(GovernanceStoreContractError):
+            store_module._test_bind_state_generation_attempt(
+                preflight,
+                store,
+                active,
+            )
+    finally:
+        lock.execute("ROLLBACK")
+        lock.close()
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(
+            preflight,
+            store,
+            active,
+        )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_preflight(
+            store,
+            active,
+        )
+    connection = sqlite3.connect(database)
+    try:
+        count = connection.execute(
+            "SELECT COUNT(*) FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime'"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert count == 0
+
+
+def test_c5a_runtime_before_rejects_reused_and_cross_store_operation_permits(
+    tmp_path: Path,
+) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    first_root.mkdir()
+    second_root.mkdir()
+    _first_fixture, _first_spec, first_store, first_permit = (
+        _advance_test_store_to_reserved(first_root)
+    )
+    _second_fixture, _second_spec, second_store, _second_permit = (
+        _advance_test_store_to_reserved(second_root)
+    )
+
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_begin_state_generation_attempt(
+            second_store,
+            first_permit,
+        )
+    store_module._test_begin_state_generation_attempt(first_store, first_permit)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_begin_state_generation_attempt(first_store, first_permit)
+
+
+def test_c5a_runtime_bind_rejects_cross_store_wrong_active_reuse_and_forgery(
+    tmp_path: Path,
+) -> None:
+    first_root = tmp_path / "first-bind"
+    second_root = tmp_path / "second-bind"
+    first_root.mkdir()
+    second_root.mkdir()
+    _first_fixture, _first_spec, first_store, first_active = (
+        _advance_test_store_to_active(first_root)
+    )
+    _second_fixture, _second_spec, second_store, second_active = (
+        _advance_test_store_to_active(second_root)
+    )
+    first_preflight = store_module._issue_test_state_generation_runtime_preflight(
+        first_store,
+        first_active,
+    )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(
+            first_preflight,
+            second_store,
+            second_active,
+        )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt({}, first_store, first_active)
+    rogue = object.__new__(store_module._TestStateGenerationRuntimePreflight)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(
+            rogue, first_store, first_active
+        )
+
+    second_preflight = store_module._issue_test_state_generation_runtime_preflight(
+        second_store,
+        second_active,
+    )
+    bound = store_module._test_bind_state_generation_attempt(
+        second_preflight,
+        second_store,
+        second_active,
+    )
+    assert type(bound) is store_module._TestRuntimeBoundStateGenerationAttempt
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(
+            second_preflight,
+            second_store,
+            second_active,
+        )
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_preflight(
+            second_store,
+            second_active,
+        )
+
+
+def test_c5a_unbound_active_cannot_issue_completion_or_prepare_artifacts(
+    tmp_path: Path,
+) -> None:
+    _fixture, _spec, _store, active = _advance_test_store_to_active(tmp_path)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._issue_test_state_generation_runtime_completion(active)
+
+    other_root = tmp_path / "bound-runtime"
+    other_root.mkdir()
+    _other_fixture, _other_spec, _other_store, _other_active, other_bound = (
+        _advance_test_store_to_bound(other_root)
+    )
+    runtime_completion = store_module._issue_test_state_generation_runtime_completion(
+        other_bound
+    )
+    verifier_identity = _sha("unbound-active-verifier")
+    inventory = _test_inventory_binding(verifier_identity)
+    attempt_identity = store_module._TEST_ACTIVE_CONTEXTS[active].attempt_identity
+    strict_referee = _test_strict_referee_binding(attempt_identity)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_prepare_state_generation_commit(
+            active,
+            inventory,
+            strict_referee,
+            runtime_completion,
+            source_games_path=tmp_path / "must-not-read-source.jsonl",
+            state_split_path=tmp_path / "must-not-read-state.jsonl",
+            singleton_ledger_path=tmp_path / "must-not-read-singletons.json",
+            timestamp_utc="2026-09-01T00:00:05Z",
+            active_seconds=0,
+        )
+
+
+def test_c5a_runtime_bind_rejects_preexisting_runtime_row_and_is_one_shot(
+    tmp_path: Path,
+) -> None:
+    _fixture, _spec, store, active = _advance_test_store_to_active(tmp_path)
+    preflight = store_module._issue_test_state_generation_runtime_preflight(
+        store,
+        active,
+    )
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    context = store_module._TEST_ACTIVE_CONTEXTS[active]
+    payload = canonical_json_bytes(
+        {
+            "schema_version": (
+                "nmm.classical-a-pos-state-generation-resource-before.v1"
+            ),
+            "stream_identity": _sha("preexisting-runtime-stream"),
+            "stream_kind": "state-generation-runtime",
+            "sequence": 0,
+            "record_type": "state-generation-resource-before",
+            "previous_record_identity": None,
+            "attempt_identity": context.attempt_identity,
+        }
+    )
+    identity = hashlib.sha256(payload).hexdigest()
+    connection = sqlite3.connect(database, isolation_level=None)
+    try:
+        connection.execute(
+            "INSERT INTO domain_records(stream_identity, stream_kind, sequence, "
+            "record_type, previous_record_identity, record_identity, record_bytes, "
+            "size_bytes, record_bytes_sha256) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                _sha("preexisting-runtime-stream"),
+                "state-generation-runtime",
+                0,
+                "state-generation-resource-before",
+                None,
+                identity,
+                payload,
+                len(payload),
+                identity,
+            ),
+        )
+    finally:
+        connection.close()
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_bind_state_generation_attempt(preflight, store, active)
+
+
+def test_c5a_completion_lock_failure_has_no_partial_after_or_stability_and_no_retry(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    store = prepared[2]
+    pending = prepared[5]
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    lock = sqlite3.connect(database, timeout=0, isolation_level=None)
+    try:
+        lock.execute("BEGIN IMMEDIATE")
+        with pytest.raises(GovernanceStoreContractError):
+            store_module._test_commit_state_generation(store, pending)
+    finally:
+        lock.execute("ROLLBACK")
+        lock.close()
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_commit_state_generation(store, pending)
+    connection = sqlite3.connect(database)
+    try:
+        runtime_rows = connection.execute(
+            "SELECT sequence, record_type FROM domain_records "
+            "WHERE stream_kind='state-generation-runtime' ORDER BY sequence"
+        ).fetchall()
+        completion_count = connection.execute(
+            "SELECT COUNT(*) FROM domain_records "
+            "WHERE record_type='state-generation-completion'"
+        ).fetchone()[0]
+        controller_count = connection.execute(
+            "SELECT COUNT(*) FROM domain_records WHERE stream_kind='controller'"
+        ).fetchone()[0]
+        artifact_count = connection.execute(
+            "SELECT COUNT(*) FROM artifacts"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+    assert runtime_rows == [
+        (0, "state-generation-resource-before"),
+    ]
+    assert completion_count == 0
+    assert controller_count == 0
+    assert artifact_count == 0
+
+
+def test_c5a_restore_durable_state_freeze_reissues_only_from_frozen_store(
+    tmp_path: Path,
+) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    fixture, spec, store, pending = prepared[0], prepared[1], prepared[2], prepared[5]
+    completion = store_module._test_commit_state_generation(store, pending)
+    original = store_module._test_commit_state_freeze(
+        store,
+        completion,
+        timestamp_utc="2026-09-01T00:00:06Z",
+    )
+    expected_state_identity = store_module._test_verify_durable_state_freeze(
+        store,
+        original,
+    )
+    database = tmp_path / "governance" / "classical-a-pos-controller.sqlite3"
+    connection = sqlite3.connect(database)
+    try:
+        completion_record = json.loads(
+            bytes(
+                connection.execute(
+                    "SELECT record_bytes FROM domain_records "
+                    "WHERE record_type='state-generation-completion'"
+                ).fetchone()[0]
+            )
+        )
+        freeze_record = json.loads(
+            bytes(
+                connection.execute(
+                    "SELECT record_bytes FROM domain_records "
+                    "WHERE record_type='state-freeze'"
+                ).fetchone()[0]
+            )
+        )
+    finally:
+        connection.close()
+    assert (
+        freeze_record["runtime_evidence_stream_identity"]
+        == completion_record["runtime_evidence_stream_identity"]
+    )
+    assert (
+        freeze_record["resource_stability_identity"]
+        == completion_record["resource_stability_identity"]
+    )
+    reopened = store_module._test_open_governance_store(
+        tmp_path,
+        spec,
+        plan_permit=fixture.plan_permit,
+        authorization_permit=fixture.authorization_permit,
+    )
+    restored = store_module._test_restore_durable_state_freeze(reopened)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module.restore_durable_state_freeze(reopened)
+    assert (
+        store_module._test_verify_durable_state_freeze(reopened, restored)
+        == expected_state_identity
+    )
+
+
+def test_c5a_restore_rejects_generated_but_not_frozen_store(tmp_path: Path) -> None:
+    prepared = _prepare_valid_state_commit(tmp_path)
+    store = prepared[2]
+    pending = prepared[5]
+    store_module._test_commit_state_generation(store, pending)
+    with pytest.raises(GovernanceStoreContractError):
+        store_module._test_restore_durable_state_freeze(store)
 
 
 def test_incomplete_artifact_rows_cannot_appear_before_completion(
@@ -2402,8 +4092,8 @@ def test_incomplete_artifact_rows_cannot_appear_before_completion(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2415,8 +4105,8 @@ def test_corrupt_database_header_fails_closed(tmp_path: Path) -> None:
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2448,8 +4138,8 @@ def test_sqlite_dynamic_type_spoof_is_wrapped_as_store_contract_failure(
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2470,11 +4160,8 @@ def test_existing_governance_namespace_is_not_reused_or_modified(
         store_module._test_initialize_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
-            bootstrap_ledger_bytes=governance.encode_governance_ledger(
-                fixture.events[:3]
-            ),
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
     assert sentinel.read_bytes() == b"preserve-me"
     assert not (namespace / "classical-a-pos-controller.sqlite3").exists()
@@ -2488,8 +4175,8 @@ def test_governance_database_hardlink_alias_fails_closed(tmp_path: Path) -> None
         store_module._test_open_governance_store(
             tmp_path,
             spec,
-            plan=fixture.plan,
-            authorization=fixture.authorization,
+            plan_permit=fixture.plan_permit,
+            authorization_permit=fixture.authorization_permit,
         )
 
 
@@ -2501,7 +4188,7 @@ def test_state_artifact_paths_must_be_unaliased_plan_owned_files(
     tmp_path: Path,
     path_attack: str,
 ) -> None:
-    _fixture, _spec, _store, active = _advance_test_store_to_active(tmp_path)
+    _fixture, _spec, _store, active, bound = _advance_test_store_to_bound(tmp_path)
     verifier_identity = _sha("live-a-pos-verifier")
     inventory = _test_inventory_binding(verifier_identity)
     attempt_identity = store_module._TEST_ACTIVE_CONTEXTS[active].attempt_identity
@@ -2530,11 +4217,15 @@ def test_state_artifact_paths_must_be_unaliased_plan_owned_files(
     else:
         (tmp_path / "alias-segment").mkdir()
         source_path = tmp_path / "alias-segment" / ".." / source_path.name
+    runtime_completion = store_module._issue_test_state_generation_runtime_completion(
+        bound
+    )
     with pytest.raises(GovernanceStoreContractError):
         store_module._test_prepare_state_generation_commit(
-            active,
+            bound,
             inventory,
             strict_referee,
+            runtime_completion,
             source_games_path=source_path,
             state_split_path=state_path,
             singleton_ledger_path=singleton_path,
@@ -2594,6 +4285,7 @@ def test_public_store_apis_reject_test_domain_mappings_and_rogue_capabilities(
             active,
             inventory,
             strict_referee,
+            object(),
             source_games_path=source_path,
             state_split_path=state_path,
             singleton_ledger_path=singleton_path,

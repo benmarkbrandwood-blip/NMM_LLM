@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import inspect
 import json
 import pickle
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import fields, replace
 from typing import Any
 
 import pytest
@@ -1803,3 +1804,353 @@ def test_prepared_event_bytes_are_registry_bound_and_domain_separated() -> None:
         governance.prepared_governance_event_bytes(pending)
     with pytest.raises(GovernanceContractError):
         governance.prepared_governance_event_bytes(payload)
+
+
+def test_production_store_bootstrap_private_boundary_rejects_unissued_permits() -> None:
+    fixture = _test_fixture()
+    spec_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+            "plan_identity": fixture.plan["plan_identity"],
+        }
+    )
+    assert callable(governance._claim_production_store_bootstrap)
+    assert callable(governance._inspect_production_store_open_context)
+    assert tuple(
+        inspect.signature(governance._claim_production_store_bootstrap).parameters
+    ) == ("plan_permit", "authorization_permit", "store_spec_identity")
+    open_parameters = inspect.signature(
+        governance._inspect_production_store_open_context
+    ).parameters
+    assert tuple(open_parameters) == (
+        "plan_permit",
+        "authorization_permit",
+        "store_spec_identity",
+    )
+    assert open_parameters["store_spec_identity"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert not hasattr(governance, "issue_production_runtime_plan_permit")
+    assert not hasattr(governance, "issue_production_authorization_permit")
+
+    with pytest.raises(TypeError):
+
+        class _ForbiddenBootstrapClaimSubclass(
+            governance._ProductionStoreBootstrapClaim
+        ):
+            pass
+
+    with pytest.raises(TypeError):
+        governance._inspect_production_store_open_context(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+        )
+
+    with pytest.raises(GovernanceContractError):
+        governance._claim_production_store_bootstrap(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+    with pytest.raises(GovernanceContractError):
+        governance._inspect_production_store_open_context(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+    rogue_plan = object.__new__(ProductionRuntimePlanPermit)
+    rogue_authorization = object.__new__(ProductionAuthorizationPermit)
+    with pytest.raises(GovernanceContractError):
+        governance._claim_production_store_bootstrap(
+            rogue_plan,
+            rogue_authorization,
+            store_spec_identity=spec_identity,
+        )
+    with pytest.raises(GovernanceContractError):
+        governance._inspect_production_store_open_context(
+            rogue_plan,
+            rogue_authorization,
+            store_spec_identity=spec_identity,
+        )
+
+
+@pytest.mark.parametrize(
+    "claim_identity",
+    ["0" * 64, "malformed", "A" * 64],
+)
+def test_production_authorization_consumption_rejects_unbound_store_claim_identity(
+    claim_identity: str,
+) -> None:
+    fixture = _test_fixture()
+    plan_permit = ProductionRuntimePlanPermit(governance._PRODUCTION_PLAN_TOKEN)
+    authorization_permit = ProductionAuthorizationPermit(
+        governance._PRODUCTION_AUTHORIZATION_TOKEN
+    )
+    governance._PRODUCTION_PLAN_CONTEXTS[plan_permit] = governance._PlanPermitContext(
+        plan=fixture.plan,
+        store_claim_identity=claim_identity,
+    )
+    governance._PRODUCTION_AUTH_CONTEXTS[authorization_permit] = (
+        governance._AuthorizationPermitContext(
+            plan_identity=fixture.plan["plan_identity"],
+            authorization=fixture.authorization,
+            store_claim_identity=claim_identity,
+        )
+    )
+    governance._PRODUCTION_STORE_PERMIT_PAIRS[plan_permit] = authorization_permit
+    replay = _replay_prefix(fixture, "authorization_registered")
+
+    with pytest.raises(GovernanceContractError):
+        prepare_authorization_consumption(
+            plan_permit,
+            authorization_permit,
+            replay,
+            timestamp_utc="2026-09-01T00:00:03Z",
+        )
+
+
+def test_internal_store_bootstrap_claim_is_one_use_and_uses_issued_at_genesis() -> None:
+    fixture = _test_fixture()
+    spec_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+            "plan_identity": fixture.plan["plan_identity"],
+        }
+    )
+    claim = governance._test_claim_store_bootstrap(
+        fixture.plan_permit,
+        fixture.authorization_permit,
+        store_spec_identity=spec_identity,
+    )
+    assert not hasattr(claim, "__dict__")
+    with pytest.raises(TypeError):
+        copy.copy(claim)
+    with pytest.raises(TypeError):
+        pickle.dumps(claim)
+    registered = governance._TEST_STORE_BOOTSTRAP_CONTEXTS[claim]
+    assert {field.name for field in fields(registered)} == {
+        "plan",
+        "authorization",
+        "store_spec_identity",
+        "bootstrap_ledger_bytes",
+        "bootstrap_ledger_sha256",
+        "claim_identity",
+        "spent",
+    }
+    assert registered.spent is False
+    assert (
+        registered.bootstrap_ledger_sha256
+        == hashlib.sha256(registered.bootstrap_ledger_bytes).hexdigest()
+    )
+    expected_claim_body = {
+        "schema_version": governance._PRODUCTION_STORE_BOOTSTRAP_CLAIM_SCHEMA,
+        "domain": "internal-test",
+        "plan_identity": fixture.plan["plan_identity"],
+        "readiness_identity": fixture.authorization["readiness_identity"],
+        "authorization_identity": fixture.authorization["authorization_identity"],
+        "store_spec_identity": spec_identity,
+        "bootstrap_ledger_sha256": registered.bootstrap_ledger_sha256,
+    }
+    assert (
+        governance._PRODUCTION_STORE_BOOTSTRAP_CLAIM_SCHEMA
+        == "nmm.classical-a-pos-production-store-bootstrap-claim.v1"
+    )
+    assert registered.claim_identity == canonical_sha256(expected_claim_body)
+    plan_context = governance._TEST_PLAN_CONTEXTS[fixture.plan_permit]
+    authorization_context = governance._TEST_AUTH_CONTEXTS[fixture.authorization_permit]
+    assert {field.name for field in fields(plan_context)} == {
+        "plan",
+        "spent",
+        "store_claim_identity",
+    }
+    assert {field.name for field in fields(authorization_context)} == {
+        "plan_identity",
+        "authorization",
+        "spent",
+        "store_claim_identity",
+    }
+    assert not hasattr(plan_context, "claimed_store_spec_identity")
+    assert not hasattr(authorization_context, "claimed_store_spec_identity")
+    assert plan_context.store_claim_identity == registered.claim_identity
+    assert authorization_context.store_claim_identity == registered.claim_identity
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=canonical_sha256(
+                {
+                    "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+                    "plan_identity": fixture.plan["plan_identity"],
+                    "different": True,
+                }
+            ),
+        )
+    context = governance._test_consume_store_bootstrap_claim(claim)
+    decoded = decode_governance_ledger(context.bootstrap_ledger_bytes)
+    assert encode_governance_ledger(decoded) == context.bootstrap_ledger_bytes
+    assert context.plan == fixture.plan
+    assert context.authorization == fixture.authorization
+    assert context.store_spec_identity == spec_identity
+    assert [event["event_type"] for event in decoded] == [
+        "plan_frozen",
+        "readiness_frozen",
+        "authorization_registered",
+    ]
+    assert {event["timestamp_utc"] for event in decoded} == {
+        fixture.authorization["issued_at_utc"]
+    }
+    replay = replay_governance_ledger(
+        decoded,
+        plan=context.plan,
+        authorization=context.authorization,
+    )
+    assert replay.state == "authorized_unconsumed"
+    assert registered.spent is True
+
+    with pytest.raises(GovernanceContractError):
+        governance._test_consume_store_bootstrap_claim(claim)
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            fixture.plan_permit,
+            fixture.authorization_permit,
+            store_spec_identity=canonical_sha256(
+                {
+                    "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+                    "plan_identity": fixture.plan["plan_identity"],
+                    "different": True,
+                }
+            ),
+        )
+
+
+def test_internal_store_bootstrap_claim_rejects_cross_pair_plan_and_authorization() -> (
+    None
+):
+    first = _test_fixture()
+    second = _test_fixture()
+    spec_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+            "plan_identity": first.plan["plan_identity"],
+        }
+    )
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            first.plan_permit,
+            second.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+    with pytest.raises(GovernanceContractError):
+        governance._test_claim_store_bootstrap(
+            second.plan_permit,
+            first.authorization_permit,
+            store_spec_identity=spec_identity,
+        )
+
+
+def test_internal_store_open_context_is_registry_bound_and_not_a_raw_record_seam() -> (
+    None
+):
+    fixture = _test_fixture()
+    spec_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+            "plan_identity": fixture.plan["plan_identity"],
+        }
+    )
+    claim = governance._test_claim_store_bootstrap(
+        fixture.plan_permit,
+        fixture.authorization_permit,
+        store_spec_identity=spec_identity,
+    )
+    governance._test_consume_store_bootstrap_claim(claim)
+    del governance._TEST_STORE_BOOTSTRAP_CONTEXTS[claim]
+    del governance._TEST_STORE_CLAIMS_BY_PLAN[fixture.plan_permit]
+    context = governance._test_inspect_store_open_context(
+        fixture.plan_permit,
+        fixture.authorization_permit,
+        store_spec_identity=spec_identity,
+    )
+    assert {field.name for field in fields(context)} == {
+        "plan",
+        "authorization",
+        "store_spec_identity",
+        "open_context_identity",
+    }
+    assert context.plan == fixture.plan
+    assert context.authorization == fixture.authorization
+    assert context.store_spec_identity == spec_identity
+    expected_open_body = {
+        "schema_version": governance._PRODUCTION_STORE_OPEN_CONTEXT_SCHEMA,
+        "domain": "internal-test",
+        "plan_identity": fixture.plan["plan_identity"],
+        "readiness_identity": fixture.authorization["readiness_identity"],
+        "authorization_identity": fixture.authorization["authorization_identity"],
+        "store_spec_identity": spec_identity,
+    }
+    assert (
+        governance._PRODUCTION_STORE_OPEN_CONTEXT_SCHEMA
+        == "nmm.classical-a-pos-production-store-open-context.v1"
+    )
+    assert context.open_context_identity == canonical_sha256(expected_open_body)
+    with pytest.raises(GovernanceContractError):
+        governance._test_inspect_store_open_context(
+            fixture.plan,
+            fixture.authorization,
+            store_spec_identity=spec_identity,
+        )
+
+
+@pytest.mark.parametrize("attack", ["missing-genesis", "extra-event"])
+def test_resigned_bootstrap_claim_requires_exact_three_event_genesis(
+    attack: str,
+) -> None:
+    fixture = _test_fixture()
+    spec_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-test-store-spec.v1",
+            "plan_identity": fixture.plan["plan_identity"],
+        }
+    )
+    claim = governance._test_claim_store_bootstrap(
+        fixture.plan_permit,
+        fixture.authorization_permit,
+        store_spec_identity=spec_identity,
+    )
+    registered = governance._TEST_STORE_BOOTSTRAP_CONTEXTS[claim]
+    decoded = list(decode_governance_ledger(registered.bootstrap_ledger_bytes))
+    if attack == "missing-genesis":
+        tampered_events = decoded[:2]
+    else:
+        tampered_events = [*decoded, fixture.events[3]]
+    tampered_bytes = encode_governance_ledger(tampered_events)
+    tampered_sha = hashlib.sha256(tampered_bytes).hexdigest()
+    tampered_claim_identity = canonical_sha256(
+        {
+            "schema_version": governance._PRODUCTION_STORE_BOOTSTRAP_CLAIM_SCHEMA,
+            "domain": "internal-test",
+            "plan_identity": fixture.plan["plan_identity"],
+            "readiness_identity": fixture.authorization["readiness_identity"],
+            "authorization_identity": fixture.authorization["authorization_identity"],
+            "store_spec_identity": spec_identity,
+            "bootstrap_ledger_sha256": tampered_sha,
+        }
+    )
+    governance._TEST_STORE_BOOTSTRAP_CONTEXTS[claim] = replace(
+        registered,
+        bootstrap_ledger_bytes=tampered_bytes,
+        bootstrap_ledger_sha256=tampered_sha,
+        claim_identity=tampered_claim_identity,
+    )
+    with pytest.raises(GovernanceContractError):
+        governance._test_consume_store_bootstrap_claim(claim)
