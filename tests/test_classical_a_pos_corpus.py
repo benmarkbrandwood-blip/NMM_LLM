@@ -18,6 +18,7 @@ from learned_ai.training.classical_a_pos_corpus import (
     _load_frozen_corpus,
     load_frozen_corpus,
     seal_singleton_ledger,
+    state_split_artifact_identity,
 )
 from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
 
@@ -40,6 +41,37 @@ MINI_LAYOUT = CorpusLayout(
 
 def _sha(char: str) -> str:
     return char * 64
+
+
+def test_state_split_artifact_identity_is_public_and_order_sensitive() -> None:
+    identities = (_sha("1"), _sha("2"))
+    split_identity = _sha("3")
+    verifier_identity = _sha("4")
+    expected = canonical_sha256(
+        {
+            "schema_version": corpus_module.STATE_SPLIT_ARTIFACT_SCHEMA,
+            "state_record_schema": corpus_module.STATE_RECORD_SCHEMA,
+            "state_record_identities": list(identities),
+            "split_identity": split_identity,
+            "a_pos_verifier_identity": verifier_identity,
+        }
+    )
+    assert (
+        state_split_artifact_identity(
+            state_record_identities=identities,
+            split_identity=split_identity,
+            verifier_identity=verifier_identity,
+        )
+        == expected
+    )
+    assert (
+        state_split_artifact_identity(
+            state_record_identities=tuple(reversed(identities)),
+            split_identity=split_identity,
+            verifier_identity=verifier_identity,
+        )
+        != expected
+    )
 
 
 def _source() -> dict:

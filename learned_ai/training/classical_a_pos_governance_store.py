@@ -1,0 +1,4521 @@
+"""Durable SQLite foundation for classical ``A_pos`` state generation.
+
+The public production surface is intentionally non-launchable in C4a: no
+production runtime-plan issuer, positional-inventory issuer, strict-referee
+issuer, or runtime-provenance issuer exists.  The implementation freezes the single-file SQLite
+contract and exercises it through strictly separate internal-test
+capabilities.  SQLite ``FULL`` synchronous durability is the declared process
+boundary on the pinned Windows host; this module does not claim directory
+fsync, resistance to an administrator, or protection from hardware failure.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import sqlite3
+import stat
+import weakref
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+from types import MappingProxyType
+from typing import Any
+
+from game.board import BoardState
+from game.rules import get_all_legal_moves, get_game_phase, terminal_result
+from learned_ai.evaluation.sanmill_uci import (
+    EXPECTED_RULES_IDENTITY_SHA256,
+    SanmillBridgeError,
+    UciPositionState,
+    project_stable_sanmill_fen,
+)
+from learned_ai.training import classical_a_pos_governance as _governance
+from learned_ai.training.classical_a_pos_corpus import (
+    FROZEN_CORPUS_LAYOUT,
+    SINGLETON_LEDGER_SCHEMA,
+    STATE_RECORD_SCHEMA,
+    state_split_artifact_identity,
+)
+from learned_ai.training.classical_a_pos_governance import (
+    ConsumedAuthorizationPermit,
+    GovernanceReplay,
+    PendingAuthorizationConsumption,
+    PendingOperationReservation,
+    ProductionAuthorizationPermit,
+    ProductionOperationPermit,
+    ProductionRuntimePlanPermit,
+    RuntimePlanRecord,
+    SingleUseAuthorizationRecord,
+    build_state_frozen_event,
+    build_state_generation_completed_event,
+    confirm_authorization_consumption,
+    confirm_operation_reservation,
+    decode_governance_ledger,
+    encode_governance_ledger,
+    prepared_governance_event_bytes,
+    replay_governance_ledger,
+    require_production_operation_permit,
+    verify_runtime_plan,
+    verify_single_use_authorization,
+)
+from learned_ai.training.run_contract import canonical_json_bytes, canonical_sha256
+from learned_ai.training.sanmill_referee import (
+    TRAINING_REFEREE_FORMAT,
+    TRAINING_REFEREE_PROFILE,
+    TRAINING_REFEREE_SEMANTIC_DIGEST,
+    TRAINING_REPETITION_OBSERVATION,
+    nmm_move_actions,
+)
+
+__all__ = (
+    "GovernanceStoreContractError",
+    "GovernanceStoreSpec",
+    "DurableGovernanceStore",
+    "ProductionAPosInventoryBinding",
+    "ProductionStrictRefereeBinding",
+    "ActiveStateGenerationAttempt",
+    "PendingStateGenerationCommit",
+    "ConfirmedStateGenerationCompletion",
+    "DurableStateFreezeBinding",
+    "build_governance_store_spec",
+    "initialize_governance_store",
+    "open_governance_store",
+    "commit_authorization_consumption",
+    "commit_operation_reservation",
+    "begin_state_generation_attempt",
+    "prepare_state_generation_commit",
+    "commit_state_generation",
+    "commit_state_freeze",
+    "verify_durable_state_freeze",
+)
+
+_SPEC_SCHEMA = "nmm.classical-a-pos-governance-store-spec.v1"
+_STORE_META_SCHEMA = "nmm.classical-a-pos-governance-store-meta.v1"
+_SOURCE_GAME_SCHEMA = "nmm.classical-a-pos-source-game.v2"
+_COMPLETION_SCHEMA = "nmm.classical-a-pos-state-generation-completion.v1"
+_FREEZE_RECEIPT_SCHEMA = "nmm.classical-a-pos-durable-state-freeze.v1"
+_CONTROLLER_STREAM_KIND = "controller"
+_REPETITION_DRAW_OUTCOME = (
+    "drawThreefoldRepetition",
+    "draw_threefold_repetition",
+)
+_RULES_DRAW_OUTCOMES = frozenset(
+    {
+        ("drawFiftyMoveLegacy", "draw_fifty_move_legacy"),
+        ("drawFullBoard", "draw_full_board"),
+        ("drawStalemateCondition", "draw_stalemate_condition"),
+        ("drawFiftyMove", "draw_fifty_move"),
+        ("drawEndgameFiftyMove", "draw_endgame_fifty_move"),
+    }
+)
+_RULES_WIN_OUTCOME_BY_LOCAL_REASON = {
+    "fewer-than-three": ("loseFewerThanThree", "lose_fewer_than_three"),
+    "no-legal-move": ("loseNoLegalMoves", "lose_no_legal_moves"),
+}
+_EXPERIMENT_ID = "classical-a-pos-offline-distillation-v1"
+_PROPOSAL_IDENTITY = "edf3e1031ee4bd46b6c567891fcaab26fd288a49997410141e6e19745d070e5c"
+_PROFILE_IDENTITY = "bfa8d2f8e19b1c24641e24e4765844f678cb9288838e5eda3f8782d7ace9cbe0"
+_DATABASE_ROLE = "classical-a-pos-controller-governance"
+_RELATIVE_DATABASE_PATH = "governance/classical-a-pos-controller.sqlite3"
+_HEX = frozenset("0123456789abcdef")
+_SIDECAR_SUFFIXES = ("-journal", "-wal", "-shm")
+
+_SPEC_KEYS = {
+    "schema_version",
+    "experiment_id",
+    "proposal_identity",
+    "profile_identity",
+    "plan_identity",
+    "readiness_identity",
+    "managed_git_state_identity",
+    "launch_path_binding_identity",
+    "state_freeze_teacher_order_event_chain_identity",
+    "database_role",
+    "output_root_identity",
+    "normalized_relative_path",
+    "schema_ddl_identity",
+    "spec_identity",
+}
+_DOMAIN_ENVELOPE_KEYS = {
+    "schema_version",
+    "stream_identity",
+    "stream_kind",
+    "sequence",
+    "record_type",
+    "previous_record_identity",
+}
+_COMPLETION_GOVERNANCE_KEYS = {
+    "experiment_id",
+    "proposal_identity",
+    "profile_identity",
+    "store_spec_identity",
+    "plan_identity",
+    "readiness_identity",
+    "managed_git_state_identity",
+    "launch_path_binding_identity",
+    "authorization_identity",
+    "authorization_consumption_identity",
+    "attempt_identity",
+    "reservation_event_identity",
+    "completion_event_identity",
+}
+_COMPLETION_RUNTIME_KEYS = {
+    "host_preflight_identity",
+    "state_generator_session_identity",
+    "strict_referee_binding_identity",
+    "a_pos_inventory_binding_identity",
+    "resource_snapshot_before_identity",
+    "resource_snapshot_after_identity",
+}
+_COMPLETION_RESULT_KEYS = {
+    "artifacts",
+    "split_contract_identity",
+    "resource_observation",
+    "teacher_fields_present",
+    "authoritative_storage",
+}
+_FREEZE_GOVERNANCE_KEYS = {
+    "experiment_id",
+    "proposal_identity",
+    "profile_identity",
+    "store_spec_identity",
+    "plan_identity",
+    "readiness_identity",
+    "authorization_identity",
+    "authorization_consumption_identity",
+    "attempt_identity",
+    "completion_event_identity",
+    "completion_record_identity",
+    "source_games_identity",
+    "state_split_identity",
+    "singleton_ledger_identity",
+}
+_FREEZE_RESULT_KEYS = {
+    "teacher_fields_present",
+    "teacher_may_start_only_after_this_event",
+    "authoritative_artifacts",
+}
+_COMPLETION_KEYS = (
+    _DOMAIN_ENVELOPE_KEYS
+    | _COMPLETION_GOVERNANCE_KEYS
+    | _COMPLETION_RUNTIME_KEYS
+    | _COMPLETION_RESULT_KEYS
+)
+_FREEZE_RECEIPT_KEYS = (
+    _DOMAIN_ENVELOPE_KEYS | _FREEZE_GOVERNANCE_KEYS | _FREEZE_RESULT_KEYS
+)
+
+_DDL_STATEMENTS = (
+    "CREATE TABLE meta (key TEXT PRIMARY KEY NOT NULL, value BLOB NOT NULL) WITHOUT ROWID",
+    (
+        "CREATE TABLE events (sequence INTEGER PRIMARY KEY NOT NULL, "
+        "event_identity TEXT NOT NULL, previous_event_identity TEXT, "
+        "event_bytes BLOB NOT NULL, size_bytes INTEGER NOT NULL, sha256 TEXT NOT NULL)"
+    ),
+    (
+        "CREATE TABLE artifacts (role TEXT PRIMARY KEY NOT NULL, "
+        "artifact_identity TEXT NOT NULL, artifact_bytes BLOB NOT NULL, "
+        "size_bytes INTEGER NOT NULL, sha256 TEXT NOT NULL) WITHOUT ROWID"
+    ),
+    (
+        "CREATE TABLE domain_records ("
+        "stream_identity TEXT NOT NULL, stream_kind TEXT NOT NULL, "
+        "sequence INTEGER NOT NULL, record_type TEXT NOT NULL, "
+        "previous_record_identity TEXT, record_identity TEXT NOT NULL UNIQUE, "
+        "record_bytes BLOB NOT NULL, size_bytes INTEGER NOT NULL, "
+        "record_bytes_sha256 TEXT NOT NULL UNIQUE, "
+        "PRIMARY KEY (stream_identity, sequence), "
+        "FOREIGN KEY (previous_record_identity) REFERENCES domain_records(record_identity), "
+        "CHECK (sequence >= 0), "
+        "CHECK ((sequence = 0 AND previous_record_identity IS NULL) OR "
+        "(sequence > 0 AND previous_record_identity IS NOT NULL)), "
+        "CHECK (length(record_identity) = 64), "
+        "CHECK (length(record_bytes_sha256) = 64), "
+        "CHECK (record_identity = record_bytes_sha256), "
+        "CHECK (size_bytes >= 0 AND length(record_bytes) = size_bytes)) WITHOUT ROWID"
+    ),
+    (
+        "CREATE TRIGGER meta_reject_update BEFORE UPDATE ON meta "
+        "BEGIN SELECT RAISE(ABORT, 'meta is immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER meta_reject_delete BEFORE DELETE ON meta "
+        "BEGIN SELECT RAISE(ABORT, 'meta is immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER events_reject_update BEFORE UPDATE ON events "
+        "BEGIN SELECT RAISE(ABORT, 'events are immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER events_reject_delete BEFORE DELETE ON events "
+        "BEGIN SELECT RAISE(ABORT, 'events are immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER artifacts_reject_update BEFORE UPDATE ON artifacts "
+        "BEGIN SELECT RAISE(ABORT, 'artifacts are immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER artifacts_reject_delete BEFORE DELETE ON artifacts "
+        "BEGIN SELECT RAISE(ABORT, 'artifacts are immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER domain_records_reject_update BEFORE UPDATE ON domain_records "
+        "BEGIN SELECT RAISE(ABORT, 'domain records are immutable'); END"
+    ),
+    (
+        "CREATE TRIGGER domain_records_reject_delete BEFORE DELETE ON domain_records "
+        "BEGIN SELECT RAISE(ABORT, 'domain records are immutable'); END"
+    ),
+)
+
+
+class GovernanceStoreContractError(RuntimeError):
+    """The durable governance store failed closed."""
+
+
+def _freeze(value: Any, *, field: str) -> Any:
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise GovernanceStoreContractError(f"{field} contains non-finite data")
+        return value
+    if isinstance(value, Mapping):
+        copied: dict[str, Any] = {}
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise GovernanceStoreContractError(f"{field} has a non-string key")
+            copied[key] = _freeze(item, field=f"{field}.{key}")
+        return MappingProxyType(copied)
+    if isinstance(value, Sequence) and not isinstance(
+        value,
+        (str, bytes, bytearray),
+    ):
+        return tuple(
+            _freeze(item, field=f"{field}[{index}]") for index, item in enumerate(value)
+        )
+    raise GovernanceStoreContractError(
+        f"{field} contains unsupported {type(value).__name__} data"
+    )
+
+
+def _thaw(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw(item) for item in value]
+    return value
+
+
+def _require_exact_keys(
+    value: Any,
+    expected: set[str],
+    *,
+    field: str,
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise GovernanceStoreContractError(f"{field} must be an object")
+    actual = set(value)
+    if actual != expected or any(not isinstance(key, str) for key in value):
+        raise GovernanceStoreContractError(f"{field} keys differ")
+    return value
+
+
+def _require_exact(value: Any, expected: Any, *, field: str) -> None:
+    if isinstance(expected, Mapping):
+        checked = _require_exact_keys(value, set(expected), field=field)
+        for key in expected:
+            _require_exact(checked[key], expected[key], field=f"{field}.{key}")
+        return
+    if isinstance(expected, Sequence) and not isinstance(
+        expected,
+        (str, bytes, bytearray),
+    ):
+        if not isinstance(value, Sequence) or isinstance(
+            value,
+            (str, bytes, bytearray),
+        ):
+            raise GovernanceStoreContractError(f"{field} must be an array")
+        if len(value) != len(expected):
+            raise GovernanceStoreContractError(f"{field} length differs")
+        for index, (observed, frozen) in enumerate(zip(value, expected, strict=True)):
+            _require_exact(observed, frozen, field=f"{field}[{index}]")
+        return
+    if type(value) is not type(expected) or value != expected:
+        raise GovernanceStoreContractError(f"{field} differs")
+
+
+def _require_sha256(value: Any, *, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or value != value.lower()
+        or any(character not in _HEX for character in value)
+    ):
+        raise GovernanceStoreContractError(f"{field} must be a lowercase SHA-256")
+    return value
+
+
+def _require_bound_identity(value: Any, *, field: str) -> str:
+    identity = _require_sha256(value, field=field)
+    if identity == "0" * 64:
+        raise GovernanceStoreContractError(f"{field} must not be a zero placeholder")
+    return identity
+
+
+def _require_nonnegative_int(value: Any, *, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise GovernanceStoreContractError(f"{field} must be a non-negative integer")
+    return value
+
+
+def _require_nonempty_text(value: Any, *, field: str) -> str:
+    if type(value) is not str or not value or value != value.strip():
+        raise GovernanceStoreContractError(f"{field} must be non-empty text")
+    return value
+
+
+def _require_text_choice(
+    value: Any,
+    choices: set[str],
+    *,
+    field: str,
+) -> str:
+    text = _require_nonempty_text(value, field=field)
+    if text not in choices:
+        raise GovernanceStoreContractError(f"{field} differs")
+    return text
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _require_sqlite_blob(value: Any, *, field: str) -> bytes:
+    if type(value) is not bytes:
+        raise GovernanceStoreContractError(f"SQLite {field} must be a BLOB")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class GovernanceStoreSpec(Mapping[str, Any]):
+    """Deeply immutable exact durable-store specification."""
+
+    _data: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_data", _freeze(self._data, field="store spec"))
+
+    def __getitem__(self, key: str) -> Any:
+        return self._data[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def to_dict(self) -> dict[str, Any]:
+        return _thaw(self._data)
+
+
+def _expected_sqlite_master_rows() -> tuple[tuple[str, str, str, str], ...]:
+    rows: list[tuple[str, str, str, str]] = []
+    for statement in _DDL_STATEMENTS:
+        words = statement.split()
+        object_type = words[1].lower()
+        name = words[2]
+        if object_type == "table":
+            table_name = name
+        else:
+            on_index = words.index("ON")
+            table_name = words[on_index + 1]
+        rows.append((object_type, name, table_name, statement))
+    return tuple(sorted(rows))
+
+
+_EXPECTED_SQLITE_MASTER_ROWS = _expected_sqlite_master_rows()
+_SCHEMA_DDL_IDENTITY = canonical_sha256(
+    {
+        "schema_version": "nmm.classical-a-pos-governance-sqlite-ddl.v1",
+        "sqlite_master": [list(row) for row in _EXPECTED_SQLITE_MASTER_ROWS],
+    }
+)
+
+
+def _verified_spec(value: Mapping[str, Any]) -> GovernanceStoreSpec:
+    raw = value.to_dict() if type(value) is GovernanceStoreSpec else _thaw(value)
+    checked = _require_exact_keys(raw, _SPEC_KEYS, field="governance store spec")
+    fixed = {
+        "schema_version": _SPEC_SCHEMA,
+        "experiment_id": _EXPERIMENT_ID,
+        "proposal_identity": _PROPOSAL_IDENTITY,
+        "profile_identity": _PROFILE_IDENTITY,
+        "database_role": _DATABASE_ROLE,
+        "normalized_relative_path": _RELATIVE_DATABASE_PATH,
+        "schema_ddl_identity": _SCHEMA_DDL_IDENTITY,
+    }
+    for key, expected in fixed.items():
+        _require_exact(checked[key], expected, field=f"store spec.{key}")
+    for key in (
+        "plan_identity",
+        "readiness_identity",
+        "managed_git_state_identity",
+        "launch_path_binding_identity",
+        "state_freeze_teacher_order_event_chain_identity",
+        "output_root_identity",
+    ):
+        _require_sha256(checked[key], field=f"store spec.{key}")
+    observed_identity = _require_sha256(
+        checked["spec_identity"],
+        field="store spec.spec_identity",
+    )
+    body = {key: item for key, item in checked.items() if key != "spec_identity"}
+    if observed_identity != canonical_sha256(body):
+        raise GovernanceStoreContractError("store spec identity differs")
+    return GovernanceStoreSpec(checked)
+
+
+def build_governance_store_spec(
+    plan: Mapping[str, Any],
+    *,
+    readiness_identity: str,
+    output_root_identity: str,
+) -> GovernanceStoreSpec:
+    """Build the nonce-free store spec from one complete frozen plan."""
+    try:
+        checked_plan = verify_runtime_plan(plan)
+    except Exception as exc:
+        raise GovernanceStoreContractError("store spec plan is invalid") from exc
+    if (
+        checked_plan["plan_status"] != "frozen"
+        or checked_plan["issuable"] is not True
+        or checked_plan["executable"] is not False
+        or checked_plan["unresolved_bindings"] != ()
+    ):
+        raise GovernanceStoreContractError("store spec requires a complete frozen plan")
+    bindings = checked_plan["technical_bindings"]
+    body = {
+        "schema_version": _SPEC_SCHEMA,
+        "experiment_id": _EXPERIMENT_ID,
+        "proposal_identity": _PROPOSAL_IDENTITY,
+        "profile_identity": _PROFILE_IDENTITY,
+        "plan_identity": checked_plan["plan_identity"],
+        "readiness_identity": _require_sha256(
+            readiness_identity,
+            field="readiness_identity",
+        ),
+        "managed_git_state_identity": _require_sha256(
+            bindings["managed_git_state"],
+            field="managed_git_state binding",
+        ),
+        "launch_path_binding_identity": _require_sha256(
+            bindings["launch_path_binding"],
+            field="launch_path_binding binding",
+        ),
+        "state_freeze_teacher_order_event_chain_identity": _require_sha256(
+            bindings["state_freeze_teacher_order_event_chain"],
+            field="state_freeze_teacher_order_event_chain binding",
+        ),
+        "database_role": _DATABASE_ROLE,
+        "output_root_identity": _require_sha256(
+            output_root_identity,
+            field="output_root_identity",
+        ),
+        "normalized_relative_path": _RELATIVE_DATABASE_PATH,
+        "schema_ddl_identity": _SCHEMA_DDL_IDENTITY,
+    }
+    return _verified_spec({**body, "spec_identity": canonical_sha256(body)})
+
+
+_PRODUCTION_STORE_TOKEN = object()
+_PRODUCTION_INVENTORY_TOKEN = object()
+_PRODUCTION_STRICT_REFEREE_TOKEN = object()
+_PRODUCTION_ACTIVE_TOKEN = object()
+_PRODUCTION_PENDING_TOKEN = object()
+_PRODUCTION_COMPLETION_TOKEN = object()
+_PRODUCTION_FREEZE_TOKEN = object()
+_TEST_STORE_TOKEN = object()
+_TEST_INVENTORY_TOKEN = object()
+_TEST_STRICT_REFEREE_TOKEN = object()
+_TEST_ACTIVE_TOKEN = object()
+_TEST_PENDING_TOKEN = object()
+_TEST_COMPLETION_TOKEN = object()
+_TEST_FREEZE_TOKEN = object()
+
+
+class _OpaqueCapability:
+    __slots__ = ("__weakref__",)
+    _token: object
+    _description: str
+
+    def __init__(self, token: object) -> None:
+        if token is not self._token:
+            raise GovernanceStoreContractError(
+                f"{self._description} must come from its controlled issuer"
+            )
+
+    def __copy__(self) -> Any:
+        raise TypeError(f"{self._description} cannot be copied")
+
+    def __deepcopy__(self, memo: Any) -> Any:
+        del memo
+        raise TypeError(f"{self._description} cannot be copied")
+
+    def __reduce_ex__(self, protocol: int) -> Any:
+        del protocol
+        raise TypeError(f"{self._description} cannot be serialized")
+
+
+class DurableGovernanceStore(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_STORE_TOKEN
+    _description = "durable governance store"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("durable governance store cannot be subclassed")
+
+
+class ProductionAPosInventoryBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_INVENTORY_TOKEN
+    _description = "production A_pos inventory binding"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("production A_pos inventory binding cannot be subclassed")
+
+
+class ProductionStrictRefereeBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_STRICT_REFEREE_TOKEN
+    _description = "production strict-referee binding"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("production strict-referee binding cannot be subclassed")
+
+
+class ActiveStateGenerationAttempt(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_ACTIVE_TOKEN
+    _description = "active state-generation attempt"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("active state-generation attempt cannot be subclassed")
+
+
+class PendingStateGenerationCommit(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_PENDING_TOKEN
+    _description = "pending state-generation commit"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("pending state-generation commit cannot be subclassed")
+
+
+class ConfirmedStateGenerationCompletion(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_COMPLETION_TOKEN
+    _description = "confirmed state-generation completion"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("confirmed state-generation completion cannot be subclassed")
+
+
+class DurableStateFreezeBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _PRODUCTION_FREEZE_TOKEN
+    _description = "durable state-freeze binding"
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        del cls, kwargs
+        raise TypeError("durable state-freeze binding cannot be subclassed")
+
+
+class _TestDurableGovernanceStore(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_STORE_TOKEN
+    _description = "test durable governance store"
+
+
+class _TestAPosInventoryBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_INVENTORY_TOKEN
+    _description = "test A_pos inventory binding"
+
+
+class _TestStrictRefereeBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_STRICT_REFEREE_TOKEN
+    _description = "test strict-referee binding"
+
+
+class _TestActiveStateGenerationAttempt(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_ACTIVE_TOKEN
+    _description = "test active state-generation attempt"
+
+
+class _TestPendingStateGenerationCommit(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_PENDING_TOKEN
+    _description = "test pending state-generation commit"
+
+
+class _TestConfirmedStateGenerationCompletion(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_COMPLETION_TOKEN
+    _description = "test confirmed state-generation completion"
+
+
+class _TestDurableStateFreezeBinding(_OpaqueCapability):
+    __slots__ = ()
+    _token = _TEST_FREEZE_TOKEN
+    _description = "test durable state-freeze binding"
+
+
+def initialize_governance_store(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    plan_permit: ProductionRuntimePlanPermit,
+    authorization_permit: ProductionAuthorizationPermit,
+) -> DurableGovernanceStore:
+    """Fail closed until a later slice supplies a production bootstrap issuer."""
+    del output_root, spec
+    if (
+        type(plan_permit) is not ProductionRuntimePlanPermit
+        or type(authorization_permit) is not ProductionAuthorizationPermit
+    ):
+        raise GovernanceStoreContractError(
+            "production store bootstrap requires exact production permits"
+        )
+    raise GovernanceStoreContractError(
+        "C4a has no production governance-store bootstrap issuer"
+    )
+
+
+def open_governance_store(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    plan: Mapping[str, Any],
+    authorization: Mapping[str, Any],
+) -> DurableGovernanceStore:
+    """Fail closed until a later slice supplies a production root issuer."""
+    del output_root, spec, plan, authorization
+    raise GovernanceStoreContractError(
+        "C4a has no production governance-store open issuer"
+    )
+
+
+@dataclass(slots=True)
+class _StoreContext:
+    path: Path
+    output_root: Path
+    spec: GovernanceStoreSpec
+    plan: RuntimePlanRecord
+    authorization: SingleUseAuthorizationRecord
+    domain: str
+    replay: GovernanceReplay
+    runtime: _StoreRuntimeContext
+
+
+@dataclass(frozen=True, slots=True)
+class _StoreRuntimeContext:
+    host_preflight_identity: str
+    state_generator_session_identity: str
+    resource_snapshot_before_identity: str
+    resource_snapshot_after_identity: str
+
+
+@dataclass(frozen=True, slots=True)
+class _InventoryContext:
+    binding_identity: str
+    verifier_identity: str
+    inventory_verifier: Callable[
+        [BoardState, Sequence[Mapping[str, Any]]], Sequence[bool]
+    ]
+    policy: _ArtifactPolicy
+
+
+@dataclass(frozen=True, slots=True)
+class _StrictRefereeContext:
+    binding_identity: str
+    runtime_identity: str
+    attempt_identity: str
+    complete_history_verifier: Callable[
+        [Sequence[Mapping[str, Any]], Sequence[str]], UciPositionState
+    ]
+    prefix_history_verifier: Callable[[Sequence[Mapping[str, Any]]], str]
+    domain: str
+
+
+@dataclass(slots=True)
+class _ActiveContext:
+    store: object
+    attempt_identity: str
+    reservation_event_identity: str
+    spent: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _ArtifactPolicy:
+    layout: Mapping[str, Mapping[str, Mapping[str, int]]]
+    total_states: int
+    maximum_source_games: int
+    require_complete_game_block: bool
+    domain: str
+
+
+@dataclass(slots=True)
+class _PendingStateContext:
+    store: object
+    active: object
+    inventory_binding: object
+    strict_referee_binding: object
+    source_games_path: Path
+    state_split_path: Path
+    singleton_ledger_path: Path
+    source_games_sha256: str
+    state_split_sha256: str
+    singleton_ledger_sha256: str
+    source_games_file_key: tuple[int, int, int, int]
+    state_split_file_key: tuple[int, int, int, int]
+    singleton_ledger_file_key: tuple[int, int, int, int]
+    timestamp_utc: str
+    active_seconds: int
+    policy: _ArtifactPolicy
+    event_bytes: bytes
+    spent: bool = False
+
+
+@dataclass(slots=True)
+class _CompletionContext:
+    store: object
+    completion_event_identity: str
+    attempt_identity: str
+    source_games_identity: str
+    state_split_identity: str
+    singleton_ledger_identity: str
+    completion_record_identity: str
+    spent: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _FreezeContext:
+    store: object
+    freeze_event_identity: str
+    state_split_identity: str
+    freeze_receipt_identity: str
+
+
+_PRODUCTION_STORE_CONTEXTS: weakref.WeakKeyDictionary[
+    DurableGovernanceStore,
+    _StoreContext,
+] = weakref.WeakKeyDictionary()
+_TEST_STORE_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestDurableGovernanceStore,
+    _StoreContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_INVENTORY_CONTEXTS: weakref.WeakKeyDictionary[
+    ProductionAPosInventoryBinding,
+    _InventoryContext,
+] = weakref.WeakKeyDictionary()
+_TEST_INVENTORY_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestAPosInventoryBinding,
+    _InventoryContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_STRICT_REFEREE_CONTEXTS: weakref.WeakKeyDictionary[
+    ProductionStrictRefereeBinding,
+    _StrictRefereeContext,
+] = weakref.WeakKeyDictionary()
+_TEST_STRICT_REFEREE_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestStrictRefereeBinding,
+    _StrictRefereeContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_ACTIVE_CONTEXTS: weakref.WeakKeyDictionary[
+    ActiveStateGenerationAttempt,
+    _ActiveContext,
+] = weakref.WeakKeyDictionary()
+_TEST_ACTIVE_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestActiveStateGenerationAttempt,
+    _ActiveContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_PENDING_CONTEXTS: weakref.WeakKeyDictionary[
+    PendingStateGenerationCommit,
+    _PendingStateContext,
+] = weakref.WeakKeyDictionary()
+_TEST_PENDING_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestPendingStateGenerationCommit,
+    _PendingStateContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_COMPLETION_CONTEXTS: weakref.WeakKeyDictionary[
+    ConfirmedStateGenerationCompletion,
+    _CompletionContext,
+] = weakref.WeakKeyDictionary()
+_TEST_COMPLETION_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestConfirmedStateGenerationCompletion,
+    _CompletionContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_FREEZE_CONTEXTS: weakref.WeakKeyDictionary[
+    DurableStateFreezeBinding,
+    _FreezeContext,
+] = weakref.WeakKeyDictionary()
+_TEST_FREEZE_CONTEXTS: weakref.WeakKeyDictionary[
+    _TestDurableStateFreezeBinding,
+    _FreezeContext,
+] = weakref.WeakKeyDictionary()
+_PRODUCTION_DURABLE_PENDING_ATTEMPTS: weakref.WeakSet[object] = weakref.WeakSet()
+_TEST_DURABLE_PENDING_ATTEMPTS: weakref.WeakSet[object] = weakref.WeakSet()
+
+_PRODUCTION_POLICY = _ArtifactPolicy(
+    layout=_freeze(FROZEN_CORPUS_LAYOUT.to_dict(), field="production layout"),
+    total_states=16_384,
+    maximum_source_games=1_024,
+    require_complete_game_block=True,
+    domain="production",
+)
+
+
+def _strict_json_object(payload: bytes, *, field: str) -> dict[str, Any]:
+    if type(payload) is not bytes or payload.startswith(b"\xef\xbb\xbf"):
+        raise GovernanceStoreContractError(f"{field} is not strict UTF-8 JSON")
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, item in items:
+            if key in result:
+                raise GovernanceStoreContractError(
+                    f"{field} contains duplicate JSON key {key}"
+                )
+            result[key] = item
+        return result
+
+    def constant(token: str) -> None:
+        raise GovernanceStoreContractError(
+            f"{field} contains non-finite JSON constant {token}"
+        )
+
+    try:
+        parsed = json.loads(
+            payload.decode("utf-8"),
+            object_pairs_hook=pairs,
+            parse_constant=constant,
+        )
+    except GovernanceStoreContractError:
+        raise
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise GovernanceStoreContractError(f"{field} is not strict UTF-8 JSON") from exc
+    if not isinstance(parsed, dict):
+        raise GovernanceStoreContractError(f"{field} must be a JSON object")
+    if payload != canonical_json_bytes(parsed):
+        raise GovernanceStoreContractError(f"{field} is not canonical JSON")
+    return parsed
+
+
+def _strict_jsonl_objects(payload: bytes, *, field: str) -> tuple[dict[str, Any], ...]:
+    if type(payload) is not bytes or not payload or not payload.endswith(b"\n"):
+        raise GovernanceStoreContractError(f"{field} requires canonical JSONL")
+    if b"\r" in payload or payload.startswith(b"\xef\xbb\xbf"):
+        raise GovernanceStoreContractError(f"{field} framing differs")
+    lines = payload.split(b"\n")[:-1]
+    if any(not line for line in lines):
+        raise GovernanceStoreContractError(f"{field} contains a blank line")
+    return tuple(
+        _strict_json_object(line, field=f"{field}[{index}]")
+        for index, line in enumerate(lines)
+    )
+
+
+def _check_no_sidecars(path: Path) -> None:
+    present = [
+        str(path) + suffix
+        for suffix in _SIDECAR_SUFFIXES
+        if Path(str(path) + suffix).exists()
+    ]
+    if present:
+        raise GovernanceStoreContractError(
+            "governance database sidecar is present: " + ", ".join(present)
+        )
+
+
+def _is_reparse(path: Path) -> bool:
+    try:
+        value = path.lstat()
+    except OSError as exc:
+        raise GovernanceStoreContractError("store path cannot be inspected") from exc
+    attribute = getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    file_attributes = getattr(value, "st_file_attributes", 0)
+    return path.is_symlink() or bool(file_attributes & attribute)
+
+
+def _resolve_output_root(value: str | Path) -> Path:
+    try:
+        supplied = Path(value)
+        absolute = supplied.absolute()
+        resolved = supplied.resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise GovernanceStoreContractError("output root is missing or invalid") from exc
+    if absolute != resolved or not resolved.is_dir() or _is_reparse(resolved):
+        raise GovernanceStoreContractError(
+            "output root must be one exact non-reparse directory"
+        )
+    return resolved
+
+
+def _database_path(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    for_create: bool,
+) -> tuple[Path, Path]:
+    checked_spec = _verified_spec(spec)
+    relative = PurePosixPath(checked_spec["normalized_relative_path"])
+    if (
+        relative.is_absolute()
+        or ".." in relative.parts
+        or relative.as_posix() != _RELATIVE_DATABASE_PATH
+    ):
+        raise GovernanceStoreContractError("store relative path differs")
+    root = _resolve_output_root(output_root)
+    namespace = root / relative.parts[0]
+    path = root.joinpath(*relative.parts)
+    if for_create:
+        if namespace.exists() or path.exists():
+            raise GovernanceStoreContractError(
+                "governance store namespace already exists"
+            )
+        try:
+            namespace.mkdir()
+        except OSError as exc:
+            raise GovernanceStoreContractError(
+                "governance store namespace cannot be created"
+            ) from exc
+    else:
+        if (
+            not namespace.is_dir()
+            or _is_reparse(namespace)
+            or not path.is_file()
+            or _is_reparse(path)
+        ):
+            raise GovernanceStoreContractError("governance database path differs")
+        try:
+            if path.stat().st_nlink != 1:
+                raise GovernanceStoreContractError(
+                    "governance database aliases are forbidden"
+                )
+        except OSError as exc:
+            raise GovernanceStoreContractError(
+                "governance database cannot be inspected"
+            ) from exc
+    try:
+        parent_resolved = path.parent.resolve(strict=True)
+    except OSError as exc:
+        raise GovernanceStoreContractError("store parent cannot be resolved") from exc
+    if parent_resolved != namespace or not path.is_relative_to(root):
+        raise GovernanceStoreContractError("store path escaped its output root")
+    _check_no_sidecars(path)
+    return root, path
+
+
+def _apply_connection_pragmas(connection: sqlite3.Connection) -> None:
+    connection.execute("PRAGMA busy_timeout=0")
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute("PRAGMA trusted_schema=OFF")
+    connection.execute("PRAGMA synchronous=FULL")
+
+
+def _open_write_connection(path: Path) -> sqlite3.Connection:
+    _check_no_sidecars(path)
+    try:
+        connection = sqlite3.connect(path, timeout=0.0, isolation_level=None)
+        _apply_connection_pragmas(connection)
+        mode = connection.execute("PRAGMA journal_mode=DELETE").fetchone()
+        if mode is None or str(mode[0]).lower() != "delete":
+            raise GovernanceStoreContractError("SQLite journal mode is not DELETE")
+        return connection
+    except GovernanceStoreContractError:
+        raise
+    except sqlite3.Error as exc:
+        raise GovernanceStoreContractError(
+            "governance database write-open failed"
+        ) from exc
+
+
+def _open_read_connection(path: Path) -> sqlite3.Connection:
+    _check_no_sidecars(path)
+    try:
+        connection = sqlite3.connect(
+            f"{path.as_uri()}?mode=ro",
+            uri=True,
+            timeout=0.0,
+            isolation_level=None,
+        )
+        _apply_connection_pragmas(connection)
+        return connection
+    except sqlite3.Error as exc:
+        raise GovernanceStoreContractError(
+            "governance database read-open failed"
+        ) from exc
+
+
+def _verify_pragmas(connection: sqlite3.Connection) -> None:
+    expected = {
+        "journal_mode": "delete",
+        "synchronous": 2,
+        "foreign_keys": 1,
+        "trusted_schema": 0,
+        "busy_timeout": 0,
+    }
+    for pragma, frozen in expected.items():
+        row = connection.execute(f"PRAGMA {pragma}").fetchone()
+        observed = None if row is None else row[0]
+        if isinstance(frozen, str):
+            observed = str(observed).lower()
+        if observed != frozen:
+            raise GovernanceStoreContractError(f"SQLite {pragma} differs")
+
+
+def _verify_schema(connection: sqlite3.Connection) -> None:
+    _verify_pragmas(connection)
+    rows = tuple(
+        sorted(
+            connection.execute(
+                "SELECT type, name, tbl_name, sql FROM sqlite_master "
+                "WHERE name NOT LIKE 'sqlite_%'"
+            ).fetchall()
+        )
+    )
+    if rows != _EXPECTED_SQLITE_MASTER_ROWS:
+        raise GovernanceStoreContractError("SQLite schema objects differ")
+    observed_identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-governance-sqlite-ddl.v1",
+            "sqlite_master": [list(row) for row in rows],
+        }
+    )
+    if observed_identity != _SCHEMA_DDL_IDENTITY:
+        raise GovernanceStoreContractError("SQLite schema identity differs")
+
+
+def _meta_payloads(
+    spec: GovernanceStoreSpec,
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+    *,
+    domain: str,
+) -> dict[str, bytes]:
+    if domain not in {"production", "internal-test"}:
+        raise GovernanceStoreContractError("store domain differs")
+    meta = {
+        "schema_version": _STORE_META_SCHEMA,
+        "domain": domain,
+        "spec_identity": spec["spec_identity"],
+        "plan_identity": plan["plan_identity"],
+        "authorization_identity": authorization["authorization_identity"],
+        "schema_ddl_identity": _SCHEMA_DDL_IDENTITY,
+        "durability_boundary": "sqlite-delete-full-new-readonly-reopen-v1",
+        "directory_fsync_claimed": False,
+        "administrator_or_hardware_resistance_claimed": False,
+    }
+    return {
+        "store_meta": canonical_json_bytes(meta),
+        "spec": canonical_json_bytes(spec),
+        "plan": canonical_json_bytes(plan),
+        "authorization": canonical_json_bytes(authorization),
+    }
+
+
+def _verify_meta(
+    connection: sqlite3.Connection,
+    *,
+    spec: GovernanceStoreSpec,
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+    domain: str,
+) -> None:
+    rows = connection.execute("SELECT key, value FROM meta ORDER BY key").fetchall()
+    observed: dict[str, bytes] = {}
+    for key, value in rows:
+        if type(key) is not str or key in observed:
+            raise GovernanceStoreContractError("SQLite meta key differs")
+        observed[key] = _require_sqlite_blob(value, field=f"meta.{key}")
+    expected = _meta_payloads(spec, plan, authorization, domain=domain)
+    if set(observed) != set(expected):
+        raise GovernanceStoreContractError("SQLite meta keys differ")
+    for key, frozen in expected.items():
+        parsed = _strict_json_object(observed[key], field=f"meta.{key}")
+        if canonical_json_bytes(parsed) != frozen or observed[key] != frozen:
+            raise GovernanceStoreContractError(f"SQLite meta.{key} differs")
+
+
+def _verify_blob_tables(
+    connection: sqlite3.Connection,
+) -> tuple[dict[str, tuple[str, bytes]], dict[str, tuple[str, dict[str, Any]]]]:
+    allowed_artifacts = {
+        "source-games",
+        "state-split",
+        "singleton-ledger",
+        "state-freeze-receipt",
+    }
+    artifact_identities: set[str] = set()
+    artifacts: dict[str, tuple[str, bytes]] = {}
+    for role, identity, payload, size, digest in connection.execute(
+        "SELECT role, artifact_identity, artifact_bytes, size_bytes, sha256 "
+        "FROM artifacts ORDER BY role"
+    ):
+        if type(role) is not str or role not in allowed_artifacts:
+            raise GovernanceStoreContractError("SQLite artifact role differs")
+        checked_identity = _require_sha256(identity, field=f"artifact {role} identity")
+        blob = _require_sqlite_blob(payload, field=f"artifact {role}")
+        if (
+            checked_identity in artifact_identities
+            or _require_nonnegative_int(size, field=f"artifact {role} size")
+            != len(blob)
+            or _require_sha256(digest, field=f"artifact {role} SHA")
+            != _sha256_bytes(blob)
+        ):
+            raise GovernanceStoreContractError("SQLite artifact integrity differs")
+        artifact_identities.add(checked_identity)
+        artifacts[str(role)] = (checked_identity, blob)
+    allowed_records = {"state-generation-completion", "state-freeze"}
+    record_identities: set[str] = set()
+    records: dict[str, tuple[str, dict[str, Any]]] = {}
+    rows = connection.execute(
+        "SELECT stream_identity, stream_kind, sequence, record_type, "
+        "previous_record_identity, record_identity, record_bytes, size_bytes, "
+        "record_bytes_sha256 FROM domain_records "
+        "ORDER BY stream_identity, sequence"
+    ).fetchall()
+    prior_by_stream: dict[str, str] = {}
+    expected_sequence_by_stream: dict[str, int] = {}
+    for (
+        stream_identity,
+        stream_kind,
+        sequence,
+        record_type,
+        previous_record_identity,
+        identity,
+        payload,
+        size,
+        digest,
+    ) in rows:
+        checked_stream_identity = _require_sha256(
+            stream_identity,
+            field="domain stream identity",
+        )
+        if stream_kind != _CONTROLLER_STREAM_KIND:
+            raise GovernanceStoreContractError("unknown C4a domain stream kind")
+        if type(record_type) is not str or record_type not in allowed_records:
+            raise GovernanceStoreContractError("unknown C4a domain record type")
+        checked_sequence = _require_nonnegative_int(
+            sequence,
+            field=f"domain record {record_type} sequence",
+        )
+        expected_sequence = expected_sequence_by_stream.get(checked_stream_identity, 0)
+        expected_previous = prior_by_stream.get(checked_stream_identity)
+        if (
+            checked_sequence != expected_sequence
+            or previous_record_identity != expected_previous
+        ):
+            raise GovernanceStoreContractError("domain record stream chain differs")
+        expected_sequence_by_stream[checked_stream_identity] = expected_sequence + 1
+        checked_identity = _require_sha256(
+            identity,
+            field=f"domain record {record_type} identity",
+        )
+        blob = _require_sqlite_blob(payload, field=f"domain record {record_type}")
+        parsed = _strict_json_object(blob, field=f"domain record {record_type}")
+        row_domain = {key: parsed.get(key) for key in _DOMAIN_ENVELOPE_KEYS}
+        expected_schema = {
+            "state-generation-completion": _COMPLETION_SCHEMA,
+            "state-freeze": _FREEZE_RECEIPT_SCHEMA,
+        }[record_type]
+        expected_domain = {
+            "schema_version": expected_schema,
+            "stream_identity": checked_stream_identity,
+            "stream_kind": _CONTROLLER_STREAM_KIND,
+            "sequence": checked_sequence,
+            "record_type": record_type,
+            "previous_record_identity": previous_record_identity,
+        }
+        if (
+            checked_identity in record_identities
+            or record_type in records
+            or canonical_json_bytes(parsed) != blob
+            or canonical_sha256(parsed) != checked_identity
+            or _sha256_bytes(blob) != checked_identity
+            or _require_nonnegative_int(
+                size,
+                field=f"domain record {record_type} size",
+            )
+            != len(blob)
+            or _require_sha256(
+                digest,
+                field=f"domain record {record_type} SHA",
+            )
+            != checked_identity
+        ):
+            raise GovernanceStoreContractError("SQLite domain record integrity differs")
+        _require_exact(
+            row_domain,
+            expected_domain,
+            field=f"domain record {record_type}.domain",
+        )
+        record_identities.add(checked_identity)
+        prior_by_stream[checked_stream_identity] = checked_identity
+        records[record_type] = (checked_identity, parsed)
+    if len(prior_by_stream) > 1:
+        raise GovernanceStoreContractError("C4a supports one controller stream only")
+    return artifacts, records
+
+
+def _read_and_replay(
+    path: Path,
+    *,
+    spec: GovernanceStoreSpec,
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+    domain: str,
+    expected_head_identity: str | None = None,
+) -> GovernanceReplay:
+    _check_no_sidecars(path)
+    connection = _open_read_connection(path)
+    try:
+        result = connection.execute("PRAGMA quick_check").fetchall()
+        if result != [("ok",)]:
+            raise GovernanceStoreContractError("SQLite quick_check failed")
+        _verify_schema(connection)
+        _verify_meta(
+            connection,
+            spec=spec,
+            plan=plan,
+            authorization=authorization,
+            domain=domain,
+        )
+        artifacts, domain_records = _verify_blob_tables(connection)
+        rows = connection.execute(
+            "SELECT sequence, event_identity, previous_event_identity, event_bytes, "
+            "size_bytes, sha256 FROM events ORDER BY sequence"
+        ).fetchall()
+    except GovernanceStoreContractError:
+        raise
+    except sqlite3.Error as exc:
+        raise GovernanceStoreContractError("SQLite verification query failed") from exc
+    finally:
+        connection.close()
+    payloads: list[bytes] = []
+    previous_identity: str | None = None
+    for expected_sequence, row in enumerate(rows):
+        sequence, identity, previous, payload, size, digest = row
+        blob = _require_sqlite_blob(payload, field=f"event {expected_sequence}")
+        if (
+            sequence != expected_sequence
+            or previous != previous_identity
+            or _require_nonnegative_int(size, field="event size") != len(blob)
+            or _require_sha256(digest, field="event SHA") != _sha256_bytes(blob)
+        ):
+            raise GovernanceStoreContractError("durable event row integrity differs")
+        decoded = decode_governance_ledger(blob)
+        if len(decoded) != 1:
+            raise GovernanceStoreContractError("durable event row is not one event")
+        event = decoded[0]
+        if (
+            event["sequence"] != expected_sequence
+            or event["event_identity"] != identity
+            or event["previous_event_identity"] != previous
+        ):
+            raise GovernanceStoreContractError("durable event row binding differs")
+        previous_identity = identity
+        payloads.append(blob)
+    decoded_events = decode_governance_ledger(b"".join(payloads))
+    replay = replay_governance_ledger(
+        decoded_events,
+        plan=plan,
+        authorization=authorization,
+    )
+    if replay.head_event_identity != previous_identity:
+        raise GovernanceStoreContractError("durable replay head differs")
+    _verify_blob_stage_and_identities(
+        replay,
+        artifacts=artifacts,
+        domain_records=domain_records,
+        domain=domain,
+        spec=spec,
+        runtime=_runtime_context_for_domain(spec, domain),
+    )
+    if (
+        expected_head_identity is not None
+        and previous_identity != expected_head_identity
+    ):
+        raise GovernanceStoreContractError("durable replay did not reach expected head")
+    _check_no_sidecars(path)
+    return replay
+
+
+def _create_store_database(
+    path: Path,
+    *,
+    spec: GovernanceStoreSpec,
+    plan: RuntimePlanRecord,
+    authorization: SingleUseAuthorizationRecord,
+    domain: str,
+    bootstrap_payload: bytes,
+) -> GovernanceReplay:
+    decoded = decode_governance_ledger(bootstrap_payload)
+    replay = replay_governance_ledger(
+        decoded,
+        plan=plan,
+        authorization=authorization,
+    )
+    if replay.state != "authorized_unconsumed" or len(replay.events) != 3:
+        raise GovernanceStoreContractError(
+            "store bootstrap must be exact plan/readiness/authorization genesis"
+        )
+    connection = _open_write_connection(path)
+    committed = False
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        for statement in _DDL_STATEMENTS:
+            connection.execute(statement)
+        for key, payload in _meta_payloads(
+            spec,
+            plan,
+            authorization,
+            domain=domain,
+        ).items():
+            connection.execute(
+                "INSERT INTO meta(key, value) VALUES (?, ?)",
+                (key, payload),
+            )
+        for event in replay.events:
+            payload = encode_governance_ledger((event,))
+            connection.execute(
+                "INSERT INTO events(sequence, event_identity, "
+                "previous_event_identity, event_bytes, size_bytes, sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    event["sequence"],
+                    event["event_identity"],
+                    event["previous_event_identity"],
+                    payload,
+                    len(payload),
+                    _sha256_bytes(payload),
+                ),
+            )
+        connection.execute("COMMIT")
+        committed = True
+    except (sqlite3.Error, GovernanceStoreContractError) as exc:
+        if not committed:
+            try:
+                connection.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        raise GovernanceStoreContractError("governance store bootstrap failed") from exc
+    finally:
+        connection.close()
+    _check_no_sidecars(path)
+    return _read_and_replay(
+        path,
+        spec=spec,
+        plan=plan,
+        authorization=authorization,
+        domain=domain,
+        expected_head_identity=replay.head_event_identity,
+    )
+
+
+def _open_store_core(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    plan: Mapping[str, Any],
+    authorization: Mapping[str, Any],
+    expected_domain: str,
+    store_type: type,
+    store_token: object,
+    contexts: weakref.WeakKeyDictionary,
+) -> object:
+    checked_spec = _verified_spec(spec)
+    try:
+        checked_plan = verify_runtime_plan(plan)
+        checked_authorization = verify_single_use_authorization(
+            authorization,
+            plan=checked_plan,
+        )
+    except Exception as exc:
+        raise GovernanceStoreContractError(
+            "store plan/authorization is invalid"
+        ) from exc
+    if (
+        checked_spec["plan_identity"] != checked_plan["plan_identity"]
+        or checked_spec["readiness_identity"]
+        != checked_authorization["readiness_identity"]
+    ):
+        raise GovernanceStoreContractError("store spec plan/readiness binding differs")
+    root, path = _database_path(output_root, checked_spec, for_create=False)
+    replay = _read_and_replay(
+        path,
+        spec=checked_spec,
+        plan=checked_plan,
+        authorization=checked_authorization,
+        domain=expected_domain,
+    )
+    store = store_type(store_token)
+    contexts[store] = _StoreContext(
+        path=path,
+        output_root=root,
+        spec=checked_spec,
+        plan=checked_plan,
+        authorization=checked_authorization,
+        domain=expected_domain,
+        replay=replay,
+        runtime=_runtime_context_for_domain(checked_spec, expected_domain),
+    )
+    return store
+
+
+def _runtime_context_for_domain(
+    spec: GovernanceStoreSpec,
+    domain: str,
+) -> _StoreRuntimeContext:
+    if domain != "internal-test":
+        raise GovernanceStoreContractError(
+            "C4a has no production runtime-provenance issuer"
+        )
+
+    def identity(role: str) -> str:
+        return canonical_sha256(
+            {
+                "schema_version": "nmm.classical-a-pos-test-runtime-binding.v1",
+                "store_spec_identity": spec["spec_identity"],
+                "role": role,
+            }
+        )
+
+    return _StoreRuntimeContext(
+        host_preflight_identity=identity("host-preflight"),
+        state_generator_session_identity=identity("state-generator-session"),
+        resource_snapshot_before_identity=identity("resource-before"),
+        resource_snapshot_after_identity=identity("resource-after"),
+    )
+
+
+def _require_store_context(
+    store: object,
+    *,
+    store_type: type,
+    contexts: Mapping[object, _StoreContext],
+) -> _StoreContext:
+    if type(store) is not store_type:
+        raise GovernanceStoreContractError("durable store type/domain differs")
+    context = contexts.get(store)
+    if context is None:
+        raise GovernanceStoreContractError("durable store is not registered")
+    reopened = _read_and_replay(
+        context.path,
+        spec=context.spec,
+        plan=context.plan,
+        authorization=context.authorization,
+        domain=context.domain,
+        expected_head_identity=context.replay.head_event_identity,
+    )
+    context.replay = reopened
+    return context
+
+
+def _artifact_row(role: str, identity: str, payload: bytes) -> tuple[Any, ...]:
+    return (
+        role,
+        _require_sha256(identity, field=f"artifact {role} identity"),
+        payload,
+        len(payload),
+        _sha256_bytes(payload),
+    )
+
+
+def _controller_stream_identity(
+    context: _StoreContext,
+    *,
+    attempt_identity: str,
+) -> str:
+    return canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-domain-stream.v1",
+            "stream_kind": _CONTROLLER_STREAM_KIND,
+            "store_spec_identity": context.spec["spec_identity"],
+            "plan_identity": context.plan["plan_identity"],
+            "authorization_consumption_identity": (
+                context.replay.authorization_consumption_identity
+            ),
+            "state_generation_attempt_identity": _require_sha256(
+                attempt_identity,
+                field="controller stream attempt identity",
+            ),
+        }
+    )
+
+
+def _domain_envelope(
+    context: _StoreContext,
+    *,
+    schema_version: str,
+    attempt_identity: str,
+    sequence: int,
+    record_type: str,
+    previous_record_identity: str | None,
+) -> dict[str, Any]:
+    return {
+        "schema_version": schema_version,
+        "stream_identity": _controller_stream_identity(
+            context,
+            attempt_identity=attempt_identity,
+        ),
+        "stream_kind": _CONTROLLER_STREAM_KIND,
+        "sequence": sequence,
+        "record_type": record_type,
+        "previous_record_identity": previous_record_identity,
+    }
+
+
+def _artifact_contract_ref(
+    role: str,
+    identity: str,
+    payload: bytes,
+    *,
+    record_count: int,
+    a_pos_verifier_identity: str | None = None,
+) -> dict[str, Any]:
+    ref = {
+        "role": role,
+        "identity": _require_sha256(identity, field=f"artifact {role} identity"),
+        "bytes_sha256": _sha256_bytes(payload),
+        "size_bytes": len(payload),
+        "record_count": _require_nonnegative_int(
+            record_count,
+            field=f"artifact {role} record count",
+        ),
+    }
+    if role == "state-split":
+        ref["a_pos_verifier_identity"] = _require_sha256(
+            a_pos_verifier_identity,
+            field="state-split verifier identity",
+        )
+    elif a_pos_verifier_identity is not None:
+        raise GovernanceStoreContractError("non-state artifact has verifier identity")
+    return ref
+
+
+def _domain_record_row(payload: bytes) -> tuple[Any, ...]:
+    parsed = _strict_json_object(payload, field="domain record")
+    domain = _require_exact_keys(
+        {key: parsed.get(key) for key in _DOMAIN_ENVELOPE_KEYS},
+        _DOMAIN_ENVELOPE_KEYS,
+        field="domain record envelope",
+    )
+    record_type = _require_nonempty_text(
+        domain["record_type"], field="domain record type"
+    )
+    expected_schema = {
+        "state-generation-completion": _COMPLETION_SCHEMA,
+        "state-freeze": _FREEZE_RECEIPT_SCHEMA,
+    }.get(record_type)
+    if expected_schema is None or domain["schema_version"] != expected_schema:
+        raise GovernanceStoreContractError("domain record schema/type differs")
+    checked_identity = canonical_sha256(parsed)
+    if _sha256_bytes(payload) != checked_identity:
+        raise GovernanceStoreContractError("domain record canonical bytes differ")
+    return (
+        _require_sha256(domain["stream_identity"], field="domain stream identity"),
+        domain["stream_kind"],
+        _require_nonnegative_int(domain["sequence"], field="domain sequence"),
+        record_type,
+        domain["previous_record_identity"],
+        checked_identity,
+        payload,
+        len(payload),
+        checked_identity,
+    )
+
+
+def _commit_event_and_rows(
+    context: _StoreContext,
+    event_payload: bytes,
+    *,
+    artifact_rows: Sequence[tuple[Any, ...]] = (),
+    domain_rows: Sequence[tuple[Any, ...]] = (),
+) -> GovernanceReplay:
+    current = _read_and_replay(
+        context.path,
+        spec=context.spec,
+        plan=context.plan,
+        authorization=context.authorization,
+        domain=context.domain,
+        expected_head_identity=context.replay.head_event_identity,
+    )
+    decoded = decode_governance_ledger(event_payload)
+    if len(decoded) != 1:
+        raise GovernanceStoreContractError("commit requires exactly one event")
+    event = decoded[0]
+    if (
+        event["sequence"] != len(current.events)
+        or event["previous_event_identity"] != current.head_event_identity
+    ):
+        raise GovernanceStoreContractError("event does not extend durable replay head")
+    replay_governance_ledger(
+        (*current.events, event),
+        plan=context.plan,
+        authorization=context.authorization,
+    )
+    connection = _open_write_connection(context.path)
+    committed = False
+    try:
+        connection.execute("BEGIN IMMEDIATE")
+        _verify_schema(connection)
+        _verify_meta(
+            connection,
+            spec=context.spec,
+            plan=context.plan,
+            authorization=context.authorization,
+            domain=context.domain,
+        )
+        head_row = connection.execute(
+            "SELECT sequence, event_identity FROM events ORDER BY sequence DESC LIMIT 1"
+        ).fetchone()
+        expected_head = (
+            None
+            if not current.events
+            else (len(current.events) - 1, current.head_event_identity)
+        )
+        if head_row != expected_head:
+            raise GovernanceStoreContractError(
+                "writer durable head changed before BEGIN IMMEDIATE"
+            )
+        for row in artifact_rows:
+            connection.execute(
+                "INSERT INTO artifacts(role, artifact_identity, artifact_bytes, "
+                "size_bytes, sha256) VALUES (?, ?, ?, ?, ?)",
+                row,
+            )
+        for row in domain_rows:
+            connection.execute(
+                "INSERT INTO domain_records(stream_identity, stream_kind, sequence, "
+                "record_type, previous_record_identity, record_identity, "
+                "record_bytes, size_bytes, record_bytes_sha256) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                row,
+            )
+        connection.execute(
+            "INSERT INTO events(sequence, event_identity, previous_event_identity, "
+            "event_bytes, size_bytes, sha256) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                event["sequence"],
+                event["event_identity"],
+                event["previous_event_identity"],
+                event_payload,
+                len(event_payload),
+                _sha256_bytes(event_payload),
+            ),
+        )
+        connection.execute("COMMIT")
+        committed = True
+    except (sqlite3.Error, GovernanceStoreContractError) as exc:
+        if not committed:
+            try:
+                connection.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        raise GovernanceStoreContractError("durable governance commit failed") from exc
+    finally:
+        connection.close()
+    _check_no_sidecars(context.path)
+    replay = _read_and_replay(
+        context.path,
+        spec=context.spec,
+        plan=context.plan,
+        authorization=context.authorization,
+        domain=context.domain,
+        expected_head_identity=event["event_identity"],
+    )
+    context.replay = replay
+    return replay
+
+
+def commit_authorization_consumption(
+    store: DurableGovernanceStore,
+    pending: PendingAuthorizationConsumption,
+) -> ConsumedAuthorizationPermit:
+    """Persist and strict-replay one production authorization consumption."""
+    if (
+        type(store) is not DurableGovernanceStore
+        or type(pending) is not PendingAuthorizationConsumption
+    ):
+        raise GovernanceStoreContractError(
+            "authorization durable commit requires exact production capabilities"
+        )
+    if pending in _PRODUCTION_DURABLE_PENDING_ATTEMPTS:
+        raise GovernanceStoreContractError(
+            "authorization durable commit was already attempted"
+        )
+    _PRODUCTION_DURABLE_PENDING_ATTEMPTS.add(pending)
+    context = _require_store_context(
+        store,
+        store_type=DurableGovernanceStore,
+        contexts=_PRODUCTION_STORE_CONTEXTS,
+    )
+    try:
+        payload = prepared_governance_event_bytes(pending)
+        replay = _commit_event_and_rows(context, payload)
+        return confirm_authorization_consumption(pending, replay)
+    except Exception as exc:
+        if isinstance(exc, GovernanceStoreContractError):
+            raise
+        raise GovernanceStoreContractError(
+            "authorization consumption durable confirmation failed"
+        ) from exc
+
+
+def commit_operation_reservation(
+    store: DurableGovernanceStore,
+    pending: PendingOperationReservation,
+) -> ProductionOperationPermit:
+    """Persist and strict-replay one production operation reservation."""
+    if (
+        type(store) is not DurableGovernanceStore
+        or type(pending) is not PendingOperationReservation
+    ):
+        raise GovernanceStoreContractError(
+            "operation durable commit requires exact production capabilities"
+        )
+    if pending in _PRODUCTION_DURABLE_PENDING_ATTEMPTS:
+        raise GovernanceStoreContractError(
+            "operation durable commit was already attempted"
+        )
+    _PRODUCTION_DURABLE_PENDING_ATTEMPTS.add(pending)
+    context = _require_store_context(
+        store,
+        store_type=DurableGovernanceStore,
+        contexts=_PRODUCTION_STORE_CONTEXTS,
+    )
+    try:
+        payload = prepared_governance_event_bytes(pending)
+        replay = _commit_event_and_rows(context, payload)
+        return confirm_operation_reservation(pending, replay)
+    except Exception as exc:
+        if isinstance(exc, GovernanceStoreContractError):
+            raise
+        raise GovernanceStoreContractError(
+            "operation reservation durable confirmation failed"
+        ) from exc
+
+
+def _test_initialize_governance_store(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    plan: Mapping[str, Any],
+    authorization: Mapping[str, Any],
+    bootstrap_ledger_bytes: bytes,
+) -> _TestDurableGovernanceStore:
+    checked_spec = _verified_spec(spec)
+    try:
+        checked_plan = verify_runtime_plan(plan)
+        checked_authorization = verify_single_use_authorization(
+            authorization,
+            plan=checked_plan,
+        )
+    except Exception as exc:
+        raise GovernanceStoreContractError(
+            "test store plan/authorization is invalid"
+        ) from exc
+    if (
+        checked_spec["plan_identity"] != checked_plan["plan_identity"]
+        or checked_spec["readiness_identity"]
+        != checked_authorization["readiness_identity"]
+    ):
+        raise GovernanceStoreContractError("test store spec binding differs")
+    root, path = _database_path(output_root, checked_spec, for_create=True)
+    replay = _create_store_database(
+        path,
+        spec=checked_spec,
+        plan=checked_plan,
+        authorization=checked_authorization,
+        domain="internal-test",
+        bootstrap_payload=bootstrap_ledger_bytes,
+    )
+    store = _TestDurableGovernanceStore(_TEST_STORE_TOKEN)
+    _TEST_STORE_CONTEXTS[store] = _StoreContext(
+        path=path,
+        output_root=root,
+        spec=checked_spec,
+        plan=checked_plan,
+        authorization=checked_authorization,
+        domain="internal-test",
+        replay=replay,
+        runtime=_runtime_context_for_domain(checked_spec, "internal-test"),
+    )
+    return store
+
+
+def _test_open_governance_store(
+    output_root: str | Path,
+    spec: GovernanceStoreSpec,
+    *,
+    plan: Mapping[str, Any],
+    authorization: Mapping[str, Any],
+) -> _TestDurableGovernanceStore:
+    store = _open_store_core(
+        output_root,
+        spec,
+        plan=plan,
+        authorization=authorization,
+        expected_domain="internal-test",
+        store_type=_TestDurableGovernanceStore,
+        store_token=_TEST_STORE_TOKEN,
+        contexts=_TEST_STORE_CONTEXTS,
+    )
+    assert type(store) is _TestDurableGovernanceStore
+    return store
+
+
+def _test_commit_authorization_consumption(
+    store: _TestDurableGovernanceStore,
+    pending: object,
+) -> object:
+    if pending in _TEST_DURABLE_PENDING_ATTEMPTS:
+        raise GovernanceStoreContractError(
+            "test authorization durable commit was already attempted"
+        )
+    _TEST_DURABLE_PENDING_ATTEMPTS.add(pending)
+    context = _require_store_context(
+        store,
+        store_type=_TestDurableGovernanceStore,
+        contexts=_TEST_STORE_CONTEXTS,
+    )
+    try:
+        payload = _governance._test_prepared_governance_event_bytes(pending)
+        replay = _commit_event_and_rows(context, payload)
+        return _governance._test_confirm_authorization_consumption(pending, replay)
+    except Exception as exc:
+        if isinstance(exc, GovernanceStoreContractError):
+            raise
+        raise GovernanceStoreContractError(
+            "test authorization durable confirmation failed"
+        ) from exc
+
+
+def _test_commit_operation_reservation(
+    store: _TestDurableGovernanceStore,
+    pending: object,
+) -> object:
+    if pending in _TEST_DURABLE_PENDING_ATTEMPTS:
+        raise GovernanceStoreContractError(
+            "test operation durable commit was already attempted"
+        )
+    _TEST_DURABLE_PENDING_ATTEMPTS.add(pending)
+    context = _require_store_context(
+        store,
+        store_type=_TestDurableGovernanceStore,
+        contexts=_TEST_STORE_CONTEXTS,
+    )
+    try:
+        payload = _governance._test_prepared_governance_event_bytes(pending)
+        replay = _commit_event_and_rows(context, payload)
+        return _governance._test_confirm_operation_reservation(pending, replay)
+    except Exception as exc:
+        if isinstance(exc, GovernanceStoreContractError):
+            raise
+        raise GovernanceStoreContractError(
+            "test operation durable confirmation failed"
+        ) from exc
+
+
+def _begin_state_generation_core(
+    store: object,
+    permit: object,
+    *,
+    store_type: type,
+    permit_type: type,
+    active_type: type,
+    active_token: object,
+    store_contexts: Mapping[object, _StoreContext],
+    active_contexts: weakref.WeakKeyDictionary,
+    permit_consumer: Callable[..., str],
+) -> object:
+    context = _require_store_context(
+        store,
+        store_type=store_type,
+        contexts=store_contexts,
+    )
+    if type(permit) is not permit_type:
+        raise GovernanceStoreContractError(
+            "state-generation begin requires an exact operation permit"
+        )
+    if (
+        context.replay.state != "state_generation_running"
+        or context.replay.resource_ledger.open_operation_id != "state-generation"
+        or not context.replay.events
+        or context.replay.events[-1]["event_type"] != "state_generation_reserved"
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation reservation is not the durable replay head"
+        )
+    try:
+        attempt_identity = permit_consumer(
+            permit,
+            context.replay,
+            operation_id="state-generation",
+            purpose="state",
+            seed=None,
+        )
+    except Exception as exc:
+        raise GovernanceStoreContractError(
+            "state-generation operation permit could not be consumed"
+        ) from exc
+    active = active_type(active_token)
+    active_contexts[active] = _ActiveContext(
+        store=store,
+        attempt_identity=_require_sha256(
+            attempt_identity,
+            field="state-generation attempt identity",
+        ),
+        reservation_event_identity=context.replay.head_event_identity,
+    )
+    return active
+
+
+def begin_state_generation_attempt(
+    store: DurableGovernanceStore,
+    permit: ProductionOperationPermit,
+) -> ActiveStateGenerationAttempt:
+    """Consume one durable production state-generation operation permit."""
+    active = _begin_state_generation_core(
+        store,
+        permit,
+        store_type=DurableGovernanceStore,
+        permit_type=ProductionOperationPermit,
+        active_type=ActiveStateGenerationAttempt,
+        active_token=_PRODUCTION_ACTIVE_TOKEN,
+        store_contexts=_PRODUCTION_STORE_CONTEXTS,
+        active_contexts=_PRODUCTION_ACTIVE_CONTEXTS,
+        permit_consumer=require_production_operation_permit,
+    )
+    assert type(active) is ActiveStateGenerationAttempt
+    return active
+
+
+def _test_begin_state_generation_attempt(
+    store: _TestDurableGovernanceStore,
+    permit: object,
+) -> _TestActiveStateGenerationAttempt:
+    active = _begin_state_generation_core(
+        store,
+        permit,
+        store_type=_TestDurableGovernanceStore,
+        permit_type=_governance._TestOperationPermit,
+        active_type=_TestActiveStateGenerationAttempt,
+        active_token=_TEST_ACTIVE_TOKEN,
+        store_contexts=_TEST_STORE_CONTEXTS,
+        active_contexts=_TEST_ACTIVE_CONTEXTS,
+        permit_consumer=_governance._test_require_operation_permit,
+    )
+    assert type(active) is _TestActiveStateGenerationAttempt
+    return active
+
+
+def _test_artifact_policy(
+    layout: Mapping[str, Mapping[str, Mapping[str, int]]],
+    *,
+    maximum_source_games: int,
+) -> _ArtifactPolicy:
+    splits = {"train", "dev"}
+    strata = {"placement", "movement", "flying"}
+    colours = {"W", "B"}
+    if not isinstance(layout, Mapping) or set(layout) != splits:
+        raise GovernanceStoreContractError("test artifact layout split keys differ")
+    copied: dict[str, dict[str, dict[str, int]]] = {}
+    total = 0
+    for split in ("train", "dev"):
+        if not isinstance(layout[split], Mapping) or set(layout[split]) != strata:
+            raise GovernanceStoreContractError("test artifact layout strata differ")
+        copied[split] = {}
+        for stratum in ("placement", "movement", "flying"):
+            if (
+                not isinstance(layout[split][stratum], Mapping)
+                or set(layout[split][stratum]) != colours
+            ):
+                raise GovernanceStoreContractError(
+                    "test artifact layout colours differ"
+                )
+            copied[split][stratum] = {}
+            for colour in ("W", "B"):
+                count = _require_nonnegative_int(
+                    layout[split][stratum][colour],
+                    field="test artifact cell count",
+                )
+                copied[split][stratum][colour] = count
+                total += count
+    maximum = _require_nonnegative_int(
+        maximum_source_games,
+        field="test maximum source games",
+    )
+    if maximum == 0:
+        raise GovernanceStoreContractError("test maximum source games must be positive")
+    return _ArtifactPolicy(
+        layout=_freeze(copied, field="test artifact layout"),
+        total_states=total,
+        maximum_source_games=maximum,
+        require_complete_game_block=False,
+        domain="internal-test",
+    )
+
+
+def _issue_test_a_pos_inventory_binding(
+    *,
+    verifier_identity: str,
+    inventory_verifier: Callable[
+        [BoardState, Sequence[Mapping[str, Any]]], Sequence[bool]
+    ],
+    layout: Mapping[str, Mapping[str, Mapping[str, int]]],
+    maximum_source_games: int,
+) -> _TestAPosInventoryBinding:
+    if not callable(inventory_verifier):
+        raise GovernanceStoreContractError("test inventory verifier is not callable")
+    policy = _test_artifact_policy(
+        layout,
+        maximum_source_games=maximum_source_games,
+    )
+    checked_verifier_identity = _require_bound_identity(
+        verifier_identity,
+        field="test inventory verifier identity",
+    )
+    binding = _TestAPosInventoryBinding(_TEST_INVENTORY_TOKEN)
+    _TEST_INVENTORY_CONTEXTS[binding] = _InventoryContext(
+        binding_identity=_inventory_binding_identity(
+            checked_verifier_identity,
+            policy,
+        ),
+        verifier_identity=checked_verifier_identity,
+        inventory_verifier=inventory_verifier,
+        policy=policy,
+    )
+    return binding
+
+
+def _inventory_binding_identity(
+    verifier_identity: str,
+    policy: _ArtifactPolicy,
+) -> str:
+    return canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-inventory-binding.v1",
+            "domain": policy.domain,
+            "verifier_identity": _require_sha256(
+                verifier_identity,
+                field="inventory verifier identity",
+            ),
+            "policy": _policy_payload(policy),
+        }
+    )
+
+
+def _issue_test_strict_referee_binding(
+    *,
+    binding_identity: str,
+    runtime_identity: str,
+    attempt_identity: str,
+    complete_history_verifier: Callable[
+        [Sequence[Mapping[str, Any]], Sequence[str]], UciPositionState
+    ],
+    prefix_history_verifier: Callable[[Sequence[Mapping[str, Any]]], str],
+) -> _TestStrictRefereeBinding:
+    if not callable(complete_history_verifier) or not callable(prefix_history_verifier):
+        raise GovernanceStoreContractError("test strict referee verifier differs")
+    binding = _TestStrictRefereeBinding(_TEST_STRICT_REFEREE_TOKEN)
+    _TEST_STRICT_REFEREE_CONTEXTS[binding] = _StrictRefereeContext(
+        binding_identity=_require_bound_identity(
+            binding_identity,
+            field="test strict referee binding identity",
+        ),
+        runtime_identity=_require_bound_identity(
+            runtime_identity,
+            field="test strict referee runtime identity",
+        ),
+        attempt_identity=_require_bound_identity(
+            attempt_identity,
+            field="test strict referee attempt identity",
+        ),
+        complete_history_verifier=complete_history_verifier,
+        prefix_history_verifier=prefix_history_verifier,
+        domain="internal-test",
+    )
+    return binding
+
+
+def _atomic_action(value: Any, *, field: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {"from", "to", "capture"}:
+        raise GovernanceStoreContractError(
+            f"{field} must be one exact atomic from/to/capture action"
+        )
+    source = value["from"]
+    target = value["to"]
+    capture = value["capture"]
+    if source is not None and not isinstance(source, str):
+        raise GovernanceStoreContractError(f"{field}.from differs")
+    if not isinstance(target, str) or not target:
+        raise GovernanceStoreContractError(f"{field}.to differs")
+    if capture is not None and not isinstance(capture, str):
+        raise GovernanceStoreContractError(f"{field}.capture differs")
+    return {"from": source, "to": target, "capture": capture}
+
+
+def _action_key(value: Mapping[str, Any]) -> tuple[Any, Any, Any]:
+    return value["from"], value["to"], value["capture"]
+
+
+def _replay_history(
+    value: Any,
+    *,
+    field: str,
+) -> tuple[tuple[dict[str, Any], ...], BoardState]:
+    if not isinstance(value, list):
+        raise GovernanceStoreContractError(f"{field} must be an array")
+    history = tuple(
+        _atomic_action(move, field=f"{field}[{index}]")
+        for index, move in enumerate(value)
+    )
+    board = BoardState.new_game()
+    for index, move in enumerate(history):
+        already_terminal, _winner, _reason = terminal_result(board)
+        if already_terminal:
+            raise GovernanceStoreContractError(
+                f"{field}[{index}] continues after local terminal state"
+            )
+        legal = tuple(dict(item) for item in get_all_legal_moves(board))
+        if move not in legal:
+            raise GovernanceStoreContractError(
+                f"{field}[{index}] is not legal in its exact prefix"
+            )
+        board = board.apply_move(move)
+    return history, board
+
+
+def _file_key(path: Path) -> tuple[int, int, int, int]:
+    try:
+        status = path.stat()
+    except OSError as exc:
+        raise GovernanceStoreContractError("artifact path cannot be inspected") from exc
+    if status.st_nlink != 1:
+        raise GovernanceStoreContractError("artifact aliases are forbidden")
+    return (
+        int(status.st_dev),
+        int(status.st_ino),
+        int(status.st_size),
+        int(status.st_mtime_ns),
+    )
+
+
+def _read_plan_owned_artifact(
+    value: str | Path,
+    *,
+    store_context: _StoreContext,
+    field: str,
+) -> tuple[Path, bytes, tuple[int, int, int, int]]:
+    try:
+        supplied = Path(value)
+        absolute = supplied.absolute()
+        path = supplied.resolve(strict=True)
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        raise GovernanceStoreContractError(f"{field} path is missing") from exc
+    governance_namespace = store_context.path.parent
+    if (
+        absolute != path
+        or not path.is_file()
+        or _is_reparse(path)
+        or not path.is_relative_to(store_context.output_root)
+        or path.is_relative_to(governance_namespace)
+    ):
+        raise GovernanceStoreContractError(
+            f"{field} must be one plan-owned non-governance file"
+        )
+    before = _file_key(path)
+    try:
+        payload = path.read_bytes()
+    except OSError as exc:
+        raise GovernanceStoreContractError(f"{field} cannot be read") from exc
+    after = _file_key(path)
+    if before != after or len(payload) != before[2]:
+        raise GovernanceStoreContractError(f"{field} changed during read")
+    return path, payload, after
+
+
+_SOURCE_GAME_FIELDS = {
+    "schema_version",
+    "state_generation_attempt_identity",
+    "game_id",
+    "game_index",
+    "split",
+    "candidate_color",
+    "complete_history",
+    "sanmill_runtime_identity",
+    "sanmill_final_state",
+    "sanmill_final_state_identity",
+    "strict_terminal",
+    "referee_binding_identity",
+    "record_identity",
+}
+_COMPLETE_HISTORY_FIELDS = {
+    "logical_moves",
+    "logical_ply_count",
+    "logical_moves_sha256",
+    "sanmill_actions",
+    "action_token_count",
+    "sanmill_actions_sha256",
+}
+_SANMILL_FINAL_STATE_FIELDS = {
+    "status",
+    "ruleset_id",
+    "rules_identity_sha256",
+    "history_origin",
+    "fen",
+    "side_to_move",
+    "phase",
+    "action",
+    "terminal",
+    "removal_pending",
+    "pending_removal_count",
+    "pending_removals",
+    "legal_actions",
+    "action_token_count",
+    "logical_ply_count",
+    "logical_plies_by_side",
+    "no_capture_count",
+    "repetition_current_count",
+    "repetition_history_length",
+    "snapshot_history_length",
+    "history_sha256",
+    "outcome",
+    "strict_referee_identity",
+}
+_STRICT_TERMINAL_FIELDS = {
+    "terminal",
+    "termination_class",
+    "winner",
+    "outcome_reason",
+    "outcome_reason_code",
+    "local_board",
+}
+_LOCAL_TERMINAL_FIELDS = {"terminal", "winner", "reason"}
+_STATE_FIELDS = {
+    "schema_version",
+    "state_record_identity",
+    "example_id",
+    "game_id",
+    "game_index",
+    "split",
+    "stratum",
+    "candidate_color",
+    "logical_ply",
+    "history_moves",
+    "history_sha256",
+    "sanmill_history_sha256",
+    "board_fen",
+    "legal_actions",
+    "a_pos_mask",
+    "a_pos_verification",
+}
+_SINGLETON_ENTRY_FIELDS = {
+    "game_id",
+    "game_index",
+    "split",
+    "stratum",
+    "candidate_color",
+    "logical_ply",
+    "history_moves",
+    "history_sha256",
+    "board_fen",
+    "legal_actions",
+    "a_pos_mask",
+    "a_pos_count",
+    "entry_identity",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class _ValidatedArtifacts:
+    source_games_bytes: bytes
+    state_split_bytes: bytes
+    singleton_ledger_bytes: bytes
+    source_games_identity: str
+    state_split_identity: str
+    singleton_ledger_identity: str
+    source_game_count: int
+    state_count: int
+    singleton_count: int
+    verifier_identity: str
+
+
+def _split_contract_for_policy(policy: _ArtifactPolicy) -> dict[str, Any]:
+    return {
+        "strategy": "whole-game",
+        "algorithm": {
+            "game_index_origin": 0,
+            "block_size_games": 16,
+            "candidate_colour_by_parity": {"even": "W", "odd": "B"},
+            "dev_remainders": [0, 1],
+            "train_remainders": list(range(2, 16)),
+            "stop_only_after_complete_block": policy.require_complete_game_block,
+            "maximum_games": policy.maximum_source_games,
+        },
+        "counts": _thaw(policy.layout),
+    }
+
+
+def _policy_payload(policy: _ArtifactPolicy) -> dict[str, Any]:
+    return {
+        "domain": policy.domain,
+        "layout": _thaw(policy.layout),
+        "total_states": policy.total_states,
+        "maximum_source_games": policy.maximum_source_games,
+        "require_complete_game_block": policy.require_complete_game_block,
+    }
+
+
+def _policy_from_payload(value: Any, *, domain: str) -> _ArtifactPolicy:
+    checked = _require_exact_keys(
+        value,
+        {
+            "domain",
+            "layout",
+            "total_states",
+            "maximum_source_games",
+            "require_complete_game_block",
+        },
+        field="stored artifact policy",
+    )
+    _require_exact(checked["domain"], domain, field="stored artifact policy.domain")
+    if type(checked["require_complete_game_block"]) is not bool:
+        raise GovernanceStoreContractError("stored artifact block policy differs")
+    if domain == "production":
+        _require_exact(
+            checked,
+            _policy_payload(_PRODUCTION_POLICY),
+            field="stored production artifact policy",
+        )
+        return _PRODUCTION_POLICY
+    policy = _test_artifact_policy(
+        checked["layout"],
+        maximum_source_games=_require_nonnegative_int(
+            checked["maximum_source_games"],
+            field="stored test maximum source games",
+        ),
+    )
+    _require_exact(
+        checked["total_states"],
+        policy.total_states,
+        field="stored test total states",
+    )
+    _require_exact(
+        checked["require_complete_game_block"],
+        False,
+        field="stored test block policy",
+    )
+    return policy
+
+
+def _recompute_state_split_blob_identity(
+    payload: bytes,
+    *,
+    policy: _ArtifactPolicy,
+) -> tuple[str, str, int]:
+    records = _strict_jsonl_objects(payload, field="stored state-split")
+    if len(records) != policy.total_states:
+        raise GovernanceStoreContractError("stored state-split count differs")
+    identities: list[str] = []
+    verifier_identity: str | None = None
+    previous_verification = "0" * 64
+    for record in records:
+        _require_exact_keys(record, _STATE_FIELDS, field="stored state record")
+        body = {
+            key: item for key, item in record.items() if key != "state_record_identity"
+        }
+        identity = _require_sha256(
+            record["state_record_identity"],
+            field="stored state identity",
+        )
+        if identity != canonical_sha256(body):
+            raise GovernanceStoreContractError("stored state record identity differs")
+        verification = _require_exact_keys(
+            record["a_pos_verification"],
+            {
+                "verifier_identity",
+                "inventory_sha256",
+                "previous_verification_sha256",
+                "verification_sha256",
+            },
+            field="stored state verification",
+        )
+        current_verifier = _require_sha256(
+            verification["verifier_identity"],
+            field="stored verifier identity",
+        )
+        if verifier_identity is None:
+            verifier_identity = current_verifier
+        if (
+            current_verifier != verifier_identity
+            or verification["previous_verification_sha256"] != previous_verification
+        ):
+            raise GovernanceStoreContractError("stored verification chain differs")
+        verification_body = {
+            key: item
+            for key, item in verification.items()
+            if key != "verification_sha256"
+        }
+        previous_verification = _require_sha256(
+            verification["verification_sha256"],
+            field="stored verification SHA",
+        )
+        if previous_verification != canonical_sha256(verification_body):
+            raise GovernanceStoreContractError("stored verification hash differs")
+        inventory = {
+            "board_fen": record["board_fen"],
+            "legal_actions": record["legal_actions"],
+            "a_pos_mask": record["a_pos_mask"],
+        }
+        if verification["inventory_sha256"] != canonical_sha256(inventory):
+            raise GovernanceStoreContractError("stored inventory hash differs")
+        identities.append(identity)
+    if verifier_identity is None:
+        raise GovernanceStoreContractError("stored state verifier is absent")
+    split_identity = canonical_sha256(_split_contract_for_policy(policy))
+    return (
+        state_split_artifact_identity(
+            state_record_identities=identities,
+            split_identity=split_identity,
+            verifier_identity=verifier_identity,
+        ),
+        verifier_identity,
+        len(records),
+    )
+
+
+def _recompute_singleton_blob_identity(payload: bytes) -> tuple[str, int]:
+    ledger = _strict_json_object(payload, field="stored singleton ledger")
+    _require_exact_keys(
+        ledger,
+        {"schema_version", "count", "entries", "identity"},
+        field="stored singleton ledger",
+    )
+    body = {key: item for key, item in ledger.items() if key != "identity"}
+    identity = _require_sha256(
+        ledger["identity"],
+        field="stored singleton identity",
+    )
+    if identity != canonical_sha256(body):
+        raise GovernanceStoreContractError("stored singleton identity differs")
+    entries = ledger["entries"]
+    count = _require_nonnegative_int(ledger["count"], field="stored singleton count")
+    if not isinstance(entries, list) or count != len(entries):
+        raise GovernanceStoreContractError("stored singleton count differs")
+    return identity, count
+
+
+def _infer_internal_test_policy(
+    source_payload: bytes,
+    state_payload: bytes,
+) -> _ArtifactPolicy:
+    source_count = len(_strict_jsonl_objects(source_payload, field="source-games"))
+    records = _strict_jsonl_objects(state_payload, field="state-split")
+    layout = {
+        split: {
+            stratum: {colour: 0 for colour in ("W", "B")}
+            for stratum in ("placement", "movement", "flying")
+        }
+        for split in ("train", "dev")
+    }
+    for record in records:
+        if not isinstance(record, Mapping):
+            raise GovernanceStoreContractError("test state record differs")
+        split = _require_text_choice(
+            record.get("split"), {"train", "dev"}, field="test state split"
+        )
+        stratum = _require_text_choice(
+            record.get("stratum"),
+            {"placement", "movement", "flying"},
+            field="test state stratum",
+        )
+        colour = _require_text_choice(
+            record.get("candidate_color"),
+            {"W", "B"},
+            field="test state colour",
+        )
+        layout[split][stratum][colour] += 1
+    return _test_artifact_policy(
+        layout,
+        maximum_source_games=source_count,
+    )
+
+
+def _controller_stream_identity_from_records(
+    *,
+    spec: GovernanceStoreSpec,
+    replay: GovernanceReplay,
+    attempt_identity: str,
+) -> str:
+    return canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-domain-stream.v1",
+            "stream_kind": _CONTROLLER_STREAM_KIND,
+            "store_spec_identity": spec["spec_identity"],
+            "plan_identity": replay.plan_identity,
+            "authorization_consumption_identity": (
+                replay.authorization_consumption_identity
+            ),
+            "state_generation_attempt_identity": attempt_identity,
+        }
+    )
+
+
+def _verify_blob_stage_and_identities(
+    replay: GovernanceReplay,
+    *,
+    artifacts: Mapping[str, tuple[str, bytes]],
+    domain_records: Mapping[str, tuple[str, Mapping[str, Any]]],
+    domain: str,
+    spec: GovernanceStoreSpec,
+    runtime: _StoreRuntimeContext,
+) -> None:
+    generated = "state-generation" in replay.completed_operations
+    frozen = "state-freeze" in replay.completed_operations
+    expected_artifacts = (
+        {"source-games", "state-split", "singleton-ledger"} if generated else set()
+    )
+    expected_records = {"state-generation-completion"} if generated else set()
+    if frozen:
+        expected_artifacts.add("state-freeze-receipt")
+        expected_records.add("state-freeze")
+    if set(artifacts) != expected_artifacts or set(domain_records) != expected_records:
+        raise GovernanceStoreContractError(
+            "durable artifact/domain rows do not match replay stage"
+        )
+    if not generated:
+        return
+    completion_identity, completion = domain_records["state-generation-completion"]
+    _require_exact_keys(
+        completion,
+        _COMPLETION_KEYS,
+        field="stored state-generation completion",
+    )
+    _require_exact(
+        completion["schema_version"],
+        _COMPLETION_SCHEMA,
+        field="stored completion schema",
+    )
+    source_row_identity, source_payload = artifacts["source-games"]
+    state_row_identity, state_payload = artifacts["state-split"]
+    singleton_row_identity, singleton_payload = artifacts["singleton-ledger"]
+    policy = (
+        _PRODUCTION_POLICY
+        if domain == "production"
+        else _infer_internal_test_policy(source_payload, state_payload)
+    )
+    source_identity, games = _validate_source_games(source_payload, policy=policy)
+    state_identity, verifier_identity, state_count = (
+        _recompute_state_split_blob_identity(state_payload, policy=policy)
+    )
+    singleton_identity, singleton_count = _recompute_singleton_blob_identity(
+        singleton_payload
+    )
+    completion_events = tuple(
+        event
+        for event in replay.events
+        if event["event_type"] == "state_generation_completed"
+    )
+    if len(completion_events) != 1:
+        raise GovernanceStoreContractError("completion event cardinality differs")
+    completion_event = completion_events[0]
+    attempt_identity = completion_event["attempt_identity"]
+    stream_identity = _controller_stream_identity_from_records(
+        spec=spec,
+        replay=replay,
+        attempt_identity=attempt_identity,
+    )
+    referee_identities = {item["referee_binding_identity"] for item in games.values()}
+    runtime_identities = {item["sanmill_runtime_identity"] for item in games.values()}
+    if len(referee_identities) != 1 or len(runtime_identities) != 1:
+        raise GovernanceStoreContractError("source runtime/referee identity differs")
+    expected_completion = {
+        "schema_version": _COMPLETION_SCHEMA,
+        "stream_identity": stream_identity,
+        "stream_kind": _CONTROLLER_STREAM_KIND,
+        "sequence": 0,
+        "record_type": "state-generation-completion",
+        "previous_record_identity": None,
+        "experiment_id": replay.experiment_id,
+        "proposal_identity": replay.proposal_identity,
+        "profile_identity": _PROFILE_IDENTITY,
+        "store_spec_identity": spec["spec_identity"],
+        "plan_identity": replay.plan_identity,
+        "readiness_identity": replay.readiness_identity,
+        "managed_git_state_identity": spec["managed_git_state_identity"],
+        "launch_path_binding_identity": spec["launch_path_binding_identity"],
+        "authorization_identity": replay.authorization_identity,
+        "authorization_consumption_identity": (
+            replay.authorization_consumption_identity
+        ),
+        "attempt_identity": attempt_identity,
+        "reservation_event_identity": completion_event["prerequisite_event_identity"],
+        "completion_event_identity": completion_event["event_identity"],
+        "host_preflight_identity": runtime.host_preflight_identity,
+        "state_generator_session_identity": runtime.state_generator_session_identity,
+        "strict_referee_binding_identity": next(iter(referee_identities)),
+        "a_pos_inventory_binding_identity": _inventory_binding_identity(
+            verifier_identity,
+            policy,
+        ),
+        "resource_snapshot_before_identity": (
+            runtime.resource_snapshot_before_identity
+        ),
+        "resource_snapshot_after_identity": runtime.resource_snapshot_after_identity,
+        "artifacts": [
+            _artifact_contract_ref(
+                "source-games",
+                source_identity,
+                source_payload,
+                record_count=len(games),
+            ),
+            _artifact_contract_ref(
+                "state-split",
+                state_identity,
+                state_payload,
+                record_count=state_count,
+                a_pos_verifier_identity=verifier_identity,
+            ),
+            _artifact_contract_ref(
+                "singleton-ledger",
+                singleton_identity,
+                singleton_payload,
+                record_count=singleton_count,
+            ),
+        ],
+        "split_contract_identity": canonical_sha256(_split_contract_for_policy(policy)),
+        "resource_observation": _thaw(completion_event["resource_observation"]),
+        "teacher_fields_present": False,
+        "authoritative_storage": "sqlite-immutable-blob-second-read",
+    }
+    expected_completion_evidence = {
+        "inputs": [],
+        "outputs": [
+            _evidence_ref("source-games", source_identity, source_payload),
+            _evidence_ref("state-split", state_identity, state_payload),
+            _evidence_ref(
+                "singleton-ledger",
+                singleton_identity,
+                singleton_payload,
+            ),
+        ],
+        "checkpoint": None,
+    }
+    if (
+        source_row_identity != source_identity
+        or state_row_identity != state_identity
+        or singleton_row_identity != singleton_identity
+        or completion_identity != canonical_sha256(completion)
+        or completion_identity != _sha256_bytes(canonical_json_bytes(completion))
+    ):
+        raise GovernanceStoreContractError("durable artifact semantic identity differs")
+    _require_exact(
+        completion,
+        expected_completion,
+        field="stored state-generation completion",
+    )
+    _require_exact(
+        completion_event["evidence"],
+        expected_completion_evidence,
+        field="stored state-generation completion evidence",
+    )
+    for field, expected in {
+        "operation_id": "state-generation",
+        "purpose": "state",
+        "seed": None,
+        "from_state": "state_generation_running",
+        "to_state": "state_generated",
+    }.items():
+        _require_exact(
+            completion_event[field],
+            expected,
+            field=f"stored completion event.{field}",
+        )
+    _require_exact(
+        completion_event["resource_observation"]["state_generation_games"],
+        len(games),
+        field="stored completion observed games",
+    )
+    if not frozen:
+        return
+    receipt_row_identity, receipt_payload = artifacts["state-freeze-receipt"]
+    freeze_identity, freeze_record = domain_records["state-freeze"]
+    receipt = _strict_json_object(receipt_payload, field="stored freeze receipt")
+    _require_exact_keys(
+        receipt,
+        _FREEZE_RECEIPT_KEYS,
+        field="stored state-freeze receipt",
+    )
+    freeze_events = tuple(
+        event for event in replay.events if event["event_type"] == "state_frozen"
+    )
+    if len(freeze_events) != 1:
+        raise GovernanceStoreContractError("state-freeze event cardinality differs")
+    freeze_event = freeze_events[0]
+    expected_receipt = {
+        "schema_version": _FREEZE_RECEIPT_SCHEMA,
+        "stream_identity": stream_identity,
+        "stream_kind": _CONTROLLER_STREAM_KIND,
+        "sequence": 1,
+        "record_type": "state-freeze",
+        "previous_record_identity": completion_identity,
+        "experiment_id": replay.experiment_id,
+        "proposal_identity": replay.proposal_identity,
+        "profile_identity": _PROFILE_IDENTITY,
+        "store_spec_identity": spec["spec_identity"],
+        "plan_identity": replay.plan_identity,
+        "readiness_identity": replay.readiness_identity,
+        "authorization_identity": replay.authorization_identity,
+        "authorization_consumption_identity": (
+            replay.authorization_consumption_identity
+        ),
+        "attempt_identity": attempt_identity,
+        "completion_event_identity": completion_event["event_identity"],
+        "completion_record_identity": completion_identity,
+        "source_games_identity": source_identity,
+        "state_split_identity": state_identity,
+        "singleton_ledger_identity": singleton_identity,
+        "teacher_fields_present": False,
+        "teacher_may_start_only_after_this_event": True,
+        "authoritative_artifacts": "sqlite-immutable-blobs",
+    }
+    expected_freeze_evidence = {
+        "inputs": [
+            _evidence_ref("source-games", source_identity, source_payload),
+            _evidence_ref("state-split", state_identity, state_payload),
+            _evidence_ref(
+                "singleton-ledger",
+                singleton_identity,
+                singleton_payload,
+            ),
+        ],
+        "outputs": [
+            _evidence_ref(
+                "state-freeze-receipt",
+                receipt_row_identity,
+                receipt_payload,
+            )
+        ],
+        "checkpoint": None,
+    }
+    if (
+        receipt_row_identity != canonical_sha256(receipt)
+        or freeze_identity != receipt_row_identity
+        or freeze_record != receipt
+        or freeze_identity != _sha256_bytes(receipt_payload)
+    ):
+        raise GovernanceStoreContractError("durable freeze semantic identity differs")
+    _require_exact(
+        receipt,
+        expected_receipt,
+        field="stored state-freeze receipt",
+    )
+    _require_exact(
+        freeze_event["evidence"],
+        expected_freeze_evidence,
+        field="stored state-freeze evidence",
+    )
+    for field, expected in {
+        "operation_id": "state-freeze",
+        "purpose": "governance",
+        "seed": None,
+        "from_state": "state_generated",
+        "to_state": "state_frozen",
+        "prerequisite_event_identity": completion_event["event_identity"],
+    }.items():
+        _require_exact(
+            freeze_event[field],
+            expected,
+            field=f"stored state-freeze event.{field}",
+        )
+
+
+def _validate_sanmill_final_state(
+    value: Any,
+    *,
+    history: Sequence[Mapping[str, Any]],
+    actions: Sequence[str],
+    board: BoardState,
+    strict_referee: _StrictRefereeContext | None,
+    field: str,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    final_state = dict(
+        _require_exact_keys(value, _SANMILL_FINAL_STATE_FIELDS, field=field)
+    )
+    expected_referee = {
+        "format": TRAINING_REFEREE_FORMAT,
+        "profile": TRAINING_REFEREE_PROFILE,
+        "repetitionObservation": TRAINING_REPETITION_OBSERVATION,
+        "originCounted": True,
+        "semanticDigest": TRAINING_REFEREE_SEMANTIC_DIGEST,
+    }
+    for name, expected in {
+        "status": "terminal",
+        "ruleset_id": "nmm",
+        "rules_identity_sha256": EXPECTED_RULES_IDENTITY_SHA256,
+        "history_origin": "game_start",
+        "phase": "game_over",
+        "action": "game_over",
+        "terminal": True,
+        "removal_pending": False,
+        "pending_removal_count": 0,
+        "pending_removals": [0, 0],
+        "legal_actions": [],
+        "action_token_count": len(actions),
+        "logical_ply_count": len(history),
+        "strict_referee_identity": expected_referee,
+    }.items():
+        _require_exact(final_state[name], expected, field=f"{field}.{name}")
+    side_to_move = final_state["side_to_move"]
+    if side_to_move is not None and (
+        type(side_to_move) is not str or side_to_move not in {"white", "black"}
+    ):
+        raise GovernanceStoreContractError(f"{field}.side_to_move differs")
+    for name in (
+        "logical_plies_by_side",
+        "no_capture_count",
+        "repetition_current_count",
+        "repetition_history_length",
+        "snapshot_history_length",
+    ):
+        if name == "logical_plies_by_side":
+            counts = final_state[name]
+            if (
+                not isinstance(counts, list)
+                or len(counts) != 2
+                or any(type(item) is not int or item < 0 for item in counts)
+                or sum(counts) != len(history)
+            ):
+                raise GovernanceStoreContractError(f"{field}.{name} differs")
+        else:
+            _require_nonnegative_int(final_state[name], field=f"{field}.{name}")
+    _require_sha256(final_state["history_sha256"], field=f"{field}.history_sha256")
+    outcome = _require_exact_keys(
+        final_state["outcome"],
+        {"terminal", "winner", "winner_code", "reason", "reason_code"},
+        field=f"{field}.outcome",
+    )
+    _require_exact(outcome["terminal"], True, field=f"{field}.outcome.terminal")
+    winner = outcome["winner"]
+    winner_code = outcome["winner_code"]
+    if not (
+        (winner is None and winner_code is None)
+        or (
+            type(winner) is str
+            and winner == "white"
+            and type(winner_code) is int
+            and winner_code == 0
+        )
+        or (
+            type(winner) is str
+            and winner == "black"
+            and type(winner_code) is int
+            and winner_code == 1
+        )
+    ):
+        raise GovernanceStoreContractError(f"{field}.outcome winner differs")
+    _require_nonempty_text(outcome["reason"], field=f"{field}.outcome.reason")
+    _require_nonempty_text(outcome["reason_code"], field=f"{field}.outcome.reason_code")
+    if outcome["reason"] == "ongoing" or outcome["reason_code"] == "ongoing":
+        raise GovernanceStoreContractError(f"{field}.outcome is not terminal")
+    try:
+        projected = project_stable_sanmill_fen(final_state["fen"], terminal=True)
+    except (SanmillBridgeError, ValueError, TypeError) as exc:
+        raise GovernanceStoreContractError(f"{field}.fen cannot be projected") from exc
+    if (
+        projected.positions != board.positions
+        or projected.pieces_placed != board.pieces_placed
+        or projected.pieces_on_board != board.pieces_on_board
+        or projected.turn != board.turn
+    ):
+        raise GovernanceStoreContractError(f"{field}.fen projection differs")
+    if (
+        side_to_move is not None
+        and {
+            "white": "W",
+            "black": "B",
+        }[side_to_move]
+        != board.turn
+    ):
+        raise GovernanceStoreContractError(f"{field}.side_to_move differs from replay")
+    if strict_referee is not None:
+        try:
+            observed = strict_referee.complete_history_verifier(history, actions)
+        except Exception as exc:
+            raise GovernanceStoreContractError(
+                f"{field} live strict-referee verification failed"
+            ) from exc
+        if type(observed) is not UciPositionState:
+            raise GovernanceStoreContractError(
+                f"{field} live strict-referee state type differs"
+            )
+        _require_exact(
+            observed.portable_record(),
+            final_state,
+            field=f"{field} live strict-referee state",
+        )
+    return final_state, dict(outcome)
+
+
+def _validate_strict_terminal(
+    value: Any,
+    *,
+    board: BoardState,
+    outcome: Mapping[str, Any],
+    field: str,
+) -> None:
+    terminal = _require_exact_keys(value, _STRICT_TERMINAL_FIELDS, field=field)
+    _require_exact(terminal["terminal"], True, field=f"{field}.terminal")
+    classification = _require_text_choice(
+        terminal["termination_class"],
+        {"rules-win", "repetition-draw", "rules-draw"},
+        field=f"{field}.termination_class",
+    )
+    _require_exact(
+        terminal["outcome_reason"],
+        outcome["reason"],
+        field=f"{field}.outcome_reason",
+    )
+    _require_exact(
+        terminal["outcome_reason_code"],
+        outcome["reason_code"],
+        field=f"{field}.outcome_reason_code",
+    )
+    local_terminal, local_winner, local_reason = terminal_result(board)
+    local = {
+        "terminal": local_terminal,
+        "winner": local_winner,
+        "reason": local_reason,
+    }
+    _require_exact_keys(
+        terminal["local_board"], _LOCAL_TERMINAL_FIELDS, field=f"{field}.local_board"
+    )
+    _require_exact(terminal["local_board"], local, field=f"{field}.local_board")
+    expected_winner = {"W": "white", "B": "black", None: None}[local_winner]
+    outcome_key = (outcome["reason"], outcome["reason_code"])
+    if local_terminal:
+        expected_outcome = _RULES_WIN_OUTCOME_BY_LOCAL_REASON.get(local_reason)
+        if (
+            classification != "rules-win"
+            or outcome["winner"] != expected_winner
+            or expected_outcome is None
+            or outcome_key != expected_outcome
+        ):
+            raise GovernanceStoreContractError(
+                f"{field} conflicts with local rules terminal"
+            )
+    elif classification == "rules-win":
+        raise GovernanceStoreContractError(f"{field} invents a local rules win")
+    elif outcome["winner"] is not None:
+        raise GovernanceStoreContractError(f"{field} draw has a winner")
+    elif classification == "repetition-draw":
+        if outcome_key != _REPETITION_DRAW_OUTCOME:
+            raise GovernanceStoreContractError(
+                f"{field} repetition reason differs from pinned Sanmill"
+            )
+    elif outcome_key not in _RULES_DRAW_OUTCOMES:
+        raise GovernanceStoreContractError(
+            f"{field} rules-draw reason differs from pinned Sanmill"
+        )
+    _require_exact(terminal["winner"], local_winner, field=f"{field}.winner")
+
+
+def _validate_source_games(
+    payload: bytes,
+    *,
+    policy: _ArtifactPolicy,
+    attempt_identity: str | None = None,
+    strict_referee: _StrictRefereeContext | None = None,
+) -> tuple[str, dict[str, dict[str, Any]]]:
+    records = _strict_jsonl_objects(payload, field="source-games")
+    count = len(records)
+    if (
+        count == 0
+        or count > policy.maximum_source_games
+        or (policy.require_complete_game_block and count % 16 != 0)
+    ):
+        raise GovernanceStoreContractError("source-game count/block contract differs")
+    games: dict[str, dict[str, Any]] = {}
+    indices: set[int] = set()
+    record_identities: list[str] = []
+    seen_record_identities: set[str] = set()
+    history_identities: set[str] = set()
+    sanmill_history_identities: set[str] = set()
+    for expected_index, record in enumerate(records):
+        _require_exact_keys(record, _SOURCE_GAME_FIELDS, field="source game")
+        _require_exact(
+            record["schema_version"],
+            _SOURCE_GAME_SCHEMA,
+            field="source game.schema_version",
+        )
+        record_attempt = _require_bound_identity(
+            record["state_generation_attempt_identity"],
+            field="source game.state_generation_attempt_identity",
+        )
+        if attempt_identity is not None and record_attempt != attempt_identity:
+            raise GovernanceStoreContractError("source game attempt identity differs")
+        if (
+            strict_referee is not None
+            and record_attempt != strict_referee.attempt_identity
+        ):
+            raise GovernanceStoreContractError(
+                "source game strict-referee attempt identity differs"
+            )
+        game_id = _require_sha256(
+            record["game_id"],
+            field="source game.game_id",
+        )
+        game_index = _require_nonnegative_int(
+            record["game_index"],
+            field="source game.game_index",
+        )
+        if game_index != expected_index:
+            raise GovernanceStoreContractError(
+                "source games must use contiguous canonical game indices"
+            )
+        split = _require_text_choice(
+            record["split"], {"train", "dev"}, field="source game.split"
+        )
+        expected_split = "dev" if game_index % 16 in {0, 1} else "train"
+        if split != expected_split:
+            raise GovernanceStoreContractError("source game split differs")
+        colour = _require_text_choice(
+            record["candidate_color"],
+            {"W", "B"},
+            field="source game.candidate_color",
+        )
+        expected_colour = "W" if game_index % 2 == 0 else "B"
+        if colour != expected_colour:
+            raise GovernanceStoreContractError("source game candidate colour differs")
+        complete_history = _require_exact_keys(
+            record["complete_history"],
+            _COMPLETE_HISTORY_FIELDS,
+            field="source game.complete_history",
+        )
+        history, board = _replay_history(
+            complete_history["logical_moves"],
+            field="source game.complete_history.logical_moves",
+        )
+        if not history:
+            raise GovernanceStoreContractError("source game history must be non-empty")
+        history_identity = canonical_sha256(list(history))
+        if (
+            _require_sha256(
+                complete_history["logical_moves_sha256"],
+                field="source game.complete_history.logical_moves_sha256",
+            )
+            != history_identity
+        ):
+            raise GovernanceStoreContractError("source game history identity differs")
+        _require_exact(
+            complete_history["logical_ply_count"],
+            len(history),
+            field="source game.complete_history.logical_ply_count",
+        )
+        expected_actions = tuple(
+            action for move in history for action in nmm_move_actions(move)
+        )
+        raw_actions = complete_history["sanmill_actions"]
+        if not isinstance(raw_actions, list) or any(
+            type(action) is not str or not action for action in raw_actions
+        ):
+            raise GovernanceStoreContractError("source game Sanmill actions differ")
+        _require_exact(
+            raw_actions,
+            list(expected_actions),
+            field="source game.complete_history.sanmill_actions",
+        )
+        _require_exact(
+            complete_history["action_token_count"],
+            len(expected_actions),
+            field="source game.complete_history.action_token_count",
+        )
+        actions_identity = canonical_sha256(list(expected_actions))
+        if (
+            _require_sha256(
+                complete_history["sanmill_actions_sha256"],
+                field="source game.complete_history.sanmill_actions_sha256",
+            )
+            != actions_identity
+        ):
+            raise GovernanceStoreContractError(
+                "source game Sanmill action hash differs"
+            )
+        runtime_identity = _require_bound_identity(
+            record["sanmill_runtime_identity"],
+            field="source game.sanmill_runtime_identity",
+        )
+        referee_identity = _require_bound_identity(
+            record["referee_binding_identity"],
+            field="source game.referee_binding_identity",
+        )
+        if strict_referee is not None and (
+            runtime_identity != strict_referee.runtime_identity
+            or referee_identity != strict_referee.binding_identity
+        ):
+            raise GovernanceStoreContractError(
+                "source game strict-referee identity differs"
+            )
+        final_state, outcome = _validate_sanmill_final_state(
+            record["sanmill_final_state"],
+            history=history,
+            actions=expected_actions,
+            board=board,
+            strict_referee=strict_referee,
+            field="source game.sanmill_final_state",
+        )
+        final_state_identity = _require_sha256(
+            record["sanmill_final_state_identity"],
+            field="source game.sanmill_final_state_identity",
+        )
+        if final_state_identity != canonical_sha256(final_state):
+            raise GovernanceStoreContractError(
+                "source game final state identity differs"
+            )
+        _validate_strict_terminal(
+            record["strict_terminal"],
+            board=board,
+            outcome=outcome,
+            field="source game.strict_terminal",
+        )
+        expected_game_id = canonical_sha256(
+            {
+                "schema_version": "nmm.classical-a-pos-source-game-id.v1",
+                "state_generation_attempt_identity": record_attempt,
+                "game_index": game_index,
+                "logical_moves_sha256": history_identity,
+                "sanmill_final_state_identity": final_state_identity,
+                "referee_binding_identity": referee_identity,
+            }
+        )
+        if game_id != expected_game_id:
+            raise GovernanceStoreContractError("source game ID binding differs")
+        body = {key: item for key, item in record.items() if key != "record_identity"}
+        identity = _require_sha256(
+            record["record_identity"],
+            field="source game.record_identity",
+        )
+        if identity != canonical_sha256(body):
+            raise GovernanceStoreContractError("source game record identity differs")
+        sanmill_history_identity = _require_sha256(
+            final_state["history_sha256"],
+            field="source game.sanmill_final_state.history_sha256",
+        )
+        if (
+            game_id in games
+            or game_index in indices
+            or identity in seen_record_identities
+            or history_identity in history_identities
+            or sanmill_history_identity in sanmill_history_identities
+        ):
+            raise GovernanceStoreContractError(
+                "source game identity/index/history repeats"
+            )
+        games[game_id] = {
+            "game_index": game_index,
+            "split": split,
+            "candidate_color": colour,
+            "history_moves": history,
+            "sanmill_actions": expected_actions,
+            "sanmill_final_state_identity": final_state_identity,
+            "sanmill_runtime_identity": runtime_identity,
+            "referee_binding_identity": referee_identity,
+            "record_identity": identity,
+        }
+        indices.add(game_index)
+        history_identities.add(history_identity)
+        sanmill_history_identities.add(sanmill_history_identity)
+        seen_record_identities.add(identity)
+        record_identities.append(identity)
+    identity = canonical_sha256(
+        {
+            "schema_version": "nmm.classical-a-pos-source-games-artifact.v2",
+            "game_count": count,
+            "record_identities": record_identities,
+        }
+    )
+    return identity, games
+
+
+def _live_inventory_mask(
+    board: BoardState,
+    legal: tuple[dict[str, Any], ...],
+    *,
+    inventory: _InventoryContext,
+    field: str,
+) -> tuple[bool, ...]:
+    try:
+        observed = tuple(inventory.inventory_verifier(board, legal))
+    except Exception as exc:
+        raise GovernanceStoreContractError(f"{field} live A_pos query failed") from exc
+    if len(observed) != len(legal) or any(type(item) is not bool for item in observed):
+        raise GovernanceStoreContractError(f"{field} live A_pos mask shape differs")
+    return observed
+
+
+def _validate_state_split(
+    payload: bytes,
+    *,
+    games: Mapping[str, Mapping[str, Any]],
+    inventory: _InventoryContext,
+    strict_referee: _StrictRefereeContext,
+) -> tuple[str, set[str], tuple[str, ...]]:
+    policy = inventory.policy
+    records = _strict_jsonl_objects(payload, field="state-split")
+    if len(records) != policy.total_states:
+        raise GovernanceStoreContractError("state-split count differs")
+    expected_counts = _thaw(policy.layout)
+    observed_counts = {
+        split: {
+            stratum: {colour: 0 for colour in ("W", "B")}
+            for stratum in ("placement", "movement", "flying")
+        }
+        for split in ("train", "dev")
+    }
+    prior_selection_keys: dict[tuple[str, str, str], str] = {}
+    prior_verification = "0" * 64
+    state_identities: list[str] = []
+    seen_state_identities: set[str] = set()
+    history_identities: set[str] = set()
+    example_identities: set[str] = set()
+    prefixes: set[tuple[str, int]] = set()
+    game_splits: dict[str, str] = {}
+    for record in records:
+        _require_exact_keys(record, _STATE_FIELDS, field="state record")
+        _require_exact(
+            record["schema_version"],
+            STATE_RECORD_SCHEMA,
+            field="state record.schema_version",
+        )
+        if any("teacher" in key.lower() for key in record):
+            raise GovernanceStoreContractError("state record contains teacher data")
+        game_id = _require_nonempty_text(
+            record["game_id"],
+            field="state record.game_id",
+        )
+        if game_id not in games:
+            raise GovernanceStoreContractError("state record game is not source-bound")
+        source = games[game_id]
+        game_index = _require_nonnegative_int(
+            record["game_index"],
+            field="state record.game_index",
+        )
+        if game_index != source["game_index"]:
+            raise GovernanceStoreContractError("state/source game index differs")
+        split = _require_text_choice(
+            record["split"],
+            {"train", "dev"},
+            field="state record.split",
+        )
+        stratum = _require_text_choice(
+            record["stratum"],
+            {"placement", "movement", "flying"},
+            field="state record.stratum",
+        )
+        colour = _require_text_choice(
+            record["candidate_color"],
+            {"W", "B"},
+            field="state record.candidate_color",
+        )
+        expected_split = "dev" if game_index % 16 in {0, 1} else "train"
+        if (
+            split != expected_split
+            or split != source["split"]
+            or colour != source["candidate_color"]
+        ):
+            raise GovernanceStoreContractError("whole-game split/colour differs")
+        if game_splits.setdefault(game_id, split) != split:
+            raise GovernanceStoreContractError("one source game crosses split")
+        history, board = _replay_history(
+            record["history_moves"],
+            field="state record.history_moves",
+        )
+        logical_ply = _require_nonnegative_int(
+            record["logical_ply"],
+            field="state record.logical_ply",
+        )
+        if logical_ply != len(history):
+            raise GovernanceStoreContractError("state logical ply differs")
+        source_history = source["history_moves"]
+        if (
+            len(history) > len(source_history)
+            or tuple(source_history[: len(history)]) != history
+        ):
+            raise GovernanceStoreContractError(
+                "state is not an exact source-game prefix"
+            )
+        if board.turn != colour or record["board_fen"] != board.to_fen_string():
+            raise GovernanceStoreContractError("state board/candidate binding differs")
+        expected_stratum = {
+            "place": "placement",
+            "move": "movement",
+            "fly": "flying",
+        }[get_game_phase(board, colour)]
+        if stratum != expected_stratum:
+            raise GovernanceStoreContractError("state stratum differs")
+        history_identity = canonical_sha256(list(history))
+        if (
+            _require_sha256(
+                record["history_sha256"],
+                field="state record.history_sha256",
+            )
+            != history_identity
+        ):
+            raise GovernanceStoreContractError("state history identity differs")
+        sanmill_history_identity = _require_sha256(
+            record["sanmill_history_sha256"],
+            field="state record.sanmill_history_sha256",
+        )
+        try:
+            observed_sanmill_history = strict_referee.prefix_history_verifier(history)
+        except Exception as exc:
+            raise GovernanceStoreContractError(
+                "state prefix live strict-referee verification failed"
+            ) from exc
+        if (
+            _require_sha256(
+                observed_sanmill_history,
+                field="state prefix live Sanmill history identity",
+            )
+            != sanmill_history_identity
+        ):
+            raise GovernanceStoreContractError("state prefix Sanmill history differs")
+        example_identity = _require_sha256(
+            record["example_id"],
+            field="state record.example_id",
+        )
+        expected_example_identity = canonical_sha256(
+            {"history_sha256": history_identity, "board_fen": board.to_fen_string()}
+        )
+        if example_identity != expected_example_identity:
+            raise GovernanceStoreContractError("state example identity differs")
+        raw_legal = record["legal_actions"]
+        if not isinstance(raw_legal, list):
+            raise GovernanceStoreContractError("state legal_actions must be an array")
+        legal = tuple(
+            _atomic_action(move, field=f"state legal_actions[{index}]")
+            for index, move in enumerate(raw_legal)
+        )
+        expected_legal = tuple(dict(move) for move in get_all_legal_moves(board))
+        if legal != expected_legal or len({_action_key(move) for move in legal}) != len(
+            legal
+        ):
+            raise GovernanceStoreContractError("state legal inventory/order differs")
+        raw_mask = record["a_pos_mask"]
+        if (
+            not isinstance(raw_mask, list)
+            or len(raw_mask) != len(legal)
+            or any(type(item) is not bool for item in raw_mask)
+        ):
+            raise GovernanceStoreContractError("state A_pos mask shape differs")
+        mask = tuple(raw_mask)
+        if sum(mask) <= 1:
+            raise GovernanceStoreContractError(
+                "state artifact contains non-informative A_pos"
+            )
+        if (
+            _live_inventory_mask(
+                board,
+                legal,
+                inventory=inventory,
+                field="state record",
+            )
+            != mask
+        ):
+            raise GovernanceStoreContractError("state live A_pos inventory differs")
+        verification = _require_exact_keys(
+            record["a_pos_verification"],
+            {
+                "verifier_identity",
+                "inventory_sha256",
+                "previous_verification_sha256",
+                "verification_sha256",
+            },
+            field="state A_pos verification",
+        )
+        if (
+            verification["verifier_identity"] != inventory.verifier_identity
+            or verification["previous_verification_sha256"] != prior_verification
+            or verification["inventory_sha256"]
+            != canonical_sha256(
+                {
+                    "board_fen": board.to_fen_string(),
+                    "legal_actions": list(legal),
+                    "a_pos_mask": list(mask),
+                }
+            )
+        ):
+            raise GovernanceStoreContractError(
+                "state A_pos verification binding differs"
+            )
+        verification_body = {
+            key: item
+            for key, item in verification.items()
+            if key != "verification_sha256"
+        }
+        prior_verification = _require_sha256(
+            verification["verification_sha256"],
+            field="state verification SHA",
+        )
+        if prior_verification != canonical_sha256(verification_body):
+            raise GovernanceStoreContractError("state verification chain hash differs")
+        state_body = {
+            key: item for key, item in record.items() if key != "state_record_identity"
+        }
+        state_identity = _require_sha256(
+            record["state_record_identity"],
+            field="state_record_identity",
+        )
+        if state_identity != canonical_sha256(state_body):
+            raise GovernanceStoreContractError("state record identity differs")
+        prefix = (game_id, logical_ply)
+        if (
+            state_identity in seen_state_identities
+            or history_identity in history_identities
+            or example_identity in example_identities
+            or prefix in prefixes
+        ):
+            raise GovernanceStoreContractError("state identity/history/prefix repeats")
+        state_identities.append(state_identity)
+        seen_state_identities.add(state_identity)
+        history_identities.add(history_identity)
+        example_identities.add(example_identity)
+        prefixes.add(prefix)
+        cell = (split, stratum, colour)
+        selection_key = canonical_sha256(
+            {"selection_seed": 2026083091, "history_sha256": history_identity}
+        )
+        prior_selection_key = prior_selection_keys.get(cell)
+        if prior_selection_key is not None and selection_key <= prior_selection_key:
+            raise GovernanceStoreContractError(
+                "state canonical selection order differs"
+            )
+        prior_selection_keys[cell] = selection_key
+        observed_counts[split][stratum][colour] += 1
+    if observed_counts != expected_counts:
+        raise GovernanceStoreContractError("state 12-cell quota differs")
+    split_identity = canonical_sha256(_split_contract_for_policy(policy))
+    identity = state_split_artifact_identity(
+        state_record_identities=state_identities,
+        split_identity=split_identity,
+        verifier_identity=inventory.verifier_identity,
+    )
+    return identity, history_identities, tuple(state_identities)
+
+
+def _validate_singleton_ledger(
+    payload: bytes,
+    *,
+    games: Mapping[str, Mapping[str, Any]],
+    state_history_identities: set[str],
+    inventory: _InventoryContext,
+) -> tuple[str, int]:
+    ledger = _strict_json_object(payload, field="singleton ledger")
+    _require_exact_keys(
+        ledger,
+        {"schema_version", "count", "entries", "identity"},
+        field="singleton ledger",
+    )
+    _require_exact(
+        ledger["schema_version"],
+        SINGLETON_LEDGER_SCHEMA,
+        field="singleton ledger.schema_version",
+    )
+    entries = ledger["entries"]
+    if not isinstance(entries, list):
+        raise GovernanceStoreContractError("singleton entries must be an array")
+    count = _require_nonnegative_int(ledger["count"], field="singleton count")
+    if count != len(entries):
+        raise GovernanceStoreContractError("singleton count differs")
+    body = {key: item for key, item in ledger.items() if key != "identity"}
+    identity = _require_sha256(ledger["identity"], field="singleton identity")
+    if identity != canonical_sha256(body):
+        raise GovernanceStoreContractError("singleton ledger identity differs")
+    seen_history: set[str] = set()
+    seen_prefixes: set[tuple[str, int]] = set()
+    for entry in entries:
+        _require_exact_keys(entry, _SINGLETON_ENTRY_FIELDS, field="singleton entry")
+        game_id = _require_nonempty_text(
+            entry["game_id"],
+            field="singleton game_id",
+        )
+        if game_id not in games:
+            raise GovernanceStoreContractError("singleton game is not source-bound")
+        source = games[game_id]
+        game_index = _require_nonnegative_int(
+            entry["game_index"],
+            field="singleton game_index",
+        )
+        if game_index != source["game_index"]:
+            raise GovernanceStoreContractError("singleton/source game index differs")
+        split = _require_text_choice(
+            entry["split"],
+            {"train", "dev"},
+            field="singleton split",
+        )
+        colour = _require_text_choice(
+            entry["candidate_color"],
+            {"W", "B"},
+            field="singleton candidate_color",
+        )
+        expected_split = "dev" if game_index % 16 in {0, 1} else "train"
+        if split != expected_split or colour != source["candidate_color"]:
+            raise GovernanceStoreContractError("singleton split/colour differs")
+        history, board = _replay_history(
+            entry["history_moves"],
+            field="singleton history_moves",
+        )
+        logical_ply = _require_nonnegative_int(
+            entry["logical_ply"],
+            field="singleton logical_ply",
+        )
+        if logical_ply != len(history):
+            raise GovernanceStoreContractError("singleton logical ply differs")
+        source_history = source["history_moves"]
+        if (
+            len(history) > len(source_history)
+            or tuple(source_history[: len(history)]) != history
+        ):
+            raise GovernanceStoreContractError("singleton is not a source-game prefix")
+        if board.turn != colour or entry["board_fen"] != board.to_fen_string():
+            raise GovernanceStoreContractError("singleton board binding differs")
+        stratum = {
+            "place": "placement",
+            "move": "movement",
+            "fly": "flying",
+        }[get_game_phase(board, colour)]
+        if (
+            _require_text_choice(
+                entry["stratum"],
+                {"placement", "movement", "flying"},
+                field="singleton stratum",
+            )
+            != stratum
+        ):
+            raise GovernanceStoreContractError("singleton stratum differs")
+        history_identity = canonical_sha256(list(history))
+        if (
+            _require_sha256(
+                entry["history_sha256"],
+                field="singleton history_sha256",
+            )
+            != history_identity
+        ):
+            raise GovernanceStoreContractError("singleton history identity differs")
+        raw_legal = entry["legal_actions"]
+        if not isinstance(raw_legal, list):
+            raise GovernanceStoreContractError(
+                "singleton legal_actions must be an array"
+            )
+        legal = tuple(
+            _atomic_action(move, field=f"singleton legal_actions[{index}]")
+            for index, move in enumerate(raw_legal)
+        )
+        if legal != tuple(dict(move) for move in get_all_legal_moves(board)):
+            raise GovernanceStoreContractError("singleton legal order differs")
+        raw_mask = entry["a_pos_mask"]
+        if (
+            not isinstance(raw_mask, list)
+            or len(raw_mask) != len(legal)
+            or any(type(item) is not bool for item in raw_mask)
+        ):
+            raise GovernanceStoreContractError("singleton A_pos mask differs")
+        mask = tuple(raw_mask)
+        if (
+            _require_nonnegative_int(
+                entry["a_pos_count"],
+                field="singleton a_pos_count",
+            )
+            != 1
+            or sum(mask) != 1
+        ):
+            raise GovernanceStoreContractError("singleton entry is not |A_pos|=1")
+        if (
+            _live_inventory_mask(
+                board,
+                legal,
+                inventory=inventory,
+                field="singleton entry",
+            )
+            != mask
+        ):
+            raise GovernanceStoreContractError("singleton live A_pos differs")
+        entry_body = {
+            key: item for key, item in entry.items() if key != "entry_identity"
+        }
+        if _require_sha256(
+            entry["entry_identity"],
+            field="singleton entry identity",
+        ) != canonical_sha256(entry_body):
+            raise GovernanceStoreContractError("singleton entry identity differs")
+        prefix = (game_id, logical_ply)
+        if (
+            history_identity in state_history_identities
+            or history_identity in seen_history
+            or prefix in seen_prefixes
+        ):
+            raise GovernanceStoreContractError("singleton identity/prefix repeats")
+        seen_history.add(history_identity)
+        seen_prefixes.add(prefix)
+    return identity, count
+
+
+def _validate_artifacts(
+    source_games_bytes: bytes,
+    state_split_bytes: bytes,
+    singleton_ledger_bytes: bytes,
+    *,
+    inventory: _InventoryContext,
+    strict_referee: _StrictRefereeContext,
+    attempt_identity: str,
+) -> _ValidatedArtifacts:
+    source_identity, games = _validate_source_games(
+        source_games_bytes,
+        policy=inventory.policy,
+        attempt_identity=attempt_identity,
+        strict_referee=strict_referee,
+    )
+    state_identity, state_histories, state_ids = _validate_state_split(
+        state_split_bytes,
+        games=games,
+        inventory=inventory,
+        strict_referee=strict_referee,
+    )
+    singleton_identity, singleton_count = _validate_singleton_ledger(
+        singleton_ledger_bytes,
+        games=games,
+        state_history_identities=state_histories,
+        inventory=inventory,
+    )
+    return _ValidatedArtifacts(
+        source_games_bytes=source_games_bytes,
+        state_split_bytes=state_split_bytes,
+        singleton_ledger_bytes=singleton_ledger_bytes,
+        source_games_identity=source_identity,
+        state_split_identity=state_identity,
+        singleton_ledger_identity=singleton_identity,
+        source_game_count=len(games),
+        state_count=len(state_ids),
+        singleton_count=singleton_count,
+        verifier_identity=inventory.verifier_identity,
+    )
+
+
+def _evidence_ref(role: str, identity: str, payload: bytes) -> dict[str, Any]:
+    return {
+        "role": role,
+        "identity": _require_sha256(identity, field=f"evidence {role} identity"),
+        "file_sha256": _sha256_bytes(payload),
+        "size_bytes": len(payload),
+    }
+
+
+def _prepare_state_generation_commit_core(
+    active: object,
+    inventory_binding: object,
+    strict_referee_binding: object,
+    *,
+    source_games_path: str | Path,
+    state_split_path: str | Path,
+    singleton_ledger_path: str | Path,
+    timestamp_utc: str,
+    active_seconds: int,
+    active_type: type,
+    inventory_type: type,
+    strict_referee_type: type,
+    pending_type: type,
+    pending_token: object,
+    store_type: type,
+    store_contexts: Mapping[object, _StoreContext],
+    active_contexts: Mapping[object, _ActiveContext],
+    inventory_contexts: Mapping[object, _InventoryContext],
+    strict_referee_contexts: Mapping[object, _StrictRefereeContext],
+    pending_contexts: weakref.WeakKeyDictionary,
+) -> object:
+    if (
+        type(active) is not active_type
+        or type(inventory_binding) is not inventory_type
+        or type(strict_referee_binding) is not strict_referee_type
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation prepare requires exact active/inventory capabilities"
+        )
+    active_context = active_contexts.get(active)
+    inventory_context = inventory_contexts.get(inventory_binding)
+    strict_referee_context = strict_referee_contexts.get(strict_referee_binding)
+    if (
+        active_context is None
+        or inventory_context is None
+        or strict_referee_context is None
+        or active_context.spent
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation active/inventory capability is absent or consumed"
+        )
+    store_context = _require_store_context(
+        active_context.store,
+        store_type=store_type,
+        contexts=store_contexts,
+    )
+    if (
+        store_context.replay.state != "state_generation_running"
+        or store_context.replay.head_event_identity
+        != active_context.reservation_event_identity
+        or store_context.replay.events[-1]["attempt_identity"]
+        != active_context.attempt_identity
+        or inventory_context.policy.domain != store_context.domain
+        or strict_referee_context.domain != store_context.domain
+        or strict_referee_context.attempt_identity != active_context.attempt_identity
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation prepare capability/replay domain differs"
+        )
+    seconds = _require_nonnegative_int(
+        active_seconds,
+        field="state-generation active_seconds",
+    )
+    # The attempt is consumed before touching artifacts.  Any read, validation,
+    # or later persistence failure therefore cannot be retried through C4a.
+    active_context.spent = True
+    source_path, source_bytes, source_key = _read_plan_owned_artifact(
+        source_games_path,
+        store_context=store_context,
+        field="source-games",
+    )
+    state_path, state_bytes, state_key = _read_plan_owned_artifact(
+        state_split_path,
+        store_context=store_context,
+        field="state-split",
+    )
+    singleton_path, singleton_bytes, singleton_key = _read_plan_owned_artifact(
+        singleton_ledger_path,
+        store_context=store_context,
+        field="singleton-ledger",
+    )
+    validated = _validate_artifacts(
+        source_bytes,
+        state_bytes,
+        singleton_bytes,
+        inventory=inventory_context,
+        strict_referee=strict_referee_context,
+        attempt_identity=active_context.attempt_identity,
+    )
+    evidence = {
+        "inputs": [],
+        "outputs": [
+            _evidence_ref(
+                "source-games",
+                validated.source_games_identity,
+                source_bytes,
+            ),
+            _evidence_ref(
+                "state-split",
+                validated.state_split_identity,
+                state_bytes,
+            ),
+            _evidence_ref(
+                "singleton-ledger",
+                validated.singleton_ledger_identity,
+                singleton_bytes,
+            ),
+        ],
+        "checkpoint": None,
+    }
+    try:
+        _event, event_bytes = build_state_generation_completed_event(
+            store_context.replay,
+            timestamp_utc=timestamp_utc,
+            evidence=evidence,
+            state_generation_games=validated.source_game_count,
+            active_seconds=seconds,
+        )
+    except Exception as exc:
+        raise GovernanceStoreContractError(
+            "state-generation completion event preparation failed"
+        ) from exc
+    pending = pending_type(pending_token)
+    pending_contexts[pending] = _PendingStateContext(
+        store=active_context.store,
+        active=active,
+        inventory_binding=inventory_binding,
+        strict_referee_binding=strict_referee_binding,
+        source_games_path=source_path,
+        state_split_path=state_path,
+        singleton_ledger_path=singleton_path,
+        source_games_sha256=_sha256_bytes(source_bytes),
+        state_split_sha256=_sha256_bytes(state_bytes),
+        singleton_ledger_sha256=_sha256_bytes(singleton_bytes),
+        source_games_file_key=source_key,
+        state_split_file_key=state_key,
+        singleton_ledger_file_key=singleton_key,
+        timestamp_utc=timestamp_utc,
+        active_seconds=seconds,
+        policy=inventory_context.policy,
+        event_bytes=event_bytes,
+    )
+    return pending
+
+
+def prepare_state_generation_commit(
+    active: ActiveStateGenerationAttempt,
+    inventory_binding: ProductionAPosInventoryBinding,
+    strict_referee_binding: ProductionStrictRefereeBinding,
+    *,
+    source_games_path: str | Path,
+    state_split_path: str | Path,
+    singleton_ledger_path: str | Path,
+    timestamp_utc: str,
+    active_seconds: int,
+) -> PendingStateGenerationCommit:
+    """First-read and validate production artifacts without granting completion."""
+    pending = _prepare_state_generation_commit_core(
+        active,
+        inventory_binding,
+        strict_referee_binding,
+        source_games_path=source_games_path,
+        state_split_path=state_split_path,
+        singleton_ledger_path=singleton_ledger_path,
+        timestamp_utc=timestamp_utc,
+        active_seconds=active_seconds,
+        active_type=ActiveStateGenerationAttempt,
+        inventory_type=ProductionAPosInventoryBinding,
+        strict_referee_type=ProductionStrictRefereeBinding,
+        pending_type=PendingStateGenerationCommit,
+        pending_token=_PRODUCTION_PENDING_TOKEN,
+        store_type=DurableGovernanceStore,
+        store_contexts=_PRODUCTION_STORE_CONTEXTS,
+        active_contexts=_PRODUCTION_ACTIVE_CONTEXTS,
+        inventory_contexts=_PRODUCTION_INVENTORY_CONTEXTS,
+        strict_referee_contexts=_PRODUCTION_STRICT_REFEREE_CONTEXTS,
+        pending_contexts=_PRODUCTION_PENDING_CONTEXTS,
+    )
+    assert type(pending) is PendingStateGenerationCommit
+    return pending
+
+
+def _test_prepare_state_generation_commit(
+    active: _TestActiveStateGenerationAttempt,
+    inventory_binding: _TestAPosInventoryBinding,
+    strict_referee_binding: _TestStrictRefereeBinding,
+    *,
+    source_games_path: str | Path,
+    state_split_path: str | Path,
+    singleton_ledger_path: str | Path,
+    timestamp_utc: str,
+    active_seconds: int,
+) -> _TestPendingStateGenerationCommit:
+    pending = _prepare_state_generation_commit_core(
+        active,
+        inventory_binding,
+        strict_referee_binding,
+        source_games_path=source_games_path,
+        state_split_path=state_split_path,
+        singleton_ledger_path=singleton_ledger_path,
+        timestamp_utc=timestamp_utc,
+        active_seconds=active_seconds,
+        active_type=_TestActiveStateGenerationAttempt,
+        inventory_type=_TestAPosInventoryBinding,
+        strict_referee_type=_TestStrictRefereeBinding,
+        pending_type=_TestPendingStateGenerationCommit,
+        pending_token=_TEST_PENDING_TOKEN,
+        store_type=_TestDurableGovernanceStore,
+        store_contexts=_TEST_STORE_CONTEXTS,
+        active_contexts=_TEST_ACTIVE_CONTEXTS,
+        inventory_contexts=_TEST_INVENTORY_CONTEXTS,
+        strict_referee_contexts=_TEST_STRICT_REFEREE_CONTEXTS,
+        pending_contexts=_TEST_PENDING_CONTEXTS,
+    )
+    assert type(pending) is _TestPendingStateGenerationCommit
+    return pending
+
+
+def _second_read(
+    path: Path,
+    expected_key: tuple[int, int, int, int],
+    expected_sha256: str,
+    *,
+    store_context: _StoreContext,
+    field: str,
+) -> bytes:
+    observed_path, payload, observed_key = _read_plan_owned_artifact(
+        path,
+        store_context=store_context,
+        field=field,
+    )
+    if (
+        observed_path != path
+        or observed_key != expected_key
+        or _sha256_bytes(payload) != expected_sha256
+    ):
+        raise GovernanceStoreContractError(f"{field} changed after preparation")
+    return payload
+
+
+def _commit_state_generation_core(
+    store: object,
+    pending: object,
+    *,
+    store_type: type,
+    pending_type: type,
+    completion_type: type,
+    completion_token: object,
+    store_contexts: Mapping[object, _StoreContext],
+    pending_contexts: Mapping[object, _PendingStateContext],
+    inventory_contexts: Mapping[object, _InventoryContext],
+    strict_referee_contexts: Mapping[object, _StrictRefereeContext],
+    completion_contexts: weakref.WeakKeyDictionary,
+) -> object:
+    if type(pending) is not pending_type:
+        raise GovernanceStoreContractError(
+            "state-generation commit requires an exact pending capability"
+        )
+    pending_context = pending_contexts.get(pending)
+    if (
+        pending_context is None
+        or pending_context.spent
+        or pending_context.store is not store
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation pending capability is absent, consumed, or cross-store"
+        )
+    store_context = _require_store_context(
+        store,
+        store_type=store_type,
+        contexts=store_contexts,
+    )
+    inventory_context = inventory_contexts.get(pending_context.inventory_binding)
+    strict_referee_context = strict_referee_contexts.get(
+        pending_context.strict_referee_binding
+    )
+    if (
+        inventory_context is None
+        or strict_referee_context is None
+        or inventory_context.policy != pending_context.policy
+        or strict_referee_context.attempt_identity
+        != store_context.replay.events[-1]["attempt_identity"]
+        or store_context.replay.state != "state_generation_running"
+    ):
+        raise GovernanceStoreContractError(
+            "state-generation commit inventory/replay context differs"
+        )
+    # Persistence is one-shot.  A failed second read or COMMIT is not retryable.
+    pending_context.spent = True
+    source_bytes = _second_read(
+        pending_context.source_games_path,
+        pending_context.source_games_file_key,
+        pending_context.source_games_sha256,
+        store_context=store_context,
+        field="source-games",
+    )
+    state_bytes = _second_read(
+        pending_context.state_split_path,
+        pending_context.state_split_file_key,
+        pending_context.state_split_sha256,
+        store_context=store_context,
+        field="state-split",
+    )
+    singleton_bytes = _second_read(
+        pending_context.singleton_ledger_path,
+        pending_context.singleton_ledger_file_key,
+        pending_context.singleton_ledger_sha256,
+        store_context=store_context,
+        field="singleton-ledger",
+    )
+    validated = _validate_artifacts(
+        source_bytes,
+        state_bytes,
+        singleton_bytes,
+        inventory=inventory_context,
+        strict_referee=strict_referee_context,
+        attempt_identity=strict_referee_context.attempt_identity,
+    )
+    decoded_event = decode_governance_ledger(pending_context.event_bytes)
+    if len(decoded_event) != 1:
+        raise GovernanceStoreContractError("pending completion event bytes differ")
+    event = decoded_event[0]
+    outputs = event["evidence"]["outputs"]
+    expected_outputs = [
+        _evidence_ref("source-games", validated.source_games_identity, source_bytes),
+        _evidence_ref("state-split", validated.state_split_identity, state_bytes),
+        _evidence_ref(
+            "singleton-ledger",
+            validated.singleton_ledger_identity,
+            singleton_bytes,
+        ),
+    ]
+    if outputs != tuple(_freeze(expected_outputs, field="expected outputs")):
+        raise GovernanceStoreContractError("pending event artifact evidence differs")
+    completion_body = {
+        **_domain_envelope(
+            store_context,
+            schema_version=_COMPLETION_SCHEMA,
+            attempt_identity=event["attempt_identity"],
+            sequence=0,
+            record_type="state-generation-completion",
+            previous_record_identity=None,
+        ),
+        "experiment_id": _EXPERIMENT_ID,
+        "proposal_identity": _PROPOSAL_IDENTITY,
+        "profile_identity": _PROFILE_IDENTITY,
+        "store_spec_identity": store_context.spec["spec_identity"],
+        "plan_identity": store_context.plan["plan_identity"],
+        "readiness_identity": store_context.spec["readiness_identity"],
+        "managed_git_state_identity": store_context.spec["managed_git_state_identity"],
+        "launch_path_binding_identity": store_context.spec[
+            "launch_path_binding_identity"
+        ],
+        "authorization_identity": store_context.authorization["authorization_identity"],
+        "authorization_consumption_identity": (
+            store_context.replay.authorization_consumption_identity
+        ),
+        "attempt_identity": event["attempt_identity"],
+        "reservation_event_identity": event["prerequisite_event_identity"],
+        "completion_event_identity": event["event_identity"],
+        "host_preflight_identity": store_context.runtime.host_preflight_identity,
+        "state_generator_session_identity": (
+            store_context.runtime.state_generator_session_identity
+        ),
+        "strict_referee_binding_identity": strict_referee_context.binding_identity,
+        "a_pos_inventory_binding_identity": inventory_context.binding_identity,
+        "resource_snapshot_before_identity": (
+            store_context.runtime.resource_snapshot_before_identity
+        ),
+        "resource_snapshot_after_identity": (
+            store_context.runtime.resource_snapshot_after_identity
+        ),
+        "artifacts": [
+            _artifact_contract_ref(
+                "source-games",
+                validated.source_games_identity,
+                source_bytes,
+                record_count=validated.source_game_count,
+            ),
+            _artifact_contract_ref(
+                "state-split",
+                validated.state_split_identity,
+                state_bytes,
+                record_count=validated.state_count,
+                a_pos_verifier_identity=validated.verifier_identity,
+            ),
+            _artifact_contract_ref(
+                "singleton-ledger",
+                validated.singleton_ledger_identity,
+                singleton_bytes,
+                record_count=validated.singleton_count,
+            ),
+        ],
+        "split_contract_identity": canonical_sha256(
+            _split_contract_for_policy(pending_context.policy)
+        ),
+        "resource_observation": _thaw(event["resource_observation"]),
+        "teacher_fields_present": False,
+        "authoritative_storage": "sqlite-immutable-blob-second-read",
+    }
+    completion_identity = canonical_sha256(completion_body)
+    completion_bytes = canonical_json_bytes(completion_body)
+    replay = _commit_event_and_rows(
+        store_context,
+        pending_context.event_bytes,
+        artifact_rows=(
+            _artifact_row(
+                "source-games",
+                validated.source_games_identity,
+                source_bytes,
+            ),
+            _artifact_row(
+                "state-split",
+                validated.state_split_identity,
+                state_bytes,
+            ),
+            _artifact_row(
+                "singleton-ledger",
+                validated.singleton_ledger_identity,
+                singleton_bytes,
+            ),
+        ),
+        domain_rows=(_domain_record_row(completion_bytes),),
+    )
+    if replay.state != "state_generated":
+        raise GovernanceStoreContractError("durable state-generation did not complete")
+    completion = completion_type(completion_token)
+    completion_contexts[completion] = _CompletionContext(
+        store=store,
+        completion_event_identity=event["event_identity"],
+        attempt_identity=event["attempt_identity"],
+        source_games_identity=validated.source_games_identity,
+        state_split_identity=validated.state_split_identity,
+        singleton_ledger_identity=validated.singleton_ledger_identity,
+        completion_record_identity=completion_identity,
+    )
+    return completion
+
+
+def commit_state_generation(
+    store: DurableGovernanceStore,
+    pending: PendingStateGenerationCommit,
+) -> ConfirmedStateGenerationCompletion:
+    """Second-read, atomically persist, reopen, and confirm state generation."""
+    completion = _commit_state_generation_core(
+        store,
+        pending,
+        store_type=DurableGovernanceStore,
+        pending_type=PendingStateGenerationCommit,
+        completion_type=ConfirmedStateGenerationCompletion,
+        completion_token=_PRODUCTION_COMPLETION_TOKEN,
+        store_contexts=_PRODUCTION_STORE_CONTEXTS,
+        pending_contexts=_PRODUCTION_PENDING_CONTEXTS,
+        inventory_contexts=_PRODUCTION_INVENTORY_CONTEXTS,
+        strict_referee_contexts=_PRODUCTION_STRICT_REFEREE_CONTEXTS,
+        completion_contexts=_PRODUCTION_COMPLETION_CONTEXTS,
+    )
+    assert type(completion) is ConfirmedStateGenerationCompletion
+    return completion
+
+
+def _test_commit_state_generation(
+    store: _TestDurableGovernanceStore,
+    pending: _TestPendingStateGenerationCommit,
+) -> _TestConfirmedStateGenerationCompletion:
+    completion = _commit_state_generation_core(
+        store,
+        pending,
+        store_type=_TestDurableGovernanceStore,
+        pending_type=_TestPendingStateGenerationCommit,
+        completion_type=_TestConfirmedStateGenerationCompletion,
+        completion_token=_TEST_COMPLETION_TOKEN,
+        store_contexts=_TEST_STORE_CONTEXTS,
+        pending_contexts=_TEST_PENDING_CONTEXTS,
+        inventory_contexts=_TEST_INVENTORY_CONTEXTS,
+        strict_referee_contexts=_TEST_STRICT_REFEREE_CONTEXTS,
+        completion_contexts=_TEST_COMPLETION_CONTEXTS,
+    )
+    assert type(completion) is _TestConfirmedStateGenerationCompletion
+    return completion
+
+
+def _artifact_refs_from_database(
+    context: _StoreContext,
+    *,
+    roles: Sequence[str],
+) -> list[dict[str, Any]]:
+    connection = _open_read_connection(context.path)
+    try:
+        rows = connection.execute(
+            "SELECT role, artifact_identity, artifact_bytes FROM artifacts "
+            "ORDER BY role"
+        ).fetchall()
+    except sqlite3.Error as exc:
+        raise GovernanceStoreContractError("artifact evidence read failed") from exc
+    finally:
+        connection.close()
+    by_role: dict[str, dict[str, Any]] = {}
+    for role, identity, payload in rows:
+        if type(role) is not str or role in by_role:
+            raise GovernanceStoreContractError("artifact evidence role differs")
+        by_role[role] = _evidence_ref(
+            role,
+            identity,
+            _require_sqlite_blob(payload, field=f"artifact evidence {role}"),
+        )
+    if any(role not in by_role for role in roles):
+        raise GovernanceStoreContractError("durable artifact evidence is incomplete")
+    return [by_role[role] for role in roles]
+
+
+def _commit_state_freeze_core(
+    store: object,
+    completion: object,
+    *,
+    timestamp_utc: str,
+    store_type: type,
+    completion_type: type,
+    freeze_type: type,
+    freeze_token: object,
+    store_contexts: Mapping[object, _StoreContext],
+    completion_contexts: Mapping[object, _CompletionContext],
+    freeze_contexts: weakref.WeakKeyDictionary,
+) -> object:
+    if type(completion) is not completion_type:
+        raise GovernanceStoreContractError(
+            "state freeze requires an exact confirmed completion"
+        )
+    completion_context = completion_contexts.get(completion)
+    if (
+        completion_context is None
+        or completion_context.spent
+        or completion_context.store is not store
+    ):
+        raise GovernanceStoreContractError(
+            "state completion is absent, consumed, or cross-store"
+        )
+    store_context = _require_store_context(
+        store,
+        store_type=store_type,
+        contexts=store_contexts,
+    )
+    if (
+        store_context.replay.state != "state_generated"
+        or store_context.replay.head_event_identity
+        != completion_context.completion_event_identity
+    ):
+        raise GovernanceStoreContractError("state freeze durable predecessor differs")
+    # Freeze is one-shot even when the following SQLite transaction fails.
+    completion_context.spent = True
+    artifact_refs = _artifact_refs_from_database(
+        store_context,
+        roles=("source-games", "state-split", "singleton-ledger"),
+    )
+    by_role = {item["role"]: item for item in artifact_refs}
+    if (
+        by_role["source-games"]["identity"] != completion_context.source_games_identity
+        or by_role["state-split"]["identity"] != completion_context.state_split_identity
+        or by_role["singleton-ledger"]["identity"]
+        != completion_context.singleton_ledger_identity
+    ):
+        raise GovernanceStoreContractError("state freeze artifact identity differs")
+    receipt_body = {
+        **_domain_envelope(
+            store_context,
+            schema_version=_FREEZE_RECEIPT_SCHEMA,
+            attempt_identity=completion_context.attempt_identity,
+            sequence=1,
+            record_type="state-freeze",
+            previous_record_identity=completion_context.completion_record_identity,
+        ),
+        "experiment_id": _EXPERIMENT_ID,
+        "proposal_identity": _PROPOSAL_IDENTITY,
+        "profile_identity": _PROFILE_IDENTITY,
+        "store_spec_identity": store_context.spec["spec_identity"],
+        "plan_identity": store_context.plan["plan_identity"],
+        "readiness_identity": store_context.spec["readiness_identity"],
+        "authorization_identity": store_context.authorization["authorization_identity"],
+        "authorization_consumption_identity": (
+            store_context.replay.authorization_consumption_identity
+        ),
+        "attempt_identity": completion_context.attempt_identity,
+        "completion_event_identity": completion_context.completion_event_identity,
+        "completion_record_identity": completion_context.completion_record_identity,
+        "source_games_identity": completion_context.source_games_identity,
+        "state_split_identity": completion_context.state_split_identity,
+        "singleton_ledger_identity": completion_context.singleton_ledger_identity,
+        "teacher_fields_present": False,
+        "teacher_may_start_only_after_this_event": True,
+        "authoritative_artifacts": "sqlite-immutable-blobs",
+    }
+    receipt_identity = canonical_sha256(receipt_body)
+    receipt_bytes = canonical_json_bytes(receipt_body)
+    try:
+        event, event_bytes = build_state_frozen_event(
+            store_context.replay,
+            timestamp_utc=timestamp_utc,
+            evidence={
+                "inputs": artifact_refs,
+                "outputs": [
+                    _evidence_ref(
+                        "state-freeze-receipt",
+                        receipt_identity,
+                        receipt_bytes,
+                    )
+                ],
+                "checkpoint": None,
+            },
+        )
+    except Exception as exc:
+        raise GovernanceStoreContractError(
+            "state-freeze event preparation failed"
+        ) from exc
+    replay = _commit_event_and_rows(
+        store_context,
+        event_bytes,
+        artifact_rows=(
+            _artifact_row(
+                "state-freeze-receipt",
+                receipt_identity,
+                receipt_bytes,
+            ),
+        ),
+        domain_rows=(_domain_record_row(receipt_bytes),),
+    )
+    if replay.state != "state_frozen":
+        raise GovernanceStoreContractError("durable state freeze did not complete")
+    freeze = freeze_type(freeze_token)
+    freeze_contexts[freeze] = _FreezeContext(
+        store=store,
+        freeze_event_identity=event["event_identity"],
+        state_split_identity=completion_context.state_split_identity,
+        freeze_receipt_identity=receipt_identity,
+    )
+    return freeze
+
+
+def commit_state_freeze(
+    store: DurableGovernanceStore,
+    completion: ConfirmedStateGenerationCompletion,
+    *,
+    timestamp_utc: str,
+) -> DurableStateFreezeBinding:
+    """Persist a separate state-freeze receipt/event and reopen before binding."""
+    freeze = _commit_state_freeze_core(
+        store,
+        completion,
+        timestamp_utc=timestamp_utc,
+        store_type=DurableGovernanceStore,
+        completion_type=ConfirmedStateGenerationCompletion,
+        freeze_type=DurableStateFreezeBinding,
+        freeze_token=_PRODUCTION_FREEZE_TOKEN,
+        store_contexts=_PRODUCTION_STORE_CONTEXTS,
+        completion_contexts=_PRODUCTION_COMPLETION_CONTEXTS,
+        freeze_contexts=_PRODUCTION_FREEZE_CONTEXTS,
+    )
+    assert type(freeze) is DurableStateFreezeBinding
+    return freeze
+
+
+def _test_commit_state_freeze(
+    store: _TestDurableGovernanceStore,
+    completion: _TestConfirmedStateGenerationCompletion,
+    *,
+    timestamp_utc: str,
+) -> _TestDurableStateFreezeBinding:
+    freeze = _commit_state_freeze_core(
+        store,
+        completion,
+        timestamp_utc=timestamp_utc,
+        store_type=_TestDurableGovernanceStore,
+        completion_type=_TestConfirmedStateGenerationCompletion,
+        freeze_type=_TestDurableStateFreezeBinding,
+        freeze_token=_TEST_FREEZE_TOKEN,
+        store_contexts=_TEST_STORE_CONTEXTS,
+        completion_contexts=_TEST_COMPLETION_CONTEXTS,
+        freeze_contexts=_TEST_FREEZE_CONTEXTS,
+    )
+    assert type(freeze) is _TestDurableStateFreezeBinding
+    return freeze
+
+
+def _verify_freeze_core(
+    store: object,
+    binding: object,
+    *,
+    store_type: type,
+    freeze_type: type,
+    store_contexts: Mapping[object, _StoreContext],
+    freeze_contexts: Mapping[object, _FreezeContext],
+) -> str:
+    if type(binding) is not freeze_type:
+        raise GovernanceStoreContractError("state-freeze binding type/domain differs")
+    freeze_context = freeze_contexts.get(binding)
+    if freeze_context is None or freeze_context.store is not store:
+        raise GovernanceStoreContractError(
+            "state-freeze binding is absent or cross-store"
+        )
+    store_context = _require_store_context(
+        store,
+        store_type=store_type,
+        contexts=store_contexts,
+    )
+    if (
+        store_context.replay.state != "state_frozen"
+        or store_context.replay.head_event_identity
+        != freeze_context.freeze_event_identity
+    ):
+        raise GovernanceStoreContractError("durable state-freeze replay differs")
+    connection = _open_read_connection(store_context.path)
+    try:
+        artifact = connection.execute(
+            "SELECT artifact_identity, artifact_bytes FROM artifacts "
+            "WHERE role='state-freeze-receipt'"
+        ).fetchone()
+        record = connection.execute(
+            "SELECT record_identity, record_bytes FROM domain_records "
+            "WHERE record_type='state-freeze'"
+        ).fetchone()
+    except sqlite3.Error as exc:
+        raise GovernanceStoreContractError("state-freeze receipt read failed") from exc
+    finally:
+        connection.close()
+    if artifact is None or record is None:
+        raise GovernanceStoreContractError("state-freeze receipt is missing")
+    artifact_identity = _require_sha256(
+        artifact[0],
+        field="state-freeze artifact identity",
+    )
+    artifact_payload = _require_sqlite_blob(
+        artifact[1],
+        field="state-freeze artifact",
+    )
+    record_identity = _require_sha256(
+        record[0],
+        field="state-freeze record identity",
+    )
+    record_payload = _require_sqlite_blob(
+        record[1],
+        field="state-freeze record",
+    )
+    if (
+        artifact_identity != freeze_context.freeze_receipt_identity
+        or record_identity != freeze_context.freeze_receipt_identity
+        or artifact_payload != record_payload
+    ):
+        raise GovernanceStoreContractError("state-freeze receipt identity differs")
+    receipt = _strict_json_object(artifact_payload, field="state-freeze receipt")
+    if (
+        canonical_sha256(receipt) != freeze_context.freeze_receipt_identity
+        or receipt.get("state_split_identity") != freeze_context.state_split_identity
+        or receipt.get("teacher_fields_present") is not False
+        or receipt.get("teacher_may_start_only_after_this_event") is not True
+    ):
+        raise GovernanceStoreContractError("state-freeze receipt contract differs")
+    return freeze_context.state_split_identity
+
+
+def verify_durable_state_freeze(
+    store: DurableGovernanceStore,
+    binding: DurableStateFreezeBinding,
+) -> str:
+    """Reopen and verify the exact production durable state-freeze binding."""
+    return _verify_freeze_core(
+        store,
+        binding,
+        store_type=DurableGovernanceStore,
+        freeze_type=DurableStateFreezeBinding,
+        store_contexts=_PRODUCTION_STORE_CONTEXTS,
+        freeze_contexts=_PRODUCTION_FREEZE_CONTEXTS,
+    )
+
+
+def _test_verify_durable_state_freeze(
+    store: _TestDurableGovernanceStore,
+    binding: _TestDurableStateFreezeBinding,
+) -> str:
+    return _verify_freeze_core(
+        store,
+        binding,
+        store_type=_TestDurableGovernanceStore,
+        freeze_type=_TestDurableStateFreezeBinding,
+        store_contexts=_TEST_STORE_CONTEXTS,
+        freeze_contexts=_TEST_FREEZE_CONTEXTS,
+    )

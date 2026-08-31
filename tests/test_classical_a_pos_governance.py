@@ -63,6 +63,9 @@ EXPECTED_PUBLIC_API = (
     "prepare_operation_reservation",
     "confirm_operation_reservation",
     "require_production_operation_permit",
+    "build_state_generation_completed_event",
+    "build_state_frozen_event",
+    "prepared_governance_event_bytes",
 )
 
 
@@ -1734,3 +1737,69 @@ def test_governance_module_has_no_file_process_or_mutating_public_surface(
         ).state
         == "authorized_unconsumed"
     )
+
+
+def test_state_generation_and_freeze_builders_derive_registered_replay_scope() -> None:
+    fixture = _test_fixture()
+    reserved_index = _event_index(fixture.events, "state_generation_reserved")
+    decoded_prefix = decode_governance_ledger(
+        encode_governance_ledger(fixture.events[: reserved_index + 1])
+    )
+    running = replay_governance_ledger(
+        decoded_prefix,
+        plan=fixture.plan,
+        authorization=fixture.authorization,
+    )
+
+    completed, completed_bytes = governance.build_state_generation_completed_event(
+        running,
+        timestamp_utc="2026-09-01T00:00:05Z",
+        evidence={"inputs": [], "outputs": [], "checkpoint": None},
+        state_generation_games=1_024,
+        active_seconds=17,
+    )
+    assert completed_bytes == encode_governance_ledger((completed,))
+    completed_decoded = decode_governance_ledger(completed_bytes)[0]
+    generated = replay_governance_ledger(
+        (*decoded_prefix, completed_decoded),
+        plan=fixture.plan,
+        authorization=fixture.authorization,
+    )
+    assert generated.state == "state_generated"
+    assert completed["sequence"] == len(decoded_prefix)
+    assert completed["operation_id"] == "state-generation"
+    assert completed["attempt_identity"] == running.events[-1]["attempt_identity"]
+    assert completed["previous_event_identity"] == running.head_event_identity
+
+    frozen, frozen_bytes = governance.build_state_frozen_event(
+        generated,
+        timestamp_utc="2026-09-01T00:00:06Z",
+        evidence={"inputs": [], "outputs": [], "checkpoint": None},
+    )
+    assert frozen_bytes == encode_governance_ledger((frozen,))
+    frozen_decoded = decode_governance_ledger(frozen_bytes)[0]
+    replay = replay_governance_ledger(
+        (*decoded_prefix, completed_decoded, frozen_decoded),
+        plan=fixture.plan,
+        authorization=fixture.authorization,
+    )
+    assert replay.state == "state_frozen"
+    assert frozen["operation_id"] == "state-freeze"
+    assert frozen["attempt_identity"] is not None
+    assert frozen["prerequisite_event_identity"] == completed["event_identity"]
+
+
+def test_prepared_event_bytes_are_registry_bound_and_domain_separated() -> None:
+    fixture = _test_fixture()
+    replay = _replay_prefix(fixture, "authorization_registered")
+    pending, payload = governance._test_prepare_authorization_consumption(
+        fixture.plan_permit,
+        fixture.authorization_permit,
+        replay,
+        timestamp_utc="2026-09-01T00:00:03Z",
+    )
+    assert governance._test_prepared_governance_event_bytes(pending) == payload
+    with pytest.raises(GovernanceContractError):
+        governance.prepared_governance_event_bytes(pending)
+    with pytest.raises(GovernanceContractError):
+        governance.prepared_governance_event_bytes(payload)

@@ -716,19 +716,38 @@ def _split_contract(layout: CorpusLayout) -> dict[str, Any]:
     }
 
 
-def _state_split_identity(
+def state_split_artifact_identity(
     *,
     state_record_identities: Sequence[str],
     split_identity: str,
     verifier_identity: str,
 ) -> str:
+    """Return the ordered frozen state/split artifact identity.
+
+    This is a pure identity helper.  It does not inspect, seal, or authorize an
+    artifact, and the order of ``state_record_identities`` is semantic.
+    """
+    if not isinstance(state_record_identities, Sequence) or isinstance(
+        state_record_identities,
+        (str, bytes, bytearray),
+    ):
+        raise CorpusContractError("state record identities must be an ordered array")
+    checked_state_identities = [
+        _sha256(identity, field=f"state_record_identities[{index}]")
+        for index, identity in enumerate(state_record_identities)
+    ]
+    checked_split_identity = _sha256(split_identity, field="split_identity")
+    checked_verifier_identity = _sha256(
+        verifier_identity,
+        field="a_pos_verifier_identity",
+    )
     return canonical_sha256(
         {
             "schema_version": STATE_SPLIT_ARTIFACT_SCHEMA,
             "state_record_schema": STATE_RECORD_SCHEMA,
-            "state_record_identities": list(state_record_identities),
-            "split_identity": split_identity,
-            "a_pos_verifier_identity": verifier_identity,
+            "state_record_identities": checked_state_identities,
+            "split_identity": checked_split_identity,
+            "a_pos_verifier_identity": checked_verifier_identity,
         }
     )
 
@@ -817,7 +836,7 @@ def _build_frozen_corpus_manifest(
 
     split_contract = _split_contract(layout)
     split_identity = canonical_sha256(split_contract)
-    state_identity = _state_split_identity(
+    state_identity = state_split_artifact_identity(
         state_record_identities=state_record_identities,
         split_identity=split_identity,
         verifier_identity=verifier_identity,
@@ -1412,7 +1431,7 @@ def _load_frozen_corpus(
     )
     if state_count != layout.total:
         raise CorpusContractError("state/split artifact is an incomplete prefix")
-    expected_state_identity = _state_split_identity(
+    expected_state_identity = state_split_artifact_identity(
         state_record_identities=state_record_identities,
         split_identity=expected_split_identity,
         verifier_identity=expected_verifier_identity,

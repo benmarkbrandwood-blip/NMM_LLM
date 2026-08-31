@@ -49,6 +49,9 @@ __all__ = (
     "prepare_operation_reservation",
     "confirm_operation_reservation",
     "require_production_operation_permit",
+    "build_state_generation_completed_event",
+    "build_state_frozen_event",
+    "prepared_governance_event_bytes",
 )
 
 _PLAN_SCHEMA = "nmm.classical-a-pos-runtime-plan.v1"
@@ -2579,6 +2582,182 @@ def _make_event(
 
 def _event_bytes(event: GovernanceEvent) -> bytes:
     return encode_governance_ledger((event,))
+
+
+def _prepared_governance_event_bytes_core(
+    pending: object,
+    *,
+    pending_authorization_type: type,
+    pending_operation_type: type,
+    authorization_contexts: Mapping[object, _PendingAuthorizationContext],
+    operation_contexts: Mapping[object, _PendingOperationContext],
+) -> bytes:
+    if type(pending) is pending_authorization_type:
+        context = authorization_contexts.get(pending)
+    elif type(pending) is pending_operation_type:
+        context = operation_contexts.get(pending)
+    else:
+        raise GovernanceContractError(
+            "prepared governance bytes require an exact pending capability"
+        )
+    if context is None:
+        raise GovernanceContractError(
+            "prepared governance pending capability is absent or consumed"
+        )
+    return bytes(context.event_bytes)
+
+
+def prepared_governance_event_bytes(
+    pending: PendingAuthorizationConsumption | PendingOperationReservation,
+) -> bytes:
+    """Return registry-owned production write-ahead bytes for one pending event."""
+    return _prepared_governance_event_bytes_core(
+        pending,
+        pending_authorization_type=PendingAuthorizationConsumption,
+        pending_operation_type=PendingOperationReservation,
+        authorization_contexts=_PRODUCTION_PENDING_AUTH_CONTEXTS,
+        operation_contexts=_PRODUCTION_PENDING_OPERATION_CONTEXTS,
+    )
+
+
+def _test_prepared_governance_event_bytes(
+    pending: _TestPendingAuthorizationConsumption | _TestPendingOperationReservation,
+) -> bytes:
+    return _prepared_governance_event_bytes_core(
+        pending,
+        pending_authorization_type=_TestPendingAuthorizationConsumption,
+        pending_operation_type=_TestPendingOperationReservation,
+        authorization_contexts=_TEST_PENDING_AUTH_CONTEXTS,
+        operation_contexts=_TEST_PENDING_OPERATION_CONTEXTS,
+    )
+
+
+def _build_state_operation_event(
+    replay: GovernanceReplay,
+    *,
+    timestamp_utc: str,
+    evidence: Mapping[str, Any],
+    event_type: str,
+    expected_state: str,
+    operation_id: str,
+    to_state: str,
+    resource_observation: Mapping[str, int],
+) -> tuple[GovernanceEvent, bytes]:
+    replay_context = _validate_replay_capability(replay)
+    if (
+        replay.terminal
+        or replay.state != expected_state
+        or replay.head_event_identity is None
+        or replay_context.authorization is None
+        or not replay_context.authorization_consumed
+    ):
+        raise GovernanceContractError(
+            f"{event_type} requires the exact registered nonterminal replay state"
+        )
+    operation = _operation_by_id(replay_context.plan, operation_id)
+    if event_type == "state_generation_completed":
+        prerequisite = replay_context.reservation_event_identities.get(operation_id)
+        if (
+            replay_context.operation_status.get(operation_id) != "reserved"
+            or replay.resource_ledger.open_operation_id != operation_id
+            or replay_context.open_attempt_identity
+            != _operation_attempt_identity(replay_context.plan, operation_id)
+            or prerequisite != replay.head_event_identity
+        ):
+            raise GovernanceContractError(
+                "state-generation completion replay scope differs"
+            )
+    else:
+        prerequisite_operation = operation["prerequisite_operation_id"]
+        prerequisite = replay_context.completion_event_identities.get(
+            prerequisite_operation
+        )
+        if (
+            replay_context.operation_status.get(operation_id) != "not_started"
+            or replay.resource_ledger.open_operation_id is not None
+            or prerequisite != replay.head_event_identity
+        ):
+            raise GovernanceContractError("state-freeze replay scope differs")
+    checked_evidence = _validate_evidence(evidence)
+    if checked_evidence["checkpoint"] is not None:
+        raise GovernanceContractError(
+            "state completion/freeze evidence cannot carry a checkpoint"
+        )
+    event = _make_event(
+        sequence=len(replay.events),
+        timestamp_utc=timestamp_utc,
+        event_type=event_type,
+        from_state=expected_state,
+        to_state=to_state,
+        plan=replay_context.plan,
+        readiness_identity=replay.readiness_identity,
+        authorization_identity=replay.authorization_identity,
+        authorization_consumption_identity=(replay.authorization_consumption_identity),
+        operation=operation,
+        prerequisite_event_identity=prerequisite,
+        evidence=checked_evidence,
+        resource_reservation=None,
+        resource_observation=resource_observation,
+        reason_code=None,
+        previous_event_identity=replay.head_event_identity,
+    )
+    replay_governance_ledger(
+        (*replay.events, event),
+        plan=replay_context.plan,
+        authorization=replay_context.authorization,
+    )
+    return event, _event_bytes(event)
+
+
+def build_state_generation_completed_event(
+    replay: GovernanceReplay,
+    *,
+    timestamp_utc: str,
+    evidence: Mapping[str, Any],
+    state_generation_games: int,
+    active_seconds: int,
+) -> tuple[GovernanceEvent, bytes]:
+    """Build completion bytes from the registered active state-generation replay."""
+    games = _require_nonnegative_int(
+        state_generation_games,
+        field_name="state generation completed games",
+    )
+    seconds = _require_nonnegative_int(
+        active_seconds,
+        field_name="state generation completed active_seconds",
+    )
+    return _build_state_operation_event(
+        replay,
+        timestamp_utc=timestamp_utc,
+        evidence=evidence,
+        event_type="state_generation_completed",
+        expected_state="state_generation_running",
+        operation_id="state-generation",
+        to_state="state_generated",
+        resource_observation=_resource_vector(
+            state_generation_games=games,
+            active_seconds=seconds,
+        ),
+    )
+
+
+def build_state_frozen_event(
+    replay: GovernanceReplay,
+    *,
+    timestamp_utc: str,
+    evidence: Mapping[str, Any],
+) -> tuple[GovernanceEvent, bytes]:
+    """Build state-freeze bytes from the registered generated-state replay."""
+    return _build_state_operation_event(
+        replay,
+        timestamp_utc=timestamp_utc,
+        evidence=evidence,
+        event_type="state_frozen",
+        expected_state="state_generated",
+        operation_id="state-freeze",
+        to_state="state_frozen",
+        resource_observation=_zero_resource_vector(),
+    )
 
 
 def _prepare_authorization_consumption_core(
