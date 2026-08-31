@@ -3852,6 +3852,109 @@ The result is limited to this fixed runtime and reused development pool; it is
 not an equivalence, population, human-opponent, promotion, or deployment
 claim.
 
+## Classical `A_pos` Offline Distillation Readiness Paused (2026-08-31)
+
+The product owner ordered a staged closeout: record the verified state,
+commit and publish it, then pause.  No state generation, teacher search,
+training smoke, long run, held-out evaluation, model promotion, or deployment
+was launched during this work.  The experiment remains
+`classical-a-pos-offline-distillation-v1`, proposal identity
+`edf3e1031ee4bd46b6c567891fcaab26fd288a49997410141e6e19745d070e5c`,
+and readiness-profile identity
+`bfa8d2f8e19b1c24641e24e4765844f678cb9288838e5eda3f8782d7ace9cbe0`.
+
+The current readiness verdict is `fatal_stop`.  This is an intentional
+fail-closed launch verdict, not a runtime crash: the repository has no
+complete production issuer, resource-bound executor, frozen scientific
+acceptance contract, or launch authority for this experiment.  There is no
+approved command to run.  General autonomy instructions are not a training
+grant, and the aggregate authorized game and wall-time envelope remains zero.
+
+| Gate | Verified state | Result |
+| --- | --- | --- |
+| Frozen direction and profile | Tracked in `e210112` and `948eb5a`; their identities remain immutable | complete |
+| Governance core | Fail-closed operation permits and attempt accounting are tracked in `b75c502` | complete |
+| C5a durable runtime foundation | Store bootstrap, sequence-zero binding, atomic completion evidence, and fatal post-commit containment are tracked in `94f2026` and `76a5d7f` | independently accepted |
+| C5b production preflight and execution | Architecture and an API appendix were reviewed in the working conversation only; no production implementation or tracked final design exists | not complete |
+| C6 scientific gates | No-leak closure, controls, metrics, and promotion gates were designed read-only; no frozen corpus, evaluator, preregistration, or results exist | not complete |
+| Machine readiness | The current local path registry is noncanonical for this experiment and lacks `classical_a_pos_output_root` | failed closed |
+| Launch authority | No bounded standing delegation, per-plan authorization, smoke request, or long-run request exists | absent |
+
+### Accepted C5a boundary
+
+The first substantive independent review found a real post-COMMIT
+half-binding seam: sequence zero could become durable before replay failed,
+without leaving a usable runtime capability.  The accepted repair makes that
+state an explicit private fatal terminal: the exact lone sequence-zero row is
+preserved for audit, no capability is returned, and reopen, retry, and resume
+are denied.  A pre-COMMIT failure rolls back all runtime rows while consuming
+the attempt; a successful operation atomically adds the remaining runtime,
+controller, and artifact evidence.
+
+After repair, independent acceptance returned `C5A_ACCEPTANCE: PASS`.
+Repository verification for the relevant family was 705 passed.  Independent
+focused verification was 335 passed, and the mandatory Malom, DB-teacher, and
+label-provenance group was 103 passed with 498 subtests passed.  Ruff check,
+Ruff format verification, and `git diff --check` also passed.  These are
+focused results, not a claim that the historically non-clean full suite has a
+new clean baseline.
+
+An intermediate acceptance wait timed out because of a network problem.  The
+product owner confirmed that the network recovered, and the completed
+independent acceptance above supersedes that transport timeout; the timeout
+is not a technical failure or acceptance result.
+
+C5a is deliberately not a production launcher.  It proves that an eventual
+runtime can bind evidence safely, but it does not provide a production plan
+issuer, authorization issuer, controller, real resource preflight, executor,
+or training permission.
+
+### Training-direction boundary
+
+The independent science review judged the direction conditionally sound only
+as an offline attempt to compress the fresh difficulty-9 action preference
+for lower latency.  It does not establish stronger-than-D9 play, product
+strength, or even same-value-class DTW optimality.  Malom `A_pos` membership
+preserves the selected W/D/L class; it is not by itself a complete rules or
+search-quality guarantee.
+
+The proposed 16,384-position pilot, three seeds, and existing optimizer
+settings remain diagnostic candidates only.  Before any pilot request, the
+project still needs zero train/dev overlap under game/history, exact, D4,
+ring-16, Base62, and transposition closure; uniform-`A_pos`, step-zero, and
+linear-62 controls; phase, color, W/D/L, `A_pos`-count, and label-source
+breakdowns; paired cluster bootstrap analysis; and a 24-of-24 fresh-versus-
+live D9 audit.  Search-derived and bypass-derived labels must be reported
+separately.  Any eventual positive result is limited to an offline
+compression/latency claim unless a separately authorized product evaluation
+supports more.
+
+### Resume contract
+
+When the product owner resumes this objective, continue in this order:
+
+1. Convert the reviewed C5b architecture and final API appendix into a
+   tracked, internally consistent design before changing production code.
+2. Implement and independently accept C5b1 real resource preflight and opaque
+   capability binding.  Its authorized-attempt budget must include the one
+   full 512-component Malom SHA-256 pass; do not perform that 83.6 GB read as
+   speculative diagnosis.
+3. Implement and independently accept C5b2 generation/execution and durable
+   completion evidence.  Keep construction, authorization, execution, and
+   independent acceptance roles separate.
+4. Freeze and independently review C6a leakage-safe corpus/evaluator rules and
+   C6b controls, metrics, uncertainty method, and stop/promotion thresholds.
+5. Ask the product owner once for a bounded parent authorization covering the
+   exact state-generation, teacher-search, and offline-pilot envelope.  Do not
+   ask once per technical child plan already inside that envelope.
+6. Only after every technical and authority gate passes may a smoke be
+   requested.  Long training, held-out product evaluation, and promotion each
+   remain separate decisions.
+
+Preserve the untracked `tmp/` tree and all ignored local training artifacts.
+Do not treat conversation-only C5b/C6 designs as committed contracts, and do
+not infer approval to launch from this pause record.
+
 ## Reference Material
 
 - [`docs/endgame-training-feasibility.md`](../endgame-training-feasibility.md):
