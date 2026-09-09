@@ -1341,6 +1341,148 @@ def test_main_integration_records_all_promotion_fields(trainer, tmp_path, monkey
     assert prov["model"] != "gap_net_v3_candidate"
 
 
+# ── Codex 4e4a724 P2: frozen-registry composition exercised end-to-end ───────
+
+def test_main_integration_stage_f_eligible_with_frozen_registry(
+    trainer, tmp_path, monkeypatch,
+):
+    """Bounded end-to-end test: main() with a real frozen registry entry stores
+    gate_thresholds_frozen_sha256 and gate_thresholds_frozen_entry in the saved
+    NPZ, and stage_f_eligible=True when the gate reports PASS.
+
+    Exercises the full frozen-ID composition path that prior tests left uncovered:
+      CLI --gate-thresholds-frozen-id  →  _load_frozen_thresholds (real registry)
+      →  _cli_matches_frozen_entry  →  _build_saved_provenance  →  _save  →  NPZ
+
+    The gate itself is stubbed (_report_gate returns a canned PASS summary) because
+    gate-math correctness is unit-tested in test_gap_v3_gate_formulas.py; this test
+    focuses only on the frozen-registry wiring.  Bounded: 1 epoch, 60-row dataset."""
+    # ── 1. Write a temporary frozen registry that matches the CLI defaults ────
+    frozen_id = "stage_e_thresholds_integration_test_frozen"
+    frozen_entry_dict = {
+        "id":               frozen_id,
+        "x_a":              0.30,
+        "x_b":              0.20,
+        "min_high_support": 100,
+        "min_denominator":  1e-9,
+        "frozen":           True,
+        "authored":         "2026-08-15",
+        "notes":            "integration-test-only entry; never used in production",
+    }
+    reg_path = tmp_path / "test_registry.json"
+    reg_path.write_text(
+        json.dumps({"registry_version": 1, "entries": [frozen_entry_dict]}),
+        encoding="utf-8",
+    )
+
+    # `_STAGE_E_THRESHOLDS_REGISTRY` is a default argument captured at definition
+    # time — monkeypatching the module attribute after import has no effect.
+    # Redirect the loader by wrapping the real function with the temp registry path.
+    _real_load = trainer._load_frozen_thresholds
+
+    def _patched_load(threshold_id, _ignored_path=None):
+        return _real_load(threshold_id, reg_path)
+
+    monkeypatch.setattr(trainer, "_load_frozen_thresholds", _patched_load)
+
+    # ── 2. Stub _report_gate to return a canned PASS so stage_f_eligible=True ─
+    def _stub_report_gate(*args, **kw):
+        summary = {
+            "overall_verdict":           "PASS",
+            "n_cells_total":             9,
+            "n_cells_pass":              9,
+            "n_cells_fail":              0,
+            "n_cells_skip_insufficient": 0,
+            "n_cells_skip_degenerate":   0,
+            "n_cells_skip_non_finite":   0,
+            "failing_cells":             [],
+            "skipped_cells":             [],
+            "coverage_rule":             "ALL_CELLS_MUST_PASS",
+            "thresholds": {
+                "x_a": 0.30, "x_b": 0.20,
+                "min_n_high_support": 100, "min_denominator": 1e-9,
+                "gate_1_formula": "stubbed",
+                "gate_2_formula": "stubbed",
+            },
+        }
+        return [], summary
+
+    monkeypatch.setattr(trainer, "_report_gate", _stub_report_gate)
+
+    # ── 3. Build the same tiny synthetic dataset the other integration test uses ─
+    dataset_dir = tmp_path / "ds"
+    dataset_dir.mkdir()
+
+    n_total, n_train, n_val, n_bands = 60, 40, 20, 3
+    board_dim, heads = 79, 3
+
+    rng = np.random.default_rng(1)
+    feats = rng.standard_normal((n_total, board_dim)).astype(np.float32)
+    (dataset_dir / "parent_feats.f32.bin").write_bytes(feats.tobytes())
+    tgt  = np.ones((n_total, heads), dtype=np.float32) * 0.1
+    (dataset_dir / "targets.f32.bin").write_bytes(tgt.tobytes())
+    unif = np.ones((n_total, heads), dtype=np.float32) * 0.5
+    (dataset_dir / "targets_uniform.f32.bin").write_bytes(unif.tobytes())
+    emp = np.full((n_total, heads), np.nan, dtype=np.float32)
+    (dataset_dir / "targets_empirical.f32.bin").write_bytes(emp.tobytes())
+
+    split    = np.array([0] * n_train + [1] * n_val, dtype=np.int64)
+    band_idx = rng.integers(0, n_bands, n_total).astype(np.int64)
+    np.savez(
+        str(dataset_dir / "metadata.npz"),
+        split=split,
+        band_idx=band_idx,
+        state_keys=np.array([f"sk_{i}" for i in range(n_total)], dtype=object),
+        provenance=np.array(json.dumps(_ready_prov()), dtype=object),
+    )
+
+    # ── 4. Run main() with --gate-thresholds-frozen-id and matching CLI values ─
+    out_path = tmp_path / "candidate_frozen.npz"
+    monkeypatch.setattr(sys, "argv", [
+        "train_gap_net_v3.py",
+        "--dataset-dir",  str(dataset_dir),
+        "--out",          str(out_path),
+        "--epochs",       "1",
+        "--patience",     "0",
+        "--batch-size",   "16",
+        # Threshold values match the frozen entry exactly (required by contract).
+        "--stage-e-x-a",             "0.30",
+        "--stage-e-x-b",             "0.20",
+        "--stage-e-min-high-support","100",
+        "--stage-e-min-denominator", "1e-9",
+        "--gate-thresholds-frozen-id", frozen_id,
+    ])
+    trainer.main()
+
+    # ── 5. Verify the frozen-registry composition in the saved NPZ ────────────
+    assert out_path.exists(), "main() must produce the output NPZ"
+    z = np.load(str(out_path), allow_pickle=True)
+    prov = json.loads(str(z["provenance"]))
+
+    # Frozen-registry fields must be wired through the full main() path.
+    assert prov["gate_thresholds_frozen"] is True, \
+        "gate_thresholds_frozen must be True when a frozen registry id was supplied"
+    assert prov["gate_thresholds_frozen_id"] == frozen_id, \
+        "gate_thresholds_frozen_id must match the supplied --gate-thresholds-frozen-id"
+    assert isinstance(prov["gate_thresholds_frozen_sha256"], str), \
+        "gate_thresholds_frozen_sha256 must be a string"
+    assert len(prov["gate_thresholds_frozen_sha256"]) == 64, \
+        "gate_thresholds_frozen_sha256 must be a hex-encoded SHA-256 (64 chars)"
+    assert prov["gate_thresholds_frozen_entry"]["id"] == frozen_id, \
+        "gate_thresholds_frozen_entry must carry the loaded registry entry"
+
+    # With stubbed PASS gate + frozen thresholds + production-ready dataset,
+    # stage_f_eligible must be True.
+    assert prov["stage_f_eligible"] is True, \
+        "stage_f_eligible must be True when gate PASS + frozen thresholds + ready dataset"
+    assert prov["stage_e_passed"] is True
+    # promotion_eligible is ALWAYS False from Stage E trainer.
+    assert prov["promotion_eligible"] is False, \
+        "promotion_eligible must ALWAYS be False from Stage E trainer"
+    assert prov["model"] == "gap_net_v3_stage_e_candidate", \
+        "model label must be gap_net_v3_stage_e_candidate when stage_f_eligible=True"
+
+
 # ── P2(1) emitted_by_band_phase counter ─────────────────────────────────────
 
 def test_emitted_by_band_phase_key_present_in_provenance(extractor):

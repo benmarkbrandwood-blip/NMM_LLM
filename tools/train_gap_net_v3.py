@@ -957,11 +957,12 @@ def _combine_gate_verdicts(g1: str, g2: str) -> str:
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--dataset-dir", default=str(_ROOT / "data" / "gap_net_v3_dataset_v2"))
-    # Default output name uses the Stage-E scope (Codex 2026-08-15 3rd pass P1):
-    # the plain "gap_net_v3_candidate.npz" name is reserved for the Stage F
-    # artifact — this trainer only produces the Stage E candidate.
+    # Default output filename matches plan §12 / §13 / §16 artifacts table:
+    # Stage E produces data/gap_net_v3_candidate.npz.  Stage E scope is captured
+    # in provenance.model ("gap_net_v3_stage_e_candidate" / ineligible variant),
+    # not in the filename — the plan owns the filename, the builder owns the label.
     p.add_argument("--out",
-                   default=str(_ROOT / "data" / "gap_net_v3_stage_e_candidate.npz"))
+                   default=str(_ROOT / "data" / "gap_net_v3_candidate.npz"))
     p.add_argument("--epochs",       type=int,   default=80)
     p.add_argument("--lr",           type=float, default=3e-4)
     p.add_argument("--batch-size",   type=int,   default=4096)
