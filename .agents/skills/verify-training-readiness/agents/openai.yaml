@@ -1,7 +1,7 @@
 interface:
   display_name: "Verify Training Readiness"
-  short_description: "Verify and analyze NMM training evidence"
-  default_prompt: "Use $verify-training-readiness to verify readiness or analyze this NMM training run's evidence."
+  short_description: "Check NMM run readiness or scientific evidence"
+  default_prompt: "Use $verify-training-readiness to assess this specific NMM run's launch readiness or analyze its anomaly or scientific result."
 
 policy:
   allow_implicit_invocation: true

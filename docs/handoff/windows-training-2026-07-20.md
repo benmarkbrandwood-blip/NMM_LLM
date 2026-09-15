@@ -1,4 +1,32 @@
-# Windows Training Handover — 20 July 2026 (updated 21 August 2026)
+# Windows Training Handover — 20 July 2026 (index updated 15 September 2026)
+
+## Current Status and Decision Index
+
+Use this index to select relevant sections; the historical entries below are
+retained as evidence, not a sequential checklist or reusable authorization.
+This documentation update does not resume any paused objective or grant a run.
+
+- **Paused A_pos objective:** [31 August closeout and resume contract](#classical-a_pos-offline-distillation-readiness-paused-2026-08-31).
+  `classical-a-pos-offline-distillation-v1` remains paused with zero authorized
+  execution budget. Its production and scientific gates remain incomplete.
+- **Web runtime:** [21 August response-capture attempt](#second-web-smoke-proved-http-state-but-failed-shutdown----21-august-2026).
+  HTTP evidence was accepted separately; the shutdown gate failed. No retry
+  authority follows from that record.
+- **Authority:** [AGENTS.md](../../AGENTS.md) owns standing training-delegation
+  and ordinary dev-push policy. Use [recorded owner decisions](#recorded-and-remaining-owner-decisions)
+  and the selected experiment for consumed grants and scope restrictions.
+- **Data:** [Local training layout](../local-training-layout.md) owns path,
+  inventory, legacy-data isolation, and persisted-label trust contracts.
+- **Generalist history:** [Trainer corrections](#generalist-trainer-corrections)
+  and the [completed v4 baseline](../experiments/dev-v4-malom-corrected-baseline.md)
+  describe historical work, not the default plan for a new run.
+- **Verification history:** [Environment state](#environment-state) records
+  the old interface-test repairs and historical full-suite results. Neither is
+  a current full-suite verdict; validate only the scope needed by the task.
+
+For another named run, locate its experiment ID in this handover and read its
+owning contract. Preserve frozen contracts, consumed authorizations, attempt
+evidence, and all existing data-protection and pause restrictions.
 
 ## Executive Summary
 
