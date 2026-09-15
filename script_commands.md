@@ -1588,6 +1588,95 @@ threshold-based counter instead of `game_count % 20 == 0`. Under
 `batch_games=6` the old modulo gate fired only 1-in-30 batches or worse.
 
 
+## Learned AI — Generalist v2c (train_s_gen_v2c.py)
+
+Extends v2b with five changes to suppress draw-by-repetition:
+
+1. `DRAW_REP_PENALTY = -0.6` — avoidable repetition draws penalised harder than passive long draws (-0.25)
+2. `REVISIT_PENALTY = -0.05` — per-move inline penalty when learner revisits a position already in the game history
+3. Directional Malom reward — penalises W→D/L regressions compared to pre-move WDL
+4. Draw cap tightened — 0.40 (early levels) / 0.22 (L4+) to prevent draw-heavy policies advancing
+5. `NOVELTY_BONUS = +0.02` — fires only when escaping an established loop (prior visit + new successor)
+
+Checkpoints: `learned_ai/checkpoints/scaffolded/s_gen_v2c/`
+
+**Recommended run (the run that reached diff 20):**
+
+```
+.venv/bin/python scripts/train_s_gen_v2c.py \
+  --max-games 50000 --temp-start 0.9 \
+  --sim-ply-depth 12 --self-play-ratio 0.25 \
+  --advance-temp-boost-frac 0.6 \
+  --advance-entropy-boost-frac 0.5 \
+  --advance-rehearsal-games 20 \
+  --batch-games 6 --hot-explore-games 100 \
+  --out-dir learned_ai/checkpoints/scaffolded/s_gen_v2c \
+  --max-ply 120 --run-name repetition_penalty_2_fixed \
+  --auto-resume-best \
+  --temp-anneal-games 3000 --temp-floor 0.6
+```
+
+**Smoke test:**
+
+```
+.venv/bin/python scripts/train_s_gen_v2c.py --max-games 3 \
+  --no-sentinel --no-value-net --no-gap-net
+```
+
+**Additional v2c-only flags** (on top of all v2b flags):
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--specialist-db PATH` | `data/specialist_db.sqlite` | SpecialistDB used for WDL evidence features and self-play recording |
+| `--temp-floor F` | 0.20 | Hard floor on effective temperature — prevents scheduled+boost cooling from crushing exploration on a plateau |
+| `--temp-anneal-games N` | `max_games // diff_max` | Primary games per level over which temperature cools from `temp_start` to `TEMP_END`. Clock resets on each difficulty advancement. |
+
+
+## Learned AI — Generalist v3 (train_s_gen_v3.py)
+
+Extends v2c with three changes:
+
+1. **Full-DB SpecialistDB reads** — during training the AI queries the full aggregate `positions` table (all difficulty levels). Writes still tag each position with the current difficulty level in `positions_by_diff` for future analysis. `--sdb-diff-window` is accepted but no longer restricts reads. Uses `data/specialist_db_v3.sqlite` by default.
+2. **Fixed `sim_ply_depth`** — no longer scaled with difficulty; stays at `--sim-ply-depth` (default **12**) throughout training, matching the inference default and eliminating the training/inference feature-quality mismatch.
+3. **Diff-20 completion gate** — promotion at `diff_max` requires a score of **0.90** (up from ~0.60 in v2c) to declare training done.
+
+Checkpoints: `learned_ai/checkpoints/scaffolded/s_gen_v3/`
+
+**Recommended run (v2c settings, v3 script):**
+
+```
+.venv/bin/python scripts/train_s_gen_v3.py \
+  --max-games 50000 --temp-start 0.9 \
+  --sim-ply-depth 12 --self-play-ratio 0.25 \
+  --advance-temp-boost-frac 0.6 \
+  --advance-entropy-boost-frac 0.5 \
+  --advance-rehearsal-games 20 \
+  --batch-games 6 --hot-explore-games 100 \
+  --max-ply 120 --auto-resume-best \
+  --temp-anneal-games 3000 --temp-floor 0.6
+```
+
+**Smoke test:**
+
+```
+.venv/bin/python scripts/train_s_gen_v3.py --max-games 3 \
+  --no-sentinel --no-value-net --no-gap-net
+```
+
+**v3-only flags** (on top of all v2c flags):
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--specialist-db PATH` | `data/specialist_db_v3.sqlite` | SpecialistDB path (separate from v2c's DB by default) |
+| `--sdb-diff-window N` | 5 | Controls the diff-level tag written to `positions_by_diff`. No longer restricts reads — the AI sees all positions in the DB at every difficulty. |
+
+**Key differences from the v2c equivalent command:**
+- `scripts/train_s_gen_v3.py` instead of `scripts/train_s_gen_v2c.py`
+- `--out-dir` omitted (defaults to `learned_ai/checkpoints/scaffolded/s_gen_v3`)
+- `--run-name` omitted (fresh v3 run, not a continuation of the v2c experiment)
+- `--sim-ply-depth 12` is now the v3 default (was 5 in v2c), so explicit flag is optional but kept for clarity
+
+
 ## Learned AI — v2a Training Dashboard (plot_specialist_training_2a.py)
 
 Live 7-row dashboard for one or more scaffolded checkpoint folders.  Reads
