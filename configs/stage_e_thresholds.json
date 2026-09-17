@@ -18,6 +18,16 @@
       "frozen": false,
       "authored": "2026-08-15",
       "notes": "Initial draft values per docs/gap_net_v3_plan.md §16 revised 2026-08-12. NOT frozen — pending Batch 5 owner review. Any run using this id will be Stage F ineligible."
+    },
+    {
+      "id": "stage_e_thresholds_v1_frozen_2026-09-17",
+      "x_a": 0.30,
+      "x_b": 0.20,
+      "min_high_support": 100,
+      "min_denominator": 1e-9,
+      "frozen": true,
+      "authored": "2026-09-17",
+      "notes": "Batch 5 owner review complete (2026-09-17). Values confirmed: X_A=30% improvement over uniform required per (band, component); X_B=20% degradation vs teacher tolerated per (band, component); min_high_support=100 rows per cell; min_denominator=1e-9. Grants Stage F eligibility when all gate cells PASS."
     }
   ]
 }

@@ -812,7 +812,7 @@ def run_extraction(
     advisor = HumanMovePolicyAdvisor(teacher_net, temperature=temperature)
 
     malom = MalomDB(malom_db_dir)
-    if not malom.available:
+    if not malom.is_available():
         raise RuntimeError(f"Malom DB not available at {malom_db_dir}")
 
     # ── Pass 1: owning tier per state_key ──────────────────────────────────

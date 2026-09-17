@@ -161,27 +161,40 @@ Pending — depend on a D4-on trained model:
 
 - [ ] `tests/test_gap_v3_symmetry_invariance.py` — inference invariance under D4 to within 1e-3.
 
-### Promotion-gate freeze (before running Stage E) — 🟡 STRUCTURE LANDED, NUMBERS PENDING USER REVIEW (Batch 5)
+### Promotion-gate freeze (before running Stage E) — ✅ DONE (Batch 5, 2026-09-17)
 
 - [x] Update `docs/gap_net_v3_plan.md` §16 wording to match Decision 3A reference-based framing.
-- [x] Add per-band thresholds — **structure landed** (Gate 1 `X_A[b, c]` ≥ 30 % vs uniform; Gate 2 `X_B[b, c]` ≤ 20 % vs teacher, both per-(band × component)).  **Numeric values are initial drafts**; user reviews before Stage E run.
+- [x] Add per-band thresholds — **frozen** (Gate 1 `X_A[b, c]` = 30 % vs uniform; Gate 2 `X_B[b, c]` = 20 % vs teacher, both per-(band × component)).  Owner confirmed 2026-09-17; frozen entry `stage_e_thresholds_v1_frozen_2026-09-17` in `configs/stage_e_thresholds.json`.
 - [x] Explicitly note teacher-fidelity is not empirical validation (bolded under "Separately reported" in the Stage E cell).
 
-## Current position (2026-08-15)
+### Decision 7 — min_empirical_support (2026-09-17)
+
+First Stage E run (2026-09-17) revealed all 9 gate cells skipping with `FAIL_INSUFFICIENT_COVERAGE`: only 77 empirical val rows total (11/32/34 per band) vs `min_high_support=100`.  Root cause: `min_empirical_support=25` (default) yields only 4,609 qualifying (state_key, band) cells out of 3,441,618 total (0.13%) — 87.5% of positions appear only once across all human games.
+
+| min_empirical_support | Qualifying cells | Approx empirical val rows | Per gate cell (÷9) |
+|---|---|---|---|
+| 25 (original) | 4,609 | ~77 actual | ~9 → SKIP |
+| 5 (**chosen**) | 58,331 | ~7,500 | ~840 → evaluable |
+| 3 | 153,334 | ~20,000 | ~2,200 → evaluable |
+
+**Decision 7A — `min_empirical_support=5`**: owner confirmed 2026-09-17.  Rationale: retains positions seen at least 5 times (genuine signal); excludes 87.5% single-observation noise; gives ~840 empirical val rows per gate cell, well above `min_high_support=100`.  Stage D re-extracted and Stage E re-trained with this value.  `min_high_support=100` and all other gate thresholds unchanged.
+
+## Current position (2026-09-17)
 
 Batch progress:
 - ✅ Batch 3a — session ledger builder + 12 tests (commit `6d61d40`).
 - ✅ Batch 3b — HMPN extractor + trainer session-ledger flags + guards + 19 tests (commits `ec567b2` + `9efe0ba`).
 - ⏳ Batch 3c — HMPN plan doc (`docs/human_move_policy_net_plan.md`) amendment describing v3 teacher retrain pipeline.  Not yet started.
-- ✅ Batch 4 — Stage D GapNet extractor rewrite consuming the session ledger + session-isolation/owning-tier tests + Codex 2026-08-14 P1-B/P1-A hardening + Codex 2026-08-14 P1×5+P2×1 follow-up + Codex 2026-08-15 P1×2+P2×2 follow-up + Codex 2026-08-15 3rd-pass frozen-threshold registry / Stage F wording + Codex 2026-08-15 4th-pass artifact-lifecycle filename fix + frozen-registry integration test (commits `fdd5a97` → `93cc7da` → `da596ef` → `affd2cd` → `4e4a724` → this commit).  Tooling done; full extraction run still pending authorisation and HMPN v3 teacher.
-- ⏳ Batch 5 — Promotion-gate freeze (per-band thresholds in `docs/gap_net_v3_plan.md` §16).
-- ⏸️ Batch 6 — Results (blocked on runs; runs blocked on readiness checkpoints and user authorisation).
+- ✅ Batch 4 — Stage D GapNet extractor rewrite + session-isolation/owning-tier tests + Codex 2026-08-14/15 hardening (commits `fdd5a97` → `93cc7da` → `da596ef` → `affd2cd` → `4e4a724` → `32101d8`).
+- ✅ Batch 5 — Promotion-gate freeze: `stage_e_thresholds_v1_frozen_2026-09-17` in `configs/stage_e_thresholds.json`; Decision 7A `min_empirical_support=5` locked.
+- ⏳ Batch 6 — Stage E run with min_empirical_support=5 in progress (2026-09-17).
 
-Runs pending user authorisation:
-- Full session-ledger run (`build_gap_v3_session_ledger.py`, ~7.6 h estimated; may want single-pass optimisation first).
-- HMPN v3 teacher retrain (~18 h) — readiness checkpoint required before launch.
-- GapNet v3 Stage D re-extraction (Batch 4 must land first) — coverage floor gate.
-- GapNet v3 Stage E training run — promotion gate wording must be frozen first (Batch 5).
+Runs completed:
+- ✅ Human DB rebuild — 99,864 games, 2,254,550 positions → `data/human_db_candidate_new.sqlite` (2026-09-17).
+- ✅ Full session ledger — 102,416 sessions (train=81,752 / val=15,509 / test=5,155) → `data/gap_v3_session_ledger.json` (2026-09-17).
+- ✅ HMPN v3 teacher retrain — best val NLL=1.5267, 38 epochs → `data/human_move_policy_net_v3_teacher_candidate.npz` (2026-09-17).
+- ✅ Stage D extraction (min_empirical_support=5) — 2,568,113 rows, production_ready=True → `data/gap_net_v3_dataset_v2/` (2026-09-17).
+- ⏳ Stage E training (min_empirical_support=5, frozen id `stage_e_thresholds_v1_frozen_2026-09-17`) — running.
 
 ## Progress log
 
