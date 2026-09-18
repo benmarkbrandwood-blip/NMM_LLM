@@ -325,6 +325,111 @@ def _batches(indices: np.ndarray, batch_positions: int, rng: np.random.Generator
         yield order[start:end]
 
 
+import math as _math
+
+def _branch_weight(n_legal: int, mode: str) -> float:
+    """Return a per-sample loss multiplier based on the number of legal moves.
+
+    High-branching positions (openings, midgame) are systematically underfit
+    because each observed move gives one label across many possibilities.
+    Upweighting these positions forces the model to allocate more capacity
+    where human preferences are hardest to learn.
+
+    Modes:
+      none   — weight 1.0 for all positions (current behaviour)
+      linear — weight = n_legal (strong; can dominate on 18-move positions)
+      log    — weight = log(1 + n_legal) (softer; recommended default)
+    """
+    if mode == "none" or n_legal <= 1:
+        return 1.0
+    if mode == "linear":
+        return float(n_legal)
+    return _math.log(1.0 + n_legal)
+
+
+_TOPK          = (1, 3, 5)
+_BAND_NAMES    = ["lower", "middle", "upper"]
+_BUCKET_RANGES = [(1, 4), (5, 8), (9, 12), (13, 999)]
+_BUCKET_LABELS = ["1-4", "5-8", "9-12", "13+"]
+
+
+def eval_test(
+    ds: "MovePolicyDataset",
+    model,
+    device,
+    indices: np.ndarray,
+    label: str = "test",
+) -> dict:
+    """Evaluate top-K move accuracy on held-out indices.
+
+    For each sample, ranks all legal moves by the model's predicted
+    probability and checks whether the actual human move(s) appear in
+    the top-K.  Reports accuracy broken down by Elo band and legal-move-
+    count bucket.  Each human event (count > 1) is counted independently.
+
+    Returns a nested dict: results[band_idx][bucket_idx][k] = (hits, total).
+    """
+    import torch
+    import torch.nn.functional as F
+
+    band_bits = torch.eye(N_BANDS, dtype=torch.float32, device=device)
+    results: dict = {
+        bi: {bki: {k: [0, 0] for k in _TOPK} for bki in range(len(_BUCKET_RANGES))}
+        for bi in range(N_BANDS)
+    }
+    model.eval()
+    with torch.no_grad():
+        for sid in indices:
+            feats_np, targets_np, band = ds.sample_slice(int(sid))
+            if targets_np.sum() == 0:
+                continue
+            n_legal = feats_np.shape[0]
+            bucket_idx = next(
+                (i for i, (lo, hi) in enumerate(_BUCKET_RANGES) if lo <= n_legal <= hi),
+                len(_BUCKET_RANGES) - 1,
+            )
+            feats  = torch.from_numpy(np.array(feats_np, dtype=np.float32)).to(device)
+            bhot   = band_bits[band].unsqueeze(0).expand(feats.shape[0], -1)
+            x      = torch.cat([feats, bhot], dim=1)
+            logits = model(x).squeeze(-1)
+            probs  = F.softmax(logits, dim=0).cpu().numpy()
+            # move_rank[i] = 0-indexed rank of move i (0 = highest probability)
+            sorted_desc = np.argsort(probs)[::-1]
+            move_rank   = np.empty(n_legal, dtype=np.int32)
+            for rank, move_idx in enumerate(sorted_desc):
+                move_rank[move_idx] = rank
+            for move_idx, count in enumerate(targets_np):
+                if count <= 0:
+                    continue
+                r = int(move_rank[move_idx])
+                for k in _TOPK:
+                    results[band][bucket_idx][k][1] += int(count)
+                    if r < k:
+                        results[band][bucket_idx][k][0] += int(count)
+
+    total_events = sum(
+        results[bi][bki][1][1]
+        for bi in range(N_BANDS)
+        for bki in range(len(_BUCKET_RANGES))
+    )
+    print(f"\n[hbn] {label} top-K accuracy  (positions={len(indices):,}  events={total_events:,})")
+    header = f"  {'band':<8} {'moves':<6}" + "".join(f"  top-{k:<2}" for k in _TOPK)
+    print(header)
+    for bi in range(N_BANDS):
+        for bki, (lo, hi) in enumerate(_BUCKET_RANGES):
+            total_k1 = results[bi][bki][1][1]
+            if total_k1 == 0:
+                continue
+            row = f"  {_BAND_NAMES[bi]:<8} {_BUCKET_LABELS[bki]:<6}"
+            for k in _TOPK:
+                hits, total = results[bi][bki][k]
+                acc = hits / total if total > 0 else float("nan")
+                row += f"  {acc:.3f}"
+            row += f"  (n={total_k1:,})"
+            print(row)
+    return results
+
+
 def train(args: argparse.Namespace) -> dict:
     import torch
     import torch.nn.functional as F
@@ -347,34 +452,38 @@ def train(args: argparse.Namespace) -> dict:
     band_bits = torch.eye(N_BANDS, dtype=torch.float32, device=device)
 
     def _forward_and_loss_batch(sample_ids: np.ndarray):
-        """Return (mean_event_loss_t, total_events, unnormalised_sum_t).
-        `mean_event_loss_t` is the per-event NLL — divide the summed
-        cross-entropy by total_events.  When the batch has no observed
-        events (all sample targets are zero), returns (None, 0, None)."""
-        losses:  list = []
-        weights: list[int] = []
-        total_events = 0
+        """Return (mean_event_loss_t, total_events_raw, unnormalised_sum_t).
+
+        When --branch-weight is not 'none', each sample's loss and its
+        contribution to the normalisation denominator are multiplied by
+        _branch_weight(n_legal, mode).  total_events_raw is always the
+        unweighted event count so logged NLL is comparable across runs."""
+        losses:         list  = []
+        total_events_raw      = 0
+        total_weighted        = 0.0
         for sid in sample_ids:
             feats_np, targets_np, band = ds.sample_slice(int(sid))
             if targets_np.sum() == 0:
                 continue
-            feats   = torch.from_numpy(np.array(feats_np,  dtype=np.float32)).to(device)
-            targets = torch.from_numpy(np.array(targets_np, dtype=np.float32)).to(device)
-            bhot    = band_bits[band].unsqueeze(0).expand(feats.shape[0], -1)
-            x       = torch.cat([feats, bhot], dim=1)
-            logits  = model(x).squeeze(-1)                   # (legal,)
-            log_p   = F.log_softmax(logits, dim=0)
+            n_legal    = feats_np.shape[0]
+            bw         = _branch_weight(n_legal, args.branch_weight)
+            feats      = torch.from_numpy(np.array(feats_np,  dtype=np.float32)).to(device)
+            targets    = torch.from_numpy(np.array(targets_np, dtype=np.float32)).to(device)
+            bhot       = band_bits[band].unsqueeze(0).expand(feats.shape[0], -1)
+            x          = torch.cat([feats, bhot], dim=1)
+            logits     = model(x).squeeze(-1)                # (legal,)
+            log_p      = F.log_softmax(logits, dim=0)
             sample_loss = -(targets * log_p).sum()
             sample_ev   = int(targets.sum().item())
-            losses.append(sample_loss)
-            weights.append(sample_ev)
-            total_events += sample_ev
+            losses.append(sample_loss * bw)
+            total_events_raw += sample_ev
+            total_weighted   += sample_ev * bw
         if not losses:
             return None, 0, None
         stacked      = torch.stack(losses)
         unnormalised = stacked.sum()
-        mean_event   = unnormalised / max(total_events, 1)
-        return mean_event, total_events, unnormalised
+        mean_event   = unnormalised / max(total_weighted, 1e-9)
+        return mean_event, total_events_raw, unnormalised
 
     def _epoch_train(epoch: int) -> float:
         model.train()
@@ -433,14 +542,19 @@ def train(args: argparse.Namespace) -> dict:
         import torch
         model.load_state_dict({k: torch.from_numpy(v) for k, v in best_state.items()})
 
+    obj_label = (
+        "count_weighted_ce"
+        if args.branch_weight == "none"
+        else f"count_branch_{args.branch_weight}_weighted_ce"
+    )
     provenance = {
-        "trainer_version":            "1",
+        "trainer_version":            "2",
         "trainer_git_commit":         _git_head() or "",
         "dataset_provenance":         ds.provenance,
         "feature_dim":                int(_INPUT_DIM),
         "n_bands":                    int(N_BANDS),
         "elo_band_config_name":       ds.provenance["elo_band_config_name"],
-        "training_objective":         "count_weighted_ce",
+        "training_objective":         obj_label,
         # Surface session-ledger identity at the top level (Batch 3b) so the
         # ledger's SHA + manifest hash are one grep away — otherwise buried
         # inside dataset_provenance.  Only populated when the dataset was
@@ -460,6 +574,7 @@ def train(args: argparse.Namespace) -> dict:
             "patience":         args.patience,
             "grad_clip":        args.grad_clip,
             "seed":             args.seed,
+            "branch_weight":    args.branch_weight,
         },
         "best_val_event_nll":         float(best_val),
         "final_epochs_run":           int(ep),
@@ -468,6 +583,12 @@ def train(args: argparse.Namespace) -> dict:
     _save_npz(model, args.output, provenance)
     print(f"[hbn] Saved → {args.output}")
     print(f"[hbn] Best val event NLL: {best_val:.5f}")
+
+    if args.eval_test and len(te) > 0:
+        eval_test(ds, model, device, te, label="test (new model)")
+    elif args.eval_test:
+        print("[hbn] --eval-test requested but no test samples available in this dataset.")
+
     return provenance
 
 
@@ -484,6 +605,13 @@ def main() -> int:
                    help="Number of (position, band) samples per gradient step.")
     p.add_argument("--grad-clip",   type=float, default=1.0)
     p.add_argument("--seed",        type=int,   default=42)
+    p.add_argument("--branch-weight", choices=["none", "linear", "log"], default="none",
+                   help="Per-sample loss multiplier based on legal-move count.  "
+                        "'log' (recommended) weights by log(1+n_legal); 'linear' by "
+                        "n_legal; 'none' is the original behaviour.")
+    p.add_argument("--eval-test", action="store_true",
+                   help="After training, evaluate top-1/3/5 accuracy on the held-out "
+                        "test split, broken down by Elo band and legal-move-count bucket.")
     p.add_argument("--session-ledger", type=Path, default=None,
                    help="Path to the session ledger used to extract the dataset.  "
                         "REQUIRED when the dataset was extracted with "
