@@ -149,7 +149,7 @@ class HumanMovePolicyAdvisor:
         return [float(s) for s in self._score_batch(x)]
 
     def probs(
-        self, board: BoardState, legal_moves: list[dict], elo_band: str
+        self, board: BoardState, legal_moves: list[dict], elo_band: str = "all"
     ) -> np.ndarray:
         """Softmax over every legal move → calibrated
         `p(m | position, elo_band)`.  Sums to 1 across `legal_moves`.
@@ -221,9 +221,17 @@ class HumanMovePolicyAdvisor:
 
         Never returns a uniform fallback.  The existing probs() fallback path
         remains available for gameplay overlays that can tolerate silent degradation.
+        Pass ``elo_band="all"`` to average across all three bands (strict semantics
+        preserved — any per-band failure raises).
         """
         if not legal_moves:
             return np.zeros(0, dtype=np.float32)
+        if elo_band == "all":
+            parts = np.stack([
+                self.probs_strict(board, legal_moves, b)
+                for b in ("lower", "middle", "upper")
+            ])
+            return parts.mean(axis=0).astype(np.float32)
         logits = self.raw_logits_strict(board, legal_moves, elo_band)
         scaled = logits / self.temperature
         scaled = scaled - scaled.max()

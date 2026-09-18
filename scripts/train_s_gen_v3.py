@@ -926,6 +926,21 @@ def _mk_humanlike_weights(blend: int):
     )
 
 
+def _mk_teacher_weights(blend: int):
+    """Return HeuristicWeights for the teacher-blended opponent slot.
+    Identical to _mk_humanlike_weights — the blend mechanism is the same;
+    the difference is which advisor object is passed as human_pref_net."""
+    import dataclasses
+    hw = sys.modules.get("ai.heuristics")
+    if hw is None:
+        return None
+    return dataclasses.replace(
+        hw.DEFAULT_WEIGHTS,
+        humanlike_blend=max(0, min(100, int(blend))),
+        humanlike_temperature=1.0,
+    )
+
+
 # ── Frozen-model opponent ─────────────────────────────────────────────────────
 
 class FrozenModelOpponent:
@@ -1656,6 +1671,26 @@ def run(args: argparse.Namespace) -> None:
     if human_pref_adv is None:
         print("[s_gen_v3] Humanlike opponent unavailable — slot will be skipped")
 
+    # Teacher-blended opponent: HumanMovePolicyAdvisor (trained on all human moves)
+    # injected as human_pref_net so _apply_humanlike_adjust uses teacher probs.
+    # probs() defaults elo_band="all" — averages lower/middle/upper distributions.
+    human_teacher_adv = None
+    if not getattr(args, "no_human_teacher", False):
+        try:
+            from ai.human_move_policy_advisor import try_load as _try_load_teacher
+            _teacher_path = (
+                args.human_teacher_net
+                or str(_ROOT / "data" / "human_move_policy_net_v4_branching.npz")
+            )
+            if Path(_teacher_path).exists():
+                human_teacher_adv = _try_load_teacher(_teacher_path, temperature=1.0)
+                if human_teacher_adv is not None:
+                    print(f"[s_gen_v3] HumanMovePolicyAdvisor (teacher) loaded: {_teacher_path}")
+        except Exception as e:
+            print(f"[s_gen_v3] HumanMovePolicyAdvisor load failed ({e}) — teacher opponent disabled")
+    if human_teacher_adv is None:
+        print("[s_gen_v3] Human teacher opponent unavailable — slot will be skipped")
+
     # v3: HumanDB — for per-candidate human-play-frequency feature
     human_db = None
     hdb_path = _ROOT / "data" / "human_db.sqlite"
@@ -1924,7 +1959,7 @@ def run(args: argparse.Namespace) -> None:
         _use_rehearsal = advance_rehearsal_remaining > 0
         if _use_rehearsal:
             advance_rehearsal_remaining -= 1
-        _lower_diff_hi = 0.10 + (args.advance_rehearsal_prob if _use_rehearsal else 0.20)
+        _lower_diff_hi = 0.10 + (args.advance_rehearsal_prob if _use_rehearsal else 0.15)
 
         if games_since_target_update >= args.update_target_every:
             frozen_opp.refresh(model)
@@ -1934,11 +1969,12 @@ def run(args: argparse.Namespace) -> None:
         # ── Build N game configs ──────────────────────────────────────────────
         # Opponent schedule (per game):
         #   10% — next higher difficulty heuristic (anti-overfit to current level)
-        #   20% — random lower difficulty heuristic (diverse opponent strength)
+        #   15% — random lower difficulty heuristic (diverse opponent strength)
         #   10% — blunder heuristic (teach exploitation of mistakes)
-        #   10% — blended heuristic (value_net 10% + gap_net 30% + sentinel 20%)
+        #    5% — blended heuristic (value_net 10% + gap_net 30% + sentinel 20%)
         #    5% — humanlike-blend heuristic (HumanPrefAdvisor mixed at 50%)
-        #   45% — standard logic (self-play or current-difficulty heuristic)
+        #   25% — teacher-blended heuristic (HumanMovePolicyAdvisor mixed at 50%)
+        #   30% — standard logic (self-play or current-difficulty heuristic)
         # All non-frozen games count toward level-advancement history.
         batch_slots: list[tuple[_GameConfig, Any]] = []
         for _ in range(max(1, min(args.batch_games, args.max_games - game_count))):
@@ -1970,7 +2006,7 @@ def run(args: argparse.Namespace) -> None:
                 _h._inner = _make_ga(_oc, _gd, blunder_probability=0.25)
                 _opp, _gt = _h, "vs_heuristic_blunder"
 
-            elif _roll < _lower_diff_hi + 0.20:
+            elif _roll < _lower_diff_hi + 0.15:
                 # Blended special: nets added progressively by difficulty
                 # diff 1: pure heuristic; diff 2+: add VN; diff 3+: add gap; diff 4+: add sentinel
                 _gd        = difficulty
@@ -1987,7 +2023,7 @@ def run(args: argparse.Namespace) -> None:
                 _h._inner = _inner
                 _opp, _gt = _h, "vs_heuristic_blend"
 
-            elif human_pref_adv is not None and _roll < _lower_diff_hi + 0.25:
+            elif human_pref_adv is not None and _roll < _lower_diff_hi + 0.20:
                 # 5% humanlike-blend heuristic: HeuristicAgent whose inner GameAI
                 # mixes minimax scores with HumanPrefAdvisor probabilities.
                 # humanlike_blend is a 0-100 weight (default 50 %).
@@ -1996,6 +2032,16 @@ def run(args: argparse.Namespace) -> None:
                 _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _make_ga(_oc, _gd, human_pref_net=human_pref_adv, weights=_hw)
                 _opp, _gt = _h, "vs_heuristic_humanlike"
+
+            elif human_teacher_adv is not None and _roll < _lower_diff_hi + 0.45:
+                # 25% teacher-blended heuristic: HeuristicAgent whose inner GameAI
+                # blends minimax scores with HumanMovePolicyAdvisor probabilities
+                # (trained on all human moves, averaged across Elo bands).
+                _gd  = difficulty
+                _hw  = _mk_teacher_weights(int(args.human_teacher_blend))
+                _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
+                _h._inner = _make_ga(_oc, _gd, human_pref_net=human_teacher_adv, weights=_hw)
+                _opp, _gt = _h, "vs_heuristic_teacher"
 
             else:
                 # Standard 50%: self-play or current-difficulty heuristic
@@ -2821,11 +2867,18 @@ def main() -> None:
     p.add_argument("--value-net",default=str(_ROOT / "data" / "value_net.npz"), type=str)
     p.add_argument("--gap-net",  default=str(_ROOT / "data" / "gap_net.npz"),   type=str)
     p.add_argument("--human-pref-net", default=str(_ROOT / "data" / "human_pref_net.npz"), type=str,
-                   help="HumanPrefNet .npz used by the 1% humanlike opponent slot.")
+                   help="HumanPrefNet .npz used by the 5%% humanlike opponent slot.")
     p.add_argument("--no-humanlike-opponent", action="store_true",
-                   help="Disable the 1% humanlike-blend opponent slot even if human_pref_net.npz exists.")
+                   help="Disable the 5%% humanlike-blend opponent slot even if human_pref_net.npz exists.")
     p.add_argument("--humanlike-blend", type=int, default=50,
-                   help="humanlike_blend weight (0-100) used by the 5% humanlike opponent slot.")
+                   help="humanlike_blend weight (0-100) used by the 5%% humanlike opponent slot.")
+    p.add_argument("--human-teacher-net", default=str(_ROOT / "data" / "human_move_policy_net_v4_branching.npz"),
+                   type=str,
+                   help="HumanMovePolicyNet .npz used by the 25%% teacher-blended opponent slot.")
+    p.add_argument("--no-human-teacher", action="store_true",
+                   help="Disable the 25%% teacher-blended opponent slot.")
+    p.add_argument("--human-teacher-blend", type=int, default=50,
+                   help="humanlike_blend weight (0-100) used by the 25%% teacher-blended opponent slot.")
     p.add_argument("--ppo",      action="store_true")
     p.add_argument("--max-games",           type=int,   default=5000)
     p.add_argument("--seed",                type=int,   default=42)
