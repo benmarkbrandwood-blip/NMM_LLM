@@ -1580,6 +1580,27 @@ class GameAI:
             return 1.0
         return (my_score - lo) / (hi - lo)
 
+    def assess_position(self, board: BoardState) -> list[tuple[dict, int]]:
+        """Score all legal moves with no time deadline.
+
+        Returns [(move, raw_int_score), ...] sorted best-first (mover's perspective).
+        Intended for PostGameAssessor only — not safe during live play.
+        Caller should set self.max_search_depth to a low value (e.g. 4) before use.
+        """
+        moves = get_all_legal_moves(board)
+        if not moves:
+            return []
+        total_on_board = sum(board.pieces_on_board.values())
+        depth = max(2, _opening_ramp_depth(self.max_search_depth, total_on_board) - 1)
+        old_deadline = self._deadline
+        self._deadline = math.inf
+        try:
+            scored = self._score_all(board, moves, depth)
+        finally:
+            self._deadline = old_deadline
+        scored.sort(key=lambda x: x[1], reverse=True)
+        return scored
+
     # ── Opening book + trajectory integration ────────────────────────────────
 
     @staticmethod

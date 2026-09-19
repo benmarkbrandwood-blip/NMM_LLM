@@ -321,6 +321,113 @@ Choose after validation establishes actual latency on representative hardware.
 
 ---
 
+## Staged Implementation Plan
+
+Each stage has a test gate; later stages must not begin until the prior gate passes.
+The `r_h` values used below are **normalised** (0.0 = optimal, 1.0 = worst), where
+`r_h = 1.0 − score_played` since `score_best = 1.0` by construction.
+
+### Stage 1 — Data classes + clean scorer + heuristic loop *(implement now)*
+
+**Goal:** replay a game record, score every ply with the clean heuristic, build
+`PostGameAnnotation` with `heuristic_curve` and heuristic-only turning-point detection.
+
+**New code:**
+- `GameAI.assess_position(board)` — thin wrapper around `_score_all()` with no
+  deadline; returns `[(move, raw_int_score), ...]` sorted best-first. Caps search
+  depth via a configurable `max_assess_depth` (default 4) to bound wall-clock cost.
+- `ai/post_game_assessor.py` — `MoveAnnotation`, `PostGameAnnotation`, `PostGameAssessor`.
+  Sentinel/Malom/Trajectory/Policy fields default to `None`.
+
+**Test gate:** `tests/test_post_game_assessor.py`
+- `assessor = PostGameAssessor(difficulty=1, depth=3)`; 6-ply synthetic game record.
+- `heuristic_curve` has one entry per ply.
+- All `r_h` are ≥ 0 and ≤ 1.
+- `turning_point_oracle == "heuristic"`.
+
+### Stage 2 — Sentinel integration
+
+**Goal:** populate `sentinel_score_white`, `sentinel_played`, `sentinel_best`, `r_s`
+and `sentinel_curve` per ply when a `SentinelAdvisor` is provided.
+
+**New code:** `PostGameAssessor.__init__` gains optional `sentinel` arg. The per-ply
+loop calls `sentinel.advise(board, candidates, color, played_idx)` after the heuristic
+call; populates sentinel fields; skips gracefully when sentinel is `None`.
+
+**Test gate:** mock `SentinelAdvisor`; assert sentinel fields populated when present;
+assert fields remain `None` when sentinel absent; `sentinel_curve` tracks mocked values.
+
+### Stage 3 — Malom adjudication
+
+**Goal:** look up `wdl_before` and `wdl_after` for every ply; classify
+`quality` as `confirmed_poor` / `poor_candidate` / `clean`; flag `oracle_source`.
+
+**New code:** `PostGameAssessor.__init__` gains optional `malom_db` arg. Per-ply: look
+up position before and after the move; apply the signal-hierarchy classification;
+populate `oracle_source`, `abstained_reason`, `quality`.
+
+**Test gate:** use a known Malom-covered position (or a mock); assert `wdl_before`
+and `wdl_after` are `"W"/"D"/"L"` or `None`; assert `quality == "confirmed_poor"` for
+a verified `win_to_loss` transition.
+
+### Stage 4 — Trajectory + Human policy signals
+
+**Goal:** populate trajectory and policy fields per ply.
+
+**New code:** `PostGameAssessor.__init__` gains `trajectory_db` and `policy_advisor`
+optional args. Per-ply trajectory query (field is `None` when `{}` returned). Per-ply
+policy probs call; `is_unconventional` left uncalibrated until Stage 5 validation.
+
+**Test gate:** mock both advisors; assert trajectory fields populated at covered
+positions; assert `traj_n` is `None` when coverage below threshold; assert policy
+fields populated when advisor present.
+
+### Stage 5 — Full turning-point hierarchy + poor-move thresholds
+
+**Goal:** implement the full Malom → Sentinel+Heuristic → Heuristic turning-point
+selection and calibrate `poor_candidate` thresholds from real game data.
+
+**New code:** `_detect_turning_point` upgraded to the three-tier hierarchy (§ Score
+Curves and Turning Point). `turning_point_oracle` field set correctly for each path.
+`poor_candidate` flagging with calibrated `r_h` and `r_s` thresholds from validation.
+
+**Test gate:** three tests — one Malom-covered game (oracle `"malom_full"`), one
+Sentinel+Heuristic game (oracle `"sentinel+heuristic"`), one heuristic-only game
+(oracle `"heuristic"`). Validate `turning_point_quality` format matches its oracle.
+
+### Stage 6 — LLM synthesis
+
+**Goal:** extend `debrief_game()` to accept a `PostGameAnnotation` and produce
+the structured 3–5 sentence commentary.
+
+**New code:** `MillsLLM.debrief_game()` extended to accept `PostGameAnnotation` as
+well as the existing thin `DebriefReport`. Builds the four-section prompt (Game Facts,
+Score Trend, Turning Point, Other Poor Moves) following the hard constraints in §LLM
+Synthesis (no decimal Malom figures, no invented quality claims).
+
+**Test gate (offline):** pass a `PostGameAnnotation` with known fields to a mocked
+`_build_debrief_prompt()`; assert all four sections are present; assert no decimal
+figures appear in the Turning Point section when oracle is `"malom_full"`.
+
+### Stage 7 — UI integration
+
+**Goal:** pivotal moves highlighted in the move-replay slider; LLM commentary
+displayed in the MillsAI chat panel after the game ends.
+
+**New code:**
+- `web/app.py` and `/api/debrief` endpoint: on game end, run `PostGameAssessor.assess()`
+  asynchronously; return `PostGameAnnotation` JSON alongside the existing `DebriefReport`.
+- Frontend replay component: read `turning_point_ply` and `quality == "confirmed_poor"`
+  or `"poor_candidate"` moves from the annotation; add highlight markers to the move
+  timeline.
+- MillsAI chat panel: after game end, display the LLM debrief text (from Stage 6) in
+  the existing chat window beneath a "Game analysis" header.
+
+**Test gate:** manual validation on 5–10 games (§Validation). Gate further polish on
+that review.
+
+---
+
 ## Open Questions
 
 1. **`r_h` and `r_s` thresholds for `poor_candidate`.** What regret gap is meaningful
