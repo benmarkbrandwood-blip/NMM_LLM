@@ -1,11 +1,15 @@
 """
-Stage 1 tests for PostGameAssessor (heuristic signal only).
+Stage 1 + Stage 2 tests for PostGameAssessor.
+
+Stage 1: heuristic signal only.
+Stage 2: Sentinel integration via a lightweight mock advisor.
 
 Uses difficulty=1, depth=3 and a short synthetic game record to keep
-each test fast (no Sentinel, Malom, or trajectory dependencies).
+each test fast.
 """
 
 import pytest
+from unittest.mock import MagicMock
 from game.board import BoardState
 from game.rules import get_all_legal_moves
 from ai.post_game_assessor import PostGameAssessor, MoveAnnotation, PostGameAnnotation
@@ -177,3 +181,107 @@ class TestPostGameAssessorStage1:
         assert result.heuristic_curve == []
         assert result.sentinel_curve == []
         assert result.turning_point_ply is None
+
+    def test_generalist_fields_none_stage1(self, annotation):
+        for ann in annotation.moves:
+            assert ann.generalist_policy_prob is None
+            assert ann.generalist_top_move is None
+            assert ann.generalist_value_after is None
+            assert not ann.generalist_self_assessed
+
+
+# ── Stage 2: Sentinel integration ─────────────────────────────────────────────
+
+def _make_mock_sentinel(played_quality: float = 0.6, best_quality: float = 0.8):
+    """Create a mock SentinelAdvisor that returns fixed scores."""
+    from learned_ai.sentinel.infer import SentinelAdvice
+    advice = SentinelAdvice(
+        move_scores=[played_quality, best_quality],
+        best_sentinel_move_idx=1,
+        played_move_idx=0,
+        played_move_quality=played_quality,
+        best_available_quality=best_quality,
+        opportunity_gap=max(0.0, best_quality - played_quality),
+        player="W",
+        advisory_message="missed_opportunity",
+    )
+    mock = MagicMock()
+    mock.is_loaded.return_value = True
+    mock.advise.return_value = advice
+    return mock
+
+
+@pytest.fixture(scope="module")
+def sentinel_assessor():
+    return PostGameAssessor(difficulty=1, depth=3, sentinel=_make_mock_sentinel())
+
+
+@pytest.fixture(scope="module")
+def sentinel_annotation(sentinel_assessor):
+    record = build_game_record(n_plies=6)
+    return sentinel_assessor.assess(record)
+
+
+class TestPostGameAssessorStage2:
+    def test_sentinel_curve_populated(self, sentinel_annotation):
+        assert len(sentinel_annotation.sentinel_curve) == len(sentinel_annotation.moves)
+        assert any(v is not None for v in sentinel_annotation.sentinel_curve)
+
+    def test_sentinel_played_populated(self, sentinel_annotation):
+        for ann in sentinel_annotation.moves:
+            assert ann.sentinel_played is not None, f"ply {ann.ply}: sentinel_played is None"
+
+    def test_sentinel_best_populated(self, sentinel_annotation):
+        for ann in sentinel_annotation.moves:
+            assert ann.sentinel_best is not None
+
+    def test_r_s_non_negative(self, sentinel_annotation):
+        for ann in sentinel_annotation.moves:
+            assert ann.r_s is not None
+            assert ann.r_s >= 0.0, f"ply {ann.ply}: r_s={ann.r_s} < 0"
+
+    def test_r_s_equals_gap(self, sentinel_annotation):
+        for ann in sentinel_annotation.moves:
+            expected = max(0.0, ann.sentinel_best - ann.sentinel_played)
+            assert abs(ann.r_s - expected) < 1e-9
+
+    def test_sentinel_score_white_normalised_white_ply(self, sentinel_annotation):
+        """For a White ply sentinel_score_white == sentinel_played."""
+        white_plies = [a for a in sentinel_annotation.moves if a.color == "W"]
+        for ann in white_plies:
+            assert abs(ann.sentinel_score_white - ann.sentinel_played) < 1e-9, \
+                f"ply {ann.ply}: sentinel_score_white={ann.sentinel_score_white}, played={ann.sentinel_played}"
+
+    def test_sentinel_score_white_normalised_black_ply(self, sentinel_annotation):
+        """For a Black ply sentinel_score_white == 1 - sentinel_played."""
+        black_plies = [a for a in sentinel_annotation.moves if a.color == "B"]
+        for ann in black_plies:
+            expected = 1.0 - ann.sentinel_played
+            assert abs(ann.sentinel_score_white - expected) < 1e-9, \
+                f"ply {ann.ply}: sentinel_score_white={ann.sentinel_score_white}, expected={expected}"
+
+    def test_sentinel_curve_matches_annotations(self, sentinel_annotation):
+        for i, ann in enumerate(sentinel_annotation.moves):
+            assert sentinel_annotation.sentinel_curve[i] == ann.sentinel_score_white
+
+    def test_heuristic_fields_unaffected(self, sentinel_annotation):
+        """Heuristic fields must be unchanged when Sentinel is present."""
+        for ann in sentinel_annotation.moves:
+            assert ann.r_h >= 0.0
+            assert ann.r_h <= 1.0 + 1e-9
+            assert ann.score_best == 1.0
+
+    def test_no_sentinel_gives_none_fields(self):
+        """Without a sentinel advisor, all sentinel fields remain None."""
+        assessor_no_sentinel = PostGameAssessor(difficulty=1, depth=3, sentinel=None)
+        record = build_game_record(n_plies=4)
+        result = assessor_no_sentinel.assess(record)
+        for ann in result.moves:
+            assert ann.sentinel_score_white is None
+            assert ann.sentinel_played is None
+            assert ann.r_s is None
+        assert all(v is None for v in result.sentinel_curve)
+
+    def test_oracle_still_heuristic_stage2(self, sentinel_annotation):
+        """Turning point oracle stays 'heuristic' until Stage 5."""
+        assert sentinel_annotation.turning_point_oracle == "heuristic"

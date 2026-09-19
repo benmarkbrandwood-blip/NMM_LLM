@@ -2,17 +2,21 @@
 ai/post_game_assessor.py — Post-game per-ply analysis.
 
 PostGameAssessor replays a completed game record and produces a
-PostGameAnnotation with per-ply heuristic scoring, score curves,
+PostGameAnnotation with per-ply heuristic + sentinel scoring, score curves,
 and turning-point detection.
 
-Stage 1: heuristic signal only.
-Stage 2 adds Sentinel; Stage 3 Malom; Stage 4 Trajectory + Policy.
+Stage 1: heuristic signal.
+Stage 2: Sentinel signal added.
+Stage 3 adds Malom; Stage 4 Trajectory + Human Policy + Generalist AI.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from learned_ai.sentinel.infer import SentinelAdvisor
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
@@ -37,10 +41,10 @@ class MoveAnnotation:
     r_h: float                      # heuristic regret = 1.0 − score_played
 
     # Sentinel signal (Stage 2)
-    sentinel_score_white: Optional[float] = None
-    sentinel_played: Optional[float] = None
-    sentinel_best: Optional[float] = None
-    r_s: Optional[float] = None
+    sentinel_score_white: Optional[float] = None   # played quality, White-normalised (curve value)
+    sentinel_played: Optional[float] = None        # raw Sentinel quality, mover's perspective
+    sentinel_best: Optional[float] = None          # highest Sentinel score among candidates
+    r_s: Optional[float] = None                    # sentinel regret = sentinel_best − sentinel_played
 
     # Trajectory signal (Stage 4)
     traj_delta_played: Optional[float] = None
@@ -63,6 +67,12 @@ class MoveAnnotation:
     policy_support_n: Optional[int] = None
     is_unconventional: bool = False
 
+    # Generalist AI policy (Stage 4)
+    generalist_policy_prob: Optional[float] = None   # P(generalist plays this move)
+    generalist_top_move: Optional[str] = None        # generalist's preferred alternative
+    generalist_value_after: Optional[float] = None   # value-head win prob, White-normalised
+    generalist_self_assessed: bool = False            # True when generalist played this side
+
 
 @dataclass
 class PostGameAnnotation:
@@ -70,7 +80,7 @@ class PostGameAnnotation:
     heuristic_curve: list[float]           # heuristic_score_white at each ply
     sentinel_curve: list[Optional[float]]  # None entries when Sentinel unavailable
     turning_point_ply: Optional[int]
-    turning_point_quality: str             # e.g. "r_h:0.712" or "win_to_loss"
+    turning_point_quality: str             # e.g. "r_h:0.712", "r_h+r_s:0.712", or "win_to_loss"
     turning_point_oracle: str              # "malom_full"|"retrograde_wdl"|"sentinel+heuristic"|"heuristic"
     opening_name: Optional[str]
 
@@ -82,6 +92,15 @@ def _move_notation(move: dict) -> str:
     if move.get("capture"):
         s += f"x{move['capture']}"
     return s
+
+
+def _find_played_idx(candidates: list[dict], played_move: dict) -> int:
+    """Return index of played_move in candidates list, or 0 if not found."""
+    key = (played_move.get("from"), played_move["to"], played_move.get("capture"))
+    for i, m in enumerate(candidates):
+        if (m.get("from"), m["to"], m.get("capture")) == key:
+            return i
+    return 0
 
 
 # ── Assessor ──────────────────────────────────────────────────────────────────
@@ -96,11 +115,20 @@ class PostGameAssessor:
     depth:
         Maximum search depth for per-ply scoring. Low values (3–4) keep
         assessment fast while preserving directional accuracy. Default 4.
+    sentinel:
+        Optional SentinelAdvisor. When provided, sentinel fields are populated
+        per ply. Skipped gracefully when None.
     """
 
-    def __init__(self, difficulty: int = 3, depth: int = 4) -> None:
+    def __init__(
+        self,
+        difficulty: int = 3,
+        depth: int = 4,
+        sentinel: Optional["SentinelAdvisor"] = None,
+    ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
+        self._sentinel = sentinel
 
     def assess(self, game_record: dict) -> PostGameAnnotation:
         """Replay `game_record` and return a fully annotated PostGameAnnotation."""
@@ -131,6 +159,7 @@ class PostGameAssessor:
             board_after = board.apply_move(played_move)
             heuristic_score_white = float(evaluate_v2(board_after, "W"))
 
+            # ── Heuristic fields ──────────────────────────────────────────────
             if scored:
                 all_s = [s for _, s in scored]
                 lo, hi = min(all_s), max(all_s)
@@ -158,6 +187,25 @@ class PostGameAssessor:
 
             r_h = max(0.0, 1.0 - score_played_norm)
 
+            # ── Sentinel fields ───────────────────────────────────────────────
+            sentinel_score_white: Optional[float] = None
+            sentinel_played: Optional[float] = None
+            sentinel_best: Optional[float] = None
+            r_s: Optional[float] = None
+
+            if self._sentinel is not None and scored:
+                candidates = [m for m, _ in scored]
+                played_idx = _find_played_idx(candidates, played_move)
+                advice = self._sentinel.advise(board, candidates, color, played_idx)
+                if advice is not None:
+                    sentinel_played = advice.played_move_quality
+                    sentinel_best = advice.best_available_quality
+                    r_s = advice.opportunity_gap
+                    # White-normalise: negate for Black plies
+                    sentinel_score_white = (
+                        sentinel_played if color == "W" else 1.0 - sentinel_played
+                    )
+
             annotations.append(MoveAnnotation(
                 ply=ply_idx,
                 color=color,
@@ -168,6 +216,10 @@ class PostGameAssessor:
                 score_played=score_played_norm,
                 score_best=score_best_norm,
                 r_h=r_h,
+                sentinel_score_white=sentinel_score_white,
+                sentinel_played=sentinel_played,
+                sentinel_best=sentinel_best,
+                r_s=r_s,
             ))
             board = board_after
 
@@ -191,7 +243,8 @@ class PostGameAssessor:
     ) -> tuple[Optional[int], str, str]:
         """Return (ply, quality_str, oracle_source) for the turning point.
 
-        Stage 1: heuristic-only — ply where h(t) drops most steeply.
+        Stages 1–2: heuristic-only — ply where h(t) drops most steeply.
+        Stage 5 upgrades this to the full Malom → Sentinel+Heuristic → Heuristic hierarchy.
         """
         if len(annotations) < 2:
             return None, "", "heuristic"

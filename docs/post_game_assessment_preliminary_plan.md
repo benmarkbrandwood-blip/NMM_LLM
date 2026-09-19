@@ -21,7 +21,7 @@ objectively damaging. The LLM then produces a short commentary grounded in those
 
 ---
 
-## The Four Diagnostic Signals
+## Diagnostic Signals
 
 ### 1. Heuristic search (`score_move()` in clean mode)
 
@@ -80,6 +80,28 @@ Per ply:
 
 Human preference is a *descriptive* signal. High human frequency does not override a
 heuristic or Malom-confirmed downgrade.
+
+### 5. Generalist AI policy
+
+`GeneralistPolicyAdvisor.probs(board, legal_moves)` (or equivalent interface on the
+scaffolded generalist) returns a probability distribution over legal moves reflecting
+what the strongest trained AI would play. Unlike human preference, this signal asks
+"what would the best available AI do?"
+
+Per ply:
+- `generalist_policy_prob`: probability the generalist would play the move made.
+- `generalist_top_move`: the generalist's preferred alternative.
+- `generalist_value_after`: optional value-head win probability after the move,
+  White-normalised — a third score curve if the value head is exposed.
+
+**Own-game caveat:** when the generalist played one side of the game, its scores for
+its own moves are trivially high and carry no signal. This field should be tagged
+`generalist_self_assessed: true` in that case and treated as uninformative. The signal
+is most useful for human-vs-human games or for assessing the human's side of a
+human-vs-AI game.
+
+Generalist policy is a *descriptive* signal at the same tier as human preference. It
+does not override Malom, Sentinel, or heuristic adjudication.
 
 ### 4. Sentinel (`SentinelAdvisor.advise()`)
 
@@ -241,6 +263,12 @@ policy_top_prob       float | None
 policy_prob_source    "empirical" | "learned" | None
 policy_support_n      int | None
 is_unconventional     bool
+
+# Generalist AI policy
+generalist_policy_prob  float | None     # probability generalist plays this move
+generalist_top_move     str | None       # generalist's preferred alternative
+generalist_value_after  float | None     # value-head win prob after move, White-normalised
+generalist_self_assessed bool            # True when generalist played this side (uninformative)
 ```
 
 ### `PostGameAnnotation` (game level)
@@ -370,17 +398,21 @@ populate `oracle_source`, `abstained_reason`, `quality`.
 and `wdl_after` are `"W"/"D"/"L"` or `None`; assert `quality == "confirmed_poor"` for
 a verified `win_to_loss` transition.
 
-### Stage 4 — Trajectory + Human policy signals
+### Stage 4 — Trajectory, Human policy, and Generalist AI signals
 
-**Goal:** populate trajectory and policy fields per ply.
+**Goal:** populate trajectory, human policy, and generalist AI policy fields per ply.
 
-**New code:** `PostGameAssessor.__init__` gains `trajectory_db` and `policy_advisor`
-optional args. Per-ply trajectory query (field is `None` when `{}` returned). Per-ply
-policy probs call; `is_unconventional` left uncalibrated until Stage 5 validation.
+**New code:** `PostGameAssessor.__init__` gains `trajectory_db`, `policy_advisor`, and
+`generalist_advisor` optional args. Per-ply trajectory query (field is `None` when `{}`
+returned). Per-ply human policy probs call; `is_unconventional` left uncalibrated until
+Stage 5 validation. Per-ply generalist policy probs; `generalist_self_assessed` flagged
+when the generalist's `color` matches the ply's mover and the game was AI-played on
+that side.
 
-**Test gate:** mock both advisors; assert trajectory fields populated at covered
-positions; assert `traj_n` is `None` when coverage below threshold; assert policy
-fields populated when advisor present.
+**Test gate:** mock all three advisors; assert trajectory fields populated at covered
+positions; assert `traj_n` is `None` when coverage below threshold; assert policy and
+generalist fields populated when advisors present; assert `generalist_self_assessed`
+is set correctly.
 
 ### Stage 5 — Full turning-point hierarchy + poor-move thresholds
 
