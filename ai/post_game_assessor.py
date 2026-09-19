@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from learned_ai.sentinel.infer import SentinelAdvisor
     from ai.value_net import ValueNet  # GapNet shares this architecture
+    from ai.malom_db import MalomDB
+
+# Malom WDL transitions that mean the mover threw away a better outcome
+_MALOM_CONFIRMED_POOR = frozenset({"win_to_draw", "win_to_loss", "draw_to_loss"})
+_MALOM_CLEAN          = frozenset({"win_preserved", "draw_preserved", "all_losing"})
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
@@ -130,11 +135,13 @@ class PostGameAssessor:
         depth: int = 4,
         sentinel: Optional["SentinelAdvisor"] = None,
         gap_net: Optional["ValueNet"] = None,
+        malom_db: Optional["MalomDB"] = None,
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
         self._sentinel = sentinel
         self._gap_net = gap_net
+        self._malom_db = malom_db
 
     def assess(self, game_record: dict) -> PostGameAnnotation:
         """Replay `game_record` and return a fully annotated PostGameAnnotation."""
@@ -219,6 +226,42 @@ class PostGameAssessor:
                 raw = self._gap_net.predict(board, color)   # tanh output in (-1, 1)
                 blunder_zone_score = (raw + 1.0) / 2.0      # convert to [0, 1]
 
+            # ── Malom adjudication ────────────────────────────────────────────
+            wdl_before: Optional[str] = None
+            wdl_after: Optional[str] = None
+            oracle_source = "none"
+            abstained_reason: Optional[str] = None
+            quality = "clean"
+
+            if self._malom_db is not None and self._malom_db.is_available():
+                parent_val = self._malom_db.query_value(board)
+                if parent_val is None:
+                    abstained_reason = "parent_value_unavailable"
+                else:
+                    wdl_before = parent_val.outcome
+                    if wdl_before == "L":
+                        # Already losing — any move is equally bad; don't flag.
+                        abstained_reason = "already_losing"
+                    else:
+                        result = self._malom_db.query_regret(board, played_move)
+                        if not result.available:
+                            wdl_before = None
+                            abstained_reason = result.unavailable_reason
+                        else:
+                            wdl_after = result.omv.outcome
+                            transition = result.wdl_transition
+                            if transition in _MALOM_CONFIRMED_POOR:
+                                oracle_source = "malom_full"
+                                quality = "confirmed_poor"
+                            elif transition in _MALOM_CLEAN:
+                                oracle_source = "malom_full"
+                                quality = "clean"
+                            else:
+                                # label_inconsistency or unexpected value — fail closed
+                                wdl_before = None
+                                wdl_after = None
+                                abstained_reason = f"malom_{transition}"
+
             annotations.append(MoveAnnotation(
                 ply=ply_idx,
                 color=color,
@@ -234,6 +277,11 @@ class PostGameAssessor:
                 sentinel_best=sentinel_best,
                 r_s=r_s,
                 blunder_zone_score=blunder_zone_score,
+                wdl_before=wdl_before,
+                wdl_after=wdl_after,
+                oracle_source=oracle_source,
+                abstained_reason=abstained_reason,
+                quality=quality,
             ))
             board = board_after
 

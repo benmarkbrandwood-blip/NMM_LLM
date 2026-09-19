@@ -421,7 +421,7 @@ position blunder-zone density.
 populated when present; assert all remain `None` when advisors absent; assert
 `blunder_zone_score` is always in [0, 1] when populated.
 
-### Stage 3 — Malom adjudication
+### Stage 3 — Malom adjudication *(complete)*
 
 **Goal:** look up `wdl_before` and `wdl_after` for every ply; classify
 `quality` as `confirmed_poor` / `poor_candidate` / `clean`; flag `oracle_source`.

@@ -379,3 +379,147 @@ class TestPostGameAssessorGapNet:
             assert ann.sentinel_played is not None
             assert ann.blunder_zone_score is not None
             assert abs(ann.blunder_zone_score - (0.6 + 1.0) / 2.0) < 1e-6
+
+
+# ── Stage 3: Malom adjudication ───────────────────────────────────────────────
+
+def _make_mock_malom(wdl_before: str = "W", wdl_after: str = "W",
+                     transition: str = "win_preserved", available: bool = True,
+                     unavailable_reason: str = None):
+    """Build a mock MalomDB that returns fixed values for every position."""
+    parent_val = MagicMock()
+    parent_val.outcome = wdl_before
+
+    omv = MagicMock()
+    omv.outcome = wdl_after
+
+    regret = MagicMock()
+    regret.available = available
+    regret.omv = omv
+    regret.wdl_transition = transition
+    regret.unavailable_reason = unavailable_reason
+
+    mock = MagicMock()
+    mock.is_available.return_value = True
+    mock.query_value.return_value = parent_val
+    mock.query_regret.return_value = regret
+    return mock
+
+
+class TestPostGameAssessorStage3:
+    def test_no_malom_leaves_fields_default(self):
+        assessor = PostGameAssessor(difficulty=1, depth=3)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.wdl_before is None
+            assert ann.wdl_after is None
+            assert ann.oracle_source == "none"
+            assert ann.quality == "clean"
+
+    def test_win_preserved_is_clean(self):
+        malom = _make_mock_malom(wdl_before="W", wdl_after="W",
+                                 transition="win_preserved")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.oracle_source == "malom_full"
+            assert ann.quality == "clean"
+            assert ann.wdl_before == "W"
+            assert ann.wdl_after == "W"
+
+    def test_draw_preserved_is_clean(self):
+        malom = _make_mock_malom(wdl_before="D", wdl_after="D",
+                                 transition="draw_preserved")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "clean"
+
+    def test_win_to_loss_is_confirmed_poor(self):
+        malom = _make_mock_malom(wdl_before="W", wdl_after="L",
+                                 transition="win_to_loss")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "confirmed_poor"
+            assert ann.oracle_source == "malom_full"
+
+    def test_win_to_draw_is_confirmed_poor(self):
+        malom = _make_mock_malom(wdl_before="W", wdl_after="D",
+                                 transition="win_to_draw")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "confirmed_poor"
+
+    def test_draw_to_loss_is_confirmed_poor(self):
+        malom = _make_mock_malom(wdl_before="D", wdl_after="L",
+                                 transition="draw_to_loss")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "confirmed_poor"
+
+    def test_already_losing_is_skipped(self):
+        """wdl_before=L → abstained, quality clean, wdl fields preserved."""
+        malom = _make_mock_malom(wdl_before="L", wdl_after="L",
+                                 transition="all_losing")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "clean"
+            assert ann.abstained_reason == "already_losing"
+            assert ann.oracle_source == "none"
+
+    def test_unavailable_malom_sets_abstained(self):
+        malom = _make_mock_malom(available=False,
+                                 unavailable_reason="parent_value_unavailable")
+        # query_value returns None to trigger the unavailable path
+        malom.query_value.return_value = None
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.wdl_before is None
+            assert ann.oracle_source == "none"
+            assert ann.abstained_reason == "parent_value_unavailable"
+
+    def test_label_inconsistency_fails_closed(self):
+        malom = _make_mock_malom(wdl_before="W", wdl_after="W",
+                                 transition="label_inconsistency")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.oracle_source == "none"
+            assert ann.wdl_before is None
+            assert ann.wdl_after is None
+            assert "label_inconsistency" in (ann.abstained_reason or "")
+
+    def test_malom_not_available_leaves_fields_default(self):
+        malom = MagicMock()
+        malom.is_available.return_value = False
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.wdl_before is None
+            assert ann.oracle_source == "none"
+
+    def test_wdl_values_are_valid_strings(self):
+        malom = _make_mock_malom(wdl_before="W", wdl_after="D",
+                                 transition="win_to_draw")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            if ann.wdl_before is not None:
+                assert ann.wdl_before in ("W", "D", "L")
+            if ann.wdl_after is not None:
+                assert ann.wdl_after in ("W", "D", "L")
+
+    def test_malom_called_with_board_before_move(self):
+        """query_value must be called with the board BEFORE apply_move."""
+        malom = _make_mock_malom(transition="win_preserved")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        assessor.assess(build_game_record(n_plies=4))
+        assert malom.query_value.call_count == 4
+        for call in malom.query_value.call_args_list:
+            board_arg = call[0][0]
+            assert isinstance(board_arg, BoardState)
