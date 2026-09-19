@@ -285,3 +285,97 @@ class TestPostGameAssessorStage2:
     def test_oracle_still_heuristic_stage2(self, sentinel_annotation):
         """Turning point oracle stays 'heuristic' until Stage 5."""
         assert sentinel_annotation.turning_point_oracle == "heuristic"
+
+
+# ── Stage 2: GapNet blunder-zone density ──────────────────────────────────────
+
+def _make_mock_gap_net(raw_output: float = 0.4):
+    """Mock gap_net with fixed tanh output → blunder_zone_score = (raw+1)/2."""
+    mock = MagicMock()
+    mock.predict.return_value = raw_output
+    return mock
+
+
+@pytest.fixture(scope="module")
+def gap_net_assessor():
+    return PostGameAssessor(
+        difficulty=1, depth=3,
+        gap_net=_make_mock_gap_net(raw_output=0.4),
+    )
+
+
+@pytest.fixture(scope="module")
+def gap_net_annotation(gap_net_assessor):
+    record = build_game_record(n_plies=6)
+    return gap_net_assessor.assess(record)
+
+
+class TestPostGameAssessorGapNet:
+    def test_blunder_zone_populated(self, gap_net_annotation):
+        for ann in gap_net_annotation.moves:
+            assert ann.blunder_zone_score is not None, \
+                f"ply {ann.ply}: blunder_zone_score is None"
+
+    def test_blunder_zone_in_range(self, gap_net_annotation):
+        for ann in gap_net_annotation.moves:
+            assert 0.0 <= ann.blunder_zone_score <= 1.0, \
+                f"ply {ann.ply}: blunder_zone_score={ann.blunder_zone_score} out of [0,1]"
+
+    def test_blunder_zone_conversion(self, gap_net_annotation):
+        """(raw+1)/2 conversion: raw=0.4 → score=0.7."""
+        expected = (0.4 + 1.0) / 2.0
+        for ann in gap_net_annotation.moves:
+            assert abs(ann.blunder_zone_score - expected) < 1e-6
+
+    def test_blunder_zone_none_without_gap_net(self):
+        assessor = PostGameAssessor(difficulty=1, depth=3, gap_net=None)
+        record = build_game_record(n_plies=4)
+        result = assessor.assess(record)
+        for ann in result.moves:
+            assert ann.blunder_zone_score is None
+
+    def test_gap_net_predict_called_with_board_and_color(self):
+        mock_gn = _make_mock_gap_net()
+        assessor = PostGameAssessor(difficulty=1, depth=3, gap_net=mock_gn)
+        record = build_game_record(n_plies=4)
+        assessor.assess(record)
+        assert mock_gn.predict.call_count == 4
+        for call in mock_gn.predict.call_args_list:
+            board_arg, color_arg = call[0]
+            assert isinstance(board_arg, BoardState)
+            assert color_arg in ("W", "B")
+
+    def test_boundary_raw_minus_one(self):
+        """raw=-1.0 → blunder_zone_score=0.0 (floor)."""
+        mock_gn = _make_mock_gap_net(raw_output=-1.0)
+        assessor = PostGameAssessor(difficulty=1, depth=3, gap_net=mock_gn)
+        result = assessor.assess(build_game_record(n_plies=2))
+        for ann in result.moves:
+            assert abs(ann.blunder_zone_score - 0.0) < 1e-6
+
+    def test_boundary_raw_plus_one(self):
+        """raw=+1.0 → blunder_zone_score=1.0 (ceiling)."""
+        mock_gn = _make_mock_gap_net(raw_output=1.0)
+        assessor = PostGameAssessor(difficulty=1, depth=3, gap_net=mock_gn)
+        result = assessor.assess(build_game_record(n_plies=2))
+        for ann in result.moves:
+            assert abs(ann.blunder_zone_score - 1.0) < 1e-6
+
+    def test_sentinel_unaffected_by_gap_net(self, gap_net_annotation):
+        """Adding gap_net must not change sentinel fields (they stay None here)."""
+        for ann in gap_net_annotation.moves:
+            assert ann.sentinel_played is None
+            assert ann.r_s is None
+
+    def test_combined_sentinel_and_gap_net(self):
+        """Both can be active simultaneously without interfering."""
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3,
+            sentinel=_make_mock_sentinel(),
+            gap_net=_make_mock_gap_net(raw_output=0.6),
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.sentinel_played is not None
+            assert ann.blunder_zone_score is not None
+            assert abs(ann.blunder_zone_score - (0.6 + 1.0) / 2.0) < 1e-6

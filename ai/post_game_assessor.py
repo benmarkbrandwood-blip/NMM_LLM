@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from learned_ai.sentinel.infer import SentinelAdvisor
+    from ai.value_net import ValueNet  # GapNet shares this architecture
 
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
@@ -45,6 +46,9 @@ class MoveAnnotation:
     sentinel_played: Optional[float] = None        # raw Sentinel quality, mover's perspective
     sentinel_best: Optional[float] = None          # highest Sentinel score among candidates
     r_s: Optional[float] = None                    # sentinel regret = sentinel_best − sentinel_played
+
+    # GapNet blunder-zone density (Stage 2)
+    blunder_zone_score: Optional[float] = None     # (raw+1)/2 for board BEFORE move [0,1]
 
     # Trajectory signal (Stage 4)
     traj_delta_played: Optional[float] = None
@@ -125,10 +129,12 @@ class PostGameAssessor:
         difficulty: int = 3,
         depth: int = 4,
         sentinel: Optional["SentinelAdvisor"] = None,
+        gap_net: Optional["ValueNet"] = None,
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
         self._sentinel = sentinel
+        self._gap_net = gap_net
 
     def assess(self, game_record: dict) -> PostGameAnnotation:
         """Replay `game_record` and return a fully annotated PostGameAnnotation."""
@@ -206,6 +212,13 @@ class PostGameAssessor:
                         sentinel_played if color == "W" else 1.0 - sentinel_played
                     )
 
+            # ── GapNet blunder-zone density ───────────────────────────────────
+            blunder_zone_score: Optional[float] = None
+
+            if self._gap_net is not None:
+                raw = self._gap_net.predict(board, color)   # tanh output in (-1, 1)
+                blunder_zone_score = (raw + 1.0) / 2.0      # convert to [0, 1]
+
             annotations.append(MoveAnnotation(
                 ply=ply_idx,
                 color=color,
@@ -220,6 +233,7 @@ class PostGameAssessor:
                 sentinel_played=sentinel_played,
                 sentinel_best=sentinel_best,
                 r_s=r_s,
+                blunder_zone_score=blunder_zone_score,
             ))
             board = board_after
 

@@ -12,12 +12,13 @@
 ## Motivation
 
 After a game ends, NMM_LLM can evaluate every move without the time pressure of live play.
-Four diagnostic signals are available that each measure move quality from a different
-perspective — heuristic search, historical trajectory data, human behaviour, and the Sentinel
-model. Comparing the move actually played against what was best available under each signal
-gives a *regret* per move. The ply with the largest regret is the **turning point** — the
-moment the game was most likely decided. Malom confirms whether a turning-point candidate was
-objectively damaging. The LLM then produces a short commentary grounded in those facts.
+Several diagnostic signals are available that each measure move quality from a different
+perspective — heuristic search, learned move quality (Sentinel), blunder-zone density (GapNet),
+historical trajectory data, human behaviour, and the Generalist AI policy. Comparing the move
+actually played against what was best available under each signal gives a *regret* per move.
+The ply with the largest regret is the **turning point** — the moment the game was most likely
+decided. Malom confirms whether a turning-point candidate was objectively damaging. The LLM
+then produces a short commentary grounded in those facts.
 
 ---
 
@@ -48,7 +49,54 @@ flag required. Confirmed in `ai/game_ai.py`: `human_pref_net=None` (line 458),
 `self.sentinel = None` (line 553), `self._trajectory_db = None` (line 544) are all
 default. A freshly constructed `GameAI` with no extra arguments is already clean.
 
-### 2. Trajectory signal (`TrajectoryDB.query()`)
+### 2. Sentinel (`SentinelAdvisor.advise()`)
+
+`SentinelAdvisor.advise(board_state, candidates, player, played_move_idx)` scores all
+candidate moves in one batched forward pass. Returns a `SentinelAdvice` with per-move
+quality scores.
+
+Per ply:
+- `sentinel_score_white`: Sentinel quality score for the move made, normalised to
+  White's perspective (negate for Black plies). This is the **curve value** — the
+  sequence `s(t) = sentinel_score_white` over all plies is the **Sentinel score curve**.
+  The ply with the steepest drop in `s(t)` is a turning-point candidate under this signal.
+- `sentinel_played`: raw Sentinel quality score from the mover's perspective (as returned
+  by `SentinelAdvice.played_move_quality`).
+- `sentinel_best`: highest Sentinel score among all candidates.
+- `r_s = sentinel_best − sentinel_played` (`opportunity_gap` in `SentinelAdvice`).
+
+Sentinel can be called post-hoc for arbitrary positions — it is not restricted to live
+play. Pass the full legal move list; use the index of the played move as
+`played_move_idx`.
+
+### 3. GapNet blunder-zone density (`gap_net.predict()`)
+
+`gap_net.predict(board, color)` returns a tanh value in (−1, +1); converted to a
+blunder-zone density in (0, 1) via `(raw + 1) / 2`. Near 1 = humans frequently blunder
+from this position; near 0 = humans typically play well here.
+
+Per ply:
+- `blunder_zone_score`: blunder-zone density for the board *before* the move, from the
+  mover's perspective. Always in [0, 1]; `None` when the model is not loaded.
+
+Unlike the move-level signals, GapNet measures the *position* rather than the move. It
+answers "was this a known trap?" rather than "was this move poor?" Used alongside `r_h`
+and `r_s`, it distinguishes two qualitatively different poor moves:
+
+- High `blunder_zone_score` + high `r_h`: *the player fell into a known trap* — a
+  position that trips most players.
+- Low `blunder_zone_score` + high `r_h`: *an anomalous error in a safe-looking position*
+  — more surprising, and arguably more telling about the player's level.
+- High `blunder_zone_score` + low `r_h`: *good defensive play* — navigated a known trap
+  successfully (worth highlighting positively in LLM commentary).
+
+In `_detect_turning_point`, `blunder_zone_score` acts as a tiebreaker once Stage 5
+upgrades the hierarchy: two plies with equal `drop(t)` prefer the one with higher
+blunder density (the known trap, not noise).
+
+GapNet is a *contextual* signal. It does not adjudicate move quality independently.
+
+### 4. Trajectory signal (`TrajectoryDB.query()`)
 
 `TrajectoryDB.query(board, current_color)` returns a `{notation: delta}` dict for every
 candidate move at the current position. Delta is a confidence-weighted win-rate offset
@@ -64,7 +112,7 @@ Per ply (where data is available):
 A large `r_t` with high `traj_n` means the played move diverges from historically
 winning lines.
 
-### 3. Human preference (`HumanMovePolicyAdvisor`, teacher v4)
+### 5. Human preference (`HumanMovePolicyAdvisor`, teacher v4)
 
 `HumanMovePolicyAdvisor.probs(board, legal_moves, elo_band)` returns a probability
 distribution over legal moves for a player at the given Elo band.
@@ -81,7 +129,7 @@ Per ply:
 Human preference is a *descriptive* signal. High human frequency does not override a
 heuristic or Malom-confirmed downgrade.
 
-### 5. Generalist AI policy
+### 6. Generalist AI policy
 
 `GeneralistPolicyAdvisor.probs(board, legal_moves)` (or equivalent interface on the
 scaffolded generalist) returns a probability distribution over legal moves reflecting
@@ -102,26 +150,6 @@ human-vs-AI game.
 
 Generalist policy is a *descriptive* signal at the same tier as human preference. It
 does not override Malom, Sentinel, or heuristic adjudication.
-
-### 4. Sentinel (`SentinelAdvisor.advise()`)
-
-`SentinelAdvisor.advise(board_state, candidates, player, played_move_idx)` scores all
-candidate moves in one batched forward pass. Returns a `SentinelAdvice` with per-move
-quality scores.
-
-Per ply:
-- `sentinel_score_white`: Sentinel quality score for the move made, normalised to
-  White's perspective (negate for Black plies). This is the **curve value** — the
-  sequence `s(t) = sentinel_score_white` over all plies is the **Sentinel score curve**.
-  The ply with the steepest drop in `s(t)` is a turning-point candidate under this signal.
-- `sentinel_played`: raw Sentinel quality score from the mover's perspective (as returned
-  by `SentinelAdvice.played_move_quality`).
-- `sentinel_best`: highest Sentinel score among all candidates.
-- `r_s = sentinel_best − sentinel_played` (`opportunity_gap` in `SentinelAdvice`).
-
-Sentinel can be called post-hoc for arbitrary positions — it is not restricted to live
-play. Pass the full legal move list; use the index of the played move as
-`played_move_idx`.
 
 ---
 
@@ -242,6 +270,9 @@ sentinel_score_white  float | None     # Sentinel score after move, White-normal
 sentinel_played       float | None     # raw Sentinel quality for move made (mover's perspective)
 sentinel_best         float | None     # highest Sentinel score among candidates
 r_s                   float | None     # sentinel regret (sentinel_best − sentinel_played)
+
+# GapNet blunder-zone density
+blunder_zone_score    float | None     # (raw+1)/2 for board BEFORE move, mover's perspective [0,1]
 
 # Trajectory signal
 traj_delta_played     float | None
@@ -373,17 +404,22 @@ The `r_h` values used below are **normalised** (0.0 = optimal, 1.0 = worst), whe
 - All `r_h` are ≥ 0 and ≤ 1.
 - `turning_point_oracle == "heuristic"`.
 
-### Stage 2 — Sentinel integration
+### Stage 2 — Sentinel + GapNet blunder-zone integration *(complete)*
 
-**Goal:** populate `sentinel_score_white`, `sentinel_played`, `sentinel_best`, `r_s`
-and `sentinel_curve` per ply when a `SentinelAdvisor` is provided.
+**Goal:** populate the Sentinel per-ply move-quality scores and the GapNet per-ply
+position blunder-zone density.
 
-**New code:** `PostGameAssessor.__init__` gains optional `sentinel` arg. The per-ply
-loop calls `sentinel.advise(board, candidates, color, played_idx)` after the heuristic
-call; populates sentinel fields; skips gracefully when sentinel is `None`.
+**New code:**
+- `PostGameAssessor.__init__` gains optional `sentinel` and `gap_net` args.
+- Per-ply Sentinel call: `sentinel.advise(board, candidates, color, played_idx)`;
+  populates `sentinel_played`, `sentinel_best`, `r_s`, `sentinel_score_white` (White-
+  normalised: negate for Black plies); skips gracefully when `sentinel` is `None`.
+- Per-ply GapNet call: `gap_net.predict(board, color)`; convert to [0,1] via
+  `(raw+1)/2`; store as `blunder_zone_score`; skips when `gap_net` is `None`.
 
-**Test gate:** mock `SentinelAdvisor`; assert sentinel fields populated when present;
-assert fields remain `None` when sentinel absent; `sentinel_curve` tracks mocked values.
+**Test gate:** mock both advisors; assert sentinel fields and `blunder_zone_score`
+populated when present; assert all remain `None` when advisors absent; assert
+`blunder_zone_score` is always in [0, 1] when populated.
 
 ### Stage 3 — Malom adjudication
 
