@@ -434,7 +434,7 @@ populate `oracle_source`, `abstained_reason`, `quality`.
 and `wdl_after` are `"W"/"D"/"L"` or `None`; assert `quality == "confirmed_poor"` for
 a verified `win_to_loss` transition.
 
-### Stage 4 — Trajectory, Human policy, and Generalist AI signals
+### Stage 4 — Trajectory, Human policy, and Generalist AI signals *(complete)*
 
 **Goal:** populate trajectory, human policy, and generalist AI policy fields per ply.
 

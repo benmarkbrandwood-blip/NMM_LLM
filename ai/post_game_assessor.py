@@ -15,10 +15,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+import numpy as np
+
 if TYPE_CHECKING:
     from learned_ai.sentinel.infer import SentinelAdvisor
     from ai.value_net import ValueNet  # GapNet shares this architecture
     from ai.malom_db import MalomDB
+    from ai.trajectory_db import TrajectoryDB
+    from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
+    from learned_ai.agents.specialist_router import GeneralistAgent
 
 # Malom WDL transitions that mean the mover threw away a better outcome
 _MALOM_CONFIRMED_POOR = frozenset({"win_to_draw", "win_to_loss", "draw_to_loss"})
@@ -136,16 +141,30 @@ class PostGameAssessor:
         sentinel: Optional["SentinelAdvisor"] = None,
         gap_net: Optional["ValueNet"] = None,
         malom_db: Optional["MalomDB"] = None,
+        trajectory_db: Optional["TrajectoryDB"] = None,
+        policy_advisor: Optional["HumanMovePolicyAdvisor"] = None,
+        policy_elo_band: str = "all",
+        generalist: Optional["GeneralistAgent"] = None,
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
         self._sentinel = sentinel
         self._gap_net = gap_net
         self._malom_db = malom_db
+        self._trajectory_db = trajectory_db
+        self._policy_advisor = policy_advisor
+        self._policy_elo_band = policy_elo_band
+        self._generalist = generalist
 
     def assess(self, game_record: dict) -> PostGameAnnotation:
         """Replay `game_record` and return a fully annotated PostGameAnnotation."""
         moves_raw = game_record.get("moves", [])
+
+        # Derive AI color for generalist_self_assessed flagging.
+        human_color = game_record.get("human_color")
+        ai_color: Optional[str] = (
+            ("B" if human_color == "W" else "W") if human_color else None
+        )
 
         opening_name: Optional[str] = None
         for m in moves_raw:
@@ -200,14 +219,16 @@ class PostGameAssessor:
 
             r_h = max(0.0, 1.0 - score_played_norm)
 
+            # Candidate list shared by Sentinel, Policy, and Generalist.
+            candidates = [m for m, _ in scored]
+
             # ── Sentinel fields ───────────────────────────────────────────────
             sentinel_score_white: Optional[float] = None
             sentinel_played: Optional[float] = None
             sentinel_best: Optional[float] = None
             r_s: Optional[float] = None
 
-            if self._sentinel is not None and scored:
-                candidates = [m for m, _ in scored]
+            if self._sentinel is not None and candidates:
                 played_idx = _find_played_idx(candidates, played_move)
                 advice = self._sentinel.advise(board, candidates, color, played_idx)
                 if advice is not None:
@@ -262,6 +283,50 @@ class PostGameAssessor:
                                 wdl_after = None
                                 abstained_reason = f"malom_{transition}"
 
+            # ── Trajectory signal ─────────────────────────────────────────────
+            traj_delta_played: Optional[float] = None
+            traj_delta_best: Optional[float] = None
+            r_t: Optional[float] = None
+
+            if self._trajectory_db is not None and candidates:
+                hints = self._trajectory_db.query(board, color)
+                if hints:
+                    traj_delta_best = max(hints.values())
+                    traj_delta_played = hints.get(notation)
+                    if traj_delta_played is not None:
+                        r_t = traj_delta_best - traj_delta_played
+
+            # ── Human policy signal ───────────────────────────────────────────
+            policy_prob: Optional[float] = None
+            policy_top_move: Optional[str] = None
+            policy_top_prob: Optional[float] = None
+            policy_prob_source: Optional[str] = None
+            is_unconventional = False
+
+            if self._policy_advisor is not None and candidates:
+                probs = self._policy_advisor.probs(board, candidates,
+                                                   self._policy_elo_band)
+                if len(probs) > 0:
+                    played_idx = _find_played_idx(candidates, played_move)
+                    policy_prob = float(probs[played_idx])
+                    top_idx = int(np.argmax(probs))
+                    policy_top_move = _move_notation(candidates[top_idx])
+                    policy_top_prob = float(probs[top_idx])
+                    policy_prob_source = "learned"
+
+            # ── Generalist AI policy signal ───────────────────────────────────
+            generalist_policy_prob: Optional[float] = None
+            generalist_top_move: Optional[str] = None
+            generalist_self_assessed = (ai_color is not None and color == ai_color)
+
+            if self._generalist is not None and candidates:
+                g_scores = self._generalist.score_moves(board, candidates, color)
+                if g_scores is not None and len(g_scores) == len(candidates):
+                    played_idx = _find_played_idx(candidates, played_move)
+                    generalist_policy_prob = float(g_scores[played_idx])
+                    top_idx = int(max(range(len(g_scores)), key=lambda i: g_scores[i]))
+                    generalist_top_move = _move_notation(candidates[top_idx])
+
             annotations.append(MoveAnnotation(
                 ply=ply_idx,
                 color=color,
@@ -282,6 +347,17 @@ class PostGameAssessor:
                 oracle_source=oracle_source,
                 abstained_reason=abstained_reason,
                 quality=quality,
+                traj_delta_played=traj_delta_played,
+                traj_delta_best=traj_delta_best,
+                r_t=r_t,
+                policy_prob=policy_prob,
+                policy_top_move=policy_top_move,
+                policy_top_prob=policy_top_prob,
+                policy_prob_source=policy_prob_source,
+                is_unconventional=is_unconventional,
+                generalist_policy_prob=generalist_policy_prob,
+                generalist_top_move=generalist_top_move,
+                generalist_self_assessed=generalist_self_assessed,
             ))
             board = board_after
 

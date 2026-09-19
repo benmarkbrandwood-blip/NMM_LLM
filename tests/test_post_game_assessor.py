@@ -187,7 +187,6 @@ class TestPostGameAssessorStage1:
             assert ann.generalist_policy_prob is None
             assert ann.generalist_top_move is None
             assert ann.generalist_value_after is None
-            assert not ann.generalist_self_assessed
 
 
 # ── Stage 2: Sentinel integration ─────────────────────────────────────────────
@@ -523,3 +522,193 @@ class TestPostGameAssessorStage3:
         for call in malom.query_value.call_args_list:
             board_arg = call[0][0]
             assert isinstance(board_arg, BoardState)
+
+
+# ── Stage 4: Trajectory, Human policy, Generalist AI ─────────────────────────
+
+import numpy as _np
+
+
+def _make_mock_trajectory(notation_to_delta: dict):
+    """Mock TrajectoryDB.query() returning a fixed {notation: delta} dict."""
+    mock = MagicMock()
+    mock.query.return_value = notation_to_delta
+    return mock
+
+
+def _make_mock_policy(top_idx: int = 0):
+    """Mock HumanMovePolicyAdvisor.probs() that sizes its output to len(candidates)."""
+    def _side_effect(board, candidates, elo_band):
+        n = len(candidates)
+        probs = _np.ones(n, dtype=_np.float32) * (0.4 / max(n - 1, 1))
+        probs[min(top_idx, n - 1)] = 0.6
+        probs /= probs.sum()
+        return probs
+    mock = MagicMock()
+    mock.probs.side_effect = _side_effect
+    return mock
+
+
+def _make_mock_generalist(top_idx: int = 0):
+    """Mock GeneralistAgent.score_moves() that sizes its output to len(candidates)."""
+    def _side_effect(board, candidates, color):
+        n = len(candidates)
+        scores = [0.2] * n
+        scores[min(top_idx, n - 1)] = 0.6
+        return scores
+    mock = MagicMock()
+    mock.score_moves.side_effect = _side_effect
+    return mock
+
+
+class TestPostGameAssessorStage4Trajectory:
+    def test_trajectory_fields_populated_when_covered(self):
+        record = build_game_record(n_plies=4)
+        # Plant a delta for the notation of the first played move
+        first_notation = record["moves"][0]["notation"]
+        traj = _make_mock_trajectory({first_notation: 0.3, "other": 0.1})
+        assessor = PostGameAssessor(difficulty=1, depth=3, trajectory_db=traj)
+        result = assessor.assess(record)
+        ann = result.moves[0]
+        assert ann.traj_delta_best == 0.3
+        assert ann.traj_delta_played == 0.3
+        assert abs(ann.r_t - 0.0) < 1e-9  # played was best
+
+    def test_trajectory_regret_positive_when_not_best(self):
+        record = build_game_record(n_plies=4)
+        first_notation = record["moves"][0]["notation"]
+        traj = _make_mock_trajectory({first_notation: 0.1, "better_move": 0.4})
+        assessor = PostGameAssessor(difficulty=1, depth=3, trajectory_db=traj)
+        result = assessor.assess(record)
+        ann = result.moves[0]
+        assert abs(ann.r_t - 0.3) < 1e-6
+
+    def test_trajectory_none_when_no_coverage(self):
+        traj = _make_mock_trajectory({})
+        assessor = PostGameAssessor(difficulty=1, depth=3, trajectory_db=traj)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.traj_delta_played is None
+            assert ann.traj_delta_best is None
+            assert ann.r_t is None
+
+    def test_traj_delta_played_none_when_notation_not_in_hints(self):
+        # Hints exist but played move's notation is absent (low coverage for that move)
+        traj = _make_mock_trajectory({"other_move": 0.2})
+        assessor = PostGameAssessor(difficulty=1, depth=3, trajectory_db=traj)
+        result = assessor.assess(build_game_record(n_plies=2))
+        for ann in result.moves:
+            assert ann.traj_delta_best == 0.2
+            assert ann.traj_delta_played is None
+            assert ann.r_t is None
+
+    def test_no_trajectory_db_leaves_fields_none(self):
+        assessor = PostGameAssessor(difficulty=1, depth=3)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.traj_delta_played is None
+            assert ann.r_t is None
+
+
+class TestPostGameAssessorStage4Policy:
+    def test_policy_fields_populated(self):
+        policy = _make_mock_policy()
+        assessor = PostGameAssessor(difficulty=1, depth=3, policy_advisor=policy)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.policy_prob is not None
+            assert ann.policy_top_move is not None
+            assert ann.policy_top_prob is not None
+            assert ann.policy_prob_source == "learned"
+
+    def test_policy_prob_in_range(self):
+        policy = _make_mock_policy()
+        assessor = PostGameAssessor(difficulty=1, depth=3, policy_advisor=policy)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert 0.0 <= ann.policy_prob <= 1.0 + 1e-6
+
+    def test_policy_top_prob_ge_played_prob(self):
+        policy = _make_mock_policy()
+        assessor = PostGameAssessor(difficulty=1, depth=3, policy_advisor=policy)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.policy_top_prob >= ann.policy_prob - 1e-6
+
+    def test_no_policy_advisor_leaves_fields_none(self):
+        assessor = PostGameAssessor(difficulty=1, depth=3)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.policy_prob is None
+            assert ann.policy_top_move is None
+
+    def test_policy_called_with_elo_band(self):
+        policy = _make_mock_policy()
+        assessor = PostGameAssessor(difficulty=1, depth=3,
+                                    policy_advisor=policy, policy_elo_band="upper")
+        assessor.assess(build_game_record(n_plies=2))
+        for call in policy.probs.call_args_list:
+            assert call[0][2] == "upper"
+
+
+class TestPostGameAssessorStage4Generalist:
+    def test_generalist_fields_populated(self):
+        gen = _make_mock_generalist()
+        assessor = PostGameAssessor(difficulty=1, depth=3, generalist=gen)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.generalist_policy_prob is not None
+            assert ann.generalist_top_move is not None
+
+    def test_generalist_self_assessed_flag_ai_side(self):
+        """When human_color=W, AI is B — Black plies should be self-assessed."""
+        gen = _make_mock_generalist()
+        assessor = PostGameAssessor(difficulty=1, depth=3, generalist=gen)
+        record = build_game_record(n_plies=4)
+        record["human_color"] = "W"
+        result = assessor.assess(record)
+        for ann in result.moves:
+            if ann.color == "B":
+                assert ann.generalist_self_assessed
+            else:
+                assert not ann.generalist_self_assessed
+
+    def test_generalist_self_assessed_false_no_human_color(self):
+        gen = _make_mock_generalist()
+        assessor = PostGameAssessor(difficulty=1, depth=3, generalist=gen)
+        record = build_game_record(n_plies=4)
+        record.pop("human_color", None)
+        result = assessor.assess(record)
+        for ann in result.moves:
+            assert not ann.generalist_self_assessed
+
+    def test_no_generalist_leaves_fields_none(self):
+        assessor = PostGameAssessor(difficulty=1, depth=3)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.generalist_policy_prob is None
+            assert ann.generalist_top_move is None
+
+    def test_generalist_score_moves_returns_none_graceful(self):
+        gen = MagicMock()
+        gen.score_moves.return_value = None
+        assessor = PostGameAssessor(difficulty=1, depth=3, generalist=gen)
+        result = assessor.assess(build_game_record(n_plies=2))
+        for ann in result.moves:
+            assert ann.generalist_policy_prob is None
+
+    def test_all_stage4_signals_together(self):
+        """Trajectory + policy + generalist can all run simultaneously."""
+        record = build_game_record(n_plies=4)
+        first_notation = record["moves"][0]["notation"]
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3,
+            trajectory_db=_make_mock_trajectory({first_notation: 0.2, "x": 0.3}),
+            policy_advisor=_make_mock_policy(),
+            generalist=_make_mock_generalist(),
+        )
+        result = assessor.assess(record)
+        assert all(a.policy_prob is not None for a in result.moves)
+        assert all(a.generalist_policy_prob is not None for a in result.moves)
+        # trajectory: first ply has coverage; rest may or may not
+        assert result.moves[0].traj_delta_best == 0.3
