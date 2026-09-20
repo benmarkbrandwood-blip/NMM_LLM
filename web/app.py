@@ -399,6 +399,7 @@ if _overseer_advisor is None:
 # so they don't block or pollute the console before the server is ready.
 _malom_db = None        # ExternalSolvedDB — WDL string, used by game AI + validate
 _malom_puzzle_db = None  # MalomDB          — WDL dict with dtw, used by puzzle generators
+_module_mills_llm: "MillsLLM | None" = None  # last LLM instance; shared for HvH assessment
 _malom_db_path: str = ""  # stored for deferred puzzle-DB init in startup event
 try:
     from learned_ai.sentinel.db_teacher import ExternalSolvedDB as _ExternalSolvedDB
@@ -925,8 +926,12 @@ async def save_weights(request: Request):
 _SEARCH_DEPTH_DEFAULTS = {"min": 1, "max": 16}
 
 def _compute_search_depth_for_level(level: int, min_depth: int, max_depth: int) -> int:
-    """Map difficulty level directly to search depth (ply search = difficulty)."""
-    return max(min_depth, min(level, max_depth))
+    """Linearly interpolate max_search_depth for difficulty levels 1–8."""
+    if level <= 1:
+        return min_depth
+    if level >= 8:
+        return max_depth
+    return round(min_depth + (level - 1) / 7 * (max_depth - min_depth))
 
 def _time_budget_for_depth(d: int) -> float:
     """Exponential formula: depth 14 ≈ 77 s, capped at 120 s."""
@@ -2733,8 +2738,11 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     except asyncio.CancelledError:
         return
 
-    # LLM synthesis — only when a coordinator with MillsLLM is available
-    llm = getattr(getattr(session, "coordinator", None), "mills_llm", None)
+    # LLM synthesis — prefer coordinator's LLM, fall back to module-level (e.g. HvH)
+    llm = (
+        getattr(getattr(session, "coordinator", None), "mills_llm", None)
+        or _module_mills_llm
+    )
     if llm is None:
         return
     try:
@@ -3836,6 +3844,7 @@ async def ws_endpoint(websocket: WebSocket):
                         model = settings.get("ollama_model", "llama3.1:8b")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
                         llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                        global _module_mills_llm; _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
                         egr   = EndgameRecognizer(
@@ -3998,6 +4007,7 @@ async def ws_endpoint(websocket: WebSocket):
                         model = settings.get("ollama_model", "llama3.1:8b")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
                         llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                        global _module_mills_llm; _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
                         egr   = EndgameRecognizer(
@@ -4538,6 +4548,7 @@ async def ws_endpoint(websocket: WebSocket):
                     model = _s.get("ollama_model", "llama3.1:8b")
                     mem   = MemoryManager(ollama_url=url, ollama_model=model)
                     llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                    global _module_mills_llm; _module_mills_llm = llm
                     book  = OpeningBook()
                     rec   = OpeningRecognizer(book)
                     egr   = EndgameRecognizer(

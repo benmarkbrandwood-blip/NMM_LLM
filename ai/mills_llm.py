@@ -270,13 +270,15 @@ Write a compact markdown session summary.
 
 FORMAT:
 ## Session
-- Winner and result pattern
-- Opening or early-game pattern if known
-- One key turning point
+- Winner and result pattern (e.g. "White wins by piece loss, 8 vs 3")
+- Opening phase style if notable (e.g. "central control vs flank spread")
+- One strategic pattern that decided the game (describe in terms of piece advantage or mill threat — do NOT quote or paraphrase specific move notations)
 - One lesson about mobility, initiative, or mill timing
-- One note about the human's habits or improvements
 
-Keep it concise and specific.
+STRICT CONSTRAINTS:
+- Never invent, quote, or describe specific move notations (like "b6xb4" or "f2-d2")
+- Only describe strategic patterns and piece-count outcomes
+- Keep it concise (under 80 words)
 """
 
 _DEBRIEF_GAME_SYSTEM = _BOARD_RULES + """
