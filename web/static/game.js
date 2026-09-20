@@ -63,6 +63,10 @@ let _diagDebounce   = null;         // debounce timer handle
 let _diagCaptureFen = null;         // FEN of projected board in capture mode
 let _aiThinking     = false;        // true while AI is computing — block diagnostics
 
+// ── Post-game assessment state ────────────────────────────────────────────────
+let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assessment_result
+let _assessmentReady = false;       // true once assessment_result received
+
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
 
 const WEIGHT_DEFAULTS = [
@@ -900,6 +904,27 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderIdle();
   _loadOpenings();
 
+  // ── Game Assessment button ────────────────────────────────────────────
+  $("btn-game-assessment").addEventListener("click", () => {
+    _switchLeftTab("chat");
+    const feed = $("commentary-human");
+    if (feed) {
+      if (!_assessmentReady) {
+        // Still running — show placeholder if chat is empty of analysis content
+        if (!feed.querySelector(".assessment-running-msg")) {
+          const div = document.createElement("div");
+          div.className = "commentary-line assessment-running-msg";
+          div.textContent = "Analysis running…";
+          div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
+          feed.prepend(div);
+          setTimeout(() => div.remove(), 8000);
+        }
+      } else {
+        feed.scrollTop = 0;
+      }
+    }
+  });
+
   // ── Left column tab toggle ────────────────────────────────────────────
   $("tab-chat").addEventListener("click", () => _switchLeftTab("chat"));
   // Clicking the active profile tab closes it (returns to chat).
@@ -1082,7 +1107,9 @@ function startNewGame() {
   clearCommentary();
   setStatus("Starting…");
   phase = "idle";
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
+  _assessmentTurningPoints = []; _assessmentReady = false;
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1166,8 +1193,10 @@ function startAiVsAi() {
   clearCommentary();
   setStatus("Starting AI vs AI…");
   phase = "idle";
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   isAiVsAi = true;
   evalHistory = []; sentinelHistory = []; _humanColor = null;
+  _assessmentTurningPoints = []; _assessmentReady = false;
   hintsLeft = 0;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1381,7 +1410,9 @@ function startSetupGame() {
   clearCommentary();
   setStatus("Starting setup game…");
   phase = "idle";
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
+  _assessmentTurningPoints = []; _assessmentReady = false;
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1750,6 +1781,7 @@ function handleMessage(msg) {
       $("btn-force-cap").disabled = true;
       updateHintButton(false);
       updateDrawButton();
+      $("btn-game-assessment").classList.add("assessment-ready");
 
       // Adaptive difficulty feedback
       if (msg.adaptive) {
@@ -1922,6 +1954,42 @@ function handleMessage(msg) {
     case "game_restored":
       _removeAutosaveBanner();
       break;
+
+    case "assessment_result": {
+      _assessmentTurningPoints = msg.turning_points || [];
+      _assessmentReady = true;
+      // Redraw eval graph to show turning-point markers
+      drawEvalGraph();
+      // Update button state — stop pulse, show done
+      const btn = $("btn-game-assessment");
+      if (btn) btn.classList.add("assessment-done");
+
+      // Post structured summary to MillsAI Chat panel with line breaks
+      if (msg.summary_text) {
+        const feed = $("commentary-human");
+        if (feed) {
+          const div = document.createElement("div");
+          div.className = "commentary-line assessment-summary";
+          const label = document.createElement("span");
+          label.className = "speaker";
+          label.textContent = "Game Analysis: ";
+          div.appendChild(label);
+          const pre = document.createElement("span");
+          pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
+          pre.textContent = msg.summary_text;
+          div.appendChild(pre);
+          feed.insertBefore(div, feed.firstChild);
+          feed.scrollTop = 0;
+        }
+      }
+      break;
+    }
+
+    case "assessment_llm": {
+      // Route to MillsAI Chat (commentary-human), not AI Discussion
+      if (msg.text) addCommentary("MillsAI", msg.text, "human");
+      break;
+    }
   }
 }
 
@@ -2281,6 +2349,23 @@ function updateHintButton(isHumanTurn = false) {
 
 // ── Eval graph ────────────────────────────────────────────────────────────────
 
+function _catmullRomCurve(pts) {
+  if (pts.length < 2) return "";
+  let d = "";
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
+
 function drawEvalGraph() {
   const svg = $("eval-graph");
   if (!svg) return;
@@ -2331,8 +2416,8 @@ function drawEvalGraph() {
   }));
 
   // Build area path (filled between line and centre)
-  let area = `M ${pts[0].x},${mid}`;
-  for (const p of pts) area += ` L ${p.x},${p.y}`;
+  let area = `M ${pts[0].x},${mid} L ${pts[0].x},${pts[0].y}`;
+  area += _catmullRomCurve(pts);
   area += ` L ${pts[pts.length-1].x},${mid} Z`;
 
   // Fill: white when White leading (positive), black when Black leading
@@ -2343,8 +2428,7 @@ function drawEvalGraph() {
   svg.appendChild(mk("path", { d: area, fill: fillCol }));
 
   // Heuristic line (gold)
-  let linePath = `M ${pts[0].x},${pts[0].y}`;
-  for (const p of pts.slice(1)) linePath += ` L ${p.x},${p.y}`;
+  const linePath = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}` + _catmullRomCurve(pts);
   svg.appendChild(mk("path", { d: linePath, stroke:"#c8a96e", "stroke-width":1.5, fill:"none" }));
 
   // Sentinel line — dashed, from human's perspective (+1 = human winning)
@@ -2363,12 +2447,25 @@ function drawEvalGraph() {
                    : lastSent < -0.05 ? "#e05050"   // AI winning
                    : "#888";
     const sxScale  = (W - 2) / Math.max(sn - 1, 1);
-    const sPts     = sentinelHistory.map((entry, i) => ({
+    const sRaw = sentinelHistory.map((entry, i) => ({
       x: 1 + i * sxScale,
       y: mid - toHuman(entry) * (mid - 4),
     }));
-    let sPath = `M ${sPts[0].x},${sPts[0].y}`;
-    for (const p of sPts.slice(1)) sPath += ` L ${p.x},${p.y}`;
+    // 5-point weighted average (1-2-3-2-1) to reduce ply-to-ply zigzag
+    const sPts = sRaw.map((p, i, arr) => {
+      const weights = [1, 2, 3, 2, 1];
+      let wSum = 0, ySum = 0;
+      for (let d = -2; d <= 2; d++) {
+        const j = i + d;
+        if (j >= 0 && j < arr.length) {
+          const w = weights[d + 2];
+          ySum += arr[j].y * w;
+          wSum += w;
+        }
+      }
+      return { x: p.x, y: ySum / wSum };
+    });
+    const sPath = `M ${sPts[0].x.toFixed(1)},${sPts[0].y.toFixed(1)}` + _catmullRomCurve(sPts);
     svg.appendChild(mk("path", {
       d: sPath, stroke: sentCol, "stroke-width": 1.2, fill: "none",
       "stroke-dasharray": "4 3", opacity: "0.85",
@@ -2378,6 +2475,30 @@ function drawEvalGraph() {
     const lblSentinel  = $("legend-sentinel");
     if (lblHeuristic) lblHeuristic.style.color = "#c8a96e";
     if (lblSentinel)  lblSentinel.style.color  = sentCol;
+  }
+
+  // Assessment turning-point markers — vertical dashed lines
+  for (let ti = 0; ti < _assessmentTurningPoints.length; ti++) {
+    const tp = _assessmentTurningPoints[ti];
+    if (tp.ply < 0 || tp.ply >= n) continue;
+    const tx = pts[tp.ply].x;
+    const isFirst = ti === 0;
+    // Primary TP: red/amber dashed; secondary TPs: dimmer
+    const tpCol   = isFirst ? "rgba(220,80,60,0.85)" : "rgba(180,120,60,0.55)";
+    const tpWidth = isFirst ? "1.5" : "1";
+    svg.appendChild(mk("line", {
+      x1: tx, y1: 0, x2: tx, y2: H,
+      stroke: tpCol, "stroke-width": tpWidth,
+      "stroke-dasharray": "3 3",
+    }));
+    // Small triangle marker at top for the primary turning point
+    if (isFirst) {
+      const markerSize = 5;
+      svg.appendChild(mk("polygon", {
+        points: `${tx},${markerSize * 2 + 1} ${tx - markerSize},1 ${tx + markerSize},1`,
+        fill: tpCol,
+      }));
+    }
   }
 
   // Replay cursor: vertical line + dot at the current replay position

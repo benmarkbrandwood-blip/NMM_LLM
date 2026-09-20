@@ -12,7 +12,7 @@ Stage 3 adds Malom; Stage 4 Trajectory + Human Policy + Generalist AI.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional
 
 import numpy as np
@@ -42,10 +42,14 @@ _R_H_POOR_THRESHOLD  = 0.30  # when sentinel also confirms
 _R_H_SOLO_THRESHOLD  = 0.50  # when only heuristic is available
 _R_S_POOR_THRESHOLD  = 0.20  # sentinel r_s confirmation floor
 
+# Tier 3 turning-point detection: skip early placement plies where the full
+# evaluator has high positional variance but the strategic consequence is low.
+_TP_MIN_PLY = 6
+
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
 from ai.game_ai import GameAI
-from ai.heuristics import evaluate_v2
+from ai.heuristics import evaluate, evaluate_v2  # evaluate used for rich curve (Fix 1)
 
 
 # ── Data classes ──────────────────────────────────────────────────────────────
@@ -100,6 +104,18 @@ class MoveAnnotation:
     generalist_value_after: Optional[float] = None   # value-head win prob, White-normalised
     generalist_self_assessed: bool = False            # True when generalist played this side
 
+    # Policy quality divergence (Stage 5b)
+    policy_pref_delta: Optional[float] = None        # pref_prob − teacher_prob; negative = weak human choice
+
+    # Horizon search delta (Stage 5c)
+    horizon_delta: Optional[float] = None            # score_shallow − score_deep; positive = short-sighted
+    horizon_shallow_score: Optional[float] = None    # normalised move score at shallow depth
+    horizon_deep_score: Optional[float] = None       # normalised move score at deep depth (= score_played)
+
+    # Suspicious-position deep re-score (Fix 3)
+    r_h_deep: Optional[float] = None    # r_h at deep_depth search; replaces r_h for turning-point selection
+    deep_scored: bool = False           # True when this ply was re-scored at deep_depth
+
 
 @dataclass
 class PostGameAnnotation:
@@ -110,6 +126,8 @@ class PostGameAnnotation:
     turning_point_quality: str             # e.g. "r_h:0.712", "r_h+r_s:0.712", or "win_to_loss"
     turning_point_oracle: str              # "malom_full"|"retrograde_wdl"|"sentinel+heuristic"|"heuristic"
     opening_name: Optional[str]
+    # Ranked list of (ply, quality_str, oracle_source) — includes the primary above.
+    turning_points: list[tuple[int, str, str]] = field(default_factory=list)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -156,19 +174,35 @@ class PostGameAssessor:
         malom_db: Optional["MalomDB"] = None,
         trajectory_db: Optional["TrajectoryDB"] = None,
         policy_advisor: Optional["HumanMovePolicyAdvisor"] = None,
+        pref_advisor: Optional["HumanMovePolicyAdvisor"] = None,
         policy_elo_band: str = "all",
         generalist: Optional["GeneralistAgent"] = None,
         r_h_threshold: float = float("inf"),
         r_s_threshold: float = float("inf"),
         r_h_solo_threshold: float = float("inf"),
+        shallow_depth: Optional[int] = None,
+        deep_depth: Optional[int] = None,
+        threat_delta_threshold: float = 200.0,
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
+        if shallow_depth is not None:
+            self._ai_shallow = GameAI(color="W", difficulty=difficulty)
+            self._ai_shallow.max_search_depth = shallow_depth
+        else:
+            self._ai_shallow = None
+        if deep_depth is not None:
+            self._ai_deep = GameAI(color="W", difficulty=difficulty)
+            self._ai_deep.max_search_depth = deep_depth
+        else:
+            self._ai_deep = None
+        self._threat_delta_threshold = threat_delta_threshold
         self._sentinel = sentinel
         self._gap_net = gap_net
         self._malom_db = malom_db
         self._trajectory_db = trajectory_db
         self._policy_advisor = policy_advisor
+        self._pref_advisor = pref_advisor
         self._policy_elo_band = policy_elo_band
         self._generalist = generalist
         self._r_h_threshold = r_h_threshold
@@ -208,7 +242,10 @@ class PostGameAssessor:
             scored = self._ai.assess_position(board)
 
             board_after = board.apply_move(played_move)
-            heuristic_score_white = float(evaluate_v2(board_after, "W"))
+            # Fix 1: full evaluate() captures fork threats, two-piece configs, mobility
+            # squeeze — patterns that precede captures by 1-3 plies.  evaluate_v2 (bare-
+            # bones) only sees piece counts and stays flat until terminal captures occur.
+            heuristic_score_white = float(evaluate(board_after, "W"))
 
             # ── Heuristic fields ──────────────────────────────────────────────
             if scored:
@@ -342,6 +379,46 @@ class PostGameAssessor:
                     policy_top_prob = float(probs[top_idx])
                     policy_prob_source = "learned"
 
+            # ── Policy quality divergence (Stage 5b) ─────────────────────────
+            policy_pref_delta: Optional[float] = None
+
+            if (self._pref_advisor is not None
+                    and self._policy_advisor is not None
+                    and candidates
+                    and policy_prob is not None):
+                pref_probs = self._pref_advisor.probs(board, candidates,
+                                                      self._policy_elo_band)
+                if len(pref_probs) > 0:
+                    played_idx = _find_played_idx(candidates, played_move)
+                    pref_prob_val = float(pref_probs[played_idx])
+                    policy_pref_delta = pref_prob_val - policy_prob
+
+            # ── Horizon search delta (Stage 5c) ──────────────────────────────
+            horizon_delta: Optional[float] = None
+            horizon_shallow_score: Optional[float] = None
+            horizon_deep_score: Optional[float] = None
+
+            if self._ai_shallow is not None:
+                shallow_scored = self._ai_shallow.assess_position(board)
+                if shallow_scored:
+                    s_all = [s for _, s in shallow_scored]
+                    s_lo, s_hi = min(s_all), max(s_all)
+                    move_key = (played_move.get("from"), played_move["to"],
+                                played_move.get("capture"))
+                    shallow_raw = next(
+                        (s for m, s in shallow_scored
+                         if (m.get("from"), m["to"], m.get("capture")) == move_key),
+                        None,
+                    )
+                    if s_hi == s_lo:
+                        horizon_shallow_score = 1.0
+                    elif shallow_raw is None:
+                        horizon_shallow_score = 0.0
+                    else:
+                        horizon_shallow_score = (shallow_raw - s_lo) / (s_hi - s_lo)
+                    horizon_deep_score = score_played_norm
+                    horizon_delta = horizon_shallow_score - horizon_deep_score
+
             # ── Generalist AI policy signal ───────────────────────────────────
             generalist_policy_prob: Optional[float] = None
             generalist_top_move: Optional[str] = None
@@ -386,13 +463,21 @@ class PostGameAssessor:
                 generalist_policy_prob=generalist_policy_prob,
                 generalist_top_move=generalist_top_move,
                 generalist_self_assessed=generalist_self_assessed,
+                policy_pref_delta=policy_pref_delta,
+                horizon_delta=horizon_delta,
+                horizon_shallow_score=horizon_shallow_score,
+                horizon_deep_score=horizon_deep_score,
             ))
             board = board_after
 
         heuristic_curve = [a.heuristic_score_white for a in annotations]
         sentinel_curve: list[Optional[float]] = [a.sentinel_score_white for a in annotations]
 
-        tp_ply, tp_quality, tp_oracle = self._detect_turning_point(annotations)
+        # Fix 3: deep re-score suspicious positions before turning-point selection.
+        if self._ai_deep is not None:
+            self._deep_rescore_suspicious(annotations, moves_raw, heuristic_curve)
+
+        tp_ply, tp_quality, tp_oracle, tp_list = self._detect_turning_point(annotations)
 
         return PostGameAnnotation(
             moves=annotations,
@@ -402,20 +487,25 @@ class PostGameAssessor:
             turning_point_quality=tp_quality,
             turning_point_oracle=tp_oracle,
             opening_name=opening_name,
+            turning_points=tp_list,
         )
 
     def _detect_turning_point(
         self, annotations: list[MoveAnnotation]
-    ) -> tuple[Optional[int], str, str]:
-        """Return (ply, quality_str, oracle_source) for the turning point.
+    ) -> tuple[Optional[int], str, str, list[tuple[int, str, str]]]:
+        """Return (primary_ply, quality_str, oracle, ranked_list) for turning points.
 
-        Three-tier hierarchy (Stage 5):
+        Ranked list holds up to 3 entries (ply, quality, oracle), ordered by impact.
+
+        Three-tier hierarchy:
         1. Malom confirmed_poor — ranked by WDL severity, tie-break by r_h.
-        2. Sentinel + Heuristic combined drop Δh + Δs.
-        3. Heuristic-only steepest Δh.
+        2. Sentinel + Heuristic combined drop Δh + Δs (curve-drop).
+        3. Heuristic-only: argmax(r_h_deep if available, else r_h) — Fix 2/3.
+           Uses the worst decision rather than the steepest post-hoc curve collapse,
+           so errors upstream of a capture are found before the terminal drop.
         """
         if len(annotations) < 2:
-            return None, "", "heuristic"
+            return None, "", "heuristic", []
 
         # Tier 1 — Malom-confirmed poor moves
         malom_poor = [
@@ -425,46 +515,144 @@ class PostGameAssessor:
             and a.wdl_before is not None and a.wdl_after is not None
         ]
         if malom_poor:
-            best = max(
+            ranked = sorted(
                 malom_poor,
                 key=lambda a: (_MALOM_SEVERITY.get((a.wdl_before, a.wdl_after), 0), a.r_h),
-            )
-            label = _MALOM_TRANSITION_LABEL.get(
-                (best.wdl_before, best.wdl_after), "unknown"
-            )
-            return best.ply, label, "malom_full"
+                reverse=True,
+            )[:3]
+            top = ranked[0]
+            label = _MALOM_TRANSITION_LABEL.get((top.wdl_before, top.wdl_after), "unknown")
+            ranked_list = [
+                (a.ply, _MALOM_TRANSITION_LABEL.get((a.wdl_before, a.wdl_after), "unknown"), "malom_full")
+                for a in ranked
+            ]
+            return top.ply, label, "malom_full", ranked_list
 
-        # Tier 2 — Sentinel + Heuristic combined drop
+        # Tier 2 — Sentinel + Heuristic combined curve drop
         has_sentinel = any(a.sentinel_score_white is not None for a in annotations)
         if has_sentinel:
-            best_ply: Optional[int] = None
-            best_drop = -1.0
+            drops: list[tuple[float, int]] = []
             for i in range(1, len(annotations)):
                 dh = (annotations[i - 1].heuristic_score_white
                       - annotations[i].heuristic_score_white)
                 s_prev = annotations[i - 1].sentinel_score_white
                 s_curr = annotations[i].sentinel_score_white
                 ds = (s_prev - s_curr) if (s_prev is not None and s_curr is not None) else 0.0
-                drop = dh + ds
-                if drop > best_drop:
-                    best_drop = drop
-                    best_ply = i
-            if best_ply is None or best_drop <= 0.0:
-                return None, "", "sentinel+heuristic"
-            ann = annotations[best_ply]
-            r_s_val = ann.r_s if ann.r_s is not None else 0.0
-            return best_ply, f"r_h+r_s:{ann.r_h + r_s_val:.3f}", "sentinel+heuristic"
+                drops.append((dh + ds, i))
+            drops.sort(reverse=True)
+            top3 = [idx for (drop, idx) in drops[:3] if drop > 0.0]
+            if not top3:
+                return None, "", "sentinel+heuristic", []
+            ranked_list = []
+            for idx in top3:
+                ann = annotations[idx]
+                r_s_val = ann.r_s if ann.r_s is not None else 0.0
+                ranked_list.append((ann.ply, f"r_h+r_s:{ann.r_h + r_s_val:.3f}", "sentinel+heuristic"))
+            primary = ranked_list[0]
+            return primary[0], primary[1], primary[2], ranked_list
 
-        # Tier 3 — Heuristic-only steepest drop
-        best_ply = None
-        best_drop = -1.0
-        for i in range(1, len(annotations)):
-            drop = (annotations[i - 1].heuristic_score_white
-                    - annotations[i].heuristic_score_white)
-            if drop > best_drop:
-                best_drop = drop
-                best_ply = i
-        if best_ply is None or best_drop <= 0.0:
-            return None, "", "heuristic"
-        ann = annotations[best_ply]
-        return best_ply, f"r_h:{ann.r_h:.3f}", "heuristic"
+        # Tier 3 — Heuristic-only: top-3 by effective r_h, skipping early placement.
+        # Fix 2: use decision quality (r_h) rather than post-hoc curve collapse.
+        # Fix 3: prefer r_h_deep (deep re-score) when available on suspicious plies.
+        # _TP_MIN_PLY: skip early placement plies where the richer evaluator has
+        # high positional variance but low actual game consequence.
+        candidates: list[tuple[float, int]] = []
+        for i, ann in enumerate(annotations):
+            if i < _TP_MIN_PLY:
+                continue
+            val = ann.r_h_deep if ann.r_h_deep is not None else ann.r_h
+            if val > 0.0:
+                candidates.append((val, i))
+        candidates.sort(reverse=True)
+        top3 = candidates[:3]
+        if not top3:
+            return None, "", "heuristic", []
+        ranked_list = []
+        for (val, i) in top3:
+            ann = annotations[i]
+            if ann.r_h_deep is not None:
+                ranked_list.append((ann.ply, f"r_h_deep:{ann.r_h_deep:.3f}", "heuristic"))
+            else:
+                ranked_list.append((ann.ply, f"r_h:{ann.r_h:.3f}", "heuristic"))
+        primary = ranked_list[0]
+        return primary[0], primary[1], primary[2], ranked_list
+
+    # ── Fix 3: suspicious-position deep re-score ──────────────────────────────
+
+    _DEEP_RESCORE_MAX = 12  # cap on plies re-scored per game
+
+    def _deep_rescore_suspicious(
+        self,
+        annotations: list[MoveAnnotation],
+        moves_raw: list[dict],
+        heuristic_curve: list[float],
+    ) -> None:
+        """Identify suspicious plies and re-score them at self._ai_deep depth.
+
+        Two flagging sources (union, then capped at _DEEP_RESCORE_MAX):
+        - Capture-lookback: plies t-1 and t-2 before each capture event.
+          The defensive failure is upstream of the capture itself.
+        - Threat-delta: consecutive curve steps where |Δh| ≥ threat_delta_threshold,
+          catching fork threats / mill setups before the piece is actually taken.
+
+        Capture-lookback plies are included first so they survive the cap.
+        """
+        n = len(annotations)
+        if n < 2:
+            return
+
+        # ── Build suspicious set ──────────────────────────────────────────────
+        capture_lookback: set[int] = set()
+        for i, m in enumerate(moves_raw):
+            if m.get("capture"):
+                for lookback in (1, 2):
+                    candidate = i - lookback
+                    if 0 <= candidate < n:
+                        capture_lookback.add(candidate)
+
+        threat_delta: set[int] = set()
+        for i in range(1, len(heuristic_curve)):
+            if abs(heuristic_curve[i] - heuristic_curve[i - 1]) >= self._threat_delta_threshold:
+                threat_delta.add(i)
+
+        # Merge: capture-lookback first, then threat-delta; cap total
+        ordered = sorted(capture_lookback) + sorted(threat_delta - capture_lookback)
+        suspicious = sorted(set(ordered[: self._DEEP_RESCORE_MAX]))
+
+        if not suspicious:
+            return
+
+        suspicious_set = set(suspicious)
+
+        # ── Replay game, deep-score at flagged plies ──────────────────────────
+        board = BoardState.new_game()
+        for ply_idx, move_record in enumerate(moves_raw):
+            played_move = {
+                "from": move_record.get("from"),
+                "to": move_record["to"],
+                "capture": move_record.get("capture"),
+            }
+            if ply_idx in suspicious_set:
+                scored_deep = self._ai_deep.assess_position(board)
+                if scored_deep:
+                    all_s = [s for _, s in scored_deep]
+                    lo, hi = min(all_s), max(all_s)
+                    move_key = (
+                        played_move.get("from"),
+                        played_move["to"],
+                        played_move.get("capture"),
+                    )
+                    played_raw = next(
+                        (s for m, s in scored_deep
+                         if (m.get("from"), m["to"], m.get("capture")) == move_key),
+                        None,
+                    )
+                    if hi != lo:
+                        score_deep = (
+                            (played_raw - lo) / (hi - lo)
+                            if played_raw is not None
+                            else 0.0
+                        )
+                        annotations[ply_idx].r_h_deep = max(0.0, 1.0 - score_deep)
+                        annotations[ply_idx].deep_scored = True
+            board = board.apply_move(played_move)

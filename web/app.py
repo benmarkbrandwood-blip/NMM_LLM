@@ -117,7 +117,7 @@ def _persist_game_record(record: dict) -> None:
 # HumanDB: if the pre-built SQLite exists, use it in place of the slow file-scan
 # TrajectoryDB for human-corpus positions.  Falls back to TrajectoryDB when absent.
 _human_games_dir = _ROOT / "data" / "human_games"
-_human_db_path   = _ROOT / "data" / "human_db.sqlite"
+_human_db_path   = _ROOT / "data" / "human_db_candidate_new.sqlite"
 _human_db: "HumanDB | None" = None
 try:
     _hdb = HumanDB(_human_db_path)
@@ -276,7 +276,7 @@ else:
 # Load HumanMovePolicyAdvisor — predicted-move probabilities for the diagnostic
 # overlay when no real trajectory data exists.  Optional; fails safe.
 from ai.human_move_policy_advisor import try_load as _try_load_hmpa
-_human_move_policy_path = _ROOT / "data" / "human_move_policy_net_v2_candidate.npz"
+_human_move_policy_path = _ROOT / "data" / "human_move_policy_net_v4_branching.npz"
 _human_move_policy_advisor = _try_load_hmpa(_human_move_policy_path)
 if _human_move_policy_advisor is not None:
     _hmpa_kb = round(_human_move_policy_path.stat().st_size / 1024, 1)
@@ -826,6 +826,8 @@ class Session:
         self.black_personality: str = ""
         # Background task handle for AI-vs-AI loop
         self._ava_task: Optional[asyncio.Task] = None
+        # Background post-game assessment task
+        self._assessment_task: Optional[asyncio.Task] = None
         # B-75: pondering during the opponent's turn (None when not applicable)
         self.ponder_manager: Optional[PonderManager] = None
         # Diagnostic overlay: board after move-but-before-capture, used by get_diagnostic
@@ -2604,6 +2606,158 @@ async def _commentary(ws: WebSocket, session: Session) -> None:
             })
 
 
+def _cancel_prior_assessment(session: Optional[Session]) -> None:
+    """Cancel any running background assessment task attached to *session*."""
+    if session is not None and session._assessment_task is not None:
+        if not session._assessment_task.done():
+            session._assessment_task.cancel()
+        session._assessment_task = None
+
+
+async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) -> None:
+    """Run PostGameAssessor in a background thread and push results over *ws*."""
+    from ai.post_game_assessor import (
+        PostGameAssessor,
+        _R_H_POOR_THRESHOLD,
+        _R_H_SOLO_THRESHOLD,
+        _R_S_POOR_THRESHOLD,
+    )
+    assessor = PostGameAssessor(
+        difficulty=3,
+        depth=4,
+        shallow_depth=2,
+        sentinel=_sentinel_advisor,
+        gap_net=_gap_net,
+        malom_db=_malom_puzzle_db,
+        trajectory_db=_trajectory_db,
+        policy_advisor=_human_move_policy_advisor,
+        pref_advisor=None,  # HumanPrefAdvisor has different probs() signature; skip for now
+        generalist=_generalist_advisor,
+        r_h_threshold=_R_H_POOR_THRESHOLD,
+        r_s_threshold=_R_S_POOR_THRESHOLD,
+        r_h_solo_threshold=_R_H_SOLO_THRESHOLD,
+    )
+    try:
+        annotation = await asyncio.to_thread(assessor.assess, record)
+    except asyncio.CancelledError:
+        return
+    except Exception as exc:
+        log.warning("Post-game assessment failed: %s", exc)
+        return
+
+    winner = record.get("winner", "?")
+
+    # Turning points for graph markers
+    tp_list = annotation.turning_points or (
+        [(annotation.turning_point_ply, annotation.turning_point_quality,
+          annotation.turning_point_oracle)]
+        if annotation.turning_point_ply is not None else []
+    )
+    tp_json = [
+        {"ply": int(ply), "quality": quality, "oracle": oracle}
+        for ply, quality, oracle in tp_list
+        if ply is not None
+    ]
+
+    # Confirmed-poor moves summary
+    poor_moves = [
+        {
+            "ply":       m.ply + 1,
+            "color":     m.color,
+            "move":      m.move_played,
+            "quality":   m.quality,
+            "wdl_before": m.wdl_before,
+            "wdl_after":  m.wdl_after,
+            "r_h":        round(m.r_h, 3),
+        }
+        for m in annotation.moves
+        if m.quality == "confirmed_poor"
+    ]
+
+    # Active signal list
+    has_sentinel = any(m.sentinel_played is not None for m in annotation.moves)
+    has_malom    = any(m.oracle_source != "none" for m in annotation.moves)
+    has_traj     = any(m.traj_delta_played is not None for m in annotation.moves)
+    has_policy   = any(m.policy_prob is not None for m in annotation.moves)
+    signals = ["heuristic"]
+    if has_sentinel: signals.append("sentinel")
+    if has_malom:    signals.append("malom")
+    if has_traj:     signals.append("trajectory")
+    if has_policy:   signals.append("policy")
+
+    # Text summary for MillsAI chat panel
+    lines: list[str] = []
+    if annotation.opening_name:
+        lines.append(f"Opening: {annotation.opening_name}")
+    if tp_json:
+        tp0 = tp_json[0]
+        p0  = tp0["ply"]
+        m0  = annotation.moves[p0] if p0 < len(annotation.moves) else None
+        if m0:
+            c0_name  = "White" if m0.color == "W" else "Black"
+            move_num = (p0 + 2) // 2
+            lines.append(
+                f"Turning point — {c0_name}, move {move_num} (ply {p0 + 1}): {m0.move_played}"
+            )
+            lines.append(f"  Quality: {tp0['quality']}  Oracle: {tp0['oracle']}")
+            if m0.best_alt:
+                lines.append(f"  Better: {m0.best_alt}")
+        for rank, extra in enumerate(tp_json[1:], 2):
+            ep  = extra["ply"]
+            em  = annotation.moves[ep] if ep < len(annotation.moves) else None
+            if em:
+                ep_name  = "White" if em.color == "W" else "Black"
+                ep_mnum  = (ep + 2) // 2
+                lines.append(
+                    f"TP #{rank} — {ep_name}, move {ep_mnum} (ply {ep + 1}): {em.move_played} "
+                    f"({extra['quality']})"
+                )
+    if poor_moves:
+        lines.append(f"\nConfirmed poor ({len(poor_moves)}):")
+        for pm in poor_moves[:6]:
+            wdl = (
+                f" {pm['wdl_before']}→{pm['wdl_after']}"
+                if pm["wdl_before"] else f" r_h={pm['r_h']:.2f}"
+            )
+            lines.append(f"  Ply {pm['ply']} {pm['color']} {pm['move']}{wdl}")
+    lines.append(f"\nSignals: {', '.join(signals)}")
+    summary_text = "\n".join(lines)
+
+    try:
+        await _send(ws, {
+            "type":           "assessment_result",
+            "turning_points": tp_json,
+            "poor_moves":     poor_moves,
+            "opening_name":   annotation.opening_name,
+            "signals":        signals,
+            "summary_text":   summary_text,
+            "total_plies":    len(annotation.moves),
+            "winner":         winner,
+        })
+    except asyncio.CancelledError:
+        return
+
+    # LLM synthesis — only when a coordinator with MillsLLM is available
+    llm = getattr(getattr(session, "coordinator", None), "mills_llm", None)
+    if llm is None:
+        return
+    try:
+        class _R:
+            pass
+        _r = _R()
+        _r.winner       = winner  # type: ignore[attr-defined]
+        _r.loser        = "B" if winner == "W" else ("W" if winner == "B" else "?")  # type: ignore[attr-defined]
+        _r.opening_name = annotation.opening_name  # type: ignore[attr-defined]
+
+        prose = await asyncio.to_thread(llm.debrief_game, _r, annotation)
+        if prose:
+            await _send(ws, {"type": "assessment_llm", "text": prose})
+    except asyncio.CancelledError:
+        return
+    except Exception as exc:
+        log.debug("Assessment LLM synthesis failed: %s", exc)
+
+
 async def _game_over(ws: WebSocket, session: Session) -> None:
     global _opening_tree_cache
     _clear_autosave()
@@ -2775,6 +2929,23 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
 
         asyncio.create_task(_maybe_consolidate(ws))
         asyncio.create_task(_maybe_auto_evolve())
+
+    elif session.vs_human:
+        # Human-vs-Human — persist to data/games/ so the assessment CLI can find it.
+        hvh_record = dict(session.engine.game_record)
+        hvh_record["winner"]     = winner
+        hvh_record["vs_human"]   = True
+        if draw_reason:
+            hvh_record["draw_reason"] = draw_reason
+        session._last_game_record = hvh_record
+        await asyncio.to_thread(_persist_game_record, hvh_record)
+        log.info("HvH game saved: winner=%s", winner)
+
+    # ── Background assessment (all non-ai_vs_ai games) ──────────────────────────
+    if session._last_game_record:
+        session._assessment_task = asyncio.create_task(
+            _run_game_assessment(ws, session, session._last_game_record)
+        )
 
 
 def _make_game_ai_for_personality(color: str, personality: str, difficulty: int) -> GameAI:
@@ -3521,6 +3692,7 @@ async def ws_endpoint(websocket: WebSocket):
                         )
                         _apply_search_depth(_re_ai)
 
+                    _cancel_prior_assessment(session)
                     session = Session(_re_engine, _re_ai, None, _hc, _vs_human)
                     log.info("Game restored from autosave: fen=%s diff=%d", _fen, _diff)
                     await _send(websocket, {"type": "game_restored"})
@@ -3687,6 +3859,7 @@ async def ws_endpoint(websocket: WebSocket):
                         )
                         await asyncio.to_thread(coord.on_game_start)
 
+                _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
                 session.is_tournament_game = is_tournament
                 session.use_overseer_player = use_overseer_player and not vs_human
@@ -3848,6 +4021,7 @@ async def ws_endpoint(websocket: WebSocket):
                         )
                         await asyncio.to_thread(coord.on_game_start)
 
+                _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
                 session.use_overseer_player = use_overseer_player and not vs_human
                 session.use_generalist_player = use_generalist_player and not vs_human
@@ -3954,6 +4128,9 @@ async def ws_endpoint(websocket: WebSocket):
             # ── accept_resignation — player accepts the AI's offer to resign ────
             elif kind == "accept_resignation" and session and session._resignation_pending:
                 session._resignation_pending = False
+                if session.engine.finished:
+                    # Game already ended naturally (e.g., human captured while offer was in flight)
+                    continue
                 session.engine.finished = True
                 session.engine.winner   = session.human_color
                 human_name = "White" if session.human_color == "W" else "Black"
@@ -4651,6 +4828,7 @@ async def ws_endpoint(websocket: WebSocket):
                 )
                 # B: mark opening replay active so override_ai requests are ignored
                 new_session.opening_active = True
+                _cancel_prior_assessment(session)
                 session = new_session  # noqa: F841 — reassign nonlocal
 
                 # Send initial state to reset the client board
@@ -4950,6 +5128,7 @@ async def ws_endpoint(websocket: WebSocket):
                 new_session.black_personality    = "Generalist AI" if use_gen_b else black_personality
                 new_session.use_generalist_white = use_gen_w and _generalist_advisor is not None
                 new_session.use_generalist_black = use_gen_b and _generalist_advisor is not None
+                _cancel_prior_assessment(session)
                 session = new_session
 
                 _w_label = "Generalist AI" if use_gen_w else white_personality.capitalize()

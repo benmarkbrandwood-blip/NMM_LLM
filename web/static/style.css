@@ -6,8 +6,8 @@
   --surface:   #241f18;
   --border:    #3d3325;
   --tan:       #c8a96e;
-  --text:      #e8dcc8;
-  --text-dim:  #8a7a60;
+  --text:      #f5ede0;
+  --text-dim:  #a89070;
   --accent:    #d4834a;
   --green:     #4caf50;
   --red:       #e05050;
@@ -36,9 +36,10 @@ html, body {
 
 header {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 0 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -47,6 +48,41 @@ header h1 {
   font-weight: 600;
   letter-spacing: .04em;
   color: var(--tan);
+}
+
+#header-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+#btn-game-assessment {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .85rem;
+}
+#btn-game-assessment:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+#btn-game-assessment.assessment-ready {
+  border-color: var(--tan);
+  color: var(--tan);
+  animation: assessment-pulse 2s ease-in-out infinite;
+}
+#btn-game-assessment.assessment-done {
+  border-color: #4caf50;
+  color: #4caf50;
+  animation: none;
+}
+@keyframes assessment-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(200, 169, 110, 0.30); }
+  50%       { box-shadow: 0 0 10px rgba(200, 169, 110, 0.65); }
 }
 
 #toggle-moves,
@@ -93,6 +129,20 @@ header h1 {
   cursor: pointer;
   font-size: .9rem;
   font-weight: 600;
+}
+#btn-explorer, #btn-puzzles {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--tan);
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .85rem;
+  text-decoration: none;
+}
+#btn-explorer:hover, #btn-puzzles:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 #hdr-personality {
   background: #1e1a12;
@@ -174,9 +224,9 @@ main {
   overflow: hidden;
 }
 
-/* Human chat panel (top) gets more vertical space than AI discussion (bottom) */
-#commentary-human-panel { flex: 2; }
-#commentary-ai-panel    { flex: 1; }
+/* Human chat panel (top) gets most of the space; AI Discussion is now a compact strip */
+#commentary-human-panel { flex: 1; }
+#commentary-ai-panel    { flex: 0 0 auto; max-height: 104px; overflow: hidden; }
 
 #commentary-human,
 #commentary-ai {

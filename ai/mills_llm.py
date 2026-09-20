@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from game.board import BoardState
     from ai.memory_manager import MemoryManager
+    from ai.post_game_assessor import PostGameAnnotation
 
 _MAX_HISTORY = 16
 
@@ -297,6 +298,24 @@ STYLE:
 - no move invention
 """
 
+_DEBRIEF_ANNOTATED_SYSTEM = _BOARD_RULES + """
+
+TASK:
+Write a concise post-game commentary in 3–5 sentences.
+
+STRUCTURE:
+1. One sentence on the game's overall character (who dominated, how balanced the game was).
+2. One sentence focused on the turning point — the move that decided the game.
+3. Optionally, one sentence on any other notable poor moves or recurring patterns.
+
+STYLE:
+- Coaching tone; be concrete and specific.
+- Never invent move quality claims not present in the fact block below.
+- Malom labels (W, D, L) are categorical outcomes; never paraphrase them as probabilities.
+- Label any model probability or empirical win rate explicitly as such.
+- Do not quote raw decimal scores; use the categorical descriptors already provided.
+"""
+
 _DEBRIEF_POSITION_SYSTEM = _BOARD_RULES + """
 
 TASK:
@@ -437,6 +456,111 @@ def _notation_to_move(notation: str, legal: list[dict]) -> dict | None:
         if m["to"] == notation and not m.get("capture"):
             return m
     return None
+
+
+# ── Post-game annotation prompt helpers ───────────────────────────────────────
+
+_WDL_ARROWS = {
+    "win_to_loss": "Win→Loss",
+    "win_to_draw": "Win→Draw",
+    "draw_to_loss": "Draw→Loss",
+}
+
+
+def _wdl_quality_label(quality: str) -> str:
+    """Convert a turning_point_quality string to a display label.
+
+    Malom path: quality is a WDL class like 'win_to_loss' → 'Win→Loss'.
+    Heuristic path: quality is already a regret label like 'r_h:0.712'.
+    """
+    return _WDL_ARROWS.get(quality, quality)
+
+
+def _score_trend_words(
+    heuristic_curve: "list[float]",
+    turning_point_ply: "int | None",
+) -> str:
+    """Derive a categorical one-sentence description of the game arc.
+
+    Uses sign of heuristic_score_white (positive = White ahead) to avoid
+    quoting raw numbers in the LLM prompt.
+    """
+    if not heuristic_curve:
+        return "No score data available."
+    n = len(heuristic_curve)
+    white_ahead = sum(1 for v in heuristic_curve if v > 0)
+    frac = white_ahead / n
+    if frac >= 0.70:
+        trend = "White held the advantage for most of the game"
+    elif frac <= 0.30:
+        trend = "Black held the advantage for most of the game"
+    elif frac >= 0.55:
+        trend = "White held a slight edge overall"
+    elif frac <= 0.45:
+        trend = "Black held a slight edge overall"
+    else:
+        trend = "The position was closely contested throughout"
+    if turning_point_ply is not None and 0 < turning_point_ply < n - 1:
+        trend += f", with the key shift occurring at ply {turning_point_ply + 1}"
+    return trend + "."
+
+
+def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
+    """Build the structured user prompt for annotated game debrief.
+
+    ``report`` is any duck-typed object with .winner, .loser, .opening_name.
+    ``annotation`` is a PostGameAnnotation from PostGameAssessor.
+    """
+    lines: list[str] = []
+
+    # GAME FACTS
+    n_plies = len(annotation.moves)
+    opening = annotation.opening_name or getattr(report, "opening_name", None) or "unknown"
+    lines.append("GAME FACTS:")
+    lines.append(f"  Winner: {report.winner}")
+    lines.append(f"  Loser:  {report.loser}")
+    lines.append(f"  Plies:  {n_plies}")
+    lines.append(f"  Opening: {opening}")
+    lines.append("")
+
+    # SCORE TREND
+    lines.append("SCORE TREND:")
+    lines.append(
+        "  " + _score_trend_words(annotation.heuristic_curve, annotation.turning_point_ply)
+    )
+    lines.append("")
+
+    # TURNING POINT
+    tp_ply = annotation.turning_point_ply
+    if tp_ply is not None and 0 <= tp_ply < len(annotation.moves):
+        tp = annotation.moves[tp_ply]
+        oracle = annotation.turning_point_oracle
+        quality_label = _wdl_quality_label(annotation.turning_point_quality)
+        lines.append("TURNING POINT:")
+        lines.append(f"  Ply:            {tp_ply + 1}")
+        lines.append(f"  Move played:    {tp.move_played}")
+        if tp.best_alt:
+            lines.append(f"  Best available: {tp.best_alt}")
+        if oracle in ("malom_full", "retrograde_wdl"):
+            lines.append(f"  Malom outcome:  {quality_label}  (oracle: {oracle})")
+        else:
+            lines.append(f"  Regret signal:  {quality_label}  (oracle: {oracle})")
+        lines.append("")
+
+    # OTHER POOR MOVES (only when more than one confirmed_poor)
+    confirmed_poor = [m for m in annotation.moves if m.quality == "confirmed_poor"]
+    other_poor = [m for m in confirmed_poor if m.ply != tp_ply]
+    if other_poor:
+        lines.append("OTHER POOR MOVES:")
+        for m in other_poor:
+            if m.oracle_source in ("malom_full", "retrograde_wdl"):
+                wdl_key = f"{m.wdl_before}→{m.wdl_after}" if m.wdl_before else "confirmed_poor"
+                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (Malom: {wdl_key})")
+            else:
+                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (r_h={m.r_h:.2f})")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 class MillsLLM:
@@ -750,7 +874,10 @@ No other text.
             name = f"Novel Opening ({first}...)"
         return name
 
-    def debrief_game(self, report) -> str:
+    def debrief_game(self, report, annotation=None) -> str:
+        if annotation is not None:
+            user = _build_debrief_prompt(report, annotation)
+            return self._chat(_DEBRIEF_ANNOTATED_SYSTEM, user, keep_history=False)
         user = (
             f"Winner: {report.winner}\n"
             f"Loser: {report.loser}\n"

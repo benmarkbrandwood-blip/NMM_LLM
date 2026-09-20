@@ -527,7 +527,7 @@ flagging. `oracle_source` in `MoveAnnotation` stays `"none"` for threshold-flagg
 Malom-over-sentinel precedence, poor_candidate flagging, oracle_source discrimination,
 and already_losing guard.
 
-### Stage 5b — Policy quality divergence (HumanPref vs TeacherNet)
+### Stage 5b — Policy quality divergence (HumanPref vs TeacherNet) *(complete)*
 
 **Goal:** add `policy_pref_delta` per ply by running both nets and computing the signed
 probability difference. Flags moves that are common at lower levels but rare among better
@@ -544,7 +544,7 @@ players, or vice versa.
 `policy_pref_delta` is positive when pref assigns higher prob and negative when teacher
 does; assert `None` when either advisor is absent.
 
-### Stage 5c — Horizon search delta (short-sighted move detection)
+### Stage 5c — Horizon search delta (short-sighted move detection) *(complete)*
 
 **Goal:** add a shallow-depth scorer alongside the existing deep scorer; compute
 `horizon_delta = score_shallow − score_deep` per ply to detect moves that look good
@@ -567,7 +567,7 @@ shallowly but are penalised by deeper search.
 assert `horizon_delta` is a finite float; assert all three fields are `None` when
 `shallow_depth` is not set.
 
-### Stage 6 — LLM synthesis
+### Stage 6 — LLM synthesis *(complete)*
 
 **Goal:** extend `debrief_game()` to accept a `PostGameAnnotation` and produce
 the structured 3–5 sentence commentary.
@@ -581,7 +581,7 @@ Synthesis (no decimal Malom figures, no invented quality claims).
 `_build_debrief_prompt()`; assert all four sections are present; assert no decimal
 figures appear in the Turning Point section when oracle is `"malom_full"`.
 
-### Stage 6b — In-game move commentary
+### Stage 6b — In-game move commentary *(complete)*
 
 **Goal:** surface brief, assessment-grounded commentary *during play* (after each human
 or AI move), rather than only in the post-game debrief. Less detailed than the full
@@ -621,22 +621,47 @@ distinct features: LLM commentary is generally useful; LLM move override is not 
 assert correct comment is selected at each priority tier; assert silence when all signals
 are below threshold.
 
-### Stage 7 — UI integration
+### Stage 7 — UI integration *(complete 2026-09-20)*
 
-**Goal:** pivotal moves highlighted in the move-replay slider; LLM commentary
+**Goal:** turning-point markers on eval graph; structured summary + LLM commentary
 displayed in the MillsAI chat panel after the game ends.
 
-**New code:**
-- `web/app.py` and `/api/debrief` endpoint: on game end, run `PostGameAssessor.assess()`
-  asynchronously; return `PostGameAnnotation` JSON alongside the existing `DebriefReport`.
-- Frontend replay component: read `turning_point_ply` and `quality == "confirmed_poor"`
-  or `"poor_candidate"` moves from the annotation; add highlight markers to the move
-  timeline.
-- MillsAI chat panel: after game end, display the LLM debrief text (from Stage 6) in
-  the existing chat window beneath a "Game analysis" header.
+**Delivered:**
+- `_run_game_assessment(ws, session, record)` async coroutine in `web/app.py`: starts
+  automatically at the end of `_game_over`; runs `PostGameAssessor.assess()` in a
+  background thread with all module-level advisors wired.
+- Sends `assessment_result` WebSocket message (turning points, poor moves, signals,
+  summary_text) followed by `assessment_llm` message (LLM prose, only when
+  `session.coordinator.mills_llm` is available).
+- `_cancel_prior_assessment()` helper called at all 5 Session creation sites.
+- Frontend: `assessment_result` handler populates `_assessmentTurningPoints`, redraws
+  eval graph with dashed vertical lines (red for primary TP, amber for secondary),
+  posts structured summary to MillsAI Chat panel with `pre-wrap` formatting.
+- Frontend: `assessment_llm` handler posts LLM prose to MillsAI Chat.
+- Frontend: Game Assessment button click switches to chat tab; shows "Analysis
+  running…" if results not yet ready; button turns green when `assessment_result`
+  arrives.
+- AI Discussion panel shrunk to `max-height: 90px` (was ~33% of column height).
 
 **Test gate:** manual validation on 5–10 games (§Validation). Gate further polish on
 that review.
+
+---
+
+## Tournament Mode
+
+End-of-game assessment runs **asynchronously** after the result is recorded — it has
+no effect on game flow or move selection.
+
+For tournament play, show a **splash screen before the tournament starts** asking whether
+players want to activate end-of-game assessments. If accepted, `PostGameAssessor.assess()`
+is kicked off in a background thread after each game ends; the annotation is attached to
+the game record when the thread finishes. The UI shows "analysis pending…" and fills in
+commentary once the result arrives. If declined, the game records are stored without
+annotation (they can always be analysed offline later via a batch tool).
+
+This keeps tournament infrastructure lean while preserving the full assessment experience
+for players who want it.
 
 ---
 
@@ -676,3 +701,11 @@ that review.
 7. **`n > 50` empirical threshold.** Set independently from any training sweep — the
    assessor's source-selection threshold and the training class-balance threshold serve
    different purposes.
+
+8. **Overlay/scores lost on game resume (post-Stage 7 bug).** When a game is resumed
+   from autosave, `evalHistory` and `sentinelHistory` are reset to empty arrays on the
+   client but are not re-populated from the restored game state. As a result, the score
+   graph is empty and any overlay signals recorded during the original session are lost.
+   Fix after Stage 7 scaffolding is in place: on resume, batch-replay the restored move
+   list to re-populate both histories (and `_diagFenCache` for overlay signals — see also
+   overlay storage gap in sentinel assessment notes).
