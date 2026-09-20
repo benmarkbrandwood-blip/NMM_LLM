@@ -29,6 +29,19 @@ if TYPE_CHECKING:
 _MALOM_CONFIRMED_POOR = frozenset({"win_to_draw", "win_to_loss", "draw_to_loss"})
 _MALOM_CLEAN          = frozenset({"win_preserved", "draw_preserved", "all_losing"})
 
+# Stage 5 — turning-point severity and labels (keyed by (wdl_before, wdl_after))
+_MALOM_SEVERITY: dict = {("W", "L"): 3, ("D", "L"): 2, ("W", "D"): 1}
+_MALOM_TRANSITION_LABEL: dict = {
+    ("W", "L"): "win_to_loss",
+    ("D", "L"): "draw_to_loss",
+    ("W", "D"): "win_to_draw",
+}
+
+# Poor-candidate regret thresholds (calibrate from validation data)
+_R_H_POOR_THRESHOLD  = 0.30  # when sentinel also confirms
+_R_H_SOLO_THRESHOLD  = 0.50  # when only heuristic is available
+_R_S_POOR_THRESHOLD  = 0.20  # sentinel r_s confirmation floor
+
 from game.board import BoardState
 from game.rules import get_all_legal_moves, get_game_phase
 from ai.game_ai import GameAI
@@ -145,6 +158,9 @@ class PostGameAssessor:
         policy_advisor: Optional["HumanMovePolicyAdvisor"] = None,
         policy_elo_band: str = "all",
         generalist: Optional["GeneralistAgent"] = None,
+        r_h_threshold: float = float("inf"),
+        r_s_threshold: float = float("inf"),
+        r_h_solo_threshold: float = float("inf"),
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
@@ -155,6 +171,9 @@ class PostGameAssessor:
         self._policy_advisor = policy_advisor
         self._policy_elo_band = policy_elo_band
         self._generalist = generalist
+        self._r_h_threshold = r_h_threshold
+        self._r_s_threshold = r_s_threshold
+        self._r_h_solo_threshold = r_h_solo_threshold
 
     def assess(self, game_record: dict) -> PostGameAnnotation:
         """Replay `game_record` and return a fully annotated PostGameAnnotation."""
@@ -283,6 +302,15 @@ class PostGameAssessor:
                                 wdl_after = None
                                 abstained_reason = f"malom_{transition}"
 
+            # ── Poor-candidate flagging (regret thresholds, Stage 5) ─────────
+            if (quality == "clean" and oracle_source == "none"
+                    and abstained_reason != "already_losing"):
+                if r_s is not None:
+                    if r_h > self._r_h_threshold and r_s > self._r_s_threshold:
+                        quality = "poor_candidate"
+                elif r_h > self._r_h_solo_threshold:
+                    quality = "poor_candidate"
+
             # ── Trajectory signal ─────────────────────────────────────────────
             traj_delta_played: Optional[float] = None
             traj_delta_best: Optional[float] = None
@@ -381,25 +409,62 @@ class PostGameAssessor:
     ) -> tuple[Optional[int], str, str]:
         """Return (ply, quality_str, oracle_source) for the turning point.
 
-        Stages 1–2: heuristic-only — ply where h(t) drops most steeply.
-        Stage 5 upgrades this to the full Malom → Sentinel+Heuristic → Heuristic hierarchy.
+        Three-tier hierarchy (Stage 5):
+        1. Malom confirmed_poor — ranked by WDL severity, tie-break by r_h.
+        2. Sentinel + Heuristic combined drop Δh + Δs.
+        3. Heuristic-only steepest Δh.
         """
         if len(annotations) < 2:
             return None, "", "heuristic"
 
-        best_ply: Optional[int] = None
-        best_drop = -1.0
+        # Tier 1 — Malom-confirmed poor moves
+        malom_poor = [
+            a for a in annotations
+            if a.quality == "confirmed_poor"
+            and a.oracle_source == "malom_full"
+            and a.wdl_before is not None and a.wdl_after is not None
+        ]
+        if malom_poor:
+            best = max(
+                malom_poor,
+                key=lambda a: (_MALOM_SEVERITY.get((a.wdl_before, a.wdl_after), 0), a.r_h),
+            )
+            label = _MALOM_TRANSITION_LABEL.get(
+                (best.wdl_before, best.wdl_after), "unknown"
+            )
+            return best.ply, label, "malom_full"
 
+        # Tier 2 — Sentinel + Heuristic combined drop
+        has_sentinel = any(a.sentinel_score_white is not None for a in annotations)
+        if has_sentinel:
+            best_ply: Optional[int] = None
+            best_drop = -1.0
+            for i in range(1, len(annotations)):
+                dh = (annotations[i - 1].heuristic_score_white
+                      - annotations[i].heuristic_score_white)
+                s_prev = annotations[i - 1].sentinel_score_white
+                s_curr = annotations[i].sentinel_score_white
+                ds = (s_prev - s_curr) if (s_prev is not None and s_curr is not None) else 0.0
+                drop = dh + ds
+                if drop > best_drop:
+                    best_drop = drop
+                    best_ply = i
+            if best_ply is None or best_drop <= 0.0:
+                return None, "", "sentinel+heuristic"
+            ann = annotations[best_ply]
+            r_s_val = ann.r_s if ann.r_s is not None else 0.0
+            return best_ply, f"r_h+r_s:{ann.r_h + r_s_val:.3f}", "sentinel+heuristic"
+
+        # Tier 3 — Heuristic-only steepest drop
+        best_ply = None
+        best_drop = -1.0
         for i in range(1, len(annotations)):
             drop = (annotations[i - 1].heuristic_score_white
                     - annotations[i].heuristic_score_white)
             if drop > best_drop:
                 best_drop = drop
                 best_ply = i
-
         if best_ply is None or best_drop <= 0.0:
             return None, "", "heuristic"
-
         ann = annotations[best_ply]
-        quality_str = f"r_h:{ann.r_h:.3f}"
-        return best_ply, quality_str, "heuristic"
+        return best_ply, f"r_h:{ann.r_h:.3f}", "heuristic"

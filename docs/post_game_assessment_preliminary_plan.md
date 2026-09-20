@@ -129,6 +129,54 @@ Per ply:
 Human preference is a *descriptive* signal. High human frequency does not override a
 heuristic or Malom-confirmed downgrade.
 
+### 7. Policy quality divergence (HumanPrefNet vs TeacherNet)
+
+Two human-move nets are available:
+- **TeacherNet** (`human_move_policy_net_v4_branching.npz`): trained on all human moves
+  at roughly equal weight — reflects average human frequency.
+- **HumanPrefNet** (`human_pref_net.npz`): trained specifically on higher-quality human
+  moves — reflects what better players tend to choose.
+
+The signed difference `pref_prob − teacher_prob` at each ply acts as a *quality-of-choice*
+signal, independently of whether the move was heuristically optimal:
+
+- **Positive delta** (`pref_prob > teacher_prob`): move is disproportionately preferred
+  by stronger players — a quality human choice even if heuristically second-best.
+- **Large negative delta** (`teacher_prob >> pref_prob`): move is common at lower levels
+  but not characteristic of stronger play — a weak or automatic choice.
+- Near zero: the move's popularity is consistent across ability bands.
+
+This signal complements `r_h` and `r_s` for human plies: a move can be heuristically
+poor (`r_h` high) but human-popular (teacher high) which is different from being both
+heuristically poor AND a stronger-player divergence (negative delta).
+
+Per ply:
+- `policy_pref_delta: float | None` — `pref_prob − teacher_prob`; `None` when either
+  net is absent or the position has no coverage.
+- Negative threshold for "weak human choice" to be calibrated from validation data.
+
+### 8. Horizon search delta (short-sighted move detection)
+
+Running two `assess_position` calls per ply at different depths (e.g., depth 2 vs depth 6)
+reveals whether a move *looked good shallowly* but was penalised by deeper search — the
+classic horizon effect.
+
+`horizon_delta = score_shallow − score_deep` where both scores are the mover's normalised
+score for the played move, computed at the two depths. A large positive delta means the
+move appeared better at shallow depth than it actually was.
+
+Per ply:
+- `horizon_delta: float | None` — `score_shallow − score_deep`; `None` when the
+  shallow assessor is not configured.
+- `horizon_shallow_score: float | None` — move score at shallow depth (mover's perspective).
+- `horizon_deep_score: float | None` — move score at deep depth (same as `score_played`
+  when the standard assessor depth is the "deep" value).
+
+Implementation note: requires a second `GameAI` instance (`_ai_shallow`) at a fixed low
+depth (e.g., 2). The standard `_ai` becomes the "deep" scorer. Wall-clock cost roughly
+doubles for plies where both scorers run; consider running shallow-only on flagged plies
+(`quality != "clean"`) to bound overhead.
+
 ### 6. Generalist AI policy
 
 `GeneralistPolicyAdvisor.probs(board, legal_moves)` (or equivalent interface on the
@@ -300,6 +348,14 @@ generalist_policy_prob  float | None     # probability generalist plays this mov
 generalist_top_move     str | None       # generalist's preferred alternative
 generalist_value_after  float | None     # value-head win prob after move, White-normalised
 generalist_self_assessed bool            # True when generalist played this side (uninformative)
+
+# Policy quality divergence (Signal 7)
+policy_pref_delta       float | None     # pref_prob − teacher_prob; negative = weak human choice
+
+# Horizon depth delta (Signal 8)
+horizon_delta           float | None     # score_shallow − score_deep; positive = short-sighted
+horizon_shallow_score   float | None     # move score at shallow depth (mover's perspective)
+horizon_deep_score      float | None     # move score at deep depth (= score_played when depth matches)
 ```
 
 ### `PostGameAnnotation` (game level)
@@ -450,7 +506,7 @@ positions; assert `traj_n` is `None` when coverage below threshold; assert polic
 generalist fields populated when advisors present; assert `generalist_self_assessed`
 is set correctly.
 
-### Stage 5 — Full turning-point hierarchy + poor-move thresholds
+### Stage 5 — Full turning-point hierarchy + poor-move thresholds *(complete)*
 
 **Goal:** implement the full Malom → Sentinel+Heuristic → Heuristic turning-point
 selection and calibrate `poor_candidate` thresholds from real game data.
@@ -458,10 +514,58 @@ selection and calibrate `poor_candidate` thresholds from real game data.
 **New code:** `_detect_turning_point` upgraded to the three-tier hierarchy (§ Score
 Curves and Turning Point). `turning_point_oracle` field set correctly for each path.
 `poor_candidate` flagging with calibrated `r_h` and `r_s` thresholds from validation.
+Module-level constants `_R_H_POOR_THRESHOLD=0.30`, `_R_H_SOLO_THRESHOLD=0.50`,
+`_R_S_POOR_THRESHOLD=0.20` document calibration targets but are **not** the constructor
+defaults. Constructor defaults are `float("inf")` — no moves flagged until thresholds
+are explicitly set from validated data. Pass `r_h_threshold`, `r_s_threshold`,
+`r_h_solo_threshold` to activate. `already_losing` positions excluded from threshold
+flagging. `oracle_source` in `MoveAnnotation` stays `"none"` for threshold-flagged
+`poor_candidate` (Malom-only field); the turning-point path is tracked separately in
+`PostGameAnnotation.turning_point_oracle`.
 
-**Test gate:** three tests — one Malom-covered game (oracle `"malom_full"`), one
-Sentinel+Heuristic game (oracle `"sentinel+heuristic"`), one heuristic-only game
-(oracle `"heuristic"`). Validate `turning_point_quality` format matches its oracle.
+**Test gate:** nine Stage 5 tests pass: three oracle-path tests, severity ranking,
+Malom-over-sentinel precedence, poor_candidate flagging, oracle_source discrimination,
+and already_losing guard.
+
+### Stage 5b — Policy quality divergence (HumanPref vs TeacherNet)
+
+**Goal:** add `policy_pref_delta` per ply by running both nets and computing the signed
+probability difference. Flags moves that are common at lower levels but rare among better
+players, or vice versa.
+
+**New code:**
+- `PostGameAssessor.__init__` gains optional `pref_advisor: HumanMovePolicyAdvisor` arg
+  (separate from the existing `policy_advisor` which holds TeacherNet).
+- Per ply: if both advisors are present, call both; compute
+  `policy_pref_delta = pref_prob − teacher_prob`.
+- Add `policy_pref_delta: Optional[float] = None` to `MoveAnnotation`.
+
+**Test gate:** mock both advisors with different probability distributions; assert
+`policy_pref_delta` is positive when pref assigns higher prob and negative when teacher
+does; assert `None` when either advisor is absent.
+
+### Stage 5c — Horizon search delta (short-sighted move detection)
+
+**Goal:** add a shallow-depth scorer alongside the existing deep scorer; compute
+`horizon_delta = score_shallow − score_deep` per ply to detect moves that look good
+shallowly but are penalised by deeper search.
+
+**New code:**
+- `PostGameAssessor.__init__` gains optional `shallow_depth: int = None` arg. When set,
+  a second `GameAI` instance at that depth (`_ai_shallow`) is constructed.
+- Per ply: if `_ai_shallow` is configured, call `_ai_shallow.assess_position(board)` to
+  get the shallow-depth scored candidates; extract the played move's shallow score
+  (`horizon_shallow_score`); compare against `score_played` (the deep score) to compute
+  `horizon_delta`.
+- Add `horizon_delta`, `horizon_shallow_score`, `horizon_deep_score` fields to
+  `MoveAnnotation`.
+- Optimisation (optional): only run shallow scorer on plies where
+  `quality != "clean"` to bound wall-clock cost.
+
+**Test gate:** construct with `shallow_depth=2` (deep default 4); assert
+`horizon_shallow_score` and `horizon_delta` populated on all plies when configured;
+assert `horizon_delta` is a finite float; assert all three fields are `None` when
+`shallow_depth` is not set.
 
 ### Stage 6 — LLM synthesis
 
@@ -476,6 +580,46 @@ Synthesis (no decimal Malom figures, no invented quality claims).
 **Test gate (offline):** pass a `PostGameAnnotation` with known fields to a mocked
 `_build_debrief_prompt()`; assert all four sections are present; assert no decimal
 figures appear in the Turning Point section when oracle is `"malom_full"`.
+
+### Stage 6b — In-game move commentary
+
+**Goal:** surface brief, assessment-grounded commentary *during play* (after each human
+or AI move), rather than only in the post-game debrief. Less detailed than the full
+post-game LLM synthesis — one focused observation per move, not a game-arc narrative.
+
+**Approach:** reuse the per-ply signals already computed in `PostGameAssessor` but
+evaluate them incrementally as the game progresses. At each move:
+1. Run the heuristic scorer (and Sentinel/Malom if available) for the current ply.
+2. Select at most one comment from a priority-ranked signal list:
+   - Malom `confirmed_poor` → "That move let a won position slip" (or equivalent)
+   - `r_h > threshold` + `r_s > threshold` → "Better options were available"
+   - Low `blunder_zone_score` + high `r_h` → "Unusual mistake in a safe position"
+   - High `blunder_zone_score` + low `r_h` → "Well navigated a difficult position"
+   - Positive `policy_pref_delta` → "A move stronger players prefer"
+   - Large negative `policy_pref_delta` → "A common choice, but stronger players tend to avoid it"
+   - Large positive `horizon_delta` → "Short-sighted — deeper search disagrees"
+3. Deliver commentary via the existing MillsAI chat panel (same channel as LLM analysis),
+   labelled as "live analysis" vs post-game debrief.
+
+**Scope:** applies to both human plies and AI plies. For AI plies, commentary uses the
+same signals but frames them as "the AI's move was..." (educational context).
+
+**Constraints:**
+- Shallow assessors only (depth 2–3) to keep latency below 1 second per ply.
+- LLM call is NOT required for in-game commentary — the comment is template-based,
+  driven by signal thresholds, not generative prose. This avoids per-move LLM latency.
+- Rate-limit: comment at most once every N plies (calibrate; avoid comment spam).
+- All commentary is optional — falls back to silence if assessment is inconclusive.
+
+**Note (LLM move override):** the `chk-llm` toggle in Settings controls MillsAI commentary
+(live + debrief). A separate `chk-llm-moves` checkbox controls whether the LLM is allowed
+to override the AI's move selection (`Coordinator.ask_for_move_opinion`). These are
+distinct features: LLM commentary is generally useful; LLM move override is not recommended
+(LLMs are not strong Mills players) and should default to **off**.
+
+**Test gate:** unit test the signal-to-comment mapping function with known signal values;
+assert correct comment is selected at each priority tier; assert silence when all signals
+are below threshold.
 
 ### Stage 7 — UI integration
 

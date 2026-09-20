@@ -281,9 +281,9 @@ class TestPostGameAssessorStage2:
             assert ann.r_s is None
         assert all(v is None for v in result.sentinel_curve)
 
-    def test_oracle_still_heuristic_stage2(self, sentinel_annotation):
-        """Turning point oracle stays 'heuristic' until Stage 5."""
-        assert sentinel_annotation.turning_point_oracle == "heuristic"
+    def test_oracle_sentinel_heuristic_with_sentinel(self, sentinel_annotation):
+        """After Stage 5, sentinel presence upgrades the oracle to 'sentinel+heuristic'."""
+        assert sentinel_annotation.turning_point_oracle == "sentinel+heuristic"
 
 
 # ── Stage 2: GapNet blunder-zone density ──────────────────────────────────────
@@ -712,3 +712,87 @@ class TestPostGameAssessorStage4Generalist:
         assert all(a.generalist_policy_prob is not None for a in result.moves)
         # trajectory: first ply has coverage; rest may or may not
         assert result.moves[0].traj_delta_best == 0.3
+
+
+# ── Stage 5: Full turning-point hierarchy + poor-move thresholds ──────────────
+
+class TestPostGameAssessorStage5:
+    def test_malom_oracle_path(self):
+        """Malom confirmed_poor → turning_point_oracle == 'malom_full'."""
+        malom = _make_mock_malom(wdl_before="W", wdl_after="L", transition="win_to_loss")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert result.turning_point_oracle == "malom_full"
+        assert result.turning_point_quality == "win_to_loss"
+        assert result.turning_point_ply is not None
+
+    def test_malom_quality_label_win_to_draw(self):
+        """win_to_draw transition uses correct quality label."""
+        malom = _make_mock_malom(wdl_before="W", wdl_after="D", transition="win_to_draw")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert result.turning_point_quality == "win_to_draw"
+        assert result.turning_point_oracle == "malom_full"
+
+    def test_sentinel_heuristic_oracle_path(self):
+        """Sentinel present, no Malom → oracle == 'sentinel+heuristic'."""
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3, sentinel=_make_mock_sentinel()
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert result.turning_point_oracle == "sentinel+heuristic"
+        assert result.turning_point_quality.startswith("r_h+r_s:")
+
+    def test_heuristic_only_oracle_path(self):
+        """No sentinel, no Malom → oracle == 'heuristic'."""
+        assessor = PostGameAssessor(difficulty=1, depth=3)
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert result.turning_point_oracle == "heuristic"
+        assert result.turning_point_quality.startswith("r_h:")
+
+    def test_malom_takes_precedence_over_sentinel(self):
+        """Malom confirmed_poor present → oracle is 'malom_full', not 'sentinel+heuristic'."""
+        malom = _make_mock_malom(wdl_before="W", wdl_after="L", transition="win_to_loss")
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3, malom_db=malom, sentinel=_make_mock_sentinel()
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert result.turning_point_oracle == "malom_full"
+
+    def test_poor_candidate_flagged_solo_threshold(self):
+        """r_h > solo threshold (forced to -0.01) with no sentinel → poor_candidate."""
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3, r_h_solo_threshold=-0.01
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        assert all(a.quality == "poor_candidate" for a in result.moves)
+
+    def test_poor_candidate_oracle_source_stays_none(self):
+        """Threshold-flagged poor_candidate does not set oracle_source (stays 'none')."""
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3, r_h_solo_threshold=-0.01
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "poor_candidate"
+            assert ann.oracle_source == "none"
+
+    def test_confirmed_poor_oracle_source_malom(self):
+        """Malom-confirmed poor moves have oracle_source == 'malom_full'."""
+        malom = _make_mock_malom(wdl_before="W", wdl_after="L", transition="win_to_loss")
+        assessor = PostGameAssessor(difficulty=1, depth=3, malom_db=malom)
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "confirmed_poor"
+            assert ann.oracle_source == "malom_full"
+
+    def test_already_losing_not_flagged_poor_candidate(self):
+        """abstained_reason == 'already_losing' → quality stays 'clean'."""
+        malom = _make_mock_malom(wdl_before="L", wdl_after="L", transition="all_losing")
+        assessor = PostGameAssessor(
+            difficulty=1, depth=3, malom_db=malom, r_h_solo_threshold=-0.01
+        )
+        result = assessor.assess(build_game_record(n_plies=4))
+        for ann in result.moves:
+            assert ann.quality == "clean"
+            assert ann.abstained_reason == "already_losing"
