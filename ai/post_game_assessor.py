@@ -382,6 +382,9 @@ class PostGameAssessor:
                     policy_top_move = _move_notation(candidates[top_idx])
                     policy_top_prob = float(probs[top_idx])
                     policy_prob_source = "learned"
+                    # Flag moves humans rarely choose: played prob < 5% of top
+                    if policy_top_prob > 0 and policy_prob / policy_top_prob < 0.05:
+                        is_unconventional = True
 
             # ── Policy quality divergence (Stage 5b) ─────────────────────────
             policy_pref_delta: Optional[float] = None

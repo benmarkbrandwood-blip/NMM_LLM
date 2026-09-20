@@ -2633,7 +2633,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         malom_db=_malom_puzzle_db,
         trajectory_db=_trajectory_db,
         policy_advisor=_human_move_policy_advisor,
-        pref_advisor=None,  # HumanPrefAdvisor has different probs() signature; skip for now
+        pref_advisor=_human_pref_net,
         generalist=_generalist_advisor,
         r_h_threshold=_R_H_POOR_THRESHOLD,
         r_s_threshold=_R_S_POOR_THRESHOLD,
@@ -2664,28 +2664,37 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     # Confirmed-poor moves summary
     poor_moves = [
         {
-            "ply":       m.ply + 1,
-            "color":     m.color,
-            "move":      m.move_played,
-            "quality":   m.quality,
-            "wdl_before": m.wdl_before,
-            "wdl_after":  m.wdl_after,
-            "r_h":        round(m.r_h, 3),
+            "ply":              m.ply + 1,
+            "color":            m.color,
+            "move":             m.move_played,
+            "quality":          m.quality,
+            "wdl_before":       m.wdl_before,
+            "wdl_after":        m.wdl_after,
+            "r_h":              round(m.r_h, 3),
+            "blunder_zone":     round(m.blunder_zone_score, 3) if m.blunder_zone_score is not None else None,
+            "is_unconventional": m.is_unconventional,
+            "pref_delta":       round(m.policy_pref_delta, 3) if m.policy_pref_delta is not None else None,
         }
         for m in annotation.moves
         if m.quality == "confirmed_poor"
     ]
 
     # Active signal list
-    has_sentinel = any(m.sentinel_played is not None for m in annotation.moves)
-    has_malom    = any(m.oracle_source != "none" for m in annotation.moves)
-    has_traj     = any(m.traj_delta_played is not None for m in annotation.moves)
-    has_policy   = any(m.policy_prob is not None for m in annotation.moves)
+    has_sentinel  = any(m.sentinel_played is not None for m in annotation.moves)
+    has_malom     = any(m.oracle_source != "none" for m in annotation.moves)
+    has_traj      = any(m.traj_delta_played is not None for m in annotation.moves)
+    has_policy    = any(m.policy_prob is not None for m in annotation.moves)
+    has_gapnet    = any(m.blunder_zone_score is not None for m in annotation.moves)
+    has_pref      = any(m.policy_pref_delta is not None for m in annotation.moves)
+    has_generalist = any(m.generalist_policy_prob is not None for m in annotation.moves)
     signals = ["heuristic"]
-    if has_sentinel: signals.append("sentinel")
-    if has_malom:    signals.append("malom")
-    if has_traj:     signals.append("trajectory")
-    if has_policy:   signals.append("policy")
+    if has_sentinel:   signals.append("sentinel")
+    if has_malom:      signals.append("malom")
+    if has_traj:       signals.append("trajectory")
+    if has_policy:     signals.append("policy")
+    if has_gapnet:     signals.append("gapnet")
+    if has_pref:       signals.append("pref")
+    if has_generalist: signals.append("generalist")
 
     # Text summary for MillsAI chat panel
     lines: list[str] = []
@@ -2722,6 +2731,36 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                 if pm["wdl_before"] else f" r_h={pm['r_h']:.2f}"
             )
             lines.append(f"  Ply {pm['ply']} {pm['color']} {pm['move']}{wdl}")
+
+    # ── GapNet blunder-zone highlights ───────────────────────────────────────
+    if has_gapnet:
+        _blunder_high = [
+            m for m in annotation.moves
+            if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.72
+        ]
+        if _blunder_high:
+            lines.append(f"\nHigh-risk positions ({len(_blunder_high)}):")
+            for _bm in _blunder_high[:4]:
+                _bn = "White" if _bm.color == "W" else "Black"
+                _bply = (_bm.ply + 2) // 2
+                lines.append(
+                    f"  Ply {_bm.ply + 1} ({_bn}, move {_bply}) {_bm.move_played}"
+                    f" — blunder zone {_bm.blunder_zone_score:.2f}"
+                )
+
+    # ── Unconventional / pref-divergent moves ────────────────────────────────
+    _unconv = [m for m in annotation.moves if m.is_unconventional]
+    if _unconv:
+        lines.append(f"\nUnconventional moves ({len(_unconv)}):")
+        for _um in _unconv[:4]:
+            _un = "White" if _um.color == "W" else "Black"
+            _umnum = (_um.ply + 2) // 2
+            _uline = f"  Ply {_um.ply + 1} ({_un}, move {_umnum}) {_um.move_played}"
+            if _um.policy_top_move and _um.policy_top_move != _um.move_played:
+                _uline += f" — common choice: {_um.policy_top_move}"
+            if _um.policy_pref_delta is not None and _um.policy_pref_delta < -0.1:
+                _uline += f"  pref_Δ={_um.policy_pref_delta:+.2f}"
+            lines.append(_uline)
 
     # ── Mobility analysis ─────────────────────────────────────────────────────
     # Collect per-player legal-move counts in the move/fly phase only

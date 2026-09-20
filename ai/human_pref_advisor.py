@@ -92,8 +92,11 @@ class HumanPrefAdvisor:
         feats = self._successor_features(board, legal_moves)
         return [float(s) for s in self._score_batch(feats)]
 
-    def probs(self, board: BoardState, legal_moves: list[dict]) -> np.ndarray:
-        """Softmax over rank() outputs — for sampling in human-play mode."""
+    def probs(self, board: BoardState, legal_moves: list[dict], elo_band: str = "all") -> np.ndarray:
+        """Softmax over rank() outputs — for sampling in human-play mode.
+
+        elo_band is accepted for API compatibility with HumanMovePolicyAdvisor but ignored.
+        """
         if not legal_moves:
             return np.zeros(0, dtype=np.float32)
         feats  = self._successor_features(board, legal_moves)
