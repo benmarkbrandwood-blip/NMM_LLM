@@ -2722,6 +2722,53 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                 if pm["wdl_before"] else f" r_h={pm['r_h']:.2f}"
             )
             lines.append(f"  Ply {pm['ply']} {pm['color']} {pm['move']}{wdl}")
+
+    # ── Mobility analysis ─────────────────────────────────────────────────────
+    # Collect per-player legal-move counts in the move/fly phase only
+    # (placement counts are uniformly high and not informative).
+    _mob: dict[str, list[tuple[int, int]]] = {"W": [], "B": []}
+    for ma in annotation.moves:
+        if ma.phase in ("move", "fly") and ma.legal_move_count > 0:
+            _mob[ma.color].append((ma.ply + 1, ma.legal_move_count))
+
+    _mob_notes: list[str] = []
+    for side in ("W", "B"):
+        pts = _mob[side]
+        if len(pts) < 2:
+            continue
+        plies, counts = zip(*pts)
+        min_count = min(counts)
+        min_ply   = plies[counts.index(min_count)]
+        side_name = "White" if side == "W" else "Black"
+        move_num  = (min_ply + 1) // 2
+
+        if min_count <= 2:
+            _mob_notes.append(
+                f"{side_name} was nearly blocked (only {min_count} legal move"
+                f"{'s' if min_count != 1 else ''}) at move {move_num} (ply {min_ply})"
+            )
+        elif min_count <= 4:
+            _mob_notes.append(
+                f"{side_name} was severely constrained ({min_count} legal moves)"
+                f" at move {move_num} (ply {min_ply})"
+            )
+        elif len(counts) >= 6:
+            # Check for sustained decline: compare first-third to last-third average
+            third = max(1, len(counts) // 3)
+            avg_early = sum(counts[:third]) / third
+            avg_late  = sum(counts[-third:]) / third
+            if avg_late < avg_early * 0.55:
+                _mob_notes.append(
+                    f"{side_name}'s mobility declined from ~{avg_early:.0f} to"
+                    f" ~{avg_late:.0f} legal moves (min {min_count} at ply {min_ply})"
+                )
+
+    if _mob_notes:
+        signals.append("mobility")
+        lines.append(f"\nMobility:")
+        for note in _mob_notes:
+            lines.append(f"  {note}")
+
     lines.append(f"\nSignals: {', '.join(signals)}")
     summary_text = "\n".join(lines)
 

@@ -116,6 +116,9 @@ class MoveAnnotation:
     r_h_deep: Optional[float] = None    # r_h at deep_depth search; replaces r_h for turning-point selection
     deep_scored: bool = False           # True when this ply was re-scored at deep_depth
 
+    # Mobility signal
+    legal_move_count: int = 0           # legal moves available to mover BEFORE this move
+
 
 @dataclass
 class PostGameAnnotation:
@@ -239,6 +242,7 @@ class PostGameAssessor:
             phase = get_game_phase(board, color)
             notation = move_record.get("notation") or _move_notation(played_move)
 
+            legal_move_count = len(get_all_legal_moves(board))
             scored = self._ai.assess_position(board)
 
             board_after = board.apply_move(played_move)
@@ -467,6 +471,7 @@ class PostGameAssessor:
                 horizon_delta=horizon_delta,
                 horizon_shallow_score=horizon_shallow_score,
                 horizon_deep_score=horizon_deep_score,
+                legal_move_count=legal_move_count,
             ))
             board = board_after
 
