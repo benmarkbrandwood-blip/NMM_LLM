@@ -2617,6 +2617,7 @@ def _cancel_prior_assessment(session: Optional[Session]) -> None:
 
 async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) -> None:
     """Run PostGameAssessor in a background thread and push results over *ws*."""
+    global _module_mills_llm
     from ai.post_game_assessor import (
         PostGameAssessor,
         _R_H_POOR_THRESHOLD,
@@ -2745,7 +2746,6 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     )
     if llm is None:
         try:
-            global _module_mills_llm
             _s = _load_settings()
             _url   = _s.get("ollama_url",   "http://localhost:11434")
             _model = _s.get("ollama_model", "llama3.1:8b")
@@ -3138,7 +3138,8 @@ def _expected_think_seconds(difficulty: int, total_pieces: int) -> float:
         4: 1, 5: 3, 6: 8, 7: 15, 8: 30, 9: 45, 10: 60,
         11: 60, 12: 60, 13: 60, 14: 60, 15: 60, 16: 60,
     }
-    uncapped = float(_DEPTH_TIMES.get(depth, 60))
+    # Fallback matches game.js _timeForDepth: round(2 * 3^max(0, d-4)) gives 2s for d≤3
+    uncapped = float(_DEPTH_TIMES.get(depth, round(2 * (3 ** max(0, depth - 4)))))
     # Apply the same GUI time caps used in game_ai.py._choose_rust_scored.
     if total_pieces <= 1:
         cap = 3.0
@@ -3544,7 +3545,7 @@ def _is_ai_turn(session: Session) -> bool:
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket):
-    global _opening_tree_cache
+    global _opening_tree_cache, _module_mills_llm
     await websocket.accept()
     # Offer autosave restore before the first new_game message arrives.
     if _AUTOSAVE_PATH.exists():
@@ -3854,7 +3855,7 @@ async def ws_endpoint(websocket: WebSocket):
                         model = settings.get("ollama_model", "llama3.1:8b")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
                         llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
-                        global _module_mills_llm; _module_mills_llm = llm
+                        _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
                         egr   = EndgameRecognizer(
@@ -4017,7 +4018,7 @@ async def ws_endpoint(websocket: WebSocket):
                         model = settings.get("ollama_model", "llama3.1:8b")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
                         llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
-                        global _module_mills_llm; _module_mills_llm = llm
+                        _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
                         egr   = EndgameRecognizer(
@@ -4558,7 +4559,7 @@ async def ws_endpoint(websocket: WebSocket):
                     model = _s.get("ollama_model", "llama3.1:8b")
                     mem   = MemoryManager(ollama_url=url, ollama_model=model)
                     llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
-                    global _module_mills_llm; _module_mills_llm = llm
+                    _module_mills_llm = llm
                     book  = OpeningBook()
                     rec   = OpeningRecognizer(book)
                     egr   = EndgameRecognizer(

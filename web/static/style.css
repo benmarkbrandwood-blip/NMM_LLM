@@ -226,7 +226,7 @@ main {
 
 /* Human chat panel (top) gets most of the space; AI Discussion is now a compact strip */
 #commentary-human-panel { flex: 1; }
-#commentary-ai-panel    { flex: 0 0 auto; max-height: 135px; overflow: hidden; }
+#commentary-ai-panel    { flex: 0 0 auto; max-height: 270px; overflow: hidden; }
 
 #commentary-human,
 #commentary-ai {

@@ -431,14 +431,21 @@ class Coordinator:
         # 5. Expose score hint to MillsLLM for its prompt
         self.mills_llm._last_ai_score = ai_score
 
-        # 5. Ask MillsLLM for a recommendation (with opening + endgame context)
+        # 5. Ask MillsLLM for a recommendation (with opening + endgame context).
+        # At easy difficulty (≤4) the LLM call (~15–18 s) dominates a fast search,
+        # so skip the opinion here and play the search move immediately.
+        # LLM commentary still fires via react_to_human_move on the human's turns.
         _notations_so_far = [m.get("notation", "") for m in self._game_moves if m.get("notation")]
-        opinion, llm_notation = self.mills_llm.ask_for_move_opinion(
-            board, legal, ai_move, recognition=recognition, endgame_state=endgame_state,
-            audience="human" if self.vs_human else "ai",
-            move_history=_notations_so_far,
-            trajectory_context=trajectory_context,
-        )
+        _use_llm_opinion = self.game_ai.difficulty > 4
+        if _use_llm_opinion:
+            opinion, llm_notation = self.mills_llm.ask_for_move_opinion(
+                board, legal, ai_move, recognition=recognition, endgame_state=endgame_state,
+                audience="human" if self.vs_human else "ai",
+                move_history=_notations_so_far,
+                trajectory_context=trajectory_context,
+            )
+        else:
+            opinion, llm_notation = None, None
 
         # 6. Try to adopt the LLM's recommendation if it scores well enough
         move = ai_move
@@ -504,7 +511,7 @@ class Coordinator:
             except Exception:
                 pass
 
-        if self.game_ai.last_was_blunder:
+        if self.game_ai.last_was_blunder and _use_llm_opinion:
             blunder_msg = self.mills_llm.announce_blunder(board, move, move_history=_notations_so_far)
             self.emit("MillsAI", blunder_msg if blunder_msg else
                       "I just made a mistake there — can you spot what I should have done instead?")
