@@ -2738,13 +2738,23 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     except asyncio.CancelledError:
         return
 
-    # LLM synthesis — prefer coordinator's LLM, fall back to module-level (e.g. HvH)
+    # LLM synthesis — coordinator's LLM → module-level cache → create on-demand for HvH
     llm = (
         getattr(getattr(session, "coordinator", None), "mills_llm", None)
         or _module_mills_llm
     )
     if llm is None:
-        return
+        try:
+            global _module_mills_llm
+            _s = _load_settings()
+            _url   = _s.get("ollama_url",   "http://localhost:11434")
+            _model = _s.get("ollama_model", "llama3.1:8b")
+            _mem   = MemoryManager(ollama_url=_url, ollama_model=_model)
+            llm    = MillsLLM(memory=_mem, ollama_url=_url, model=_model)
+            _module_mills_llm = llm  # cache for subsequent assessments
+        except Exception as exc:
+            log.debug("Could not create LLM for assessment synthesis: %s", exc)
+            return
     try:
         class _R:
             pass
