@@ -922,15 +922,11 @@ async def save_weights(request: Request):
     return JSONResponse({"ok": True})
 
 
-_SEARCH_DEPTH_DEFAULTS = {"min": 5, "max": 16}
+_SEARCH_DEPTH_DEFAULTS = {"min": 1, "max": 16}
 
 def _compute_search_depth_for_level(level: int, min_depth: int, max_depth: int) -> int:
-    """Linearly interpolate max_search_depth for difficulty levels 1–8."""
-    if level <= 1:
-        return min_depth
-    if level >= 8:
-        return max_depth
-    return round(min_depth + (level - 1) / 7 * (max_depth - min_depth))
+    """Map difficulty level directly to search depth (ply search = difficulty)."""
+    return max(min_depth, min(level, max_depth))
 
 def _time_budget_for_depth(d: int) -> float:
     """Exponential formula: depth 14 ≈ 77 s, capped at 120 s."""

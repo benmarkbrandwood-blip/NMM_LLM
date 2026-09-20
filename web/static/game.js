@@ -66,6 +66,8 @@ let _aiThinking     = false;        // true while AI is computing — block diag
 // ── Post-game assessment state ────────────────────────────────────────────────
 let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assessment_result
 let _assessmentReady = false;       // true once assessment_result received
+let _assessmentStartTime = null;    // Date.now() when assessment started
+let _assessmentTimerInterval = null; // setInterval handle for elapsed counter
 
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
 
@@ -909,19 +911,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     _switchLeftTab("chat");
     const feed = $("commentary-human");
     if (feed) {
-      if (!_assessmentReady) {
-        // Still running — show placeholder if chat is empty of analysis content
-        if (!feed.querySelector(".assessment-running-msg")) {
-          const div = document.createElement("div");
-          div.className = "commentary-line assessment-running-msg";
-          div.textContent = "Analysis running…";
-          div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
-          feed.prepend(div);
-          setTimeout(() => div.remove(), 8000);
-        }
-      } else {
+      if (_assessmentReady) {
         feed.scrollTop = 0;
       }
+      // Timer message is already prepended at game end via _startAssessmentTimer()
     }
   });
 
@@ -1109,7 +1102,7 @@ function startNewGame() {
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false;
+  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1196,7 +1189,7 @@ function startAiVsAi() {
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   isAiVsAi = true;
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false;
+  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
   hintsLeft = 0;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1412,7 +1405,7 @@ function startSetupGame() {
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false;
+  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1782,6 +1775,7 @@ function handleMessage(msg) {
       updateHintButton(false);
       updateDrawButton();
       $("btn-game-assessment").classList.add("assessment-ready");
+      _startAssessmentTimer();
 
       // Adaptive difficulty feedback
       if (msg.adaptive) {
@@ -1958,6 +1952,7 @@ function handleMessage(msg) {
     case "assessment_result": {
       _assessmentTurningPoints = msg.turning_points || [];
       _assessmentReady = true;
+      _stopAssessmentTimer();
       // Redraw eval graph to show turning-point markers
       drawEvalGraph();
       // Update button state — stop pulse, show done
@@ -2846,7 +2841,43 @@ function addCommentary(speaker, text, section) {
   feed.insertBefore(div, feed.firstChild);
 }
 
+function _startAssessmentTimer() {
+  if (_assessmentTimerInterval) return;
+  _assessmentStartTime = Date.now();
+  const feed = $("commentary-human");
+  if (!feed) return;
+  const old = feed.querySelector(".assessment-running-msg");
+  if (old) old.remove();
+  const div = document.createElement("div");
+  div.className = "commentary-line assessment-running-msg";
+  div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
+  div.textContent = "Analysis running… 0s";
+  feed.prepend(div);
+  _assessmentTimerInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - _assessmentStartTime) / 1000);
+    const msg = feed.querySelector(".assessment-running-msg");
+    if (!msg) { clearInterval(_assessmentTimerInterval); _assessmentTimerInterval = null; return; }
+    const mins = Math.floor(elapsed / 60);
+    msg.textContent = mins > 0
+      ? `Analysis running… ${mins}m ${elapsed % 60}s`
+      : `Analysis running… ${elapsed}s`;
+  }, 1000);
+}
+
+function _stopAssessmentTimer() {
+  if (_assessmentTimerInterval) {
+    clearInterval(_assessmentTimerInterval);
+    _assessmentTimerInterval = null;
+  }
+  const feed = $("commentary-human");
+  if (feed) {
+    const msg = feed.querySelector(".assessment-running-msg");
+    if (msg) msg.remove();
+  }
+}
+
 function clearCommentary() {
+  _stopAssessmentTimer();
   const h = $("commentary-human");
   const a = $("commentary-ai");
   if (h) h.innerHTML = "";
