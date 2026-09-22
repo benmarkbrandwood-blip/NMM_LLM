@@ -39,6 +39,18 @@ log.info("=== Server started ===")
 import sys
 sys.path.insert(0, str(_ROOT))
 
+# Limit PyTorch intra-op + inter-op threads before ANY model is loaded.
+# Default is num_cpus (14 here); each loaded model keeps its own pool alive,
+# so 6+ models × 14 threads = 80+ spin-waiting threads that starve the
+# assessment negamax and game-AI search threads.
+try:
+    import torch as _torch_init
+    _torch_init.set_num_threads(2)
+    _torch_init.set_num_interop_threads(2)
+    del _torch_init
+except ImportError:
+    pass
+
 from game.board import BoardState
 from game.game_engine import GameEngine
 from game.rules import get_all_legal_moves, get_game_phase
@@ -2496,12 +2508,11 @@ def _state(session: Session) -> dict:
     legal_sources = list({m["from"] for m in legal if m.get("from")})
     move_pairs    = [[m["from"], m["to"]] for m in legal if m.get("from")]
 
-    eval_score = 0.0
-    if session.game_ai:
-        try:
-            eval_score = session.game_ai.position_eval(board)
-        except Exception:
-            pass
+    try:
+        from ai.heuristics import evaluate as _heval_state
+        eval_score = _heval_state(board, "W", strength_mode=True)
+    except Exception:
+        eval_score = 0.0
 
     # Early starting-play family detection during placement phase
     early_families: dict = {}
@@ -2552,6 +2563,7 @@ def _state(session: Session) -> dict:
                 "color":    m["color"],
                 "notation": m["notation"],
                 "fen":      m.get("board_fen_before", ""),
+                "to":       m.get("to", ""),
             }
             for m in engine.game_record.get("moves", [])
         ],
@@ -2615,8 +2627,63 @@ def _cancel_prior_assessment(session: Optional[Session]) -> None:
         session._assessment_task = None
 
 
+def _build_stage1_summary(annotation: "PostGameAnnotation", winner: str) -> str:
+    """Stage 1 summary text: opening + heuristic turning points + unconventional moves."""
+    moves = annotation.moves
+    ply_base = annotation.ply_base
+    lines: list[str] = []
+    if annotation.opening_name:
+        lines.append(f"Opening: {annotation.opening_name}")
+
+    tp_list = annotation.turning_points or (
+        [(annotation.turning_point_ply, annotation.turning_point_quality,
+          annotation.turning_point_oracle)]
+        if annotation.turning_point_ply is not None else []
+    )
+    if tp_list:
+        tp_ply, tp_quality, tp_oracle = tp_list[0]
+        if tp_ply is not None and tp_ply < len(moves):
+            m = moves[tp_ply]
+            c_name   = "White" if m.color == "W" else "Black"
+            move_num = (tp_ply + ply_base + 1) // 2
+            label = "Turning point" if "malom" in tp_oracle else "Probable turning point"
+            lines.append(f"{label} — {c_name}, move {move_num} (ply {tp_ply + ply_base}): {m.move_played}")
+            if m.best_alt and m.best_alt != m.move_played:
+                lines.append(f"  Better: {m.best_alt}")
+            lines.append(f"  Signal: {tp_quality}  ({tp_oracle})")
+
+    unconv = [m for m in moves if m.is_unconventional]
+    if unconv:
+        lines.append(f"\nUnconventional moves: {len(unconv)}")
+    return "\n".join(lines)
+
+
+def _build_stage2_summary(annotation: "PostGameAnnotation") -> str:
+    """Stage 2 summary: generalist AI divergence section."""
+    moves = annotation.moves
+    ply_base = annotation.ply_base
+    lines: list[str] = []
+    gen_divs = [
+        m for m in moves
+        if m.generalist_top_move is not None
+        and not m.generalist_self_assessed
+        and m.generalist_top_move != m.move_played
+    ]
+    if gen_divs:
+        gen_divs.sort(key=lambda m: m.r_h, reverse=True)
+        lines.append(f"AI divergence ({len(gen_divs)} moves):")
+        for gm in gen_divs[:4]:
+            gn    = "White" if gm.color == "W" else "Black"
+            gmnum = (gm.ply + ply_base + 1) // 2
+            lines.append(
+                f"  Ply {gm.ply + ply_base} ({gn}, move {gmnum}) {gm.move_played}"
+                f" — AI preferred {gm.generalist_top_move}"
+            )
+    return "\n".join(lines)
+
+
 async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) -> None:
-    """Run PostGameAssessor in a background thread and push results over *ws*."""
+    """Three-pass streaming assessment: emits assessment_stage_1/2 and assessment_result."""
     global _module_mills_llm
     from ai.post_game_assessor import (
         PostGameAssessor,
@@ -2626,8 +2693,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     )
     assessor = PostGameAssessor(
         difficulty=3,
-        depth=4,
-        shallow_depth=2,
+        depth=3,
         sentinel=_sentinel_advisor,
         gap_net=_gap_net,
         malom_db=_malom_puzzle_db,
@@ -2639,54 +2705,158 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         r_s_threshold=_R_S_POOR_THRESHOLD,
         r_h_solo_threshold=_R_H_SOLO_THRESHOLD,
     )
-    try:
-        annotation = await asyncio.to_thread(assessor.assess, record)
-    except asyncio.CancelledError:
-        return
-    except Exception as exc:
-        log.warning("Post-game assessment failed: %s", exc)
-        return
 
     winner = record.get("winner", "?")
 
-    # Turning points for graph markers
-    tp_list = annotation.turning_points or (
-        [(annotation.turning_point_ply, annotation.turning_point_quality,
-          annotation.turning_point_oracle)]
-        if annotation.turning_point_ply is not None else []
+    # ── LLM init (non-fatal; assessment proceeds without it) ─────────────────
+    llm = (
+        getattr(getattr(session, "coordinator", None), "mills_llm", None)
+        or _module_mills_llm
+    )
+    if llm is None:
+        try:
+            _s     = _load_settings()
+            _url   = _s.get("ollama_url",   "http://localhost:11434")
+            _model = _s.get("ollama_model", "llama3.1:8b")
+            _mem   = MemoryManager(ollama_url=_url, ollama_model=_model)
+            llm    = MillsLLM(memory=_mem, ollama_url=_url, model=_model)
+            _module_mills_llm = llm
+        except Exception as exc:
+            log.debug("Could not create LLM for assessment: %s", exc)
+
+    # ── Prepare context (board replay, no AI calls) ───────────────────────────
+    try:
+        ctx = await asyncio.to_thread(assessor._prepare, record)
+    except Exception as exc:
+        log.warning("Post-game assessment failed (prepare): %s", exc)
+        await _send(ws, {"type": "assessment_timeout", "reason": "error"})
+        return
+
+    if not ctx.moves_raw:
+        await _send(ws, {"type": "assessment_timeout", "reason": "error"})
+        return
+
+    # ── Stage 1: heuristic + sentinel + policy + pref + horizon ──────────────
+    try:
+        await _send(ws, {"type": "assessment_progress", "stage": 1,
+                         "label": "Analysing (turning points)"})
+        annotations = await asyncio.to_thread(assessor._pass_heuristic, ctx)
+    except asyncio.CancelledError:
+        await _send(ws, {"type": "assessment_timeout", "reason": "cancelled"})
+        return
+    except Exception as exc:
+        log.warning("Post-game assessment failed (pass 1): %s", exc)
+        await _send(ws, {"type": "assessment_timeout", "reason": "error"})
+        return
+
+    stage1 = assessor.partial_annotation(ctx, annotations)
+    tp_list_s1 = stage1.turning_points or (
+        [(stage1.turning_point_ply, stage1.turning_point_quality,
+          stage1.turning_point_oracle)]
+        if stage1.turning_point_ply is not None else []
+    )
+    try:
+        await _send(ws, {
+            "type":           "assessment_stage_1",
+            "turning_points": [
+                {"ply": int(p), "quality": q, "oracle": o}
+                for p, q, o in tp_list_s1 if p is not None
+            ],
+            "opening_name":   stage1.opening_name,
+            "total_plies":    len(annotations),
+            "ply_base":       ctx.ply_base,
+            "summary_text":   _build_stage1_summary(stage1, winner),
+        })
+    except asyncio.CancelledError:
+        return
+
+    # ── Stage 2: generalist AI (concurrent with Stage 1 LLM) ─────────────────
+    await _send(ws, {"type": "assessment_progress", "stage": 2,
+                     "label": "Analysing (AI divergence)"})
+
+    async def _stage1_llm_task():
+        if llm is None:
+            return None
+        try:
+            class _R1: pass
+            _r1 = _R1()
+            _r1.winner       = winner  # type: ignore[attr-defined]
+            _r1.loser        = "B" if winner == "W" else ("W" if winner == "B" else "?")  # type: ignore[attr-defined]
+            _r1.opening_name = stage1.opening_name  # type: ignore[attr-defined]
+            return await asyncio.to_thread(llm.debrief_game, _r1, stage1)
+        except Exception as exc:
+            log.debug("Stage 1 LLM failed: %s", exc)
+            return None
+
+    async def _pass2_task():
+        try:
+            await asyncio.to_thread(assessor._pass_generalist, ctx, annotations)
+        except Exception as exc:
+            log.debug("Pass 2 (generalist) failed: %s", exc)
+
+    stage1_prose, _ = await asyncio.gather(_stage1_llm_task(), _pass2_task())
+
+    if stage1_prose:
+        try:
+            await _send(ws, {"type": "assessment_llm", "text": stage1_prose, "stage": 1})
+        except asyncio.CancelledError:
+            return
+
+    stage2_text = _build_stage2_summary(assessor.partial_annotation(ctx, annotations))
+    if stage2_text:
+        try:
+            await _send(ws, {"type": "assessment_stage_2", "summary_text": stage2_text})
+        except asyncio.CancelledError:
+            return
+
+    # ── Stage 3: Malom oracle ─────────────────────────────────────────────────
+    try:
+        await _send(ws, {"type": "assessment_progress", "stage": 3,
+                         "label": "Analysing (Malom regret)"})
+        await asyncio.to_thread(assessor._pass_oracle, ctx, annotations)
+    except asyncio.CancelledError:
+        await _send(ws, {"type": "assessment_timeout", "reason": "cancelled"})
+        return
+    except Exception as exc:
+        log.warning("Post-game assessment pass 3 failed: %s", exc)
+
+    final = assessor._finalize(ctx, annotations)
+
+    # Build full assessment_result payload (same shape as before streaming)
+    tp_list_final = final.turning_points or (
+        [(final.turning_point_ply, final.turning_point_quality,
+          final.turning_point_oracle)]
+        if final.turning_point_ply is not None else []
     )
     tp_json = [
         {"ply": int(ply), "quality": quality, "oracle": oracle}
-        for ply, quality, oracle in tp_list
+        for ply, quality, oracle in tp_list_final
         if ply is not None
     ]
-
-    # Confirmed-poor moves summary
     poor_moves = [
         {
-            "ply":              m.ply + 1,
+            "ply":              m.ply + final.ply_base,
             "color":            m.color,
             "move":             m.move_played,
             "quality":          m.quality,
             "wdl_before":       m.wdl_before,
             "wdl_after":        m.wdl_after,
+            "malom_best_alt":   m.malom_best_alt,
             "r_h":              round(m.r_h, 3),
             "blunder_zone":     round(m.blunder_zone_score, 3) if m.blunder_zone_score is not None else None,
             "is_unconventional": m.is_unconventional,
             "pref_delta":       round(m.policy_pref_delta, 3) if m.policy_pref_delta is not None else None,
         }
-        for m in annotation.moves
+        for m in final.moves
         if m.quality == "confirmed_poor"
     ]
-
-    # Active signal list
-    has_sentinel  = any(m.sentinel_played is not None for m in annotation.moves)
-    has_malom     = any(m.oracle_source != "none" for m in annotation.moves)
-    has_traj      = any(m.traj_delta_played is not None for m in annotation.moves)
-    has_policy    = any(m.policy_prob is not None for m in annotation.moves)
-    has_gapnet    = any(m.blunder_zone_score is not None for m in annotation.moves)
-    has_pref      = any(m.policy_pref_delta is not None for m in annotation.moves)
-    has_generalist = any(m.generalist_policy_prob is not None for m in annotation.moves)
+    has_sentinel   = any(m.sentinel_played is not None for m in final.moves)
+    has_malom      = any(m.oracle_source != "none" for m in final.moves)
+    has_traj       = any(m.traj_delta_played is not None for m in final.moves)
+    has_policy     = any(m.policy_prob is not None for m in final.moves)
+    has_gapnet     = any(m.blunder_zone_score is not None for m in final.moves)
+    has_pref       = any(m.policy_pref_delta is not None for m in final.moves)
+    has_generalist = any(m.generalist_policy_prob is not None for m in final.moves)
     signals = ["heuristic"]
     if has_sentinel:   signals.append("sentinel")
     if has_malom:      signals.append("malom")
@@ -2696,31 +2866,30 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     if has_pref:       signals.append("pref")
     if has_generalist: signals.append("generalist")
 
-    # Text summary for MillsAI chat panel
     lines: list[str] = []
-    if annotation.opening_name:
-        lines.append(f"Opening: {annotation.opening_name}")
+    if final.opening_name:
+        lines.append(f"Opening: {final.opening_name}")
     if tp_json:
         tp0 = tp_json[0]
         p0  = tp0["ply"]
-        m0  = annotation.moves[p0] if p0 < len(annotation.moves) else None
+        m0  = final.moves[p0] if p0 < len(final.moves) else None
         if m0:
             c0_name  = "White" if m0.color == "W" else "Black"
-            move_num = (p0 + 2) // 2
+            move_num = (p0 + final.ply_base + 1) // 2
             lines.append(
-                f"Turning point — {c0_name}, move {move_num} (ply {p0 + 1}): {m0.move_played}"
+                f"Turning point — {c0_name}, move {move_num} (ply {p0 + final.ply_base}): {m0.move_played}"
             )
             lines.append(f"  Quality: {tp0['quality']}  Oracle: {tp0['oracle']}")
             if m0.best_alt:
                 lines.append(f"  Better: {m0.best_alt}")
         for rank, extra in enumerate(tp_json[1:], 2):
-            ep  = extra["ply"]
-            em  = annotation.moves[ep] if ep < len(annotation.moves) else None
+            ep = extra["ply"]
+            em = final.moves[ep] if ep < len(final.moves) else None
             if em:
-                ep_name  = "White" if em.color == "W" else "Black"
-                ep_mnum  = (ep + 2) // 2
+                ep_name = "White" if em.color == "W" else "Black"
+                ep_mnum = (ep + final.ply_base + 1) // 2
                 lines.append(
-                    f"TP #{rank} — {ep_name}, move {ep_mnum} (ply {ep + 1}): {em.move_played} "
+                    f"TP #{rank} — {ep_name}, move {ep_mnum} (ply {ep + final.ply_base}): {em.move_played} "
                     f"({extra['quality']})"
                 )
     if poor_moves:
@@ -2730,46 +2899,91 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                 f" {pm['wdl_before']}→{pm['wdl_after']}"
                 if pm["wdl_before"] else f" r_h={pm['r_h']:.2f}"
             )
-            lines.append(f"  Ply {pm['ply']} {pm['color']} {pm['move']}{wdl}")
-
-    # ── GapNet blunder-zone highlights ───────────────────────────────────────
+            alt = f"  best: {pm['malom_best_alt']}" if pm.get("malom_best_alt") else ""
+            lines.append(f"  Ply {pm['ply']} {pm['color']} {pm['move']}{wdl}{alt}")
+    # Malom WDL transitions — all moves where the board outcome changed
+    _wdl_label = {
+        ("W", "L"): "win→loss", ("W", "D"): "win→draw", ("D", "L"): "draw→loss",
+        ("D", "W"): "draw→win", ("L", "D"): "loss→draw", ("L", "W"): "loss→win",
+    }
+    _wdl_moves = [
+        m for m in final.moves
+        if m.wdl_before is not None and m.wdl_after is not None
+        and m.wdl_before != m.wdl_after
+    ]
+    if _wdl_moves:
+        lines.append(f"\nMalom WDL shifts ({len(_wdl_moves)}):")
+        for _wm in _wdl_moves:
+            _wn    = "White" if _wm.color == "W" else "Black"
+            _wmnum = (_wm.ply + final.ply_base + 1) // 2
+            _wtag  = _wdl_label.get((_wm.wdl_before, _wm.wdl_after), f"{_wm.wdl_before}→{_wm.wdl_after}")
+            _walt  = f"  best: {_wm.malom_best_alt}" if _wm.malom_best_alt else ""
+            lines.append(
+                f"  Ply {_wm.ply + final.ply_base} ({_wn}, move {_wmnum}) {_wm.move_played}"
+                f" — {_wtag}{_walt}"
+            )
     if has_gapnet:
-        _blunder_high = [
-            m for m in annotation.moves
-            if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.72
-        ]
-        if _blunder_high:
-            lines.append(f"\nHigh-risk positions ({len(_blunder_high)}):")
-            for _bm in _blunder_high[:4]:
+        _gap_moves = sorted(
+            (m for m in final.moves if m.blunder_zone_score is not None),
+            key=lambda m: m.blunder_zone_score, reverse=True,
+        )[:3]
+        if _gap_moves:
+            lines.append(f"\nGapNet risk positions (top):")
+            for _bm in _gap_moves:
                 _bn = "White" if _bm.color == "W" else "Black"
-                _bply = (_bm.ply + 2) // 2
+                _bply = (_bm.ply + final.ply_base + 1) // 2
+                _risk_label = "HIGH" if _bm.blunder_zone_score >= 0.72 else f"{_bm.blunder_zone_score:.2f}"
                 lines.append(
-                    f"  Ply {_bm.ply + 1} ({_bn}, move {_bply}) {_bm.move_played}"
-                    f" — blunder zone {_bm.blunder_zone_score:.2f}"
+                    f"  Ply {_bm.ply + final.ply_base} ({_bn}, move {_bply}) {_bm.move_played}"
+                    f" — blunder-zone score {_risk_label}"
                 )
-
-    # ── Unconventional / pref-divergent moves ────────────────────────────────
-    _unconv = [m for m in annotation.moves if m.is_unconventional]
+    if has_generalist:
+        _gen_divs = [
+            m for m in final.moves
+            if m.generalist_top_move is not None
+            and not m.generalist_self_assessed
+            and m.generalist_top_move != m.move_played
+        ]
+        if _gen_divs:
+            _gen_divs.sort(key=lambda m: m.r_h, reverse=True)
+            lines.append(f"\nGeneralist divergence ({len(_gen_divs)} moves):")
+            for _gm in _gen_divs[:4]:
+                _gn    = "White" if _gm.color == "W" else "Black"
+                _gmnum = (_gm.ply + final.ply_base + 1) // 2
+                lines.append(
+                    f"  Ply {_gm.ply + final.ply_base} ({_gn}, move {_gmnum}) {_gm.move_played}"
+                    f" — AI preferred {_gm.generalist_top_move}"
+                )
+    if has_pref:
+        _pref_moves = [
+            m for m in final.moves
+            if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
+        ]
+        if _pref_moves:
+            _pref_moves.sort(key=lambda m: m.policy_pref_delta)
+            lines.append(f"\nPolicy divergence (pref vs teacher):")
+            for _pm in _pref_moves[:4]:
+                _pn    = "White" if _pm.color == "W" else "Black"
+                _pmnum = (_pm.ply + final.ply_base + 1) // 2
+                _direction = "weak choice" if _pm.policy_pref_delta < 0 else "strong choice"
+                lines.append(
+                    f"  Ply {_pm.ply + final.ply_base} ({_pn}, move {_pmnum}) {_pm.move_played}"
+                    f"  Δ={_pm.policy_pref_delta:+.2f} ({_direction})"
+                )
+    _unconv = [m for m in final.moves if m.is_unconventional]
     if _unconv:
         lines.append(f"\nUnconventional moves ({len(_unconv)}):")
         for _um in _unconv[:4]:
-            _un = "White" if _um.color == "W" else "Black"
-            _umnum = (_um.ply + 2) // 2
-            _uline = f"  Ply {_um.ply + 1} ({_un}, move {_umnum}) {_um.move_played}"
+            _un    = "White" if _um.color == "W" else "Black"
+            _umnum = (_um.ply + final.ply_base + 1) // 2
+            _uline = f"  Ply {_um.ply + final.ply_base} ({_un}, move {_umnum}) {_um.move_played}"
             if _um.policy_top_move and _um.policy_top_move != _um.move_played:
                 _uline += f" — common choice: {_um.policy_top_move}"
-            if _um.policy_pref_delta is not None and _um.policy_pref_delta < -0.1:
-                _uline += f"  pref_Δ={_um.policy_pref_delta:+.2f}"
             lines.append(_uline)
-
-    # ── Mobility analysis ─────────────────────────────────────────────────────
-    # Collect per-player legal-move counts in the move/fly phase only
-    # (placement counts are uniformly high and not informative).
     _mob: dict[str, list[tuple[int, int]]] = {"W": [], "B": []}
-    for ma in annotation.moves:
+    for ma in final.moves:
         if ma.phase in ("move", "fly") and ma.legal_move_count > 0:
-            _mob[ma.color].append((ma.ply + 1, ma.legal_move_count))
-
+            _mob[ma.color].append((ma.ply + final.ply_base, ma.legal_move_count))
     _mob_notes: list[str] = []
     for side in ("W", "B"):
         pts = _mob[side]
@@ -2780,7 +2994,6 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         min_ply   = plies[counts.index(min_count)]
         side_name = "White" if side == "W" else "Black"
         move_num  = (min_ply + 1) // 2
-
         if min_count <= 2:
             _mob_notes.append(
                 f"{side_name} was nearly blocked (only {min_count} legal move"
@@ -2792,8 +3005,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                 f" at move {move_num} (ply {min_ply})"
             )
         elif len(counts) >= 6:
-            # Check for sustained decline: compare first-third to last-third average
-            third = max(1, len(counts) // 3)
+            third     = max(1, len(counts) // 3)
             avg_early = sum(counts[:third]) / third
             avg_late  = sum(counts[-third:]) / third
             if avg_late < avg_early * 0.55:
@@ -2801,61 +3013,64 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                     f"{side_name}'s mobility declined from ~{avg_early:.0f} to"
                     f" ~{avg_late:.0f} legal moves (min {min_count} at ply {min_ply})"
                 )
-
     if _mob_notes:
         signals.append("mobility")
         lines.append(f"\nMobility:")
         for note in _mob_notes:
             lines.append(f"  {note}")
-
     lines.append(f"\nSignals: {', '.join(signals)}")
     summary_text = "\n".join(lines)
 
     try:
+        _wdl_json = [
+            {
+                "ply":       m.ply + final.ply_base,
+                "color":     m.color,
+                "move":      m.move_played,
+                "wdl_before": m.wdl_before,
+                "wdl_after":  m.wdl_after,
+                "best_alt":   m.malom_best_alt,
+            }
+            for m in final.moves
+            if m.wdl_before is not None and m.wdl_after is not None
+            and m.wdl_before != m.wdl_after
+        ]
         await _send(ws, {
             "type":           "assessment_result",
             "turning_points": tp_json,
             "poor_moves":     poor_moves,
-            "opening_name":   annotation.opening_name,
+            "malom_wdl_shifts": _wdl_json,
+            "opening_name":   final.opening_name,
             "signals":        signals,
             "summary_text":   summary_text,
-            "total_plies":    len(annotation.moves),
+            "total_plies":    len(final.moves),
+            "ply_quality":    [m.quality for m in final.moves],
+            "ply_base":       final.ply_base,
             "winner":         winner,
         })
     except asyncio.CancelledError:
         return
 
-    # LLM synthesis — coordinator's LLM → module-level cache → create on-demand for HvH
-    llm = (
-        getattr(getattr(session, "coordinator", None), "mills_llm", None)
-        or _module_mills_llm
-    )
+    # ── Stage 4: LLM full synthesis ───────────────────────────────────────────
     if llm is None:
-        try:
-            _s = _load_settings()
-            _url   = _s.get("ollama_url",   "http://localhost:11434")
-            _model = _s.get("ollama_model", "llama3.1:8b")
-            _mem   = MemoryManager(ollama_url=_url, ollama_model=_model)
-            llm    = MillsLLM(memory=_mem, ollama_url=_url, model=_model)
-            _module_mills_llm = llm  # cache for subsequent assessments
-        except Exception as exc:
-            log.debug("Could not create LLM for assessment synthesis: %s", exc)
-            return
+        await _send(ws, {"type": "assessment_progress", "stage": 0})
+        return
     try:
-        class _R:
-            pass
-        _r = _R()
-        _r.winner       = winner  # type: ignore[attr-defined]
-        _r.loser        = "B" if winner == "W" else ("W" if winner == "B" else "?")  # type: ignore[attr-defined]
-        _r.opening_name = annotation.opening_name  # type: ignore[attr-defined]
-
-        prose = await asyncio.to_thread(llm.debrief_game, _r, annotation)
+        await _send(ws, {"type": "assessment_progress", "stage": 4,
+                         "label": "Generating commentary"})
+        class _R4: pass
+        _r4 = _R4()
+        _r4.winner       = winner  # type: ignore[attr-defined]
+        _r4.loser        = "B" if winner == "W" else ("W" if winner == "B" else "?")  # type: ignore[attr-defined]
+        _r4.opening_name = final.opening_name  # type: ignore[attr-defined]
+        prose = await asyncio.to_thread(llm.debrief_game, _r4, final)
         if prose:
             await _send(ws, {"type": "assessment_llm", "text": prose})
     except asyncio.CancelledError:
         return
     except Exception as exc:
         log.debug("Assessment LLM synthesis failed: %s", exc)
+    await _send(ws, {"type": "assessment_progress", "stage": 0})
 
 
 async def _game_over(ws: WebSocket, session: Session) -> None:
@@ -3434,8 +3649,9 @@ async def _ai_turn(ws: WebSocket, session: Session, elo_band: str = "middle") ->
     })
 
     # Pre-compute static overlay so client sees scores before the AI move arrives.
-    # Essential at high difficulty where ponder hits complete synchronously.
-    await _pre_ai_static_diag(ws, board, session, elo_band)
+    # Run as background task so it doesn't block the search from starting (or
+    # delay force_move processing at low difficulty where search finishes fast).
+    asyncio.create_task(_pre_ai_static_diag(ws, board, session, elo_band))
 
     # B-75/B-94: stop any running ponder; check if we pre-computed this position.
     _ponder_hit: dict | None = None
@@ -3851,7 +4067,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
-                use_generalist_player = bool(msg.get("use_generalist_player", False))
+                use_generalist_player = bool(msg.get("use_generalist_player", False)) or diff >= 9
                 star_square_mode = str(msg.get("star_square_mode", ""))
                 settings  = _load_settings()
 
@@ -4013,7 +4229,7 @@ async def ws_endpoint(websocket: WebSocket):
                 use_perfect_db = bool(msg.get("use_perfect_db", False))
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
-                use_generalist_player = bool(msg.get("use_generalist_player", False))
+                use_generalist_player = bool(msg.get("use_generalist_player", False)) or diff >= 9
                 star_square_mode = str(msg.get("star_square_mode", ""))
                 setup_fen_str = msg.get("setup_fen", "")
                 if setup_fen_str:
@@ -4283,305 +4499,316 @@ async def ws_endpoint(websocket: WebSocket):
                 if ai_thinking and diag_mode == "negamax":
                     continue
 
-                # Determine board to analyse
-                if diag_mode == "capture" and session._proj_board is not None:
-                    diag_board = session._proj_board
-                elif fen_override:
-                    try:
-                        diag_board = BoardState.from_fen_string(fen_override)
-                    except Exception:
+                # Pre-extract from msg before spawning — msg is overwritten each iteration.
+                _diag_prefix = list(msg.get("prefix", [])) if fen_override else []
+
+                # Run the heavy computation as a background task so the WS loop can
+                # continue receiving messages (e.g. force_move) while scoring runs.
+                # Default-arg capture freezes the loop-local variables at spawn time.
+                async def _run_diag(
+                    _mode=diag_mode, _depth=diag_depth, _seq=diag_seq,
+                    _fen=fen_override, _band=diag_elo_band, _prefix=_diag_prefix,
+                ):
+                    # Determine board to analyse
+                    if _mode == "capture" and session._proj_board is not None:
+                        diag_board = session._proj_board
+                    elif _fen:
+                        try:
+                            diag_board = BoardState.from_fen_string(_fen)
+                        except Exception:
+                            diag_board = session.engine.board
+                    else:
                         diag_board = session.engine.board
-                else:
-                    diag_board = session.engine.board
 
-                color   = diag_board.turn
-                weights = session.game_ai._weights if session.game_ai else _DW
+                    color   = diag_board.turn
+                    weights = session.game_ai._weights if session.game_ai else _DW
 
-                eval_w = int(_heval(diag_board, "W"))
-                eval_b = int(_heval(diag_board, "B"))
+                    eval_w = int(_heval(diag_board, "W"))
+                    eval_b = int(_heval(diag_board, "B"))
 
-                if diag_mode == "capture":
-                    # Score each legal capture from the perspective of the player who just moved.
-                    # The just-moved player's color = opponent of diag_board.turn.
-                    mover = "B" if diag_board.turn == "W" else "W"
-                    caps = diag_board.legal_captures(mover)
-                    moves_out = []
-                    for cap_pos in caps:
-                        after_cap = diag_board.apply_move({"from": None, "to": None, "capture": cap_pos})
-                        moves_out.append({
-                            "from": None, "to": cap_pos, "capture": None,
-                            "score": int(_heval(after_cap, mover)),
-                        })
-                    moves_out.sort(key=lambda x: x["score"], reverse=True)
+                    if _mode == "capture":
+                        # Score each legal capture from the perspective of the player who just moved.
+                        # The just-moved player's color = opponent of diag_board.turn.
+                        mover = "B" if diag_board.turn == "W" else "W"
+                        caps = diag_board.legal_captures(mover)
+                        moves_out = []
+                        for cap_pos in caps:
+                            after_cap = diag_board.apply_move({"from": None, "to": None, "capture": cap_pos})
+                            moves_out.append({
+                                "from": None, "to": cap_pos, "capture": None,
+                                "score": int(_heval(after_cap, mover)),
+                            })
+                        moves_out.sort(key=lambda x: x["score"], reverse=True)
 
-                elif diag_mode == "negamax" and session.game_ai:
-                    game_notations = [
-                        m.get("notation", "")
-                        for m in session.engine.game_record.get("moves", [])
-                    ]
-                    if fen_override:
-                        prefix_json = msg.get("prefix", [])
-                        game_notations = list(prefix_json) if prefix_json else []
-                    moves_out = await asyncio.to_thread(
-                        session.game_ai.diagnostic_scores,
-                        diag_board, diag_depth, game_notations,
-                    )
+                    elif _mode == "negamax" and session.game_ai:
+                        game_notations = [
+                            m.get("notation", "")
+                            for m in session.engine.game_record.get("moves", [])
+                        ]
+                        if _fen:
+                            game_notations = list(_prefix) if _prefix else []
+                        moves_out = await asyncio.to_thread(
+                            session.game_ai.diagnostic_scores,
+                            diag_board, _depth, game_notations,
+                        )
 
-                else:
-                    # Static: tac_bonus + evaluate for each legal move
-                    legal = get_all_legal_moves(diag_board)
-                    moves_out = []
-                    for mv in legal:
-                        after = diag_board.apply_move(mv)
-                        tac   = _tac_bonus(diag_board, after, color, weights,
-                                           return_breakdown=True)
-                        ev    = int(_heval(after, color))
-                        moves_out.append({
-                            "from":      mv.get("from"),
-                            "to":        mv["to"],
-                            "capture":   mv.get("capture"),
-                            "tac_total": int(tac["total"]),
-                            "tac_terms": [[lbl, val] for lbl, val in tac.get("top_terms", [])],
-                            "eval_score": ev,
-                            "score":     int(tac["total"]) + ev,
-                        })
-                    moves_out.sort(key=lambda x: x["score"], reverse=True)
+                    else:
+                        # Static: tac_bonus + evaluate for each legal move
+                        legal = get_all_legal_moves(diag_board)
+                        moves_out = []
+                        for mv in legal:
+                            after = diag_board.apply_move(mv)
+                            tac   = _tac_bonus(diag_board, after, color, weights,
+                                               return_breakdown=True)
+                            ev    = int(_heval(after, color))
+                            moves_out.append({
+                                "from":      mv.get("from"),
+                                "to":        mv["to"],
+                                "capture":   mv.get("capture"),
+                                "tac_total": int(tac["total"]),
+                                "tac_terms": [[lbl, val] for lbl, val in tac.get("top_terms", [])],
+                                "eval_score": ev,
+                                "score":     int(tac["total"]) + ev,
+                            })
+                        moves_out.sort(key=lambda x: x["score"], reverse=True)
 
-                # ── Merge DB data into every move entry ─────────────────────
-                def _diag_ntn(mv_entry):
-                    frm = mv_entry.get("from")
-                    to  = mv_entry.get("to") or ""
-                    cap = mv_entry.get("capture")
-                    s = f"{frm}-{to}" if frm else to
-                    if cap:
-                        s += f"x{cap}"
-                    return s
+                    # ── Merge DB data into every move entry ─────────────────────
+                    def _diag_ntn(mv_entry):
+                        frm = mv_entry.get("from")
+                        to  = mv_entry.get("to") or ""
+                        cap = mv_entry.get("capture")
+                        s = f"{frm}-{to}" if frm else to
+                        if cap:
+                            s += f"x{cap}"
+                        return s
 
-                # Trajectory DB: per-move relative frequency and raw counts
-                traj_freqs: dict = {}
-                traj_counts: dict = {}
-                traj_total: int = 0
-                if _effective_tdb:
-                    try:
-                        traj_freqs = _effective_tdb.query_all_frequencies(diag_board)
-                        if hasattr(_effective_tdb, "query_all_move_counts"):
-                            traj_counts, traj_total = _effective_tdb.query_all_move_counts(diag_board)
-                    except Exception:
-                        pass
+                    # Trajectory DB: per-move relative frequency and raw counts
+                    traj_freqs: dict = {}
+                    traj_counts: dict = {}
+                    traj_total: int = 0
+                    if _effective_tdb:
+                        try:
+                            traj_freqs = _effective_tdb.query_all_frequencies(diag_board)
+                            if hasattr(_effective_tdb, "query_all_move_counts"):
+                                traj_counts, traj_total = _effective_tdb.query_all_move_counts(diag_board)
+                        except Exception:
+                            pass
 
-                # FullGame DB: per-move WIN/LOSS/NEUTRAL delta
-                db_deltas: dict = {}
-                if _fullgame_db and _fullgame_db.is_available():
-                    try:
-                        db_deltas = _fullgame_db.score_delta(diag_board, color)
-                    except Exception:
-                        pass
+                    # FullGame DB: per-move WIN/LOSS/NEUTRAL delta
+                    db_deltas: dict = {}
+                    if _fullgame_db and _fullgame_db.is_available():
+                        try:
+                            db_deltas = _fullgame_db.score_delta(diag_board, color)
+                        except Exception:
+                            pass
 
-                # Endgame DB: probe each resulting position for WDL
-                eg_flags: dict = {}
-                eg_dtws:  dict = {}   # per-move absolute depth-to-mate (Malom only)
-                if _endgame_solved_db:
-                    total_pc = sum(diag_board.pieces_on_board.values())
-                    all_placed = (diag_board.pieces_placed.get("W", 0) >= 9
-                                  and diag_board.pieces_placed.get("B", 0) >= 9)
-                    if all_placed and total_pc <= 8:
-                        if diag_mode == "capture":
-                            mover_eg = "B" if diag_board.turn == "W" else "W"
+                    # Endgame DB: probe each resulting position for WDL
+                    eg_flags: dict = {}
+                    eg_dtws:  dict = {}   # per-move absolute depth-to-mate (Malom only)
+                    if _endgame_solved_db:
+                        total_pc = sum(diag_board.pieces_on_board.values())
+                        all_placed = (diag_board.pieces_placed.get("W", 0) >= 9
+                                      and diag_board.pieces_placed.get("B", 0) >= 9)
+                        if all_placed and total_pc <= 8:
+                            if _mode == "capture":
+                                mover_eg = "B" if diag_board.turn == "W" else "W"
+                                for mv_e in moves_out:
+                                    cap_pos = mv_e.get("to")
+                                    if cap_pos:
+                                        after_eg = diag_board.apply_move(
+                                            {"from": None, "to": None, "capture": cap_pos})
+                                        res = _endgame_solved_db.query(after_eg)
+                                        if res:
+                                            # res is from after_eg.turn (opponent) POV; flip for us
+                                            eg_flags[cap_pos] = (
+                                                "W" if res == "L" else
+                                                "L" if res == "W" else "D"
+                                            )
+                            else:
+                                try:
+                                    legal_eg = get_all_legal_moves(diag_board)
+                                except Exception:
+                                    legal_eg = []
+                                for mv_eg in legal_eg:
+                                    try:
+                                        after_eg = diag_board.apply_move(mv_eg)
+                                        res = _endgame_solved_db.query(after_eg)
+                                        if res:
+                                            ntn_eg = _diag_ntn(mv_eg)
+                                            eg_flags[ntn_eg] = (
+                                                "W" if res == "L" else
+                                                "L" if res == "W" else "D"
+                                            )
+                                    except Exception:
+                                        pass
+
+                    # Malom perfect DB: fill eg_flags for any move not covered above,
+                    # and eg_dtws (moves-to-mate absolute value) whenever Malom is loaded.
+                    # _malom_puzzle_db (MalomDB) returns {"outcome":str, "dtw":int}; if unavailable
+                    # fall back to _malom_db (ExternalSolvedDB) which returns just "W"/"L"/"D".
+                    _malom_ext = _malom_db if (_malom_db is not None and _malom_db.is_available()) else None
+                    _malom_puz = _malom_puzzle_db
+                    if _malom_puz is not None or _malom_ext is not None:
+                        _flip = {"W": "L", "L": "W", "D": "D"}
+                        def _malom_probe(board_after):
+                            """Return (outcome_flipped, dtw_abs). Both None on miss."""
+                            if _malom_puz is not None:
+                                try:
+                                    r = _malom_puz.query(board_after)
+                                    if r is not None:
+                                        out = _flip.get(r.get("outcome"))
+                                        dtw = r.get("dtw")
+                                        dtw_abs = abs(int(dtw)) if dtw is not None else None
+                                        return out, dtw_abs
+                                except Exception:
+                                    pass
+                            if _malom_ext is not None:
+                                try:
+                                    res = _malom_ext.query(board_after)   # "W"/"L"/"D" or None
+                                    if res:
+                                        return _flip.get(res), None
+                                except Exception:
+                                    pass
+                            return None, None
+
+                        if _mode == "capture":
                             for mv_e in moves_out:
                                 cap_pos = mv_e.get("to")
-                                if cap_pos:
-                                    after_eg = diag_board.apply_move(
+                                if not cap_pos:
+                                    continue
+                                try:
+                                    after_ml = diag_board.apply_move(
                                         {"from": None, "to": None, "capture": cap_pos})
-                                    res = _endgame_solved_db.query(after_eg)
-                                    if res:
-                                        # res is from after_eg.turn (opponent) POV; flip for us
-                                        eg_flags[cap_pos] = (
-                                            "W" if res == "L" else
-                                            "L" if res == "W" else "D"
-                                        )
+                                    out, dtw = _malom_probe(after_ml)
+                                    if out and not eg_flags.get(cap_pos):
+                                        eg_flags[cap_pos] = out
+                                    if dtw is not None:
+                                        eg_dtws[cap_pos] = dtw
+                                except Exception:
+                                    pass
                         else:
                             try:
-                                legal_eg = get_all_legal_moves(diag_board)
+                                legal_ml = get_all_legal_moves(diag_board)
                             except Exception:
-                                legal_eg = []
-                            for mv_eg in legal_eg:
+                                legal_ml = []
+                            for mv_ml in legal_ml:
+                                ntn_ml = _diag_ntn(mv_ml)
                                 try:
-                                    after_eg = diag_board.apply_move(mv_eg)
-                                    res = _endgame_solved_db.query(after_eg)
-                                    if res:
-                                        ntn_eg = _diag_ntn(mv_eg)
-                                        eg_flags[ntn_eg] = (
-                                            "W" if res == "L" else
-                                            "L" if res == "W" else "D"
-                                        )
+                                    after_ml = diag_board.apply_move(mv_ml)
+                                    out, dtw = _malom_probe(after_ml)
+                                    if out and not eg_flags.get(ntn_ml):
+                                        eg_flags[ntn_ml] = out
+                                    if dtw is not None:
+                                        eg_dtws[ntn_ml] = dtw
                                 except Exception:
                                     pass
 
-                # Malom perfect DB: fill eg_flags for any move not covered above,
-                # and eg_dtws (moves-to-mate absolute value) whenever Malom is loaded.
-                # _malom_puzzle_db (MalomDB) returns {"outcome":str, "dtw":int}; if unavailable
-                # fall back to _malom_db (ExternalSolvedDB) which returns just "W"/"L"/"D".
-                _malom_ext = _malom_db if (_malom_db is not None and _malom_db.is_available()) else None
-                _malom_puz = _malom_puzzle_db
-                if _malom_puz is not None or _malom_ext is not None:
-                    _flip = {"W": "L", "L": "W", "D": "D"}
-                    def _malom_probe(board_after):
-                        """Return (outcome_flipped, dtw_abs). Both None on miss."""
-                        if _malom_puz is not None:
-                            try:
-                                r = _malom_puz.query(board_after)
-                                if r is not None:
-                                    out = _flip.get(r.get("outcome"))
-                                    dtw = r.get("dtw")
-                                    dtw_abs = abs(int(dtw)) if dtw is not None else None
-                                    return out, dtw_abs
-                            except Exception:
-                                pass
-                        if _malom_ext is not None:
-                            try:
-                                res = _malom_ext.query(board_after)   # "W"/"L"/"D" or None
-                                if res:
-                                    return _flip.get(res), None
-                            except Exception:
-                                pass
-                        return None, None
+                    for mv_e in moves_out:
+                        ntn = _diag_ntn(mv_e)
+                        mv_e["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
+                        mv_e["traj_count"] = traj_counts.get(ntn)
+                        _dd = db_deltas.get(ntn)
+                        mv_e["db_delta"]  = float(_dd) if _dd is not None else None
+                        # Capture mode eg_flags keyed by captured square
+                        cap_pos = mv_e.get("to") if _mode == "capture" else None
+                        _key = cap_pos or ntn
+                        mv_e["eg_flag"] = eg_flags.get(_key)   # "W"/"L"/"D"/None
+                        mv_e["eg_dtw"]  = eg_dtws.get(_key)    # int moves-to-mate or None
 
-                    if diag_mode == "capture":
-                        for mv_e in moves_out:
-                            cap_pos = mv_e.get("to")
-                            if not cap_pos:
-                                continue
-                            try:
-                                after_ml = diag_board.apply_move(
-                                    {"from": None, "to": None, "capture": cap_pos})
-                                out, dtw = _malom_probe(after_ml)
-                                if out and not eg_flags.get(cap_pos):
-                                    eg_flags[cap_pos] = out
-                                if dtw is not None:
-                                    eg_dtws[cap_pos] = dtw
-                            except Exception:
-                                pass
-                    else:
+                    # ── Sentinel overlay: score each legal move ───────────────────
+                    # 2D: sentinel/overseer are skipped in capture mode — they encode
+                    # from the projected board (post-mill) where the from→to move is
+                    # already applied, making the move-feature encoding nonsensical.
+                    # Heuristic scores above are the correct signal for capture choice.
+                    if _sentinel_advisor is not None and _sentinel_advisor.is_loaded() and _mode != "capture":
                         try:
-                            legal_ml = get_all_legal_moves(diag_board)
-                        except Exception:
-                            legal_ml = []
-                        for mv_ml in legal_ml:
-                            ntn_ml = _diag_ntn(mv_ml)
-                            try:
-                                after_ml = diag_board.apply_move(mv_ml)
-                                out, dtw = _malom_probe(after_ml)
-                                if out and not eg_flags.get(ntn_ml):
-                                    eg_flags[ntn_ml] = out
-                                if dtw is not None:
-                                    eg_dtws[ntn_ml] = dtw
-                            except Exception:
-                                pass
+                            candidates = [
+                                {"from": mv_e.get("from"), "to": mv_e.get("to"),
+                                 "capture": mv_e.get("capture")}
+                                for mv_e in moves_out
+                            ]
+                            if candidates:
+                                sent_advice = await asyncio.to_thread(
+                                    _sentinel_advisor.advise,
+                                    diag_board, candidates, color, 0,
+                                )
+                                if sent_advice is not None:
+                                    for i, mv_e in enumerate(moves_out):
+                                        if i < len(sent_advice.move_scores):
+                                            mv_e["sentinel_score"] = round(sent_advice.move_scores[i], 3)
+                        except Exception as _se:
+                            log.debug("Sentinel diagnostic scoring failed: %s", _se)
+                    for mv_e in moves_out:
+                        if "sentinel_score" not in mv_e:
+                            mv_e["sentinel_score"] = None
 
-                for mv_e in moves_out:
-                    ntn = _diag_ntn(mv_e)
-                    mv_e["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
-                    mv_e["traj_count"] = traj_counts.get(ntn)
-                    _dd = db_deltas.get(ntn)
-                    mv_e["db_delta"]  = float(_dd) if _dd is not None else None
-                    # Capture mode eg_flags keyed by captured square
-                    cap_pos = mv_e.get("to") if diag_mode == "capture" else None
-                    _key = cap_pos or ntn
-                    mv_e["eg_flag"] = eg_flags.get(_key)   # "W"/"L"/"D"/None
-                    mv_e["eg_dtw"]  = eg_dtws.get(_key)    # int moves-to-mate or None
+                    # ── Overseer overlay: per-move pick probabilities ─────────────
+                    if _overseer_advisor is not None and _overseer_advisor.is_loaded() and _mode != "capture":
+                        try:
+                            ov_candidates = [
+                                {"from": mv_e.get("from"), "to": mv_e.get("to"),
+                                 "capture": mv_e.get("capture")}
+                                for mv_e in moves_out
+                            ]
+                            if ov_candidates:
+                                ov_probs = await asyncio.to_thread(
+                                    _overseer_advisor.score_moves,
+                                    diag_board, ov_candidates, color,
+                                )
+                                if ov_probs is not None:
+                                    log.debug("Overseer OK: %d probs, top=%.3f (mode=%s)",
+                                              len(ov_probs), max(ov_probs), _mode)
+                                    for i, mv_e in enumerate(moves_out):
+                                        if i < len(ov_probs):
+                                            mv_e["overseer_prob"] = round(ov_probs[i], 4)
+                                else:
+                                    log.info("Overseer score_moves returned None (mode=%s, n=%d)",
+                                             _mode, len(ov_candidates))
+                        except Exception as _oe:
+                            log.warning("Overseer diagnostic scoring failed: %s", _oe, exc_info=True)
+                    for mv_e in moves_out:
+                        if "overseer_prob" not in mv_e:
+                            mv_e["overseer_prob"] = None
 
-                # ── Sentinel overlay: score each legal move ───────────────────
-                # 2D: sentinel/overseer are skipped in capture mode — they encode
-                # from the projected board (post-mill) where the from→to move is
-                # already applied, making the move-feature encoding nonsensical.
-                # Heuristic scores above are the correct signal for capture choice.
-                if _sentinel_advisor is not None and _sentinel_advisor.is_loaded() and diag_mode != "capture":
-                    try:
-                        candidates = [
-                            {"from": mv_e.get("from"), "to": mv_e.get("to"),
-                             "capture": mv_e.get("capture")}
-                            for mv_e in moves_out
-                        ]
-                        if candidates:
-                            sent_advice = await asyncio.to_thread(
-                                _sentinel_advisor.advise,
-                                diag_board, candidates, color, 0,
+                    # ── Human Move Policy fallback ─────────────────────────────────
+                    # Pred Human: computed for all positions (not capture mode — net
+                    # trained on moves, not captures). Shown alongside T: not instead.
+                    has_traj_data = any((mv.get("traj_freq") or 0) > 0 for mv in moves_out)
+                    if _human_move_policy_advisor is not None and _mode != "capture":
+                        try:
+                            _hmpa_cands = [
+                                {"from": mv.get("from"), "to": mv.get("to"),
+                                 "capture": mv.get("capture")}
+                                for mv in moves_out
+                            ]
+                            _hmpa_probs = await asyncio.to_thread(
+                                _human_move_policy_advisor.probs_for_display,
+                                diag_board, _hmpa_cands, _band,
                             )
-                            if sent_advice is not None:
-                                for i, mv_e in enumerate(moves_out):
-                                    if i < len(sent_advice.move_scores):
-                                        mv_e["sentinel_score"] = round(sent_advice.move_scores[i], 3)
-                    except Exception as _se:
-                        log.debug("Sentinel diagnostic scoring failed: %s", _se)
-                for mv_e in moves_out:
-                    if "sentinel_score" not in mv_e:
-                        mv_e["sentinel_score"] = None
-
-                # ── Overseer overlay: per-move pick probabilities ─────────────
-                if _overseer_advisor is not None and _overseer_advisor.is_loaded() and diag_mode != "capture":
-                    try:
-                        ov_candidates = [
-                            {"from": mv_e.get("from"), "to": mv_e.get("to"),
-                             "capture": mv_e.get("capture")}
-                            for mv_e in moves_out
-                        ]
-                        if ov_candidates:
-                            ov_probs = await asyncio.to_thread(
-                                _overseer_advisor.score_moves,
-                                diag_board, ov_candidates, color,
-                            )
-                            if ov_probs is not None:
-                                log.debug("Overseer OK: %d probs, top=%.3f (mode=%s)",
-                                          len(ov_probs), max(ov_probs), diag_mode)
-                                for i, mv_e in enumerate(moves_out):
-                                    if i < len(ov_probs):
-                                        mv_e["overseer_prob"] = round(ov_probs[i], 4)
-                            else:
-                                log.info("Overseer score_moves returned None (mode=%s, n=%d)",
-                                         diag_mode, len(ov_candidates))
-                    except Exception as _oe:
-                        log.warning("Overseer diagnostic scoring failed: %s", _oe, exc_info=True)
-                for mv_e in moves_out:
-                    if "overseer_prob" not in mv_e:
-                        mv_e["overseer_prob"] = None
-
-                # ── Human Move Policy fallback ─────────────────────────────────
-                # Pred Human: computed for all positions (not capture mode — net
-                # trained on moves, not captures). Shown alongside T: not instead.
-                has_traj_data = any((mv.get("traj_freq") or 0) > 0 for mv in moves_out)
-                if _human_move_policy_advisor is not None and diag_mode != "capture":
-                    try:
-                        _hmpa_cands = [
-                            {"from": mv.get("from"), "to": mv.get("to"),
-                             "capture": mv.get("capture")}
-                            for mv in moves_out
-                        ]
-                        _hmpa_probs = await asyncio.to_thread(
-                            _human_move_policy_advisor.probs_for_display,
-                            diag_board, _hmpa_cands, diag_elo_band,
-                        )
-                        for mv, prob in zip(moves_out, _hmpa_probs):
-                            mv["pred_human_prob"] = round(float(prob), 4)
-                    except Exception as _hmpa_e:
-                        log.debug("Human policy failed: %s", _hmpa_e)
+                            for mv, prob in zip(moves_out, _hmpa_probs):
+                                mv["pred_human_prob"] = round(float(prob), 4)
+                        except Exception as _hmpa_e:
+                            log.debug("Human policy failed: %s", _hmpa_e)
+                            for mv in moves_out:
+                                mv["pred_human_prob"] = None
+                    else:
                         for mv in moves_out:
                             mv["pred_human_prob"] = None
-                else:
-                    for mv in moves_out:
-                        mv["pred_human_prob"] = None
 
-                await _send(websocket, {
-                    "type":         "diagnostic",
-                    "seq":          diag_seq,
-                    "mode":         diag_mode,
-                    "color":        color,
-                    "eval_w":       eval_w,
-                    "eval_b":       eval_b,
-                    "moves":        moves_out,
-                    "has_traj_data": has_traj_data,
-                    "traj_total":   traj_total,
-                    "fen":          fen_override or diag_board.to_fen_string(),
-                })
+                    await _send(websocket, {
+                        "type":         "diagnostic",
+                        "seq":          _seq,
+                        "mode":         _mode,
+                        "color":        color,
+                        "eval_w":       eval_w,
+                        "eval_b":       eval_b,
+                        "moves":        moves_out,
+                        "has_traj_data": has_traj_data,
+                        "traj_total":   traj_total,
+                        "fen":          _fen or diag_board.to_fen_string(),
+                    })
+
+                asyncio.create_task(_run_diag())
 
             # ── good_game — elevate a draw to win-like status in trajectory ────
             elif kind == "good_game" and session:

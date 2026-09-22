@@ -68,6 +68,8 @@ let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assess
 let _assessmentReady = false;       // true once assessment_result received
 let _assessmentStartTime = null;    // Date.now() when assessment started
 let _assessmentTimerInterval = null; // setInterval handle for elapsed counter
+let _assessmentPlyQuality   = [];   // per-ply quality string from assessment_result
+let _assessmentActiveStage  = 0;    // 0=idle, 1-4=stage currently computing
 
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
 
@@ -1098,11 +1100,12 @@ function startNewGame() {
   }
 
   clearCommentary();
+  board && board.clearDiag();
   setStatus("Starting…");
   phase = "idle";
-  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1184,12 +1187,13 @@ function startAiVsAi() {
   $("ava-modal").style.display = "none";
 
   clearCommentary();
+  board && board.clearDiag();
   setStatus("Starting AI vs AI…");
   phase = "idle";
-  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   isAiVsAi = true;
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 0;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1401,11 +1405,12 @@ function startSetupGame() {
   }
 
   clearCommentary();
+  board && board.clearDiag();
   setStatus("Starting setup game…");
   phase = "idle";
-  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done");
+  $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentReady = false; _stopAssessmentTimer();
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1541,12 +1546,9 @@ function handleMessage(msg) {
             : "Your turn — select a piece, then its destination."
         );
       }
-      // Diagnostic: refresh scores for this position
-      if (diagEnabled) {
-        _diagStaticData  = null;
-        _diagNegamaxData = null;
-        _diagRequestAll();
-      }
+      // Diagnostic: refresh scores for this position (always fires for sentinel graph)
+      if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+      _diagRequestAll();
       // Update Explorer button to open at the current board position
       if (msg.fen) {
         const explorerBtn = document.getElementById('btn-explorer');
@@ -1575,14 +1577,9 @@ function handleMessage(msg) {
       _aiThinking = true;       // block negamax diagnostics while AI computes
       // Request static overlay for the position the AI is about to evaluate,
       // before search starts so the user can see the scores immediately.
-      if (diagEnabled) {
-        _diagStaticData  = null;
-        _diagNegamaxData = null;
-        board && board.clearDiag();
-        _diagRequestStatic();   // bypasses _diagRequestAll's _aiThinking guard
-      } else {
-        board && board.clearDiag();
-      }
+      board && board.clearDiag();
+      if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+      _diagRequestStatic();   // bypasses _diagRequestAll's _aiThinking guard; fires for sentinel graph too
       startThinkingTimer(msg.color, msg.expected_seconds ?? 0, ws, msg.max_depth_expected ?? 0);
       $("btn-force-move").hidden = false;
       canOverride = false;
@@ -1776,6 +1773,7 @@ function handleMessage(msg) {
       updateDrawButton();
       $("btn-game-assessment").classList.add("assessment-ready");
       _startAssessmentTimer();
+      _updateAssessmentProgress(1);
 
       // Adaptive difficulty feedback
       if (msg.adaptive) {
@@ -1949,20 +1947,77 @@ function handleMessage(msg) {
       _removeAutosaveBanner();
       break;
 
-    case "assessment_result": {
-      _assessmentTurningPoints = msg.turning_points || [];
-      _assessmentReady = true;
-      _stopAssessmentTimer();
-      // Redraw eval graph to show turning-point markers
-      drawEvalGraph();
-      // Update button state — stop pulse, show done
-      const btn = $("btn-game-assessment");
-      if (btn) btn.classList.add("assessment-done");
+    case "assessment_progress": {
+      _updateAssessmentProgress(msg.stage || 0);
+      break;
+    }
 
-      // Post structured summary to MillsAI Chat panel with line breaks
+    case "assessment_stage_1": {
+      // Early heuristic turning points — show on graph before full analysis completes
+      _assessmentTurningPoints = msg.turning_points || [];
+      _stopAssessmentTimer();
+      drawEvalGraph();
       if (msg.summary_text) {
         const feed = $("commentary-human");
         if (feed) {
+          // Remove any previous partial summary before adding new one
+          const old = feed.querySelector(".assessment-partial");
+          if (old) old.remove();
+          const div = document.createElement("div");
+          div.className = "commentary-line assessment-partial";
+          const lbl = document.createElement("span");
+          lbl.className = "speaker";
+          lbl.textContent = "Game Analysis (partial): ";
+          div.appendChild(lbl);
+          const pre = document.createElement("span");
+          pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
+          pre.textContent = msg.summary_text;
+          div.appendChild(pre);
+          feed.insertBefore(div, feed.firstChild);
+          feed.scrollTop = 0;
+        }
+      }
+      break;
+    }
+
+    case "assessment_stage_2": {
+      // Generalist AI divergence section — append to chat feed
+      if (msg.summary_text) {
+        const feed = $("commentary-human");
+        if (feed) {
+          const div = document.createElement("div");
+          div.className = "commentary-line assessment-partial";
+          const lbl = document.createElement("span");
+          lbl.className = "speaker";
+          lbl.textContent = "AI Divergence: ";
+          div.appendChild(lbl);
+          const pre = document.createElement("span");
+          pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
+          pre.textContent = msg.summary_text;
+          div.appendChild(pre);
+          feed.insertBefore(div, feed.firstChild);
+          feed.scrollTop = 0;
+        }
+      }
+      break;
+    }
+
+    case "assessment_result": {
+      _assessmentTurningPoints = msg.turning_points || [];
+      _assessmentPlyQuality = msg.ply_quality || [];
+      _assessmentReady = true;
+      _stopAssessmentTimer();
+      // Redraw eval graph to show final (Malom-confirmed) turning-point markers
+      drawEvalGraph();
+      _annotateMovesListWithQuality();
+      // Update button state — stop pulse, show done
+      const btn = $("btn-game-assessment");
+      if (btn) btn.classList.add("assessment-done");
+      // Remove partial stage summaries — full summary replaces them
+      const feed = $("commentary-human");
+      if (feed) {
+        feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
+        if (msg.summary_text) {
           const div = document.createElement("div");
           div.className = "commentary-line assessment-summary";
           const label = document.createElement("span");
@@ -1983,6 +2038,29 @@ function handleMessage(msg) {
     case "assessment_llm": {
       // Route to MillsAI Chat (commentary-human), not AI Discussion
       if (msg.text) addCommentary("MillsAI", msg.text, "human");
+      // Stage 4 LLM arrives without stage field — mark progress bar done
+      if (!msg.stage) _updateAssessmentProgress(0);
+      break;
+    }
+
+    case "assessment_timeout": {
+      _stopAssessmentTimer();
+      _updateAssessmentProgress(0);
+      const btn = $("btn-game-assessment");
+      if (btn) {
+        btn.classList.remove("assessment-ready", "assessment-done");
+        btn.classList.add("assessment-failed");
+      }
+      const feed = $("commentary-human");
+      if (feed) {
+        feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
+        const div = document.createElement("div");
+        div.className = "commentary-line assessment-running-msg";
+        div.style.cssText = "color:#c07830;font-style:italic;padding:4px 0";
+        const reasonMap = { timeout: "Analysis timed out", cancelled: "Analysis cancelled", error: "Analysis failed" };
+        div.textContent = reasonMap[msg.reason] || "Analysis unavailable";
+        feed.insertBefore(div, feed.firstChild);
+      }
       break;
     }
   }
@@ -2307,6 +2385,10 @@ function stopThinkingTimer() {
     barFill.style.width = "10%";
     barWrap.style.display = "none";
   }
+  const plyEl  = $("ply-progress");
+  const timeEl = $("think-time-info");
+  if (plyEl)  plyEl.textContent  = "";
+  if (timeEl) timeEl.textContent = "";
 }
 
 function updateDrawButton() {
@@ -2612,10 +2694,10 @@ function renderMoves(moves) {
     const b = moves[i].color === "B" && !w ? moves[i] : null;
     if (w) {
       const bNext = moves[i + 1] && moves[i + 1].color === "B" ? moves[i + 1] : null;
-      rows.push([w.notation, bNext ? bNext.notation : ""]);
+      rows.push([w.notation, bNext ? bNext.notation : "", i, bNext ? i + 1 : null]);
       i += bNext ? 2 : 1;
     } else {
-      rows.push(["—", b ? b.notation : moves[i].notation]);
+      rows.push(["—", b ? b.notation : moves[i].notation, null, i]);
       i += 1;
     }
   }
@@ -2637,9 +2719,11 @@ function renderMoves(moves) {
     const wm = document.createElement("span");
     wm.className   = "move-w";
     wm.textContent = pair[0] || "";
+    if (pair[2] != null) wm.dataset.ply = pair[2];
     const bm = document.createElement("span");
     bm.className   = "move-b";
     bm.textContent = pair[1] || "";
+    if (pair[3] != null) bm.dataset.ply = pair[3];
     row.appendChild(num);
     row.appendChild(wm);
     row.appendChild(bm);
@@ -2648,6 +2732,7 @@ function renderMoves(moves) {
 
   // Auto-scroll to bottom
   list.scrollTop = list.scrollHeight;
+  if (_assessmentPlyQuality.length > 0) _annotateMovesListWithQuality();
 }
 
 function copyMoveNotation() {
@@ -2765,10 +2850,13 @@ function replayGo(idx) {
   _highlightReplayMove(idx);
   drawEvalGraph();
   _diagRefreshForReplay(idx);
+  _applyReplayAnnotations(idx);
 }
 
 function exitReplay() {
   replayIdx = -1;
+  if (board.clearReplayOverlay) board.clearReplayOverlay();
+  _hideReplayTPBadge();
   if (gameState) {
     board.render(gameState);
     if (gameState.move_pairs) board.setMovePairs(gameState.move_pairs);
@@ -2776,10 +2864,89 @@ function exitReplay() {
   _updateReplayLabel();
   _highlightReplayMove(-1);
   drawEvalGraph();
-  if (diagEnabled) {
-    _diagStaticData = null; _diagNegamaxData = null;
-    _diagRequestAll();
+  if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+  _diagRequestAll();
+}
+
+const _TP_ORACLE_LABELS = {
+  "malom_full":         "Malom",
+  "sentinel+heuristic": "Sentinel+H",
+  "heuristic":          "Heuristic",
+};
+
+function _parseMoveNotationDest(notation) {
+  // "d6" → "d6",  "b6xb4" → "b6",  "d5-c5" → "c5",  "f4-f2xe4" → "f2"
+  if (!notation) return null;
+  const dash = notation.indexOf('-');
+  const x    = notation.indexOf('x');
+  if (dash >= 0) {
+    const after = notation.slice(dash + 1);
+    const xi = after.indexOf('x');
+    return xi >= 0 ? after.slice(0, xi) : after;
   }
+  return x >= 0 ? notation.slice(0, x) : notation;
+}
+
+function _applyReplayAnnotations(idx) {
+  if (!board.clearReplayOverlay) return;
+  board.clearReplayOverlay();
+  _hideReplayTPBadge();
+  if (idx <= 0 || !replayMoves.length) return;
+
+  const plyIdx = idx - 1;
+  const move   = replayMoves[plyIdx];
+  if (!move) return;
+
+  const quality = _assessmentPlyQuality[plyIdx] || "clean";
+  let tpRank = null;
+  let tpData = null;
+  for (let ti = 0; ti < _assessmentTurningPoints.length; ti++) {
+    if (_assessmentTurningPoints[ti].ply === plyIdx) {
+      tpRank = ti;
+      tpData = _assessmentTurningPoints[ti];
+      break;
+    }
+  }
+
+  const dest = move.to || _parseMoveNotationDest(move.notation);
+  if (dest) board.setReplayQualityRings(dest, quality, tpRank);
+  if (tpData)  _showReplayTPBadge(tpRank, tpData);
+}
+
+function _showReplayTPBadge(rank, tpData) {
+  const badge = $("replay-tp-badge");
+  if (!badge) return;
+  const label   = rank === 0 ? "⚑ Turning Point" : `⚑ Turning Point #${rank + 1}`;
+  const oracle  = _TP_ORACLE_LABELS[tpData.oracle] || tpData.oracle;
+  const quality = (tpData.quality || "").replace(/_/g, " ");
+  badge.innerHTML =
+    `<span class="tp-label">${label}</span>` +
+    `<span class="tp-detail">${quality} · ${oracle}</span>`;
+  badge.className = "replay-tp-badge" + (rank === 0 ? " tp-primary" : " tp-secondary");
+  badge.hidden = false;
+}
+
+function _hideReplayTPBadge() {
+  const badge = $("replay-tp-badge");
+  if (badge) badge.hidden = true;
+}
+
+function _annotateMovesListWithQuality() {
+  const list = $("moves-list");
+  if (!list) return;
+  const tpPlies = new Map(_assessmentTurningPoints.map((tp, i) => [tp.ply, i]));
+  list.querySelectorAll("[data-ply]").forEach(el => {
+    const ply = parseInt(el.dataset.ply, 10);
+    const q   = _assessmentPlyQuality[ply];
+    el.classList.remove("move-quality-poor", "move-quality-candidate",
+                        "move-tp", "move-tp-primary");
+    if (q === "confirmed_poor")       el.classList.add("move-quality-poor");
+    else if (q === "poor_candidate")  el.classList.add("move-quality-candidate");
+    if (tpPlies.has(ply)) {
+      el.classList.add("move-tp");
+      if (tpPlies.get(ply) === 0) el.classList.add("move-tp-primary");
+    }
+  });
 }
 
 function _setReplayButtonsDisabled(disabled) {
@@ -2839,6 +3006,36 @@ function addCommentary(speaker, text, section) {
   div.appendChild(document.createTextNode(text));
   // Prepend so newest appears at top
   feed.insertBefore(div, feed.firstChild);
+}
+
+const _AP_LABELS = ["Turning points", "AI divergence", "Malom regret", "Commentary"];
+
+function _updateAssessmentProgress(stage) {
+  _assessmentActiveStage = stage;
+  const bar   = $("assessment-progress-bar");
+  const label = $("assessment-stage-label");
+  if (!bar) return;
+  if (stage === 0) {
+    bar.style.display   = "none";
+    if (label) { label.style.display = "none"; label.textContent = ""; }
+    for (let i = 1; i <= 4; i++) {
+      const seg = $(`ap-${i}`);
+      if (seg) seg.className = "ap-seg";
+    }
+    return;
+  }
+  bar.style.display = "flex";
+  if (label) {
+    label.style.display = "block";
+    label.textContent   = _AP_LABELS[stage - 1] || "";
+  }
+  for (let i = 1; i <= 4; i++) {
+    const seg = $(`ap-${i}`);
+    if (!seg) continue;
+    if (i < stage)      seg.className = "ap-seg done";
+    else if (i === stage) seg.className = "ap-seg active";
+    else                  seg.className = "ap-seg";
+  }
 }
 
 function _startAssessmentTimer() {
@@ -3314,21 +3511,42 @@ function _diagRequestCapture() {
 }
 
 function _diagRequestAll(fen, prefix) {
-  if (!diagEnabled || _aiThinking) return;
+  if (_aiThinking) return;
   clearTimeout(_diagDebounce);
   _diagDebounce = setTimeout(() => {
     if (_aiThinking) return;    // re-check after debounce fires
     _diagStaticData  = null;
     _diagNegamaxData = null;
-    _diagPending = _diagSeq + (diagStatic ? 1 : 0) + (diagNegamax ? 1 : 0);
-    _diagRequestStatic(fen, prefix);
-    _diagRequestNegamax(fen, prefix);
+    // Always fire static for sentinel graph data even when overlay is off.
+    // Skip only when diagStatic is explicitly off AND overlay is also off.
+    if (diagEnabled || diagStatic) {
+      _diagPending = _diagSeq + 1 + (diagEnabled && diagNegamax ? 1 : 0);
+      _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
+    }
+    if (diagEnabled) _diagRequestNegamax(fen, prefix);
   }, 300);  // 300ms debounce — longer to absorb rapid replay + prevent flood
 }
 
 function _diagOnReceive(msg) {
+  // Sentinel position score and FEN cache — always processed regardless of overlay state.
+  // Sentinel graph data must arrive even when the scores overlay is off.
+  if (msg.fen && msg.mode !== "capture") {
+    const entry = _diagFenCache.get(msg.fen) || {};
+    if (msg.mode === "static")  entry.static  = msg;
+    if (msg.mode === "negamax") entry.negamax = msg;
+    _diagFenCache.set(msg.fen, entry);
+  }
+  if (msg.mode === "static" && msg.moves) {
+    const sentScores = msg.moves.map(m => m.sentinel_score).filter(s => s != null);
+    if (sentScores.length > 0) {
+      const avg = sentScores.reduce((a, b) => a + b, 0) / sentScores.length;
+      sentinelHistory.push({ raw: (avg - 0.5) * 2, color: msg.color || "W" });
+      drawEvalGraph();
+    }
+  }
+
   if (!diagEnabled) return;
-  // Update eval bar always
+  // Update eval bar
   if (msg.eval_w !== undefined) {
     const fmt = n => (n >= 0 ? `+${n}` : `${n}`);
     $("eval-w").textContent = fmt(msg.eval_w);
@@ -3340,24 +3558,6 @@ function _diagOnReceive(msg) {
   if (msg.mode === "static")  { _diagStaticData  = msg; }
   if (msg.mode === "negamax") { _diagNegamaxData = msg; }
   if (msg.mode === "capture") { _diagStaticData  = msg; }
-  // Cache by FEN (skip capture mode — live-board only, not replay-addressable)
-  if (msg.fen && msg.mode !== "capture") {
-    const entry = _diagFenCache.get(msg.fen) || {};
-    if (msg.mode === "static")  entry.static  = msg;
-    if (msg.mode === "negamax") entry.negamax = msg;
-    _diagFenCache.set(msg.fen, entry);
-  }
-  // Sentinel position score: average move quality for the current player.
-  // Store { raw, color } so drawEvalGraph can compute human-perspective at render time
-  // even when _humanColor arrives in a state message after the first diagnostic fires.
-  if (msg.mode === "static" && msg.moves) {
-    const sentScores = msg.moves.map(m => m.sentinel_score).filter(s => s != null);
-    if (sentScores.length > 0) {
-      const avg = sentScores.reduce((a, b) => a + b, 0) / sentScores.length;
-      sentinelHistory.push({ raw: (avg - 0.5) * 2, color: msg.color || "W" });
-      drawEvalGraph();
-    }
-  }
   const humanLabel = document.getElementById("to-move-human-label");
   if (humanLabel && msg.mode !== "capture") {
     const hasTrajData = msg.has_traj_data !== false;
