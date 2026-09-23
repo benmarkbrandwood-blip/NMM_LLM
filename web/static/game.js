@@ -2900,6 +2900,7 @@ function _applyReplayAnnotations(idx) {
   if (!board.clearReplayOverlay) return;
   board.clearReplayOverlay();
   _hideReplayTPBadge();
+  _hideReplaySignalBadge();
   if (idx <= 0 || !replayMoves.length) return;
 
   const plyIdx = idx - 1;
@@ -2917,9 +2918,15 @@ function _applyReplayAnnotations(idx) {
     }
   }
 
+  // Check if this ply is the top-ranked ply for any signal
+  const topSigMap = _buildTopSignalByPly();
+  const sigMatch  = topSigMap.get(plyIdx);
+  const sigColor  = sigMatch ? (_SIGNAL_META[sigMatch.key] || {}).color : null;
+
   const dest = move.to || _parseMoveNotationDest(move.notation);
-  if (dest) board.setReplayQualityRings(dest, quality, tpRank);
-  if (tpData)  _showReplayTPBadge(tpRank, tpData);
+  if (dest) board.setReplayQualityRings(dest, quality, tpRank, sigColor);
+  if (tpData)   _showReplayTPBadge(tpRank, tpData);
+  if (sigMatch) _showReplaySignalBadge(sigMatch.key, sigMatch.item);
 }
 
 function _showReplayTPBadge(rank, tpData) {
@@ -2940,6 +2947,45 @@ function _hideReplayTPBadge() {
   if (badge) badge.hidden = true;
 }
 
+function _showReplaySignalBadge(sigKey, item) {
+  const badge = $("replay-signal-badge");
+  if (!badge) return;
+  const meta  = _SIGNAL_META[sigKey] || { color: "#888", label: sigKey };
+  let detail  = "";
+  if (sigKey === "gapnet") {
+    const risk = item.score >= 0.72 ? "HIGH" : item.score.toFixed(2);
+    detail = `blunder-zone ${risk}`;
+  } else if (sigKey === "generalist" && item.preferred) {
+    detail = `preferred: ${item.preferred}`;
+  } else if (sigKey === "unconventional" && item.preferred) {
+    detail = `common: ${item.preferred}`;
+  } else if (sigKey === "pref" && item.delta != null) {
+    detail = `pref δ${item.delta > 0 ? "+" : ""}${item.delta.toFixed(2)}`;
+  } else if (sigKey === "mobility" && item.count != null) {
+    detail = `${item.count} legal moves`;
+  }
+  badge.innerHTML =
+    `<span class="sig-badge-label" style="color:${meta.color}">${meta.label}</span>` +
+    (detail ? `<span class="sig-badge-detail">${detail}</span>` : "");
+  badge.style.borderColor = meta.color;
+  badge.hidden = false;
+}
+
+function _hideReplaySignalBadge() {
+  const badge = $("replay-signal-badge");
+  if (badge) badge.hidden = true;
+}
+
+function _buildTopSignalByPly() {
+  const map = new Map();
+  for (const [key, items] of Object.entries(_assessmentSignalPlies)) {
+    if (!items.length) continue;
+    const top = typeof items[0] === "object" ? items[0] : { ply: items[0] };
+    map.set(top.ply, { key, item: top });
+  }
+  return map;
+}
+
 function _buildPlySignalMap() {
   const map = new Map();
   const add = (ply, key) => {
@@ -2951,8 +2997,8 @@ function _buildPlySignalMap() {
     const rel = ms.ply - _assessmentPlyBase;
     if (rel >= 0) add(rel, "malom");
   }
-  for (const [key, plies] of Object.entries(_assessmentSignalPlies)) {
-    for (const p of plies) add(p, key);
+  for (const [key, items] of Object.entries(_assessmentSignalPlies)) {
+    for (const item of items) add(typeof item === "object" ? item.ply : item, key);
   }
   return map;
 }
@@ -3133,10 +3179,12 @@ function _renderAssessmentSignalSections(msg, feed) {
   const tps = msg.turning_points || [];
   if (tps.length) {
     const lines = tps.map((tp, i) => {
-      const absPly = tp.ply + base;
+      const absPly  = tp.ply + base;
       const moveNum = Math.ceil(absPly / 2);
-      const oracle  = tp.oracle ? ` [${tp.oracle}]` : "";
-      return `ply ${absPly} (move ${moveNum})${oracle}`;
+      const side    = tp.color ? ` (${_sideName(tp.color)})` : "";
+      const mv      = tp.move  ? `: ${tp.move}` : "";
+      const alt     = tp.best_alt ? `  →better: ${tp.best_alt}` : "";
+      return `ply ${absPly}${side}${mv}${alt}`;
     });
     const c = _card("turning_point", `Turning Point (${tps.length})`, lines);
     if (c) outer.appendChild(c);
@@ -3157,39 +3205,60 @@ function _renderAssessmentSignalSections(msg, feed) {
 
   // ── signal_plies cards ──────────────────────────────────────────────────────
   const sp = msg.signal_plies || {};
-  const _plyListLine = (plies) => {
-    const abs = plies.map(p => p + base);
-    if (abs.length <= 10) return `plies: ${abs.join(", ")}`;
-    return `plies: ${abs.slice(0, 10).join(", ")} … +${abs.length - 10} more`;
+  const _sideName = c => c === "W" ? "White" : "Black";
+  const _absPly   = p => p + base;
+  const _plyTail  = (items, top) => {
+    const rest = items.length - top;
+    return rest > 0 ? [`… +${rest} more`] : [];
   };
 
   const gapnet = sp.gapnet || [];
   if (gapnet.length) {
-    const c = _card("gapnet", `Blunder Risk / GapNet (${gapnet.length} flagged)`, [_plyListLine(gapnet)]);
+    const lines = gapnet.slice(0, 6).map(it => {
+      const risk = it.score >= 0.72 ? "HIGH" : it.score.toFixed(2);
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — blunder-zone ${risk}`;
+    }).concat(_plyTail(gapnet, 6));
+    const c = _card("gapnet", `Blunder Risk / GapNet (${gapnet.length} flagged)`, lines);
     if (c) outer.appendChild(c);
   }
 
   const gen = sp.generalist || [];
   if (gen.length) {
-    const c = _card("generalist", `Generalist Divergence (${gen.length} flagged)`, [_plyListLine(gen)]);
+    const lines = gen.slice(0, 6).map(it => {
+      const alt = it.preferred ? `  preferred: ${it.preferred}` : "";
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}${alt}`;
+    }).concat(_plyTail(gen, 6));
+    const c = _card("generalist", `Generalist Divergence (${gen.length} flagged)`, lines);
     if (c) outer.appendChild(c);
   }
 
   const unconv = sp.unconventional || [];
   if (unconv.length) {
-    const c = _card("unconventional", `Unconventional Moves (${unconv.length} flagged)`, [_plyListLine(unconv)]);
+    const lines = unconv.slice(0, 6).map(it => {
+      const common = it.preferred ? `  common: ${it.preferred}` : "";
+      const prob   = it.prob != null ? `  (prob ${(it.prob * 100).toFixed(0)}%)` : "";
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}${common}${prob}`;
+    }).concat(_plyTail(unconv, 6));
+    const c = _card("unconventional", `Unconventional Moves (${unconv.length} flagged)`, lines);
     if (c) outer.appendChild(c);
   }
 
   const pref = sp.pref || [];
   if (pref.length) {
-    const c = _card("pref", `Pref Divergence (${pref.length} flagged)`, [_plyListLine(pref)]);
+    const lines = pref.slice(0, 6).map(it => {
+      const dir = it.delta < 0 ? "weaker-player choice" : "stronger-player choice";
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  δ${it.delta > 0 ? "+" : ""}${it.delta.toFixed(2)} (${dir})`;
+    }).concat(_plyTail(pref, 6));
+    const c = _card("pref", `Pref Divergence (${pref.length} flagged)`, lines);
     if (c) outer.appendChild(c);
   }
 
   const mob = sp.mobility || [];
   if (mob.length) {
-    const c = _card("mobility", `Mobility Warning (${mob.length} tight plies)`, [_plyListLine(mob)]);
+    const lines = mob.slice(0, 6).map(it =>
+      `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — ${it.count} legal moves`
+    ).concat(_plyTail(mob, 6));
+    const c = _card("mobility", `Mobility Warning (${mob.length} tight plies)`, lines);
     if (c) outer.appendChild(c);
   }
 

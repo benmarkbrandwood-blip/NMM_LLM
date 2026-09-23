@@ -2847,11 +2847,19 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
           final.turning_point_oracle)]
         if final.turning_point_ply is not None else []
     )
-    tp_json = [
-        {"ply": int(ply), "quality": quality, "oracle": oracle}
-        for ply, quality, oracle in tp_list_final
-        if ply is not None
-    ]
+    tp_json = []
+    for ply, quality, oracle in tp_list_final:
+        if ply is None:
+            continue
+        tp_m = final.moves[ply] if 0 <= ply < len(final.moves) else None
+        tp_json.append({
+            "ply":      int(ply),
+            "quality":  quality,
+            "oracle":   oracle,
+            "color":    tp_m.color if tp_m else None,
+            "move":     tp_m.move_played if tp_m else None,
+            "best_alt": (tp_m.malom_best_alt or tp_m.best_alt) if tp_m else None,
+        })
     poor_moves = [
         {
             "ply":              m.ply + final.ply_base,
@@ -3040,26 +3048,55 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     lines.append(f"\nSignals: {', '.join(signals)}")
     summary_text = "\n".join(lines)
 
-    signal_plies: dict[str, list[int]] = {
-        "generalist": [
-            m.ply for m in final.moves
-            if m.generalist_top_move is not None
-            and not m.generalist_self_assessed
-            and m.generalist_top_move != m.move_played
-        ],
-        "unconventional": [m.ply for m in final.moves if m.is_unconventional],
-        "gapnet": [
-            m.ply for m in final.moves
-            if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.55
-        ],
-        "pref": [
-            m.ply for m in final.moves
-            if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
-        ],
-        "mobility": [
-            m.ply for m in final.moves
-            if m.phase in ("move", "fly") and 0 < m.legal_move_count <= 4
-        ],
+    def _sp_base(m) -> dict:
+        return {"ply": m.ply, "color": m.color, "move": m.move_played}
+
+    signal_plies: dict[str, list[dict]] = {
+        "generalist": sorted(
+            [
+                {**_sp_base(m), "preferred": m.generalist_top_move, "r_h": round(m.r_h, 3)}
+                for m in final.moves
+                if m.generalist_top_move is not None
+                and not m.generalist_self_assessed
+                and m.generalist_top_move != m.move_played
+            ],
+            key=lambda d: abs(d["r_h"]), reverse=True,
+        ),
+        "unconventional": sorted(
+            [
+                {
+                    **_sp_base(m),
+                    "preferred": m.policy_top_move,
+                    "prob": round(m.policy_prob, 3) if m.policy_prob is not None else None,
+                }
+                for m in final.moves if m.is_unconventional
+            ],
+            key=lambda d: (d["prob"] or 1.0),
+        ),
+        "gapnet": sorted(
+            [
+                {**_sp_base(m), "score": round(m.blunder_zone_score, 3)}
+                for m in final.moves
+                if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.55
+            ],
+            key=lambda d: d["score"], reverse=True,
+        ),
+        "pref": sorted(
+            [
+                {**_sp_base(m), "delta": round(m.policy_pref_delta, 3)}
+                for m in final.moves
+                if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
+            ],
+            key=lambda d: abs(d["delta"]), reverse=True,
+        ),
+        "mobility": sorted(
+            [
+                {**_sp_base(m), "count": m.legal_move_count}
+                for m in final.moves
+                if m.phase in ("move", "fly") and 0 < m.legal_move_count <= 4
+            ],
+            key=lambda d: d["count"],
+        ),
     }
 
     try:

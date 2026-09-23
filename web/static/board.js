@@ -380,7 +380,7 @@ export class Board {
     this._replayGroup.innerHTML = "";
   }
 
-  setReplayQualityRings(node, quality, tpRank) {
+  setReplayQualityRings(node, quality, tpRank, sigColor) {
     this._replayGroup.innerHTML = "";
     const coords = nodeXY(node);
     if (!coords) return;
@@ -403,6 +403,14 @@ export class Board {
         cx:x, cy:y, r: PIECE_R + 17,
         fill:"none", stroke:tpColor, "stroke-width":tpWidth,
         "stroke-dasharray":"5 3", opacity:"0.8",
+      }));
+    }
+
+    if (sigColor) {
+      this._replayGroup.appendChild(_el("circle", {
+        cx:x, cy:y, r: PIECE_R + 24,
+        fill:"none", stroke:sigColor, "stroke-width":"1.5",
+        "stroke-dasharray":"3 4", opacity:"0.75",
       }));
     }
   }

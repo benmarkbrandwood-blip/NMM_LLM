@@ -408,6 +408,31 @@ main {
   font-size: .71rem;
 }
 
+#replay-signal-badge {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(8, 14, 20, 0.90);
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: .74rem;
+  color: #cccccc;
+  text-align: center;
+  pointer-events: none;
+  z-index: 9;
+  white-space: nowrap;
+}
+#replay-signal-badge .sig-badge-label {
+  font-weight: bold;
+  margin-right: 6px;
+}
+#replay-signal-badge .sig-badge-detail {
+  opacity: 0.75;
+  font-size: .70rem;
+}
+
 #status-bar {
   font-size: .9rem;
   color: var(--text-dim);
