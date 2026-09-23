@@ -1329,11 +1329,13 @@ class TestDebriefAnnotationPrompt:
             f"Decimal found in TURNING POINT block: {tp_block!r}"
 
     def test_malom_wdl_label_used_not_raw_quality_string(self):
-        """When oracle is malom_full, the arrow label is used, not the raw quality string."""
+        """When oracle is malom_full, English WDL verdict is used, not the raw quality string."""
         ann = _make_annotation_with_tp(oracle="malom_full", quality="win_to_loss")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "Win→Loss" in prompt
-        # Raw 'win_to_loss' string should not appear in the prompt
+        # Must contain natural-language WDL description
+        assert "winning before" in prompt or "losing after" in prompt, \
+            f"Expected WDL verdict prose in prompt, got: {prompt!r}"
+        # Raw 'win_to_loss' quality string must not appear verbatim
         assert "win_to_loss" not in prompt
 
     def test_regret_label_used_for_heuristic_oracle(self):

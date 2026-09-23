@@ -3040,6 +3040,28 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     lines.append(f"\nSignals: {', '.join(signals)}")
     summary_text = "\n".join(lines)
 
+    signal_plies: dict[str, list[int]] = {
+        "generalist": [
+            m.ply for m in final.moves
+            if m.generalist_top_move is not None
+            and not m.generalist_self_assessed
+            and m.generalist_top_move != m.move_played
+        ],
+        "unconventional": [m.ply for m in final.moves if m.is_unconventional],
+        "gapnet": [
+            m.ply for m in final.moves
+            if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.55
+        ],
+        "pref": [
+            m.ply for m in final.moves
+            if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
+        ],
+        "mobility": [
+            m.ply for m in final.moves
+            if m.phase in ("move", "fly") and 0 < m.legal_move_count <= 4
+        ],
+    }
+
     try:
         _wdl_json = [
             {
@@ -3066,6 +3088,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             "ply_quality":    [m.quality for m in final.moves],
             "ply_base":       final.ply_base,
             "winner":         winner,
+            "signal_plies":   signal_plies,
         })
     except asyncio.CancelledError:
         return

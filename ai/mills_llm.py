@@ -316,6 +316,16 @@ STYLE:
 - Malom labels (W, D, L) are categorical outcomes; never paraphrase them as probabilities.
 - Label any model probability or empirical win rate explicitly as such.
 - Do not quote raw decimal scores; use the categorical descriptors already provided.
+
+COLOR ATTRIBUTION RULES (CRITICAL — violations render the commentary wrong):
+- Every move entry in the fact block has an explicit Player field: W (White) or B (Black).
+- That Player field is ground truth. NEVER override it or infer color from ply parity.
+- 'W' = White, 'B' = Black, everywhere in this prompt without exception.
+- WDL verdicts are stated from the named player's perspective.
+  Example: "White was drawn before, losing after" means WHITE's position worsened.
+  Example: "Black was drawn before, losing after" means BLACK's position worsened.
+- Winner and Loser are stated explicitly in GAME FACTS — do not infer them from anything else.
+- A player making a poor move is the one who worsened their own position; the opponent benefited.
 """
 
 _DEBRIEF_POSITION_SYSTEM = _BOARD_RULES + """
@@ -518,11 +528,15 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
     # GAME FACTS
     n_plies = len(annotation.moves)
     opening = annotation.opening_name or getattr(report, "opening_name", None) or "unknown"
+    _cn = {"W": "White", "B": "Black"}
+    winner_label = f"{report.winner} ({_cn.get(report.winner, report.winner)})"
+    loser_label  = f"{report.loser}  ({_cn.get(report.loser,  report.loser)})"
     lines.append("GAME FACTS:")
-    lines.append(f"  Winner: {report.winner}")
-    lines.append(f"  Loser:  {report.loser}")
+    lines.append(f"  Winner: {winner_label}")
+    lines.append(f"  Loser:  {loser_label}")
     lines.append(f"  Plies:  {n_plies}")
     lines.append(f"  Opening: {opening}")
+    lines.append("  (W = White, B = Black throughout this prompt)")
     lines.append("")
 
     # SCORE TREND
@@ -538,13 +552,22 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         tp = annotation.moves[tp_ply]
         oracle = annotation.turning_point_oracle
         quality_label = _wdl_quality_label(annotation.turning_point_quality)
+        tp_color_name = _cn.get(tp.color, tp.color)
         lines.append("TURNING POINT:")
+        lines.append(f"  Player:         {tp.color} ({tp_color_name})  ← authoritative, do not change")
         lines.append(f"  Ply:            {tp_ply + 1}")
         lines.append(f"  Move played:    {tp.move_played}")
-        if tp.best_alt:
-            lines.append(f"  Best available: {tp.best_alt}")
+        best_shown = tp.malom_best_alt if (oracle in ("malom_full", "retrograde_wdl") and tp.malom_best_alt) else tp.best_alt
+        if best_shown:
+            lines.append(f"  Best available: {best_shown}  (stronger for {tp_color_name})")
         if oracle in ("malom_full", "retrograde_wdl"):
-            lines.append(f"  Malom outcome:  {quality_label}  (oracle: {oracle})")
+            wdl_map = {"W": "winning", "D": "drawn", "L": "losing"}
+            wb = wdl_map.get(tp.wdl_before or "", tp.wdl_before or "?")
+            wa = wdl_map.get(tp.wdl_after  or "", tp.wdl_after  or "?")
+            lines.append(
+                f"  Malom verdict:  {tp_color_name} was {wb} before this move,"
+                f" {wa} after  (oracle: {oracle})"
+            )
         else:
             lines.append(f"  Regret signal:  {quality_label}  (oracle: {oracle})")
         lines.append("")
@@ -555,12 +578,21 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
     if other_poor:
         lines.append("OTHER POOR MOVES:")
         for m in other_poor:
+            m_color_name = _cn.get(m.color, m.color)
             if m.oracle_source in ("malom_full", "retrograde_wdl"):
-                wdl_key = f"{m.wdl_before}→{m.wdl_after}" if m.wdl_before else "confirmed_poor"
+                wdl_map2 = {"W": "winning", "D": "drawn", "L": "losing"}
+                wb2 = wdl_map2.get(m.wdl_before or "", m.wdl_before or "?")
+                wa2 = wdl_map2.get(m.wdl_after  or "", m.wdl_after  or "?")
                 alt_note = f"  best: {m.malom_best_alt}" if m.malom_best_alt else ""
-                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (Malom: {wdl_key}){alt_note}")
+                lines.append(
+                    f"  Ply {m.ply + 1} {m.color} ({m_color_name}): {m.move_played}"
+                    f"  — {m_color_name} was {wb2} before, {wa2} after{alt_note}"
+                )
             else:
-                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (r_h={m.r_h:.2f})")
+                lines.append(
+                    f"  Ply {m.ply + 1} {m.color} ({m_color_name}): {m.move_played}"
+                    f"  (r_h={m.r_h:.2f})"
+                )
         lines.append("")
 
     # SENTINEL TURNING POINTS (always shown when Sentinel available, even if Malom ran)
@@ -573,7 +605,10 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         for ply, quality, _ in sentinel_tps:
             if 0 <= ply < len(annotation.moves):
                 m = annotation.moves[ply]
-                lines.append(f"  Ply {ply + 1}: {m.move_played}  ({quality})")
+                s_color_name = _cn.get(m.color, m.color)
+                lines.append(
+                    f"  Ply {ply + 1} {m.color} ({s_color_name}): {m.move_played}  ({quality})"
+                )
         lines.append("")
 
     # GENERALIST DIVERGENCE (moves where AI preferred a different move)
@@ -586,8 +621,9 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
     if gen_divs:
         lines.append("GENERALIST DIVERGENCE:")
         for m in sorted(gen_divs, key=lambda x: abs(x.r_h), reverse=True)[:4]:
+            gd_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1} ({m.color}): played {m.move_played}, "
+                f"  Ply {m.ply + 1} {m.color} ({gd_color_name}): played {m.move_played}, "
                 f"AI preferred {m.generalist_top_move}"
             )
         lines.append("")
@@ -601,8 +637,10 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         lines.append("POLICY DIVERGENCE (pref vs teacher):")
         for m in sorted(pref_moves, key=lambda x: x.policy_pref_delta)[:4]:
             direction = "weak" if m.policy_pref_delta < 0 else "strong"
+            p_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1}: {m.move_played}  delta={m.policy_pref_delta:+.2f} ({direction})"
+                f"  Ply {m.ply + 1} {m.color} ({p_color_name}): {m.move_played}"
+                f"  delta={m.policy_pref_delta:+.2f} ({direction} choice for {p_color_name})"
             )
         lines.append("")
 
@@ -612,8 +650,9 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         top_gap = sorted(gap_moves, key=lambda x: x.blunder_zone_score, reverse=True)[:3]
         lines.append("GAPNET RISK POSITIONS:")
         for m in top_gap:
+            g_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1} ({m.color}): {m.move_played}  "
+                f"  Ply {m.ply + 1} {m.color} ({g_color_name}): {m.move_played}  "
                 f"blunder-zone={m.blunder_zone_score:.2f}"
             )
         lines.append("")

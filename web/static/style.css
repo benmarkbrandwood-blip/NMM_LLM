@@ -800,6 +800,10 @@ main {
 .move-row .move-w.move-tp-primary::after,
 .move-row .move-b.move-tp-primary::after { content: " ⚑"; font-size: .68em; opacity: 0.85; }
 
+/* Assessment signal dots in moves list */
+.sig-dot-row { display:inline-flex; gap:2px; vertical-align:middle; margin-left:3px; }
+.sig-dot     { display:inline-block; width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+
 .move-num  { color: var(--text-dim); }
 .move-row .move-w { color: var(--white-p); }
 .move-row .move-b { color: #9090cc; }

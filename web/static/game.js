@@ -70,6 +70,19 @@ let _assessmentStartTime = null;    // Date.now() when assessment started
 let _assessmentTimerInterval = null; // setInterval handle for elapsed counter
 let _assessmentPlyQuality   = [];   // per-ply quality string from assessment_result
 let _assessmentActiveStage  = 0;    // 0=idle, 1-4=stage currently computing
+let _assessmentSignalPlies  = {};   // {signalKey: [relative plies]} from assessment_result
+let _assessmentMalomShifts  = [];   // [{ply (absolute), color, wdl_before, wdl_after}] from assessment_result
+let _assessmentPlyBase      = 0;    // ply_base offset — add to relative plies for display
+
+const _SIGNAL_META = {
+  turning_point:  { color: "#5ab85a", label: "Turning Point" },
+  malom:          { color: "#5a7acc", label: "Malom WDL Shift" },
+  gapnet:         { color: "#cc5555", label: "Blunder Risk" },
+  generalist:     { color: "#e07830", label: "Generalist Divergence" },
+  unconventional: { color: "#9a60cc", label: "Unconventional Move" },
+  pref:           { color: "#c4a020", label: "Pref Divergence" },
+  mobility:       { color: "#50aaaa", label: "Mobility Warning" },
+};
 
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
 
@@ -1105,7 +1118,9 @@ function startNewGame() {
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
+  _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
+  _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1193,7 +1208,9 @@ function startAiVsAi() {
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   isAiVsAi = true;
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
+  _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
+  _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 0;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1410,7 +1427,9 @@ function startSetupGame() {
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
-  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false; _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
+  _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
+  _stopAssessmentTimer(); _updateAssessmentProgress(0);
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -2004,7 +2023,10 @@ function handleMessage(msg) {
 
     case "assessment_result": {
       _assessmentTurningPoints = msg.turning_points || [];
-      _assessmentPlyQuality = msg.ply_quality || [];
+      _assessmentPlyQuality    = msg.ply_quality || [];
+      _assessmentSignalPlies   = msg.signal_plies || {};
+      _assessmentMalomShifts   = msg.malom_wdl_shifts || [];
+      _assessmentPlyBase       = msg.ply_base || 0;
       _assessmentReady = true;
       _stopAssessmentTimer();
       // Redraw eval graph to show final (Malom-confirmed) turning-point markers
@@ -2017,20 +2039,7 @@ function handleMessage(msg) {
       const feed = $("commentary-human");
       if (feed) {
         feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
-        if (msg.summary_text) {
-          const div = document.createElement("div");
-          div.className = "commentary-line assessment-summary";
-          const label = document.createElement("span");
-          label.className = "speaker";
-          label.textContent = "Game Analysis: ";
-          div.appendChild(label);
-          const pre = document.createElement("span");
-          pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
-          pre.textContent = msg.summary_text;
-          div.appendChild(pre);
-          feed.insertBefore(div, feed.firstChild);
-          feed.scrollTop = 0;
-        }
+        _renderAssessmentSignalSections(msg, feed);
       }
       break;
     }
@@ -2931,10 +2940,28 @@ function _hideReplayTPBadge() {
   if (badge) badge.hidden = true;
 }
 
+function _buildPlySignalMap() {
+  const map = new Map();
+  const add = (ply, key) => {
+    if (!map.has(ply)) map.set(ply, new Set());
+    map.get(ply).add(key);
+  };
+  for (const tp of _assessmentTurningPoints) add(tp.ply, "turning_point");
+  for (const ms of _assessmentMalomShifts) {
+    const rel = ms.ply - _assessmentPlyBase;
+    if (rel >= 0) add(rel, "malom");
+  }
+  for (const [key, plies] of Object.entries(_assessmentSignalPlies)) {
+    for (const p of plies) add(p, key);
+  }
+  return map;
+}
+
 function _annotateMovesListWithQuality() {
   const list = $("moves-list");
   if (!list) return;
-  const tpPlies = new Map(_assessmentTurningPoints.map((tp, i) => [tp.ply, i]));
+  const tpPlies     = new Map(_assessmentTurningPoints.map((tp, i) => [tp.ply, i]));
+  const sigMap      = _buildPlySignalMap();
   list.querySelectorAll("[data-ply]").forEach(el => {
     const ply = parseInt(el.dataset.ply, 10);
     const q   = _assessmentPlyQuality[ply];
@@ -2945,6 +2972,22 @@ function _annotateMovesListWithQuality() {
     if (tpPlies.has(ply)) {
       el.classList.add("move-tp");
       if (tpPlies.get(ply) === 0) el.classList.add("move-tp-primary");
+    }
+    // Remove old signal dots then rebuild
+    const old = el.querySelector(".sig-dot-row");
+    if (old) old.remove();
+    const sigs = sigMap.get(ply);
+    if (sigs && sigs.size > 0) {
+      const row = document.createElement("span");
+      row.className = "sig-dot-row";
+      for (const key of sigs) {
+        const dot = document.createElement("span");
+        dot.className = "sig-dot";
+        dot.style.backgroundColor = (_SIGNAL_META[key] || {}).color || "#888";
+        dot.title = (_SIGNAL_META[key] || {}).label || key;
+        row.appendChild(dot);
+      }
+      el.appendChild(row);
     }
   });
 }
@@ -3038,17 +3081,144 @@ function _updateAssessmentProgress(stage) {
   }
 }
 
+function _renderAssessmentSignalSections(msg, feed) {
+  // Build colored signal-card summary to replace the plain pre-wrap text block.
+  const base = msg.ply_base || 0;
+  const outer = document.createElement("div");
+  outer.className = "commentary-line assessment-summary";
+  outer.style.cssText = "padding:4px 0";
+
+  // Opening name header
+  if (msg.opening_name) {
+    const opener = document.createElement("div");
+    opener.style.cssText = "font-size:.8rem;font-weight:700;color:#8aaa8a;margin-bottom:6px;padding:0 2px";
+    opener.textContent = msg.opening_name;
+    outer.appendChild(opener);
+  }
+
+  // Helper: make one signal card
+  function _card(sigKey, headerText, bodyLines) {
+    if (!bodyLines.length) return null;
+    const meta = _SIGNAL_META[sigKey] || { color: "#888", label: sigKey };
+    const card = document.createElement("div");
+    card.style.cssText = "margin:3px 0;border-radius:3px;overflow:hidden";
+    const hdr = document.createElement("div");
+    hdr.style.cssText = [
+      `background:${meta.color}22`,
+      `border-left:3px solid ${meta.color}`,
+      "padding:3px 7px",
+      "font-size:.73rem",
+      "font-weight:700",
+      `color:${meta.color}`,
+      "letter-spacing:.03em",
+    ].join(";");
+    const dot = document.createElement("span");
+    dot.className = "sig-dot";
+    dot.style.cssText = `background-color:${meta.color};margin-right:5px;vertical-align:middle`;
+    hdr.appendChild(dot);
+    hdr.appendChild(document.createTextNode(headerText));
+    card.appendChild(hdr);
+    const body = document.createElement("div");
+    body.style.cssText = "padding:3px 10px 5px;font-size:.74rem;color:#aaaaaa;line-height:1.6;background:#0c130c";
+    for (const line of bodyLines) {
+      const ln = document.createElement("div");
+      ln.textContent = line;
+      body.appendChild(ln);
+    }
+    card.appendChild(body);
+    return card;
+  }
+
+  // ── Turning points ──────────────────────────────────────────────────────────
+  const tps = msg.turning_points || [];
+  if (tps.length) {
+    const lines = tps.map((tp, i) => {
+      const absPly = tp.ply + base;
+      const moveNum = Math.ceil(absPly / 2);
+      const oracle  = tp.oracle ? ` [${tp.oracle}]` : "";
+      return `ply ${absPly} (move ${moveNum})${oracle}`;
+    });
+    const c = _card("turning_point", `Turning Point (${tps.length})`, lines);
+    if (c) outer.appendChild(c);
+  }
+
+  // ── Malom WDL shifts ────────────────────────────────────────────────────────
+  const malomShifts = msg.malom_wdl_shifts || [];
+  if (malomShifts.length) {
+    const lines = malomShifts.slice(0, 8).map(ms => {
+      const side = ms.color === "W" ? "White" : "Black";
+      const moveNum = Math.ceil(ms.ply / 2);
+      return `ply ${ms.ply} (${side}, move ${moveNum}): ${ms.wdl_before}→${ms.wdl_after}`;
+    });
+    if (malomShifts.length > 8) lines.push(`… +${malomShifts.length - 8} more`);
+    const c = _card("malom", `Malom WDL Shifts (${malomShifts.length})`, lines);
+    if (c) outer.appendChild(c);
+  }
+
+  // ── signal_plies cards ──────────────────────────────────────────────────────
+  const sp = msg.signal_plies || {};
+  const _plyListLine = (plies) => {
+    const abs = plies.map(p => p + base);
+    if (abs.length <= 10) return `plies: ${abs.join(", ")}`;
+    return `plies: ${abs.slice(0, 10).join(", ")} … +${abs.length - 10} more`;
+  };
+
+  const gapnet = sp.gapnet || [];
+  if (gapnet.length) {
+    const c = _card("gapnet", `Blunder Risk / GapNet (${gapnet.length} flagged)`, [_plyListLine(gapnet)]);
+    if (c) outer.appendChild(c);
+  }
+
+  const gen = sp.generalist || [];
+  if (gen.length) {
+    const c = _card("generalist", `Generalist Divergence (${gen.length} flagged)`, [_plyListLine(gen)]);
+    if (c) outer.appendChild(c);
+  }
+
+  const unconv = sp.unconventional || [];
+  if (unconv.length) {
+    const c = _card("unconventional", `Unconventional Moves (${unconv.length} flagged)`, [_plyListLine(unconv)]);
+    if (c) outer.appendChild(c);
+  }
+
+  const pref = sp.pref || [];
+  if (pref.length) {
+    const c = _card("pref", `Pref Divergence (${pref.length} flagged)`, [_plyListLine(pref)]);
+    if (c) outer.appendChild(c);
+  }
+
+  const mob = sp.mobility || [];
+  if (mob.length) {
+    const c = _card("mobility", `Mobility Warning (${mob.length} tight plies)`, [_plyListLine(mob)]);
+    if (c) outer.appendChild(c);
+  }
+
+  // If nothing was flagged, show a clean-game message
+  const hasAny = tps.length || malomShifts.length ||
+    gapnet.length || gen.length || unconv.length || pref.length || mob.length;
+  if (!hasAny) {
+    const clean = document.createElement("div");
+    clean.style.cssText = "font-size:.8rem;color:#6aaa6a;padding:4px 2px";
+    clean.textContent = "No flagged signals — clean game.";
+    outer.appendChild(clean);
+  }
+
+  feed.insertBefore(outer, feed.firstChild);
+  feed.scrollTop = 0;
+}
+
+// [label, description, signal_key_or_null]
 const _ASSESSMENT_LEGEND_ITEMS = [
-  ["Turning point",    "The ply where the position evaluation shifted most sharply, then cross-checked against Malom's perfect database to confirm it was a genuine game-state change — not just a heuristic fluctuation."],
-  ["Malom",           "A perfect solver covering every Nine Men's Morris position. It provides a definitive Win / Draw / Loss verdict for any board state, so WDL shifts mark moves that provably changed the theoretical game outcome."],
-  ["Heuristic eval",  "The classical AI's board score, based on mills formed, piece mobility, and blocked opponent pieces. Used to detect large evaluation swings and identify the first-pass turning point before Malom confirmation."],
-  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness."],
-  ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs."],
-  ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment."],
-  ["Teacher net",     "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play."],
-  ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players."],
-  ["Unconventional",  "Moves ranked low by the teacher net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare."],
-  ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped."],
+  ["Turning point",   "The ply where the position evaluation shifted most sharply, then cross-checked against Malom's perfect database to confirm it was a genuine game-state change — not just a heuristic fluctuation.", "turning_point"],
+  ["Malom",           "A perfect solver covering every Nine Men's Morris position. It provides a definitive Win / Draw / Loss verdict for any board state, so WDL shifts mark moves that provably changed the theoretical game outcome.", "malom"],
+  ["Heuristic eval",  "The classical AI's board score, based on mills formed, piece mobility, and blocked opponent pieces. Used to detect large evaluation swings and identify the first-pass turning point before Malom confirmation.", null],
+  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness.", null],
+  ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs.", "gapnet"],
+  ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment.", "generalist"],
+  ["Teacher net",     "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", null],
+  ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
+  ["Unconventional",  "Moves ranked low by the teacher net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
+  ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped.", "mobility"],
 ];
 
 function _buildAssessmentLegend() {
@@ -3065,12 +3235,19 @@ function _buildAssessmentLegend() {
   wrap.appendChild(hdr);
   const grid = document.createElement("div");
   grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:4px 14px";
-  for (const [label, desc] of _ASSESSMENT_LEGEND_ITEMS) {
+  for (const [label, desc, sigKey] of _ASSESSMENT_LEGEND_ITEMS) {
     const item = document.createElement("div");
     item.style.cssText = "padding:3px 0;border-top:1px solid #1e2e1e";
     const lbl = document.createElement("span");
-    lbl.style.cssText = "font-weight:700;color:#6aaa6a;margin-right:4px";
-    lbl.textContent = label + ": ";
+    const sigColor = sigKey ? (_SIGNAL_META[sigKey] || {}).color : null;
+    lbl.style.cssText = `font-weight:700;color:${sigColor || "#6aaa6a"};margin-right:4px`;
+    if (sigColor) {
+      const dot = document.createElement("span");
+      dot.className = "sig-dot";
+      dot.style.cssText = `background-color:${sigColor};margin-right:4px;vertical-align:middle`;
+      lbl.appendChild(dot);
+    }
+    lbl.appendChild(document.createTextNode(label + ": "));
     item.appendChild(lbl);
     item.appendChild(document.createTextNode(desc));
     grid.appendChild(item);
