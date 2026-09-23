@@ -914,6 +914,21 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Strength graph seek interaction
   _initGraphInteraction();
 
+  // Moves list click-to-seek: clicking a ply cell during replay jumps to that position
+  {
+    const ml = $("moves-list");
+    if (ml) {
+      ml.addEventListener("click", e => {
+        if (!replayMoves.length) return;
+        const target = e.target.closest("[data-ply]");
+        if (!target) return;
+        const ply = parseInt(target.dataset.ply, 10);
+        if (isNaN(ply)) return;
+        replayGo(ply + 1);
+      });
+    }
+  }
+
   $("settings-panel").hidden  = false;
   $("ai-tuning-panel").hidden = true;
   $("moves-panel").hidden     = false;   // show moves by default
@@ -2587,6 +2602,25 @@ function drawEvalGraph() {
     }
   }
 
+  // Signal marker lines — top 2 per signal, colored by each signal's color
+  if (_assessmentReady && Object.keys(_assessmentSignalPlies).length) {
+    const sigMap = _buildSignalReplayMap();
+    // Track which plies already have a TP line so we don't double-draw
+    const tpPlies = new Set(_assessmentTurningPoints.map(tp => tp.ply));
+    for (const [ply, matches] of sigMap) {
+      if (ply < 0 || ply >= n) continue;
+      if (tpPlies.has(ply)) continue;  // TP line already drawn, skip
+      const topKey  = matches[0].key;
+      const sigColor = (_SIGNAL_META[topKey] || {}).color || "#888";
+      const sx = pts[ply].x;
+      svg.appendChild(mk("line", {
+        x1: sx, y1: 0, x2: sx, y2: H,
+        stroke: sigColor, "stroke-width": "1",
+        "stroke-dasharray": "2 4", opacity: "0.5",
+      }));
+    }
+  }
+
   // Replay cursor: vertical line + dot at the current replay position
   if (replayIdx >= 0) {
     // replayIdx=k means board after move k-1; eval index = k-1
@@ -2918,15 +2952,23 @@ function _applyReplayAnnotations(idx) {
     }
   }
 
-  // Check if this ply is the top-ranked ply for any signal
-  const topSigMap = _buildTopSignalByPly();
-  const sigMatch  = topSigMap.get(plyIdx);
-  const sigColor  = sigMatch ? (_SIGNAL_META[sigMatch.key] || {}).color : null;
+  // Check if this ply falls in the top-2 for any signal
+  const sigReplayMap = _buildSignalReplayMap();
+  const sigMatches   = sigReplayMap.get(plyIdx) || [];
+  const topSig       = sigMatches[0] || null;
+  const sigColor     = topSig ? (_SIGNAL_META[topSig.key] || {}).color : null;
 
   const dest = move.to || _parseMoveNotationDest(move.notation);
   if (dest) board.setReplayQualityRings(dest, quality, tpRank, sigColor);
-  if (tpData)   _showReplayTPBadge(tpRank, tpData);
-  if (sigMatch) _showReplaySignalBadge(sigMatch.key, sigMatch.item);
+
+  // Green preferred-move hint: TP best_alt takes priority, then signal preferred
+  const preferredNotation = (tpData && tpData.best_alt)
+    ? tpData.best_alt
+    : (topSig && (topSig.item.preferred || topSig.item.best_alt)) || null;
+  if (preferredNotation && board.drawSignalHint) board.drawSignalHint(preferredNotation);
+
+  if (tpData)  _showReplayTPBadge(tpRank, tpData);
+  if (topSig)  _showReplaySignalBadge(topSig.key, topSig.item);
 }
 
 function _showReplayTPBadge(rank, tpData) {
@@ -2976,12 +3018,16 @@ function _hideReplaySignalBadge() {
   if (badge) badge.hidden = true;
 }
 
-function _buildTopSignalByPly() {
+// Returns Map<relPly, [{key, item, rank}]> for the top 2 items of each signal.
+function _buildSignalReplayMap() {
   const map = new Map();
   for (const [key, items] of Object.entries(_assessmentSignalPlies)) {
-    if (!items.length) continue;
-    const top = typeof items[0] === "object" ? items[0] : { ply: items[0] };
-    map.set(top.ply, { key, item: top });
+    for (let rank = 0; rank < Math.min(2, items.length); rank++) {
+      const item = typeof items[rank] === "object" ? items[rank] : { ply: items[rank] };
+      const ply = item.ply;
+      if (!map.has(ply)) map.set(ply, []);
+      map.get(ply).push({ key, item, rank });
+    }
   }
   return map;
 }
@@ -3129,7 +3175,13 @@ function _updateAssessmentProgress(stage) {
 
 function _renderAssessmentSignalSections(msg, feed) {
   // Build colored signal-card summary to replace the plain pre-wrap text block.
-  const base = msg.ply_base || 0;
+  const base     = msg.ply_base || 0;
+  const _sideName = c => c === "W" ? "White" : "Black";
+  const _absPly   = p => p + base;
+  const _plyTail  = (items, top) => {
+    const rest = items.length - top;
+    return rest > 0 ? [`… +${rest} more`] : [];
+  };
   const outer = document.createElement("div");
   outer.className = "commentary-line assessment-summary";
   outer.style.cssText = "padding:4px 0";
@@ -3205,12 +3257,6 @@ function _renderAssessmentSignalSections(msg, feed) {
 
   // ── signal_plies cards ──────────────────────────────────────────────────────
   const sp = msg.signal_plies || {};
-  const _sideName = c => c === "W" ? "White" : "Black";
-  const _absPly   = p => p + base;
-  const _plyTail  = (items, top) => {
-    const rest = items.length - top;
-    return rest > 0 ? [`… +${rest} more`] : [];
-  };
 
   const gapnet = sp.gapnet || [];
   if (gapnet.length) {

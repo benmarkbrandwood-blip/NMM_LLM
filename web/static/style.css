@@ -805,6 +805,8 @@ main {
   border-radius: 3px;
 }
 .move-row:hover { background: #1e1a12; }
+#moves-list [data-ply] { cursor: pointer; }
+#moves-list [data-ply]:hover { background: rgba(200,169,110,0.12); border-radius: 2px; }
 .move-row-hdr {
   color: var(--text-dim);
   font-size: .72rem;

@@ -46,6 +46,28 @@ function nodeXY(name) {
   return [CX + col * SCALE, CY - row * SCALE];
 }
 
+// Parse a move notation string into {from, to, capture}.
+// "d6" → {from:null, to:"d6", capture:null}
+// "b6xd6" → {from:null, to:"b6", capture:"d6"}
+// "d5-c5" → {from:"d5", to:"c5", capture:null}
+// "f4-f2xe4" → {from:"f4", to:"f2", capture:"e4"}
+function _parseFullNotation(notation) {
+  if (!notation) return null;
+  const dash = notation.indexOf('-');
+  if (dash >= 0) {
+    const from = notation.slice(0, dash);
+    const rest = notation.slice(dash + 1);
+    const xi = rest.indexOf('x');
+    return xi >= 0
+      ? { from, to: rest.slice(0, xi), capture: rest.slice(xi + 1) }
+      : { from, to: rest, capture: null };
+  }
+  const xi = notation.indexOf('x');
+  return xi >= 0
+    ? { from: null, to: notation.slice(0, xi), capture: notation.slice(xi + 1) }
+    : { from: null, to: notation, capture: null };
+}
+
 export class Board {
   constructor(svgEl, onNodeClick) {
     this.svg        = svgEl;
@@ -378,6 +400,63 @@ export class Board {
 
   clearReplayOverlay() {
     this._replayGroup.innerHTML = "";
+  }
+
+  // Draw a green suggested-move overlay (arrow for moves, ring for placements, X for captures).
+  // Call AFTER setReplayQualityRings so it appends without clearing.
+  drawSignalHint(notation) {
+    if (!notation) return;
+    const parsed = _parseFullNotation(notation);
+    if (!parsed) return;
+    const { from, to, capture } = parsed;
+    const toCoords = nodeXY(to);
+    if (!toCoords) return;
+    const [tx, ty] = toCoords;
+    const G = "#4caf50";
+    const g = this._replayGroup;
+
+    if (from) {
+      const fromCoords = nodeXY(from);
+      if (fromCoords) {
+        const [fx, fy] = fromCoords;
+        const dx = tx - fx, dy = ty - fy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > PIECE_R * 2) {
+          const sx = fx + dx / dist * PIECE_R;
+          const sy = fy + dy / dist * PIECE_R;
+          const ex = tx - dx / dist * PIECE_R;
+          const ey = ty - dy / dist * PIECE_R;
+          g.appendChild(_el("line", {
+            x1: sx, y1: sy, x2: ex, y2: ey,
+            stroke: G, "stroke-width": "2.5", opacity: "0.9",
+            "marker-end": "url(#arr-green)",
+          }));
+        }
+      }
+    } else {
+      // Placement: filled halo at destination
+      g.appendChild(_el("circle", {
+        cx: tx, cy: ty, r: PIECE_R + 6,
+        fill: "rgba(76,175,80,0.18)", stroke: G, "stroke-width": "2", opacity: "0.85",
+      }));
+    }
+
+    // Green destination ring
+    g.appendChild(_el("circle", {
+      cx: tx, cy: ty, r: PIECE_R + 5,
+      fill: "none", stroke: G, "stroke-width": "1.8", opacity: "0.8",
+    }));
+
+    // Green X at capture square
+    if (capture) {
+      const capCoords = nodeXY(capture);
+      if (capCoords) {
+        const [cx, cy] = capCoords;
+        const S = 9;
+        g.appendChild(_el("line", { x1: cx - S, y1: cy - S, x2: cx + S, y2: cy + S, stroke: G, "stroke-width": "2.5", opacity: "0.85" }));
+        g.appendChild(_el("line", { x1: cx + S, y1: cy - S, x2: cx - S, y2: cy + S, stroke: G, "stroke-width": "2.5", opacity: "0.85" }));
+      }
+    }
   }
 
   setReplayQualityRings(node, quality, tpRank, sigColor) {
