@@ -1132,7 +1132,17 @@ async def list_openings():
 _opening_tree_cache: dict = {}  # keyed by depth int
 
 
-def _build_opening_tree(max_depth: int = 8) -> dict:
+def _notation_to_move_dict(n: str) -> dict:
+    cap, base = None, n
+    if "x" in n:
+        xi = n.index("x"); cap = n[xi + 1:]; base = n[:xi]
+    if "-" in base:
+        fr, to = base.split("-", 1)
+        return {"from": fr, "to": to, "capture": cap}
+    return {"from": None, "to": base, "capture": cap}
+
+
+def _build_opening_tree(max_depth: int = 14) -> dict:
     """Build a prefix trie from the opening book + HumanDB frequencies.
 
     Each node has: move, ply, human_pct, w_wins, draws, b_wins,
@@ -1174,18 +1184,27 @@ def _build_opening_tree(max_depth: int = 8) -> dict:
 
         nodes = []
         for move, entry in book_moves.items():
-            new_board = board.apply_move({"from": None, "to": move, "capture": None})
+            new_board = board.apply_move(_notation_to_move_dict(move))
 
             ops_here = entry.get("ops", [])
             # Names of openings whose stored line ends exactly at this ply
             term_names = [op.name for op in ops_here if len(op.line_moves) == ply + 1]
             # All opening names that pass through (include) this move
             all_names  = [op.name for op in ops_here]
+            # Source classification: "learned" only when ALL ops are user-discovered.
+            # "book" and "teacher-predicted" are both curated (shipped) content.
+            all_srcs = {op.seed_source for op in ops_here}
+            curated  = all_srcs - {"learned"}
+            node_src  = ("learned" if not curated
+                         else "book"   if "book"   in curated
+                         else "human"  if "human"  in curated
+                         else "book")   # teacher-predicted counts as curated book
 
             children = _recurse(new_board, ply + 1, prefix + (move,))
             nodes.append({
                 "move":            move,
                 "ply":             ply + 1,
+                "source":          node_src,
                 "human_pct":       round(human_freqs.get(move, 0.0) * 100, 1),
                 "w_wins":          entry.get("w", 0),
                 "draws":           entry.get("d", 0),
@@ -1205,10 +1224,10 @@ def _build_opening_tree(max_depth: int = 8) -> dict:
 
 
 @app.get("/api/opening_tree")
-async def api_opening_tree(depth: int = 8):
+async def api_opening_tree(depth: int = 14, refresh: bool = False):
     global _opening_tree_cache
     d = max(2, min(depth, 16))
-    if d not in _opening_tree_cache:
+    if refresh or d not in _opening_tree_cache:
         _opening_tree_cache[d] = await asyncio.to_thread(_build_opening_tree, d)
     from fastapi.responses import JSONResponse
     return JSONResponse(_opening_tree_cache[d])
@@ -4464,11 +4483,15 @@ async def ws_endpoint(websocket: WebSocket):
                     record = session.coordinator.build_game_record(
                         winner=session.human_color, human_color=session.human_color
                     )
+                    session._last_game_record = record
                     await asyncio.to_thread(session.coordinator.on_game_end, record)
                     if hasattr(_overseer_advisor, "record_game_result"):
                         await asyncio.to_thread(_overseer_advisor.record_game_result, record)
                     await _commentary(websocket, session)
                     asyncio.create_task(_maybe_consolidate(websocket))
+                    session._assessment_task = asyncio.create_task(
+                        _run_game_assessment(websocket, session, record)
+                    )
                 await _after_game_end()
 
             # ── decline_resignation — player forces the AI to keep playing ──────
@@ -5171,15 +5194,16 @@ async def ws_endpoint(websocket: WebSocket):
                     "section": "ai",
                 })
 
-                # Replay each placement move
+                # Replay each placement move (handles captures like "b6xb4")
                 for pos in opening.line_moves:
                     await asyncio.sleep(0)  # yield to event loop
-                    move = {"from": None, "to": pos, "capture": None}
+                    move = _notation_to_move_dict(pos)
 
-                    # Check legality
+                    # Check legality using the parsed destination
                     board = session.engine.board
                     legal = get_all_legal_moves(board)
-                    valid = any(m.get("from") is None and m["to"] == pos for m in legal)
+                    dest  = move["to"]
+                    valid = any(m.get("from") is None and m["to"] == dest for m in legal)
                     if not valid:
                         await _send(websocket, {
                             "type":    "commentary",
@@ -5189,8 +5213,8 @@ async def ws_endpoint(websocket: WebSocket):
                         })
                         break
 
-                    # Auto-capture when a mill is formed
-                    if session.engine.move_forms_mill(move):
+                    # Use book-specified capture; fall back to first legal capture if mill formed
+                    if move["capture"] is None and session.engine.move_forms_mill({"from": None, "to": dest, "capture": None}):
                         caps = sorted(board.legal_captures(board.turn))
                         if caps:
                             move["capture"] = caps[0]
@@ -5200,8 +5224,8 @@ async def ws_endpoint(websocket: WebSocket):
                     await asyncio.sleep(speed_ms / 1000)
                     await _send(websocket, {
                         "type":        "ai_move",
-                        "from":        None,
-                        "to":          pos,
+                        "from":        move.get("from"),
+                        "to":          move["to"],
                         "capture":     move.get("capture"),
                         "was_blunder": False,
                         "can_mark_bad": False,

@@ -3038,6 +3038,47 @@ function _updateAssessmentProgress(stage) {
   }
 }
 
+const _ASSESSMENT_LEGEND_ITEMS = [
+  ["Turning point",    "The ply where the position evaluation shifted most sharply, then cross-checked against Malom's perfect database to confirm it was a genuine game-state change — not just a heuristic fluctuation."],
+  ["Malom",           "A perfect solver covering every Nine Men's Morris position. It provides a definitive Win / Draw / Loss verdict for any board state, so WDL shifts mark moves that provably changed the theoretical game outcome."],
+  ["Heuristic eval",  "The classical AI's board score, based on mills formed, piece mobility, and blocked opponent pieces. Used to detect large evaluation swings and identify the first-pass turning point before Malom confirmation."],
+  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness."],
+  ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs."],
+  ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment."],
+  ["Teacher net",     "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play."],
+  ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players."],
+  ["Unconventional",  "Moves ranked low by the teacher net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare."],
+  ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped."],
+];
+
+function _buildAssessmentLegend() {
+  const wrap = document.createElement("div");
+  wrap.className = "assessment-legend";
+  wrap.style.cssText = [
+    "margin:6px 0 2px", "padding:8px 10px",
+    "background:#111a11", "border:1px solid #2a3a2a", "border-radius:4px",
+    "font-size:.74rem", "color:#8aaa8a", "line-height:1.45",
+  ].join(";");
+  const hdr = document.createElement("div");
+  hdr.style.cssText = "font-size:.72rem;font-weight:700;color:#5a8a5a;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase";
+  hdr.textContent = "Signal reference";
+  wrap.appendChild(hdr);
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:4px 14px";
+  for (const [label, desc] of _ASSESSMENT_LEGEND_ITEMS) {
+    const item = document.createElement("div");
+    item.style.cssText = "padding:3px 0;border-top:1px solid #1e2e1e";
+    const lbl = document.createElement("span");
+    lbl.style.cssText = "font-weight:700;color:#6aaa6a;margin-right:4px";
+    lbl.textContent = label + ": ";
+    item.appendChild(lbl);
+    item.appendChild(document.createTextNode(desc));
+    grid.appendChild(item);
+  }
+  wrap.appendChild(grid);
+  return wrap;
+}
+
 function _startAssessmentTimer() {
   if (_assessmentTimerInterval) return;
   _assessmentStartTime = Date.now();
@@ -3045,6 +3086,9 @@ function _startAssessmentTimer() {
   if (!feed) return;
   const old = feed.querySelector(".assessment-running-msg");
   if (old) old.remove();
+  // Insert legend first so timer prepends above it
+  const oldLegend = feed.querySelector(".assessment-legend");
+  if (!oldLegend) feed.prepend(_buildAssessmentLegend());
   const div = document.createElement("div");
   div.className = "commentary-line assessment-running-msg";
   div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
