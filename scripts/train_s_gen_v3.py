@@ -2034,11 +2034,20 @@ def run(args: argparse.Namespace) -> None:
                 _opp, _gt = _h, "vs_heuristic_humanlike"
 
             elif human_teacher_adv is not None and _roll < _lower_diff_hi + 0.45:
-                # 25% teacher-blended heuristic: HeuristicAgent whose inner GameAI
-                # blends minimax scores with HumanMovePolicyAdvisor probabilities
-                # (trained on all human moves, averaged across Elo bands).
-                _gd  = difficulty
-                _hw  = _mk_teacher_weights(int(args.human_teacher_blend))
+                # 25% teacher-blended heuristic: varied difficulty with adaptive blend.
+                # Lower difficulty = more human signal (high blend = more mistakes).
+                # Higher difficulty = heuristic-grounded with human flavouring.
+                #   diff 1-3  → blend 75  (beginner-like: mostly human probs)
+                #   diff 4-6  → blend 50  (mid-range: balanced)
+                #   diff 7+   → blend 25  (strong player: human tendencies only)
+                _gd = int(rng.randint(1, max(1, difficulty))) if difficulty > 1 else 1
+                if _gd <= 3:
+                    _t_blend = 75
+                elif _gd <= 6:
+                    _t_blend = 50
+                else:
+                    _t_blend = 25
+                _hw  = _mk_teacher_weights(_t_blend)
                 _h   = HeuristicAgent(color=_oc, difficulty=_gd, game_ai=None)
                 _h._inner = _make_ga(_oc, _gd, human_pref_net=human_teacher_adv, weights=_hw)
                 _opp, _gt = _h, "vs_heuristic_teacher"

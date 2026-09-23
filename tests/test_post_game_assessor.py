@@ -551,7 +551,7 @@ def _make_mock_policy(top_idx: int = 0):
 
 def _make_mock_generalist(top_idx: int = 0):
     """Mock GeneralistAgent.score_moves() that sizes its output to len(candidates)."""
-    def _side_effect(board, candidates, color):
+    def _side_effect(board, candidates, color, **kwargs):
         n = len(candidates)
         scores = [0.2] * n
         scores[min(top_idx, n - 1)] = 0.6

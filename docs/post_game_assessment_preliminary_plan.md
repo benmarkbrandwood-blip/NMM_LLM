@@ -709,3 +709,158 @@ for players who want it.
    Fix after Stage 7 scaffolding is in place: on resume, batch-replay the restored move
    list to re-populate both histories (and `_diagFenCache` for overlay signals — see also
    overlay storage gap in sentinel assessment notes).
+
+---
+
+## Appendix A — Four-Stage Progressive Release (Stage 8 design)
+
+> **Status: Design pending timing measurements.**
+> Implement only after per-component timing is measured on real games using
+> `tools/bench_assessment_timing.py`. Stage groupings below are provisional and
+> must be revised if timing measurements show imbalance.
+
+### Motivation
+
+Full assessment of a 36-ply game with all components active takes O(minutes).
+Releasing results progressively — while assessment continues in the background —
+keeps the user reading rather than waiting. Each stage releases a self-contained
+block of insight; the user does not need to wait for Malom/generalist to read the
+game arc and spot mistakes.
+
+### Architecture: three-pass single board replay
+
+`PostGameAssessor.assess()` is refactored into three sequential passes that mutate
+a shared `list[MoveAnnotation]` in place. The board is replayed **once**; each pass
+fills new fields without redoing heuristic scoring.
+
+```
+_assess_pass_heuristic(annotations, moves_raw, board_seq)
+    → fills: heuristic fields, sentinel, gapnet, legal_move_count
+_assess_pass_generalist(annotations, moves_raw, board_seq)
+    → fills: generalist_*, policy_*, pref_*, is_unconventional
+_assess_pass_oracle(annotations, moves_raw, board_seq)
+    → fills: malom wdl_*, quality, oracle_source, turning_points (final)
+```
+
+Board state sequence is computed once before any pass and stored as a list.
+`_detect_turning_point()` is called after each pass using only the fields
+populated so far — provisional result in passes 1–2, final in pass 3.
+
+`assess()` becomes an iterator or accepts a `yield_after_pass` callback so
+the caller can send partial results to the WebSocket between passes.
+
+### `_run_game_assessment` call flow
+
+```python
+# Three passes, streaming partial results after each
+ann_list = []  # shared, mutated in place
+board_seq = _build_board_sequence(record)
+
+await to_thread(assessor._assess_pass_heuristic, ann_list, moves_raw, board_seq)
+await _send(ws, _build_stage_message(1, ann_list, record))
+
+await to_thread(assessor._assess_pass_generalist, ann_list, moves_raw, board_seq)
+await _send(ws, _build_stage_message(2, ann_list, record))
+
+await to_thread(assessor._assess_pass_oracle, ann_list, moves_raw, board_seq)
+await _send(ws, _build_stage_message(3, ann_list, record))  # "assessment_result"
+```
+
+LLM commentary is produced once per stage (three LLM calls, strictly scoped):
+- Stage 1 LLM: game shape + eval curve (one sentence)
+- Stage 2 LLM: AI divergence + unconventional moves (one sentence)
+- Stage 3/4 LLM: full synthesis — turning points, Malom adjudication, pref/teacher
+
+### Provisional four-stage UI grouping
+
+> Groupings will be confirmed or revised once `bench_assessment_timing.py` produces
+> real per-component times. Target: roughly even wall-clock time per stage.
+
+| Stage | Label shown in UI | Components | WebSocket message |
+|-------|-------------------|------------|-------------------|
+| 1 | "Analysing game arc…" | Heuristic, eval curve, opening, mobility | `assessment_stage_1` |
+| 2 | "Analysing move quality…" | Sentinel, GapNet, provisional TPs, unconventional moves | `assessment_stage_2` |
+| 3 | "Comparing to AI…" | Generalist, policy (teacher/pref), pref delta | `assessment_stage_3` |
+| 4 | "Adjudicating with Malom…" | Malom WDL, final TPs, confirmed-poor moves | `assessment_result` (existing) |
+
+Stages 1–3 each end with a partial LLM sentence. Stage 4 ends with the full
+`assessment_result` + final `assessment_llm` (same as current flow).
+
+### Turning-point cross-dependency
+
+Stages 1–3 emit **provisional** TPs from whichever signals are populated so far.
+Stage 4 replaces them with the final Malom-adjudicated list. The UI:
+- Renders provisional TP markers in a lighter style (dashed, amber)
+- Replaces them silently when the final `assessment_result` arrives
+- Does **not** label provisional TPs as "turning point" in prose — only Stage 4
+  uses that term
+
+This is **Option C** from the advisor's analysis: TPs appear early as "notable
+moments" and are upgraded to "turning point" only when Malom confirms.
+
+### Progress bar UI
+
+A four-segment bar sits below the Game Assessment button. Each segment fills
+when its stage completes. The active segment pulses. Segments:
+1. Game arc
+2. Move quality
+3. AI comparison
+4. Malom adjudication
+
+```
+[Game arc ✓] [Move quality…] [AI comparison] [Malom]
+```
+
+Once all four are complete the bar is replaced by the green "Assessment done"
+button state (current behaviour).
+
+### LLM commentary scope constraints
+
+| Stage | Prompt scope | Hard constraint |
+|-------|-------------|-----------------|
+| 1 | Game shape only: eval curve characterisation, opening name | One sentence. No move quality claims. |
+| 2 | Sentinel/GapNet findings + unconventional moves | One sentence. No Malom attribution. |
+| 3 | Generalist divergence: where AI would have played differently | One sentence. Frame as AI perspective. |
+| 4 | Full synthesis: turning points, confirmed-poor moves, overall verdict | 3–5 sentences. May reference all signals. |
+
+Each stage prompt includes a hard instruction: "Do not repeat content from prior
+stages. Stage N commentary is already shown above." Stages 1–2 may be
+template-generated rather than LLM if timing analysis shows those stages are
+trivially fast (< 5s) and LLM latency would dominate.
+
+### Confirmed timing measurements (2026-09-21, depth=3, sim_ply=5)
+
+Measured on the last 3 real games using `tools/bench_assessment_timing.py`:
+
+| Game | Plies | depth=4 total | depth=3 total | Heuristic | Generalist | Malom |
+|------|-------|--------------|---------------|-----------|------------|-------|
+| 1 | 41 | 272s | 44.6s | 44.5s | 16.6s | 6.8s |
+| 2 | 32 | 259s | 35.7s | 35.7s | 11.1s | 6.5s |
+| 3 | 35 | 131s | 31.1s | 31.1s | 7.7s | 0.0s |
+| **avg** | | **221s** | **37.1s** | **37.1s** | **12.0s** | **4.4s** |
+
+Key findings:
+- **Sentinel, GapNet, Policy, Pref: all <50ms total** — add to Stage 1 for free
+- **Generalist (sim_ply=5): ~0.35s/ply** — separate stage, 10–17s
+- **Malom: ~0.2s/ply when available** — separate stage, 5–7s
+- **Heuristic: depth=3 is 4–7× faster than depth=4** — use depth=3 in production
+- **Projected total at depth=3 (all components): ~54s** — well under 2 minutes
+
+The four-stage timings become:
+- Stage 1 (heuristic + sentinel + GapNet + policy + pref): ~37s
+- Stage 2 (generalist): ~12s
+- Stage 3 (Malom adjudication): ~5s
+- Stage 4 (LLM synthesis): ~10–20s per call × 4 stages
+
+### Pre-implementation checklist
+
+- [x] Run `tools/bench_assessment_timing.py -n 3` on the last 3 games
+- [x] Confirm sim_ply=5 fix is effective (generalist now ~0.35s/ply)
+- [x] Change assessment depth to 3 in `web/app.py` (done)
+- [x] Per-component breakdown measured; stage groupings confirmed above
+- [ ] Refactor `assess()` into three-pass architecture (single board replay)
+- [ ] Add `_build_stage_message()` helper to `web/app.py`
+- [ ] Wire streaming `_run_game_assessment` with three `to_thread` + `_send` calls
+- [ ] Add four-segment progress bar to `game.js` and `style.css`
+- [ ] Write three-scope LLM prompts (game arc / AI divergence / full synthesis)
+- [ ] Manual validation on 5 games after streaming is live

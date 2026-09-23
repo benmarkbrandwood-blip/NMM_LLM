@@ -555,13 +555,21 @@ def _scan_pass2_aggregate(
     log_every: int = 1_000_000,
     ledger_file_shas: Optional[dict[str, str]] = None,
     strict: bool = True,
+    pool_bands: bool = False,
 ) -> tuple[dict, dict]:
     """Second JSONL pass.  Aggregate counts for owning-tier events only.
 
-    Returns:
+    When pool_bands=False (default): returns
         counts: dict[(state_key, band), {"notation_counts": dict[str, int],
                                           "phase": str,
                                           "mover_color": str}]
+
+    When pool_bands=True: returns
+        counts: dict[state_key, {"notation_counts": dict[str, int],
+                                  "phase": str,
+                                  "mover_color": str,
+                                  "band_counts": dict[band, int]}]
+        Each state_key entry aggregates events from all Elo bands.
         disposition: {
             "events_kept_by_tier":       {tier: int},
             "events_discarded_by_tier":  {tier: int},   # event's tier ≠ owning tier
@@ -596,7 +604,7 @@ def _scan_pass2_aggregate(
             continue
         owning_tier   = owning_entry["tier"]
         session_tier  = session_meta[session_id]["tier"]
-        key           = (sk, band)
+        key           = sk if pool_bands else (sk, band)
         bp            = (band, phase)
         if session_tier != owning_tier:
             events_discarded_by_tier[session_tier] += 1
@@ -610,13 +618,18 @@ def _scan_pass2_aggregate(
 
         entry = counts.get(key)
         if entry is None:
-            counts[key] = {
+            new_entry: dict = {
                 "notation_counts": {notation: 1},
                 "phase":           phase,
                 "mover_color":     mover_color,
             }
+            if pool_bands:
+                new_entry["band_counts"] = {band: 1}
+            counts[key] = new_entry
         else:
             entry["notation_counts"][notation] = entry["notation_counts"].get(notation, 0) + 1
+            if pool_bands:
+                entry["band_counts"][band] = entry["band_counts"].get(band, 0) + 1
 
         if log_every and n_events % log_every == 0:
             print(f"[extract v2] pass2 events={n_events:,}  "
@@ -637,6 +650,51 @@ def _scan_pass2_aggregate(
         "elapsed_seconds":                  round(time.time() - t0, 1),
     }
     return counts, disposition
+
+
+def _normalize_pooled_counts(
+    counts: dict[str, dict],
+) -> dict[tuple[str, str], dict]:
+    """Convert pooled counts (key=state_key str) to standard (sk, band) key format.
+
+    The band in each key is set to "all" so the teacher is called with band-averaged
+    inference.  The majority observed band is stored as entry["majority_band"] for
+    band_idx recording in the emit loop.
+    """
+    normalized: dict[tuple[str, str], dict] = {}
+    for sk, entry in counts.items():
+        band_counts: dict[str, int] = entry.get("band_counts", {})
+        majority = max(band_counts, key=band_counts.get) if band_counts else "lower"
+        entry["majority_band"] = majority
+        normalized[(sk, "all")] = entry
+    return normalized
+
+
+def _report_overlap_correlation(
+    targets_path: Path,
+    empirical_path: Path,
+    n_rows: int,
+) -> None:
+    """Print per-component teacher-vs-empirical Pearson r and MSE on overlap rows."""
+    from scipy.stats import pearsonr
+    teacher  = np.fromfile(targets_path,  dtype=np.float32).reshape(n_rows, 3)
+    empirical = np.fromfile(empirical_path, dtype=np.float32).reshape(n_rows, 3)
+    comp_names = ("class_downgrade", "wdl_utility_loss", "ordinal_rank_loss")
+    print("\n[extract v2] Teacher-vs-empirical overlap correlation:")
+    for c, name in enumerate(comp_names):
+        mask = ~np.isnan(empirical[:, c])
+        n = int(mask.sum())
+        if n < 2:
+            print(f"  {name}: n={n} — insufficient overlap")
+            continue
+        t = teacher[mask, c]
+        e = empirical[mask, c]
+        r, _ = pearsonr(t.astype(float), e.astype(float))
+        mse = float(((t - e) ** 2).mean())
+        print(f"  {name}: n={n:,}  r={r:.4f}  teacher_vs_emp_mse={mse:.5f}")
+    total_overlap = int((~np.isnan(empirical)).any(axis=1).sum())
+    pct = 100.0 * total_overlap / n_rows if n_rows > 0 else 0.0
+    print(f"  total rows with any empirical target: {total_overlap:,} / {n_rows:,} ({pct:.2f}%)")
 
 
 # ── Fail-closed helpers (borrowed / adapted from v1 extractor) ───────────────
@@ -756,6 +814,7 @@ def run_extraction(
     force:        bool           = False,
     strict:       bool           = True,
     allow_partial_ledger: bool   = False,
+    pool_bands:   bool           = False,
 ) -> dict:
     """Run the Stage D v2 extraction end-to-end.  Returns provenance dict.
 
@@ -826,17 +885,21 @@ def run_extraction(
           f"({pass1_stats['elapsed_seconds']:.1f}s)")
 
     # ── Pass 2: owning-tier-only aggregation ───────────────────────────────
-    print(f"[extract v2] Pass 2 — owning-tier-only aggregation …")
+    mode_label = "pooled state_key" if pool_bands else "(state_key, band)"
+    print(f"[extract v2] Pass 2 — owning-tier-only aggregation (pool_bands={pool_bands}) …")
     counts, disposition = _scan_pass2_aggregate(
         games_dir, session_meta, state_key_owning, limit_files=limit_files,
-        ledger_file_shas=ledger_file_shas, strict=strict,
+        ledger_file_shas=ledger_file_shas, strict=strict, pool_bands=pool_bands,
     )
-    print(f"[extract v2]   pass2 aggregated (state_key, band) pairs: {len(counts):,}")
+    print(f"[extract v2]   pass2 aggregated {mode_label} keys: {len(counts):,}")
     print(f"[extract v2]   events kept by tier: {disposition['events_kept_by_tier']}")
     print(f"[extract v2]   events discarded by tier: {disposition['events_discarded_by_tier']}")
+    if pool_bands:
+        counts = _normalize_pooled_counts(counts)
+        print(f"[extract v2]   pooled keys normalised → {len(counts):,} (sk, 'all') entries")
 
     # ── Emit loop ──────────────────────────────────────────────────────────
-    print(f"[extract v2] Building per-(state_key, band) targets …")
+    print(f"[extract v2] Building per-{mode_label} targets …")
 
     feat_bin_path = out_dir / "parent_feats.f32.bin"
     tgt_bin_path  = out_dir / "targets.f32.bin"
@@ -982,7 +1045,9 @@ def run_extraction(
         unif_rows.append(unif_row)
         emp_rows.append(emp_row)
         state_keys_arr.append(state_key)
-        band_idx_arr.append(_BAND_TO_IDX[band])
+        # When band == "all" (pooled mode) use majority_band for index/reporting.
+        report_band = entry.get("majority_band", "lower") if band == "all" else band
+        band_idx_arr.append(_BAND_TO_IDX[report_band])
         split_arr.append(_SPLIT_TO_INT8[state_key_owning[state_key]["tier"]])
         phase_arr.append(entry["phase"])
         mover_arr.append(entry["mover_color"])
@@ -991,7 +1056,7 @@ def run_extraction(
         owning_hash_arr.append(state_key_owning[state_key]["session_hash"])
         counters["n_emitted"] += 1
         # Per-(band, phase) emitted-row counter (Codex P2 2026-08-14 self-review).
-        bp_key = f"{band}|{entry['phase']}"
+        bp_key = f"{report_band}|{entry['phase']}"
         counters["emitted_by_band_phase"][bp_key] = (
             counters["emitted_by_band_phase"].get(bp_key, 0) + 1
         )
@@ -1014,6 +1079,7 @@ def run_extraction(
             require_ready=require_ready, strict=strict,
             allow_partial_ledger=allow_partial_ledger,
             teacher_prov=teacher_prov,
+            pool_bands=pool_bands,
         )
         (out_dir / "provenance.json").write_text(
             json.dumps(provenance, indent=2), encoding="utf-8",
@@ -1060,6 +1126,7 @@ def run_extraction(
         require_ready=require_ready, strict=strict,
         allow_partial_ledger=allow_partial_ledger,
         teacher_prov=teacher_prov,
+        pool_bands=pool_bands,
     )
     # Re-save metadata with real provenance
     md = dict(np.load(metadata_path, allow_pickle=True))
@@ -1069,6 +1136,8 @@ def run_extraction(
     (out_dir / "provenance.json").write_text(
         json.dumps(provenance, indent=2), encoding="utf-8",
     )
+
+    _report_overlap_correlation(tgt_bin_path, emp_bin_path, n_emitted)
 
     print(f"[extract v2] Done.  Emitted {n_emitted:,} rows to {out_dir}")
     return provenance
@@ -1085,6 +1154,7 @@ def _make_provenance(
     strict: bool = True,
     allow_partial_ledger: bool = False,
     teacher_prov: Optional[dict] = None,
+    pool_bands: bool = False,
 ) -> dict:
     """Assemble the provenance dict for the emitted (or halt-reported) dataset.
 
@@ -1127,6 +1197,7 @@ def _make_provenance(
             "strict":               strict,
             "allow_partial_ledger": allow_partial_ledger,
             "limit_files":          limit_files,
+            "pool_bands":           pool_bands,
         },
         "extract_git_commit":               _git_commit(),
         "built_at":                         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
@@ -1203,16 +1274,26 @@ def main() -> int:
     p.add_argument("--allow-partial-ledger", action="store_true",
                    help="Accept a ledger built with --limit-files (is_partial=True).  "
                         "For smoke tests only.")
+    p.add_argument("--pool-bands", action="store_true",
+                   help="Aggregate all Elo bands into a single per-position key.  "
+                        "Teacher is called with elo_band='all' (equal-weight 3-band average).  "
+                        "Empirical coverage improves because all-band events count toward "
+                        "min_empirical_support.  Output defaults to gap_net_v3_dataset_pooled/.")
     args = p.parse_args()
 
     malom_db_dir = args.malom_db_dir or _load_malom_db_dir()
+
+    # When pooling, default output dir is separate from the banded dataset.
+    out_dir = args.out_dir
+    if args.pool_bands and out_dir == _ROOT / "data" / "gap_net_v3_dataset_v2":
+        out_dir = _ROOT / "data" / "gap_net_v3_dataset_pooled"
 
     prov = run_extraction(
         games_dir=args.games_dir,
         ledger_path=args.session_ledger,
         teacher_net=args.teacher_net,
         malom_db_dir=malom_db_dir,
-        out_dir=args.out_dir,
+        out_dir=out_dir,
         min_empirical_support=args.min_empirical_support,
         temperature=args.temperature,
         coverage_floor_rows=args.coverage_floor_rows,
@@ -1221,6 +1302,7 @@ def main() -> int:
         force=args.force,
         strict=not args.allow_malformed,
         allow_partial_ledger=args.allow_partial_ledger,
+        pool_bands=args.pool_bands,
     )
     if prov["gate_status"] == "halt_coverage_floor":
         return 2

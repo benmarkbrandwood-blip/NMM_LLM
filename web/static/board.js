@@ -145,6 +145,10 @@ export class Board {
     svg.appendChild(this._hintOverlay);
     this._hintTimer = null;
 
+    // Replay quality rings — annotated during move-by-move replay
+    this._replayGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._replayGroup);
+
     // DB overlay — trajectory/fullgame/endgame arrows and halos; below score labels
     this._dbGroup = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._dbGroup);
@@ -153,6 +157,10 @@ export class Board {
     this._diagGroup = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._diagGroup);
     this._diagSelected = null;  // source square selected for movement diag
+
+    // Placement counter overlay — stones left to place
+    this._counterGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._counterGroup);
   }
 
   render(state) {
@@ -168,6 +176,7 @@ export class Board {
     this.clearHint();
     this._drawPieces();
     this._drawHints();
+    this._drawCounter(state.pieces_placed, state.phase);
   }
 
   enterCapture(legalCaps) {
@@ -292,6 +301,43 @@ export class Board {
       .map(([, t]) => t);
   }
 
+  _drawCounter(piecesPlaced, phase) {
+    this._counterGroup.innerHTML = "";
+    if (phase !== "place" || !piecesPlaced) return;
+    const wLeft = 9 - (piecesPlaced.W || 0);
+    const bLeft = 9 - (piecesPlaced.B || 0);
+    if (wLeft <= 0 && bLeft <= 0) return;
+
+    const g = this._counterGroup;
+    // Background pill
+    g.appendChild(_el("rect", {
+      x: CX - 50, y: CY - 22, width: 100, height: 44, rx: 8,
+      fill: "rgba(20,16,10,0.72)", stroke: "#3d3325", "stroke-width": 1,
+    }));
+    // White side
+    g.appendChild(_el("circle", { cx: CX - 28, cy: CY - 6, r: 10,
+      fill: "#f2ede0", stroke: "#888", "stroke-width": 1.5 }));
+    const wt = _el("text", { x: CX - 28, y: CY - 5,
+      fill: "#5c3318", "font-size": "11", "font-weight": "bold",
+      "font-family": "monospace", "text-anchor": "middle", "dominant-baseline": "middle" });
+    wt.textContent = wLeft;
+    g.appendChild(wt);
+    // Black side
+    g.appendChild(_el("circle", { cx: CX + 28, cy: CY - 6, r: 10,
+      fill: "#1e1a2e", stroke: "#666", "stroke-width": 1.5 }));
+    const bt = _el("text", { x: CX + 28, y: CY - 5,
+      fill: "#c8c0e0", "font-size": "11", "font-weight": "bold",
+      "font-family": "monospace", "text-anchor": "middle", "dominant-baseline": "middle" });
+    bt.textContent = bLeft;
+    g.appendChild(bt);
+    // Label
+    const lbl = _el("text", { x: CX, y: CY + 14,
+      fill: "#8a7a60", "font-size": "9", "font-family": "monospace",
+      "text-anchor": "middle", "dominant-baseline": "middle" });
+    lbl.textContent = "to place";
+    g.appendChild(lbl);
+  }
+
   setMovePairs(pairs) {
     // pairs: [[from, to], ...]
     this._movePairs = pairs;
@@ -330,6 +376,37 @@ export class Board {
     this._hintOverlay.innerHTML = "";
   }
 
+  clearReplayOverlay() {
+    this._replayGroup.innerHTML = "";
+  }
+
+  setReplayQualityRings(node, quality, tpRank) {
+    this._replayGroup.innerHTML = "";
+    const coords = nodeXY(node);
+    if (!coords) return;
+    const [x, y] = coords;
+
+    const qColor = quality === "confirmed_poor" ? "#e53935"
+                 : quality === "poor_candidate" ? "#fb8c00"
+                 : null;
+    if (qColor) {
+      this._replayGroup.appendChild(_el("circle", {
+        cx:x, cy:y, r: PIECE_R + 10,
+        fill:"none", stroke:qColor, "stroke-width":"2.5", opacity:"0.85",
+      }));
+    }
+
+    if (tpRank !== null && tpRank !== undefined) {
+      const tpColor = tpRank === 0 ? "rgba(220,60,50,0.9)" : "rgba(200,140,50,0.6)";
+      const tpWidth = tpRank === 0 ? "2" : "1.5";
+      this._replayGroup.appendChild(_el("circle", {
+        cx:x, cy:y, r: PIECE_R + 17,
+        fill:"none", stroke:tpColor, "stroke-width":tpWidth,
+        "stroke-dasharray":"5 3", opacity:"0.8",
+      }));
+    }
+  }
+
   // Render board positions from a FEN string (for move replay).
   // FEN format: "<24chars>|<turn>|<W_placed>|<B_placed>"
   // Positions are in canonical order matching board.py POSITIONS list.
@@ -348,6 +425,7 @@ export class Board {
     this._millNodes = new Set();
     this._hintGroup.innerHTML = "";
     this._hintOverlay.innerHTML = "";
+    this._counterGroup.innerHTML = "";
     this._drawPieces();
   }
 

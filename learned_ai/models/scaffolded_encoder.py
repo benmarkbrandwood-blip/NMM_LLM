@@ -403,6 +403,7 @@ def encode_position_with_lookahead(
     specialist_db=None,
     sdb_min_samples: int = 5,
     wdl_db=None,
+    sim_ply_depth: Optional[int] = None,
 ) -> Optional[EncodedPosition]:
     """Encode legal moves with a lookahead block appended.
 
@@ -425,7 +426,10 @@ def encode_position_with_lookahead(
     k = len(enc.legal_moves)
     if lookahead_advisor is not None:
         try:
-            la_block = lookahead_advisor.score_moves_matrix(board, enc, player)
+            la_block = lookahead_advisor.score_moves_matrix(
+                board, enc, player,
+                sim_ply_depth=sim_ply_depth,
+            )
         except Exception:
             _dim = getattr(lookahead_advisor, "feat_dim", LOOKAHEAD_FEAT_DIM)
             la_block = np.zeros((k, _dim), dtype=np.float32)

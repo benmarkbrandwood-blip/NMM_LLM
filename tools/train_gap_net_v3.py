@@ -290,10 +290,13 @@ def _verify_dataset_production_ready(
     }
 
 
-def _load_split(dataset_dir: Path, split_val: int) -> dict:
+def _load_split(dataset_dir: Path, split_val: int,
+                teacher_filename: str = "targets.f32.bin") -> dict:
     """Load one split.  Returns dict of tensors + numpy arrays.
 
     Fail-closed: raises ValueError if any non-NaN target value is non-finite.
+    teacher_filename: which file to use as teacher targets (default targets.f32.bin;
+        pass targets_calibrated.f32.bin for calibrated-teacher runs).
     """
     meta = np.load(str(dataset_dir / "metadata.npz"), allow_pickle=True)
     idx = np.where(meta["split"] == split_val)[0]
@@ -306,7 +309,7 @@ def _load_split(dataset_dir: Path, split_val: int) -> dict:
         )
 
     board_arr = _mm("parent_feats.f32.bin", _BOARD_DIM)[idx].copy()
-    tgt_arr   = _mm("targets.f32.bin", _N_HEADS)[idx].copy()
+    tgt_arr   = _mm(teacher_filename, _N_HEADS)[idx].copy()
     unif_arr  = _mm("targets_uniform.f32.bin", _N_HEADS)[idx].copy()
     emp_arr   = _mm("targets_empirical.f32.bin", _N_HEADS)[idx].copy()
     band_arr  = meta["band_idx"][idx].astype(np.int64)
@@ -1003,6 +1006,22 @@ def main() -> None:
                         "values that do not match the entry exactly.  "
                         "promotion_eligible is ALWAYS False from this trainer — "
                         "only Stage F tooling produces a promotable artifact.")
+    p.add_argument("--calibrated-teacher", action="store_true",
+                   help="Use targets_calibrated.f32.bin (from calibrate_teacher_gv.py) "
+                        "as teacher G_v targets instead of targets.f32.bin.  "
+                        "Affects both training loss and the gate-2 teacher baseline. "
+                        "Diagnostic experiment — does not affect Stage F eligibility rules.")
+    p.add_argument("--hybrid-stress-test", action="store_true",
+                   help="Stress test: train ONLY on hybrid rows (y_emp non-NaN) with "
+                        "empirical G_v targets.  Diagnoses whether n=5-support empirical "
+                        "targets are learnable; val loss tracks y_emp on hybrid rows only. "
+                        "Gate still evaluates on full val split for diagnostics. "
+                        "Diagnostic only — not eligible for Stage F.")
+    p.add_argument("--hybrid-targets", action="store_true",
+                   help="Use empirical G_v as training target for hybrid rows (y_emp "
+                        "non-NaN), teacher G_v for model-only rows.  Gate reference "
+                        "teacher_vs_emp stays as teacher G_v (gate logic unchanged). "
+                        "Diagnostic experiment — does not affect Stage F eligibility rules.")
     args = p.parse_args()
 
     torch.manual_seed(args.seed)
@@ -1046,15 +1065,36 @@ def main() -> None:
               f"{args.gate_thresholds_frozen_id!r}  sha256={frozen_sha256[:16]}…")
 
     # ── Load train / val ─────────────────────────────────────────────────────
+    teacher_filename = (
+        "targets_calibrated.f32.bin" if args.calibrated_teacher
+        else "targets.f32.bin"
+    )
+    if args.calibrated_teacher:
+        cal_path = dataset_dir / "targets_calibrated.f32.bin"
+        if not cal_path.exists():
+            raise SystemExit(
+                f"[gap_net_v3] --calibrated-teacher requested but "
+                f"{cal_path} does not exist. "
+                f"Run tools/calibrate_teacher_gv.py first."
+            )
+        print(f"[gap_net_v3] Using calibrated teacher targets: {cal_path}")
+
     print("[gap_net_v3] Loading train split …")
     t0 = time.time()
-    tr = _load_split(dataset_dir, split_val=0)
+    tr = _load_split(dataset_dir, split_val=0, teacher_filename=teacher_filename)
     print(f"[gap_net_v3] Train: {len(tr['board']):,} rows  ({time.time()-t0:.1f}s)")
 
     print("[gap_net_v3] Loading val split …")
     t0 = time.time()
-    va = _load_split(dataset_dir, split_val=1)
+    va = _load_split(dataset_dir, split_val=1, teacher_filename=teacher_filename)
     print(f"[gap_net_v3] Val:   {len(va['board']):,} rows  ({time.time()-t0:.1f}s)")
+
+    # ── Hybrid row masks (rows where at least one y_emp component is non-NaN) ─
+    tr_hybrid_mask = (~torch.isnan(tr["y_emp"])).any(dim=1)   # (N_tr,)
+    va_hybrid_mask = (~torch.isnan(va["y_emp"])).any(dim=1)   # (N_va,)
+    n_tr_hybrid = int(tr_hybrid_mask.sum())
+    n_va_hybrid = int(va_hybrid_mask.sum())
+    print(f"[gap_net_v3] Hybrid rows: train={n_tr_hybrid:,}  val={n_va_hybrid:,}")
 
     # ── Coverage per component per band ──────────────────────────────────────
     for c in range(_N_HEADS):
@@ -1074,7 +1114,22 @@ def main() -> None:
 
     # ── Build inputs ────────────────────────────────────────────────────────
     X_tr = _build_features(tr["board"], tr["band"])
-    y_tr = tr["y_model"]
+
+    if args.hybrid_stress_test:
+        # Train on hybrid rows only; empirical G_v is the training target.
+        X_tr = X_tr[tr_hybrid_mask]
+        y_tr = tr["y_emp"][tr_hybrid_mask]
+        print(f"[gap_net_v3] --hybrid-stress-test: {len(y_tr):,} hybrid train rows; "
+              f"target=y_emp")
+    elif args.hybrid_targets:
+        # All rows; empirical G_v for hybrid rows, teacher G_v for model-only.
+        y_tr = tr["y_emp"].clone()
+        model_only = torch.isnan(y_tr)
+        y_tr[model_only] = tr["y_model"][model_only]
+        print(f"[gap_net_v3] --hybrid-targets: empirical for {n_tr_hybrid:,} hybrid rows; "
+              f"teacher for {len(y_tr) - n_tr_hybrid:,} model-only rows")
+    else:
+        y_tr = tr["y_model"]
 
     tr_loader = DataLoader(
         TensorDataset(X_tr, y_tr),
@@ -1087,7 +1142,12 @@ def main() -> None:
     perm_t = torch.from_numpy(np.stack(_BOARD_PERMS)).long().to(device)  # (8, 79)
 
     X_va = _build_features(va["board"], va["band"]).to(device)
-    y_va = va["y_model"].to(device)
+    if args.hybrid_stress_test:
+        # Early stopping tracks val MSE vs empirical on hybrid rows only;
+        # _nan_mse masks out NaN (i.e. model-only rows) automatically.
+        y_va = va["y_emp"].to(device)
+    else:
+        y_va = va["y_model"].to(device)
 
     # ── Model + optimiser ────────────────────────────────────────────────────
     model = GapNetV3().to(device)
@@ -1151,6 +1211,25 @@ def main() -> None:
     model.eval()
     with torch.no_grad():
         val_pred_np = _forward_chunked(model, X_va).cpu().numpy()
+
+    # ── Hybrid-specific MSE report ────────────────────────────────────────────
+    va_emp_np     = va["y_emp"].numpy()
+    va_hybrid_np  = va_hybrid_mask.numpy()
+    va_unif_np    = va["y_unif"].numpy()
+    print(f"\n[gap_net_v3] Val-hybrid MSE (n_hybrid={n_va_hybrid:,} rows):")
+    for c in range(_N_HEADS):
+        cell_mask = va_hybrid_np & ~np.isnan(va_emp_np[:, c])
+        n_c = int(cell_mask.sum())
+        if n_c > 0:
+            cand_mse  = float(np.mean((val_pred_np[cell_mask, c] - va_emp_np[cell_mask, c]) ** 2))
+            unif_mse  = float(np.mean((va_unif_np[cell_mask, c] - va_emp_np[cell_mask, c]) ** 2))
+            threshold = (1.0 - args.stage_e_x_a) * unif_mse
+            verdict   = "PASS" if cand_mse <= threshold else "FAIL"
+            print(f"  {_COMP_NAMES[c]}: n={n_c}  "
+                  f"candidate={cand_mse:.6f}  uniform={unif_mse:.6f}  "
+                  f"gate1_threshold={(threshold):.6f}  [{verdict}]")
+        else:
+            print(f"  {_COMP_NAMES[c]}: n=0")
 
     gate_results, gate_summary = _report_gate(
         val_pred_np,

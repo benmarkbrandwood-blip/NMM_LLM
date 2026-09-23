@@ -11,7 +11,16 @@
   <header>
     <h1>Nine Men's Morris</h1>
     <div id="header-buttons">
-    <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
+    <div id="assessment-btn-wrap">
+      <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
+      <div id="assessment-progress-bar">
+        <div class="ap-seg" id="ap-1" title="Turning points"></div>
+        <div class="ap-seg" id="ap-2" title="AI divergence"></div>
+        <div class="ap-seg" id="ap-3" title="Malom regret"></div>
+        <div class="ap-seg" id="ap-4" title="Commentary"></div>
+      </div>
+      <span id="assessment-stage-label"></span>
+    </div>
     <button id="toggle-moves" class="btn-active">Moves</button>
     <button id="toggle-openings">Openings</button>
     <button id="toggle-setup">Setup</button>
@@ -175,6 +184,7 @@
 
       <div id="board-wrap">
         <svg id="board-svg"></svg>
+        <div id="replay-tp-badge" hidden></div>
       </div>
       <div id="status-bar">Configure a game and click New Game.</div>
       <div id="think-bar-wrap" title="AI search time">
@@ -214,15 +224,23 @@
         <!-- Inline heading-change row — hidden until heading button is clicked -->
         <div id="opening-heading-row" style="display:none;gap:4px;margin-bottom:6px;align-items:center">
           <select id="opening-heading-sel" style="flex:1;background:#1e1a12;border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:4px;font-size:.82rem">
-            <option value="novel">Novel</option>
-            <option value="Mill Rush">Mill Rush</option>
-            <option value="Battle Lines">Battle Lines</option>
-            <option value="Z Mill">Z Mill</option>
-            <option value="Corner Gambit">Corner Gambit</option>
-            <option value="Early Game">Early Game</option>
-            <option value="Inverted Mill Rush">Inverted Mill Rush</option>
-            <option value="Man-to-Man Marking">Man-to-Man Marking</option>
-            <option value="Black Diamond">Black Diamond</option>
+            <option value="novel">Novel (user discovery)</option>
+            <optgroup label="Book openings">
+              <option value="Mill Rush">Mill Rush</option>
+              <option value="Inverted Mill Rush">Inverted Mill Rush</option>
+              <option value="Battle Lines">Battle Lines</option>
+              <option value="Closed Z Mill">Closed Z Mill</option>
+              <option value="Open Z Mill">Open Z Mill</option>
+              <option value="Z Mill – c4 to d3">Z Mill – c4 to d3</option>
+              <option value="Z Mill – c4 and e3">Z Mill – c4 and e3</option>
+              <option value="Z Mill Interrupted">Z Mill Interrupted</option>
+              <option value="Mill Rush Interrupt">Mill Rush Interrupt</option>
+              <option value="Black into White">Black into White</option>
+              <option value="Black away from White">Black away from White</option>
+            </optgroup>
+            <optgroup label="Human DB">
+              <option value="Human DB">Human DB Pattern</option>
+            </optgroup>
           </select>
           <input type="text" id="opening-heading-custom" placeholder="New heading…"
             style="flex:1;background:#1e1a12;border:1px solid var(--border);color:var(--text);padding:4px 7px;border-radius:4px;font-size:.82rem">

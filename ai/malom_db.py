@@ -836,6 +836,7 @@ class RegretResult:
     regret_version: str
     malom_label_version: str
     unavailable_reason: Optional[str] = None
+    best_legal_move: Optional[dict] = None
 
 
 # ── MalomDB ────────────────────────────────────────────────────────────────────
@@ -1150,13 +1151,17 @@ class MalomDB:
 
         # Determine best_omv (fail-closed if any non-terminal child uncovered).
         best_omv: Optional[OracleMoveValue]
+        best_legal_move: Optional[dict]
         if not best_complete:
             best_omv = None
+            best_legal_move = None
         else:
-            best_omv = max(
-                (o for o in all_omvs if o is not None),
-                key=lambda o: o.ordering_key(),
+            best_idx = max(
+                range(len(all_omvs)),
+                key=lambda i: all_omvs[i].ordering_key() if all_omvs[i] is not None else float('-inf'),
             )
+            best_omv = all_omvs[best_idx]
+            best_legal_move = legal_moves[best_idx]
 
         # Component A — class_downgrade_prob
         if wdl_transition in _DOWNGRADE_TRANSITIONS:
@@ -1190,6 +1195,7 @@ class MalomDB:
             omv=this_omv,
             wdl_transition=wdl_transition,
             best_omv=best_omv,
+            best_legal_move=best_legal_move,
             components={
                 "class_downgrade_prob": comp_a,
                 "wdl_utility_loss": comp_b,

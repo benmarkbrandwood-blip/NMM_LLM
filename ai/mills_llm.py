@@ -557,9 +557,65 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         for m in other_poor:
             if m.oracle_source in ("malom_full", "retrograde_wdl"):
                 wdl_key = f"{m.wdl_before}→{m.wdl_after}" if m.wdl_before else "confirmed_poor"
-                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (Malom: {wdl_key})")
+                alt_note = f"  best: {m.malom_best_alt}" if m.malom_best_alt else ""
+                lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (Malom: {wdl_key}){alt_note}")
             else:
                 lines.append(f"  Ply {m.ply + 1}: {m.move_played}  (r_h={m.r_h:.2f})")
+        lines.append("")
+
+    # SENTINEL TURNING POINTS (always shown when Sentinel available, even if Malom ran)
+    sentinel_tps = [
+        (ply, q, src) for ply, q, src in annotation.turning_points
+        if src == "sentinel+heuristic"
+    ]
+    if sentinel_tps:
+        lines.append("SENTINEL TURNING POINTS:")
+        for ply, quality, _ in sentinel_tps:
+            if 0 <= ply < len(annotation.moves):
+                m = annotation.moves[ply]
+                lines.append(f"  Ply {ply + 1}: {m.move_played}  ({quality})")
+        lines.append("")
+
+    # GENERALIST DIVERGENCE (moves where AI preferred a different move)
+    gen_divs = [
+        m for m in annotation.moves
+        if m.generalist_top_move is not None
+        and not m.generalist_self_assessed
+        and m.generalist_top_move != m.move_played
+    ]
+    if gen_divs:
+        lines.append("GENERALIST DIVERGENCE:")
+        for m in sorted(gen_divs, key=lambda x: abs(x.r_h), reverse=True)[:4]:
+            lines.append(
+                f"  Ply {m.ply + 1} ({m.color}): played {m.move_played}, "
+                f"AI preferred {m.generalist_top_move}"
+            )
+        lines.append("")
+
+    # POLICY/PREF DIVERGENCE (pref_delta: human preference vs teacher policy)
+    pref_moves = [
+        m for m in annotation.moves
+        if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
+    ]
+    if pref_moves:
+        lines.append("POLICY DIVERGENCE (pref vs teacher):")
+        for m in sorted(pref_moves, key=lambda x: x.policy_pref_delta)[:4]:
+            direction = "weak" if m.policy_pref_delta < 0 else "strong"
+            lines.append(
+                f"  Ply {m.ply + 1}: {m.move_played}  delta={m.policy_pref_delta:+.2f} ({direction})"
+            )
+        lines.append("")
+
+    # GAPNET RISK POSITIONS (pre-move blunder-zone density)
+    gap_moves = [m for m in annotation.moves if m.blunder_zone_score is not None]
+    if gap_moves:
+        top_gap = sorted(gap_moves, key=lambda x: x.blunder_zone_score, reverse=True)[:3]
+        lines.append("GAPNET RISK POSITIONS:")
+        for m in top_gap:
+            lines.append(
+                f"  Ply {m.ply + 1} ({m.color}): {m.move_played}  "
+                f"blunder-zone={m.blunder_zone_score:.2f}"
+            )
         lines.append("")
 
     return "\n".join(lines)

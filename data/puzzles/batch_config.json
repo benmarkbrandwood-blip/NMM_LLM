@@ -1,6 +1,6 @@
 {
   "cells": [
-    {"type": "midgame",   "side": "random", "depth": 0, "count": 200},
+    {"type": "midgame",   "side": "random", "depth": 0, "count": 100},
     {"type": "placement", "side": "random", "depth": 0, "count": 200},
     {"type": "endgame",   "side": "random", "depth": 0, "count": 200}
   ],

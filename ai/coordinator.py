@@ -247,14 +247,27 @@ class Coordinator:
             self.emit("MillsAI", summary)
 
     @staticmethod
+    def _notation_to_move_dict(n: str) -> dict:
+        cap, base = None, n
+        if "x" in n:
+            xi = n.index("x"); cap = n[xi + 1:]; base = n[:xi]
+        if "-" in base:
+            fr, to = base.split("-", 1)
+            return {"from": fr, "to": to, "capture": cap}
+        return {"from": None, "to": base, "capture": cap}
+
+    @staticmethod
     def _compute_fen_signatures(placement_moves: list[str]) -> list[dict]:
         from game.board import BoardState
         board = BoardState.new_game()
         sigs = []
+        seen: set[int] = set()
+        n = len(placement_moves)
         for i, pos in enumerate(placement_moves):
-            board = board.apply_move({"from": None, "to": pos, "capture": None})
+            board = board.apply_move(Coordinator._notation_to_move_dict(pos))
             ply = i + 1
-            if ply in (4, 6, 8, 10):
+            if (ply in (4, 6, 8, 10, 12) or ply == n) and ply not in seen:
+                seen.add(ply)
                 sigs.append({"ply": ply, "fen": board.to_fen_string()})
         return sigs
 
@@ -436,7 +449,7 @@ class Coordinator:
         # so skip the opinion here and play the search move immediately.
         # LLM commentary still fires via react_to_human_move on the human's turns.
         _notations_so_far = [m.get("notation", "") for m in self._game_moves if m.get("notation")]
-        _use_llm_opinion = self.game_ai.difficulty > 4
+        _use_llm_opinion = self.game_ai.difficulty > 4 and not self.game_ai._force_stop
         if _use_llm_opinion:
             opinion, llm_notation = self.mills_llm.ask_for_move_opinion(
                 board, legal, ai_move, recognition=recognition, endgame_state=endgame_state,

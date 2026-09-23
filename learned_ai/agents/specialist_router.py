@@ -213,7 +213,8 @@ class SpecialistRouter:
 
     # ── inference ─────────────────────────────────────────────────────────────
 
-    def score_moves(self, board: BoardState, candidates: list[dict], color: str) -> Optional[list[float]]:
+    def score_moves(self, board: BoardState, candidates: list[dict], color: str,
+                    sim_ply_depth: Optional[int] = None) -> Optional[list[float]]:
         """Return per-candidate pick probabilities (sum to 1.0).
 
         Routes to the phase-appropriate specialist; falls back to whichever
@@ -247,6 +248,7 @@ class SpecialistRouter:
                 value_net=self._value_net,
                 lookahead_advisor=la,
                 specialist_db=self._specialist_db,
+                sim_ply_depth=sim_ply_depth,
             )
             if enc is None or not enc.legal_moves:
                 return None
@@ -308,7 +310,8 @@ class GeneralistAgent:
     def record_game_result(self, game_record: dict) -> None:
         pass  # generalist doesn't use specialist_db routing
 
-    def score_moves(self, board: BoardState, candidates: list[dict], color: str) -> Optional[list[float]]:
+    def score_moves(self, board: BoardState, candidates: list[dict], color: str,
+                    sim_ply_depth: Optional[int] = None) -> Optional[list[float]]:
         if not candidates or self._model is None:
             return None
         try:
@@ -321,6 +324,8 @@ class GeneralistAgent:
                 value_net=self._value_net,
                 lookahead_advisor=self._la,
                 specialist_db=self._specialist_db,
+                sdb_min_samples=3,
+                sim_ply_depth=sim_ply_depth,
             )
             if enc is None or not enc.legal_moves:
                 return None
@@ -353,6 +358,7 @@ def load_generalist(
     human_db=None,
     specialist_db=None,
     ply_depth: int = 12,
+    sim_ply_depth: Optional[int] = None,
 ) -> Optional[GeneralistAgent]:
     """Load the s_gen_v2 generalist checkpoint. Returns None if not found."""
     from learned_ai.models.lookahead_advisor import LookaheadAdvisor
@@ -427,12 +433,14 @@ def load_generalist(
             human_db=human_db,
             use_sentinel=True,
             ply_depth=ply_depth,
+            sim_ply_depth=sim_ply_depth,
         )
     except Exception as e:
         log.warning("GeneralistAgent LookaheadAdvisor init failed: %s", e)
         la = None
 
-    log.info("GeneralistAgent loaded from %s ply_depth=%d", gen_path, ply_depth)
+    log.info("GeneralistAgent loaded from %s ply_depth=%d sim_ply_depth=%s",
+             gen_path, ply_depth, sim_ply_depth)
     return GeneralistAgent(
         model=m_gen,
         la=la,

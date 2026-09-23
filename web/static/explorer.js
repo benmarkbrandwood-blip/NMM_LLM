@@ -1501,13 +1501,16 @@ function _otRender(syncBoard = true) {
     return;
   }
 
-  if (!children.length) {
+  const showNovel = document.getElementById('ot-show-novel')?.checked !== false;
+  const visibleChildren = showNovel ? children : children.filter(c => (c.source || 'book') !== 'learned');
+
+  if (!visibleChildren.length) {
     _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
     if (syncBoard) _otSyncBoard();
     return;
   }
 
-  for (const child of children) {
+  for (const child of visibleChildren) {
     const total  = child.w_wins + child.draws + child.b_wins;
     const hasWdl = total > 0;
     const wPct   = hasWdl ? child.w_wins / total * 100 : 0;
@@ -1516,9 +1519,10 @@ function _otRender(syncBoard = true) {
     const isLeaf = !child.children || child.children.length === 0;
     // White plays on odd plies (ply 1,3,5…), Black on even (2,4,6…)
     const isWhiteTurn = (child.ply % 2 === 1);
+    const src = child.source || 'book';
 
     const row = document.createElement('div');
-    row.className = 'ot-row';
+    row.className = 'ot-row' + (src === 'learned' ? ' ot-row-novel' : '');
 
     const turnDot = `<span class="ot-turn-dot ${isWhiteTurn ? 'ot-turn-w' : 'ot-turn-b'}"></span>`;
     // Prefer terminal names; fall back to through_openings when there are ≤2
@@ -1526,6 +1530,11 @@ function _otRender(syncBoard = true) {
     const displayNames = child.opening_names.length
       ? child.opening_names
       : (throughNames.length <= 2 ? throughNames : [throughNames[0], `+${throughNames.length - 1} more`]);
+    const srcBadge = src === 'learned'
+      ? '<span class="ot-src ot-src-novel">Novel</span>'
+      : src === 'human'
+      ? '<span class="ot-src ot-src-human">Human</span>'
+      : '';
     const nameHtml = displayNames.length
       ? displayNames.map(n => `<span class="ot-opening-label" title="${throughNames.join(', ')}">${n}</span>`).join('')
       : '';
@@ -1550,7 +1559,7 @@ function _otRender(syncBoard = true) {
         <div class="ot-move">${turnDot}${child.move}</div>
         ${expandHint}
       </div>
-      <div class="ot-names-cell">${nameHtml}</div>
+      <div class="ot-names-cell">${srcBadge}${nameHtml}</div>
       <div class="ot-pct-cell">
         <div class="ot-pct-track"><div class="ot-pct-fill" style="width:${barWidth}%"></div></div>
         <span class="ot-pct-text">${pctText}</span>
@@ -1577,11 +1586,12 @@ function _otRender(syncBoard = true) {
   if (syncBoard) _otSyncBoard();
 }
 
-async function _otLoad() {
+async function _otLoad(forceRefresh = false) {
   const depth = parseInt(_otDepthIn.value, 10);
   _otRows.innerHTML = '<div id="ot-loading">Loading…</div>';
   try {
-    const res = await fetch(`/api/opening_tree?depth=${depth}`);
+    const url = `/api/opening_tree?depth=${depth}${forceRefresh ? '&refresh=true' : ''}`;
+    const res = await fetch(url);
     _otData = await res.json();
     _otLoaded = true;
     _otRender(false); // keep current board on initial load
@@ -1641,6 +1651,23 @@ _otDepthIn.addEventListener('change', () => {
   _otPath   = [];
   if (_otToggle.checked) _otLoad();
 });
+
+// Novel toggle: re-render in place (no network fetch needed — data already loaded)
+const _otShowNovelChk = document.getElementById('ot-show-novel');
+if (_otShowNovelChk) {
+  _otShowNovelChk.addEventListener('change', () => { if (_otLoaded) _otRender(false); });
+}
+
+// Refresh button: force reload from server (picks up new source tags / openings)
+const _otRefreshBtn = document.getElementById('ot-refresh-btn');
+if (_otRefreshBtn) {
+  _otRefreshBtn.addEventListener('click', () => {
+    _otData   = null;
+    _otLoaded = false;
+    _otPath   = [];
+    _otLoad(true);
+  });
+}
 
 // ── Save path as opening ──────────────────────────────────────────────────────
 

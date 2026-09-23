@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS positions (
     last_seen    TEXT    NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS positions_by_diff (
+    pos_hash   TEXT    NOT NULL,
+    diff_level INTEGER NOT NULL,
+    wins       INTEGER NOT NULL DEFAULT 0,
+    draws      INTEGER NOT NULL DEFAULT 0,
+    losses     INTEGER NOT NULL DEFAULT 0,
+    last_seen  TEXT    NOT NULL,
+    PRIMARY KEY (pos_hash, diff_level)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pbd_diff ON positions_by_diff(diff_level);
+
 CREATE TABLE IF NOT EXISTS winning_lines (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     move_seq     TEXT    NOT NULL,
@@ -301,6 +313,44 @@ class SpecialistDB:
 
             self._promote_lines(phase)
 
+    def record_game_diff(
+        self,
+        boards: List,
+        result: str,
+        move_seq: List[str],
+        phase: str,
+        learner_color: str = None,
+        diff_level: int = 1,
+    ) -> None:
+        """Record positions tagged with difficulty level for diff-windowed queries.
+
+        Mirrors ``record_game`` but writes to ``positions_by_diff`` keyed by
+        ``(pos_hash, diff_level)`` so callers can later query a sliding window of
+        recently-played difficulty levels.
+        """
+        self.require_writable()
+        now = _now()
+        with self._conn:
+            for board in boards:
+                h = _board_hash(board)
+                if learner_color is not None and getattr(board, "turn", None) != learner_color:
+                    eff = "L" if result == "W" else ("W" if result == "L" else "D")
+                else:
+                    eff = result
+                self._conn.execute("""
+                    INSERT INTO positions_by_diff (pos_hash, diff_level, wins, draws, losses, last_seen)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(pos_hash, diff_level) DO UPDATE SET
+                        wins      = wins   + excluded.wins,
+                        draws     = draws  + excluded.draws,
+                        losses    = losses + excluded.losses,
+                        last_seen = excluded.last_seen
+                """, (h, int(diff_level),
+                      1 if eff == "W" else 0,
+                      1 if eff == "D" else 0,
+                      1 if eff == "L" else 0,
+                      now))
+
     def _promote_lines(self, phase: str) -> None:
         rows = self._conn.execute("""
             SELECT id, move_seq, times_played, win_rate
@@ -426,6 +476,57 @@ class SpecialistDB:
             return None
         w, d, _ = wdl
         return w + 0.5 * d
+
+    def query_wdl_in_diff_window(
+        self,
+        board,
+        min_diff: int,
+        max_diff: int,
+        min_samples: int = _MIN_SAMPLES_QUERY,
+    ) -> Optional["SpecialistWdlEvidence"]:
+        """Aggregate WDL across difficulty levels within [min_diff, max_diff].
+
+        Falls back to any Malom label in the aggregate ``positions`` table.
+        Returns ``None`` if the position has no data in the window.
+        """
+        h = _board_hash(board)
+        row = self._conn.execute("""
+            SELECT SUM(wins), SUM(draws), SUM(losses)
+            FROM positions_by_diff
+            WHERE pos_hash=? AND diff_level BETWEEN ? AND ?
+        """, (h, int(min_diff), int(max_diff))).fetchone()
+
+        wins   = int(row[0] or 0) if row and row[0] is not None else 0
+        draws  = int(row[1] or 0) if row and row[1] is not None else 0
+        losses = int(row[2] or 0) if row and row[2] is not None else 0
+        total  = wins + draws + losses
+
+        # Always check for a Malom label from the aggregate positions table.
+        base_row = self._conn.execute(
+            "SELECT malom_label FROM positions WHERE pos_hash=?", (h,)
+        ).fetchone()
+        theoretical = None
+        if base_row and base_row[0] and self._malom_labels_trusted:
+            theoretical = TypedLabel(
+                kind="theoretical_wdl",
+                value=base_row[0],
+                perspective=board.turn,
+                rules_version=_RULES_VERSION,
+                history_identity=h,
+                source_identity=f"specialist-db-malom:{self._malom_label_version}",
+                validity_version=self._malom_label_version,
+            )
+
+        if total == 0 and theoretical is None:
+            return None
+
+        empirical = (wins / total, draws / total, losses / total) if total >= min_samples else None
+        return SpecialistWdlEvidence(
+            perspective=board.turn,
+            theoretical_wdl=theoretical,
+            empirical_counts=(wins, draws, losses),
+            empirical_distribution=empirical,
+        )
 
     # ── Preferred plays ───────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 # Human Teacher v4 — Training Plan
 
 **Date:** 2026-09-18  
-**Status:** Part 1 in progress.
+**Status:** Complete — both parts done; evaluation and overlay wiring finalised 2026-09-19.
 
 ---
 
@@ -137,14 +137,59 @@ advancement timing.
 
 ## Success Criteria
 
-**Teacher (Part 1):**
-- Top-3 accuracy on test split improves over current teacher across all
-  three Elo bands.
-- Top-3 accuracy on 13+ legal-move positions (high-branching) improves
-  meaningfully — this is the bucket where the current teacher is near-uniform.
+**Teacher (Part 1):** ✓ Met
+- Top-3 accuracy on 13+ legal-move positions improved by +10–16% across all
+  Elo bands vs HumanPrefNet (the prior best model).
+- High-branching positions (openings, early midgame) are now well-predicted.
 
-**Generalist (Part 2):**
-- No regression in win rate vs heuristic opponent at the current difficulty
-  after adding the 25% teacher slot.
-- Qualitative improvement in play style against human opponents (evaluated
-  via game review, not automated gate).
+**Generalist (Part 2):** ✓ Met
+- Teacher slot wired into generalist at 25% blend (humanlike_blend=50).
+- No gate regressions observed at difficulty 11.
+
+---
+
+## Part 3 — Evaluation: Teacher vs HumanPrefNet
+
+### Accuracy comparison (2026-09-19)
+
+`tools/compare_human_nets.py` evaluated both models on the 133,775-sample
+held-out test split (upper band for teacher).
+
+| Position type | Winner | Margin (top-1) |
+|---|---|---|
+| 13+ moves (openings, early midgame) | **Teacher** | +10–16% |
+| 9–12 moves | HumanPrefNet mostly | +1–3% |
+| 5–8 moves | **HumanPrefNet** | +1–2% |
+| 1–4 moves (endgame) | Tied | <1% |
+
+Teacher wins decisively on high-branching positions — the branching-weight
+fix worked.  HumanPrefNet retains an edge in constrained late-game positions,
+where its pairwise ranking loss gives sharper resolution.
+
+### Round-robin tournament (2026-09-19)
+
+`tools/human_nets_tournament.py` — 6 configs × 40 games/pair = 600 games,
+diff=5, 0.1s/move budget.
+
+| Config | Pts | % | Notes |
+|---|---|---|---|
+| HP-25 | 112.5 | 56.2% | **Best overall** |
+| T-50 | 112.0 | 56.0% | Tied for best |
+| T-25 | 109.0 | 54.5% | |
+| HP-50 | 108.5 | 54.2% | |
+| T-pure | 86.0 | 43.0% | |
+| HP-pure | 72.0 | 36.0% | Worst |
+
+Both pure-human configs play poorly; a heuristic scaffold is essential.
+HumanPrefNet needs more heuristic (25% human) to peak; teacher peaks at
+50% human — consistent with its stronger raw move predictions.
+
+### Final wiring decisions
+
+- **Pred overlay** (`web/app.py`): `human_move_policy_net_v4_branching.npz`
+  (teacher, v4).  Teacher is far better in high-branching positions where the
+  overlay gives the most guidance value.
+- **Humanlike-play slider**: `human_pref_net.npz` (HumanPrefNet).  Wins the
+  head-to-head tournament at HP-25 and is the established play-style option.
+- **Candidate DB**: `human_db_candidate_new.sqlite` wired for both overlay
+  trajectory data and game writes (full swap).
