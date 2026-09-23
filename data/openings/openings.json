@@ -36,7 +36,7 @@
         "fen": "........WWWWBB.B..W.....|B|5|4"
       }
     ],
-    "strategic_notes": "15.2 \u2013 White mills b6-d6-f6 capturing b4; Black re-places b4; White piece 5 to e5 starts the mill rush variant.",
+    "strategic_notes": "15.2 – White mills b6-d6-f6 capturing b4; Black re-places b4; White piece 5 to e5 starts the mill rush variant.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -54,7 +54,7 @@
   },
   {
     "opening_id": "mill-rush-c01",
-    "name": "Mill Rush \u2014 C01",
+    "name": "Mill Rush — C01",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -96,7 +96,7 @@
         "fen": ".B......WWWWBB.B.WWB....|W|6|6"
       }
     ],
-    "strategic_notes": "\u00a715.2 parallel (G1)",
+    "strategic_notes": "§15.2 parallel (G1)",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -114,7 +114,7 @@
   },
   {
     "opening_id": "mill-rush-c02",
-    "name": "Mill Rush \u2014 C02",
+    "name": "Mill Rush — C02",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -156,7 +156,7 @@
         "fen": "...B....WWWWBB.B.BWW....|W|6|6"
       }
     ],
-    "strategic_notes": "\u00a715.2 perpendicular (G2)",
+    "strategic_notes": "§15.2 perpendicular (G2)",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -174,7 +174,7 @@
   },
   {
     "opening_id": "mill-rush-c03",
-    "name": "Mill Rush \u2014 C03",
+    "name": "Mill Rush — C03",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -216,7 +216,7 @@
         "fen": "........WWWWBB.B.BWWB...|W|6|6"
       }
     ],
-    "strategic_notes": "\u00a715.2 ext. parallel (G3)",
+    "strategic_notes": "§15.2 ext. parallel (G3)",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -234,7 +234,7 @@
   },
   {
     "opening_id": "mill-rush-c04",
-    "name": "Mill Rush \u2014 C04",
+    "name": "Mill Rush — C04",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -276,7 +276,7 @@
         "fen": ".B......WWWWBB.B..WWB...|W|6|6"
       }
     ],
-    "strategic_notes": "\u00a715.2 alt. parallel (G4)",
+    "strategic_notes": "§15.2 alt. parallel (G4)",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -294,7 +294,7 @@
   },
   {
     "opening_id": "mill-rush-c05",
-    "name": "Mill Rush \u2014 C05",
+    "name": "Mill Rush — C05",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -336,7 +336,7 @@
         "fen": "........WWWWBBBB.B.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -355,7 +355,7 @@
   },
   {
     "opening_id": "mill-rush-c06",
-    "name": "Mill Rush \u2014 C06",
+    "name": "Mill Rush — C06",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -397,7 +397,7 @@
         "fen": "........WWWWBBBB.B...W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -416,7 +416,7 @@
   },
   {
     "opening_id": "mill-rush-c07",
-    "name": "Mill Rush \u2014 Perpendicular",
+    "name": "Mill Rush — Perpendicular",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -458,7 +458,7 @@
         "fen": ".......WWWWWBBBB.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -477,7 +477,7 @@
   },
   {
     "opening_id": "mill-rush-c08",
-    "name": "Mill Rush \u2014 C08",
+    "name": "Mill Rush — C08",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -519,7 +519,7 @@
         "fen": ".B......WWWWBBBB.....W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -538,7 +538,7 @@
   },
   {
     "opening_id": "mill-rush-c09",
-    "name": "Mill Rush \u2014 C09",
+    "name": "Mill Rush — C09",
     "aliases": [],
     "family": "Mill Rush",
     "side": "W",
@@ -580,7 +580,7 @@
         "fen": ".B......WWWWBBBB.......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -635,7 +635,7 @@
         "fen": "WWWB.....W.W.B.B.B......|W|5|5"
       }
     ],
-    "strategic_notes": "15.3 \u2013 White builds outer top mill a7-d7-g7, captures d5.",
+    "strategic_notes": "15.3 – White builds outer top mill a7-d7-g7, captures d5.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -653,7 +653,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c01",
-    "name": "Inverted Mill Rush \u2014 C01",
+    "name": "Inverted Mill Rush — C01",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -713,7 +713,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c02",
-    "name": "Inverted Mill Rush \u2014 C02",
+    "name": "Inverted Mill Rush — C02",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -773,7 +773,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c03",
-    "name": "Inverted Mill Rush \u2014 C03",
+    "name": "Inverted Mill Rush — C03",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -833,7 +833,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c04",
-    "name": "Inverted Mill Rush \u2014 C04",
+    "name": "Inverted Mill Rush — C04",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -875,7 +875,7 @@
         "fen": "WWWB.W..BW.W.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -894,7 +894,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c05",
-    "name": "Inverted Mill Rush \u2014 C05",
+    "name": "Inverted Mill Rush — C05",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -936,7 +936,7 @@
         "fen": "WWWB.W...WBW.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -955,7 +955,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c06",
-    "name": "Inverted Mill Rush \u2014 C06",
+    "name": "Inverted Mill Rush — C06",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -997,7 +997,7 @@
         "fen": "WWWB..W..WBW.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1016,7 +1016,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c07",
-    "name": "Inverted Mill Rush \u2014 C07",
+    "name": "Inverted Mill Rush — C07",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -1058,7 +1058,7 @@
         "fen": "WWWB..W.BW.W.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1077,7 +1077,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c08",
-    "name": "Inverted Mill Rush \u2014 C08",
+    "name": "Inverted Mill Rush — C08",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -1119,7 +1119,7 @@
         "fen": "WWWB.W.B.W.W.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1138,7 +1138,7 @@
   },
   {
     "opening_id": "inverted-mill-rush-c09",
-    "name": "Inverted Mill Rush \u2014 C09",
+    "name": "Inverted Mill Rush — C09",
     "aliases": [],
     "family": "Inverted Mill Rush",
     "side": "W",
@@ -1180,7 +1180,7 @@
         "fen": "WWWB..WB.W.W.B.B.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1229,7 +1229,7 @@
         "fen": "........WWW.BBB.........|W|4|4"
       }
     ],
-    "strategic_notes": "15.4 \u2013 Double mill capture: W mills b-f6 takes b4; B mills b2-d2-f2 takes f4.",
+    "strategic_notes": "15.4 – Double mill capture: W mills b-f6 takes b4; B mills b2-d2-f2 takes f4.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1247,7 +1247,7 @@
   },
   {
     "opening_id": "battle-lines-c01",
-    "name": "Battle Lines \u2014 C01",
+    "name": "Battle Lines — C01",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1289,7 +1289,7 @@
         "fen": ".....W..WWWBBBBB.......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1308,7 +1308,7 @@
   },
   {
     "opening_id": "battle-lines-c02",
-    "name": "Battle Lines \u2014 C02",
+    "name": "Battle Lines — C02",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1350,7 +1350,7 @@
         "fen": ".......WWWWBBBBB.....W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1369,7 +1369,7 @@
   },
   {
     "opening_id": "battle-lines-c03",
-    "name": "Battle Lines \u2014 C03",
+    "name": "Battle Lines — C03",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1411,7 +1411,7 @@
         "fen": ".....W.WWWWBBBBB........|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1430,7 +1430,7 @@
   },
   {
     "opening_id": "battle-lines-c04",
-    "name": "Battle Lines \u2014 C04",
+    "name": "Battle Lines — C04",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1472,7 +1472,7 @@
         "fen": "........WWWWBBBB.B.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1491,7 +1491,7 @@
   },
   {
     "opening_id": "battle-lines-c05",
-    "name": "Battle Lines \u2014 C05",
+    "name": "Battle Lines — C05",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1533,7 +1533,7 @@
         "fen": ".....W..WWWBBBBB.....W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1552,7 +1552,7 @@
   },
   {
     "opening_id": "battle-lines-c06",
-    "name": "Battle Lines \u2014 C06",
+    "name": "Battle Lines — C06",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1594,7 +1594,7 @@
         "fen": ".......WWWWBBBBB.......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1613,7 +1613,7 @@
   },
   {
     "opening_id": "battle-lines-c07",
-    "name": "Battle Lines \u2014 C07",
+    "name": "Battle Lines — C07",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1655,7 +1655,7 @@
         "fen": "........WWWWBBBB.B...W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1674,7 +1674,7 @@
   },
   {
     "opening_id": "battle-lines-c08",
-    "name": "Battle Lines \u2014 C08",
+    "name": "Battle Lines — C08",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1716,7 +1716,7 @@
         "fen": "........WWWBBBBB.....W.W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1735,7 +1735,7 @@
   },
   {
     "opening_id": "battle-lines-c09",
-    "name": "Battle Lines \u2014 C09",
+    "name": "Battle Lines — C09",
     "aliases": [],
     "family": "Battle Lines",
     "side": "W",
@@ -1777,7 +1777,7 @@
         "fen": ".....W..WWWWBBBB.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -1832,7 +1832,7 @@
         "fen": "........WWWWBBWBB.......|W|5|5"
       }
     ],
-    "strategic_notes": "15.5 \u2013 Mill Rush trunk + W closes Z shape with b2; B counters c5.",
+    "strategic_notes": "15.5 – Mill Rush trunk + W closes Z shape with b2; B counters c5.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2552,7 +2552,7 @@
         "fen": ".B......WWWWBBWBB......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2613,7 +2613,7 @@
         "fen": "........WWWWBBWBBB.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2674,7 +2674,7 @@
         "fen": ".B.....WWWWWBBWBB.......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2735,7 +2735,7 @@
         "fen": ".B......WWWWBBWBBW......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2796,7 +2796,7 @@
         "fen": "........WWWWBBWBB.B....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2857,7 +2857,7 @@
         "fen": "........WWWWBBWBB..B...W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2918,7 +2918,7 @@
         "fen": "...B....WWWWBBWBB......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2951,8 +2951,7 @@
       "f2",
       "b6xb4",
       "b4",
-      "c4",
-      "d7"
+      "c4"
     ],
     "branch_moves": [],
     "opening_fen_signatures": [
@@ -2969,11 +2968,11 @@
         "fen": "........WWWWBB.B........|W|4|4"
       },
       {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "ply": 9,
+        "fen": "........WWWWBB.B.......W|B|5|4"
       }
     ],
-    "strategic_notes": "15.6 \u2013 Mill Rush trunk + W opens Z with c4; B counters d7.",
+    "strategic_notes": "15.6 – Mill Rush trunk + W opens Z with c4; B's 5th move varies.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -2991,7 +2990,7 @@
   },
   {
     "opening_id": "open-z-mill-c01",
-    "name": "Open Z Mill \u2014 C01",
+    "name": "Open Z Mill — C01",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
@@ -3006,129 +3005,7 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
-      "b2",
-      "e4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBBWB...B...W|W|6|6"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.6",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "open-z-mill-c02",
-    "name": "Open Z Mill \u2014 C02",
-    "aliases": [],
-    "family": "Open Z Mill",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "b2",
-      "c5"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBBWBB......W|W|6|6"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.6",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "open-z-mill-c03",
-    "name": "Open Z Mill \u2014 C03",
-    "aliases": [],
-    "family": "Open Z Mill",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
+      "a7",
       "b2",
       "d5"
     ],
@@ -3148,14 +3025,136 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "B.......WWWWBB.B.......W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B......WWWWBBWB.B.....W|W|6|6"
+        "fen": "B.......WWWWBBWB.B.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.6",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-c02",
+    "name": "Open Z Mill — C02",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "g7",
+      "b2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "..B.....WWWWBB.B.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "..B.....WWWWBBWB.B.....W|W|6|6"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.6",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-c03",
+    "name": "Open Z Mill — C03",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "c5",
+      "b2",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.BB......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B......WWWWBBWBB......W|W|6|6"
+      }
+    ],
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3174,7 +3173,7 @@
   },
   {
     "opening_id": "open-z-mill-c04",
-    "name": "Open Z Mill \u2014 C04",
+    "name": "Open Z Mill — C04",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
@@ -3189,7 +3188,7 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
+      "d5",
       "b2",
       "g4"
     ],
@@ -3209,14 +3208,14 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "........WWWWBB.B.B.....W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B.B....WWWWBBWB.......W|W|6|6"
+        "fen": "...B....WWWWBBWB.B.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3235,7 +3234,7 @@
   },
   {
     "opening_id": "open-z-mill-c05",
-    "name": "Open Z Mill \u2014 C05",
+    "name": "Open Z Mill — C05",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
@@ -3250,9 +3249,9 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
-      "b2",
-      "e5"
+      "e3",
+      "d3",
+      "d5"
     ],
     "branch_moves": [],
     "opening_fen_signatures": [
@@ -3270,14 +3269,14 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "........WWWWBB.B....B..W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B......WWWWBBWB..B....W|W|6|6"
+        "fen": "........WWWWBB.B.B..BW.W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3296,7 +3295,7 @@
   },
   {
     "opening_id": "open-z-mill-c06",
-    "name": "Open Z Mill \u2014 C06",
+    "name": "Open Z Mill — C06",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
@@ -3311,9 +3310,9 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
-      "g4",
-      "e4"
+      "g1",
+      "d1",
+      "d7"
     ],
     "branch_moves": [],
     "opening_fen_signatures": [
@@ -3331,14 +3330,14 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "....B...WWWWBB.B.......W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B.W....WWWWBB.B...B...W|W|6|6"
+        "fen": ".B..BW..WWWWBB.B.......W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3357,7 +3356,7 @@
   },
   {
     "opening_id": "open-z-mill-c07",
-    "name": "Open Z Mill \u2014 C07",
+    "name": "Open Z Mill — C07",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
@@ -3372,9 +3371,9 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
-      "d3",
-      "e4"
+      "e3",
+      "b2",
+      "d5"
     ],
     "branch_moves": [],
     "opening_fen_signatures": [
@@ -3392,14 +3391,14 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "........WWWWBB.B....B..W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B......WWWWBB.B...B.W.W|W|6|6"
+        "fen": "........WWWWBBWB.B..B..W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3418,133 +3417,11 @@
   },
   {
     "opening_id": "open-z-mill-c08",
-    "name": "Open Z Mill \u2014 C08",
+    "name": "Open Z Mill — C08",
     "aliases": [],
     "family": "Open Z Mill",
     "side": "W",
     "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "c3"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.....WBW|W|6|6"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.6",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "open-z-mill-c09",
-    "name": "Open Z Mill \u2014 C09",
-    "aliases": [],
-    "family": "Open Z Mill",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "c5"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.BB....W.W|W|6|6"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.6",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3",
-    "name": "Z Mill \u2013 c4 to d3",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "book",
     "line_moves": [
       "d6",
       "d2",
@@ -3582,7 +3459,122 @@
         "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
       }
     ],
-    "strategic_notes": "15.7 \u2013 Open Z Mill + W extends to d3; B counters d5.",
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.6",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-c09",
+    "name": "Open Z Mill — C09",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "b2",
+      "d3",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBBBB.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "........WWWWBBBB.B...W.W|W|6|6"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.6",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3",
+    "name": "Z Mill – c4 to d3",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 9,
+        "fen": "........WWWWBB.B.......W|B|5|4"
+      }
+    ],
+    "strategic_notes": "15.7 – Open Z Mill + W extends to d3; B’s 5th move varies.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -3600,9 +3592,478 @@
   },
   {
     "opening_id": "z-mill-c4-to-d3-c01",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C01",
+    "name": "Z Mill – c4 to d3 — C01",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "a7",
+      "b2",
+      "d5",
+      "d1",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "B.......WWWWBB.B.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "B.......WWWWBBWB.B.....W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": "B..B.W..WWWWBBWB.B.....W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c02",
+    "name": "Z Mill – c4 to d3 — C02",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "g7",
+      "b2",
+      "d5",
+      "g4",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "..B.....WWWWBB.B.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "..B.....WWWWBBWB.B.....W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": "..BW....WWWWBBWB.B.B...W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c03",
+    "name": "Z Mill – c4 to d3 — C03",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "c5",
+      "b2",
+      "d7",
+      "d1",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.BB......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B......WWWWBBWBB......W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": ".B.B.W..WWWWBBWBB......W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c04",
+    "name": "Z Mill – c4 to d3 — C04",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "d5",
+      "b2",
+      "g4",
+      "d1",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.B.B.....W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "...B....WWWWBBWB.B.....W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": ".B.B.W..WWWWBBWB.B.....W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c05",
+    "name": "Z Mill – c4 to d3 — C05",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "e3",
+      "d3",
+      "d5",
+      "b2",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.B....B..W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "........WWWWBB.B.B..BW.W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": ".B......WWWWBBWB.B..BW.W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c06",
+    "name": "Z Mill – c4 to d3 — C06",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "g1",
+      "d1",
+      "d7",
+      "b2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "....B...WWWWBB.B.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B..BW..WWWWBB.B.......W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": ".B..BW..WWWWBBWB.B.....W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c07",
+    "name": "Z Mill – c4 to d3 — C07",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
+    "side": "W",
+    "seed_source": "teacher-predicted",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "e3",
+      "b2",
+      "d5",
+      "d3",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WWWBB.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........WWWWBB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........WWWWBB.B....B..W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "........WWWWBBWB.B..B..W|W|6|6"
+      },
+      {
+        "ply": 14,
+        "fen": ".B......WWWWBBWB.B..BW.W|W|7|7"
+      }
+    ],
+    "strategic_notes": "★ teacher",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book",
+      "teacher-predicted"
+    ],
+    "source_reference": "Chapter 15.7",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "z-mill-c4-to-d3-c08",
+    "name": "Z Mill – c4 to d3 — C08",
+    "aliases": [],
+    "family": "Z Mill – c4 to d3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -3648,476 +4109,7 @@
         "fen": ".B......WWWWBBWB.B...WBW|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c02",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C02",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "b2",
-      "e4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B......WWWWBBWB.B.B.W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c03",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C03",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "b2",
-      "e3"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B......WWWWBBWB.B..BW.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c04",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C04",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "e4",
-      "b2xe4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B......WWWWBBBB.B...W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c05",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C05",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "b2",
-      "g4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B.B....WWWWBBWB.B...W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c06",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C06",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "b2",
-      "a4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B.....BWWWWBBWB.B...W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c07",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C07",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "e4",
-      "g4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B.B....WWWWBB.B.B.W.W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
-    "common_blunders": [],
-    "recommended_responses": {},
-    "outcome_stats": {
-      "W": 0,
-      "B": 0,
-      "D": 0
-    },
-    "confidence": 1.0,
-    "tags": [
-      "book",
-      "teacher-predicted"
-    ],
-    "source_reference": "Chapter 15.7",
-    "needs_llm_name": false,
-    "favored_side": "unknown"
-  },
-  {
-    "opening_id": "z-mill-c4-to-d3-c08",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C08",
-    "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
-    "side": "W",
-    "seed_source": "teacher-predicted",
-    "line_moves": [
-      "d6",
-      "d2",
-      "f4",
-      "b4",
-      "f6",
-      "f2",
-      "b6xb4",
-      "b4",
-      "c4",
-      "d7",
-      "d3",
-      "d5",
-      "e4",
-      "b2xf4"
-    ],
-    "branch_moves": [],
-    "opening_fen_signatures": [
-      {
-        "ply": 4,
-        "fen": ".........W.W.B.B........|W|2|2"
-      },
-      {
-        "ply": 6,
-        "fen": ".........WWWBB.B........|W|3|3"
-      },
-      {
-        "ply": 8,
-        "fen": "........WWWWBB.B........|W|4|4"
-      },
-      {
-        "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
-      },
-      {
-        "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
-      },
-      {
-        "ply": 14,
-        "fen": ".B......WWW.BBBB.B.W.W.W|W|7|7"
-      }
-    ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4136,9 +4128,9 @@
   },
   {
     "opening_id": "z-mill-c4-to-d3-c09",
-    "name": "Z Mill \u2013 c4 to d3 \u2014 C09",
+    "name": "Z Mill – c4 to d3 — C09",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 to d3",
+    "family": "Z Mill – c4 to d3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4151,11 +4143,11 @@
       "b6xb4",
       "b4",
       "c4",
-      "d7",
+      "b2",
       "d3",
       "d5",
-      "a7",
-      "e4"
+      "d1",
+      "d7"
     ],
     "branch_moves": [],
     "opening_fen_signatures": [
@@ -4173,18 +4165,18 @@
       },
       {
         "ply": 10,
-        "fen": ".B......WWWWBB.B.......W|W|5|5"
+        "fen": "........WWWWBBBB.......W|W|5|5"
       },
       {
         "ply": 12,
-        "fen": ".B......WWWWBB.B.B...W.W|W|6|6"
+        "fen": "........WWWWBBBB.B...W.W|W|6|6"
       },
       {
         "ply": 14,
-        "fen": "WB......WWWWBB.B.B.B.W.W|W|7|7"
+        "fen": ".B...W..WWWWBBBB.B...W.W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4203,9 +4195,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3",
-    "name": "Z Mill \u2013 c4 and e3",
+    "name": "Z Mill – c4 and e3",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "book",
     "line_moves": [
@@ -4245,7 +4237,7 @@
         "fen": "........WWWWBB.B.B.BW..W|W|6|6"
       }
     ],
-    "strategic_notes": "15.8 \u2013 Open Z Mill + W places e3; B counters e4.",
+    "strategic_notes": "15.8 – Open Z Mill + W places e3; B counters e4.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4263,9 +4255,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c01",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C01",
+    "name": "Z Mill – c4 and e3 — C01",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4311,7 +4303,7 @@
         "fen": "........WWWWBBWB.B.BWB.W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4330,9 +4322,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c02",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C02",
+    "name": "Z Mill – c4 and e3 — C02",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4378,7 +4370,7 @@
         "fen": "........WWWWBB.B.B.BWWBW|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4397,9 +4389,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c03",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C03",
+    "name": "Z Mill – c4 and e3 — C03",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4445,7 +4437,7 @@
         "fen": "........WWWWBBWB.B.BW.BW|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4464,9 +4456,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c04",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C04",
+    "name": "Z Mill – c4 and e3 — C04",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4512,7 +4504,7 @@
         "fen": ".B......WWWWBBWB.B.BW..W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4531,9 +4523,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c05",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C05",
+    "name": "Z Mill – c4 and e3 — C05",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4579,7 +4571,7 @@
         "fen": "........WWWWBBWBBB.BW..W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4598,9 +4590,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c06",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C06",
+    "name": "Z Mill – c4 and e3 — C06",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4646,7 +4638,7 @@
         "fen": ".......BWWWWBBWB.B.BW..W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4665,9 +4657,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c07",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C07",
+    "name": "Z Mill – c4 and e3 — C07",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4713,7 +4705,7 @@
         "fen": "........WWWWBBBB.B.BW..W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4732,9 +4724,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c08",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C08",
+    "name": "Z Mill – c4 and e3 — C08",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4780,7 +4772,7 @@
         "fen": "........WWWWBB.B.B.BWBWW|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4799,9 +4791,9 @@
   },
   {
     "opening_id": "z-mill-c4-and-e3-c09",
-    "name": "Z Mill \u2013 c4 and e3 \u2014 C09",
+    "name": "Z Mill – c4 and e3 — C09",
     "aliases": [],
-    "family": "Z Mill \u2013 c4 and e3",
+    "family": "Z Mill – c4 and e3",
     "side": "W",
     "seed_source": "teacher-predicted",
     "line_moves": [
@@ -4847,7 +4839,7 @@
         "fen": ".B...W..WWWWBB.B.B.BW..W|W|7|7"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4896,7 +4888,7 @@
         "fen": "........BW.W.BBB......W.|W|4|4"
       }
     ],
-    "strategic_notes": "15.9 \u2013 B disrupts with b6 piece 2, builds b-col mill, captures f2.",
+    "strategic_notes": "15.9 – B disrupts with b6 piece 2, builds b-col mill, captures f2.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -4914,7 +4906,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c01",
-    "name": "Z Mill Interrupted \u2014 C01",
+    "name": "Z Mill Interrupted — C01",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -4974,7 +4966,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c02",
-    "name": "Z Mill Interrupted \u2014 C02",
+    "name": "Z Mill Interrupted — C02",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5034,7 +5026,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c03",
-    "name": "Z Mill Interrupted \u2014 C03",
+    "name": "Z Mill Interrupted — C03",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5094,7 +5086,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c04",
-    "name": "Z Mill Interrupted \u2014 C04",
+    "name": "Z Mill Interrupted — C04",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5136,7 +5128,7 @@
         "fen": ".......WBW.WWBBB.....BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5155,7 +5147,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c05",
-    "name": "Z Mill Interrupted \u2014 C05",
+    "name": "Z Mill Interrupted — C05",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5197,7 +5189,7 @@
         "fen": ".....B.WBW.WWBBB......WB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5216,7 +5208,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c06",
-    "name": "Z Mill Interrupted \u2014 C06",
+    "name": "Z Mill Interrupted — C06",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5258,7 +5250,7 @@
         "fen": ".......WBWBWWBBB......WB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5277,7 +5269,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c07",
-    "name": "Z Mill Interrupted \u2014 C07",
+    "name": "Z Mill Interrupted — C07",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5319,7 +5311,7 @@
         "fen": "...B...WBW.WWBBB......WB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5338,7 +5330,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c08",
-    "name": "Z Mill Interrupted \u2014 C08",
+    "name": "Z Mill Interrupted — C08",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5380,7 +5372,7 @@
         "fen": ".....W..BW.WWBBB.....BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5399,7 +5391,7 @@
   },
   {
     "opening_id": "z-mill-interrupted-c09",
-    "name": "Z Mill Interrupted \u2014 C09",
+    "name": "Z Mill Interrupted — C09",
     "aliases": [],
     "family": "Z Mill Interrupted",
     "side": "W",
@@ -5441,7 +5433,7 @@
         "fen": ".....W.BBW.WWBBB.....BW.|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5490,7 +5482,7 @@
         "fen": "..W..W...W.W.B.B.....B.B|W|4|4"
       }
     ],
-    "strategic_notes": "15.10 \u2013 White builds outer wrap g7-d1; Black forced to c4.",
+    "strategic_notes": "15.10 – White builds outer wrap g7-d1; Black forced to c4.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5508,7 +5500,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c01",
-    "name": "Mill Rush Interrupt \u2014 C01",
+    "name": "Mill Rush Interrupt — C01",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5550,7 +5542,7 @@
         "fen": ".BWB.W.W.W.W.B.B.....BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5569,7 +5561,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c02",
-    "name": "Mill Rush Interrupt \u2014 C02",
+    "name": "Mill Rush Interrupt — C02",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5611,7 +5603,7 @@
         "fen": "..WB.W.W.W.W.B.B.B...BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5630,7 +5622,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c03",
-    "name": "Mill Rush Interrupt \u2014 C03",
+    "name": "Mill Rush Interrupt — C03",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5672,7 +5664,7 @@
         "fen": ".BW.BW.W.W.W.B.B.....BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5691,7 +5683,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c04",
-    "name": "Mill Rush Interrupt \u2014 C04",
+    "name": "Mill Rush Interrupt — C04",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5733,7 +5725,7 @@
         "fen": ".BWB.W.W.W.W.B.BW....B.B|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5752,7 +5744,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c05",
-    "name": "Mill Rush Interrupt \u2014 C05",
+    "name": "Mill Rush Interrupt — C05",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5794,7 +5786,7 @@
         "fen": ".BW..W.W.W.W.B.B..B..BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5813,7 +5805,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c06",
-    "name": "Mill Rush Interrupt \u2014 C06",
+    "name": "Mill Rush Interrupt — C06",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5855,7 +5847,7 @@
         "fen": ".BW..W.W.W.W.B.BB....BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5874,7 +5866,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c07",
-    "name": "Mill Rush Interrupt \u2014 C07",
+    "name": "Mill Rush Interrupt — C07",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5916,7 +5908,7 @@
         "fen": "WBWB.W.W.W.W.B.B.....B.B|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5935,7 +5927,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c08",
-    "name": "Mill Rush Interrupt \u2014 C08",
+    "name": "Mill Rush Interrupt — C08",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -5977,7 +5969,7 @@
         "fen": ".BW..W.W.W.W.B.B.B...BWB|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -5996,7 +5988,7 @@
   },
   {
     "opening_id": "mill-rush-interrupt-c09",
-    "name": "Mill Rush Interrupt \u2014 C09",
+    "name": "Mill Rush Interrupt — C09",
     "aliases": [],
     "family": "Mill Rush Interrupt",
     "side": "W",
@@ -6038,7 +6030,7 @@
         "fen": ".BWB.W.W.W.W.BWB.....B.B|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6087,7 +6079,7 @@
         "fen": "..W......WBWWBB..B......|W|4|4"
       }
     ],
-    "strategic_notes": "15.11 \u2013 Black's 2nd piece to b2 disruption; W responds f6, g7.",
+    "strategic_notes": "15.11 – Black's 2nd piece to b2 disruption; W responds f6, g7.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6105,7 +6097,7 @@
   },
   {
     "opening_id": "black-into-white-c01",
-    "name": "Black into White \u2014 C01",
+    "name": "Black into White — C01",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6147,7 +6139,7 @@
         "fen": "..WB.W.B.WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6166,7 +6158,7 @@
   },
   {
     "opening_id": "black-into-white-c02",
-    "name": "Black into White \u2014 C02",
+    "name": "Black into White — C02",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6208,7 +6200,7 @@
         "fen": "..WB..WB.WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6227,7 +6219,7 @@
   },
   {
     "opening_id": "black-into-white-c03",
-    "name": "Black into White \u2014 C03",
+    "name": "Black into White — C03",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6269,7 +6261,7 @@
         "fen": "B.WB.W...WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6288,7 +6280,7 @@
   },
   {
     "opening_id": "black-into-white-c04",
-    "name": "Black into White \u2014 C04",
+    "name": "Black into White — C04",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6330,7 +6322,7 @@
         "fen": "..WBW..B.WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6349,7 +6341,7 @@
   },
   {
     "opening_id": "black-into-white-c05",
-    "name": "Black into White \u2014 C05",
+    "name": "Black into White — C05",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6391,7 +6383,7 @@
         "fen": "..WB...B.WBWWBBW.B.....W|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6410,7 +6402,7 @@
   },
   {
     "opening_id": "black-into-white-c06",
-    "name": "Black into White \u2014 C06",
+    "name": "Black into White — C06",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6452,7 +6444,7 @@
         "fen": "..WB.W...WBWWBBW.B.....B|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6471,7 +6463,7 @@
   },
   {
     "opening_id": "black-into-white-c07",
-    "name": "Black into White \u2014 C07",
+    "name": "Black into White — C07",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6513,7 +6505,7 @@
         "fen": "..WB...B.WBWWBBW.B...W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6532,7 +6524,7 @@
   },
   {
     "opening_id": "black-into-white-c08",
-    "name": "Black into White \u2014 C08",
+    "name": "Black into White — C08",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6574,7 +6566,7 @@
         "fen": "..WB.WB..WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6593,7 +6585,7 @@
   },
   {
     "opening_id": "black-into-white-c09",
-    "name": "Black into White \u2014 C09",
+    "name": "Black into White — C09",
     "aliases": [],
     "family": "Black into White",
     "side": "W",
@@ -6635,7 +6627,7 @@
         "fen": ".BWB.W...WBWWBBW.B......|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6684,7 +6676,7 @@
         "fen": "..W......W.WBBWB...B....|W|4|4"
       }
     ],
-    "strategic_notes": "15.12 \u2013 Black's 2nd piece to f2; rich midgame divergence.",
+    "strategic_notes": "15.12 – Black's 2nd piece to f2; rich midgame divergence.",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6702,7 +6694,7 @@
   },
   {
     "opening_id": "black-away-from-white-c01",
-    "name": "Black away from White \u2014 C01",
+    "name": "Black away from White — C01",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -6744,7 +6736,7 @@
         "fen": ".BWBW....W.WBBWB...B.W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6763,7 +6755,7 @@
   },
   {
     "opening_id": "black-away-from-white-c02",
-    "name": "Black away from White \u2014 C02",
+    "name": "Black away from White — C02",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -6805,7 +6797,7 @@
         "fen": ".BWBW.W..W.WBBWB...B....|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6824,7 +6816,7 @@
   },
   {
     "opening_id": "black-away-from-white-c03",
-    "name": "Black away from White \u2014 C03",
+    "name": "Black away from White — C03",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -6866,7 +6858,7 @@
         "fen": ".BW..BW..W.WBBWB...B.W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6885,7 +6877,7 @@
   },
   {
     "opening_id": "black-away-from-white-c04",
-    "name": "Black away from White \u2014 C04",
+    "name": "Black away from White — C04",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -6927,7 +6919,7 @@
         "fen": "..WBWBW..W.WBBWB...B....|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -6946,7 +6938,7 @@
   },
   {
     "opening_id": "black-away-from-white-c05",
-    "name": "Black away from White \u2014 C05",
+    "name": "Black away from White — C05",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -6988,7 +6980,7 @@
         "fen": ".BW.WBW..W.WBBWB...B....|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -7007,7 +6999,7 @@
   },
   {
     "opening_id": "black-away-from-white-c06",
-    "name": "Black away from White \u2014 C06",
+    "name": "Black away from White — C06",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -7049,7 +7041,7 @@
         "fen": ".BWBW..W.W.WBBWB...B....|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -7068,7 +7060,7 @@
   },
   {
     "opening_id": "black-away-from-white-c07",
-    "name": "Black away from White \u2014 C07",
+    "name": "Black away from White — C07",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -7110,7 +7102,7 @@
         "fen": ".BW.B.W..W.WBBWB...B.W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -7129,7 +7121,7 @@
   },
   {
     "opening_id": "black-away-from-white-c08",
-    "name": "Black away from White \u2014 C08",
+    "name": "Black away from White — C08",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -7171,7 +7163,7 @@
         "fen": ".BW.BWW..W.WBBWB...B....|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -7190,7 +7182,7 @@
   },
   {
     "opening_id": "black-away-from-white-c09",
-    "name": "Black away from White \u2014 C09",
+    "name": "Black away from White — C09",
     "aliases": [],
     "family": "Black away from White",
     "side": "W",
@@ -7232,7 +7224,7 @@
         "fen": "..WBW....W.WBBWB.B.B.W..|W|6|6"
       }
     ],
-    "strategic_notes": "\u2605 teacher",
+    "strategic_notes": "★ teacher",
     "common_blunders": [],
     "recommended_responses": {},
     "outcome_stats": {
@@ -7281,7 +7273,7 @@
         "fen": "........WWWB.BBW........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #1 (ELO \u2265 1400, freq=1185).",
+    "strategic_notes": "Top human-DB pattern #1 (ELO ≥ 1400, freq=1185).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7297,7 +7289,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7333,7 +7325,7 @@
         "fen": ".........WBWWBBW...B....|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #2 (ELO \u2265 1400, freq=146).",
+    "strategic_notes": "Top human-DB pattern #2 (ELO ≥ 1400, freq=146).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7349,7 +7341,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7385,7 +7377,7 @@
         "fen": ".........WBWWBBW.B......|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #3 (ELO \u2265 1400, freq=85).",
+    "strategic_notes": "Top human-DB pattern #3 (ELO ≥ 1400, freq=85).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7401,7 +7393,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7437,7 +7429,7 @@
         "fen": "...B.....WBWWBBW........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #4 (ELO \u2265 1400, freq=73).",
+    "strategic_notes": "Top human-DB pattern #4 (ELO ≥ 1400, freq=73).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7453,7 +7445,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7489,7 +7481,7 @@
         "fen": ".B.W.....W.B.W.B.....B.W|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #5 (ELO \u2265 1400, freq=61).",
+    "strategic_notes": "Top human-DB pattern #5 (ELO ≥ 1400, freq=61).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7505,7 +7497,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7541,7 +7533,7 @@
         "fen": ".........WBWWBBW.......B|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #6 (ELO \u2265 1400, freq=56).",
+    "strategic_notes": "Top human-DB pattern #6 (ELO ≥ 1400, freq=56).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7557,7 +7549,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7593,7 +7585,7 @@
         "fen": "........WWBBWBBW........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #7 (ELO \u2265 1400, freq=46).",
+    "strategic_notes": "Top human-DB pattern #7 (ELO ≥ 1400, freq=46).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7609,7 +7601,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7645,7 +7637,7 @@
         "fen": "........BW.BWB.W.B.W....|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #8 (ELO \u2265 1400, freq=44).",
+    "strategic_notes": "Top human-DB pattern #8 (ELO ≥ 1400, freq=44).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7661,7 +7653,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7697,7 +7689,7 @@
         "fen": ".........WBW.B.W...B.W.B|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #9 (ELO \u2265 1400, freq=37).",
+    "strategic_notes": "Top human-DB pattern #9 (ELO ≥ 1400, freq=37).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7713,7 +7705,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7749,7 +7741,7 @@
         "fen": ".......B.WBWWBBW........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #10 (ELO \u2265 1400, freq=36).",
+    "strategic_notes": "Top human-DB pattern #10 (ELO ≥ 1400, freq=36).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7765,7 +7757,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7801,7 +7793,7 @@
         "fen": "WW.....B.W.B.B.W.B......|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #11 (ELO \u2265 1400, freq=32).",
+    "strategic_notes": "Top human-DB pattern #11 (ELO ≥ 1400, freq=32).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7817,7 +7809,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7853,7 +7845,7 @@
         "fen": ".....W..BWWBBB.W........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #12 (ELO \u2265 1400, freq=27).",
+    "strategic_notes": "Top human-DB pattern #12 (ELO ≥ 1400, freq=27).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7869,7 +7861,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7905,7 +7897,7 @@
         "fen": ".BW......WBW.B.W.......B|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #13 (ELO \u2265 1400, freq=27).",
+    "strategic_notes": "Top human-DB pattern #13 (ELO ≥ 1400, freq=27).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7921,7 +7913,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -7957,7 +7949,7 @@
         "fen": "B.BW.....W.B.W.B.......W|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #14 (ELO \u2265 1400, freq=27).",
+    "strategic_notes": "Top human-DB pattern #14 (ELO ≥ 1400, freq=27).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -7973,7 +7965,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8009,7 +8001,7 @@
         "fen": "........BWWW.B...BWB....|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #15 (ELO \u2265 1400, freq=26).",
+    "strategic_notes": "Top human-DB pattern #15 (ELO ≥ 1400, freq=26).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8025,7 +8017,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8061,7 +8053,7 @@
         "fen": ".B.......WBWWBBW........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #16 (ELO \u2265 1400, freq=25).",
+    "strategic_notes": "Top human-DB pattern #16 (ELO ≥ 1400, freq=25).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8077,7 +8069,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8113,7 +8105,7 @@
         "fen": ".....W.B.W.B.B.WWB......|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #17 (ELO \u2265 1400, freq=24).",
+    "strategic_notes": "Top human-DB pattern #17 (ELO ≥ 1400, freq=24).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8129,7 +8121,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8165,7 +8157,7 @@
         "fen": "...BW..B.WBW.B.W........|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #18 (ELO \u2265 1400, freq=23).",
+    "strategic_notes": "Top human-DB pattern #18 (ELO ≥ 1400, freq=23).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8181,7 +8173,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8217,7 +8209,7 @@
         "fen": ".........WBW.WBW.B...B..|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #19 (ELO \u2265 1400, freq=23).",
+    "strategic_notes": "Top human-DB pattern #19 (ELO ≥ 1400, freq=23).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8233,7 +8225,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8269,7 +8261,7 @@
         "fen": "..BWW....W.B.B.W...B....|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #20 (ELO \u2265 1400, freq=21).",
+    "strategic_notes": "Top human-DB pattern #20 (ELO ≥ 1400, freq=21).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8285,7 +8277,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8321,7 +8313,7 @@
         "fen": ".......B.W.B.B.WWB.....W|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #21 (ELO \u2265 1400, freq=21).",
+    "strategic_notes": "Top human-DB pattern #21 (ELO ≥ 1400, freq=21).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8337,7 +8329,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   },
@@ -8373,7 +8365,7 @@
         "fen": ".B.W.....WB.WB.W...B....|W|4|4"
       }
     ],
-    "strategic_notes": "Top human-DB pattern #22 (ELO \u2265 1400, freq=21).",
+    "strategic_notes": "Top human-DB pattern #22 (ELO ≥ 1400, freq=21).",
     "common_blunders": [],
     "recommended_responses": {
       "W": [],
@@ -8389,7 +8381,7 @@
       "human-db",
       "pattern"
     ],
-    "source_reference": "Human DB ELO \u2265 1400",
+    "source_reference": "Human DB ELO ≥ 1400",
     "needs_llm_name": false,
     "favored_side": "unknown"
   }
