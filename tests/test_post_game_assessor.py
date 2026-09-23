@@ -1302,7 +1302,7 @@ class TestDebriefAnnotationPrompt:
         """TURNING POINT section must appear when annotation has a turning point."""
         ann = _make_annotation_with_tp()
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "TURNING POINT:" in prompt
+        assert "TURNING POINT" in prompt
 
     def test_other_poor_moves_present_when_multiple_confirmed_poor(self):
         """OTHER POOR MOVES section appears only when there are additional confirmed_poor moves."""
@@ -1321,7 +1321,7 @@ class TestDebriefAnnotationPrompt:
         ann = _make_annotation_with_tp(oracle="malom_full", quality="win_to_loss")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
         # Extract only the TURNING POINT block
-        start = prompt.find("TURNING POINT:")
+        start = prompt.find("TURNING POINT")
         end = prompt.find("\n\n", start) if "\n\n" in prompt[start:] else len(prompt)
         tp_block = prompt[start:end]
         # Must not contain a bare decimal number (e.g., "0.712")
@@ -1332,8 +1332,8 @@ class TestDebriefAnnotationPrompt:
         """When oracle is malom_full, English WDL verdict is used, not the raw quality string."""
         ann = _make_annotation_with_tp(oracle="malom_full", quality="win_to_loss")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        # Must contain natural-language WDL description
-        assert "winning before" in prompt or "losing after" in prompt, \
+        # Must contain natural-language WDL description (arrow format: "winning → losing")
+        assert any(w in prompt for w in ("winning →", "→ losing", "drawn →", "→ drawn")), \
             f"Expected WDL verdict prose in prompt, got: {prompt!r}"
         # Raw 'win_to_loss' quality string must not appear verbatim
         assert "win_to_loss" not in prompt
@@ -1363,7 +1363,7 @@ class TestDebriefAnnotationPrompt:
         """TURNING POINT section must be absent when annotation.turning_point_ply is None."""
         ann = _make_clean_annotation()
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "TURNING POINT:" not in prompt
+        assert "TURNING POINT" not in prompt
 
     def test_winner_and_loser_in_facts(self):
         """Winner and Loser values from report appear in GAME FACTS."""

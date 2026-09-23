@@ -318,14 +318,26 @@ STYLE:
 - Do not quote raw decimal scores; use the categorical descriptors already provided.
 
 COLOR ATTRIBUTION RULES (CRITICAL — violations render the commentary wrong):
-- Every move entry in the fact block has an explicit Player field: W (White) or B (Black).
-- That Player field is ground truth. NEVER override it or infer color from ply parity.
-- 'W' = White, 'B' = Black, everywhere in this prompt without exception.
-- WDL verdicts are stated from the named player's perspective.
-  Example: "White was drawn before, losing after" means WHITE's position worsened.
-  Example: "Black was drawn before, losing after" means BLACK's position worsened.
-- Winner and Loser are stated explicitly in GAME FACTS — do not infer them from anything else.
-- A player making a poor move is the one who worsened their own position; the opponent benefited.
+- Every move entry has an explicit Player field: W (White) or B (Black). It is ground truth.
+- NEVER infer color from ply parity or game outcome. Use the Player field exactly as given.
+- 'W' = White, 'B' = Black, everywhere without exception.
+- WDL verdicts are from the NAMED PLAYER's own perspective:
+    "Black's position: drawn → LOSING" means BLACK's game became a theoretical loss.
+    "White's position: winning → drawn" means WHITE lost their winning advantage.
+  The opponent is not the subject; the named player is.
+- The eventual game winner is often NOT the player who erred at the turning point.
+  The winner won because the opponent blundered, not because the winner played well there.
+- STRUCTURE RULE: Your turning-point sentence MUST name the player who erred FIRST,
+  then state what happened to THEIR position (not the opponent's).
+  WRONG: "White played d1-a1, shifting the balance in their favor"  ← if White's position became Losing
+  RIGHT: "White blundered with d1-a1 — White's own position deteriorated from drawn to losing"
+
+OUTPUT RULES:
+1. Do NOT describe a move as favorable, beneficial, or an improvement for the player whose own
+   WDL worsened. If the TURNING POINT section shows the player's position went W→D, D→L, or W→L,
+   that move damaged THEIR position — write it as a blunder or mistake, regardless of game outcome.
+2. The game winner may be the player who benefited from the opponent's mistake. Say so explicitly:
+   e.g. "White blundered, handing Black the advantage" — not "White made a strong move."
 """
 
 _DEBRIEF_POSITION_SYSTEM = _BOARD_RULES + """
@@ -553,23 +565,23 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         oracle = annotation.turning_point_oracle
         quality_label = _wdl_quality_label(annotation.turning_point_quality)
         tp_color_name = _cn.get(tp.color, tp.color)
-        lines.append("TURNING POINT:")
-        lines.append(f"  Player:         {tp.color} ({tp_color_name})  ← authoritative, do not change")
-        lines.append(f"  Ply:            {tp_ply + 1}")
-        lines.append(f"  Move played:    {tp.move_played}")
+        lines.append(f"TURNING POINT (a MISTAKE by {tp_color_name}):")
+        lines.append(f"  Player who erred: {tp.color} ({tp_color_name})  ← authoritative, do not change")
+        lines.append(f"  Ply:              {tp_ply + 1}")
+        lines.append(f"  Move played:      {tp.move_played}")
         best_shown = tp.malom_best_alt if (oracle in ("malom_full", "retrograde_wdl") and tp.malom_best_alt) else tp.best_alt
         if best_shown:
-            lines.append(f"  Best available: {best_shown}  (stronger for {tp_color_name})")
+            lines.append(f"  Best available:   {best_shown}  (would have kept {tp_color_name} in a better position)")
         if oracle in ("malom_full", "retrograde_wdl"):
             wdl_map = {"W": "winning", "D": "drawn", "L": "losing"}
             wb = wdl_map.get(tp.wdl_before or "", tp.wdl_before or "?")
             wa = wdl_map.get(tp.wdl_after  or "", tp.wdl_after  or "?")
             lines.append(
-                f"  Malom verdict:  {tp_color_name} was {wb} before this move,"
-                f" {wa} after  (oracle: {oracle})"
+                f"  Impact on {tp_color_name}'s position: {wb} → {wa}"
+                f"  (oracle: {oracle})  ← {tp_color_name} WORSENED their own position"
             )
         else:
-            lines.append(f"  Regret signal:  {quality_label}  (oracle: {oracle})")
+            lines.append(f"  Regret signal:    {quality_label}  (oracle: {oracle})")
         lines.append("")
 
     # OTHER POOR MOVES (only when more than one confirmed_poor)
