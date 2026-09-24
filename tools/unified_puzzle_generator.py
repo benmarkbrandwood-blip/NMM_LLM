@@ -68,11 +68,15 @@ def _load_settings() -> dict:
 
 # ── Worker initialiser (pre-warms hash cache once per worker process) ─────────
 
+_worker_settings: dict = {}
+_worker_db = None   # per-worker MalomDB singleton; reused across tasks
+
+
 def _worker_init(settings_path: str) -> None:
     """Called once per worker process at pool startup."""
     import sys
     sys.path.insert(0, str(_ROOT))
-    global _worker_settings
+    global _worker_settings, _worker_db
     try:
         _worker_settings = json.loads(Path(settings_path).read_text()) if Path(settings_path).exists() else {}
     except Exception:
@@ -82,9 +86,15 @@ def _worker_init(settings_path: str) -> None:
     try:
         from ai.malom_puzzle_search import prewarm_hash_cache, _PREWARM_DONE
         if not _PREWARM_DONE:
-            # spawn start method (non-Linux): must prewarm here (~30s per worker)
-            print(f"[worker pid={pid}] pre-warming Malom hash cache (max_pieces=9)…", flush=True)
-            prewarm_hash_cache(9)
+            # spawn start method (non-Linux): must prewarm here per worker
+            print(f"[worker pid={pid}] pre-warming Malom hash cache (max_pieces=7)…", flush=True)
+            prewarm_hash_cache(7)
+
+        malom_path = _worker_settings.get("malom_db_path", "")
+        if malom_path:
+            from ai.malom_db import MalomDB
+            _worker_db = MalomDB(malom_path)
+
         rss = _rss_mb()
         print(f"[worker pid={pid}] ready  RSS={rss} MB", flush=True)
     except Exception as exc:
@@ -159,13 +169,16 @@ def _gen_midgame(depth, side, max_winning_moves, min_hardness, attempts, setting
     from ai.malom_db import MalomDB
     from ai.malom_puzzle_search import generate_malom_puzzle
 
-    malom_path = settings.get("malom_db_path", "")
-    if not malom_path:
-        return None
-
-    db = MalomDB(malom_path)
-    if not db.is_available():
-        return None
+    global _worker_db
+    if _worker_db is not None and _worker_db.is_available():
+        db = _worker_db
+    else:
+        malom_path = settings.get("malom_db_path", "")
+        if not malom_path:
+            return None
+        db = MalomDB(malom_path)
+        if not db.is_available():
+            return None
 
     puzzle = generate_malom_puzzle(
         db,
@@ -188,13 +201,16 @@ def _gen_placement(depth, side, max_winning_moves, min_hardness, attempts, setti
     from ai.malom_db import MalomDB
     from ai.malom_puzzle_search import generate_malom_placement_puzzle
 
-    malom_path = settings.get("malom_db_path", "")
-    if not malom_path:
-        return None
-
-    db = MalomDB(malom_path)
-    if not db.is_available():
-        return None
+    global _worker_db
+    if _worker_db is not None and _worker_db.is_available():
+        db = _worker_db
+    else:
+        malom_path = settings.get("malom_db_path", "")
+        if not malom_path:
+            return None
+        db = MalomDB(malom_path)
+        if not db.is_available():
+            return None
 
     puzzle = generate_malom_placement_puzzle(
         db,
@@ -485,11 +501,11 @@ if __name__ == "__main__":
         # Forked workers inherit the populated _HASH_CACHE via copy-on-write,
         # so the ~30s prewarm and ~500MB of lookup tables only exist once
         # in physical memory — not once per worker.
-        print("Pre-warming Malom hash cache in parent (max_pieces=9) — ~30s…", flush=True)
+        print("Pre-warming Malom hash cache in parent (max_pieces=7)…", flush=True)
         t_pw = time.time()
         try:
             from ai.malom_puzzle_search import prewarm_hash_cache
-            prewarm_hash_cache(9)
+            prewarm_hash_cache(7)
             print(f"Hash cache ready in {time.time()-t_pw:.1f}s  parent RSS={_rss_mb()} MB", flush=True)
         except Exception as exc:
             print(f"Warning: prewarm failed ({exc}); workers will warm individually", flush=True)

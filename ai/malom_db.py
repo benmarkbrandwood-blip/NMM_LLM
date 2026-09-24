@@ -92,6 +92,7 @@ from __future__ import annotations
 
 import logging
 import struct
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from math import comb
 from pathlib import Path
@@ -234,6 +235,11 @@ _SYM_PERMS: list[list[int]] = [
 # int inv[] = {2,1,0,3,4,5,6,7,10,9,8,11,12,13,14,15};
 _SYM_INV: list[int] = [2,1,0,3,4,5,6,7,10,9,8,11,12,13,14,15]
 
+# f_lookup and f_sym_lookup depend only on W, not B.  Cache them by W so all
+# _HashState objects with the same W share a single copy of these tables.
+# Value: (f_lookup, f_sym_lookup, orbit_count)
+_W_LOOKUP_CACHE: dict[int, tuple[dict[int,int], dict[int,int], int]] = {}
+
 # ── Hash cache (one HashState per (W,B) sector pair) ──────────────────────────
 
 class _HashState:
@@ -260,21 +266,25 @@ class _HashState:
     # ── build ──────────────────────────────────────────────────────────────
 
     def _build(self, W: int, B: int) -> None:
-        f_lookup: dict[int, int] = {}   # W_bits → canonical orbit index
-        f_sym_lookup: dict[int, int] = {} # W_bits → symmetry op that brings to canonical
+        global _W_LOOKUP_CACHE
+        if W in _W_LOOKUP_CACHE:
+            f_lookup, f_sym_lookup, orbit_count = _W_LOOKUP_CACHE[W]
+        else:
+            f_lookup: dict[int, int] = {}   # W_bits → canonical orbit index
+            f_sym_lookup: dict[int, int] = {} # W_bits → symmetry op that brings to canonical
+            orbit_count = 0
+            w = (1 << W) - 1
+            while w < (1 << 24):
+                if w not in f_lookup:
+                    for i in range(16):
+                        sw = _sym24_from_perm(_SYM_PERMS[i], w)
+                        f_lookup[sw] = orbit_count
+                        f_sym_lookup[sw] = _SYM_INV[i]
+                    orbit_count += 1
+                w = self._next_choose(w)
+            _W_LOOKUP_CACHE[W] = (f_lookup, f_sym_lookup, orbit_count)
 
-        c = 0
-        w = (1 << W) - 1
-        while w < (1 << 24):
-            if w not in f_lookup:
-                for i in range(16):
-                    sw = _sym24_from_perm(_SYM_PERMS[i], w)
-                    f_lookup[sw] = c
-                    f_sym_lookup[sw] = _SYM_INV[i]
-                c += 1
-            w = self._next_choose(w)
-
-        # g_lookup: compressed-black-bits → rank
+        # g_lookup: compressed-black-bits → rank (depends on both W and B)
         g_lookup: dict[int, int] = {}
         gc = 0
         b = (1 << B) - 1
@@ -286,7 +296,7 @@ class _HashState:
         self.f_lookup = f_lookup
         self.f_sym_lookup = f_sym_lookup
         self.g_lookup = g_lookup
-        self.hash_count = c * comb(24 - W, B)
+        self.hash_count = orbit_count * comb(24 - W, B)
 
     # ── hash ──────────────────────────────────────────────────────────────
 
@@ -841,6 +851,9 @@ class RegretResult:
 
 # ── MalomDB ────────────────────────────────────────────────────────────────────
 
+_SECTOR_CACHE_MAX = 64   # max open sectors per MalomDB instance
+
+
 class MalomDB:
     """Read-only adapter for the Malom ultra-strong NMM database.
 
@@ -857,9 +870,10 @@ class MalomDB:
         self._virt_win = 299
         self._virt_loss = -299
         self._secvals: dict[tuple[int,int,int,int], int] = {}
-        # Cache: sector key → (data, hash_count, em_set)
+        # LRU cache: sector key → (data, hash_count, em_set)
         # data is a memoryview of a mmap — zero resident memory until pages are touched.
-        self._cache: dict[tuple[int,int,int,int], tuple[memoryview,int,dict[int,int]]] = {}
+        # Capped at _SECTOR_CACHE_MAX to prevent unbounded em_set accumulation.
+        self._cache: OrderedDict[tuple[int,int,int,int], tuple[memoryview,int,dict[int,int]]] = OrderedDict()
         self._available = False
         self._warned = False
         self._load_secval()
@@ -890,6 +904,7 @@ class MalomDB:
     def _get_sector(self, path: Path, sector: tuple[int,int,int,int]
                     ) -> Optional[tuple[memoryview, int, dict[int,int]]]:
         if sector in self._cache:
+            self._cache.move_to_end(sector)
             return self._cache[sector]
         if not path.exists():
             return None
@@ -898,6 +913,8 @@ class MalomDB:
                 path, self._virt_win, self._virt_loss
             )
             self._cache[sector] = (data, hash_count, em_set)
+            if len(self._cache) > _SECTOR_CACHE_MAX:
+                self._cache.popitem(last=False)  # evict LRU
             return self._cache[sector]
         except Exception as exc:
             logger.warning("[MalomDB] failed to read sector %s: %s", path.name, exc)

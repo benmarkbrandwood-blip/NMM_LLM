@@ -137,7 +137,7 @@ class TestRegretResultStructure(unittest.TestCase):
         required = {
             "available", "omv", "wdl_transition", "best_omv",
             "components", "regret_version", "malom_label_version",
-            "unavailable_reason",
+            "unavailable_reason", "best_legal_move",
         }
         self.assertEqual(fields, required)
 
