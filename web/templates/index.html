@@ -11,36 +11,43 @@
   <header>
     <h1>Nine Men's Morris</h1>
     <div id="header-buttons">
-    <div id="assessment-btn-wrap">
-      <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
-      <div id="assessment-progress-bar">
-        <div class="ap-seg" id="ap-1" title="Turning points"></div>
-        <div class="ap-seg" id="ap-2" title="AI divergence"></div>
-        <div class="ap-seg" id="ap-3" title="Malom regret"></div>
-        <div class="ap-seg" id="ap-4" title="Commentary"></div>
+      <div class="hdr-row">
+        <button id="btn-new-game-header" class="hdr-bi">&#9658; New Game</button>
+        <button id="toggle-setup" class="hdr-bi">Game Setup</button>
+        <button id="btn-ai-vs-ai" class="hdr-bi" title="Watch two AIs play each other">&#x1F916; AI vs AI Games</button>
+        <button id="toggle-tournament" class="hdr-bi" title="Open Tournament Mode">&#127942; Tournament Games</button>
+        <select id="hdr-personality" class="hdr-bi" title="AI Personality">
+          <option value="random" selected>Random</option>
+          <option value="balanced">Balanced</option>
+          <option value="aggressive">Aggressive</option>
+          <option value="defensive">Defensive</option>
+          <option value="positional">Positional</option>
+          <option value="scholar">Scholar</option>
+          <option value="chaos">Chaos</option>
+          <option value="current">Custom</option>
+        </select>
+        <div id="assessment-btn-wrap" class="hdr-bi">
+          <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
+          <div id="assessment-progress-bar">
+            <div class="ap-seg" id="ap-1" title="Turning points"></div>
+            <div class="ap-seg" id="ap-2" title="AI divergence"></div>
+            <div class="ap-seg" id="ap-3" title="Malom regret"></div>
+            <div class="ap-seg" id="ap-4" title="Commentary"></div>
+          </div>
+          <span id="assessment-stage-label"></span>
+        </div>
       </div>
-      <span id="assessment-stage-label"></span>
-    </div>
-    <button id="toggle-openings">Replay openings</button>
-    <a href="/explorer" id="btn-explorer" target="_blank" rel="noopener" title="3D Position Explorer — browse human game data and Malom WDL" style="text-decoration:none">&#127759; Explorer</a>
-    <a href="/puzzles" id="btn-puzzles" target="_blank" rel="noopener" title="Endgame Puzzles — forced wins from the retrograde tablebase" style="text-decoration:none">&#x1F9E9; Puzzles</a>
-    <button id="toggle-setup">Game setup</button>
-    <button id="toggle-tournament" title="Open Tournament Mode">&#127942; Tournament</button>
-    <button id="btn-ai-vs-ai" title="Watch two AIs play each other">&#x1F916; AI vs AI</button>
-    <button id="btn-new-game-header">&#9658; New Game</button>
-    <select id="hdr-personality" title="AI Personality">
-      <option value="random" selected>Random</option>
-      <option value="balanced">Balanced</option>
-      <option value="aggressive">Aggressive</option>
-      <option value="defensive">Defensive</option>
-      <option value="positional">Positional</option>
-      <option value="scholar">Scholar</option>
-      <option value="chaos">Chaos</option>
-      <option value="current">Custom</option>
-    </select>
-    <button id="btn-formation-guide" title="Formation Guide: show target formation arrows when W has 6 pieces (Off → Naive → Malom)">Endgame guide</button><span id="guide-threat-warn"></span>
-    <button id="toggle-settings" style="margin-left:auto">Settings</button>
-    <button id="toggle-ai-tuning">Personality tuning</button>
+      <div class="hdr-row">
+        <a href="/explorer" id="btn-explorer" class="hdr-bi" target="_blank" rel="noopener" title="3D Position Explorer — browse human game data and Malom WDL" style="text-decoration:none">&#127759; Game / Opening Explorer</a>
+        <a href="/puzzles" id="btn-puzzles" class="hdr-bi" target="_blank" rel="noopener" title="Endgame Puzzles — forced wins from the retrograde tablebase" style="text-decoration:none">&#x1F9E9; NMM Puzzles</a>
+        <div id="formation-guide-wrap" class="hdr-bi">
+          <button id="btn-formation-guide" title="Endgame Guide: show target formation arrows when player has 6 or 7 pieces (Off → Naive → Malom)">7/6 vs 4 Endgame Helper</button>
+          <div id="guide-threat-warn-row"><span id="guide-threat-warn"></span></div>
+        </div>
+        <button id="toggle-openings" class="hdr-bi">Replay Openings</button>
+        <button id="toggle-settings" class="hdr-bi">Settings</button>
+        <button id="toggle-ai-tuning" class="hdr-bi">Personality Tuning</button>
+      </div>
     </div>
   </header>
 

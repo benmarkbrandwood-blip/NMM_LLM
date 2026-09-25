@@ -91,6 +91,7 @@ function _mvNotation(mv) {
 let _guideMode      = 0;
 let _guideMalomAvail = false;  // set from /api/sentinel_status
 let _guideDebounce  = null;
+let _guideSpillerDone = false;
 
 // ── Post-game assessment state ────────────────────────────────────────────────
 let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assessment_result
@@ -695,6 +696,17 @@ document.addEventListener("DOMContentLoaded", async () => {
       _updateGuideWarning(null);
     } else {
       _requestFormationGuide();
+      if (_guideMode === 1 && !_guideSpillerDone) {
+        _guideSpillerDone = true;
+        const btn = $("btn-formation-guide");
+        setTimeout(() => {
+          btn.textContent = "Thanks!";
+          setTimeout(() => {
+            btn.textContent = "C. Spiller";
+            setTimeout(() => _updateGuideButton(), 1100);
+          }, 900);
+        }, 350);
+      }
     }
   });
 
@@ -4134,17 +4146,17 @@ function _updateGuideButton() {
   const btn = $("btn-formation-guide");
   if (!btn) return;
   if (_guideMode === 0) {
-    btn.textContent = "Endgame guide";
+    btn.textContent = "7/6 vs 4 Endgame Helper";
     btn.classList.remove("btn-active");
-    btn.title = "Formation Guide: Off — click to enable (Naive)";
+    btn.title = "Endgame Helper: Off — click to enable (Naive)";
   } else if (_guideMode === 1) {
-    btn.textContent = "Guide: Naive";
+    btn.textContent = "Helper: Naive";
     btn.classList.add("btn-active");
-    btn.title = "Formation Guide: Naive — click for Malom mode" + (_guideMalomAvail ? "" : " (unavailable)");
+    btn.title = "Endgame Helper: Naive — click for Malom mode" + (_guideMalomAvail ? "" : " (unavailable)");
   } else {
-    btn.textContent = "Guide: Malom";
+    btn.textContent = "Helper: Malom";
     btn.classList.add("btn-active");
-    btn.title = "Formation Guide: Malom — click to turn off";
+    btn.title = "Endgame Helper: Malom — click to turn off";
   }
 }
 

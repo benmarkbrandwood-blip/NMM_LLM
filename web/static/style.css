@@ -52,13 +52,26 @@ header h1 {
 
 #header-buttons {
   display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+.hdr-row {
+  display: flex;
+  gap: 5px;
+  width: 100%;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 10px;
+}
+/* Each button/control in a header row grows equally */
+.hdr-bi {
+  flex: 1 1 0;
+  min-width: 88px;
+  box-sizing: border-box;
+  text-align: center;
 }
 
 #assessment-btn-wrap {
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 3px;
@@ -99,10 +112,11 @@ header h1 {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  padding: 4px 12px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: .85rem;
+  font-size: .82rem;
+  width: 100%;
 }
 #btn-game-assessment:hover {
   border-color: var(--accent);
@@ -138,10 +152,10 @@ header h1 {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  padding: 4px 12px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: .85rem;
+  font-size: .82rem;
 }
 #toggle-moves:hover,
 #toggle-settings:hover,
@@ -159,7 +173,22 @@ header h1 {
 #toggle-scores.btn-active,
 #btn-formation-guide.btn-active { border-color: var(--tan); color: var(--tan); }
 #btn-formation-guide:disabled { opacity: .45; cursor: not-allowed; }
-#guide-threat-warn { font-size: 0.78em; margin-left: 6px; vertical-align: middle; }
+/* Formation guide wrapper — flex column, button fills top, warn row fixed height below */
+#formation-guide-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#formation-guide-wrap #btn-formation-guide {
+  flex: 1;
+  width: 100%;
+}
+#guide-threat-warn-row {
+  height: 1em;
+  line-height: 1;
+  text-align: center;
+  font-size: 0.72em;
+}
 #guide-threat-warn.guide-warn        { color: #e6a817; }
 #guide-threat-warn.guide-warn-urgent { color: #e05555; font-weight: bold; }
 #toggle-tournament:disabled { opacity: .45; cursor: not-allowed; }
@@ -172,21 +201,24 @@ header h1 {
   background: var(--accent);
   color: var(--bg);
   border: none;
-  padding: 6px 18px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: .9rem;
+  font-size: .88rem;
   font-weight: 600;
 }
 #btn-explorer, #btn-puzzles {
   background: none;
   border: 1px solid var(--border);
   color: var(--tan);
-  padding: 4px 12px;
+  padding: 5px 8px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: .85rem;
+  font-size: .82rem;
   text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 #btn-explorer:hover, #btn-puzzles:hover {
   border-color: var(--accent);
@@ -196,10 +228,21 @@ header h1 {
   background: #1e1a12;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  padding: 4px 6px;
+  padding: 5px 4px;
   border-radius: 4px;
   font-size: .82rem;
   cursor: pointer;
+  width: 100%;
+}
+/* btn-ai-vs-ai shares toggle styling */
+#btn-ai-vs-ai, #btn-formation-guide {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: .82rem;
 }
 
 /* ── Main 3-column grid ──────────────────────────────────────────────── */
