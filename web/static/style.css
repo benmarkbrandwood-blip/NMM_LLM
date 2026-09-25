@@ -159,6 +159,9 @@ header h1 {
 #toggle-scores.btn-active,
 #btn-formation-guide.btn-active { border-color: var(--tan); color: var(--tan); }
 #btn-formation-guide:disabled { opacity: .45; cursor: not-allowed; }
+#guide-threat-warn { font-size: 0.78em; margin-left: 6px; vertical-align: middle; }
+#guide-threat-warn.guide-warn        { color: #e6a817; }
+#guide-threat-warn.guide-warn-urgent { color: #e05555; font-weight: bold; }
 #toggle-tournament:disabled { opacity: .45; cursor: not-allowed; }
 #tournament-scoreboard td,
 #tournament-scoreboard th { border-bottom: 1px solid var(--border); padding: 3px 4px; }

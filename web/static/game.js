@@ -45,12 +45,11 @@ let playerName = localStorage.getItem("nmm_player_name") || "";
 let _pureAiMode = false;
 
 // ── Diagnostic overlay state ──────────────────────────────────────────────────
-let diagEnabled     = false;        // master toggle
-let diagStatic      = true;         // show static (tac+eval) scores
+let diagEnabled     = false;        // true when Static or Negamax chip is active (drives eval-bar + score labels)
+let diagStatic      = false;        // show static (tac+eval) scores (chip starts off)
 let diagNegamax     = false;        // show negamax scores
 let diagTraj        = false;        // show trajectory DB frequencies
 let diagDB          = false;        // show fullgame/endgame DB arrows
-let diagSentinel    = false;        // show Sentinel AI move quality overlay
 let diagOverseer    = false;        // show Overseer pick-probability overlay
 let diagDepth       = 3;            // negamax depth
 let currentDifficulty = 3;          // updated from state messages; gates overlay visibility
@@ -62,6 +61,30 @@ let _diagPending    = 0;            // expected seq for current request pair
 let _diagDebounce   = null;         // debounce timer handle
 let _diagCaptureFen = null;         // FEN of projected board in capture mode
 let _aiThinking     = false;        // true while AI is computing — block diagnostics
+
+// ── Net overlay state (3 dropdown slots) ─────────────────────────────────────
+let gameNetSlots    = ['', '', ''];  // values: ''|'sentinel'|'gapnet'|'value'|'pref'|'pred'|'regret'
+let _gameRegret     = {};           // notation → regret_score, fetched async
+let _gameRegretFen  = null;         // FEN for which _gameRegret is valid
+
+const GAME_NET_DEFS = {
+  sentinel: { label:'Sentinel',  prefix:'S:', cssColor:'#e07030', field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
+  gapnet:   { label:'GapNet',    prefix:'G:', cssColor:'#cc5555', field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
+  value:    { label:'ValueNet',  prefix:'V:', cssColor:'#50aaaa', field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
+  pref:     { label:'PrefNet',   prefix:'F:', cssColor:'#c4a020', field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
+  pred:     { label:'Pred',      prefix:'P:', cssColor:'#5591c7', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  teacher:  { label:'Pred',      prefix:'M:', cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  regret:   { label:'Regret',    prefix:'R:', cssColor:'#ff6020', field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
+};
+
+function _diagActive() {
+  return diagStatic || diagNegamax || diagTraj || diagDB || diagOverseer || gameNetSlots.some(Boolean);
+}
+
+function _mvNotation(mv) {
+  const base = mv.from ? `${mv.from}-${mv.to}` : mv.to;
+  return mv.capture ? `${base}x${mv.capture}` : base;
+}
 
 // ── Formation guide state ─────────────────────────────────────────────────────
 // Guide mode cycles: 0=off, 1=naive, 2=malom
@@ -255,14 +278,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (hint) hint.textContent = s.available ? "(retrained sentinel + value net)" : "(model not loaded)";
   }).catch(() => {});
 
-  // Sentinel chip availability check + perfect DB checkbox availability
+  // Perfect DB checkbox availability (sentinel chip removed — sentinel is in dropdown)
   fetch("/api/sentinel_status").then(r => r.json()).then(s => {
-    const chip   = $("diag-btn-sentinel");
-    const status = $("diag-sentinel-status");
-    if (!s.available) {
-      if (chip)   { chip.disabled = true; chip.title = "Sentinel model not loaded"; }
-      if (status) status.style.display = "inline";
-    }
     const chkPerfect = $("chk-perfect-db");
     const rowPerfect = $("row-perfect-db");
     if (!s.malom_db) {
@@ -657,11 +674,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     p.hidden = !p.hidden;
     $("toggle-ai-tuning").classList.toggle("btn-active", !p.hidden);
   });
-  $("toggle-moves").addEventListener("click", () => {
-    const p = $("moves-panel");
-    p.hidden = !p.hidden;
-    $("toggle-moves").classList.toggle("btn-active", !p.hidden);
-  });
   $("toggle-openings").addEventListener("click", () => {
     const p = $("openings-panel");
     p.hidden = !p.hidden;
@@ -680,38 +692,49 @@ document.addEventListener("DOMContentLoaded", async () => {
     _updateGuideButton();
     if (_guideMode === 0) {
       board && board.clearFormationGuide();
+      _updateGuideWarning(null);
     } else {
       _requestFormationGuide();
     }
   });
 
-  // ── Diagnostic toggle ─────────────────────────────────────────────────
-  $("toggle-scores").addEventListener("click", () => {
-    diagEnabled = !diagEnabled;
-    $("toggle-scores").classList.toggle("btn-active", diagEnabled);
-    $("eval-bar").hidden     = !diagEnabled;
-    $("diag-controls").hidden = !diagEnabled;
-    if (!diagEnabled) {
-      board && board.clearDiag();
-      _diagStaticData = null;
-      _diagNegamaxData = null;
-    } else {
-      _diagRequestAll();
-    }
+  // ── Net overlay slot selects ──────────────────────────────────────────
+  ['game-net-1', 'game-net-2', 'game-net-3'].forEach((id, i) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('change', () => {
+      gameNetSlots[i] = el.value;
+      if (el.value === 'regret') {
+        _ensureGameRegret();
+      } else {
+        if (gameNetSlots.some(Boolean) && !_diagStaticData) {
+          _diagStaticData = null;
+          _diagNegamaxData = null;
+          _diagRequestAll();
+        } else {
+          _diagRender();
+        }
+      }
+    });
   });
 
+  // ── Diagnostic chips ──────────────────────────────────────────────────
   $("diag-btn-static").addEventListener("click", () => {
     diagStatic = !diagStatic;
     $("diag-btn-static").classList.toggle("diag-chip-active", diagStatic);
     if (!diagStatic) { _diagStaticData = null; }
+    diagEnabled = diagStatic || diagNegamax;
+    $("eval-bar").hidden = !diagEnabled;
     _diagRender();
-    if (diagStatic) _diagRequestStatic();
+    if (diagStatic) _diagRequestAll();
   });
 
   $("diag-btn-negamax").addEventListener("click", () => {
     diagNegamax = !diagNegamax;
     $("diag-btn-negamax").classList.toggle("diag-chip-active", diagNegamax);
     if (!diagNegamax) { _diagNegamaxData = null; }
+    diagEnabled = diagStatic || diagNegamax;
+    $("eval-bar").hidden = !diagEnabled;
     _diagRender();
     if (diagNegamax) _diagRequestNegamax();
   });
@@ -725,56 +748,48 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("diag-btn-traj").addEventListener("click", () => {
     diagTraj = !diagTraj;
     $("diag-btn-traj").classList.toggle("diag-chip-active", diagTraj);
-    _diagRender();
+    if (diagTraj && !_diagStaticData) _diagRequestAll();
+    else _diagRender();
   });
 
   const _predBandSel = $("pred-band-select");
   if (_predBandSel) {
     _predBandSel.addEventListener("change", () => {
       diagEloBand = _predBandSel.value;
-      if (diagEnabled && diagTraj) _diagRequestStatic();
+      if (_diagActive() && diagTraj) _diagRequestStatic();
     });
   }
 
   const _trajNSel = $("sel-traj-n");
   if (_trajNSel) {
-    _trajNSel.addEventListener("change", () => { if (diagEnabled) _diagRender(); });
+    _trajNSel.addEventListener("change", () => { if (_diagActive()) _diagRender(); });
   }
 
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
-    _diagRender();
-  });
-
-  $("diag-btn-sentinel") && $("diag-btn-sentinel").addEventListener("click", () => {
-    diagSentinel = !diagSentinel;
-    if (diagSentinel) {
-      _diagRequestStatic();  // ensure server has computed sentinel_score
-    }
-    $("diag-btn-sentinel").classList.toggle("diag-chip-active", diagSentinel);
-    _diagRender();
+    if (diagDB && !_diagStaticData) _diagRequestAll();
+    else _diagRender();
   });
 
   $("diag-btn-overseer") && $("diag-btn-overseer").addEventListener("click", () => {
     diagOverseer = !diagOverseer;
     if (diagOverseer) {
-      _diagRequestStatic();  // ensure server has computed overseer_prob
-    }
+      if (!_diagStaticData) _diagRequestAll(); else _diagRequestStatic();
+    } else { _diagRender(); }
     $("diag-btn-overseer").classList.toggle("diag-chip-active", diagOverseer);
     const chkOv = $("chk-overseer");
     if (chkOv) chkOv.checked = diagOverseer;
-    _diagRender();
   });
 
   const chkOverseer = $("chk-overseer");
   if (chkOverseer) {
     chkOverseer.addEventListener("change", () => {
       diagOverseer = chkOverseer.checked;
-      if (diagOverseer) _diagRequestStatic();
+      if (diagOverseer) { if (!_diagStaticData) _diagRequestAll(); else _diagRequestStatic(); }
+      else _diagRender();
       const chip = $("diag-btn-overseer");
       if (chip) chip.classList.toggle("diag-chip-active", diagOverseer);
-      _diagRender();
     });
   }
 
@@ -1155,6 +1170,7 @@ function startNewGame() {
   clearCommentary();
   board && board.clearDiag();
   board && board.clearFormationGuide();
+  _updateGuideWarning(null);
   setStatus("Starting…");
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
@@ -1611,7 +1627,11 @@ function handleMessage(msg) {
       else if (board) board.clearFormationGuide();
 
       // Diagnostic: refresh scores for this position (always fires for sentinel graph)
-      if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+      if (_diagActive()) { _diagStaticData = null; _diagNegamaxData = null; }
+      // Regret cache invalidation on FEN change
+      if (gameNetSlots.includes('regret') && msg.fen && msg.fen !== _gameRegretFen) {
+        _gameRegret = {}; _gameRegretFen = null; _ensureGameRegret();
+      }
       _diagRequestAll();
       // Update Explorer button to open at the current board position
       if (msg.fen) {
@@ -1630,7 +1650,7 @@ function handleMessage(msg) {
       setStatus("Mill! Click an opponent piece to capture.");
       // Store projected FEN for diagnostic capture scoring
       _diagCaptureFen = msg.projected_fen || null;
-      if (diagEnabled) _diagRequestCapture();
+      if (_diagActive()) _diagRequestCapture();
       break;
 
     case "diagnostic":
@@ -1642,7 +1662,7 @@ function handleMessage(msg) {
       // Request static overlay for the position the AI is about to evaluate,
       // before search starts so the user can see the scores immediately.
       board && board.clearDiag();
-      if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+      if (_diagActive()) { _diagStaticData = null; _diagNegamaxData = null; }
       _diagRequestStatic();   // bypasses _diagRequestAll's _aiThinking guard; fires for sentinel graph too
       startThinkingTimer(msg.color, msg.expected_seconds ?? 0, ws, msg.max_depth_expected ?? 0);
       $("btn-force-move").hidden = false;
@@ -1812,6 +1832,7 @@ function handleMessage(msg) {
       phase = "game_over";
       stopThinkingTimer();
       board && board.clearFormationGuide();
+      _updateGuideWarning(null);
       $("btn-force-move").hidden = true;
       canOverride = false;
       $("btn-override").hidden = true;
@@ -2279,7 +2300,7 @@ function onNodeClick(name) {
     if (gameState.legal_sources.includes(name) &&
         gameState.board[name] === gameState.turn) {
       board.selectSource(name);
-      if (diagEnabled) _diagRender();
+      if (_diagActive()) _diagRender();
     }
   } else {
     const src = board.selected;
@@ -2287,7 +2308,7 @@ function onNodeClick(name) {
       board.selected = null;
       board._drawPieces();
       board._drawHints();
-      if (diagEnabled) _diagRender();
+      if (_diagActive()) _diagRender();
       return;
     }
     const pairs = board._movePairs || [];
@@ -2306,13 +2327,13 @@ function onNodeClick(name) {
       board.legalSrcs  = new Set();
       board._drawPieces();
       board._drawHints();
-      if (diagEnabled) board.clearDiag();
+      if (_diagActive()) board.clearDiag();
       setStatus("Move sent — AI calculating…");
       ws.send(JSON.stringify({ type: "move", from: src, to: name }));
     } else if (gameState.legal_sources.includes(name) &&
                gameState.board[name] === gameState.turn) {
       board.selectSource(name);
-      if (diagEnabled) _diagRender();
+      if (_diagActive()) _diagRender();
     }
   }
 }
@@ -2950,7 +2971,7 @@ function exitReplay() {
   _updateReplayLabel();
   _highlightReplayMove(-1);
   drawEvalGraph();
-  if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
+  if (_diagActive()) { _diagStaticData = null; _diagNegamaxData = null; }
   _diagRequestAll();
 }
 
@@ -3373,9 +3394,9 @@ const _ASSESSMENT_LEGEND_ITEMS = [
   ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness.", null],
   ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs.", "gapnet"],
   ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment.", "generalist"],
-  ["Teacher net",     "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", null],
+  ["Predictive",      "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", null],
   ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
-  ["Unconventional",  "Moves ranked low by the teacher net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
+  ["Unconventional",  "Moves ranked low by the Predictive net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
   ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped.", "mobility"],
 ];
 
@@ -3876,7 +3897,6 @@ function _diagSend(mode, extraOpts = {}) {
 }
 
 function _diagRequestStatic(fen, prefix) {
-  if (!diagStatic) return;
   _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
 }
 
@@ -3896,13 +3916,10 @@ function _diagRequestAll(fen, prefix) {
     if (_aiThinking) return;    // re-check after debounce fires
     _diagStaticData  = null;
     _diagNegamaxData = null;
-    // Always fire static for sentinel graph data even when overlay is off.
-    // Skip only when diagStatic is explicitly off AND overlay is also off.
-    if (diagEnabled || diagStatic) {
-      _diagPending = _diagSeq + 1 + (diagEnabled && diagNegamax ? 1 : 0);
-      _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
-    }
-    if (diagEnabled) _diagRequestNegamax(fen, prefix);
+    // Always fire static for sentinel graph data + any active overlays.
+    _diagPending = _diagSeq + 1 + (diagNegamax ? 1 : 0);
+    _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
+    if (diagNegamax) _diagRequestNegamax(fen, prefix);
   }, 300);  // 300ms debounce — longer to absorb rapid replay + prevent flood
 }
 
@@ -3924,21 +3941,23 @@ function _diagOnReceive(msg) {
     }
   }
 
-  if (!diagEnabled) return;
-  // Update eval bar
-  if (msg.eval_w !== undefined) {
-    const fmt = n => (n >= 0 ? `+${n}` : `${n}`);
-    $("eval-w").textContent = fmt(msg.eval_w);
-    $("eval-b").textContent = fmt(msg.eval_b);
-    // Color the evals
-    $("eval-w").style.color = msg.eval_w > 50 ? "#4caf50" : msg.eval_w < -50 ? "#e05050" : "#ddd";
-    $("eval-b").style.color = msg.eval_b > 50 ? "#4caf50" : msg.eval_b < -50 ? "#e05050" : "#aaa";
-  }
+  // Store data regardless of diagEnabled — net slots need it even when Scores is off.
   if (msg.mode === "static")  { _diagStaticData  = msg; }
   if (msg.mode === "negamax") { _diagNegamaxData = msg; }
   if (msg.mode === "capture") { _diagStaticData  = msg; }
+
+  if (!_diagActive()) return;
+
+  // Update eval bar (only when diagEnabled)
+  if (diagEnabled && msg.eval_w !== undefined) {
+    const fmt = n => (n >= 0 ? `+${n}` : `${n}`);
+    $("eval-w").textContent = fmt(msg.eval_w);
+    $("eval-b").textContent = fmt(msg.eval_b);
+    $("eval-w").style.color = msg.eval_w > 50 ? "#4caf50" : msg.eval_w < -50 ? "#e05050" : "#ddd";
+    $("eval-b").style.color = msg.eval_b > 50 ? "#4caf50" : msg.eval_b < -50 ? "#e05050" : "#aaa";
+  }
   const humanLabel = document.getElementById("to-move-human-label");
-  if (humanLabel && msg.mode !== "capture") {
+  if (diagTraj && humanLabel && msg.mode !== "capture") {
     const hasTrajData = msg.has_traj_data !== false;
     humanLabel.textContent = hasTrajData ? "HumanDB best" : "Pred Human";
     humanLabel.style.color = hasTrajData ? "#a86fdf" : "#5591c7";
@@ -3971,13 +3990,14 @@ function _updateSentinelUI(diff) {
 }
 
 function _diagRender() {
-  if (!diagEnabled || !board) { board && board.clearDiag(); return; }
+  const anyNetSlot = gameNetSlots.some(Boolean);
+  if (!_diagActive() || !board) { board && board.clearDiag(); return; }
 
   const staticD  = diagStatic  ? _diagStaticData  : null;
   const negamaxD = diagNegamax ? _diagNegamaxData : null;
   const anyScore = staticD || negamaxD;
 
-  if (!anyScore && !diagTraj && !diagDB && !diagSentinel && !diagOverseer) { board.clearDiag(); return; }
+  if (!anyScore && !diagTraj && !diagDB && !diagOverseer && !anyNetSlot) { board.clearDiag(); return; }
 
   // Pick primary data source (static preferred for phase/color info)
   const primary   = staticD || negamaxD;
@@ -3987,16 +4007,18 @@ function _diagRender() {
   const curPhase = (phase === "capture") ? "capture"
     : (gameState ? gameState.phase : (primary && primary.phase) || "move");
 
-  const modeLabel = [];
-  if (staticD) modeLabel.push("static");
-  if (negamaxD) modeLabel.push(`negamax d${diagDepth}`);
-  if (diagTraj) modeLabel.push("traj");
-  if (diagDB)   modeLabel.push("DB");
-  if (diagSentinel) modeLabel.push("Sentinel");
-  if (diagOverseer) modeLabel.push("AI choice");
-  $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
+  {
+    const modeLabel = [];
+    if (staticD) modeLabel.push("static");
+    if (negamaxD) modeLabel.push(`negamax d${diagDepth}`);
+    if (diagTraj) modeLabel.push("traj");
+    if (diagDB)   modeLabel.push("DB");
+    if (diagOverseer) modeLabel.push("AI choice");
+    gameNetSlots.filter(Boolean).forEach(k => { const d = GAME_NET_DEFS[k]; if (d) modeLabel.push(d.label); });
+    $("diag-mode-label").textContent = modeLabel.join(" + ") || "off";
+  }
 
-  // Score label overlay (heuristic / negamax numbers)
+  // Score label overlay (heuristic / negamax numbers) — only when Static or Negamax chip active
   if (anyScore) {
     board.renderDiag(primary, {
       phase:       curPhase,
@@ -4007,34 +4029,54 @@ function _diagRender() {
     board._diagGroup.innerHTML = "";
   }
 
-  // DB / Sentinel / Overseer overlay — gated by difficulty
+  // DB / Overseer / Net overlay — gated by difficulty
   const visFrac = _overlayVisibilityFraction(currentDifficulty);
   if (visFrac === 0.0) {
     board._dbGroup.innerHTML = "";
   } else {
-    const dbSource = anyScore || _diagStaticData;  // prefer static for DB data
-    if ((diagTraj || diagDB || diagSentinel || diagOverseer) && dbSource && dbSource.moves) {
+    const dbSource = anyScore || _diagStaticData;  // use static even when diagStatic=off
+    const hasTrajData = dbSource?.has_traj_data !== false;
+    // Pred slot pairs with Traj: when both active, pred fills the traj fallback channel
+    // and is suppressed from the independent net overlay when no traj data is available.
+    const predInTraj = diagTraj && gameNetSlots.includes('pred');
+    const showDbLayer = (diagTraj || diagDB || diagOverseer) && dbSource?.moves;
+
+    if (showDbLayer) {
       board.renderDiagDB(dbSource.moves, {
         phase:              curPhase,
         selectedSrc:        board.selected,
         showTraj:           diagTraj,
-        showPredHuman:      diagTraj,
-        hasTrajData:        dbSource.has_traj_data !== false,
+        showPredHuman:      diagTraj && !predInTraj,
+        hasTrajData:        hasTrajData,
         showTrajN:          $("sel-traj-n") ? $("sel-traj-n").value === "n" : false,
         showDB:             diagDB,
-        showSentinel:       diagSentinel,
+        showSentinel:       false,
         showOverseer:       diagOverseer,
+        teacherFallback:    predInTraj,
         visibilityFraction: visFrac,
       });
     } else {
       board._dbGroup.innerHTML = "";
+    }
+
+    if (anyNetSlot && dbSource?.moves) {
+      // Suppress pred from the net overlay when it's paired with traj and no traj data
+      // (pred predictions are already rendered via the traj fallback channel in that case)
+      const slotsForOverlay = (predInTraj && !hasTrajData)
+        ? gameNetSlots.map(k => k === 'pred' ? '' : k)
+        : gameNetSlots;
+      board.renderNetOverlay(dbSource.moves, slotsForOverlay, GAME_NET_DEFS, {
+        phase:        curPhase,
+        selectedSrc:  board.selected,
+        regretScores: _gameRegret,
+      });
     }
   }
 }
 
 // Called from replayGo() to refresh diag for the replayed position
 function _diagRefreshForReplay(idx) {
-  if (!diagEnabled || !replayMoves.length) return;
+  if (!_diagActive() || !replayMoves.length) return;
   let fen = null;
   let prefix = [];
   if (idx === 0) {
@@ -4052,7 +4094,8 @@ function _diagRefreshForReplay(idx) {
   if (fen) {
     const cached = _diagFenCache.get(fen);
     if (cached) {
-      const haveStatic  = !diagStatic  || !!cached.static;
+      const needStatic  = diagStatic || gameNetSlots.some(Boolean) || diagTraj || diagDB || diagOverseer;
+      const haveStatic  = !needStatic || !!cached.static;
       const haveNegamax = !diagNegamax || !!cached.negamax;
       if (haveStatic && haveNegamax) {
         if (cached.static)  _diagStaticData  = cached.static;
@@ -4068,13 +4111,30 @@ function _diagRefreshForReplay(idx) {
   _diagRequestAll(fen || undefined, prefix || undefined);
 }
 
+// ── Regret overlay for game page ──────────────────────────────────────────────
+
+async function _ensureGameRegret() {
+  const fen = _diagStaticData?.fen || gameState?.fen;
+  if (!fen) return;
+  if (_gameRegretFen === fen) { _diagRender(); return; }
+  try {
+    const resp = await fetch(`/api/explorer/regret?fen=${encodeURIComponent(fen)}`);
+    const data = await resp.json();
+    if (data.regret_scores) {
+      _gameRegret    = data.regret_scores;
+      _gameRegretFen = fen;
+      _diagRender();
+    }
+  } catch (_e) { /* regret unavailable */ }
+}
+
 // ── Formation guide ───────────────────────────────────────────────────────────
 
 function _updateGuideButton() {
   const btn = $("btn-formation-guide");
   if (!btn) return;
   if (_guideMode === 0) {
-    btn.textContent = "Guide";
+    btn.textContent = "Endgame guide";
     btn.classList.remove("btn-active");
     btn.title = "Formation Guide: Off — click to enable (Naive)";
   } else if (_guideMode === 1) {
@@ -4134,9 +4194,52 @@ function _requestFormationGuide() {
           data.target_squares = (data.target_squares || []).map(_m);
           data.arrows = (data.arrows || []).map(a => ({ from: _m(a.from), to: _m(a.to) }));
           data.stay   = (data.stay   || []).map(_m);
+          if (data.secondary) {
+            data.secondary.target_squares = (data.secondary.target_squares || []).map(_m);
+            data.secondary.arrows = (data.secondary.arrows || []).map(a => ({ from: _m(a.from), to: _m(a.to) }));
+            data.secondary.stay   = (data.secondary.stay   || []).map(_m);
+            data.secondary.anchor_squares = (data.secondary.anchor_squares || []).map(_m);
+          }
         }
         board.renderFormationGuide(data);
+        _updateGuideWarning(data);
       })
       .catch(() => board && board.clearFormationGuide());
   }, 80);
+}
+
+function _updateGuideWarning(data) {
+  const el = $("guide-threat-warn");
+  if (!el) return;
+  if (!data || !data.target_squares || !data.target_squares.length) {
+    el.textContent = "";
+    el.className = "";
+    return;
+  }
+  const threat = data.opponent_mill_threat ?? 3;
+  const cost   = data.total_distance ?? 0;
+  const dtw    = data.dtw_current;
+  const dtwWarn = data.dtw_warning;
+
+  const parts = [];
+
+  if (threat === 0) {
+    parts.push(`Opp has active mill`);
+  } else if (threat === 1) {
+    parts.push(`Opp mills in 1 move`);
+  } else if (threat === 2 && cost > 2) {
+    parts.push(`Opp can mill in 2`);
+  }
+
+  if (dtwWarn && dtw != null) {
+    parts.push(`formation (${cost}) > DTW (${dtw})`);
+  }
+
+  if (parts.length === 0) {
+    el.textContent = "";
+    el.className = "";
+  } else {
+    el.textContent = "⚠ " + parts.join(" · ");
+    el.className = (threat <= 1 || dtwWarn) ? "guide-warn-urgent" : "guide-warn";
+  }
 }

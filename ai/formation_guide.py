@@ -203,6 +203,105 @@ def _min_cost_assignment(
     return best_cost, best_pairs
 
 
+# ── Opponent mill-threat helper ───────────────────────────────────────────────
+
+# All 16 mill lines on the NMM board.
+_MILLS: list[tuple[str, str, str]] = [
+    ("a7","d7","g7"), ("g7","g4","g1"), ("g1","d1","a1"), ("a1","a4","a7"),
+    ("b6","d6","f6"), ("f6","f4","f2"), ("f2","d2","b2"), ("b2","b4","b6"),
+    ("c5","d5","e5"), ("e5","e4","e3"), ("e3","d3","c3"), ("c3","c4","c5"),
+    ("a4","b4","c4"), ("d7","d6","d5"), ("g4","f4","e4"), ("d1","d2","d3"),
+]
+
+
+def _opponent_mill_threat(b_positions: list[str], w_positions: list[str]) -> int:
+    """Return the minimum number of moves the opponent needs to close their nearest open mill.
+
+    Approximation: for each mill line, threat = (3 - B_count_on_line) when no W piece
+    blocks the line.  Returns the minimum across all lines, capped at 3 (no credible threat).
+    """
+    b_set = set(b_positions)
+    w_set = set(w_positions)
+    min_threat = 3
+    for m in _MILLS:
+        b_count = sum(1 for sq in m if sq in b_set)
+        w_count = sum(1 for sq in m if sq in w_set)
+        if w_count > 0:
+            continue  # W piece blocks this mill
+        threat = 3 - b_count
+        if threat < min_threat:
+            min_threat = threat
+    return min_threat
+
+
+# ── Secondary formation selection ─────────────────────────────────────────────
+
+def _secondary_formation(
+    primary_target: list[str],
+    primary_cost: int,
+    candidates: list[tuple[int, dict]],
+    cost_slack: int,
+    primary_idx: int,
+) -> Optional[dict]:
+    """Find the best second formation from the sorted candidate list.
+
+    Targets 2-3 shared squares with the primary (the "sweet spot" that makes
+    the fork unblockable with 4 opponent pieces).  Falls back to adjacent
+    overlap counts if no candidate exists in that range within the cost window.
+
+    Returns a secondary dict or None if nothing suitable is found.
+    """
+    primary_set = set(primary_target)
+    cost_limit  = primary_cost + cost_slack
+
+    # Group eligible candidates (within cost window, not the primary) by overlap count.
+    # overlap = |candidate_target ∩ primary_target|
+    by_overlap: dict[int, list[tuple[int, dict]]] = {}
+    for i, (cost, cand) in enumerate(candidates):
+        if i == primary_idx:
+            continue
+        if cost > cost_limit:
+            continue
+        overlap = len(set(cand["target_squares"]) & primary_set)
+        by_overlap.setdefault(overlap, []).append((cost, cand))
+
+    if not by_overlap:
+        return None
+
+    # Search outward from the sweet-spot centre (2.5) until we find a match.
+    # Priority: 2, 3, 1, 4, 0, 5, 6 — biased toward fewer shared (more fork pressure).
+    n_targets = len(primary_target)
+    search_order = []
+    for target_ov in [2, 3, 1, 4, 0, 5, 6]:
+        if target_ov <= n_targets:
+            search_order.append(target_ov)
+
+    chosen: Optional[tuple[int, dict]] = None
+    for ov in search_order:
+        pool = by_overlap.get(ov)
+        if pool:
+            chosen = min(pool, key=lambda x: x[0])  # cheapest within this overlap count
+            break
+
+    if chosen is None:
+        return None
+
+    _, cand = chosen
+    target   = cand["target_squares"]
+    pairs    = cand["pairs"]
+    shared   = sorted(set(target) & primary_set)
+
+    return {
+        "formation_id":    cand["formation_id"],
+        "target_squares":  target,
+        "arrows":          [{"from": w, "to": t} for w, t in pairs if w != t],
+        "stay":            [w for w, t in pairs if w == t],
+        "total_distance":  cand["base_cost"],
+        "shared_squares":  shared,
+        "anchor_squares":  shared,
+    }
+
+
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 def best_formation(
@@ -307,9 +406,33 @@ def best_formation(
         except Exception:
             pass  # BoardState unavailable or DB error — use naive result
 
+    primary_idx = next(i for i, (_, c) in enumerate(candidates) if c is chosen)
     pairs = chosen["pairs"]
-    stay = [w for w, t in pairs if w == t]
+    stay  = [w for w, t in pairs if w == t]
     arrows = [{"from": w, "to": t} for w, t in pairs if w != t]
+
+    secondary = _secondary_formation(
+        chosen["target_squares"], chosen["base_cost"],
+        candidates, cost_slack=6, primary_idx=primary_idx,
+    )
+
+    opp_threat = _opponent_mill_threat(b_positions, w_list)
+    dtw_current: Optional[int] = None
+    dtw_warning: bool = False
+
+    if mode_used == "malom" and db is not None:
+        try:
+            from game.board import BoardState
+            positions: dict[str, str] = {p: "W" for p in w_list}
+            positions.update({p: "B" for p in b_positions})
+            cur_board = BoardState.from_setup(positions, turn="W", phase="move")
+            val = db.query(cur_board)
+            if val is not None and val.get("outcome") == "W":
+                dtw_current = val.get("dtw")
+                if dtw_current is not None and chosen["base_cost"] > dtw_current:
+                    dtw_warning = True
+        except Exception:
+            pass
 
     return {
         "formation_id": chosen["formation_id"],
@@ -318,6 +441,10 @@ def best_formation(
         "stay": stay,
         "total_distance": chosen["base_cost"],
         "mode_used": mode_used,
+        "secondary": secondary,
+        "opponent_mill_threat": opp_threat,
+        "dtw_current": dtw_current,
+        "dtw_warning": dtw_warning,
     }
 
 
@@ -329,6 +456,10 @@ def _empty_result(mode: str) -> dict:
         "stay": [],
         "total_distance": 0,
         "mode_used": mode,
+        "secondary": None,
+        "opponent_mill_threat": 3,
+        "dtw_current": None,
+        "dtw_warning": False,
     }
 
 
@@ -395,7 +526,9 @@ def best_formation_7v4(
 
     overlap_ranked.sort(key=lambda x: (x[0], x[1]))
 
-    # Step 2: exact BFS assignment for candidates at max or max-1 overlap (cap 100)
+    # Step 2: exact BFS assignment for candidates at max or max-1 overlap (cap 200)
+    # Larger pool (200 vs original 100) so the secondary selector has enough
+    # candidates with varied target-square patterns to find the sweet spot.
     max_overlap = -overlap_ranked[0][0]
     cutoff = max_overlap - 1
     top_pool = []
@@ -403,7 +536,7 @@ def best_formation_7v4(
         if -entry[0] < cutoff:
             break
         top_pool.append(entry)
-        if len(top_pool) >= 100:
+        if len(top_pool) >= 200:
             break
 
     candidates: list[tuple[int, dict]] = []
@@ -462,9 +595,33 @@ def best_formation_7v4(
         except Exception:
             pass
 
-    pairs = chosen["pairs"]
-    stay = [w for w, t in pairs if w == t]
+    primary_idx = next(i for i, (_, c) in enumerate(candidates) if c is chosen)
+    pairs  = chosen["pairs"]
+    stay   = [w for w, t in pairs if w == t]
     arrows = [{"from": w, "to": t} for w, t in pairs if w != t]
+
+    secondary = _secondary_formation(
+        chosen["target_squares"], chosen["base_cost"],
+        candidates, cost_slack=8, primary_idx=primary_idx,
+    )
+
+    opp_threat = _opponent_mill_threat(b_positions, list(w_positions))
+    dtw_current: Optional[int] = None
+    dtw_warning: bool = False
+
+    if mode_used == "malom" and db is not None:
+        try:
+            from game.board import BoardState
+            positions: dict[str, str] = {p: "W" for p in w_positions}
+            positions.update({p: "B" for p in b_positions})
+            cur_board = BoardState.from_setup(positions, turn="W", phase="move")
+            val = db.query(cur_board)
+            if val is not None and val.get("outcome") == "W":
+                dtw_current = val.get("dtw")
+                if dtw_current is not None and chosen["base_cost"] > dtw_current:
+                    dtw_warning = True
+        except Exception:
+            pass
 
     return {
         "formation_id": chosen["formation_id"],
@@ -473,4 +630,8 @@ def best_formation_7v4(
         "stay": stay,
         "total_distance": chosen["base_cost"],
         "mode_used": mode_used,
+        "secondary": secondary,
+        "opponent_mill_threat": opp_threat,
+        "dtw_current": dtw_current,
+        "dtw_warning": dtw_warning,
     }

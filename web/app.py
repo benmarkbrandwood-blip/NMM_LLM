@@ -2212,6 +2212,24 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
         ev    = int(_heval(after, color))
         heuristic_score = int(tac["total"]) + ev
 
+        # GapNet score (blunder risk for color, [0,1]: higher = riskier)
+        gapnet_score = None
+        if _gap_net is not None:
+            try:
+                _gn_raw = _gap_net.predict(after, color)
+                gapnet_score = round((_gn_raw + 1) / 2, 4)
+            except Exception:
+                pass
+
+        # ValueNet score ([0,1]: higher = better for color)
+        value_score = None
+        if _value_net is not None:
+            try:
+                _vn_raw = _value_net.predict(after, color)
+                value_score = round((_vn_raw + 1) / 2, 4)
+            except Exception:
+                pass
+
         ms = db_by_notation.get(notation)
         has_db = ms is not None
         malom_after = ms.malom_wdl_after if has_db else None
@@ -2240,6 +2258,9 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
             "tac_total":         int(tac["total"]),
             "eval_score":        ev,
             "sentinel_score":    None,  # filled below if sentinel is loaded
+            "gapnet_score":      gapnet_score,
+            "value_score":       value_score,
+            "pref_score":        None,  # filled below if pref net is loaded
         })
         candidates_ordered.append({"from": from_sq, "to": to_sq, "capture": mv.get("capture")})
 
@@ -2256,6 +2277,16 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
                         m["sentinel_score"] = round(score, 3) if score is not None else None
         except Exception as _e:
             log.debug("Explorer sentinel scoring failed: %s", _e)
+
+    # ── HumanPrefNet scores ───────────────────────────────────────────────────
+    if _human_pref_net is not None and legal:
+        try:
+            pref_probs = await asyncio.to_thread(_human_pref_net.probs, board, legal)
+            for i, m in enumerate(moves_out):
+                if i < len(pref_probs):
+                    m["pref_score"] = round(float(pref_probs[i]), 4)
+        except Exception as _pref_e:
+            log.debug("Explorer pref net failed: %s", _pref_e)
 
     # ── Human Move Policy fallback for explorer ───────────────────────────────
     if elo_band not in ("lower", "middle", "upper", "all"):
@@ -2282,6 +2313,21 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
             m["pred_human_prob"] = None
             m["is_pred_human_best"] = False
 
+    # ── Generalist top pick ───────────────────────────────────────────────────
+    generalist_top_sq   = None
+    generalist_top_from = None
+    if _generalist_advisor is not None and _generalist_advisor.is_loaded() and candidates_ordered:
+        try:
+            gen_scores = await asyncio.to_thread(
+                _generalist_advisor.score_moves, board, candidates_ordered, color,
+            )
+            if gen_scores:
+                best_i = max(range(len(gen_scores)), key=lambda i: gen_scores[i])
+                generalist_top_sq   = candidates_ordered[best_i].get("to")
+                generalist_top_from = candidates_ordered[best_i].get("from")  # None in place phase
+        except Exception as _ge:
+            log.debug("Explorer generalist scoring failed: %s", _ge)
+
     # ── Sort: DB moves first (by total desc), then non-DB (by heuristic desc) ─
     db_moves    = sorted([m for m in moves_out if m["has_db_data"]],
                          key=lambda x: x["total"], reverse=True)
@@ -2290,14 +2336,16 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
     moves_out = db_moves + nondb_moves
 
     return {
-        "fen":            board.to_fen_string(),
-        "turn":           board.turn,
-        "phase":          _get_phase(board, color),
-        "board":          board_dict,
-        "position_stats": pos_stats,
-        "moves":          moves_out,
-        "has_traj_data":  has_traj_data,
-        "winning_line":   winning_line,
+        "fen":               board.to_fen_string(),
+        "turn":              board.turn,
+        "phase":             _get_phase(board, color),
+        "board":             board_dict,
+        "position_stats":    pos_stats,
+        "moves":             moves_out,
+        "has_traj_data":     has_traj_data,
+        "winning_line":      winning_line,
+        "generalist_top_sq":   generalist_top_sq,
+        "generalist_top_from": generalist_top_from,
     }
 
 
@@ -2314,6 +2362,35 @@ async def explorer_move(fen: str, move: str):
     if next_board is None:
         return {"error": f"Could not apply move {move!r} to position"}
     return await explorer_position(next_board.to_fen_string())
+
+
+@app.get("/api/explorer/regret")
+async def explorer_regret(fen: str = "........................|W|0|0"):
+    """Horizon-effect regret: max(0, score_2ply - score_4ply) per move.
+
+    Uses a fresh GameAI with all ML/DB stripped (pure heuristic alpha-beta)
+    so the signal measures classical horizon effect only.
+    """
+    import asyncio
+    from game.board import BoardState
+    from ai.game_ai import GameAI
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception as exc:
+        return {"error": str(exc)}
+
+    def _compute():
+        gai = GameAI(color=board.turn, difficulty=4)
+        scored2 = gai.score_root_moves(board, depth=2, time_budget=30.0)
+        scored4 = gai.score_root_moves(board, depth=4, time_budget=60.0)
+        s2 = {_mv_notation(mv): norm for mv, norm in scored2}
+        s4 = {_mv_notation(mv): norm for mv, norm in scored4}
+        all_notations = set(s2) | set(s4)
+        regret = {n: max(0.0, s2.get(n, 0.0) - s4.get(n, 0.0)) for n in all_notations}
+        return {"regret_scores": regret}
+
+    return await asyncio.to_thread(_compute)
 
 
 @app.get("/api/explorer/fen_after_moves")
@@ -3073,7 +3150,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         ]
         if _pref_moves:
             _pref_moves.sort(key=lambda m: m.policy_pref_delta)
-            lines.append(f"\nPolicy divergence (pref vs teacher):")
+            lines.append(f"\nPolicy divergence (pref vs predictive):")
             for _pm in _pref_moves[:4]:
                 _pn    = "White" if _pm.color == "W" else "Black"
                 _pmnum = (_pm.ply + final.ply_base + 1) // 2
@@ -4729,6 +4806,20 @@ async def ws_endpoint(websocket: WebSocket):
                             tac   = _tac_bonus(diag_board, after, color, weights,
                                                return_breakdown=True)
                             ev    = int(_heval(after, color))
+                            gapnet_score = None
+                            if _gap_net is not None:
+                                try:
+                                    _gn_raw = _gap_net.predict(after, color)
+                                    gapnet_score = round((_gn_raw + 1) / 2, 4)
+                                except Exception:
+                                    pass
+                            value_score = None
+                            if _value_net is not None:
+                                try:
+                                    _vn_raw = _value_net.predict(after, color)
+                                    value_score = round((_vn_raw + 1) / 2, 4)
+                                except Exception:
+                                    pass
                             moves_out.append({
                                 "from":      mv.get("from"),
                                 "to":        mv["to"],
@@ -4737,7 +4828,21 @@ async def ws_endpoint(websocket: WebSocket):
                                 "tac_terms": [[lbl, val] for lbl, val in tac.get("top_terms", [])],
                                 "eval_score": ev,
                                 "score":     int(tac["total"]) + ev,
+                                "gapnet_score":  gapnet_score,
+                                "value_score":   value_score,
+                                "pref_score":    None,  # filled below
                             })
+                        # PrefNet scores — computed before sort so indices match legal order
+                        if _human_pref_net is not None and legal:
+                            try:
+                                pref_probs = await asyncio.to_thread(
+                                    _human_pref_net.probs, diag_board, legal)
+                                for i, mv_e in enumerate(moves_out):
+                                    if i < len(pref_probs):
+                                        mv_e["pref_score"] = round(float(pref_probs[i]), 4)
+                            except Exception as _pe:
+                                log.debug("Pref net failed in diagnostic: %s", _pe)
+
                         moves_out.sort(key=lambda x: x["score"], reverse=True)
 
                     # ── Merge DB data into every move entry ─────────────────────
@@ -5227,7 +5332,7 @@ async def ws_endpoint(websocket: WebSocket):
 
             # ── hint_request ──────────────────────────────────────────────────
             elif kind == "hint_request" and session:
-                if not session.game_ai:
+                if not session.game_ai and not session.vs_human:
                     await _send(websocket, {"type": "error", "message": "Hints require an AI opponent."})
                     continue
                 if session.hints_used >= session.hint_cap:
@@ -5235,7 +5340,16 @@ async def ws_endpoint(websocket: WebSocket):
                     continue
 
                 board = session.engine.board
-                hint_move = await asyncio.to_thread(session.game_ai.choose_move, board)
+
+                if session.vs_human:
+                    # H-vs-H: spin up a plain heuristic AI for this hint only
+                    _hvh_ai = GameAI(color=board.turn, difficulty=5)
+                    def _hvh_hint(_ai=_hvh_ai, _b=board):
+                        scored = _ai.score_root_moves(_b, depth=5, time_budget=5.0)
+                        return scored[0][0] if scored else _ai.choose_move(_b)
+                    hint_move = await asyncio.to_thread(_hvh_hint)
+                else:
+                    hint_move = await asyncio.to_thread(session.game_ai.choose_move, board)
                 session.hints_used += 1
                 hints_left = session.hint_cap - session.hints_used
 

@@ -94,7 +94,7 @@ export class Board {
     const defs = _el("defs");
     for (const [id, col] of [
       ["arr-green","#4caf50"],["arr-red","#e05050"],["arr-grey","#666"],["arr-blue","#7bbfff"],
-      ["arr-orange","#ff8c00"],
+      ["arr-orange","#ff8c00"],["arr-brown","#a0522d"],
     ]) {
       const mk = _el("marker", { id, markerWidth:"7", markerHeight:"5", refX:"5", refY:"2.5", orient:"auto" });
       const poly = _el("polygon", { points:"0 0,7 2.5,0 5", fill:col });
@@ -546,58 +546,70 @@ export class Board {
   }
 
   // Render formation guide arrows and target rings.
-  // data: {target_squares:[str], arrows:[{from,to}], stay:[str], mode_used:str}
+  // data: {target_squares, arrows, stay, secondary:{target_squares,arrows,stay,anchor_squares}}
   renderFormationGuide(data) {
     const g = this._formationGroup;
     g.innerHTML = "";
     if (!data || !data.target_squares || !data.target_squares.length) return;
 
-    const ORANGE = "#ff8c00";
-    const STAY_COL = "#ffe082";    // light amber for "already in place"
-    const MARKER = "url(#arr-orange)";
+    const ORANGE    = "#ff8c00";
+    const BROWN     = "#a0522d";
+    const GOLD      = "#ffd700";
+    const STAY_COL  = "#ffe082";
 
-    // Target position rings (dim background glow on each of the 6 targets)
-    for (const pos of data.target_squares) {
+    const _hexToRgb3 = h => {
+      const n = parseInt(h.replace("#",""), 16);
+      return `${(n>>16)&255},${(n>>8)&255},${n&255}`;
+    };
+    const _drawRing = (pos, color, r, dash, fillAlpha, sw = 1.5, op = 0.75) => {
       const [x, y] = nodeXY(pos);
       g.appendChild(_el("circle", {
-        cx: x, cy: y, r: PIECE_R + 8,
-        fill: "rgba(255,140,0,0.10)", stroke: ORANGE,
-        "stroke-width": "1.5", "stroke-dasharray": "4 3", opacity: "0.75",
+        cx: x, cy: y, r,
+        fill: fillAlpha > 0 ? `rgba(${_hexToRgb3(color)},${fillAlpha})` : "none",
+        stroke: color, "stroke-width": String(sw),
+        "stroke-dasharray": dash, opacity: String(op),
       }));
-    }
+    };
 
-    // "Stay" rings — pieces already on target
-    for (const pos of (data.stay || [])) {
-      const [x, y] = nodeXY(pos);
-      g.appendChild(_el("circle", {
-        cx: x, cy: y, r: PIECE_R + 5,
-        fill: "none", stroke: STAY_COL,
-        "stroke-width": "2.5", opacity: "0.9",
-      }));
-    }
-
-    // Movement arrows
-    for (const { from, to } of (data.arrows || [])) {
-      if (!from || !to || from === to) continue;
+    const _drawArrow = (from, to, color, marker) => {
+      if (!from || !to || from === to) return;
       const [fx, fy] = nodeXY(from);
       const [tx, ty] = nodeXY(to);
       const dx = tx - fx, dy = ty - fy;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 1) continue;
-      const sx = fx + dx / dist * PIECE_R;
-      const sy = fy + dy / dist * PIECE_R;
-      const ex = tx - dx / dist * (PIECE_R + 4);
-      const ey = ty - dy / dist * (PIECE_R + 4);
+      if (dist < 1) return;
+      const ux = dx / dist, uy = dy / dist;
       g.appendChild(_el("line", {
-        x1: sx, y1: sy, x2: ex, y2: ey,
-        stroke: ORANGE, "stroke-width": "2.5", opacity: "0.85",
-        "marker-end": MARKER,
+        x1: fx + ux * PIECE_R, y1: fy + uy * PIECE_R,
+        x2: tx - ux * (PIECE_R + 4), y2: ty - uy * (PIECE_R + 4),
+        stroke: color, "stroke-width": "2.5", opacity: "0.85",
+        "marker-end": marker,
       }));
-      // Dot at origin of each arrow
-      g.appendChild(_el("circle", {
-        cx: fx, cy: fy, r: 4,
-        fill: ORANGE, opacity: "0.7",
-      }));
+      g.appendChild(_el("circle", { cx: fx, cy: fy, r: 4, fill: color, opacity: "0.7" }));
+    };
+
+    // ── Primary formation (orange) ──────────────────────────────────────────
+    for (const pos of data.target_squares)
+      _drawRing(pos, ORANGE, PIECE_R + 8, "4 3", 0.10);
+    for (const pos of (data.stay || []))
+      _drawRing(pos, STAY_COL, PIECE_R + 5, "none", 0, 2.5, 0.9);
+    for (const { from, to } of (data.arrows || []))
+      _drawArrow(from, to, ORANGE, "url(#arr-orange)");
+
+    // ── Secondary formation (brown) ─────────────────────────────────────────
+    const sec = data.secondary;
+    if (sec && sec.target_squares && sec.target_squares.length) {
+      for (const pos of sec.target_squares)
+        _drawRing(pos, BROWN, PIECE_R + 12, "3 4", 0.07);
+      for (const pos of (sec.stay || []))
+        _drawRing(pos, BROWN, PIECE_R + 9, "none", 0, 2.0, 0.75);
+      for (const { from, to } of (sec.arrows || []))
+        _drawArrow(from, to, BROWN, "url(#arr-brown)");
+
+      // ── Anchor squares: gold ring on top (shared by both formations) ──────
+      for (const pos of (sec.anchor_squares || [])) {
+        _drawRing(pos, GOLD, PIECE_R + 14, "2 2", 0, 2.0, 0.9);
+      }
     }
   }
 
@@ -608,13 +620,14 @@ export class Board {
     this._dbGroup.innerHTML = "";
     if (!moves || !moves.length) return;
 
-    const phase        = opts.phase || "move";
-    const selSrc       = opts.selectedSrc || null;
+    const phase         = opts.phase || "move";
+    const selSrc        = opts.selectedSrc || null;
     const showTraj      = opts.showTraj !== false;
     const showDB        = opts.showDB  !== false;
     const showSentinel  = opts.showSentinel || false;
     const showOverseer  = opts.showOverseer || false;
     const showPredHuman = opts.showPredHuman || false;
+    const teacherFallback = opts.teacherFallback || false;
     const hasTrajData   = opts.hasTrajData !== false;
     const showTrajN     = opts.showTrajN || false;
     const visFrac       = opts.visibilityFraction != null ? opts.visibilityFraction : 1.0;
@@ -663,6 +676,14 @@ export class Board {
       if (pct < 1) return null;
       return `P:${pct}%`;
     };
+    // Helper: teacher-net fallback label ("M:37%"), purple. Shown instead of predLabel
+    // when teacherFallback is on — Teacher net fills the traj channel when no DB data.
+    const teacherLabel = (prob) => {
+      if (!teacherFallback || hasTrajData || prob == null) return null;
+      const pct = Math.round(prob * 100);
+      if (pct < 1) return null;
+      return `M:${pct}%`;
+    };
     // Helper: moves-to-mate label ("M#5"). Suppressed unless DB overlay is on.
     // dtw is the absolute depth-to-mate returned by Malom perfect DB.
     const dtwLabel = (dtw) => {
@@ -685,6 +706,7 @@ export class Board {
         const olbl = overseerLabel(mv.overseer_prob);
         const dlbl = dtwLabel(mv.eg_dtw);
         const plbl = predLabel(mv.pred_human_prob);
+        const tlbl = teacherLabel(mv.pred_human_prob);
         const showDash = hasTrajData && showTraj && freq === 0;
 
         if (col) {
@@ -692,7 +714,7 @@ export class Board {
           this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 9,
             fill: "none", stroke: col, "stroke-width": 2.5, opacity: 0.7 }));
         }
-        if (slbl || olbl || dlbl || plbl || freq > 0 || showDash) {
+        if (slbl || olbl || dlbl || plbl || tlbl || freq > 0 || showDash) {
           const [x, y] = nodeXY(pos);
           const hasPiece = !!this.grid[pos];
           let ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
@@ -721,6 +743,15 @@ export class Board {
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = plbl;
+            this._dbGroup.appendChild(t);
+            ty -= 11;
+          }
+          if (tlbl) {
+            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#a06fe0",
+              "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = tlbl;
             this._dbGroup.appendChild(t);
             ty -= 11;
           }
@@ -775,8 +806,9 @@ export class Board {
         const olbl = selSrc ? overseerLabel(mv.overseer_prob)  : null;
         const dlbl = selSrc ? dtwLabel(mv.eg_dtw) : null;
         const plbl = selSrc ? predLabel(mv.pred_human_prob) : null;
+        const tlbl = selSrc ? teacherLabel(mv.pred_human_prob) : null;
         const showDashMv = selSrc && hasTrajData && showTraj && freq === 0;
-        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl) continue;
+        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl && !tlbl) continue;
 
         const [x1, y1] = nodeXY(mv.from);
         const [x2, y2] = nodeXY(mv.to);
@@ -799,7 +831,7 @@ export class Board {
             }));
           }
         }
-        if (slbl || olbl || dlbl || plbl || freq > 0 || showDashMv) {
+        if (slbl || olbl || dlbl || plbl || tlbl || freq > 0 || showDashMv) {
           const [x, y] = nodeXY(mv.to);
           let ty = y - PIECE_R - 4;
           if (freq > 0 && (!selSrc || mv.from === selSrc)) {
@@ -827,6 +859,15 @@ export class Board {
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = plbl;
+            this._dbGroup.appendChild(t);
+            ty -= 10;
+          }
+          if (tlbl) {
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#a06fe0",
+              "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = tlbl;
             this._dbGroup.appendChild(t);
             ty -= 10;
           }
@@ -935,6 +976,30 @@ export class Board {
         }
       }
 
+      // Per-source best teacher-fallback probability when no piece is selected.
+      // Mirrors predLabel block — shown instead of pred when teacherFallback is on.
+      if (!selSrc && teacherFallback && !hasTrajData) {
+        const srcBestT = new Map();
+        for (const mv of moves) {
+          if (!mv.from || mv.pred_human_prob == null) continue;
+          const prev = srcBestT.get(mv.from);
+          if (prev == null || mv.pred_human_prob > prev)
+            srcBestT.set(mv.from, mv.pred_human_prob);
+        }
+        for (const [src, prob] of srcBestT) {
+          const lbl = teacherLabel(prob);
+          if (!lbl) continue;
+          const [x, y] = nodeXY(src);
+          const t = _el("text", { x, y: y - PIECE_R - 3,
+            "font-size":"10", "font-weight":"bold",
+            fill:"#a06fe0", "text-anchor":"middle", "font-family":"monospace",
+            stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
+            "paint-order":"stroke" });
+          t.textContent = lbl;
+          this._dbGroup.appendChild(t);
+        }
+      }
+
       // Per-source best Overseer pick-probability when no piece is selected.
       // Shows the highest prob move for each piece as O:XX% above it.
       // Stacks above the sentinel label when both overlays are active.
@@ -966,6 +1031,146 @@ export class Board {
           t.textContent = olbl;
           this._dbGroup.appendChild(t);
         }
+      }
+    }
+  }
+
+  // ── Net overlay (3-slot dropdowns on game page) ───────────────────────────
+  // Appends score labels to _dbGroup for each active net slot.
+  // Call AFTER renderDiagDB (or after clearing _dbGroup manually) — never clears itself.
+  // When 3 slots are active, the bottom label is centered and the top two are side-by-side
+  // (±12px horizontally) to avoid vertical crowding.
+  renderNetOverlay(moves, slots, defs, opts = {}) {
+    const phase  = opts.phase || 'move';
+    const selSrc = opts.selectedSrc || null;
+    const regret = opts.regretScores || {};
+
+    const activeSlots = slots.filter(Boolean);
+    if (!activeSlots.length || !moves?.length) return;
+
+    // Pre-compute normalization ranges for isAbsNorm fields
+    const normRanges = {};
+    for (const key of activeSlots) {
+      const def = defs[key];
+      if (!def || !def.isAbsNorm) continue;
+      const vals = moves.map(m => m[def.field]).filter(v => v != null);
+      if (vals.length) {
+        normRanges[key] = { min: Math.min(...vals), max: Math.max(...vals) };
+      }
+    }
+
+    const fmtScore = (key, score) => {
+      const def = defs[key];
+      if (def.isAbsNorm) {
+        const r = normRanges[key];
+        if (!r || r.min === r.max) return def.prefix + '—';
+        return def.prefix + Math.round(((score - r.min) / (r.max - r.min)) * 100) + '%';
+      }
+      return def.prefix + Math.round(score * 100) + '%';
+    };
+
+    const getScore = (mv, key) => {
+      if (key === 'regret') {
+        const n = mv.from ? `${mv.from}-${mv.to}` : mv.to;
+        const nCap = mv.capture ? n + 'x' + mv.capture : n;
+        return regret[nCap] ?? null;
+      }
+      const def = defs[key];
+      return def ? (mv[def.field] ?? null) : null;
+    };
+
+    // Collect all labels per position in slot order before rendering.
+    // posEntries: pos → [{text, color}]  — entries in activeSlots order.
+    const posEntries = new Map();
+    const record = (pos, key, score) => {
+      const def = defs[key];
+      if (!def || !NODE_COORDS[pos]) return;
+      if (!posEntries.has(pos)) posEntries.set(pos, []);
+      posEntries.get(pos).push({ text: fmtScore(key, score), color: def.cssColor });
+    };
+
+    if (phase === 'place' || phase === 'capture') {
+      // Multiple moves may share the same mv.to (different captures from the same destination).
+      // Take best-per-destination per slot to avoid duplicate labels.
+      for (const key of activeSlots) {
+        const def = defs[key];
+        if (!def) continue;
+        const destBest = new Map();
+        for (const mv of moves) {
+          if (!mv.to) continue;
+          const score = getScore(mv, key);
+          if (score == null) continue;
+          const prev = destBest.get(mv.to);
+          const better = def.isHigherBetter
+            ? (prev == null || score > prev)
+            : (prev == null || score < prev);
+          if (better) destBest.set(mv.to, score);
+        }
+        for (const [dest, score] of destBest) record(dest, key, score);
+      }
+    } else if (selSrc) {
+      // Best-per-destination per slot for moves from the selected source.
+      for (const key of activeSlots) {
+        const def = defs[key];
+        if (!def) continue;
+        const destBest = new Map();
+        for (const mv of moves) {
+          if (mv.from !== selSrc || !mv.to) continue;
+          const score = getScore(mv, key);
+          if (score == null) continue;
+          const prev = destBest.get(mv.to);
+          const better = def.isHigherBetter
+            ? (prev == null || score > prev)
+            : (prev == null || score < prev);
+          if (better) destBest.set(mv.to, score);
+        }
+        for (const [dest, score] of destBest) record(dest, key, score);
+      }
+    } else {
+      // Best-per-source for each slot (slots iterated in order → entries in slot order)
+      for (const key of activeSlots) {
+        const def = defs[key];
+        if (!def) continue;
+        const srcBest = new Map();
+        for (const mv of moves) {
+          if (!mv.from) continue;
+          const score = getScore(mv, key);
+          if (score == null) continue;
+          const prev = srcBest.get(mv.from);
+          const better = def.isHigherBetter
+            ? (prev == null || score > prev)
+            : (prev == null || score < prev);
+          if (better) srcBest.set(mv.from, score);
+        }
+        for (const [src, score] of srcBest) record(src, key, score);
+      }
+    }
+
+    // Render: 1-2 labels stack upward; 3 labels → bottom centered + top two side-by-side.
+    const _addText = (x, y, text, color) => {
+      const t = _el('text', { x, y, 'font-size': '9', 'font-weight': 'bold',
+        fill: color, 'text-anchor': 'middle', 'font-family': 'monospace',
+        stroke: '#1a1208', 'stroke-width': '2.5', 'stroke-linejoin': 'round',
+        'paint-order': 'stroke' });
+      t.textContent = text;
+      this._dbGroup.appendChild(t);
+    };
+
+    // Track next-Y per pos for external callers that also append (e.g. renderDiagDB stacking)
+    const tyMap = new Map();
+    for (const [pos, labels] of posEntries) {
+      const [x, y] = nodeXY(pos);
+      const baseY = y - PIECE_R - 3;
+      if (labels.length === 3) {
+        _addText(x,       baseY,      labels[0].text, labels[0].color);
+        _addText(x - 13,  baseY - 11, labels[1].text, labels[1].color);
+        _addText(x + 13,  baseY - 11, labels[2].text, labels[2].color);
+        tyMap.set(pos, baseY - 22);
+      } else {
+        for (let i = 0; i < labels.length; i++) {
+          _addText(x, baseY - i * 11, labels[i].text, labels[i].color);
+        }
+        tyMap.set(pos, baseY - labels.length * 11);
       }
     }
   }

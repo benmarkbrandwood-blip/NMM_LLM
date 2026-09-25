@@ -21,13 +21,12 @@
       </div>
       <span id="assessment-stage-label"></span>
     </div>
-    <button id="toggle-moves" class="btn-active">Moves</button>
-    <button id="toggle-openings">Openings</button>
-    <button id="toggle-setup">Setup</button>
-    <button id="toggle-tournament" title="Open Tournament Mode">&#127942; Tournament</button>
-    <button id="btn-ai-vs-ai" title="Watch two AIs play each other">&#x1F916; AI vs AI</button>
+    <button id="toggle-openings">Replay openings</button>
     <a href="/explorer" id="btn-explorer" target="_blank" rel="noopener" title="3D Position Explorer — browse human game data and Malom WDL" style="text-decoration:none">&#127759; Explorer</a>
     <a href="/puzzles" id="btn-puzzles" target="_blank" rel="noopener" title="Endgame Puzzles — forced wins from the retrograde tablebase" style="text-decoration:none">&#x1F9E9; Puzzles</a>
+    <button id="toggle-setup">Game setup</button>
+    <button id="toggle-tournament" title="Open Tournament Mode">&#127942; Tournament</button>
+    <button id="btn-ai-vs-ai" title="Watch two AIs play each other">&#x1F916; AI vs AI</button>
     <button id="btn-new-game-header">&#9658; New Game</button>
     <select id="hdr-personality" title="AI Personality">
       <option value="random" selected>Random</option>
@@ -39,10 +38,9 @@
       <option value="chaos">Chaos</option>
       <option value="current">Custom</option>
     </select>
-    <button id="toggle-scores" title="Toggle diagnostic score overlay">Scores</button>
-    <button id="btn-formation-guide" title="Formation Guide: show target formation arrows when W has 6 pieces (Off → Naive → Malom)">Guide</button>
+    <button id="btn-formation-guide" title="Formation Guide: show target formation arrows when W has 6 pieces (Off → Naive → Malom)">Endgame guide</button><span id="guide-threat-warn"></span>
     <button id="toggle-settings" style="margin-left:auto">Settings</button>
-    <button id="toggle-ai-tuning">AI Tuning</button>
+    <button id="toggle-ai-tuning">Personality tuning</button>
     </div>
   </header>
 
@@ -153,10 +151,39 @@
         <span id="diag-mode-label" class="diag-mode-label">static</span>
       </div>
 
-      <!-- Diagnostic controls (hidden until Scores toggle is on) -->
-      <div id="diag-controls" hidden>
+      <!-- Diagnostic controls (overlay + score chips — always visible) -->
+      <div id="diag-controls">
+        <span class="diag-section-label">Overlay:</span>
+        <select id="game-net-1" title="Overlay slot 1" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+          <option value="">— Off —</option>
+          <option value="sentinel">Sentinel</option>
+          <option value="gapnet">GapNet</option>
+          <option value="value">ValueNet</option>
+          <option value="pref">PrefNet</option>
+          <option value="pred">Pred</option>
+          <option value="regret">Regret</option>
+        </select>
+        <select id="game-net-2" title="Overlay slot 2" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+          <option value="">— Off —</option>
+          <option value="sentinel">Sentinel</option>
+          <option value="gapnet">GapNet</option>
+          <option value="value">ValueNet</option>
+          <option value="pref">PrefNet</option>
+          <option value="pred">Pred</option>
+          <option value="regret">Regret</option>
+        </select>
+        <select id="game-net-3" title="Overlay slot 3" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+          <option value="">— Off —</option>
+          <option value="sentinel">Sentinel</option>
+          <option value="gapnet">GapNet</option>
+          <option value="value">ValueNet</option>
+          <option value="pref">PrefNet</option>
+          <option value="pred">Pred</option>
+          <option value="regret">Regret</option>
+        </select>
+        <span class="diag-sep">|</span>
         <span class="diag-section-label">Scores:</span>
-        <button id="diag-btn-static"  class="diag-chip diag-chip-active" title="Static: tactic bonus + position eval (fast)">Static</button>
+        <button id="diag-btn-static"  class="diag-chip" title="Static: tactic bonus + position eval (fast)">Static</button>
         <button id="diag-btn-negamax" class="diag-chip" title="Negamax: deep search scores (slow)">Negamax d3</button>
         <span class="diag-depth-wrap">
           <label for="diag-depth" class="diag-section-label">d</label>
@@ -175,9 +202,7 @@
           <option value="middle" selected>Middle</option>
           <option value="upper">Upper</option>
         </select>
-        <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB: WIN (green) / LOSS (red) arrows">DB Lines</button>
-        <button id="diag-btn-sentinel" class="diag-chip" title="Sentinel AI: move quality overlay (green=good, red=bad) — mutually exclusive with DB Lines">Sentinel</button>
-        <span id="diag-sentinel-status" style="font-size:.75rem;color:#888;display:none" title="Sentinel checkpoint not loaded">(no model)</span>
+        <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB + Malom: WIN (green) / LOSS (red) arrows">DB/Malom</button>
         <button id="diag-btn-overseer" class="diag-chip" title="AI choice: ScaffoldedPolicyNet pick probability per move (O:XX%)">AI choice</button>
         <span id="diag-overseer-status" style="font-size:.75rem;color:#888;display:none" title="Overseer checkpoint not loaded">(no model)</span>
         <span style="font-size:.63rem;color:#777;margin-left:6px" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</span>
@@ -199,13 +224,26 @@
     <!-- Right column: moves list, status badge, game info, settings -->
     <div id="side-panel">
 
-      <!-- Moves list (toggled via header button) -->
+      <!-- Moves list (always visible) -->
       <div class="panel-box" id="moves-panel">
         <h3 style="display:flex;align-items:center;justify-content:space-between">
           Moves
           <button id="copy-moves-btn" style="font-size:.7rem;padding:2px 7px;cursor:pointer">Copy</button>
         </h3>
         <div id="moves-list"></div>
+      </div>
+
+      <!-- Replay controls (directly under moves) -->
+      <div class="panel-box" id="replay-panel">
+        <h3>Replay</h3>
+        <div id="replay-controls">
+          <button id="btn-replay-first" title="First move">&#x23EE;</button>
+          <button id="btn-replay-prev"  title="Previous move">&#x23F4;</button>
+          <span id="replay-ply-label">0 / 0</span>
+          <button id="btn-replay-next"  title="Next move">&#x23F5;</button>
+          <button id="btn-replay-last"  title="Last move">&#x23ED;</button>
+        </div>
+        <button id="btn-replay-live" class="btn-small" style="margin-top:6px;width:100%">&#x21A9; Back to Live</button>
       </div>
 
       <!-- Openings panel (toggled via header button) -->
@@ -303,19 +341,6 @@
         </div>
       </div>
 
-      <!-- Replay controls -->
-      <div class="panel-box" id="replay-panel">
-        <h3>Replay</h3>
-        <div id="replay-controls">
-          <button id="btn-replay-first" title="First move">&#x23EE;</button>
-          <button id="btn-replay-prev"  title="Previous move">&#x23F4;</button>
-          <span id="replay-ply-label">0 / 0</span>
-          <button id="btn-replay-next"  title="Next move">&#x23F5;</button>
-          <button id="btn-replay-last"  title="Last move">&#x23ED;</button>
-        </div>
-        <button id="btn-replay-live" class="btn-small" style="margin-top:6px;width:100%">&#x21A9; Back to Live</button>
-      </div>
-
       <div class="panel-box" id="settings-panel">
         <h3>New Game</h3>
 
@@ -337,6 +362,7 @@
           </select>
         </div>
 
+        <div style="font-size:.85rem;font-weight:600;color:var(--tan);margin:8px 0 2px">Personality</div>
         <div class="form-row" id="row-personality">
           <label for="sel-game-personality">AI Personality</label>
           <select id="sel-game-personality">
@@ -659,9 +685,9 @@
         <button id="btn-tournament-start" style="margin-top:8px;width:100%">&#9654; Start Tournament</button>
       </div>
 
-      <!-- AI Tuning panel (toggled via header button, stays open during play) -->
+      <!-- Personality Tuning panel (toggled via header button, stays open during play) -->
       <div class="panel-box" id="ai-tuning-panel" hidden>
-        <h3>AI Tuning</h3>
+        <h3>Personality Tuning</h3>
         <div id="ai-weight-sliders"></div>
         <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
           <button id="btn-reset-weights" class="btn-small">Reset defaults</button>

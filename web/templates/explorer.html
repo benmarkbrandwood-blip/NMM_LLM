@@ -74,8 +74,15 @@
     .move-sub { color: #8a7a5a; font-size: 0.72rem; }
     .move-malom { font-size: 0.72rem; padding: 0.1rem 0.3rem; border-radius: 4px; }
     .move-item-no-db { opacity: 0.85; }
-    .move-sentinel { font-size: 0.72rem; color: #60a5fa; }
+    .move-sentinel { font-size: 0.72rem; color: #e07030; }
     .move-heuristic { font-size: 0.72rem; color: #c8a96e; }
+    .move-net-val { font-size: 0.72rem; min-width: 3.2em; text-align: right; }
+    .move-list-net-hdr {
+      display: flex; align-items: center; padding: 0.15rem 0.75rem;
+      font-size: 0.68rem; border-bottom: 1px solid #2a2018; gap: 0;
+    }
+    .move-list-net-hdr-spacer { flex: 1; }
+    .move-net-hdr { min-width: 3.2em; text-align: right; font-weight: 600; font-size: 0.68rem; }
 
     /* Colour legend */
     #color-legend { padding: 0.6rem 0.75rem; border-top: 1px solid #3a2e1e; }
@@ -83,7 +90,7 @@
     .legend-row { display: flex; align-items: center; gap: 0.5rem; margin: 0.25rem 0; font-size: 0.75rem; color: #c8a96e; }
     .legend-swatch { width: 40px; height: 8px; border-radius: 3px; flex-shrink: 0; }
     .legend-swatch-db { background: linear-gradient(to right, #ef4444, #f59e0b, #22c55e); }
-    .legend-swatch-sentinel { background: linear-gradient(to right, #1e3a5f, #1d4ed8, #38bdf8); }
+    .legend-swatch-sentinel { background: linear-gradient(to right, #7a3010, #c05020, #e07030); }
     .legend-swatch-none { background: #555555; }
 
     /* Winning line */
@@ -128,12 +135,16 @@
       text-shadow: 0 1px 3px rgba(0,0,0,0.95); white-space: nowrap;
     }
 
-    /* Malom toggle */
+    /* Malom / net toggles */
     .toggle-label {
       display: flex; align-items: center; gap: 0.3rem;
       font-size: 0.8rem; color: #c8a96e; cursor: pointer; white-space: nowrap;
     }
     .toggle-label input[type="checkbox"] { accent-color: #c8a96e; }
+    .net-slot-sel {
+      font-size:.72rem; padding: 1px 3px; background:#2a2016; color:#c8a96e;
+      border: 1px solid #5a4a2a; border-radius: 3px; cursor:pointer; height:22px;
+    }
 
     /* ── Played-moves history panel (left, mutually exclusive with OT) ── */
     #pm-panel {
@@ -277,7 +288,8 @@
   <button class="btn-secondary" id="btn-best">Best move &#8594;</button>
   <button class="btn-secondary" id="btn-reset">&#8635; Reset</button>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label"><input type="checkbox" id="malom-toggle"> Malom overlay</label>
+  <label class="toggle-label"><input type="checkbox" id="malom-toggle"> Malom</label>
+  <label class="toggle-label"><input type="checkbox" id="generalist-toggle"> Generalist</label>
   <span class="hdr-sep">|</span>
   <label class="toggle-label" style="gap:4px">Pred band:
     <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
@@ -285,6 +297,36 @@
       <option value="lower">Lower</option>
       <option value="middle" selected>Middle</option>
       <option value="upper">Upper</option>
+    </select>
+  </label>
+  <span class="hdr-sep">|</span>
+  <label class="toggle-label" style="gap:4px">Nets:
+    <select id="net-slot-0" class="net-slot-sel" title="Ring slot 1 (2nd outermost ring)">
+      <option value="sentinel" selected>Sentinel</option>
+      <option value="gapnet">GapNet</option>
+      <option value="value">ValueNet</option>
+      <option value="pref">PrefNet</option>
+      <option value="pred">Pred</option>
+      <option value="regret">Regret</option>
+      <option value="">Off</option>
+    </select>
+    <select id="net-slot-1" class="net-slot-sel" title="Ring slot 2 (3rd ring)">
+      <option value="sentinel">Sentinel</option>
+      <option value="gapnet">GapNet</option>
+      <option value="value">ValueNet</option>
+      <option value="pref">PrefNet</option>
+      <option value="pred">Pred</option>
+      <option value="regret">Regret</option>
+      <option value="" selected>Off</option>
+    </select>
+    <select id="net-slot-2" class="net-slot-sel" title="Ring slot 3 (innermost ring)">
+      <option value="sentinel">Sentinel</option>
+      <option value="gapnet">GapNet</option>
+      <option value="value">ValueNet</option>
+      <option value="pref">PrefNet</option>
+      <option value="pred">Pred</option>
+      <option value="regret">Regret</option>
+      <option value="" selected>Off</option>
     </select>
   </label>
   <span class="hdr-sep">|</span>
@@ -364,13 +406,7 @@
     <div class="panel-section">
       <h3>To move</h3>
       <span id="turn-badge" class="white">White</span>
-      <div style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;">
-        <div class="legend-row" style="margin:0;" title="Outermost ring"><div style="width:18px;height:18px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>&nbsp;HumanDB best</div>
-        <div class="legend-row" style="margin:0;" title="2nd ring"><div style="width:14px;height:14px;border-radius:50%;border:2px solid #5591c7;flex-shrink:0;"></div>&nbsp;Pred Human best</div>
-        <div class="legend-row" style="margin:0;" title="3rd ring"><div style="width:10px;height:10px;border-radius:50%;border:2px solid #4488ff;flex-shrink:0;"></div>&nbsp;Sentinel best</div>
-        <div class="legend-row" style="margin:0;" title="Innermost ring"><div style="width:7px;height:7px;border-radius:50%;border:2px solid #a855f7;flex-shrink:0;"></div>&nbsp;Heuristic best</div>
-        <div style="font-size:.65rem;color:#666;margin-top:0.3rem;line-height:1.5" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</div>
-      </div>
+      <div id="hint-ring-legend" style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;"></div>
     </div>
 
     <div class="panel-section">
@@ -393,8 +429,7 @@
     <div id="color-legend">
       <h3>Colour key</h3>
       <div class="legend-row"><div class="legend-swatch legend-swatch-db"></div>Win rate (human games)</div>
-      <div class="legend-row"><div class="legend-swatch legend-swatch-sentinel"></div>Sentinel quality</div>
-      <div class="legend-row"><div class="legend-swatch" style="background:#a855f7"></div>Heuristic eval</div>
+      <div class="legend-row"><div class="legend-swatch" style="background:#a06fe0"></div>Pred (no-DB fallback)</div>
       <div class="legend-row"><div class="legend-swatch legend-swatch-none"></div>No data</div>
     </div>
   </div>
