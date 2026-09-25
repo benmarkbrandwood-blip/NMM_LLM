@@ -63,6 +63,12 @@ let _diagDebounce   = null;         // debounce timer handle
 let _diagCaptureFen = null;         // FEN of projected board in capture mode
 let _aiThinking     = false;        // true while AI is computing — block diagnostics
 
+// ── Formation guide state ─────────────────────────────────────────────────────
+// Guide mode cycles: 0=off, 1=naive, 2=malom
+let _guideMode      = 0;
+let _guideMalomAvail = false;  // set from /api/sentinel_status
+let _guideDebounce  = null;
+
 // ── Post-game assessment state ────────────────────────────────────────────────
 let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assessment_result
 let _assessmentReady = false;       // true once assessment_result received
@@ -265,6 +271,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       const hint = $("perfect-db-hint");
       if (hint) hint.textContent = "(Malom DB not loaded)";
     }
+    _guideMalomAvail = !!s.malom_db;
+    _updateGuideButton();
   }).catch(() => {});
 
   // Overseer chip + settings row availability
@@ -658,6 +666,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     const p = $("openings-panel");
     p.hidden = !p.hidden;
     $("toggle-openings").classList.toggle("btn-active", !p.hidden);
+  });
+
+  // ── Formation guide toggle (Off → Naive → Malom → Off) ──────────────────
+  $("btn-formation-guide").addEventListener("click", () => {
+    if (_guideMode === 0) {
+      _guideMode = 1;
+    } else if (_guideMode === 1) {
+      _guideMode = _guideMalomAvail ? 2 : 0;
+    } else {
+      _guideMode = 0;
+    }
+    _updateGuideButton();
+    if (_guideMode === 0) {
+      board && board.clearFormationGuide();
+    } else {
+      _requestFormationGuide();
+    }
   });
 
   // ── Diagnostic toggle ─────────────────────────────────────────────────
@@ -1129,6 +1154,7 @@ function startNewGame() {
 
   clearCommentary();
   board && board.clearDiag();
+  board && board.clearFormationGuide();
   setStatus("Starting…");
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
@@ -1580,6 +1606,10 @@ function handleMessage(msg) {
             : "Your turn — select a piece, then its destination."
         );
       }
+      // Formation guide: refresh on every state update
+      if (_guideMode > 0) _requestFormationGuide();
+      else if (board) board.clearFormationGuide();
+
       // Diagnostic: refresh scores for this position (always fires for sentinel graph)
       if (diagEnabled) { _diagStaticData = null; _diagNegamaxData = null; }
       _diagRequestAll();
@@ -1781,6 +1811,7 @@ function handleMessage(msg) {
     case "game_over": {
       phase = "game_over";
       stopThinkingTimer();
+      board && board.clearFormationGuide();
       $("btn-force-move").hidden = true;
       canOverride = false;
       $("btn-override").hidden = true;
@@ -4023,4 +4054,77 @@ function _diagRefreshForReplay(idx) {
   _diagStaticData  = null;
   _diagNegamaxData = null;
   _diagRequestAll(fen || undefined, prefix || undefined);
+}
+
+// ── Formation guide ───────────────────────────────────────────────────────────
+
+function _updateGuideButton() {
+  const btn = $("btn-formation-guide");
+  if (!btn) return;
+  if (_guideMode === 0) {
+    btn.textContent = "Guide";
+    btn.classList.remove("btn-active");
+    btn.title = "Formation Guide: Off — click to enable (Naive)";
+  } else if (_guideMode === 1) {
+    btn.textContent = "Guide: Naive";
+    btn.classList.add("btn-active");
+    btn.title = "Formation Guide: Naive — click for Malom mode" + (_guideMalomAvail ? "" : " (unavailable)");
+  } else {
+    btn.textContent = "Guide: Malom";
+    btn.classList.add("btn-active");
+    btn.title = "Formation Guide: Malom — click to turn off";
+  }
+}
+
+function _requestFormationGuide() {
+  if (_guideMode === 0 || !gameState || !board) return;
+
+  const humanColor = _humanColor || gameState.human_color;
+  if (!humanColor) return;
+
+  const boardMap = gameState.board || {};
+  const w_positions = Object.keys(boardMap).filter(p => boardMap[p] === "W");
+  const b_positions = Object.keys(boardMap).filter(p => boardMap[p] === "B");
+
+  // Determine which are the "guide" player's pieces
+  const guidePieces  = humanColor === "W" ? w_positions : b_positions;
+  const otherPieces  = humanColor === "W" ? b_positions : w_positions;
+
+  // Show when guide player has exactly 6 pieces (6v4 guide) or 7 pieces (7v4 guide)
+  if (guidePieces.length !== 6 && guidePieces.length !== 7) {
+    board.clearFormationGuide();
+    return;
+  }
+
+  // If human is B, swap perspective: formations are defined for W, so we
+  // mirror the board (rename all positions via vertical-axis reflection).
+  const _mirror = pos => {
+    const COLS = { a:"g", b:"f", c:"e", d:"d", e:"c", f:"b", g:"a" };
+    return COLS[pos[0]] + pos[1];
+  };
+  const reqW = humanColor === "W" ? guidePieces : guidePieces.map(_mirror);
+  const reqB = humanColor === "W" ? otherPieces  : otherPieces.map(_mirror);
+  const mode = _guideMode === 2 ? "malom" : "naive";
+
+  clearTimeout(_guideDebounce);
+  _guideDebounce = setTimeout(() => {
+    fetch("/api/formation_guide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ w_positions: reqW, b_positions: reqB, mode }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (_guideMode === 0 || !board) return;
+        // If human is B, mirror the result back to board coordinates
+        if (humanColor === "B") {
+          const _m = pos => pos ? ({ a:"g",b:"f",c:"e",d:"d",e:"c",f:"b",g:"a" }[pos[0]] + pos[1]) : pos;
+          data.target_squares = (data.target_squares || []).map(_m);
+          data.arrows = (data.arrows || []).map(a => ({ from: _m(a.from), to: _m(a.to) }));
+          data.stay   = (data.stay   || []).map(_m);
+        }
+        board.renderFormationGuide(data);
+      })
+      .catch(() => board && board.clearFormationGuide());
+  }, 80);
 }

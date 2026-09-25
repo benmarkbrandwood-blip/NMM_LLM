@@ -1,0 +1,71 @@
+{
+  "id": "fmn_64dfa37c",
+  "source_db": "malom",
+  "board_fen": "..W.W.B.W.WW..B..W.B..B.|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 4",
+  "target_win_in": 4,
+  "best_move": "g7-d7",
+  "solution_line": [
+    "g7-d7",
+    "a1-d1",
+    "f6-d6xd1",
+    "b2-f6",
+    "d7-g7",
+    "f6-a7",
+    "g7-d7xa7"
+  ],
+  "legal_moves": [
+    "g7-d7",
+    "g7-g4",
+    "g1-g4",
+    "g1-d1",
+    "b6-d6",
+    "b6-b4",
+    "f6-d6",
+    "f4-f2",
+    "f4-g4xa1",
+    "f4-g4xb2",
+    "f4-g4xe4",
+    "f4-g4xc3",
+    "d5-c5",
+    "d5-e5",
+    "d5-d6xa1",
+    "d5-d6xb2",
+    "d5-d6xe4",
+    "d5-d6xc3"
+  ],
+  "winning_moves": [
+    "g7-d7",
+    "f6-d6"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "g7-g4",
+    "g1-g4",
+    "g1-d1",
+    "b6-d6",
+    "b6-b4",
+    "f4-f2",
+    "f4-g4xa1",
+    "f4-g4xb2",
+    "f4-g4xe4",
+    "f4-g4xc3",
+    "d5-c5",
+    "d5-e5",
+    "d5-d6xa1",
+    "d5-d6xb2",
+    "d5-d6xe4",
+    "d5-d6xc3"
+  ],
+  "hardness_score": 6.5,
+  "tags": [
+    "formation-guide",
+    "formation-19",
+    "win-in-4",
+    "two-solutions",
+    "high-branching"
+  ],
+  "created_at": "2026-09-24 10:59"
+}

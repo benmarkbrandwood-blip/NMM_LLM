@@ -1,0 +1,56 @@
+{
+  "id": "fmn_8acac0ea",
+  "source_db": "malom",
+  "board_fen": "B.W.WB.......WW.B..W.W.B|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 4",
+  "target_win_in": 4,
+  "best_move": "e4-f4",
+  "solution_line": [
+    "e4-f4",
+    "a7-d7",
+    "f4-g4xd1",
+    "d7-d1",
+    "g4-f4",
+    "d1-a7",
+    "g1-d1xa7"
+  ],
+  "legal_moves": [
+    "g7-d7",
+    "g7-g4",
+    "g1-g4",
+    "d2-f2",
+    "b2-b4",
+    "e4-e5",
+    "e4-e3",
+    "e4-f4",
+    "d3-e3",
+    "d3-c3"
+  ],
+  "winning_moves": [
+    "e4-f4"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "g7-d7",
+    "g7-g4",
+    "g1-g4",
+    "d2-f2",
+    "b2-b4",
+    "e4-e5",
+    "e4-e3",
+    "d3-e3",
+    "d3-c3"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "formation-guide",
+    "formation-28",
+    "win-in-4",
+    "unique-move",
+    "bottleneck",
+    "high-branching"
+  ],
+  "created_at": "2026-09-24 11:09"
+}

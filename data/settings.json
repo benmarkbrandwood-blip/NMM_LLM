@@ -59,7 +59,7 @@
     "sel-opponent": "human",
     "sel-human-color": "W",
     "sel-game-personality": "balanced",
-    "sel-difficulty": "1",
+    "sel-difficulty": "8",
     "chk-llm": true,
     "chk-sentinel": false,
     "sel-sentinel-mode": "score_adjust",
@@ -67,13 +67,13 @@
     "chk-gap-net": true,
     "rng-gap-net-blend": "30",
     "chk-humanlike": true,
-    "rng-humanlike-blend": "30",
+    "rng-humanlike-blend": "25",
     "chk-value-net": true,
     "rng-value-net-blend": "5",
     "chk-ext-qsearch": false,
     "sel-traj-n": "",
     "sel-star-square": "cardinal",
-    "chk-ngram": true,
+    "chk-ngram": false,
     "chk-perfect-db": false
   }
 }

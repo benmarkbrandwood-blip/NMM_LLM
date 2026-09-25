@@ -1,0 +1,66 @@
+{
+  "id": "fmn_89c4473b",
+  "source_db": "malom",
+  "board_fen": ".WB.BW....WWW....B..B..W|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 7",
+  "target_win_in": 7,
+  "best_move": "f6-d6",
+  "solution_line": [
+    "f6-d6",
+    "g7-g4",
+    "d7-g7",
+    "d5-c5",
+    "d6-d5",
+    "e3-e4",
+    "f2-d2",
+    "e4-e5",
+    "d2-d3",
+    "e5-e4",
+    "d3-e3",
+    "e4-e5",
+    "e3-e4"
+  ],
+  "legal_moves": [
+    "d7-a7",
+    "d7-d6",
+    "d1-a1",
+    "d1-d2",
+    "f6-d6",
+    "f4-g4",
+    "f4-e4",
+    "f2-d2",
+    "c4-c3",
+    "c4-c5",
+    "c4-b4"
+  ],
+  "winning_moves": [
+    "f6-d6"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "d7-a7",
+    "d7-d6",
+    "d1-a1",
+    "d1-d2",
+    "f4-g4",
+    "f4-e4",
+    "f2-d2",
+    "c4-c3",
+    "c4-c5",
+    "c4-b4"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "formation-guide",
+    "formation-NM4",
+    "win-in-7",
+    "unique-move",
+    "bottleneck",
+    "high-branching",
+    "hard",
+    "no-mill-win"
+  ],
+  "created_at": "2026-09-24 07:59"
+}

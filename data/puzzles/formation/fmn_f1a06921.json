@@ -1,0 +1,62 @@
+{
+  "id": "fmn_f1a06921",
+  "source_db": "malom",
+  "board_fen": "WW.W.WWB..B...BW.......B|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 3",
+  "target_win_in": 3,
+  "best_move": "g4-g7xa4",
+  "solution_line": [
+    "g4-g7xa4",
+    "f6-a4",
+    "g7-g4",
+    "a4-g7",
+    "g4-g1xg7"
+  ],
+  "legal_moves": [
+    "d7-g7",
+    "d7-d6",
+    "g4-g7xa4",
+    "g4-g7xf6",
+    "g4-g7xb2",
+    "g4-g7xc4",
+    "g4-g1xa4",
+    "g4-g1xf6",
+    "g4-g1xb2",
+    "g4-g1xc4",
+    "g4-f4",
+    "d1-g1",
+    "d1-d2",
+    "b4-b6"
+  ],
+  "winning_moves": [
+    "g4-g7xa4",
+    "g4-g1xa4"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "d7-g7",
+    "d7-d6",
+    "g4-g7xf6",
+    "g4-g7xb2",
+    "g4-g7xc4",
+    "g4-g1xf6",
+    "g4-g1xb2",
+    "g4-g1xc4",
+    "g4-f4",
+    "d1-g1",
+    "d1-d2",
+    "b4-b6"
+  ],
+  "hardness_score": 5.5,
+  "tags": [
+    "formation-guide",
+    "formation-1",
+    "win-in-3",
+    "two-solutions",
+    "high-branching",
+    "easy"
+  ],
+  "created_at": "2026-09-24 10:47"
+}

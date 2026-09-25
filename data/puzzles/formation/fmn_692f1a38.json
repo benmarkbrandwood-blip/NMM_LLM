@@ -1,0 +1,57 @@
+{
+  "id": "fmn_692f1a38",
+  "source_db": "malom",
+  "board_fen": "WWW...B....WW.BB...W.B..|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 4",
+  "target_win_in": 4,
+  "best_move": "a7-a4",
+  "solution_line": [
+    "a7-a4",
+    "a1-d1",
+    "a4-a7xd1",
+    "b2-g4",
+    "d7-d6",
+    "g4-d7",
+    "g7-g4xd7"
+  ],
+  "legal_moves": [
+    "a7-a4",
+    "d7-d6",
+    "g7-g4xa1",
+    "g7-g4xb2",
+    "g7-g4xb4",
+    "g7-g4xd3",
+    "f4-f6",
+    "f4-g4",
+    "f2-d2",
+    "e4-e5",
+    "e4-e3"
+  ],
+  "winning_moves": [
+    "a7-a4",
+    "d7-d6"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "g7-g4xa1",
+    "g7-g4xb2",
+    "g7-g4xb4",
+    "g7-g4xd3",
+    "f4-f6",
+    "f4-g4",
+    "f2-d2",
+    "e4-e5",
+    "e4-e3"
+  ],
+  "hardness_score": 6.5,
+  "tags": [
+    "formation-guide",
+    "formation-29",
+    "win-in-4",
+    "two-solutions",
+    "high-branching"
+  ],
+  "created_at": "2026-09-24 11:09"
+}

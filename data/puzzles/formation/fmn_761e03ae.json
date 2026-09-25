@@ -1,0 +1,45 @@
+{
+  "id": "fmn_761e03ae",
+  "source_db": "malom",
+  "board_fen": "...BBWB....WWW...BWW....|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 5",
+  "target_win_in": 5,
+  "best_move": "f4-f6",
+  "solution_line": [
+    "f4-f6",
+    "g4-g7",
+    "d2-d3",
+    "g7-d7",
+    "f2-d2xd7",
+    "g1-e3",
+    "d2-f2",
+    "a1-a7",
+    "f2-d2xa7"
+  ],
+  "legal_moves": [
+    "f4-f6",
+    "d2-b2",
+    "d2-d3",
+    "e4-e3"
+  ],
+  "winning_moves": [
+    "f4-f6",
+    "d2-d3"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "d2-b2",
+    "e4-e3"
+  ],
+  "hardness_score": 5.5,
+  "tags": [
+    "formation-guide",
+    "formation-NM4",
+    "win-in-5",
+    "two-solutions",
+    "no-mill-win"
+  ],
+  "created_at": "2026-09-24 11:16"
+}

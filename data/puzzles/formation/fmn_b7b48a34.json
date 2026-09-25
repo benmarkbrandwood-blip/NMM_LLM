@@ -1,0 +1,53 @@
+{
+  "id": "fmn_b7b48a34",
+  "source_db": "malom",
+  "board_fen": "BWBBBW...W.WW....W......|W|9|9",
+  "side_to_move": "W",
+  "winning_side": "W",
+  "goal": "White to move and win in 3",
+  "target_win_in": 3,
+  "best_move": "d6-b6",
+  "solution_line": [
+    "d6-b6",
+    "a7-a4",
+    "b6-b4",
+    "a4-a1",
+    "b4-a4"
+  ],
+  "legal_moves": [
+    "d1-a1",
+    "d1-d2",
+    "d6-b6",
+    "d6-f6xa7",
+    "f4-f6",
+    "f4-e4",
+    "f2-d2",
+    "d5-c5",
+    "d5-e5"
+  ],
+  "winning_moves": [
+    "d6-b6"
+  ],
+  "losing_moves": [],
+  "drawing_moves": [
+    "d1-a1",
+    "d1-d2",
+    "d6-f6xa7",
+    "f4-f6",
+    "f4-e4",
+    "f2-d2",
+    "d5-c5",
+    "d5-e5"
+  ],
+  "hardness_score": 8.0,
+  "tags": [
+    "formation-guide",
+    "formation-22",
+    "win-in-3",
+    "unique-move",
+    "bottleneck",
+    "high-branching",
+    "easy"
+  ],
+  "created_at": "2026-09-24 11:01"
+}

@@ -58,10 +58,12 @@ Performance notes
 from __future__ import annotations
 
 import argparse
+import array
 import hashlib
 import importlib.util as _ilu
 import logging
 import mmap
+import os
 import random
 import re
 import sys
@@ -108,6 +110,72 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+
+
+# ── Memory monitoring helpers ──────────────────────────────────────────────────
+
+def _rss_mb() -> int:
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) // 1024
+    except Exception:
+        pass
+    return 0
+
+
+def _sys_mem() -> tuple[int, int, int]:
+    """Return (avail_mb, swap_used_mb, swap_total_mb) from /proc/meminfo."""
+    try:
+        info: dict[str, int] = {}
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                info[parts[0].rstrip(":")] = int(parts[1])
+        avail = info.get("MemAvailable", 0) // 1024
+        swap_total = info.get("SwapTotal", 0) // 1024
+        swap_free = info.get("SwapFree", 0) // 1024
+        return avail, swap_total - swap_free, swap_total
+    except Exception:
+        return 9999, 0, 0
+
+
+def _check_memory(session_items: int, min_avail_mb: int, max_swap_pct: int) -> bool:
+    """Return True if memory pressure is high enough to warrant a restart.
+
+    session_items guards against restart-loops at startup: pass 1 to bypass.
+    """
+    if session_items < 1:
+        return False
+    avail, swap_used, swap_total = _sys_mem()
+    swap_pct = (swap_used * 100 // swap_total) if swap_total > 0 else 0
+    if avail < min_avail_mb:
+        logger.warning(
+            "[mem-check] MemAvailable=%d MB < threshold %d MB  "
+            "swap=%d/%d MB (%d%%) — triggering restart",
+            avail, min_avail_mb, swap_used, swap_total, swap_pct,
+        )
+        return True
+    if swap_total > 0 and swap_pct > max_swap_pct:
+        logger.warning(
+            "[mem-check] swap=%d/%d MB (%d%%) > threshold %d%%  "
+            "avail=%d MB — triggering restart",
+            swap_used, swap_total, swap_pct, max_swap_pct, avail,
+        )
+        return True
+    return False
+
+
+def _do_restart() -> None:
+    restart_count = int(os.environ.get("ENDGAME_RESTART_COUNT", "0")) + 1
+    os.environ["ENDGAME_RESTART_COUNT"] = str(restart_count)
+    avail, swap_used, swap_total = _sys_mem()
+    logger.info(
+        "[restart #%d] RSS=%d MB  avail=%d MB  swap=%d/%d MB — exec'ing fresh instance…",
+        restart_count, _rss_mb(), avail, swap_used, swap_total,
+    )
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
 
 # ── Fast combinatorial helpers ─────────────────────────────────────────────────
 # Precomputed Pascal's triangle: _CT[n][k] = C(n, k) for 0 ≤ n,k ≤ 24.
@@ -448,6 +516,8 @@ def solve_table(
     sub_tables: dict[tuple[int, int], bytes],
     out_path: Path,
     verbose: bool = True,
+    min_avail_mb: int = 3000,
+    max_swap_pct: int = 40,
 ) -> None:
     """Solve all (nW, nB) positions and write the WDL file to *out_path*.
 
@@ -471,83 +541,109 @@ def solve_table(
     _fh = open(out_path, "r+b")
     table = mmap.mmap(_fh.fileno(), n_bytes)
 
-    # ── Precompute canonical position IDs (~ts/8) ─────────────────────────────
-    canonical_ids: list[int] = []
-    for pos_id in range(ts):
-        w, b, _tb = _decode(pos_id, nW, nB, nC_b)
-        if _is_canonical(w, b):
-            canonical_ids.append(pos_id)
+    _need_restart = False
+    try:
+        # ── Precompute canonical position IDs (~ts/8) ─────────────────────────
+        # array.array('Q') uses 8 bytes/entry vs ~36 bytes for list[int],
+        # cutting peak RAM ~4.5x for large tables (e.g. (5,6) ≈ 2.3 GB vs 10 GB).
+        canonical_ids: array.array = array.array('Q')
+        for pos_id in range(ts):
+            w, b, _tb = _decode(pos_id, nW, nB, nC_b)
+            if _is_canonical(w, b):
+                canonical_ids.append(pos_id)
 
-    if verbose:
-        logger.info(
-            "(%d,%d) Canonical positions: %d / %d (%.1f%%)",
-            nW, nB, len(canonical_ids), ts, 100.0 * len(canonical_ids) / ts,
-        )
+        if verbose:
+            avail, swap_used, swap_total = _sys_mem()
+            swap_pct = (swap_used * 100 // swap_total) if swap_total > 0 else 0
+            logger.info(
+                "(%d,%d) Canonical positions: %d / %d (%.1f%%)  "
+                "RSS=%d MB  avail=%d MB  swap=%d/%d MB (%d%%)",
+                nW, nB, len(canonical_ids), ts, 100.0 * len(canonical_ids) / ts,
+                _rss_mb(), avail, swap_used, swap_total, swap_pct,
+            )
 
-    # ── Pass 0: mark terminals (canonical positions only) ─────────────────────
-    n_pass0 = 0
-    for pos_id in canonical_ids:
-        w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
-        v = _process_pos(w, b, turn_bit, table, nW, nB, nC_b, sub_tables)
-        if v != WDL_UNKNOWN:
-            set_wdl(table, pos_id, v)
-            n_pass0 += 1
-
-    if verbose:
-        logger.info(
-            "(%d,%d) Pass 0: %d resolved (%.1fs)", nW, nB, n_pass0, time.time() - t0
-        )
-
-    # ── Iterative forward passes (canonical positions only) ───────────────────
-    for pass_num in range(1, 60):
-        changed = 0
-        tp = time.time()
+        # ── Pass 0: mark terminals (canonical positions only) ─────────────────
+        n_pass0 = 0
         for pos_id in canonical_ids:
-            if get_wdl(table, pos_id) != WDL_UNKNOWN:
-                continue
             w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
             v = _process_pos(w, b, turn_bit, table, nW, nB, nC_b, sub_tables)
             if v != WDL_UNKNOWN:
                 set_wdl(table, pos_id, v)
-                changed += 1
+                n_pass0 += 1
 
         if verbose:
             logger.info(
-                "(%d,%d) Pass %d: %d newly resolved (%.1fs)",
-                nW, nB, pass_num, changed, time.time() - tp,
-            )
-        if changed == 0:
-            break
-
-    # ── Mark remaining canonical UNKNOWN as DRAW ──────────────────────────────
-    n_draw = 0
-    for pos_id in canonical_ids:
-        if get_wdl(table, pos_id) == WDL_UNKNOWN:
-            set_wdl(table, pos_id, WDL_DRAW)
-            n_draw += 1
-
-    # ── Fill non-canonical positions from their canonical equivalents ─────────
-    try:
-        for pos_id in range(ts):
-            w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
-            w_can, b_can = _canonical_indices(w, b)
-            if w_can == w and b_can == b:
-                continue  # canonical: already solved
-            can_id = _encode(w_can, b_can, turn_bit, nC_b)
-            set_wdl(table, pos_id, get_wdl(table, can_id))
-
-        if verbose:
-            n_win = sum(1 for i in range(ts) if get_wdl(table, i) == WDL_WIN)
-            n_loss = sum(1 for i in range(ts) if get_wdl(table, i) == WDL_LOSS)
-            logger.info(
-                "(%d,%d) Solved: %d WIN  %d LOSS  %d DRAW  (total %d, %.1fs)",
-                nW, nB, n_win, n_loss, n_draw, ts, time.time() - t0,
+                "(%d,%d) Pass 0: %d resolved (%.1fs)", nW, nB, n_pass0, time.time() - t0
             )
 
-        table.flush()
+        # ── Iterative forward passes (canonical positions only) ───────────────
+        for pass_num in range(1, 60):
+            changed = 0
+            tp = time.time()
+            for pos_id in canonical_ids:
+                if get_wdl(table, pos_id) != WDL_UNKNOWN:
+                    continue
+                w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
+                v = _process_pos(w, b, turn_bit, table, nW, nB, nC_b, sub_tables)
+                if v != WDL_UNKNOWN:
+                    set_wdl(table, pos_id, v)
+                    changed += 1
+
+            avail, swap_used, swap_total = _sys_mem()
+            swap_pct = (swap_used * 100 // swap_total) if swap_total > 0 else 0
+            if verbose:
+                logger.info(
+                    "(%d,%d) Pass %d: %d newly resolved (%.1fs)  "
+                    "RSS=%d MB  avail=%d MB  swap=%d/%d MB (%d%%)",
+                    nW, nB, pass_num, changed, time.time() - tp,
+                    _rss_mb(), avail, swap_used, swap_total, swap_pct,
+                )
+
+            if changed == 0:
+                break
+
+            # Check memory pressure mid-build; session_items=1 bypasses startup guard.
+            if _check_memory(1, min_avail_mb, max_swap_pct):
+                logger.warning(
+                    "(%d,%d) Memory pressure after pass %d — will restart after close",
+                    nW, nB, pass_num,
+                )
+                _need_restart = True
+                break
+
+        if not _need_restart:
+            # ── Mark remaining canonical UNKNOWN as DRAW ──────────────────────
+            n_draw = 0
+            for pos_id in canonical_ids:
+                if get_wdl(table, pos_id) == WDL_UNKNOWN:
+                    set_wdl(table, pos_id, WDL_DRAW)
+                    n_draw += 1
+
+            # ── Fill non-canonical positions from their canonical equivalents ─
+            for pos_id in range(ts):
+                w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
+                w_can, b_can = _canonical_indices(w, b)
+                if w_can == w and b_can == b:
+                    continue  # canonical: already solved
+                can_id = _encode(w_can, b_can, turn_bit, nC_b)
+                set_wdl(table, pos_id, get_wdl(table, can_id))
+
+            if verbose:
+                n_win = sum(1 for i in range(ts) if get_wdl(table, i) == WDL_WIN)
+                n_loss = sum(1 for i in range(ts) if get_wdl(table, i) == WDL_LOSS)
+                logger.info(
+                    "(%d,%d) Solved: %d WIN  %d LOSS  %d DRAW  (total %d, %.1fs)",
+                    nW, nB, n_win, n_loss, n_draw, ts, time.time() - t0,
+                )
+
+            table.flush()
+
     finally:
         table.close()
         _fh.close()
+
+    if _need_restart:
+        _do_restart()
 
 
 def solve_3_3(out_dir: Path, verbose: bool = True) -> None:
@@ -835,6 +931,22 @@ def _sub_tables_needed(nW: int, nB: int) -> list[tuple[int, int]]:
     return deps
 
 
+def _evict_stale(
+    loaded: dict[tuple[int, int], bytes],
+    schedule: list[tuple[int, int]],
+    current_idx: int,
+) -> None:
+    """Remove entries from *loaded* that no future schedule entry needs."""
+    remaining = set(schedule[current_idx + 1:])
+    still_needed: set[tuple[int, int]] = set()
+    for rnW, rnB in remaining:
+        for dep in _sub_tables_needed(rnW, rnB):
+            still_needed.add(dep)
+    for key in list(loaded.keys()):
+        if key not in remaining and key not in still_needed:
+            del loaded[key]
+
+
 # ── Main ────────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -890,6 +1002,14 @@ def main() -> None:
     )
 
     ap.add_argument("--quiet", action="store_true", help="Suppress per-pass logging")
+    ap.add_argument(
+        "--min-avail-mb", type=int, default=3000, metavar="MB",
+        help="Restart when MemAvailable drops below this (default: 3000 MB)",
+    )
+    ap.add_argument(
+        "--max-swap-pct", type=int, default=40, metavar="PCT",
+        help="Restart when swap usage exceeds this percent (default: 40)",
+    )
     args = ap.parse_args()
 
     out_dir = Path(args.out_dir)
@@ -968,6 +1088,16 @@ def main() -> None:
                  "or both --nW and --nB")
 
     loaded: dict[tuple[int, int], bytes] = {}
+    session_tables = 0
+    restart_count = int(os.environ.get("ENDGAME_RESTART_COUNT", "0"))
+
+    avail0, swap_used0, swap_total0 = _sys_mem()
+    logger.info(
+        "build-all  schedule=%d  restart#%d  RSS=%d MB  avail=%d MB  swap=%d/%d MB"
+        "  min-avail=%d MB  max-swap=%d%%",
+        len(schedule), restart_count, _rss_mb(), avail0, swap_used0, swap_total0,
+        args.min_avail_mb, args.max_swap_pct,
+    )
 
     for idx, (nW, nB) in enumerate(schedule):
         wdl_path = _wdl_path(out_dir, nW, nB)
@@ -982,6 +1112,7 @@ def main() -> None:
                 data = _load_table(out_dir, nW, nB)
                 if data is not None:
                     loaded[(nW, nB)] = data
+                _evict_stale(loaded, schedule, idx)
                 continue
             else:
                 logger.info("(%d,%d) not complete — rebuilding (%s).", nW, nB, reason)
@@ -1016,7 +1147,11 @@ def main() -> None:
             _table_size(nW, nB),
             _packed_table_bytes(nW, nB) / 1024 / 1024,
         )
-        solve_table(nW, nB, sub_tables, wdl_path, verbose=verbose)
+        solve_table(
+            nW, nB, sub_tables, wdl_path, verbose=verbose,
+            min_avail_mb=args.min_avail_mb, max_swap_pct=args.max_swap_pct,
+        )
+        session_tables += 1
         digest = _write_checksum_sidecar(out_dir, nW, nB)
         logger.info("Wrote %s (%d bytes)", wdl_path, wdl_path.stat().st_size)
         logger.info("(%d,%d) SHA-256 %s", nW, nB, digest)
@@ -1024,14 +1159,10 @@ def main() -> None:
         if data is not None:
             loaded[(nW, nB)] = data
 
-        remaining_schedule = set(schedule[idx + 1:])
-        still_needed = set()
-        for rnW, rnB in remaining_schedule:
-            for dep in _sub_tables_needed(rnW, rnB):
-                still_needed.add(dep)
-        for key in list(loaded.keys()):
-            if key not in remaining_schedule and key not in still_needed:
-                del loaded[key]
+        _evict_stale(loaded, schedule, idx)
+
+        if _check_memory(session_tables, args.min_avail_mb, args.max_swap_pct):
+            _do_restart()
 
 
 if __name__ == "__main__":

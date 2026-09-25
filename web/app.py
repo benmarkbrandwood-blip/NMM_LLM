@@ -1348,6 +1348,8 @@ _MALOM_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "malom"
 _MALOM_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _PLACEMENT_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "placement"
 _PLACEMENT_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+_FORMATION_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "formation"
+_FORMATION_PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 from datetime import datetime as _puzzle_dt
 
 
@@ -2048,6 +2050,61 @@ async def api_placement_puzzle_random(
     return d
 
 
+@app.get("/api/puzzles/formation/random")
+async def api_formation_puzzle_random(
+    side: str = "random",
+    depth: int = 0,
+    formation: str = "random",
+):
+    """Return a random formation-guide endgame puzzle from data/puzzles/formation/.
+
+    Query params:
+        side:      "W" | "B" | "random"
+        depth:     2–8, or 0 (any)
+        formation: formation label (e.g. "straight-5") or "random"
+    """
+    import json, random as _rand
+
+    if side not in ("W", "B", "random"):
+        from fastapi import HTTPException
+        raise HTTPException(400, "side must be W/B/random")
+
+    all_cached: list[dict] = []
+    path_map: dict = {}
+    for jf in _FORMATION_PUZZLE_CACHE_DIR.glob("fmn_*.json"):
+        try:
+            data = json.loads(jf.read_text())
+        except Exception:
+            continue
+        if "created_at" not in data:
+            data["created_at"] = _puzzle_dt.fromtimestamp(jf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+        all_cached.append(data)
+        path_map[data["id"]] = jf
+
+    if not all_cached:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=503,
+            content={"error": "No formation puzzles found. Run tools/formation_puzzle_generator.py to generate them."},
+        )
+
+    all_cached.sort(key=lambda d: d.get("created_at", ""))
+    id_to_number = {d["id"]: i + 1 for i, d in enumerate(all_cached)}
+
+    effective_side = _rand.choice(["W", "B"]) if side == "random" else side
+    candidates = [
+        d for d in all_cached
+        if (side == "random" or d.get("winning_side") == effective_side)
+        and (depth == 0 or d.get("target_win_in") == depth)
+        and (formation == "random" or any(f"formation-{formation}" in (d.get("tags") or []) for _ in [1]))
+    ]
+
+    if not candidates:
+        candidates = all_cached  # fall back to unrestricted
+
+    return _puzzle_pick_and_increment(candidates, all_cached, id_to_number, path_map)
+
+
 def _parse_notation_squares(notation: str) -> tuple[str | None, str]:
     """Return (from_sq, to_sq) from a move notation string."""
     notation = notation.replace("×", "x")
@@ -2440,6 +2497,27 @@ async def set_db_settings(request: Request):
     if changed:
         _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
     return _JSONResponse({"ok": True})
+
+
+@app.post("/api/formation_guide")
+async def api_formation_guide(request: Request):
+    """Return best target formation for W given current piece positions.
+
+    Body: {w_positions: [str], b_positions: [str], mode: "naive"|"malom"}
+    """
+    from ai.formation_guide import best_formation, best_formation_7v4
+    body = await request.json()
+    w_positions = body.get("w_positions", [])
+    b_positions = body.get("b_positions", [])
+    mode = body.get("mode", "naive")
+    if mode not in ("naive", "malom"):
+        mode = "naive"
+    db = _malom_db if (mode == "malom" and _malom_db is not None and _malom_db.is_available()) else None
+    if len(w_positions) == 7:
+        result = best_formation_7v4(w_positions, b_positions, mode, db)
+    else:
+        result = best_formation(w_positions, b_positions, mode, db)
+    return _JSONResponse(result)
 
 
 @app.websocket("/ws/tools")

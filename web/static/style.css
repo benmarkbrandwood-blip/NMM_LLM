@@ -156,7 +156,9 @@ header h1 {
 #toggle-openings.btn-active,
 #toggle-setup.btn-active,
 #toggle-tournament.btn-active,
-#toggle-scores.btn-active { border-color: var(--tan); color: var(--tan); }
+#toggle-scores.btn-active,
+#btn-formation-guide.btn-active { border-color: var(--tan); color: var(--tan); }
+#btn-formation-guide:disabled { opacity: .45; cursor: not-allowed; }
 #toggle-tournament:disabled { opacity: .45; cursor: not-allowed; }
 #tournament-scoreboard td,
 #tournament-scoreboard th { border-bottom: 1px solid var(--border); padding: 3px 4px; }

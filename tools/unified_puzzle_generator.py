@@ -37,6 +37,63 @@ except ImportError:
     def _rss_mb() -> int:  # type: ignore[misc]
         return 0
 
+
+def _sys_mem() -> tuple[int, int, int]:
+    """Return (avail_mb, swap_used_mb, swap_total_mb) from /proc/meminfo."""
+    try:
+        info: dict[str, int] = {}
+        with open("/proc/meminfo") as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2:
+                    info[parts[0].rstrip(":")] = int(parts[1])  # kB
+        avail      = info.get("MemAvailable", 0) // 1024
+        swap_total = info.get("SwapTotal",    0) // 1024
+        swap_free  = info.get("SwapFree",     0) // 1024
+        return avail, swap_total - swap_free, swap_total
+    except Exception:
+        return 999_999, 0, 0  # can't read — don't trigger
+
+
+def _check_memory(session_puzzles: int, min_avail_mb: int, max_swap_pct: int) -> bool:
+    """Return True if memory pressure exceeds thresholds.
+
+    Only fires after at least one puzzle saved in this process instance,
+    preventing restart-at-startup loops.
+    """
+    if session_puzzles < 1:
+        return False
+    avail, swap_used, swap_total = _sys_mem()
+    swap_pct = (swap_used * 100 // swap_total) if swap_total > 0 else 0
+    if avail < min_avail_mb:
+        print(
+            f"\n[mem-check] MemAvailable={avail} MB < threshold {min_avail_mb} MB"
+            f"  swap={swap_used}/{swap_total} MB ({swap_pct}%) — triggering restart",
+            flush=True,
+        )
+        return True
+    if swap_total > 0 and swap_pct > max_swap_pct:
+        print(
+            f"\n[mem-check] swap={swap_used}/{swap_total} MB ({swap_pct}%) >"
+            f" threshold {max_swap_pct}%  avail={avail} MB — triggering restart",
+            flush=True,
+        )
+        return True
+    return False
+
+
+def _do_restart() -> None:
+    """Replace current process with a fresh instance using the same argv."""
+    restart_count = int(os.environ.get("PUZZLE_RESTART_COUNT", "0")) + 1
+    os.environ["PUZZLE_RESTART_COUNT"] = str(restart_count)
+    avail, swap_used, swap_total = _sys_mem()
+    print(
+        f"[restart #{restart_count}] RSS={_rss_mb()} MB  avail={avail} MB"
+        f"  swap={swap_used}/{swap_total} MB — exec'ing fresh instance…",
+        flush=True,
+    )
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+
 _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
@@ -279,20 +336,25 @@ def run_generation(
     workers: int,
     out_dir: Path,
     settings_path: str,
+    min_avail_mb: int = 3000,
+    max_swap_pct: int = 40,
 ) -> None:
     """Run the generation loop (possibly forever if count==0)."""
     out_dir.mkdir(parents=True, exist_ok=True)
 
     run_forever = (count == 0)
     generated = 0
+    session_puzzles = 0  # puzzles saved in this process instance (restart guard)
     dispatched = 0
     t_start = time.time()
+    should_restart = False
 
     label = f"[{puzzle_type}/{side}/depth={depth or 'any'}]"
 
     print(f"{label} Starting — workers={workers}  count={'∞' if run_forever else count}  "
           f"attempts={attempts}  min-hardness={min_hardness}  max-winning={max_winning_moves}")
     print(f"{label} Output: {out_dir}")
+    print(f"{label} Memory thresholds: avail>{min_avail_mb} MB  swap<{max_swap_pct}%")
     print()
 
     worker_args = (puzzle_type, depth, side, max_winning_moves, min_hardness, attempts, settings_path)
@@ -317,18 +379,32 @@ def run_generation(
 
                 out_file = _write_puzzle_json(out_dir, result)
                 generated += 1
+                session_puzzles += 1
                 total_time = time.time() - t_start
+                avail, swap_used, swap_total = _sys_mem()
                 rss = _rss_mb()
                 print(
                     f"{label} FOUND #{generated}  id={result['id']}  "
                     f"goal={result.get('goal', '?')}  score={result.get('hardness_score', '?')}  "
                     f"elapsed={total_time/60:.1f} min  RSS={rss} MB"
+                    f"  mem={avail}MB avail  swap={swap_used}/{swap_total}MB"
                 )
                 print(f"  Saved → {out_file.relative_to(_ROOT)}")
                 t0 = time.time()
 
+                if _check_memory(session_puzzles, min_avail_mb, max_swap_pct):
+                    pool.terminate()
+                    should_restart = True
+                    break
+
                 if not run_forever and generated >= count:
                     break
+
+            if should_restart:
+                break
+
+    if should_restart:
+        _do_restart()  # os.execv — does not return
 
     total_time = time.time() - t_start
     print(f"\n{label} Done. {generated} puzzles generated in {total_time/60:.1f} min.")
@@ -341,6 +417,8 @@ def run_batch(
     workers: int,
     out_dir_override: Path | None,
     settings_path: str,
+    min_avail_mb: int = 3000,
+    max_swap_pct: int = 40,
 ) -> None:
     """Process batch cells sequentially (each cell can use all workers)."""
     cells = batch_cfg.get("cells", [])
@@ -384,6 +462,8 @@ def run_batch(
             workers=workers,
             out_dir=out_dir,
             settings_path=settings_path,
+            min_avail_mb=min_avail_mb,
+            max_swap_pct=max_swap_pct,
         )
         print()
 
@@ -436,7 +516,25 @@ def main() -> None:
         "--out", type=str, default=None, metavar="DIR",
         help="Output directory override",
     )
+    parser.add_argument(
+        "--min-avail-mb", type=int, default=3000, metavar="MB",
+        help="Restart when free RAM drops below this (default: 3000 MB)",
+    )
+    parser.add_argument(
+        "--max-swap-pct", type=int, default=40, metavar="PCT",
+        help="Restart when swap usage exceeds this percentage (default: 40%%)",
+    )
     args = parser.parse_args()
+
+    # Display restart count if we've been exec'd back due to memory pressure
+    restart_count = int(os.environ.get("PUZZLE_RESTART_COUNT", "0"))
+    if restart_count:
+        avail, swap_used, swap_total = _sys_mem()
+        print(
+            f"[restart #{restart_count}] resumed after memory restart"
+            f"  avail={avail} MB  swap={swap_used}/{swap_total} MB",
+            flush=True,
+        )
 
     settings_path = str(_ROOT / "data" / "settings.json")
     workers = args.workers if args.workers else max(1, (multiprocessing.cpu_count() or 2) - 1)
@@ -449,7 +547,8 @@ def main() -> None:
             print(f"ERROR: batch config not found: {batch_path}", file=sys.stderr)
             sys.exit(1)
         batch_cfg = json.loads(batch_path.read_text())
-        run_batch(batch_cfg, workers, out_dir_override, settings_path)
+        run_batch(batch_cfg, workers, out_dir_override, settings_path,
+                  min_avail_mb=args.min_avail_mb, max_swap_pct=args.max_swap_pct)
         return
 
     # Single-type mode
@@ -492,6 +591,8 @@ def main() -> None:
         workers=workers,
         out_dir=out_dir,
         settings_path=settings_path,
+        min_avail_mb=args.min_avail_mb,
+        max_swap_pct=args.max_swap_pct,
     )
 
 

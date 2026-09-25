@@ -118,6 +118,7 @@
   <button id="mode-endgame" class="btn-active" onclick="window._setMode('endgame')">Endgame</button>
   <button id="mode-midgame" onclick="window._setMode('midgame')">Midgame</button>
   <button id="mode-placement" onclick="window._setMode('placement')">Placement</button>
+  <button id="mode-formation" onclick="window._setMode('formation')">Formation</button>
 </div>
 
 <div class="controls" id="endgame-controls">
@@ -178,6 +179,26 @@
     <option value="10">Win in 10</option>
   </select>
   <button id="btn-new-plc" onclick="window._loadPlacementPuzzle()">New puzzle</button>
+  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
+</div>
+
+<div class="controls" id="formation-controls" style="display:none">
+  <select id="sel-side-fmn">
+    <option value="random">Side: random</option>
+    <option value="W">White to move</option>
+    <option value="B">Black to move</option>
+  </select>
+  <select id="sel-depth-fmn">
+    <option value="0">Depth: any</option>
+    <option value="2">Win in 2</option>
+    <option value="3">Win in 3</option>
+    <option value="4">Win in 4</option>
+    <option value="5">Win in 5</option>
+    <option value="6">Win in 6</option>
+    <option value="7">Win in 7</option>
+    <option value="8">Win in 8</option>
+  </select>
+  <button id="btn-new-fmn" onclick="window._loadFormationPuzzle()">New puzzle</button>
   <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
 </div>
 
@@ -480,7 +501,7 @@ function isPlacementPhase(fen) {
 }
 
 function _validateBaseUrl() {
-  if (puzzleMode === 'midgame' || puzzleMode === 'placement') return '/api/puzzles/malom/validate';
+  if (puzzleMode === 'midgame' || puzzleMode === 'placement' || puzzleMode === 'formation') return '/api/puzzles/malom/validate';
   return '/api/puzzles/validate';
 }
 
@@ -1029,13 +1050,16 @@ window._setMode = function(mode) {
   document.getElementById('mode-endgame').classList.toggle('btn-active', mode === 'endgame');
   document.getElementById('mode-midgame').classList.toggle('btn-active', mode === 'midgame');
   document.getElementById('mode-placement').classList.toggle('btn-active', mode === 'placement');
+  document.getElementById('mode-formation').classList.toggle('btn-active', mode === 'formation');
   document.getElementById('endgame-controls').style.display   = mode === 'endgame'   ? '' : 'none';
   document.getElementById('midgame-controls').style.display   = mode === 'midgame'   ? '' : 'none';
   document.getElementById('placement-controls').style.display = mode === 'placement' ? '' : 'none';
+  document.getElementById('formation-controls').style.display = mode === 'formation' ? '' : 'none';
   const titles = {
     endgame:   ['NMM Endgame Puzzles',   'Find the forced win — endgame positions from the retrograde tablebase.'],
     midgame:   ['NMM Midgame Puzzles',   'Find the forced win — midgame positions from the Malom perfect database.'],
     placement: ['NMM Placement Puzzles', 'Find the forced win — placement-phase positions from the Malom perfect database.'],
+    formation: ['NMM Formation Puzzles', 'Navigate a 6v4 endgame to the forced win — based on the 42 Spiller catalogue formations.'],
   };
   document.getElementById('page-title').textContent    = titles[mode][0];
   document.getElementById('page-subtitle').textContent = titles[mode][1];
@@ -1055,6 +1079,7 @@ window._setMode = function(mode) {
     endgame:   'Click "New puzzle" to load an endgame puzzle.',
     midgame:   'Click "New puzzle" to load a midgame puzzle.',
     placement: 'Click "New puzzle" to load a placement puzzle.',
+    formation: 'Click "New puzzle" to load a formation puzzle.',
   };
   setStatus(hints[mode], 'info');
   showBoard();
@@ -1076,6 +1101,69 @@ window._loadMalomPuzzle = async function() {
     const data = await r.json();
     if (!r.ok) {
       setStatus('⚠ ' + (data.error || 'No midgame puzzle found. Try again.'), 'fail');
+      return;
+    }
+    puzzle      = data;
+    currentFen  = puzzle.board_fen;
+    posMap      = parseFen(currentFen);
+    movesDone   = [];
+    solved       = false;
+    failed       = false;
+    freePlayMode = false; _opponentThinking = false;
+    pendingMove  = null;
+    document.getElementById('capture-prompt').style.display = 'none';
+    document.getElementById('goal-label').style.display = '';
+    document.getElementById('goal-label').textContent   = puzzle.goal;
+    document.getElementById('btn-area').style.display   = '';
+    const numEl = document.getElementById('puzzle-num');
+    if (puzzle.puzzle_number) {
+      const num   = String(puzzle.puzzle_number).padStart(4, '0');
+      const total = puzzle.total_puzzles ? ` / ${puzzle.total_puzzles}` : '';
+      const date  = puzzle.created_at ? `  ·  ${puzzle.created_at} UTC` : '';
+      numEl.textContent = `Puzzle #${num}${total}${date}`;
+    } else if (puzzle.created_at) {
+      numEl.textContent = `Created ${puzzle.created_at} UTC`;
+    } else {
+      numEl.textContent = '';
+    }
+    document.getElementById('meta').innerHTML =
+      `Source: <span>${puzzle.source_db}</span> &nbsp;|&nbsp; ` +
+      `Hardness: <span class="score">${puzzle.hardness_score}</span> &nbsp;|&nbsp; ` +
+      `Legal: <span>${puzzle.legal_moves.length} moves</span>` +
+      ` &nbsp;|&nbsp; Played: <span>${puzzle.play_count || 0}×</span>`;
+    document.getElementById('tags').innerHTML =
+      (puzzle.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
+    document.getElementById('alt-note').style.display = '';
+    const pairs = puzzle.legal_moves
+      .map(n => { const m = n.match(/^([a-g][1-7])-([a-g][1-7])/); return m ? [m[1], m[2]] : null; })
+      .filter(Boolean);
+    setupUserTurn(pairs);
+    updateMoveLog();
+    setStatus(`${puzzle.goal}. Click one of your pieces (highlighted) to start.`, 'info');
+  } catch (e) {
+    setStatus('Error: ' + e.message, 'fail');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'New puzzle';
+  }
+};
+
+// ── Formation puzzle loading ──────────────────────────────────────────────────
+window._loadFormationPuzzle = async function() {
+  if (setupMode) exitSetupMode();
+  const btn = document.getElementById('btn-new-fmn');
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  setStatus('Fetching formation puzzle…', 'info');
+
+  const side  = document.getElementById('sel-side-fmn').value;
+  const depth = document.getElementById('sel-depth-fmn').value;
+  const url   = `/api/puzzles/formation/random?side=${side}&depth=${depth}`;
+  try {
+    const r    = await fetch(url);
+    const data = await r.json();
+    if (!r.ok) {
+      setStatus('⚠ ' + (data.error || 'No formation puzzle found. Try again.'), 'fail');
       return;
     }
     puzzle      = data;

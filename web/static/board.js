@@ -90,9 +90,12 @@ export class Board {
     // Extra space at left (30px) and bottom (30px) for coordinate labels
     svg.setAttribute("viewBox", "-30 0 630 630");
 
-    // Arrow-marker defs for DB overlay
+    // Arrow-marker defs for DB overlay and formation guide
     const defs = _el("defs");
-    for (const [id, col] of [["arr-green","#4caf50"],["arr-red","#e05050"],["arr-grey","#666"],["arr-blue","#7bbfff"]]) {
+    for (const [id, col] of [
+      ["arr-green","#4caf50"],["arr-red","#e05050"],["arr-grey","#666"],["arr-blue","#7bbfff"],
+      ["arr-orange","#ff8c00"],
+    ]) {
       const mk = _el("marker", { id, markerWidth:"7", markerHeight:"5", refX:"5", refY:"2.5", orient:"auto" });
       const poly = _el("polygon", { points:"0 0,7 2.5,0 5", fill:col });
       mk.appendChild(poly);
@@ -183,6 +186,10 @@ export class Board {
     // Placement counter overlay — stones left to place
     this._counterGroup = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._counterGroup);
+
+    // Formation guide overlay — target position rings and movement arrows
+    this._formationGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._formationGroup);
   }
 
   render(state) {
@@ -532,6 +539,66 @@ export class Board {
     this._diagGroup.innerHTML = "";
     this._dbGroup.innerHTML   = "";
     this._diagSelected = null;
+  }
+
+  clearFormationGuide() {
+    if (this._formationGroup) this._formationGroup.innerHTML = "";
+  }
+
+  // Render formation guide arrows and target rings.
+  // data: {target_squares:[str], arrows:[{from,to}], stay:[str], mode_used:str}
+  renderFormationGuide(data) {
+    const g = this._formationGroup;
+    g.innerHTML = "";
+    if (!data || !data.target_squares || !data.target_squares.length) return;
+
+    const ORANGE = "#ff8c00";
+    const STAY_COL = "#ffe082";    // light amber for "already in place"
+    const MARKER = "url(#arr-orange)";
+
+    // Target position rings (dim background glow on each of the 6 targets)
+    for (const pos of data.target_squares) {
+      const [x, y] = nodeXY(pos);
+      g.appendChild(_el("circle", {
+        cx: x, cy: y, r: PIECE_R + 8,
+        fill: "rgba(255,140,0,0.10)", stroke: ORANGE,
+        "stroke-width": "1.5", "stroke-dasharray": "4 3", opacity: "0.75",
+      }));
+    }
+
+    // "Stay" rings — pieces already on target
+    for (const pos of (data.stay || [])) {
+      const [x, y] = nodeXY(pos);
+      g.appendChild(_el("circle", {
+        cx: x, cy: y, r: PIECE_R + 5,
+        fill: "none", stroke: STAY_COL,
+        "stroke-width": "2.5", opacity: "0.9",
+      }));
+    }
+
+    // Movement arrows
+    for (const { from, to } of (data.arrows || [])) {
+      if (!from || !to || from === to) continue;
+      const [fx, fy] = nodeXY(from);
+      const [tx, ty] = nodeXY(to);
+      const dx = tx - fx, dy = ty - fy;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1) continue;
+      const sx = fx + dx / dist * PIECE_R;
+      const sy = fy + dy / dist * PIECE_R;
+      const ex = tx - dx / dist * (PIECE_R + 4);
+      const ey = ty - dy / dist * (PIECE_R + 4);
+      g.appendChild(_el("line", {
+        x1: sx, y1: sy, x2: ex, y2: ey,
+        stroke: ORANGE, "stroke-width": "2.5", opacity: "0.85",
+        "marker-end": MARKER,
+      }));
+      // Dot at origin of each arrow
+      g.appendChild(_el("circle", {
+        cx: fx, cy: fy, r: 4,
+        fill: ORANGE, opacity: "0.7",
+      }));
+    }
   }
 
   // ── DB overlay (trajectory / fullgame / endgame) ──────────────────────────
