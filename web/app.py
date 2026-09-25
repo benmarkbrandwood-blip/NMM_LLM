@@ -263,15 +263,22 @@ elif _value_net is not None:
 else:
     log.info("ValueNet: not found at %s or %s_*.npz", _value_net_path, _phase_vn_base)
 
-# Load gap network — blunder-zone exploitation (V3a). Optional.
-from ai.value_net import ValueNet as _GapNetCls
-_gap_net_path = _ROOT / "data" / "gap_net.npz"
-_gap_net: "_GapNetCls | None" = _GapNetCls.load_if_exists(_gap_net_path)
+# Load gap network — blunder-zone exploitation. Uses v3 calibrated model when
+# available (82-input 4-layer MLP, PyTorch format), falling back to v1 legacy.
+from ai.value_net import GapNetV3 as _GapNetV3Cls, ValueNet as _GapNetV1Cls
+_gap_net_v3_path = _ROOT / "data" / "gap_net_v3_candidate_calibrated.npz"
+_gap_net_v1_path = _ROOT / "data" / "gap_net.npz"
+_gap_net = _GapNetV3Cls.load_if_exists(_gap_net_v3_path)
 if _gap_net is not None:
-    _gn_size_kb = round(_gap_net_path.stat().st_size / 1024, 1)
-    log.info("GapNet: loaded from %s (%s KB)", _gap_net_path, _gn_size_kb)
+    _gn_size_kb = round(_gap_net_v3_path.stat().st_size / 1024, 1)
+    log.info("GapNet v3: loaded from %s (%s KB)", _gap_net_v3_path, _gn_size_kb)
 else:
-    log.info("GapNet: not found at %s — blunder exploitation disabled", _gap_net_path)
+    _gap_net = _GapNetV1Cls.load_if_exists(_gap_net_v1_path)
+    if _gap_net is not None:
+        _gn_size_kb = round(_gap_net_v1_path.stat().st_size / 1024, 1)
+        log.info("GapNet v1 (fallback): loaded from %s (%s KB)", _gap_net_v1_path, _gn_size_kb)
+    else:
+        log.info("GapNet: not found — blunder exploitation disabled")
 
 # Load HumanPrefNet — human-move ranker for humanlike-play mode (Step 3
 # of docs/retrain_v2_plan.md).  Optional; graceful no-op if the file is
@@ -3155,7 +3162,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             [
                 {**_sp_base(m), "score": round(m.blunder_zone_score, 3)}
                 for m in final.moves
-                if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.55
+                if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.40
             ],
             key=lambda d: d["score"], reverse=True,
         ),

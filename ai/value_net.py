@@ -254,6 +254,70 @@ class ValueNet:
         return None
 
 
+class GapNetV3:
+    """
+    GapNet v3 — 82→128→64→32→3 MLP, weights in PyTorch naming convention.
+
+    Inputs: board_to_features() (79-dim) + 3-way Elo-band one-hot (middle band
+    default = [0,1,0]).  Outputs: 3-class logits; blunder_zone_score is the
+    probability of the highest-risk class (index 2 = downgrade/worst).
+    """
+
+    _ELO_MID = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+
+    def __init__(
+        self,
+        W0: np.ndarray, b0: np.ndarray,
+        W2: np.ndarray, b2: np.ndarray,
+        W4: np.ndarray, b4: np.ndarray,
+        W6: np.ndarray, b6: np.ndarray,
+    ) -> None:
+        self.W0, self.b0 = W0, b0
+        self.W2, self.b2 = W2, b2
+        self.W4, self.b4 = W4, b4
+        self.W6, self.b6 = W6, b6
+
+    def predict(self, board: BoardState, color: str) -> float:
+        """Return value in (-1, 1) compatible with the ValueNet pipeline.
+
+        GapNet v3 Component A (class_downgrade probability) is the primary
+        blunder-risk signal.  post_game_assessor applies (raw+1)/2 to convert
+        to blunder_zone_score in [0,1], so we return 2*P_A - 1 here.
+        """
+        board_feats = board_to_features(board, color)
+        x = np.concatenate([board_feats, self._ELO_MID]).reshape(1, -1)
+        h1 = np.maximum(0.0, x  @ self.W0.T + self.b0)
+        h2 = np.maximum(0.0, h1 @ self.W2.T + self.b2)
+        h3 = np.maximum(0.0, h2 @ self.W4.T + self.b4)
+        out = (h3 @ self.W6.T + self.b6).ravel()   # 3 raw regression outputs
+        comp_a = float(np.clip(out[0], 0.0, 1.0))   # Component A: class_downgrade, clipped to [0,1]
+        return 2.0 * comp_a - 1.0                   # rescale → (-1,1) for pipeline
+
+    @classmethod
+    def load(cls, path: str | Path) -> "GapNetV3":
+        data = np.load(str(path))
+        return cls(
+            W0=data["net.0.weight"].astype(np.float32),
+            b0=data["net.0.bias"].astype(np.float32),
+            W2=data["net.2.weight"].astype(np.float32),
+            b2=data["net.2.bias"].astype(np.float32),
+            W4=data["net.4.weight"].astype(np.float32),
+            b4=data["net.4.bias"].astype(np.float32),
+            W6=data["net.6.weight"].astype(np.float32),
+            b6=data["net.6.bias"].astype(np.float32),
+        )
+
+    @classmethod
+    def load_if_exists(cls, path: str | Path) -> Optional["GapNetV3"]:
+        p = Path(path)
+        if p.exists():
+            try:
+                return cls.load(p)
+            except Exception:
+                return None
+        return None
+
+
 _PHASES = ("place", "move", "fly")
 
 

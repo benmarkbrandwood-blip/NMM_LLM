@@ -691,11 +691,11 @@ class MillsLLM:
         try:
             import httpx
             import ollama
-            # 5 s connect timeout, 30 s read timeout — prevents blocking forever
-            # when Ollama is cold-loading a model or swapping between models.
+            # 5 s connect timeout, 90 s read timeout — game debrief on llama3.1:8b
+            # needs more time than the default 30 s for annotated game prompts.
             return ollama.Client(
                 host=self._url,
-                timeout=httpx.Timeout(30.0, connect=5.0),
+                timeout=httpx.Timeout(90.0, connect=5.0),
             )
         except Exception:
             return None

@@ -2087,6 +2087,18 @@ function handleMessage(msg) {
         feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
         _renderAssessmentSignalSections(msg, feed);
       }
+      // Post a GapNet chat notification if blunder-risk positions were found
+      const _gapnetPlies = (msg.signal_plies || {}).gapnet || [];
+      if (_gapnetPlies.length) {
+        const _base = msg.ply_base || 0;
+        const _top = _gapnetPlies.slice(0, 3).map(it => {
+          const risk = it.score >= 0.72 ? "HIGH" : it.score.toFixed(2);
+          const side = it.color === "W" ? "White" : "Black";
+          return `ply ${it.ply + _base} (${side}, ${risk})`;
+        });
+        const _tail = _gapnetPlies.length > 3 ? ` +${_gapnetPlies.length - 3} more` : "";
+        addCommentary("GapNet", `Blunder-risk positions: ${_top.join(", ")}${_tail}`, "human");
+      }
       break;
     }
 
@@ -4115,7 +4127,7 @@ function _requestFormationGuide() {
     })
       .then(r => r.json())
       .then(data => {
-        if (_guideMode === 0 || !board) return;
+        if (_guideMode === 0 || !board || phase === "game_over") return;
         // If human is B, mirror the result back to board coordinates
         if (humanColor === "B") {
           const _m = pos => pos ? ({ a:"g",b:"f",c:"e",d:"d",e:"c",f:"b",g:"a" }[pos[0]] + pos[1]) : pos;
