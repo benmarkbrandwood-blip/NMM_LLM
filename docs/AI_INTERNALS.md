@@ -698,116 +698,181 @@ Pieces already in a closed mill, a 2-config, or another 1-config are excluded fr
 
 ---
 
-## 6. Learned (Neural) AI
+## 6. Learned (Neural) AI — Scaffolded Generalist
 
-The classical heuristic engine documented above has an opt-in self-learning counterpart under `learned_ai/` — a PyTorch policy/value network trained by self-play reinforcement learning using the REINFORCE algorithm. It is selected via the `NMM_AI_ENGINE=learned` environment variable and exposes the same `choose_move(board)` interface as the heuristic engine.
+The classical heuristic engine has an opt-in learned counterpart under `learned_ai/`. Rather than replacing the heuristic engine, it acts as a **meta-policy**: it re-ranks the moves the heuristic engine already knows about, using a rich set of expert signals as input features. This keeps the learned component grounded in correct legal moves while allowing the neural network to improve on move ordering.
 
-The learned AI does **not** share any code with the heuristic engine. It learns purely from game-outcome rewards and never consults the hand-crafted evaluation weights, tactical bonuses, or alpha-beta search stack described above. **This component is experimental and not well-calibrated.**
+Full design notes: `Learned_ai.md`.
 
-Full plan: `Learned_ai.md` — root-cause analysis of v1 failure, 6-stage training plan, results per stage.
+### ScaffoldedPolicyNet (`learned_ai/models/scaffolded_net.py`)
 
-### Stage 2 — REINFORCE self-play vs weak heuristic
+PyTorch network with two heads sharing no weights:
 
-```bash
-.venv/bin/python -u scripts/train_stage2.py \
-  --resume learned_ai/checkpoints/stage1/best.pt \
-  --out-dir learned_ai/checkpoints/stage2 \
-  --max-games 5000 \
-  --time-budget 0.05 \
-  --malom-db /mnt/windows/NMM_DB/Malom_Standard_Ultra-strong_1.1.0/Std_DD_89adjusted
-```
+| Head | Input | Architecture | Output |
+|------|-------|--------------|--------|
+| **Policy** | (k, 62–85) per-move features | 62→512→256→128→1 + softmax | pick probability per legal move |
+| **Value** | (23,) board-level vector | 23→256→128→64→1 + tanh | position eval ∈ (−1, 1) |
 
-**Key flags:**
+`k` = number of legal moves at this position (variable). The policy head processes each move independently and softmaxes over the move axis to produce a probability distribution.
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--max-games N` | 5000 | Total training games |
-| `--time-budget F` | 0.05 | Seconds per opponent move (0.05 = ~3s/game) |
-| `--temperature F` | 0.5 | Learner sampling temperature |
-| `--win-reward F` | 2.0 | Terminal reward magnitude on win/loss |
-| `--warmup-frac F` | 0.20 | Fraction of games with no sentinel blunder filter |
-| `--malom-frac F` | 0.30 | Fraction of games with Malom reward shaping |
-| `--malom-weight F` | 0.30 | Scale applied to each Malom signal |
-| `--no-malom` | off | Disable Malom shaping entirely |
-| `--no-sentinel` | off | Disable sentinel blunder filter entirely |
+### Feature vectors
 
-**Malom reward shaping (two signals, both Malom-exact, active for first `--malom-frac` of games):**
+**Per-move features (base: 62 floats)**  
+`MOVE_FEAT_DIM = 62` — `learned_ai/models/scaffolded_encoder.py`
 
-1. **Move quality** — `query_move_quality(board, move)` returns `0` when the move preserves the exact root WDL, `−1` or `−2` when it downgrades that value, and `None` when the value is unavailable or inconsistent. An exact minimax move cannot improve on its root value; a positive delta indicates an adapter contradiction and is rejected. When enabled, the non-positive delta is scaled by `malom_weight` and added to the transition reward.
+The 62 floats extend the sentinel's 58-float feature vector with 4 expert-context slots:
 
-2. **Trap reward** — after each learner move, `query(board)` checks the resulting position from the *opponent's* perspective. If the opponent is now in an "L" (losing) state, the learner's transition receives an additional `+malom_weight` bonus. This rewards the strategically critical NMM skill of constraining the opponent — cycling mill setups (oscillating a pivot piece between two 2-configs to force a capture every turn), forced captures, zugzwang. The sentinel approximates this signal; Malom is exact.
+| Slot | Content |
+|------|---------|
+| [0:58) | Sentinel feature vector (board context + move-specific + counterfactual) |
+| [58] | `sentinel_score`: SentinelAdvisor quality score ∈ [0, 1] |
+| [59] | `blended_abs`: 0.5 × heuristic_abs + 0.5 × value_net_abs, each mapped from [−1,1] to [0,1] |
+| [60] | `is_engine_top1`: 1.0 if this is the heuristic engine's top-ranked move |
+| [61] | `blended_delta`: tanh(0.5 × h_delta + 0.5 × vn_delta) — signed improvement |
 
-Both signals degrade gracefully when a position is outside DB coverage (return `None`).
+When `value_net=None`, slots 59/61 fall back to pure heuristic values (backward-compatible).
+
+**Board-level features (value head: 23 floats)**
+
+| Slots | Content |
+|-------|---------|
+| [0:20) | Phase one-hot, piece counts, mobility, mill counts |
+| [20] | `h_eval_abs`: absolute heuristic evaluation in [−1, 1] |
+| [21] | max sentinel score across legal moves |
+| [22] | mean sentinel score across legal moves |
+
+**With lookahead: 77 floats**  
+`encode_position_with_lookahead()` extends base 62 to 77 by appending 15 floats from `LookaheadAdvisor` (1-ply ahead estimates for each move).
+
+**Overseer (generalist) input: 85 floats**  
+`build_overseer_extras()` (`learned_ai/models/overseer_extras.py`) extends the 77-float base with 8 more:
+
+| Slots | Content |
+|-------|---------|
+| [77:80) | Specialist policy probs (opening, midgame, endgame specialist networks) |
+| [80:82) | GameAI: score_norm [0,1], is_gameai_best flag |
+| [82:85) | HumanDB: win_rate, freq_norm, seen_flag |
+
+### Production deployment
+
+**Checkpoint:** `learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt`  
+**Loaded via:** `load_generalist()` in `learned_ai/agents/specialist_router.py`  
+**Served by:** `OverseerAdvisor` (`learned_ai/models/overseer.py`) — wraps `ScaffoldedPolicyNet` and exposes `score_moves(board, candidates, color) → list[float]`
+
+When the generalist loads successfully, app.py sets it as `_overseer_advisor`, which drives the "O:XX%" pick-probability overlay in the game UI.
+
+### Specialists
+
+Three phase-specific checkpoints complement the generalist:
+
+| Specialist | Checkpoint path | Phase active |
+|------------|-----------------|--------------|
+| Opening | `s_open_v2/best.pt` | Early placement |
+| Midgame | `s_mid_v2/best.pt` | Mid-to-late placement and early movement |
+| Endgame | `s_end_v2/best.pt` | Late movement and fly |
+
+The `SpecialistRouter` routes positions to the appropriate specialist by phase, falling back to the generalist when specialists are unavailable.
+
+### Value net in the generalist
+
+Slots [59] and [61] in the per-move feature vector incorporate the value net signal (blended 50/50 with the heuristic). After the v3 promotion (2026-09-26), the move-phase and fly-phase value net provides a stronger urgency signal in these slots; the placement-phase retains the v2 net. See §7 for value net details.
 
 ---
 
 ## 7. Value Network (`ai/value_net.py`)
 
-A small MLP (79 → 128 → 64 → 1) trained from game records to predict the winner from a board position.
+### Architecture
+
+`ValueNet`: small MLP **79 → 128 → 64 → 1** with tanh output, pure numpy, ~74 KB, ~0.1 ms/position.
 
 **Input (79 floats):** 24 positions × 3 one-hot channels (own/opponent/empty) + 7 scalar metadata (turn, pieces placed and on board for each side). Encoded from the current player's perspective so the same weights handle both colours.
 
 **Output:** `tanh` scalar in (−1, 1). Positive = current player likely wins.
 
-**Inference:** Pure numpy, no deep-learning framework required. ~0.1 ms per position.
+`PhaseValueNet` wraps three separate `ValueNet` instances (one per game phase: place/move/fly) and dispatches `predict(board, color)` based on `get_game_phase()`. This allows each phase to learn a different prediction scale.
 
-**Usage:** Passed as the `value_net` parameter to `GameAI` and used as the MCTS leaf evaluator. The **Value network blend %** slider in AI Tuning controls how much weight the value net gets versus the heuristic (0 = heuristic only, 100 = value net only). Not loaded by the web server by default — must be enabled explicitly.
+### Production files (2026-09-26)
 
-### Self-play data generation
+| File | Contents |
+|------|----------|
+| `data/value_net_phase_place.npz` | v2 net (original self-play trained) — kept for placement |
+| `data/value_net_phase_move.npz` | **v3 net** (DTW-weighted, human DB) |
+| `data/value_net_phase_fly.npz` | **v3 net** (DTW-weighted, human DB) |
+| `data/value_net.npz` | Legacy single-net fallback (v2) |
 
-Run before or alongside value-net training to add fresh AI-generated games:
+`app.py` loads `PhaseValueNet` when all three `value_net_phase_*.npz` files exist; otherwise falls back to the monolithic `value_net.npz`.
 
-```bash
-python tools/self_play.py \
-  --games 500 \
-  --no-llm \
-  --white 7 --black 3 \
-  --parallel 4 \
-  --game-dir data/games/self_play \
-  --random-difficulty
-```
+### v3 — DTW-weighted phase nets (current production: move + fly)
 
-### Training
+Trained 2026-09-25 on 2.31M positions from `data/human_db_candidate_new.sqlite` (Malom-labelled human games). Script: `tools/train_value_net_v3.py`.
 
-```bash
-# Production command — used to train the current data/value_net.npz
-.venv/bin/python tools/train_value_net.py \
-  --epochs 100 --lr 0.009 --decisive_only \
-  --games-dir data/games \
-  --games-dir data/games/self_play \
-  --games-dir data/human_games
+**Training target:** `tanh(7 / dtw)` for wins, `0` for draws, `-tanh(7 / dtw)` for losses. This gives an *urgency* signal — a forced win in 3 moves → 0.92, in 20 moves → 0.33, in 100 moves → 0.07. Captures something GapNet (blunder risk) and Sentinel (RL quality) do not: how close to resolved the position already is.
 
-# Quick smoke run — 30 epochs, AI games only
-.venv/bin/python tools/train_value_net.py \
-  --games-dir data/games \
-  --decisive-only \
-  --epochs 30 \
-  --output data/value_net.npz
-```
+**Three-way data split:** `three_way_split()` (SHA-256 hash bucket) → train 80% / val 15% / test 5%. The test slice (buckets 0–4) was never seen during training.
 
-**FEN deduplication:** Each unique board position (identified by `board_fen_before`) is included exactly once. When the same position appears in multiple games with different outcomes, the label is the **mean** of all outcomes (+1.0 / −1.0 / 0.0). This prevents repeated opening positions from dominating the training signal.
+**Test-set evaluation (115,255 held-out positions):**
 
-**Multi-directory support:** Pass multiple paths to `--games-dir` to combine AI self-play games (`data/games/`) with human-vs-human games (`data/human_games/`). The value net currently achieves ~0.82 final loss over 743,231 unique positions from 31,501 game files.
+| Phase | v2 MSE | v3 MSE | v2 sign% | v3 sign% | v3 W-mean | v3 L-mean | Gap |
+|-------|--------|--------|----------|----------|-----------|-----------|-----|
+| place | 0.101 | 0.026 | 87.2% | 74.3% | 0.070 | −0.016 | 0.086 |
+| move | 0.109 | 0.048 | 92.7% | 88.3% | 0.304 | −0.257 | 0.561 |
+| fly | 0.090 | 0.106 | 86.0% | 82.0% | 0.160 | −0.428 | 0.588 |
+| total | 0.107 | 0.045 | 91.6% | 85.6% | — | — | — |
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--games-dir PATH [PATH …]` | `data/games` | Source directories containing `*.jsonl` game records |
-| `--output PATH` | `data/value_net.npz` | Output `.npz` path |
-| `--epochs N` | 30 | Training epochs |
-| `--lr F` | 0.001 | Learning rate |
-| `--batch-size N` | 256 | Mini-batch size |
-| `--decisive-only` | off | Exclude draw/unknown games |
+*Lower sign accuracy vs v2 is the expected DTW paradox*: v3 correctly predicts near-zero for distant wins; v2's discrete ±1 targets inflate sign accuracy at the cost of calibration (5× higher MSE).
 
-### Benchmark
+**Placement phase not promoted:** W/L gap of only 0.086 in placement — positions have high DTW so targets compress near zero; the signal is too weak to add steering force. v2 monolithic net retained for placement.
+
+**Head-to-head game play (200 games, difficulty 5, vn_blend 60%):**
+v3 won **77% of decisive games** at checkpoint 120/200 (v3=85, v2=25, draws=10). v3 move+fly promoted.
+
+**Promotion decision:** mixed phase — v3 for move/fly (strong directional signal), v2 for placement (weak signal risks adding noise). The scaffolded generalist AI uses value net as 2/62 input features (vn_before, vn_delta); the phase split keeps placement features on a familiar scale while improving move/fly.
+
+### Training v3
 
 ```bash
-# Value net alone vs baseline heuristic
-.venv/bin/python scripts/bench_sentinel.py --games 200 --difficulty 4 --white-value-net
-
-# Value net + sentinel vs baseline
-.venv/bin/python scripts/bench_sentinel.py --games 200 --difficulty 4 \
-  --white-value-net --white-sentinel score_adjust
+.venv/bin/python tools/train_value_net_v3.py \
+  --db data/human_db_candidate_new.sqlite \
+  --output-base data/value_net_v3 \
+  --epochs 200 --patience 15 --lr 1e-3
 ```
+
+Saves `data/value_net_v3_{place,move,fly}.npz`. Prints per-phase test-set MSE + sign accuracy on completion.
+
+### Evaluating v3 vs v2
+
+```bash
+# Test-set metrics only (fast):
+.venv/bin/python scripts/eval_value_net_v3.py --mode metrics
+
+# Head-to-head game play:
+.venv/bin/python scripts/eval_value_net_v3.py \
+  --mode games --n-games 200 --difficulty 5 --vn-blend 60
+```
+
+### Promoting a new version
+
+```bash
+# Mixed promotion (v3 move+fly, v2 place) — current production:
+cp data/value_net.npz            data/value_net_phase_place.npz
+cp data/value_net_v3_move.npz    data/value_net_phase_move.npz
+cp data/value_net_v3_fly.npz     data/value_net_phase_fly.npz
+
+# Full v3 promotion (if placement improves in a future version):
+cp data/value_net_v3_place.npz   data/value_net_phase_place.npz
+cp data/value_net_v3_move.npz    data/value_net_phase_move.npz
+cp data/value_net_v3_fly.npz     data/value_net_phase_fly.npz
+```
+
+Restart the server to pick up the new files (loaded once at startup).
+
+### Usage in the engine
+
+Passed as `value_net` to `GameAI`. The **Value network blend %** slider in AI Tuning controls how much weight the net gets vs the heuristic (0 = heuristic only, 100 = net only). Also passed to the scaffolded generalist as input features 59–61 (`vn_before`, `vn_delta`).
+
+### Legacy v1 (archived)
+
+The original value net trained from self-play game records (`tools/train_value_net.py`) is no longer in production. It used discrete W/L/D labels assigned from final game outcomes. Retained as `data/value_net.npz` (= v2) for use as the placement-phase fallback.
 
 ---
 
