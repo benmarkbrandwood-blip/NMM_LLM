@@ -114,6 +114,62 @@ def _clear_autosave() -> None:
         pass
 
 
+def _reconstruct_missing_placements(starting_board: "BoardState") -> "list[dict] | None":
+    """Reconstruct synthetic placement records for pieces already on the board.
+
+    Used when a game is resumed mid-session and the early placement moves are
+    absent from the game_record (because the session was interrupted before they
+    were recorded).  Returns None when a capture occurred during the missing
+    placements (making perfect reconstruction impossible).
+    """
+    from itertools import zip_longest as _zl
+
+    w_on     = starting_board.pieces_on_board["W"]
+    b_on     = starting_board.pieces_on_board["B"]
+    w_placed = starting_board.pieces_placed["W"]
+    b_placed = starting_board.pieces_placed["B"]
+
+    if w_placed == 0 and b_placed == 0:
+        return []
+    if w_placed != w_on or b_placed != b_on:
+        # A capture occurred during the missing placements — can't reconstruct
+        return None
+
+    w_pieces = sorted(sq for sq, v in starting_board.positions.items() if v == "W")
+    b_pieces = sorted(sq for sq, v in starting_board.positions.items() if v == "B")
+
+    synthetic: list[dict] = []
+    recon = BoardState.new_game()
+    turn_num = 1
+    try:
+        for w_sq, b_sq in _zl(w_pieces, b_pieces):
+            if w_sq is not None:
+                mv = {"from": None, "to": w_sq, "capture": None}
+                synthetic.append({
+                    "turn": turn_num, "color": "W", "type": "place",
+                    "from": None, "to": w_sq, "capture": None,
+                    "notation": w_sq,
+                    "board_fen_before": recon.to_fen_string(),
+                    "_reconstructed": True,
+                })
+                recon = recon.apply_move(mv)
+            if b_sq is not None:
+                mv = {"from": None, "to": b_sq, "capture": None}
+                synthetic.append({
+                    "turn": turn_num, "color": "B", "type": "place",
+                    "from": None, "to": b_sq, "capture": None,
+                    "notation": b_sq,
+                    "board_fen_before": recon.to_fen_string(),
+                    "_reconstructed": True,
+                })
+                recon = recon.apply_move(mv)
+            turn_num += 1
+    except Exception:
+        return None
+
+    return synthetic
+
+
 def _persist_game_record(record: dict) -> None:
     """Write a completed game record to the games JSONL folder (no LLM required)."""
     import uuid as _uuid
@@ -4273,6 +4329,29 @@ async def ws_endpoint(websocket: WebSocket):
                     _re_engine = GameEngine(human_color=_hc)
                     _re_engine.board = BoardState.from_fen_string(_fen)
                     _re_engine.game_record.update(_as_record)
+
+                    # Prepend reconstructed placement records for any pieces that
+                    # were already on the board when the session was first saved but
+                    # whose individual moves were not captured (e.g. interrupted game).
+                    _re_moves = _re_engine.game_record.get("moves", [])
+                    if _re_moves:
+                        _first_fen = _re_moves[0].get("board_fen_before", "")
+                        _fp = _first_fen.split("|")
+                        _already = (
+                            int(_fp[2]) + int(_fp[3])
+                            if len(_fp) >= 4 and _fp[2].isdigit() and _fp[3].isdigit()
+                            else 0
+                        )
+                        if _already > 0:
+                            _start_board = BoardState.from_fen_string(_first_fen)
+                            _synth = _reconstruct_missing_placements(_start_board)
+                            if _synth:
+                                _re_engine.game_record["moves"] = _synth + _re_moves
+                                log.info("Restored game: prepended %d reconstructed placements", len(_synth))
+                            else:
+                                # Captures during missing placements — record setup_fen
+                                _re_engine.game_record["setup_fen"] = _first_fen
+                                log.info("Restored game: set setup_fen (capture in missing placements)")
 
                     _re_ai = None
                     if not _vs_human and _ai_col:

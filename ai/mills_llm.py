@@ -306,43 +306,27 @@ TASK:
 Write a concise post-game commentary in 3–5 sentences.
 
 STRUCTURE:
-1. One sentence on the game's overall character (who dominated, how balanced the game was).
-2. One sentence focused on the turning point — the move that decided the game.
-3. Optionally, one sentence on OTHER POOR MOVES or GAPNET RISK positions only.
-   DO NOT use GENERALIST DIVERGENCE data for sentence 3 — divergence is contextual and NOT
-   evidence of a poor move. Only cite a move as poor if it appears in OTHER POOR MOVES or
-   has a high blunder-zone score from GAPNET. If neither section has data, omit sentence 3.
+1. One sentence on the game's overall character (who dominated, how balanced it was).
+2. One or two sentences on the decisive event from KEY EVENTS — prioritise [malom] entries
+   (these are perfect-play verified). Name the player who erred first, then describe what
+   happened to THEIR position. Use the "← ... OWN position worsened" annotation as your guide.
+3. Optionally, one sentence on a [heuristic] or [gapnet] event. Skip if none present.
+   Do NOT cite [generalist] or [policy] events as poor moves — they are context only.
 
-STYLE:
-- Coaching tone; be concrete and specific.
-- Never invent move quality claims not present in the fact block below.
-- Malom labels (W, D, L) are categorical outcomes; never paraphrase them as probabilities.
-- Label any model probability or empirical win rate explicitly as such.
-- Do not quote raw decimal scores; use the categorical descriptors already provided.
-
-COLOR ATTRIBUTION RULES (CRITICAL — violations render the commentary wrong):
-- Every move entry has an explicit Player field: W (White) or B (Black). It is ground truth.
-- NEVER infer color from ply parity or game outcome. Use the Player field exactly as given.
-- 'W' = White, 'B' = Black, everywhere without exception.
-- WDL verdicts are from the NAMED PLAYER's own perspective:
-    "Black's position: drawn → LOSING" means BLACK's game became a theoretical loss.
-    "White's position: winning → drawn" means WHITE lost their winning advantage.
-  The opponent is not the subject; the named player is.
-- The eventual game winner is often NOT the player who erred at the turning point.
-  The winner won because the opponent blundered, not because the winner played well there.
-- STRUCTURE RULE: Your turning-point sentence MUST name the player who erred FIRST,
-  then state what happened to THEIR position (not the opponent's).
-  WRONG: "White played d1-a1, shifting the balance in their favor"  ← if White's position became Losing
-  RIGHT: "White blundered with d1-a1 — White's own position deteriorated from drawn to losing"
+ATTRIBUTION RULES (CRITICAL — every event line in KEY EVENTS starts with the player letter):
+- The format is:  W (White): ply N  move  [signal]   or   B (Black): ply N  move  [signal]
+- Read the player letter at the start of each line. That is the player who MADE that move.
+- NEVER infer player from ply parity or from who won the game.
+- 'W' = White, 'B' = Black throughout. Winner and Loser are stated explicitly in GAME FACTS.
+- WDL verdicts are from the stated player's OWN perspective:
+    [drawn→losing] on a W (White) line means White's own position became a theoretical loss.
+- The winner often benefits from the opponent's blunder. Say so explicitly:
+    "White blundered, handing Black the advantage" — not "White made a strong move."
 
 OUTPUT RULES:
-1. Do NOT describe a move as favorable, beneficial, or an improvement for the player whose own
-   WDL worsened. If the TURNING POINT section shows the player's position went W→D, D→L, or W→L,
-   that move damaged THEIR position — write it as a blunder or mistake, regardless of game outcome.
-2. The game winner may be the player who benefited from the opponent's mistake. Say so explicitly:
-   e.g. "White blundered, handing Black the advantage" — not "White made a strong move."
-3. Never add meta-commentary, disclaimers, or notes about what you chose to omit. If an optional
-   sentence has no data to support it, simply skip it — do not explain the omission.
+1. A move labelled [drawn→losing] or [winning→losing] is a blunder by that player.
+   Never describe it as favourable or beneficial regardless of who won the game.
+2. Never add meta-commentary or explain omissions. If optional sentence 3 has no data, skip it.
 """
 
 _DEBRIEF_POSITION_SYSTEM = _BOARD_RULES + """
@@ -508,12 +492,9 @@ def _wdl_quality_label(quality: str) -> str:
 def _score_trend_words(
     heuristic_curve: "list[float]",
     turning_point_ply: "int | None",
+    ply_base: int = 1,
 ) -> str:
-    """Derive a categorical one-sentence description of the game arc.
-
-    Uses sign of heuristic_score_white (positive = White ahead) to avoid
-    quoting raw numbers in the LLM prompt.
-    """
+    """Derive a categorical one-sentence description of the game arc."""
     if not heuristic_curve:
         return "No score data available."
     n = len(heuristic_curve)
@@ -530,7 +511,7 @@ def _score_trend_words(
     else:
         trend = "The position was closely contested throughout"
     if turning_point_ply is not None and 0 < turning_point_ply < n - 1:
-        trend += f", with the key shift occurring at ply {turning_point_ply + 1}"
+        trend += f", with the key shift occurring at ply {turning_point_ply + ply_base}"
     return trend + "."
 
 
@@ -541,137 +522,119 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
     ``annotation`` is a PostGameAnnotation from PostGameAssessor.
     """
     lines: list[str] = []
+    _cn = {"W": "White", "B": "Black"}
+    pb = annotation.ply_base
+    wdl_map = {"W": "winning", "D": "drawn", "L": "losing"}
 
-    # GAME FACTS
+    # GAME FACTS — repeat winner/loser clearly so the LLM cannot miss attribution
     n_plies = len(annotation.moves)
     opening = annotation.opening_name or getattr(report, "opening_name", None) or "unknown"
-    _cn = {"W": "White", "B": "Black"}
-    winner_label = f"{report.winner} ({_cn.get(report.winner, report.winner)})"
-    loser_label  = f"{report.loser}  ({_cn.get(report.loser,  report.loser)})"
+    winner_name = _cn.get(report.winner, report.winner)
+    loser_name  = _cn.get(report.loser,  report.loser)
     lines.append("GAME FACTS:")
-    lines.append(f"  Winner: {winner_label}")
-    lines.append(f"  Loser:  {loser_label}")
-    lines.append(f"  Plies:  {n_plies}")
-    lines.append(f"  Opening: {opening}")
-    lines.append("  (W = White, B = Black throughout this prompt)")
+    lines.append(f"  Winner: {report.winner} = {winner_name}  ← {winner_name} WON this game")
+    lines.append(f"  Loser:  {report.loser} = {loser_name}  ← {loser_name} LOST this game")
+    lines.append(f"  Plies:  {n_plies}   Opening: {opening}")
+    lines.append("  (W = White, B = Black — every event line below begins with the player letter)")
     lines.append("")
 
     # SCORE TREND
     lines.append("SCORE TREND:")
     lines.append(
-        "  " + _score_trend_words(annotation.heuristic_curve, annotation.turning_point_ply)
+        "  " + _score_trend_words(annotation.heuristic_curve, annotation.turning_point_ply, pb)
     )
     lines.append("")
 
-    # TURNING POINT
-    tp_ply = annotation.turning_point_ply
-    if tp_ply is not None and 0 <= tp_ply < len(annotation.moves):
-        tp = annotation.moves[tp_ply]
-        oracle = annotation.turning_point_oracle
-        quality_label = _wdl_quality_label(annotation.turning_point_quality)
-        tp_color_name = _cn.get(tp.color, tp.color)
-        lines.append(f"TURNING POINT (a MISTAKE by {tp_color_name}):")
-        lines.append(f"  Player who erred: {tp.color} ({tp_color_name})  ← authoritative, do not change")
-        lines.append(f"  Ply:              {tp_ply + annotation.ply_base}")
-        lines.append(f"  Move played:      {tp.move_played}")
-        best_shown = tp.malom_best_alt if (oracle in ("malom_full", "retrograde_wdl") and tp.malom_best_alt) else tp.best_alt
-        if best_shown:
-            lines.append(f"  Best available:   {best_shown}  (would have kept {tp_color_name} in a better position)")
-        if oracle in ("malom_full", "retrograde_wdl"):
-            wdl_map = {"W": "winning", "D": "drawn", "L": "losing"}
-            wb = wdl_map.get(tp.wdl_before or "", tp.wdl_before or "?")
-            wa = wdl_map.get(tp.wdl_after  or "", tp.wdl_after  or "?")
-            lines.append(
-                f"  Impact on {tp_color_name}'s position: {wb} → {wa}"
-                f"  (oracle: {oracle})  ← {tp_color_name} WORSENED their own position"
-            )
-        else:
-            lines.append(f"  Regret signal:    {quality_label}  (oracle: {oracle})")
-        lines.append("")
+    # KEY EVENTS — top 2 per signal, each line begins with player letter for unambiguous attribution
+    events: list[tuple[int, str]] = []  # (display_ply, text)
 
-    # OTHER POOR MOVES (only when more than one confirmed_poor)
-    confirmed_poor = [m for m in annotation.moves if m.quality == "confirmed_poor"]
-    other_poor = [m for m in confirmed_poor if m.ply != tp_ply]
-    if other_poor:
-        lines.append("OTHER POOR MOVES:")
-        for m in other_poor:
-            m_color_name = _cn.get(m.color, m.color)
-            if m.oracle_source in ("malom_full", "retrograde_wdl"):
-                wdl_map2 = {"W": "winning", "D": "drawn", "L": "losing"}
-                wb2 = wdl_map2.get(m.wdl_before or "", m.wdl_before or "?")
-                wa2 = wdl_map2.get(m.wdl_after  or "", m.wdl_after  or "?")
-                alt_note = f"  best: {m.malom_best_alt}" if m.malom_best_alt else ""
-                lines.append(
-                    f"  Ply {m.ply + annotation.ply_base} {m.color} ({m_color_name}): {m.move_played}"
-                    f"  — {m_color_name} was {wb2} before, {wa2} after{alt_note}"
-                )
-            else:
-                lines.append(
-                    f"  Ply {m.ply + annotation.ply_base} {m.color} ({m_color_name}): {m.move_played}"
-                    f"  (r_h={m.r_h:.2f})"
-                )
-        lines.append("")
+    def _add(ply_idx: int, text: str) -> None:
+        events.append((ply_idx + pb, text))
 
-    # SENTINEL TURNING POINTS (always shown when Sentinel available, even if Malom ran)
-    sentinel_tps = [
-        (ply, q, src) for ply, q, src in annotation.turning_points
-        if src == "sentinel+heuristic"
+    # Signal 1: Malom WDL shifts (worst first — D→L > W→L > W→D)
+    _wdl_severity = {"draw_to_loss": 3, "win_to_loss": 2, "win_to_draw": 1}
+    malom_shifts = [
+        m for m in annotation.moves
+        if m.wdl_before is not None and m.wdl_after is not None
+        and m.wdl_before != m.wdl_after
+        and m.oracle_source in ("malom_full", "retrograde_wdl")
     ]
-    if sentinel_tps:
-        lines.append("SENTINEL TURNING POINTS:")
-        for ply, quality, _ in sentinel_tps:
-            if 0 <= ply < len(annotation.moves):
-                m = annotation.moves[ply]
-                s_color_name = _cn.get(m.color, m.color)
-                lines.append(
-                    f"  Ply {ply + annotation.ply_base} {m.color} ({s_color_name}): {m.move_played}  ({quality})"
-                )
-        lines.append("")
+    malom_shifts.sort(key=lambda m: _wdl_severity.get(
+        f"{'win' if m.wdl_before=='W' else 'draw' if m.wdl_before=='D' else 'loss'}_to_"
+        f"{'win' if m.wdl_after=='W' else 'draw' if m.wdl_after=='D' else 'loss'}", 0
+    ), reverse=True)
+    for m in malom_shifts[:2]:
+        cn = _cn.get(m.color, m.color)
+        wb = wdl_map.get(m.wdl_before, m.wdl_before)
+        wa = wdl_map.get(m.wdl_after,  m.wdl_after)
+        best = m.malom_best_alt or m.best_alt or ""
+        best_part = f"  |  best: {best}" if best else ""
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  [{wb}→{wa}]{best_part}  ← {cn}'s OWN position worsened  [malom]")
 
-    # GENERALIST DIVERGENCE (context only — do NOT cite as "poor moves" in commentary)
+    # Signal 2: Heuristic confirmed-poor moves (top 2 by r_h, skip if already in malom_shifts)
+    malom_plies = {m.ply for m in malom_shifts[:2]}
+    h_poor = [m for m in annotation.moves if m.quality == "confirmed_poor" and m.ply not in malom_plies]
+    h_poor.sort(key=lambda m: m.r_h, reverse=True)
+    for m in h_poor[:2]:
+        cn = _cn.get(m.color, m.color)
+        best = m.best_alt or ""
+        best_part = f"  |  best: {best}" if best else ""
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  regret={m.r_h:.2f}{best_part}  [heuristic]")
+
+    # Signal 3: Sentinel turning points (top 2)
+    sentinel_tps = [
+        (ply, q) for ply, q, src in annotation.turning_points
+        if src == "sentinel+heuristic" and 0 <= ply < len(annotation.moves)
+    ]
+    for ply, quality in sentinel_tps[:2]:
+        m = annotation.moves[ply]
+        cn = _cn.get(m.color, m.color)
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  ({quality})  [sentinel]")
+
+    # Signal 4: Generalist divergence (top 2 by abs r_h, opponent moves only)
     gen_divs = [
         m for m in annotation.moves
         if m.generalist_top_move is not None
         and not m.generalist_self_assessed
         and m.generalist_top_move != m.move_played
     ]
-    if gen_divs:
-        lines.append("GENERALIST DIVERGENCE (context only — NOT evidence of a poor move):")
-        for m in sorted(gen_divs, key=lambda x: abs(x.r_h), reverse=True)[:4]:
-            gd_color_name = _cn.get(m.color, m.color)
-            lines.append(
-                f"  Ply {m.ply + annotation.ply_base} {m.color} ({gd_color_name}):"
-                f" played {m.move_played} | AI would have chosen {m.generalist_top_move}"
-            )
-        lines.append("")
+    gen_divs.sort(key=lambda m: abs(m.r_h), reverse=True)
+    for m in gen_divs[:2]:
+        cn = _cn.get(m.color, m.color)
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  |  AI preferred: {m.generalist_top_move}  [generalist]")
 
-    # POLICY/PREF DIVERGENCE (pref_delta: human preference vs teacher policy)
+    # Signal 5: Policy/pref divergence (top 2 by abs pref_delta)
     pref_moves = [
         m for m in annotation.moves
         if m.policy_pref_delta is not None and abs(m.policy_pref_delta) > 0.1
     ]
-    if pref_moves:
-        lines.append("POLICY DIVERGENCE (pref vs teacher):")
-        for m in sorted(pref_moves, key=lambda x: x.policy_pref_delta)[:4]:
-            direction = "weak" if m.policy_pref_delta < 0 else "strong"
-            p_color_name = _cn.get(m.color, m.color)
-            lines.append(
-                f"  Ply {m.ply + annotation.ply_base} {m.color} ({p_color_name}): {m.move_played}"
-                f"  delta={m.policy_pref_delta:+.2f} ({direction} choice for {p_color_name})"
-            )
-        lines.append("")
+    pref_moves.sort(key=lambda m: abs(m.policy_pref_delta), reverse=True)
+    for m in pref_moves[:2]:
+        cn = _cn.get(m.color, m.color)
+        direction = "weak" if m.policy_pref_delta < 0 else "strong"
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  delta={m.policy_pref_delta:+.2f} ({direction})  [policy]")
 
-    # GAPNET RISK POSITIONS (pre-move blunder-zone density)
+    # Signal 6: GapNet risk (top 2)
     gap_moves = [m for m in annotation.moves if m.blunder_zone_score is not None]
-    if gap_moves:
-        top_gap = sorted(gap_moves, key=lambda x: x.blunder_zone_score, reverse=True)[:3]
-        lines.append("GAPNET RISK POSITIONS:")
-        for m in top_gap:
-            g_color_name = _cn.get(m.color, m.color)
-            lines.append(
-                f"  Ply {m.ply + annotation.ply_base} {m.color} ({g_color_name}): {m.move_played}  "
-                f"blunder-zone={m.blunder_zone_score:.2f}"
-            )
+    gap_moves.sort(key=lambda m: m.blunder_zone_score, reverse=True)
+    for m in gap_moves[:2]:
+        cn = _cn.get(m.color, m.color)
+        _add(m.ply, f"{m.color} ({cn}): ply {m.ply+pb}  {m.move_played}"
+                    f"  blunder-zone={m.blunder_zone_score:.2f}  [gapnet]")
+
+    if events:
+        events.sort(key=lambda x: x[0])  # chronological
+        lines.append("KEY EVENTS (top 2 per signal, each line begins with the player who acted):")
+        for _display_ply, text in events:
+            lines.append(f"  {text}")
+        lines.append("")
+    else:
+        lines.append("KEY EVENTS: no significant events detected.")
         lines.append("")
 
     return "\n".join(lines)

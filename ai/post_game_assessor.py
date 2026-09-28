@@ -319,8 +319,13 @@ class PostGameAssessor:
             board = BoardState.from_fen_string(setup_fen)
             setup_offset = board.pieces_placed["W"] + board.pieces_placed["B"]
         else:
-            board = BoardState.new_game()
-            setup_offset = 0
+            first_fen = moves_raw[0].get("board_fen_before") if moves_raw else None
+            if first_fen:
+                board = BoardState.from_fen_string(first_fen)
+                setup_offset = board.pieces_placed["W"] + board.pieces_placed["B"]
+            else:
+                board = BoardState.new_game()
+                setup_offset = 0
 
         board_seq: list[BoardState] = [board]
         for move_record in moves_raw:
