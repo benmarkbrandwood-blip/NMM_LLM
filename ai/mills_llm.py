@@ -308,7 +308,10 @@ Write a concise post-game commentary in 3–5 sentences.
 STRUCTURE:
 1. One sentence on the game's overall character (who dominated, how balanced the game was).
 2. One sentence focused on the turning point — the move that decided the game.
-3. Optionally, one sentence on any other notable poor moves or recurring patterns.
+3. Optionally, one sentence on OTHER POOR MOVES or GAPNET RISK positions only.
+   DO NOT use GENERALIST DIVERGENCE data for sentence 3 — divergence is contextual and NOT
+   evidence of a poor move. Only cite a move as poor if it appears in OTHER POOR MOVES or
+   has a high blunder-zone score from GAPNET. If neither section has data, omit sentence 3.
 
 STYLE:
 - Coaching tone; be concrete and specific.
@@ -338,6 +341,8 @@ OUTPUT RULES:
    that move damaged THEIR position — write it as a blunder or mistake, regardless of game outcome.
 2. The game winner may be the player who benefited from the opponent's mistake. Say so explicitly:
    e.g. "White blundered, handing Black the advantage" — not "White made a strong move."
+3. Never add meta-commentary, disclaimers, or notes about what you chose to omit. If an optional
+   sentence has no data to support it, simply skip it — do not explain the omission.
 """
 
 _DEBRIEF_POSITION_SYSTEM = _BOARD_RULES + """
@@ -567,7 +572,7 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         tp_color_name = _cn.get(tp.color, tp.color)
         lines.append(f"TURNING POINT (a MISTAKE by {tp_color_name}):")
         lines.append(f"  Player who erred: {tp.color} ({tp_color_name})  ← authoritative, do not change")
-        lines.append(f"  Ply:              {tp_ply + 1}")
+        lines.append(f"  Ply:              {tp_ply + annotation.ply_base}")
         lines.append(f"  Move played:      {tp.move_played}")
         best_shown = tp.malom_best_alt if (oracle in ("malom_full", "retrograde_wdl") and tp.malom_best_alt) else tp.best_alt
         if best_shown:
@@ -597,12 +602,12 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
                 wa2 = wdl_map2.get(m.wdl_after  or "", m.wdl_after  or "?")
                 alt_note = f"  best: {m.malom_best_alt}" if m.malom_best_alt else ""
                 lines.append(
-                    f"  Ply {m.ply + 1} {m.color} ({m_color_name}): {m.move_played}"
+                    f"  Ply {m.ply + annotation.ply_base} {m.color} ({m_color_name}): {m.move_played}"
                     f"  — {m_color_name} was {wb2} before, {wa2} after{alt_note}"
                 )
             else:
                 lines.append(
-                    f"  Ply {m.ply + 1} {m.color} ({m_color_name}): {m.move_played}"
+                    f"  Ply {m.ply + annotation.ply_base} {m.color} ({m_color_name}): {m.move_played}"
                     f"  (r_h={m.r_h:.2f})"
                 )
         lines.append("")
@@ -619,11 +624,11 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
                 m = annotation.moves[ply]
                 s_color_name = _cn.get(m.color, m.color)
                 lines.append(
-                    f"  Ply {ply + 1} {m.color} ({s_color_name}): {m.move_played}  ({quality})"
+                    f"  Ply {ply + annotation.ply_base} {m.color} ({s_color_name}): {m.move_played}  ({quality})"
                 )
         lines.append("")
 
-    # GENERALIST DIVERGENCE (moves where AI preferred a different move)
+    # GENERALIST DIVERGENCE (context only — do NOT cite as "poor moves" in commentary)
     gen_divs = [
         m for m in annotation.moves
         if m.generalist_top_move is not None
@@ -631,12 +636,12 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         and m.generalist_top_move != m.move_played
     ]
     if gen_divs:
-        lines.append("GENERALIST DIVERGENCE:")
+        lines.append("GENERALIST DIVERGENCE (context only — NOT evidence of a poor move):")
         for m in sorted(gen_divs, key=lambda x: abs(x.r_h), reverse=True)[:4]:
             gd_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1} {m.color} ({gd_color_name}): played {m.move_played}, "
-                f"AI preferred {m.generalist_top_move}"
+                f"  Ply {m.ply + annotation.ply_base} {m.color} ({gd_color_name}):"
+                f" played {m.move_played} | AI would have chosen {m.generalist_top_move}"
             )
         lines.append("")
 
@@ -651,7 +656,7 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
             direction = "weak" if m.policy_pref_delta < 0 else "strong"
             p_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1} {m.color} ({p_color_name}): {m.move_played}"
+                f"  Ply {m.ply + annotation.ply_base} {m.color} ({p_color_name}): {m.move_played}"
                 f"  delta={m.policy_pref_delta:+.2f} ({direction} choice for {p_color_name})"
             )
         lines.append("")
@@ -664,7 +669,7 @@ def _build_debrief_prompt(report, annotation: "PostGameAnnotation") -> str:
         for m in top_gap:
             g_color_name = _cn.get(m.color, m.color)
             lines.append(
-                f"  Ply {m.ply + 1} {m.color} ({g_color_name}): {m.move_played}  "
+                f"  Ply {m.ply + annotation.ply_base} {m.color} ({g_color_name}): {m.move_played}  "
                 f"blunder-zone={m.blunder_zone_score:.2f}"
             )
         lines.append("")

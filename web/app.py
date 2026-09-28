@@ -1022,6 +1022,23 @@ async def sentinel_status():
     }
 
 
+@app.get("/api/malom_trajectory")
+async def get_malom_trajectory(fen: str, max_depth: int = 14):
+    from fastapi.responses import JSONResponse
+    if _malom_db is None or not _malom_db.is_available():
+        return JSONResponse({"steps": [], "available": False})
+    try:
+        from game.board import BoardState
+        board = BoardState.from_fen_string(fen)
+        steps = await asyncio.to_thread(
+            _malom_db.query_win_trajectory, board, min(int(max_depth), 16)
+        )
+        return JSONResponse({"steps": steps, "available": True})
+    except Exception as exc:
+        log.debug("malom_trajectory error: %s", exc)
+        return JSONResponse({"steps": [], "available": False})
+
+
 @app.get("/api/overseer_status")
 async def overseer_status():
     return {
@@ -2589,7 +2606,7 @@ async def api_formation_guide(request: Request):
 
     Body: {w_positions: [str], b_positions: [str], mode: "naive"|"malom"}
     """
-    from ai.formation_guide import best_formation, best_formation_7v4
+    from ai.formation_guide import best_formation, best_formation_7v4, best_formation_8v_early
     body = await request.json()
     w_positions = body.get("w_positions", [])
     b_positions = body.get("b_positions", [])
@@ -2597,8 +2614,14 @@ async def api_formation_guide(request: Request):
     if mode not in ("naive", "malom"):
         mode = "naive"
     db = _malom_db if (mode == "malom" and _malom_db is not None and _malom_db.is_available()) else None
-    if len(w_positions) == 7:
+    w_count = len(w_positions)
+    b_count = len(b_positions)
+    if w_count == 8 and b_count <= 5:
+        result = best_formation_8v_early(w_positions, b_positions)
+    elif w_count == 7:
         result = best_formation_7v4(w_positions, b_positions, mode, db)
+        if b_count >= 5:
+            result["dotted"] = True
     else:
         result = best_formation(w_positions, b_positions, mode, db)
     return _JSONResponse(result)
@@ -3365,7 +3388,20 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
             log.info("AI-vs-AI game saved  winner=%s white=%s black=%s",
                      winner, session.white_personality, session.black_personality)
         else:
+            # Not saved to library, but still build a record so assessment can run
+            record = dict(session.engine.game_record)
+            record["winner"]            = winner
+            record["ai_vs_ai"]          = True
+            record["white_personality"] = session.white_personality
+            record["black_personality"] = session.black_personality
+            if draw_reason:
+                record["draw_reason"] = draw_reason
+            session._last_game_record = record
             log.info("AI-vs-AI game not saved (save_to_library=False)")
+        if session._last_game_record:
+            session._assessment_task = asyncio.create_task(
+                _run_game_assessment(ws, session, session._last_game_record)
+            )
         return
 
     if session.coordinator:

@@ -59,6 +59,7 @@ let _diagSeq        = 0;            // sequence counter for in-flight requests
 let _diagFenCache   = new Map();    // fen → {static?: msg, negamax?: msg} — reset on new game
 let _diagPending    = 0;            // expected seq for current request pair
 let _diagDebounce   = null;         // debounce timer handle
+let _replayOverlayTimer = null;     // 1.5s debounce for overlay fetches during replay
 let _diagCaptureFen = null;         // FEN of projected board in capture mode
 let _aiThinking     = false;        // true while AI is computing — block diagnostics
 
@@ -95,6 +96,9 @@ let _guideSpillerDone = false;
 
 // ── Post-game assessment state ────────────────────────────────────────────────
 let _assessmentTurningPoints = [];  // [{ply, quality, oracle}, ...] from assessment_result
+let _malomTrajActive  = false;      // unused — Malom trajectory now follows diagDB
+let _malomTrajCache   = new Map();  // FEN → {steps, available} from /api/malom_trajectory
+let _malomTrajReqFen  = null;       // FEN of the in-flight trajectory request (race guard)
 let _assessmentReady = false;       // true once assessment_result received
 let _assessmentStartTime = null;    // Date.now() when assessment started
 let _assessmentTimerInterval = null; // setInterval handle for elapsed counter
@@ -112,6 +116,7 @@ const _SIGNAL_META = {
   unconventional: { color: "#9a60cc", label: "Unconventional Move" },
   pref:           { color: "#c4a020", label: "Pref Divergence" },
   mobility:       { color: "#50aaaa", label: "Mobility Warning" },
+  value:          { color: "#50aaaa", label: "ValueNet" },
 };
 
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
@@ -719,10 +724,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (el.value === 'regret') {
         _ensureGameRegret();
       } else {
-        if (gameNetSlots.some(Boolean) && !_diagStaticData) {
-          _diagStaticData = null;
-          _diagNegamaxData = null;
-          _diagRequestAll();
+        if (gameNetSlots.some(Boolean)) {
+          _diagTrigger();
         } else {
           _diagRender();
         }
@@ -737,8 +740,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!diagStatic) { _diagStaticData = null; }
     diagEnabled = diagStatic || diagNegamax;
     $("eval-bar").hidden = !diagEnabled;
-    _diagRender();
-    if (diagStatic) _diagRequestAll();
+    if (diagStatic) { _diagTrigger(); } else { _diagRender(); }
   });
 
   $("diag-btn-negamax").addEventListener("click", () => {
@@ -760,8 +762,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("diag-btn-traj").addEventListener("click", () => {
     diagTraj = !diagTraj;
     $("diag-btn-traj").classList.toggle("diag-chip-active", diagTraj);
-    if (diagTraj && !_diagStaticData) _diagRequestAll();
-    else _diagRender();
+    if (diagTraj) { _diagTrigger(); } else _diagRender();
   });
 
   const _predBandSel = $("pred-band-select");
@@ -780,15 +781,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("diag-btn-db").addEventListener("click", () => {
     diagDB = !diagDB;
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
-    if (diagDB && !_diagStaticData) _diagRequestAll();
-    else _diagRender();
+    if (diagDB) { _diagTrigger(); } else _diagRender();
   });
 
   $("diag-btn-overseer") && $("diag-btn-overseer").addEventListener("click", () => {
     diagOverseer = !diagOverseer;
-    if (diagOverseer) {
-      if (!_diagStaticData) _diagRequestAll(); else _diagRequestStatic();
-    } else { _diagRender(); }
+    if (diagOverseer) { _diagTrigger(); } else { _diagRender(); }
     $("diag-btn-overseer").classList.toggle("diag-chip-active", diagOverseer);
     const chkOv = $("chk-overseer");
     if (chkOv) chkOv.checked = diagOverseer;
@@ -1196,6 +1194,7 @@ function startNewGame() {
   replayMoves = [];
   replayIdx   = -1;
   _diagFenCache = new Map();
+  _malomTrajCache.clear();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").classList.remove("btn-active");
@@ -1286,6 +1285,7 @@ function startAiVsAi() {
   replayMoves = [];
   replayIdx   = -1;
   _diagFenCache = new Map();
+  _malomTrajCache.clear();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").disabled = true;
@@ -1505,6 +1505,7 @@ function startSetupGame() {
   replayMoves = [];
   replayIdx   = -1;
   _diagFenCache = new Map();
+  _malomTrajCache.clear();
   _updateReplayLabel();
   _setReplayButtonsDisabled(true);
   $("btn-force-cap").classList.remove("btn-active");
@@ -2119,18 +2120,6 @@ function handleMessage(msg) {
       if (feed) {
         feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
         _renderAssessmentSignalSections(msg, feed);
-      }
-      // Post a GapNet chat notification if blunder-risk positions were found
-      const _gapnetPlies = (msg.signal_plies || {}).gapnet || [];
-      if (_gapnetPlies.length) {
-        const _base = msg.ply_base || 0;
-        const _top = _gapnetPlies.slice(0, 3).map(it => {
-          const risk = it.score >= 0.72 ? "HIGH" : it.score.toFixed(2);
-          const side = it.color === "W" ? "White" : "Black";
-          return `ply ${it.ply + _base} (${side}, ${risk})`;
-        });
-        const _tail = _gapnetPlies.length > 3 ? ` +${_gapnetPlies.length - 3} more` : "";
-        addCommentary("GapNet", `Blunder-risk positions: ${_top.join(", ")}${_tail}`, "human");
       }
       break;
     }
@@ -2932,6 +2921,41 @@ function setTurnBadge(name, winner) {
   }
 }
 
+// ── Malom trajectory overlay ─────────────────────────────────────────────────
+
+
+async function _fetchAndDrawMalomTraj(idx) {
+  if (!diagDB || !replayMoves.length) return;
+  if (board && board.clearMalomTrajectory) board.clearMalomTrajectory();
+
+  let fen = null;
+  if (idx === 0 && replayMoves[0]) {
+    fen = replayMoves[0].fen;
+  } else if (idx > 0 && idx < replayMoves.length && replayMoves[idx]) {
+    fen = replayMoves[idx].fen;
+  }
+  if (!fen) return;
+
+  if (_malomTrajCache.has(fen)) {
+    const cached = _malomTrajCache.get(fen);
+    if (replayIdx === idx && board && board.drawMalomTrajectory)
+      board.drawMalomTrajectory(cached.steps || []);
+    return;
+  }
+
+  _malomTrajReqFen = fen;
+  try {
+    const r = await fetch(`/api/malom_trajectory?fen=${encodeURIComponent(fen)}`);
+    if (!r.ok) return;
+    const data = await r.json();
+    _malomTrajCache.set(fen, data);
+    // Race guard: skip draw if user stepped away
+    if (diagDB && replayIdx === idx && _malomTrajReqFen === fen)
+      if (board && board.drawMalomTrajectory)
+        board.drawMalomTrajectory(data.steps || []);
+  } catch (_) { /* ignore network errors */ }
+}
+
 // ── Move replay ───────────────────────────────────────────────────────────────
 // replayIdx: -1 = live; 0 = initial board; k = board after move k.
 // move[k].fen is the board BEFORE move k, so:
@@ -2968,13 +2992,17 @@ function replayGo(idx) {
   _updateReplayLabel();
   _highlightReplayMove(idx);
   drawEvalGraph();
-  _diagRefreshForReplay(idx);
+  clearTimeout(_replayOverlayTimer);
+  _replayOverlayTimer = setTimeout(() => _diagRefreshForReplay(replayIdx), 1500);
   _applyReplayAnnotations(idx);
 }
 
 function exitReplay() {
+  clearTimeout(_replayOverlayTimer);
+  _replayOverlayTimer = null;
   replayIdx = -1;
   if (board.clearReplayOverlay) board.clearReplayOverlay();
+  if (board.clearMalomTrajectory) board.clearMalomTrajectory();
   _hideReplayTPBadge();
   if (gameState) {
     board.render(gameState);
@@ -3011,6 +3039,14 @@ function _applyReplayAnnotations(idx) {
   board.clearReplayOverlay();
   _hideReplayTPBadge();
   _hideReplaySignalBadge();
+
+  // Malom trajectory: shown when DB/Malom overlay is active
+  if (diagDB) {
+    _fetchAndDrawMalomTraj(idx);
+  } else if (board.clearMalomTrajectory) {
+    board.clearMalomTrajectory();
+  }
+
   if (idx <= 0 || !replayMoves.length) return;
 
   const plyIdx = idx - 1;
@@ -3037,11 +3073,13 @@ function _applyReplayAnnotations(idx) {
   const dest = move.to || _parseMoveNotationDest(move.notation);
   if (dest) board.setReplayQualityRings(dest, quality, tpRank, sigColor);
 
-  // Green preferred-move hint: TP best_alt takes priority, then signal preferred
-  const preferredNotation = (tpData && tpData.best_alt)
-    ? tpData.best_alt
-    : (topSig && (topSig.item.preferred || topSig.item.best_alt)) || null;
-  if (preferredNotation && board.drawSignalHint) board.drawSignalHint(preferredNotation);
+  // Suppress single-arrow TP hint when DB/trajectory overlay is active (avoids visual collision)
+  if (!diagDB) {
+    const preferredNotation = (tpData && tpData.best_alt)
+      ? tpData.best_alt
+      : (topSig && (topSig.item.preferred || topSig.item.best_alt)) || null;
+    if (preferredNotation && board.drawSignalHint) board.drawSignalHint(preferredNotation);
+  }
 
   if (tpData)  _showReplayTPBadge(tpRank, tpData);
   if (topSig)  _showReplaySignalBadge(topSig.key, topSig.item);
@@ -3407,6 +3445,7 @@ const _ASSESSMENT_LEGEND_ITEMS = [
   ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs.", "gapnet"],
   ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment.", "generalist"],
   ["Predictive",      "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", null],
+  ["ValueNet",        "A positional value network trained on Malom distance-to-win (DTW) labels — the number of optimal moves to force a win or avoid a loss. Higher scores mean White is closer to a theoretical win; lower scores mean Black is ahead. Used by the AI to blend long-range positional judgement with the classical heuristic.", "value"],
   ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
   ["Unconventional",  "Moves ranked low by the Predictive net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
   ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped.", "mobility"],
@@ -3935,6 +3974,17 @@ function _diagRequestAll(fen, prefix) {
   }, 300);  // 300ms debounce — longer to absorb rapid replay + prevent flood
 }
 
+// Fetch overlay for the correct context: replay FEN (immediate) or live board (debounced).
+function _diagTrigger() {
+  if (replayIdx >= 0) {
+    clearTimeout(_replayOverlayTimer);
+    _diagRefreshForReplay(replayIdx);
+  } else {
+    _diagRequestAll();
+  }
+}
+
+
 function _diagOnReceive(msg) {
   // Sentinel position score and FEN cache — always processed regardless of overlay state.
   // Sentinel graph data must arrive even when the scores overlay is off.
@@ -4146,7 +4196,7 @@ function _updateGuideButton() {
   const btn = $("btn-formation-guide");
   if (!btn) return;
   if (_guideMode === 0) {
-    btn.textContent = "7/6 vs 4 Endgame Helper";
+    btn.textContent = "Endgame Helper";
     btn.classList.remove("btn-active");
     btn.title = "Endgame Helper: Off — click to enable (Naive)";
   } else if (_guideMode === 1) {
@@ -4174,8 +4224,9 @@ function _requestFormationGuide() {
   const guidePieces  = humanColor === "W" ? w_positions : b_positions;
   const otherPieces  = humanColor === "W" ? b_positions : w_positions;
 
-  // Show when guide player has exactly 6 pieces (6v4 guide) or 7 pieces (7v4 guide)
-  if (guidePieces.length !== 6 && guidePieces.length !== 7) {
+  // Show for 6 or 7 pieces (solid), or 8 pieces with ≤5 opponents (dotted early guide)
+  if (guidePieces.length < 6 || guidePieces.length > 8 ||
+      (guidePieces.length === 8 && otherPieces.length > 5)) {
     board.clearFormationGuide();
     return;
   }
