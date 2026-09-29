@@ -427,6 +427,12 @@ class ExternalSolvedDB:
                 out.append(None)
         return out
 
+    def query_win_trajectory(self, board, max_depth: int = 16) -> list:
+        """Delegate to MalomDB.query_win_trajectory for the replay trajectory overlay."""
+        if self._malom is None or not self._malom.is_available():
+            return []
+        return self._malom.query_win_trajectory(board, max_depth=max_depth)
+
     def close(self) -> None:
         """Release cached sector data."""
         if self._malom is not None:

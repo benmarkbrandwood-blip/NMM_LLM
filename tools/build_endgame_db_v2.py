@@ -61,6 +61,7 @@ import argparse
 import array
 import hashlib
 import importlib.util as _ilu
+import json
 import logging
 import mmap
 import os
@@ -534,23 +535,63 @@ def solve_table(
     t0 = time.time()
 
     # Pre-allocate sparse file (all zeros = WDL_UNKNOWN = valid start state).
+    # Only (re-)create the file if it doesn't exist or has wrong size — if it
+    # already has the correct size it may contain partial pass progress that we
+    # want to resume, so we must NOT truncate it.
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "wb") as _pre:
-        _pre.seek(max(n_bytes, 1) - 1)
-        _pre.write(b"\x00")
+    if not out_path.exists() or out_path.stat().st_size != n_bytes:
+        with open(out_path, "wb") as _pre:
+            _pre.seek(max(n_bytes, 1) - 1)
+            _pre.write(b"\x00")
     _fh = open(out_path, "r+b")
     table = mmap.mmap(_fh.fileno(), n_bytes)
 
+    # ── Restart-resume helpers ────────────────────────────────────────────────
+    # .cids  — cached canonical position IDs (array.array 'Q', raw binary)
+    # .progress — JSON {"pass_done": N}; N=-1 means nothing done yet.
+    # Both live next to the .wdl file and are deleted on successful completion.
+    cids_path = out_path.with_suffix('.cids')
+    progress_path = out_path.with_suffix('.progress')
+
+    def _load_progress() -> int:
+        try:
+            return json.loads(progress_path.read_text()).get("pass_done", -1)
+        except Exception:
+            return -1
+
+    def _save_progress(pass_num: int) -> None:
+        progress_path.write_text(json.dumps({"pass_done": pass_num}))
+
     _need_restart = False
     try:
-        # ── Precompute canonical position IDs (~ts/8) ─────────────────────────
+        # ── Canonical position IDs — load from cache or compute ───────────────
         # array.array('Q') uses 8 bytes/entry vs ~36 bytes for list[int],
         # cutting peak RAM ~4.5x for large tables (e.g. (5,6) ≈ 2.3 GB vs 10 GB).
+        # The cache file saves ~8-9h of recomputation on every restart.
         canonical_ids: array.array = array.array('Q')
-        for pos_id in range(ts):
-            w, b, _tb = _decode(pos_id, nW, nB, nC_b)
-            if _is_canonical(w, b):
-                canonical_ids.append(pos_id)
+        if cids_path.exists():
+            raw = cids_path.read_bytes()
+            if len(raw) % 8 == 0 and len(raw) > 0:
+                canonical_ids.frombytes(raw)
+                if verbose:
+                    logger.info(
+                        "(%d,%d) Loaded %d canonical IDs from cache (%s)",
+                        nW, nB, len(canonical_ids), cids_path.name,
+                    )
+            else:
+                canonical_ids = array.array('Q')  # truncated cache — recompute
+
+        if not canonical_ids:
+            for pos_id in range(ts):
+                w, b, _tb = _decode(pos_id, nW, nB, nC_b)
+                if _is_canonical(w, b):
+                    canonical_ids.append(pos_id)
+            cids_path.write_bytes(canonical_ids.tobytes())
+            if verbose:
+                logger.info(
+                    "(%d,%d) Cached %d canonical IDs → %s",
+                    nW, nB, len(canonical_ids), cids_path.name,
+                )
 
         if verbose:
             avail, swap_used, swap_total = _sys_mem()
@@ -562,22 +603,31 @@ def solve_table(
                 _rss_mb(), avail, swap_used, swap_total, swap_pct,
             )
 
-        # ── Pass 0: mark terminals (canonical positions only) ─────────────────
-        n_pass0 = 0
-        for pos_id in canonical_ids:
-            w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
-            v = _process_pos(w, b, turn_bit, table, nW, nB, nC_b, sub_tables)
-            if v != WDL_UNKNOWN:
-                set_wdl(table, pos_id, v)
-                n_pass0 += 1
+        pass_done = _load_progress()
 
-        if verbose:
-            logger.info(
-                "(%d,%d) Pass 0: %d resolved (%.1fs)", nW, nB, n_pass0, time.time() - t0
-            )
+        # ── Pass 0: mark terminals (canonical positions only) ─────────────────
+        if pass_done < 0:
+            n_pass0 = 0
+            for pos_id in canonical_ids:
+                w, b, turn_bit = _decode(pos_id, nW, nB, nC_b)
+                v = _process_pos(w, b, turn_bit, table, nW, nB, nC_b, sub_tables)
+                if v != WDL_UNKNOWN:
+                    set_wdl(table, pos_id, v)
+                    n_pass0 += 1
+
+            if verbose:
+                logger.info(
+                    "(%d,%d) Pass 0: %d resolved (%.1fs)", nW, nB, n_pass0, time.time() - t0
+                )
+            table.flush()
+            _save_progress(0)
+            pass_done = 0
+        else:
+            if verbose:
+                logger.info("(%d,%d) Skipping Pass 0 (already done, pass_done=%d)", nW, nB, pass_done)
 
         # ── Iterative forward passes (canonical positions only) ───────────────
-        for pass_num in range(1, 60):
+        for pass_num in range(max(1, pass_done + 1), 60):
             changed = 0
             tp = time.time()
             for pos_id in canonical_ids:
@@ -598,6 +648,10 @@ def solve_table(
                     nW, nB, pass_num, changed, time.time() - tp,
                     _rss_mb(), avail, swap_used, swap_total, swap_pct,
                 )
+
+            # Flush and checkpoint before memory check so progress survives restart.
+            table.flush()
+            _save_progress(pass_num)
 
             if changed == 0:
                 break
@@ -639,8 +693,18 @@ def solve_table(
             table.flush()
 
     finally:
+        # Always flush before close — ensures pass progress is on disk even on restart.
+        try:
+            table.flush()
+        except Exception:
+            pass
         table.close()
         _fh.close()
+
+    if not _need_restart:
+        # Clean up restart-resume sidecars now that the table is complete.
+        cids_path.unlink(missing_ok=True)
+        progress_path.unlink(missing_ok=True)
 
     if _need_restart:
         _do_restart()

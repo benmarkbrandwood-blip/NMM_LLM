@@ -490,6 +490,122 @@ def _load_7v4_formations() -> list[list[str]]:
         return []
 
 
+def _min_cost_assignment_drop1(
+    w_current: list[str],
+    target: list[str],
+    b_set: set[str],
+) -> tuple[int, list[tuple[str, str]], str]:
+    """Assign 8 pieces to a 7-target formation by dropping the best-excluded piece.
+
+    Tries all 8 "drop one" subsets, calling _min_cost_assignment on each 7-element
+    subset.  Returns (best_cost, pairs, excluded_piece).
+    """
+    best_cost = 10_000
+    best_pairs: list[tuple[str, str]] = []
+    best_excluded = w_current[0]
+
+    for i, excluded in enumerate(w_current):
+        subset = [p for j, p in enumerate(w_current) if j != i]
+        cost, pairs = _min_cost_assignment(subset, target, b_set)
+        if cost < best_cost:
+            best_cost = cost
+            best_pairs = pairs
+            best_excluded = excluded
+
+    return best_cost, best_pairs, best_excluded
+
+
+def best_formation_8v_early(
+    w_positions: list[str],
+    b_positions: list[str],
+) -> dict:
+    """Find best 7-piece target formation for 8 W pieces (pre-endgame guide).
+
+    Always naive-only — Malom may not cover 8-piece positions.
+    Returns the same dict shape as best_formation(), with 'dotted': True added.
+    """
+    formations = _load_7v4_formations()
+    if not formations or not w_positions:
+        result = _empty_result("naive")
+        result["dotted"] = True
+        return result
+
+    w_set = set(w_positions)
+    b_set = set(b_positions)
+    w_list = list(w_positions)
+
+    overlap_ranked: list[tuple[int, int, list[str], int]] = []
+    for form_idx, form_w in enumerate(formations):
+        for t_idx in range(8):
+            target = _transform_formation(form_w, t_idx)
+            if target is None or len(target) != 7:
+                continue
+            overlap = sum(1 for p in target if p in w_set)
+            b_blocking = sum(1 for p in target if p in b_set)
+            overlap_ranked.append((-overlap, b_blocking, target, form_idx))
+
+    if not overlap_ranked:
+        result = _empty_result("naive")
+        result["dotted"] = True
+        return result
+
+    overlap_ranked.sort(key=lambda x: (x[0], x[1]))
+
+    max_overlap = -overlap_ranked[0][0]
+    cutoff = max_overlap - 1
+    top_pool = []
+    for entry in overlap_ranked:
+        if -entry[0] < cutoff:
+            break
+        top_pool.append(entry)
+        if len(top_pool) >= 200:
+            break
+
+    candidates: list[tuple[int, dict]] = []
+    for neg_ov, b_block, target, form_idx in top_pool:
+        cost, pairs, _ = _min_cost_assignment_drop1(w_list, target, b_set)
+        candidates.append((cost, {
+            "formation_id": f"8v_early:{form_idx}",
+            "target_squares": target,
+            "pairs": pairs,
+            "base_cost": cost,
+        }))
+
+    if not candidates:
+        result = _empty_result("naive")
+        result["dotted"] = True
+        return result
+
+    candidates.sort(key=lambda x: x[0])
+    chosen = candidates[0][1]
+
+    primary_idx = next(i for i, (_, c) in enumerate(candidates) if c is chosen)
+    pairs  = chosen["pairs"]
+    stay   = [w for w, t in pairs if w == t]
+    arrows = [{"from": w, "to": t} for w, t in pairs if w != t]
+
+    secondary = _secondary_formation(
+        chosen["target_squares"], chosen["base_cost"],
+        candidates, cost_slack=8, primary_idx=primary_idx,
+    )
+
+    opp_threat = _opponent_mill_threat(b_positions, w_list)
+
+    return {
+        "formation_id":       chosen["formation_id"],
+        "target_squares":     chosen["target_squares"],
+        "arrows":             arrows,
+        "stay":               stay,
+        "total_distance":     chosen["base_cost"],
+        "mode_used":          "naive",
+        "secondary":          secondary,
+        "opponent_mill_threat": opp_threat,
+        "dtw_current":        None,
+        "dtw_warning":        False,
+        "dotted":             True,
+    }
+
+
 def best_formation_7v4(
     w_positions: list[str],
     b_positions: list[str],

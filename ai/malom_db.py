@@ -1223,6 +1223,85 @@ class MalomDB:
             malom_label_version=_MALOM_LABEL_VERSION,
         )
 
+    def query_win_trajectory(self, board, max_depth: int = 16) -> list[dict]:
+        """Return the DTW-optimal trajectory from the current position.
+
+        Returns a list of steps (up to max_depth), each a dict:
+          {from, to, capture, wdl, dtw, is_winner_move, turn}
+
+        ``is_winner_move`` is True for steps made by the player who holds the
+        winning position at depth 0, False for the other player's responses.
+
+        Returns an empty list when the position is a draw or unavailable.
+        """
+        from game.rules import get_all_legal_moves, terminal_wdl
+
+        steps: list[dict] = []
+        current = board
+        seen_fens: set[str] = set()
+        initial_outcome: Optional[str] = None
+
+        for depth in range(min(max_depth, 16)):
+            val = self.query_value(current)
+            if val is None:
+                break
+
+            if depth == 0:
+                initial_outcome = val.outcome
+                if initial_outcome == "D":
+                    break
+
+            legal = get_all_legal_moves(current)
+            if not legal:
+                break
+
+            best_move: Optional[dict] = None
+            best_omv: Optional[OracleMoveValue] = None
+
+            for move in legal:
+                child = current.apply_move(move)
+                term_wdl = terminal_wdl(child)
+                if term_wdl is not None:
+                    omv = self.terminal_move_value(val, term_wdl)
+                else:
+                    child_val = self.query_value(child)
+                    if child_val is None:
+                        continue
+                    omv = self.move_value(val, child_val)
+
+                if best_omv is None or omv.ordering_key() > best_omv.ordering_key():
+                    best_omv = omv
+                    best_move = move
+
+            if best_move is None:
+                break
+
+            is_winner_move = (initial_outcome == "W") == (depth % 2 == 0)
+
+            steps.append({
+                "from":           best_move.get("from"),
+                "to":             best_move.get("to"),
+                "capture":        best_move.get("capture"),
+                "wdl":            val.outcome,
+                "dtw":            val.key2,
+                "is_winner_move": is_winner_move,
+                "turn":           current.turn,
+            })
+
+            next_board = current.apply_move(best_move)
+
+            if terminal_wdl(next_board) is not None:
+                break
+
+            fen = next_board.to_fen_string()
+            if fen in seen_fens:
+                break
+            seen_fens.add(fen)
+
+            current = next_board
+
+        return steps
+
     def close(self) -> None:
         """Release cached sector data."""
         self._cache.clear()
