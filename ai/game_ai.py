@@ -1081,24 +1081,7 @@ class GameAI:
         if not moves:
             return {}
 
-        # Star square mode (§M1 of docs/discussion_plan.md) — HARD restriction
-        # during placement while at least one star square is empty.  Once
-        # every star square is taken, the filter turns itself off and normal
-        # placement resumes.  The last-move-source flag `last_move_source`
-        # (set on self below when we return) is stamped 'star_filter' so
-        # downstream fast paths / logging can see when this restriction fired.
         self._last_star_filter_applied = False
-        if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 3:
-            _pool = (
-                _INNER_SQUARE_POSITIONS if self.star_square_mode == "inner_square"
-                else _STAR_SQUARES
-            )
-            _empty_pool = {sq for sq in _pool if board.positions.get(sq, "") == ""}
-            if _empty_pool:
-                _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_pool]
-                if _star_moves:
-                    moves = _star_moves
-                    self._last_star_filter_applied = True
 
         if len(moves) == 1:
             self.last_was_blunder = False
@@ -1378,6 +1361,22 @@ class GameAI:
                 ]
                 if unpinned2:
                     moves = unpinned2
+
+        # Star square mode — restricts the AI's first 3 placements to star/inner
+        # squares.  Runs AFTER mandatory-block, dead-placement, and pin filters so
+        # tactical priorities already in `moves` are respected.  If no star square
+        # is available in the filtered candidate set it silently falls through.
+        if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 3 and board.phase == "place":
+            _ss_pool = (
+                _INNER_SQUARE_POSITIONS if self.star_square_mode == "inner_square"
+                else _STAR_SQUARES
+            )
+            _empty_pool = {sq for sq in _ss_pool if board.positions.get(sq, "") == ""}
+            if _empty_pool:
+                _star_moves = [m for m in moves if not m.get("from") and m.get("to") in _empty_pool]
+                if _star_moves:
+                    moves = _star_moves
+                    self._last_star_filter_applied = True
 
         # Sentinel advisory pass: consult the learned overlay on the finalized
         # candidate set. Advisory mode only logs; it never changes the move. Fully
@@ -2458,16 +2457,18 @@ class GameAI:
         if moves is None:
             moves = get_all_legal_moves(board)
         best_move     = moves[0]
-        use_adjustments = (
-            (
-                recognition is not None
-                and recognition.status not in ("novel", "inactive")
-            ) or (bool(trajectory_hints) and self._weights.opening_adherence > 0)
+        _humanlike_active = (
+            self._human_pref_net is not None
+            and getattr(self._weights, "humanlike_blend", 0) > 0
         )
-
-        prev_score: int | None = None
         _vn_blend_active = self._vn_active(board)
-        use_adjustments = use_adjustments or _vn_blend_active
+        use_adjustments = (
+            recognition is not None  # book bonus (applied last, guards novel/inactive internally)
+            or (bool(trajectory_hints) and self._weights.opening_adherence > 0)
+            or _humanlike_active
+            or _vn_blend_active
+        )
+        prev_score: int | None = None
 
         last_completed_depth = 1
         for depth in range(2, max_depth + 1):
@@ -2476,13 +2477,14 @@ class GameAI:
             try:
                 if use_adjustments:
                     scored = self._score_all(board, moves, depth)
-                    if recognition is not None:
-                        scored = self._apply_opening_adjustments(scored, recognition, board)
                     if trajectory_hints:
                         scored = self._apply_trajectory_hints(scored, trajectory_hints)
                     scored = self._apply_humanlike_adjust(scored, board)
                     if _vn_blend_active:
                         scored = self._apply_vn_blend(scored, board)
+                    # Book bonus applied last so blends don't dilute it
+                    if recognition is not None:
+                        scored = self._apply_opening_adjustments(scored, recognition, board)
                     if top_n > 1:
                         scored_sorted = sorted(scored, key=lambda x: x[1], reverse=True)
                         best_move = random.choice(scored_sorted[:top_n])[0]
@@ -2668,11 +2670,9 @@ class GameAI:
                 for frm, to, cap, score in raw_moves
             ]
 
-            # Apply Python-side bonuses.
+            # Apply Python-side bonuses — blends first, book bonus last so the
+            # weighted-average blends don't dilute the opening adherence bonus.
             n_bonuses = 0
-            if recognition is not None and recognition.status not in ("novel", "inactive"):
-                scored = self._apply_opening_adjustments(scored, recognition, board)
-                n_bonuses += 1
             if trajectory_hints:
                 scored = self._apply_trajectory_hints(scored, trajectory_hints)
                 n_bonuses += 1
@@ -2681,6 +2681,9 @@ class GameAI:
                 n_bonuses += 1
             if self._value_net is not None and self._weights.value_net_blend > 0:
                 scored = self._apply_vn_blend(scored, board)
+                n_bonuses += 1
+            if recognition is not None and recognition.status not in ("novel", "inactive"):
+                scored = self._apply_opening_adjustments(scored, recognition, board)
                 n_bonuses += 1
 
             _var_pct = self._weights.move_variance_pct if self._weights else 0
