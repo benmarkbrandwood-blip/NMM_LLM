@@ -492,7 +492,7 @@ try:
         specialist_db=_specialist_db,
     )
     if _generalist_advisor is not None:
-        log.info("GeneralistAgent (s_gen_v2) loaded")
+        log.info("GeneralistAgent loaded")
         # User request: use the Generalist as the Overseer overlay when it
         # loads, so the per-move pick-probability overlay is generalist-driven
         # rather than the (now-deprecated) specialist router / legacy overseer.

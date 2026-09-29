@@ -277,7 +277,7 @@ class SpecialistRouter:
 # ── generalist (single model, no phase routing) ───────────────────────────────
 
 class GeneralistAgent:
-    """Wraps a single s_gen_v2 ScaffoldedPolicyNet.  Same public interface as SpecialistRouter."""
+    """Wraps a single ScaffoldedPolicyNet generalist.  Same public interface as SpecialistRouter."""
 
     def __init__(self, model, la, sentinel_advisor=None, value_net=None, specialist_db=None):
         self._model    = model
@@ -360,7 +360,7 @@ def load_generalist(
     ply_depth: int = 12,
     sim_ply_depth: Optional[int] = None,
 ) -> Optional[GeneralistAgent]:
-    """Load the s_gen_v2 generalist checkpoint. Returns None if not found."""
+    """Load the generalist checkpoint (path from settings.json). Returns None if not found."""
     from learned_ai.models.lookahead_advisor import LookaheadAdvisor
     from learned_ai.agents.heuristic_agent import get_heuristic_evaluate
 
@@ -416,7 +416,7 @@ def load_generalist(
         except Exception:
             gen_path = None
     if gen_path is None:
-        gen_path = ckpt_dir / "s_gen_v2" / "best.pt"
+        gen_path = ckpt_dir / "s_gen_v4" / "BWDB" / "best.pt"
     log.info("GeneralistAgent: checkpoint path = %s", gen_path)
     m_gen, _ = _load_spec_model(gen_path)
     if m_gen is None:
