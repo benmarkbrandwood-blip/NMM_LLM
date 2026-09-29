@@ -3077,6 +3077,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     assessor = PostGameAssessor(
         difficulty=3,
         depth=3,
+        shallow_depth=2,
         sentinel=_sentinel_advisor,
         gap_net=_gap_net,
         malom_db=_malom_puzzle_db,
@@ -3460,6 +3461,14 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
                 if m.phase in ("move", "fly") and 0 < m.legal_move_count <= 4
             ],
             key=lambda d: d["count"],
+        ),
+        "horizon": sorted(
+            [
+                {**_sp_base(m), "delta": round(m.horizon_delta, 3)}
+                for m in final.moves
+                if m.horizon_delta is not None and m.horizon_delta >= 0.25
+            ],
+            key=lambda d: d["delta"], reverse=True,
         ),
         "malom": sorted(
             [

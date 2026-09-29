@@ -116,6 +116,7 @@ const _SIGNAL_META = {
   unconventional: { color: "#9a60cc", label: "Unconventional Move" },
   pref:           { color: "#c4a020", label: "Pref Divergence" },
   mobility:       { color: "#50aaaa", label: "Mobility Warning" },
+  horizon:        { color: "#c47820", label: "Horizon Regret" },
   value:          { color: "#50aaaa", label: "ValueNet" },
 };
 
@@ -3457,9 +3458,19 @@ function _renderAssessmentSignalSections(msg, feed) {
     if (c) outer.appendChild(c);
   }
 
+  const horizon = sp.horizon || [];
+  if (horizon.length) {
+    const lines = horizon.slice(0, 6).map(it => {
+      const d = it.delta >= 0 ? `+${it.delta.toFixed(2)}` : it.delta.toFixed(2);
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  δ${d}`;
+    }).concat(_plyTail(horizon, 6));
+    const c = _card("horizon", `Horizon Regret (${horizon.length} flagged)`, lines);
+    if (c) outer.appendChild(c);
+  }
+
   // If nothing was flagged, show a clean-game message
   const hasAny = tps.length || malomShifts.length ||
-    gapnet.length || gen.length || unconv.length || pref.length || mob.length;
+    gapnet.length || gen.length || unconv.length || pref.length || mob.length || horizon.length;
   if (!hasAny) {
     const clean = document.createElement("div");
     clean.style.cssText = "font-size:.8rem;color:#6aaa6a;padding:4px 2px";

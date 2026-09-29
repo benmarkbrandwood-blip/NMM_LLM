@@ -26,6 +26,7 @@ STRONG_PREF_THRESHOLD     =  0.15  # pref_delta above this → strong (human pre
 WEAK_SENTINEL_THRESHOLD   =  0.40  # sentinel quality below this → weak
 RISKY_BLUNDER_THRESHOLD   =  0.65  # blunder_zone above this → risky position
 GEN_DIVERGE_THRESHOLD     =  0.15  # generalist prob gap above this → significant divergence
+HORIZON_THRESHOLD         =  0.25  # horizon_delta above this → short-sighted move
 
 
 @dataclass
@@ -48,13 +49,16 @@ class LiveMoveSignals:
     blunder_zone:     Optional[float]  # GapNet [0,1]: high → humans frequently blunder here
     sentinel_quality: Optional[float]  # Sentinel [0,1] quality of played move
 
+    # Horizon regret (None when shallow AI not wired up)
+    horizon_delta:     Optional[float] = None   # shallow_rank − deep_rank; positive = short-sighted
+
     # Derived flags
-    is_unconventional: bool   # policy_prob < UNCONVENTIONAL_THRESHOLD
-    closed_mill:       bool
-    captured:          bool
-    is_strong:         bool
-    is_weak:           bool
-    is_risky:          bool   # high blunder_zone (GapNet)
+    is_unconventional: bool = False   # policy_prob < UNCONVENTIONAL_THRESHOLD
+    closed_mill:       bool = False
+    captured:          bool = False
+    is_strong:         bool = False
+    is_weak:           bool = False
+    is_risky:          bool = False   # high blunder_zone (GapNet)
 
     def facts_block(self) -> str:
         """One-paragraph FACTS string for the LLM prompt."""
@@ -86,6 +90,11 @@ class LiveMoveSignals:
             )
         if self.generalist_top is not None:
             lines.append(f"  Generalist AI preferred: {self.generalist_top}")
+        if self.horizon_delta is not None and self.horizon_delta >= HORIZON_THRESHOLD:
+            lines.append(
+                f"  Horizon regret: {self.horizon_delta:+.2f} "
+                "(move looks better at shallow depth than it does with deeper search)"
+            )
         if self.is_strong:
             lines.append("  Overall assessment: strong move")
         elif self.is_weak:
@@ -149,12 +158,14 @@ class LiveMoveAnalyser:
         generalist_advisor = None,   # GeneralistAgent | SpecialistRouter | None
         gap_net            = None,   # GapNet (ValueNet) | None
         sentinel_advisor   = None,   # SentinelAdvisor | None
+        shallow_ai         = None,   # GameAI at low depth for horizon regret; None = skip
     ) -> None:
         self._policy      = policy_advisor
         self._pref        = pref_advisor
         self._generalist  = generalist_advisor
         self._gap_net     = gap_net
         self._sentinel    = sentinel_advisor
+        self._shallow_ai  = shallow_ai
 
     @property
     def has_signals(self) -> bool:
@@ -164,6 +175,7 @@ class LiveMoveAnalyser:
             or self._generalist is not None
             or self._gap_net is not None
             or self._sentinel is not None
+            or self._shallow_ai is not None
         )
 
     def analyse(
@@ -251,6 +263,26 @@ class LiveMoveAnalyser:
                     except Exception:
                         pass
 
+        # ── Horizon regret (shallow vs deep) ──────────────────────────────────
+        horizon_delta: Optional[float] = None
+        if self._shallow_ai is not None and legal_moves and move_idx is not None:
+            try:
+                move_key = (move.get("from"), move["to"], move.get("capture"))
+                shallow_scored = self._shallow_ai.assess_position(board_before)
+                if shallow_scored:
+                    s_all = [s for _, s in shallow_scored]
+                    s_lo, s_hi = min(s_all), max(s_all)
+                    shallow_raw = next(
+                        (s for m, s in shallow_scored
+                         if (m.get("from"), m["to"], m.get("capture")) == move_key),
+                        None,
+                    )
+                    if s_hi != s_lo and shallow_raw is not None:
+                        shallow_norm = (shallow_raw - s_lo) / (s_hi - s_lo)
+                        horizon_delta = shallow_norm - score_norm
+            except Exception:
+                pass
+
         is_unconventional = (
             policy_prob is not None and policy_prob < UNCONVENTIONAL_THRESHOLD
         )
@@ -278,6 +310,7 @@ class LiveMoveAnalyser:
             generalist_top=generalist_top,
             blunder_zone=blunder_zone,
             sentinel_quality=sentinel_quality,
+            horizon_delta=horizon_delta,
             is_unconventional=is_unconventional,
             closed_mill=closed_mill,
             captured=captured,

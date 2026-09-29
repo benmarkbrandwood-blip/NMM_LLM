@@ -69,13 +69,18 @@ class Coordinator:
         self.vs_human = vs_human
         self.human_color = human_color
 
-        from ai.live_move_analyser import LiveMoveAnalyser
+        from ai.live_move_analyser import LiveMoveAnalyser, HORIZON_THRESHOLD
+        self._horizon_threshold = HORIZON_THRESHOLD
+        # Shallow AI for horizon regret: 2-ply search, same weights as game_ai.
+        _shallow = GameAI(color=game_ai.color, difficulty=game_ai.difficulty)
+        _shallow.max_search_depth = 2
         self._live_analyser = LiveMoveAnalyser(
             policy_advisor=policy_advisor,
             pref_advisor=pref_advisor,
             generalist_advisor=generalist_advisor,
             gap_net=gap_net,
             sentinel_advisor=sentinel_advisor,
+            shallow_ai=_shallow,
         )
 
         self.dialogue_log: list[dict] = []
@@ -725,11 +730,16 @@ class Coordinator:
 
         # 2. Signal-grounded comment when live signals indicate a noteworthy move
         if self._live_analyser.has_signals and self._can_comment():
+            _horizon_fires = (
+                signals.horizon_delta is not None
+                and signals.horizon_delta >= self._horizon_threshold
+            )
             _signal_fires = (
                 signals.is_weak
                 or signals.is_unconventional
                 or signals.is_risky
                 or signals.generalist_top is not None
+                or _horizon_fires
             )
             if _signal_fires:
                 comment = self.mills_llm.comment_with_live_signals(
