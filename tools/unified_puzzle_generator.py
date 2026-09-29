@@ -126,25 +126,65 @@ def _load_settings() -> dict:
 # ── Worker initialiser (pre-warms hash cache once per worker process) ─────────
 
 _worker_settings: dict = {}
-_worker_db = None   # per-worker MalomDB singleton; reused across tasks
+_worker_db = None   # MalomDB — loaded in main process, inherited by workers via fork
+
+
+def _preinit_main(settings: dict) -> None:
+    """Load MalomDB and prewarm hash cache in the MAIN process before any Pool
+    is created.  On Linux, Pool uses fork so workers inherit these objects via
+    copy-on-write — only one copy of the (large) DB ever lives in memory
+    regardless of worker count.
+    """
+    global _worker_db, _worker_settings
+    _worker_settings = settings
+    malom_path = settings.get("malom_db_path", "")
+    if malom_path:
+        try:
+            from ai.malom_db import MalomDB
+            db = MalomDB(malom_path)
+            if db.is_available():
+                _worker_db = db
+                print(f"[main] MalomDB loaded  RSS={_rss_mb()} MB", flush=True)
+            else:
+                print(f"[main] MalomDB not available at {malom_path}", flush=True)
+        except Exception as exc:
+            print(f"[main] MalomDB load failed: {exc}", flush=True)
+    try:
+        from ai.malom_puzzle_search import prewarm_hash_cache, _PREWARM_DONE
+        if not _PREWARM_DONE:
+            print(f"[main] pre-warming Malom hash cache (max_pieces=7)…", flush=True)
+            prewarm_hash_cache(7)
+            print(f"[main] hash cache warm  RSS={_rss_mb()} MB", flush=True)
+    except Exception as exc:
+        print(f"[main] hash cache prewarm failed: {exc}", flush=True)
 
 
 def _worker_init(settings_path: str) -> None:
-    """Called once per worker process at pool startup."""
+    """Called once per worker process at pool startup.
+
+    On Linux (fork), _worker_db and the hash cache are already inherited from
+    the main process — this function is a no-op in that case.  Falls back to
+    loading fresh for non-fork start methods (macOS/Windows spawn).
+    """
     import sys
     sys.path.insert(0, str(_ROOT))
     global _worker_settings, _worker_db
+    pid = os.getpid()
+
+    # Fast path: inherited from parent via fork — nothing to do.
+    if _worker_db is not None:
+        print(f"[worker pid={pid}] ready (inherited DB)  RSS={_rss_mb()} MB", flush=True)
+        return
+
     try:
         _worker_settings = json.loads(Path(settings_path).read_text()) if Path(settings_path).exists() else {}
     except Exception:
         _worker_settings = {}
 
-    pid = os.getpid()
     try:
         from ai.malom_puzzle_search import prewarm_hash_cache, _PREWARM_DONE
         if not _PREWARM_DONE:
-            # spawn start method (non-Linux): must prewarm here per worker
-            print(f"[worker pid={pid}] pre-warming Malom hash cache (max_pieces=7)…", flush=True)
+            print(f"[worker pid={pid}] pre-warming Malom hash cache…", flush=True)
             prewarm_hash_cache(7)
 
         malom_path = _worker_settings.get("malom_db_path", "")
@@ -152,8 +192,7 @@ def _worker_init(settings_path: str) -> None:
             from ai.malom_db import MalomDB
             _worker_db = MalomDB(malom_path)
 
-        rss = _rss_mb()
-        print(f"[worker pid={pid}] ready  RSS={rss} MB", flush=True)
+        print(f"[worker pid={pid}] ready (fresh load)  RSS={_rss_mb()} MB", flush=True)
     except Exception as exc:
         print(f"[worker pid={pid}] init warning: {exc}", flush=True)
 
@@ -366,7 +405,7 @@ def run_generation(
     ) as pool:
         # Use imap_unordered so we process results as they come in
         while run_forever or generated < count:
-            batch_size = workers * 2
+            batch_size = workers  # one task per worker — avoid over-queuing memory
             tasks = [worker_args] * batch_size
             dispatched += batch_size
 
@@ -517,12 +556,12 @@ def main() -> None:
         help="Output directory override",
     )
     parser.add_argument(
-        "--min-avail-mb", type=int, default=3000, metavar="MB",
-        help="Restart when free RAM drops below this (default: 3000 MB)",
+        "--min-avail-mb", type=int, default=4000, metavar="MB",
+        help="Restart when free RAM drops below this (default: 4000 MB)",
     )
     parser.add_argument(
-        "--max-swap-pct", type=int, default=40, metavar="PCT",
-        help="Restart when swap usage exceeds this percentage (default: 40%%)",
+        "--max-swap-pct", type=int, default=20, metavar="PCT",
+        help="Restart when swap usage exceeds this percentage (default: 20%%)",
     )
     args = parser.parse_args()
 
@@ -537,8 +576,13 @@ def main() -> None:
         )
 
     settings_path = str(_ROOT / "data" / "settings.json")
-    workers = args.workers if args.workers else max(1, (multiprocessing.cpu_count() or 2) - 1)
+    workers = args.workers if args.workers else max(1, min(2, (multiprocessing.cpu_count() or 2) - 1))
     out_dir_override = Path(args.out) if args.out else None
+
+    # Pre-load MalomDB + hash cache in main process before any Pool is created.
+    # Workers inherit via fork (copy-on-write) so only one copy lives in RAM.
+    settings = json.loads(Path(settings_path).read_text()) if Path(settings_path).exists() else {}
+    _preinit_main(settings)
 
     if args.batch:
         # Batch mode

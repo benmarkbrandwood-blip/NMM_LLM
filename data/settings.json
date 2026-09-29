@@ -61,6 +61,7 @@
     "sel-game-personality": "balanced",
     "sel-difficulty": "8",
     "chk-llm": true,
+    "chk-llm-override": false,
     "chk-sentinel": false,
     "sel-sentinel-mode": "score_adjust",
     "rng-sentinel-gap": "35",

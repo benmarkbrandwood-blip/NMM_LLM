@@ -4744,6 +4744,7 @@ async def ws_endpoint(websocket: WebSocket):
 
                 _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
+                session.player_name = player_name
                 session.is_tournament_game = is_tournament
                 session.use_overseer_player = use_overseer_player and not vs_human
                 session.use_generalist_player = use_generalist_player and not vs_human
@@ -4916,6 +4917,7 @@ async def ws_endpoint(websocket: WebSocket):
 
                 _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
+                session.player_name = player_name
                 session.use_overseer_player = use_overseer_player and not vs_human
                 session.use_generalist_player = use_generalist_player and not vs_human
                 if not vs_human and coord is None and game_ai is not None:
