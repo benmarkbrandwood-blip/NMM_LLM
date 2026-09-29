@@ -279,20 +279,33 @@ def extract_families(db_path: str, min_diff: int = 0):
             families[canon_key].append(moves)
             raw_counters[canon_key][tuple(moves[:2])] += 1
 
-    ranked = sorted(families.items(), key=lambda x: -len(x[1]))[:11]
+    # Require 11 families with enough clean-placement trunks; scan top candidates
+    MIN_PLACE_GAMES = 2   # minimum placement-only games needed for a valid trunk
+    ranked_all = sorted(families.items(), key=lambda x: -len(x[1]))
     result = []
-    for rank, (canon_key, games) in enumerate(ranked, 1):
-        code    = f"A{rank:02d}"
+    rank = 0
+    for canon_key, games in ranked_all:
+        if len(result) >= 11:
+            break
         raw_key = raw_counters[canon_key].most_common(1)[0][0]
         name    = FAMILY_NAMES.get(raw_key, f"{raw_key[0]}-{raw_key[1]}")
 
-        long_games = [g for g in games if len(g) >= 8]
-        if not long_games:
-            long_games = games
+        # Only use games whose first 8 moves are ALL placements (no slide notation).
+        # winning_lines stores single-player sequences; slide moves in the prefix
+        # corrupt the board when replayed on an alternating-turn board.
+        place_games = [
+            g for g in games
+            if len(g) >= 8 and all("-" not in m for m in g[:8])
+        ]
+        if len(place_games) < MIN_PLACE_GAMES:
+            continue  # skip family — not enough clean-placement trunk data
+
+        rank += 1
+        code = f"A{rank:02d}"
         prefix8: collections.Counter = collections.Counter()
-        for g in long_games:
+        for g in place_games:
             prefix8[tuple(g[:8])] += 1
-        trunk8, _ = prefix8.most_common(1)[0]
+        trunk8, trunk_cnt = prefix8.most_common(1)[0]
         assert len(trunk8) == 8, f"{code}: trunk has {len(trunk8)} moves (expected 8)"
         result.append((code, name, raw_key, list(trunk8), len(games)))
     return result, len(rows)
