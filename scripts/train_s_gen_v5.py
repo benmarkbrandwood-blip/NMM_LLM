@@ -59,7 +59,7 @@ _ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(_ROOT))
 
 from game.board import BoardState, MILLS, POSITIONS
-from game.rules import is_terminal
+from game.rules import is_terminal, get_all_legal_moves
 from learned_ai.training.termination import (
     TerminationReason,
     VALID_OUTCOMES,
@@ -115,6 +115,12 @@ BOOK_GAME_PROB = 0.50
 
 def _sample_forced_placements(line_moves: list[str], learner_color: str) -> list[str]:
     start = 0 if learner_color == "W" else 1
+    return [line_moves[i] for i in range(start, len(line_moves), 2)][:4]
+
+
+def _sample_opp_forced_placements(line_moves: list[str], learner_color: str) -> list[str]:
+    """Extract the opponent's half of a book line (alternating plies, up to 4)."""
+    start = 1 if learner_color == "W" else 0
     return [line_moves[i] for i in range(start, len(line_moves), 2)][:4]
 
 
@@ -997,9 +1003,10 @@ class _GameConfig:
     # easy, hard) still influence recovery + display but are excluded from
     # the advancement gate.
     is_advance_reference:   bool
-    game_forced_placements: Optional[list[str]]
-    retry_ply:              int
-    temperature:            float
+    game_forced_placements:     Optional[list[str]]
+    opp_forced_placements:      Optional[list[str]]
+    retry_ply:                  int
+    temperature:                float
 
 
 @dataclass
@@ -1043,7 +1050,8 @@ def _rollout(
     record_branches: bool,
     branch_every:   int,
     retry_ply:      int,
-    forced_placements: Optional[list[str]] = None,
+    forced_placements:     Optional[list[str]] = None,
+    opp_forced_placements: Optional[list[str]] = None,
     lookahead_advisor=None,
     game_difficulty: int = 1,
     human_db=None,
@@ -1069,8 +1077,9 @@ def _rollout(
     _n_rep_malom_unknown:    int = 0   # Malom unavailable at rep-draw decision
     done                    = False
     outcome                 = 0.0
-    learner_move_count      = 0
-    learner_placement_count = 0
+    learner_move_count       = 0
+    learner_placement_count  = 0
+    opponent_placement_count = 0
     retry_board: Optional[BoardState] = None
     move_history: deque[dict] = deque(maxlen=N_HISTORY)
     learner_boards: list[BoardState] = []
@@ -1355,10 +1364,25 @@ def _rollout(
 
         else:
             opponent_boards.append(board)  # record pre-move board for full game DB
-            try:
-                opp_move = opponent.choose_move(board)
-            except Exception:
-                opp_move = None
+            opp_move = None
+            # Force book placement for opponent when configured
+            if (opp_forced_placements
+                    and board.phase == "place"
+                    and opponent_placement_count < len(opp_forced_placements)):
+                book_sq = opp_forced_placements[opponent_placement_count]
+                legal_opp = get_all_legal_moves(board)
+                _forced = next(
+                    (m for m in legal_opp if not m.get("from") and m.get("to") == book_sq),
+                    None,
+                )
+                if _forced is not None:
+                    opp_move = _forced
+                opponent_placement_count += 1
+            if opp_move is None:
+                try:
+                    opp_move = opponent.choose_move(board)
+                except Exception:
+                    opp_move = None
             if not opp_move:
                 # Opponent produced no move on a non-terminal position — infra,
                 # not a learner win.  Keep outcome as WIN_REWARD so RL signal is
@@ -2121,9 +2145,11 @@ def run(args: argparse.Namespace) -> None:
                     _is_advance_ref = _is_full  # §A — only current-diff heur gates advancement
 
             _fp: Optional[list[str]] = None
+            _opp_fp: Optional[list[str]] = None
             if _OPENING_LINES and rng.random() < BOOK_GAME_PROB:
                 _ln = _OPENING_LINES[rng.randint(0, len(_OPENING_LINES) - 1)]
-                _fp = _sample_forced_placements(_ln, _lc)
+                _fp     = _sample_forced_placements(_ln, _lc)
+                _opp_fp = _sample_opp_forced_placements(_ln, _lc)
             batch_slots.append((
                 _GameConfig(
                     learner_color=_lc, opp_color=_oc, game_type=_gt,
@@ -2131,6 +2157,7 @@ def run(args: argparse.Namespace) -> None:
                     is_full_diff=_is_full,
                     is_advance_reference=_is_advance_ref,
                     game_forced_placements=_fp,
+                    opp_forced_placements=_opp_fp,
                     retry_ply=rng.randint(RETRY_PLY_MIN, RETRY_PLY_MAX),
                     temperature=temperature,
                 ),
@@ -2205,6 +2232,7 @@ def run(args: argparse.Namespace) -> None:
                 max_ply=args.max_ply, record_branches=(args.max_branches_per_game > 0),
                 branch_every=args.branch_every, retry_ply=cfg.retry_ply,
                 forced_placements=cfg.game_forced_placements,
+                opp_forced_placements=cfg.opp_forced_placements,
                 lookahead_advisor=lookahead_advisor,
                 game_difficulty=cfg.game_difficulty,
                 human_db=human_db,
@@ -2229,6 +2257,7 @@ def run(args: argparse.Namespace) -> None:
             is_full_diff           = cfg.is_full_diff
             is_advance_reference   = cfg.is_advance_reference   # §A
             game_forced_placements = cfg.game_forced_placements
+            game_opp_forced        = cfg.opp_forced_placements
             game_retry_ply         = cfg.retry_ply
 
             # Capture probe position once from the first non-empty trajectory.
