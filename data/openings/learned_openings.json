@@ -1,5 +1,57 @@
 [
   {
+    "opening_id": "human-02-d6-d2-b4-f6-f4-b2-f2-e4",
+    "name": "F-Column Build",
+    "aliases": [],
+    "family": "Human DB",
+    "side": "W",
+    "seed_source": "human",
+    "line_moves": [
+      "d6",
+      "d2",
+      "b4",
+      "f6",
+      "f4",
+      "b2",
+      "f2",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........WB..B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".........WBW.BBW........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".........WBWWBBW...B....|W|4|4"
+      }
+    ],
+    "strategic_notes": "Top human-DB pattern #2 (ELO ≥ 1400, freq=146).",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.85,
+    "tags": [
+      "human-db",
+      "pattern"
+    ],
+    "source_reference": "Human DB ELO ≥ 1400",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
     "opening_id": "book-00-287755",
     "name": "Game One",
     "aliases": [],
@@ -401,7 +453,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 102,
+      "W": 103,
       "B": 7,
       "D": 0
     },
@@ -16211,6 +16263,644 @@
       {
         "ply": 10,
         "fen": "WBWBW..B........BW..B..W|W|5|5"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-b5e0db52",
+    "name": "Z mill wrap",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "f6",
+      "b6",
+      "f2",
+      "b6",
+      "d3",
+      "e5",
+      "c5",
+      "e3",
+      "b2",
+      "d7",
+      "a4",
+      "d1",
+      "g7",
+      "e4",
+      "c3",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........B.W.W...........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........B.W.W.....B..W..|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........B.W.W...W.B.BW..|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B......B.W.W.W.W.B.BW..|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B...B.WB.W.W.W.W.B.BW..|W|6|6"
+      },
+      {
+        "ply": 16,
+        "fen": ".BW..B.WB.W.W.W.W.BBBWW.|W|8|8"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-15f0c1c8",
+    "name": "Royal Foothold",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "c4",
+      "a7",
+      "a1",
+      "b2",
+      "c4",
+      "g7",
+      "d1",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "B.....W.......B........W|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "B.B...W.......B........W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "BBB..WW.......B........W|W|4|4"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-295980f4",
+    "name": "The Kettle's Early Rise",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "f2",
+      "b4",
+      "b2",
+      "d2",
+      "c5",
+      "d7",
+      "g4",
+      "d5",
+      "g1",
+      "g7",
+      "a7",
+      "d1",
+      "d3",
+      "e4",
+      "c4",
+      "c3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "............WBWB........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B..........WBWBW.......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.W........WBWBWB......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BBWW.......WBWBWB......|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "WBBWWB......WBWBWB......|W|6|6"
+      },
+      {
+        "ply": 16,
+        "fen": "WBBWWB......WBWBWB.B.WBW|W|8|8"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-6f7ef334",
+    "name": "The Iron Chain Rise",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b6",
+      "c3",
+      "d7",
+      "d1",
+      "d2",
+      "f4",
+      "b4",
+      "c5",
+      "c4",
+      "a4",
+      "b2",
+      "a4",
+      "g7",
+      "f2",
+      "a7",
+      "f6",
+      "e3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".W...B..W.............B.|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".W...B..W..B.W........B.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".W...B..W..B.W.WB.....B.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W...B.BW..B.W.WB.....BW|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".W...B.BW..B.WWWB.....BW|W|6|6"
+      },
+      {
+        "ply": 17,
+        "fen": "WWW..B.BW.BBBWWWB...W.BW|B|9|8"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-a6fe0c6b",
+    "name": "The \"Double Anchor's Foothold",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "f2",
+      "f4",
+      "f6",
+      "a4",
+      "d7",
+      "c3",
+      "d2",
+      "d1",
+      "d5",
+      "a7",
+      "g1",
+      "c5",
+      "c4",
+      "e5",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........BW.BW...........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......BBWWBW...........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".W.....BBWWBW.........B.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".W...B.BBWWBWW........B.|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "BW...B.BBWWBWW...W....B.|W|6|6"
+      },
+      {
+        "ply": 17,
+        "fen": "BW..WB.BBWWBWW..BWB...BW|B|9|8"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-ab5fcade",
+    "name": "Eastern Sentinel's Pride",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "b2",
+      "d7",
+      "c4",
+      "a4",
+      "e3",
+      "e5",
+      "c3",
+      "c5",
+      "d3",
+      "d2",
+      "g4",
+      "e5",
+      "d5",
+      "f6",
+      "f4",
+      "e4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".B......BW....W.........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.....BBW....W........W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.....BBW....W...B.W..W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.....BBW....W.B.B.W.WW|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B.....BBW...BW.B.B.WWWW|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": ".B.W...BBWBW.BW.BWBBWWWW|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-4bcb5aeb",
+    "name": "Triple Crown Advance",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "a4",
+      "f4",
+      "c3",
+      "b4",
+      "b2",
+      "f2",
+      "f6",
+      "d3",
+      "d1",
+      "g7",
+      "c5",
+      "g4",
+      "c4",
+      "d7",
+      "a7",
+      "a1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".......WBW.B............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......WBW.B...B......W.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".......WBW.BB.WB......W.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".......WBWWBB.WB.....BW.|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "..B..W.WBWWBB.WB.....BW.|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "WBBB.WBWBWWBB.WBW....BWW|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-e7674866",
+    "name": "Novel — d6-b4-f4 Var. d6-b4-f4",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b4",
+      "f4",
+      "d2",
+      "f6",
+      "b6",
+      "f2",
+      "b6",
+      "d3",
+      "e5",
+      "b2",
+      "e3",
+      "c5",
+      "d7",
+      "a4",
+      "d1",
+      "e4",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.W.B.B........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........BWWW.B.B........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........BWWWWB.B........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "........BWWWWB.B..B..W..|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "........BWWWWBWB..B.BW..|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": ".B.B.B.WBWWWWBWBW.BWBW..|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-91a8cad7",
+    "name": "Eastern Sentinel's Pride Var. d6-b6-b2",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "b2",
+      "d7",
+      "a4",
+      "d1",
+      "g1",
+      "f4",
+      "d3",
+      "f2",
+      "f6",
+      "c5",
+      "c4",
+      "b4",
+      "e3",
+      "c3",
+      "d5",
+      "e5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".B......BW....W.........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B...B.WBW....W.........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B..WB.WBW.B..W.........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B..WB.WBW.BB.W......W..|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B..WB.WBWWBB.W.B....W..|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": ".B..WB.WBWWBB.WBBWB.WWBW|W|9|9"
       }
     ],
     "strategic_notes": "",
