@@ -223,7 +223,7 @@ class TestCoordinator(unittest.TestCase):
             board = BoardState.new_game()
             coord.deliberate(board)
             lines = coord.flush_dialogue()
-            self.assertTrue(any("[GameAI]" in l for l in lines))
+            self.assertTrue(any(e.get("speaker") == "GameAI" for e in lines))
 
     def test_react_to_human_move_no_comment_small_delta(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -234,7 +234,7 @@ class TestCoordinator(unittest.TestCase):
             board_after = board.apply_move(move)
             coord.react_to_human_move(board, board_after, move)
             lines = coord.flush_dialogue()
-            self.assertFalse(any("[MillsLLM]" in l for l in lines))
+            self.assertFalse(any(e.get("speaker") == "MillsLLM" for e in lines))
 
     def test_on_game_start_resets_state(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from game.board import BoardState
+    from ai.human_pref_advisor import HumanPrefAdvisor
+    from ai.human_move_policy_advisor import HumanMovePolicyAdvisor
 
 from ai.game_ai import GameAI
 from ai.mills_llm import MillsLLM
@@ -47,6 +49,12 @@ class Coordinator:
         endgame_db: EndgameDB | None = None,
         vs_human: bool = True,
         human_color: str = "W",
+        policy_advisor:        "HumanMovePolicyAdvisor | None" = None,
+        pref_advisor:          "HumanPrefAdvisor | None"       = None,
+        generalist_advisor     = None,   # GeneralistAgent | SpecialistRouter | None
+        gap_net                = None,   # GapNet (ValueNet) | None
+        sentinel_advisor       = None,   # SentinelAdvisor | None
+        llm_can_override_move: bool = True,
     ) -> None:
         self.game_ai = game_ai
         self.mills_llm = mills_llm
@@ -61,7 +69,16 @@ class Coordinator:
         self.vs_human = vs_human
         self.human_color = human_color
 
-        self.dialogue_log: list[str] = []
+        from ai.live_move_analyser import LiveMoveAnalyser
+        self._live_analyser = LiveMoveAnalyser(
+            policy_advisor=policy_advisor,
+            pref_advisor=pref_advisor,
+            generalist_advisor=generalist_advisor,
+            gap_net=gap_net,
+            sentinel_advisor=sentinel_advisor,
+        )
+
+        self.dialogue_log: list[dict] = []
         self._poor_move_count = 0
         self._general_comment_count = 0
         self._last_comment_turn = -2
@@ -74,19 +91,21 @@ class Coordinator:
         self._game_sym_idx: int = 0   # D4 symmetry applied to book moves this game
         self._last_novel_id: str | None = None   # set when an unnamed opening is saved
         self._dominant_turn_streak: int = 0
+        self._session_signals: list = []   # rolling buffer of last 6 LiveMoveSignals (human moves)
         self.resignation_offered: bool = False
         self.last_thinking: str = ""   # plain-English label for the most recent AI move
+        self.llm_can_override_move: bool = llm_can_override_move
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
     def emit(self, speaker: str, text: str, tag: str = "normal") -> None:
         if text:
-            self.dialogue_log.append(f"[{speaker}] {text}")
+            self.dialogue_log.append({"speaker": speaker, "text": text, "tag": tag})
 
-    def flush_dialogue(self) -> list[str]:
-        lines = self.dialogue_log[:]
+    def flush_dialogue(self) -> list[dict]:
+        entries = self.dialogue_log[:]
         self.dialogue_log.clear()
-        return lines
+        return entries
 
     def _can_comment(self) -> bool:
         if self._poor_move_count >= self.max_poor_move_comments:
@@ -97,6 +116,39 @@ class Coordinator:
 
     def _can_comment_general(self) -> bool:
         return self._turn_num - self._last_comment_turn >= 2
+
+    def _emit_reasoning(self, board_before: "BoardState", move: dict, color: str, ply: int) -> None:
+        """Emit heuristic breakdown of a move to the AI Discussion panel."""
+        try:
+            from ai.heuristics import tactical_move_bonus
+            import re
+            board_after = board_before.apply_move(move)
+            bd = tactical_move_bonus(
+                board_before, board_after, color,
+                self.game_ai._weights,
+                self.game_ai._opp_last_weak,
+                return_breakdown=True,
+            )
+            if not isinstance(bd, dict):
+                return
+            top = bd.get("top_terms", [])
+            total = bd.get("total", 0)
+            color_name = "White" if color == "W" else "Black"
+            move_str = _move_str(move)
+            lines = [f"ply {ply} · {color_name}: {move_str}"]
+            for label, val in top:
+                clean = re.sub(r'\s*\([^)]+\)\s*$', '', label).strip()
+                lines.append(f"  {clean}: {val:+d}")
+            lines.append(f"  Δ total: {total:+d}")
+            self.emit("GameAI", "\n".join(lines), tag="reasoning")
+        except Exception:
+            pass
+
+    def _emit_signal_badge(self, signals: "LiveMoveSignals") -> None:
+        """Emit a signal_badge entry for the live badge under the board."""
+        import json
+        label, detail, severity = signals.badge_tuple()
+        self.emit("system", json.dumps({"label": label, "detail": detail, "severity": severity}), tag="signal_badge")
 
     # ── Game lifecycle ────────────────────────────────────────────────────────
 
@@ -109,6 +161,7 @@ class Coordinator:
         self._game_moves = []
         self._session_id = str(uuid.uuid4())
         self._dominant_turn_streak = 0
+        self._session_signals.clear()
         self.resignation_offered = False
         self.last_thinking = ""
         self.dialogue_log.clear()
@@ -174,8 +227,11 @@ class Coordinator:
         winner = game_record.get("winner")
 
         # Compute final piece counts by replaying placement / capture events.
-        # Start with 0 pieces on board; each "place" type adds one, each capture removes one.
-        on_board = {"W": 0, "B": 0}
+        # Seed from the first move's board_fen_before so resumed games (missing early placements)
+        # start with the correct initial piece counts rather than 0.
+        first_fen = moves[0].get("board_fen_before", "") if moves else ""
+        board_part = first_fen.split("|")[0] if first_fen else ""
+        on_board = {"W": board_part.count("W"), "B": board_part.count("B")}
         for m in moves:
             color = m.get("color", "")
             if m.get("type") == "place" and color in on_board:
@@ -216,6 +272,34 @@ class Coordinator:
             f"  Final piece counts: White {w_pieces}, Black {b_pieces}\n"
             f"  Winner: {winner_label}"
         )
+
+    @staticmethod
+    def _arc_signals_block(signals_list: list) -> str:
+        """Format a list of LiveMoveSignals as a compact RECENT SIGNALS block."""
+        lines = [f"RECENT SIGNALS (last {len(signals_list)} human moves):"]
+        for s in signals_list:
+            parts = []
+            if s.pref_delta is not None:
+                parts.append(f"pref δ{s.pref_delta:+.2f}")
+            if s.policy_prob is not None:
+                parts.append(f"policy {s.policy_prob:.0%}")
+            if s.sentinel_quality is not None:
+                parts.append(f"sentinel {s.sentinel_quality:.2f}")
+            if s.blunder_zone is not None:
+                parts.append(f"risk {s.blunder_zone:.2f}")
+            if s.is_unconventional:
+                parts.append("unusual")
+            if s.generalist_top:
+                parts.append(f"gen:{s.generalist_top}")
+            flags = []
+            if s.is_weak:   flags.append("weak")
+            if s.is_strong: flags.append("strong")
+            if s.is_risky:  flags.append("risky")
+            color_name = "W" if s.color == "W" else "B"
+            signal_str = ", ".join(parts) if parts else "no signals"
+            flag_str = f" [{', '.join(flags)}]" if flags else ""
+            lines.append(f"  ply {s.ply} {color_name} {s.move_played}: {signal_str}{flag_str}")
+        return "\n".join(lines)
 
     def on_game_end(self, game_record: dict) -> None:
         self.memory.save_game_record(game_record)
@@ -476,7 +560,7 @@ class Coordinator:
                 # Never let the LLM override the engine during tactical emergencies
                 # (must-block or own-mill-closure), regardless of score delta.
                 _tac_lock = tac["must_block_opponent"] or tac["can_close_mill"]
-                if llm_score + self.LLM_BONUS > ai_score and not _tac_lock:
+                if self.llm_can_override_move and llm_score + self.LLM_BONUS > ai_score and not _tac_lock:
                     move = llm_move
                     self.emit(
                         "GameAI",
@@ -498,6 +582,11 @@ class Coordinator:
                 self.emit("MillsLLM", reason)
 
         move_str = _move_str(move)
+        _ai_signals = self._live_analyser.analyse(
+            board, move, legal, ai_score, self.game_ai.color, self._turn_num
+        )
+        self._emit_signal_badge(_ai_signals)
+        self._emit_reasoning(board, move, self.game_ai.color, self._turn_num)
         self.emit("GameAI", f"Playing {move_str}")
 
         # Resignation check: if human has dominated for 3 consecutive AI turns
@@ -581,7 +670,19 @@ class Coordinator:
             elif recognition.status == "transposition" and recognition.name:
                 self.emit("MillsAI", f"Transposition to: {recognition.name}")
 
+        legal_moves  = get_all_legal_moves(board_before)
         score_before = self.game_ai.score_move(board_before, human_move)
+        signals      = self._live_analyser.analyse(
+            board_before, human_move, legal_moves,
+            score_norm=score_before,
+            color=board_before.turn,
+            ply=self._turn_num,
+        )
+
+        self._emit_signal_badge(signals)
+        self._session_signals.append(signals)
+        if len(self._session_signals) > 6:
+            self._session_signals.pop(0)
 
         self._game_moves.append({
             "turn": self._turn_num,
@@ -600,6 +701,8 @@ class Coordinator:
                 "deviation": recognition.deviation_ply is not None,
             },
         })
+
+        self._emit_reasoning(board_before, human_move, board_before.turn, self._turn_num)
 
         if not self._can_comment_general():
             return
@@ -620,7 +723,27 @@ class Coordinator:
                 self._last_comment_turn = self._turn_num
                 return
 
-        # 2. Poor-move warning (capped by max_poor_move_comments)
+        # 2. Signal-grounded comment when live signals indicate a noteworthy move
+        if self._live_analyser.has_signals and self._can_comment():
+            _signal_fires = (
+                signals.is_weak
+                or signals.is_unconventional
+                or signals.is_risky
+                or signals.generalist_top is not None
+            )
+            if _signal_fires:
+                comment = self.mills_llm.comment_with_live_signals(
+                    board_before, human_move, signals,
+                    human_color=self.human_color, move_history=_notations,
+                )
+                if comment:
+                    tag = "warning" if signals.is_weak else "normal"
+                    self.emit("MillsAI", comment, tag=tag)
+                    self._poor_move_count += 1
+                    self._last_comment_turn = self._turn_num
+                    return
+
+        # 2b. Poor-move warning fallback (no live signals, or signals didn't trigger)
         if self._can_comment():
             comment = self.mills_llm.evaluate_human_move(
                 board_before=board_before,
@@ -657,6 +780,18 @@ class Coordinator:
             )
             if question:
                 self.emit("MillsAI", question)
+                self._last_comment_turn = self._turn_num
+
+        # 5. Phase 4: Arc comment every 4 human moves when buffer has enough data
+        if (self._human_turn_num % 4 == 0
+                and len(self._session_signals) >= 4
+                and self._can_comment_general()):
+            arc_block = self._arc_signals_block(self._session_signals[-4:])
+            arc = self.mills_llm.comment_with_arc(
+                board_after, arc_block, human_color=self.human_color,
+            )
+            if arc:
+                self.emit("MillsAI", arc)
                 self._last_comment_turn = self._turn_num
 
     # ── Export ────────────────────────────────────────────────────────────────

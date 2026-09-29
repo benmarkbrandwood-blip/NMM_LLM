@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from game.board import BoardState
     from ai.memory_manager import MemoryManager
     from ai.post_game_assessor import PostGameAnnotation
+    from ai.live_move_analyser import LiveMoveSignals
 
 _MAX_HISTORY = 16
 
@@ -403,6 +404,36 @@ OUTPUT RULES:
 - Max 14 words
 - No lecture, no move suggestion
 - Ask something that invites them to think about mobility, threats, or mill formation
+"""
+
+_SIGNAL_COMMENT_SYSTEM = _BOARD_RULES + """
+
+TASK:
+Comment briefly on the human's last move using the factual signal data provided.
+
+OUTPUT RULES:
+- Write exactly one short sentence, max 18 words
+- Ground your comment in MOVE FACTS — do not contradict them
+- Pick the single most interesting signal: low human preference, rare choice,
+  weak sentinel quality, high blunder-zone risk, or generalist AI disagreement
+- Do not suggest a specific move
+- Do not mention chess
+- If MOVE FACTS show no weak or risky signals, reply exactly: NO_COMMENT
+"""
+
+_ARC_SYSTEM = _BOARD_RULES + """
+
+TASK:
+Write one sentence describing a trend across the last few moves, based on signal data.
+
+OUTPUT RULES:
+- Exactly one sentence, max 22 words
+- Describe a pattern visible in RECENT SIGNALS: consistent weakness, improving position,
+  repeated risk, momentum shift, or similar
+- Ground your sentence in the signals — do not invent reasons
+- Do not suggest a move
+- Do not mention chess
+- If there is no clear trend, reply exactly: NO_COMMENT
 """
 
 
@@ -869,6 +900,45 @@ No other text.
             f"\nBOARD:\n{board.to_display_grid()}"
         )
         reply = self._chat(_POSITIVE_COMMENT_SYSTEM, user, keep_history=False)
+        if not reply or reply.strip() == "NO_COMMENT":
+            return None
+        return reply.strip()
+
+    def comment_with_live_signals(
+        self,
+        board_before: "BoardState",
+        move: dict,
+        signals: "LiveMoveSignals",
+        human_color: str = "",
+        move_history: list[str] | None = None,
+    ) -> str | None:
+        """Generate a signal-grounded comment for a weak or unconventional human move."""
+        color_ctx = f"HUMAN PLAYS AS: {'White' if human_color == 'W' else 'Black'}\n" if human_color else ""
+        history_block = _move_history_block(move_history) if move_history else ""
+        user = (
+            f"{color_ctx}{signals.facts_block()}\n\n"
+            f"{history_block}\n"
+            f"{_board_summary(board_before)}\n"
+            f"\nBOARD:\n{board_before.to_display_grid()}"
+        )
+        reply = self._chat(_SIGNAL_COMMENT_SYSTEM, user, keep_history=False)
+        if not reply or reply.strip() == "NO_COMMENT":
+            return None
+        return reply.strip()
+
+    def comment_with_arc(
+        self,
+        board: "BoardState",
+        signals_summary: str,
+        human_color: str = "",
+    ) -> str | None:
+        """Emit a trend comment grounded in the last N moves' signal buffer."""
+        color_ctx = f"HUMAN PLAYS AS: {'White' if human_color == 'W' else 'Black'}\n" if human_color else ""
+        user = (
+            f"{color_ctx}{signals_summary}\n\n"
+            f"{_board_summary(board)}"
+        )
+        reply = self._chat(_ARC_SYSTEM, user, keep_history=False)
         if not reply or reply.strip() == "NO_COMMENT":
             return None
         return reply.strip()
