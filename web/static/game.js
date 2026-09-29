@@ -2122,27 +2122,9 @@ function handleMessage(msg) {
       break;
     }
 
-    case "assessment_stage_2": {
-      // Generalist AI divergence section — append to chat feed
-      if (msg.summary_text) {
-        const feed = $("commentary-human");
-        if (feed) {
-          const div = document.createElement("div");
-          div.className = "commentary-line assessment-partial";
-          const lbl = document.createElement("span");
-          lbl.className = "speaker";
-          lbl.textContent = "AI Divergence: ";
-          div.appendChild(lbl);
-          const pre = document.createElement("span");
-          pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
-          pre.textContent = msg.summary_text;
-          div.appendChild(pre);
-          feed.insertBefore(div, feed.firstChild);
-          feed.scrollTop = 0;
-        }
-      }
+    case "assessment_stage_2":
+      // superseded by assessment_result signal cards — no-op
       break;
-    }
 
     case "assessment_result": {
       _assessmentTurningPoints = msg.turning_points || [];
