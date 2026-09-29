@@ -1864,6 +1864,7 @@ def run(args: argparse.Namespace) -> None:
     hot_explore_remaining:    int   = int(_resume_ckpt.get("hot_explore_remaining",     0))
     hot_explore_triggered:    bool  = bool(_resume_ckpt.get("hot_explore_triggered",    False))
     recovery_baseline_win_rate: float = float(_resume_ckpt.get("recovery_baseline_win_rate", 0.0))
+    weights_frozen:           bool  = bool(_resume_ckpt.get("weights_frozen",           False))
     _current_recovery_state:  str   = str(_resume_ckpt.get("recovery_state",            ""))
     # Temperature-boost state (§T of docs/discussion_plan.md): now persisted
     # and decayed per primary game so batch size no longer distorts curriculum
@@ -1942,6 +1943,13 @@ def run(args: argparse.Namespace) -> None:
 
     diag_buffer: list[GameDiag] = []
     _executor = ThreadPoolExecutor(max_workers=args.batch_games) if args.batch_games > 1 else None
+
+    if weights_frozen:
+        _freeze_level = getattr(args, "freeze_after_level", None)
+        print(f"[s_gen_v5] *** Resuming in DATA-COLLECTION mode "
+              f"(weights frozen at diff {difficulty}"
+              + (f", --freeze-after-level {_freeze_level}" if _freeze_level is not None else "")
+              + f") — no gradient updates will be applied ***")
 
     batch_count   = 0
     _last_log_game = int(_resume_ckpt.get("last_log_game", start_game))   # threshold-based log gate
@@ -2484,22 +2492,26 @@ def run(args: argparse.Namespace) -> None:
 
             # ── Update ─────────────────────────────────────────────────────────
             if len(ep_steps) >= args.update_every:
-                last_update_pl, last_update_vl, last_update_ent = update_fn(
-                    model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=_effective_entropy_coef
-                )
-                upd_entry = {
-                    "game":        game_count,
-                    "policy_loss": None if last_update_pl  is None else float(last_update_pl),
-                    "value_loss":  None if last_update_vl  is None else float(last_update_vl),
-                    "entropy":     None if last_update_ent is None else float(last_update_ent),
-                    "lr":          float(opt.param_groups[0]["lr"]),
-                    "batch_steps": len(ep_steps),
-                }
-                with open(update_log_path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(upd_entry) + "\n")
-                ep_steps.clear()
-                if _imitation_data is not None and not getattr(args, "no_imitation_mix", False):
-                    _imitation_mix_step(model, device, _imitation_data, opt)
+                if weights_frozen:
+                    # Data-collection mode: discard trajectory, no gradient step.
+                    ep_steps.clear()
+                else:
+                    last_update_pl, last_update_vl, last_update_ent = update_fn(
+                        model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=_effective_entropy_coef
+                    )
+                    upd_entry = {
+                        "game":        game_count,
+                        "policy_loss": None if last_update_pl  is None else float(last_update_pl),
+                        "value_loss":  None if last_update_vl  is None else float(last_update_vl),
+                        "entropy":     None if last_update_ent is None else float(last_update_ent),
+                        "lr":          float(opt.param_groups[0]["lr"]),
+                        "batch_steps": len(ep_steps),
+                    }
+                    with open(update_log_path, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(upd_entry) + "\n")
+                    ep_steps.clear()
+                    if _imitation_data is not None and not getattr(args, "no_imitation_mix", False):
+                        _imitation_mix_step(model, device, _imitation_data, opt)
 
             # ── Fixed-probe metric at T=1 ─────────────────────────────────────
             # Logs raw-logit entropy and top-1 prob independent of sampling
@@ -2786,9 +2798,16 @@ def run(args: argparse.Namespace) -> None:
                     print(f"[s_gen_v5] advance-check @ diff {difficulty}: {_adv.reason}")
             if _adv is not None and _adv.should_advance:
                 if difficulty >= args.diff_max:
-                    print(f"[s_gen_v5] *** DONE at diff {difficulty}: {_adv.reason} ***")
-                    _advance_done = True
-                    break
+                    _freeze_level = getattr(args, "freeze_after_level", None)
+                    if _freeze_level is not None and difficulty >= _freeze_level and not weights_frozen:
+                        weights_frozen = True
+                        print(f"[s_gen_v5] *** WEIGHTS FROZEN at diff {difficulty} "
+                              f"(--freeze-after-level {_freeze_level}): "
+                              f"continuing data-collection run, no more gradient updates ***")
+                    else:
+                        print(f"[s_gen_v5] *** DONE at diff {difficulty}: {_adv.reason} ***")
+                        _advance_done = True
+                        break
                 else:
                     prev_diff = difficulty
                     difficulty += 1
@@ -2851,7 +2870,7 @@ def run(args: argparse.Namespace) -> None:
             break
 
     # ── Final flush ────────────────────────────────────────────────────────────
-    if ep_steps:
+    if ep_steps and not weights_frozen:
         update_fn(model, opt, ep_steps, device, gamma=args.gamma_td, entropy_coef=_effective_entropy_coef)
     if diag_buffer:
         with open(log_path, "a", encoding="utf-8") as f:
@@ -2875,6 +2894,7 @@ def run(args: argparse.Namespace) -> None:
         "recovery_state":            _current_recovery_state,
         "recovery_baseline_win_rate": recovery_baseline_win_rate,
         "advance_rehearsal_remaining": advance_rehearsal_remaining,
+        "weights_frozen":             weights_frozen,
         # §T
         "temp_boost":                float(temp_boost),
         "entropy_boost":             float(entropy_boost),
@@ -3012,6 +3032,13 @@ def main() -> None:
                         "reloading the best checkpoint. Counter decrements by batch_games per batch, "
                         "so wall-clock batches ≈ hot_explore_games / batch_games. "
                         "(0=skip Stage 1, go straight to reload; default 75)")
+    p.add_argument("--freeze-after-level",        type=int,   default=None,
+                   help="When difficulty reaches this level and the normal 'done' condition fires, "
+                        "freeze model weights instead of stopping. Training continues as a pure "
+                        "data-collection run: rollouts keep playing at the frozen difficulty, "
+                        "winning_lines_by_diff accumulates high-difficulty games, but no gradient "
+                        "updates are applied. Use --max-games to control how long to collect. "
+                        "Example: --freeze-after-level 20 --max-games 50000")
     args = p.parse_args()
     args.policy_hidden = tuple(int(x) for x in args.policy_hidden.split(","))
     run(args)
