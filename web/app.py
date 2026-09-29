@@ -264,20 +264,34 @@ else:
 # It is HumanDB when available (duck-compatible), otherwise TrajectoryDB.
 _effective_tdb = _human_db if _human_db is not None else _trajectory_db
 
-# SE-13: load n-gram opponent model from the same games directories.
+# SE-13: N-gram opponent model — load from JSON cache if present (fast path),
+# otherwise scan game files in a background thread and save the result.
+# This avoids blocking startup when human_games has 100k+ files.
 _ngram_model: NGramOpponentModel = NGramOpponentModel()
-try:
-    _ngram_model_path = _ROOT / "data" / "ngram_model.json"
-    if _ngram_model_path.exists():
-        _ngram_model.load(_ngram_model_path)
-        log.info("NGramOpponentModel: loaded %d games", _ngram_model.game_count)
-    else:
-        _ngram_model.load_from_games(_ROOT / "data" / "games")
-        if _human_games_dir.exists():
-            _ngram_model.load_from_games(_human_games_dir)
-        log.info("NGramOpponentModel: built from %d games", _ngram_model.game_count)
-except Exception as _exc:
-    log.warning("NGramOpponentModel: load failed — %s", _exc)
+_ngram_model_path = _ROOT / "data" / "ngram_model.json"
+
+def _ngram_build_or_load() -> None:
+    """Run in a daemon thread: load from cache or build from files and save."""
+    global _ngram_model
+    try:
+        if _ngram_model_path.exists():
+            _ngram_model.load(str(_ngram_model_path))
+            log.info("NGramOpponentModel: loaded %d games from cache", _ngram_model.game_count)
+        else:
+            log.info("NGramOpponentModel: no cache found — scanning game files (may take a while)…")
+            _ngram_model.load_from_games(_ROOT / "data" / "games")
+            if _human_games_dir.exists():
+                _ngram_model.load_from_games(_human_games_dir)
+            log.info("NGramOpponentModel: built from %d games — saving cache", _ngram_model.game_count)
+            try:
+                _ngram_model.save(str(_ngram_model_path))
+            except Exception as _se:
+                log.warning("NGramOpponentModel: could not save cache — %s", _se)
+    except Exception as _exc:
+        log.warning("NGramOpponentModel: load/build failed — %s", _exc)
+
+import threading as _ngram_thread_mod
+_ngram_thread_mod.Thread(target=_ngram_build_or_load, daemon=True).start()
 
 # Load evolved weights if available — produced by tools/evolve_weights.py.
 _WEIGHTS_DIR = _ROOT / "data" / "weights"
