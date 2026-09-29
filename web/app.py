@@ -1231,7 +1231,10 @@ async def api_profile_games(player: str = ""):
             record = json.loads(lines[0])
             if record.get("ai_vs_ai"):
                 continue
-            if player and record.get("player_name", "").lower() != player.lower():
+            # Only skip if the record names a DIFFERENT player; untagged games
+            # (recorded before player-name tracking) are shown to whoever asks.
+            game_player = record.get("player_name", "")
+            if player and game_player and game_player.lower() != player.lower():
                 continue
             moves = record.get("moves", [])
             board_at_8 = _compute_board_at_ply(moves, 8)
