@@ -916,8 +916,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("btn-force-cap").classList.toggle("btn-active", forceAggressive);
     ws.send(JSON.stringify({ type: "force_aggressive", active: forceAggressive }));
     addCommentary("Game", forceAggressive
-      ? "Force Capture ON — AI will capture aggressively even in 4v4."
-      : "Force Capture OFF — AI returns to fly-sacrifice strategy.",
+      ? "Force 4-3 capture ON — AI will capture aggressively even in 4v4."
+      : "Force 4-3 capture OFF — AI returns to fly-sacrifice strategy.",
     "ai");
   });
   $("btn-force-move").addEventListener("click", () => {
@@ -949,6 +949,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     canMarkGoodGame = false;
     $("btn-good-game").hidden = true;
     ws.send(JSON.stringify({ type: "good_game" }));
+  });
+  $("btn-human-resign").addEventListener("click", () => {
+    if (!ws || phase === "idle" || phase === "game_over") return;
+    if (!confirm("Resign this game?")) return;
+    $("btn-human-resign").hidden = true;
+    ws.send(JSON.stringify({ type: "human_resign" }));
   });
   $("player-chat-send").addEventListener("click", sendPlayerMessage);
   $("player-chat-input").addEventListener("keydown", e => {
@@ -1019,6 +1025,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     _fetchAndRenderProfile(name);
     addCommentary("Game", `Profile saved for "${name}".`, "ai");
   });
+  $("btn-refresh-games").addEventListener("click", _fetchProfileGames);
 
   // Header "New Game" button mirrors sidebar button
   $("btn-new-game-header").addEventListener("click", () => $("btn-new-game").click());
@@ -1216,6 +1223,7 @@ function startNewGame() {
   $("resignation-offer").hidden = true;
   $("btn-good-game").hidden = true;
   canMarkGoodGame = false;
+  $("btn-human-resign").hidden = true;
   stopThinkingTimer();
   updateHintButton();
   updateDrawButton();
@@ -1625,6 +1633,10 @@ function handleMessage(msg) {
       updateHintButton(msg.is_human_turn && phase !== "game_over");
       if ((msg.post_placement_moves ?? 0) >= 40) drawUnlocked = true;
       updateDrawButton();
+      // Show resign button on human's turn in a non-vs-human, non-ai-vs-ai game
+      if (!isVsHuman && !isAiVsAi && phase === "playing") {
+        $("btn-human-resign").hidden = !msg.is_human_turn;
+      }
       {
         // B-1: Force Capture only makes sense when human has exactly 4 pieces
         // (the AI's fly-sacrifice hesitation only applies at that count).
@@ -1882,8 +1894,9 @@ function handleMessage(msg) {
       $("btn-override").hidden = true;
       inGuidanceMode = false;
       _hideOpeningContinueButtons();
-  resignationPending = false;
-  $("resignation-offer").hidden = true;
+      resignationPending = false;
+      $("resignation-offer").hidden = true;
+      $("btn-human-resign").hidden = true;
       // Show Good Game after a draw in AI vs human (reinforces strong AI play)
       canMarkGoodGame = !msg.winner && !isVsHuman && !isAiVsAi;
       $("btn-good-game").hidden = !canMarkGoodGame;
@@ -3974,6 +3987,96 @@ function _renderProfile(p) {
   $("profile-difficulty").textContent = p.current_difficulty ?? 3;
   $("profile-last-played").textContent = p.last_played ?? "—";
   $("profile-created").textContent     = p.created_at ?? "—";
+  // Load game history now that a named profile is loaded
+  _fetchProfileGames();
+}
+
+// ── Profile game history ──────────────────────────────────────────────────────
+
+const _NODE_COORDS_MINI = {
+  a7:[-3, 3], d7:[0, 3], g7:[3, 3],
+  g4:[3, 0],  g1:[3,-3], d1:[0,-3], a1:[-3,-3], a4:[-3,0],
+  b6:[-2, 2], d6:[0, 2], f6:[2, 2],
+  f4:[2, 0],  f2:[2,-2], d2:[0,-2], b2:[-2,-2], b4:[-2,0],
+  c5:[-1, 1], d5:[0, 1], e5:[1, 1],
+  e4:[1, 0],  e3:[1,-1], d3:[0,-1], c3:[-1,-1], c4:[-1,0],
+};
+
+function _miniBoardSVG(boardMap, size = 80) {
+  const cx = size / 2, cy = size / 2;
+  const s  = size / 7;    // scale: 6 units span, 0.5 unit margin each side
+  const r  = s * 0.3;     // piece radius
+  const nr = s * 0.14;    // node dot radius
+  const sw = Math.max(0.6, s * 0.07);   // stroke width
+
+  function xy(name) {
+    const [col, row] = _NODE_COORDS_MINI[name];
+    return [cx + col * s, cy - row * s];
+  }
+
+  const LINES = [
+    ["a7","d7","g7","g4","g1","d1","a1","a4","a7"],
+    ["b6","d6","f6","f4","f2","d2","b2","b4","b6"],
+    ["c5","d5","e5","e4","e3","d3","c3","c4","c5"],
+    ["d7","d6","d5"], ["g4","f4","e4"], ["d1","d2","d3"], ["a4","b4","c4"],
+  ];
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}">`;
+  svg += `<rect width="${size}" height="${size}" rx="3" fill="#1a1608"/>`;
+
+  for (const line of LINES) {
+    const pts = line.map(n => xy(n).join(",")).join(" ");
+    svg += `<polyline points="${pts}" fill="none" stroke="#4a3a1a" stroke-width="${sw}"/>`;
+  }
+  for (const name of Object.keys(_NODE_COORDS_MINI)) {
+    const [nx, ny] = xy(name);
+    svg += `<circle cx="${nx}" cy="${ny}" r="${nr}" fill="#2a2010" stroke="#4a3a1a" stroke-width="${sw * 0.7}"/>`;
+  }
+  for (const [pos, color] of Object.entries(boardMap)) {
+    if (!color || !_NODE_COORDS_MINI[pos]) continue;
+    const [px, py] = xy(pos);
+    const fill   = color === "W" ? "#ede0c4" : "#222222";
+    const stroke = color === "W" ? "#c8a96e" : "#666666";
+    svg += `<circle cx="${px}" cy="${py}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  svg += `</svg>`;
+  return svg;
+}
+
+function _fetchProfileGames() {
+  const section = $("profile-games-section");
+  const grid    = $("profile-games-grid");
+  if (!section || !grid) return;
+  const qs = playerName ? `?player=${encodeURIComponent(playerName)}` : "";
+  fetch(`/api/profile/games${qs}`)
+    .then(r => r.json())
+    .then(games => {
+      if (!games || !games.length) { section.hidden = true; return; }
+      section.hidden = false;
+      grid.innerHTML = "";
+      $("profile-game-detail").hidden = true;
+      for (const g of games) {
+        const div  = document.createElement("div");
+        div.className = "game-thumb";
+        div.innerHTML = _miniBoardSVG(g.board_at_ply8 || {});
+        const label = document.createElement("div");
+        label.className = "game-thumb-label";
+        const winText = g.winner === "W" ? "White wins"
+          : g.winner === "B" ? "Black wins"
+          : g.draw_reason ? "Draw" : `${g.total_plies} plies`;
+        label.textContent = `${g.date || ""} · ${winText}`;
+        div.appendChild(label);
+        div.addEventListener("click", () => {
+          document.querySelectorAll(".game-thumb").forEach(el => el.classList.remove("selected"));
+          div.classList.add("selected");
+          const detail = $("profile-game-detail");
+          detail.hidden = false;
+          detail.textContent = g.summary_text || g.opening_name || "(No assessment yet)";
+        });
+        grid.appendChild(div);
+      }
+    })
+    .catch(() => { if (section) section.hidden = true; });
 }
 
 // ── Diagnostic overlay ────────────────────────────────────────────────────────
@@ -4258,6 +4361,12 @@ function _updateGuideButton() {
 
 function _requestFormationGuide() {
   if (_guideMode === 0 || !gameState || !board) return;
+
+  // Don't show formation guide during placement phase
+  if (gameState.phase === "place") {
+    board.clearFormationGuide();
+    return;
+  }
 
   const humanColor = _humanColor || gameState.human_color;
   if (!humanColor) return;

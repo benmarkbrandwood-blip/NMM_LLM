@@ -179,7 +179,54 @@ def _persist_game_record(record: dict) -> None:
     fname = _GAMES_PATH / f"game_{date_str}_{session_id[:8]}.jsonl"
     with open(fname, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")
-    log.info("Game saved (no-LLM): %s", fname.name)
+    log.info("Game saved: %s", fname.name)
+
+
+def _persist_assessment(record: dict, assessment: dict) -> None:
+    """Append assessment JSON as a second line to the game's .jsonl file, if it exists."""
+    from datetime import datetime as _dt
+    session_id = record.get("session_id") or ""
+    if not session_id:
+        return
+    date_str = (record.get("date") or _dt.now().isoformat())[:10]
+    fname = _GAMES_PATH / f"game_{date_str}_{session_id[:8]}.jsonl"
+    if not fname.exists():
+        return
+    try:
+        with open(fname, "r", encoding="utf-8") as fh:
+            lines = [l for l in fh.readlines() if l.strip()]
+        if len(lines) >= 2:
+            return  # already has assessment line
+        with open(fname, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(assessment) + "\n")
+        log.debug("Assessment saved: %s", fname.name)
+    except Exception as exc:
+        log.debug("Assessment persist failed: %s", exc)
+
+
+def _compute_board_at_ply(moves: list, ply: int) -> dict:
+    """Replay moves up to ply N; return board as {pos: color} dict."""
+    board: dict[str, str] = {}
+    for move in moves[:ply]:
+        mtype = move.get("type", "place")
+        color = move.get("color")
+        if not color:
+            continue
+        if mtype == "place":
+            to = move.get("to")
+            if to:
+                board[to] = color
+        elif mtype in ("move", "fly"):
+            frm = move.get("from")
+            to  = move.get("to")
+            if frm:
+                board.pop(frm, None)
+            if to:
+                board[to] = color
+        cap = move.get("capture")
+        if cap:
+            board.pop(cap, None)
+    return board
 
 
 # HumanDB: if the pre-built SQLite exists, use it in place of the slow file-scan
@@ -882,6 +929,7 @@ class Session:
         self._can_undo_ai: bool = False        # True only right after an AI move
         self._awaiting_guided_move: bool = False  # True while human is directing AI's move
         self._resignation_pending: bool = False   # True while waiting for player to accept/decline
+        self.player_name: str = ""             # set from new_game message for per-player game tagging
         self.adaptive: Optional[AdaptiveTracker] = None
         self.is_tournament_game: bool = False
         self._last_game_record: Optional[dict] = None  # stored after game ends for good_game
@@ -1158,6 +1206,57 @@ async def post_profile(name: str, request: Request):
             setattr(profile, field, type(getattr(profile, field))(body[field]))
     await asyncio.to_thread(save_profile, profile)
     return JSONResponse(profile.to_dict())
+
+
+@app.get("/api/profile/games")
+async def api_profile_games(player: str = ""):
+    """Return last 10 games (filtered by player name when provided) with ply-8 board snapshots."""
+    from fastapi.responses import JSONResponse as _JR
+    files = sorted(
+        _GAMES_PATH.glob("*.jsonl"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    result: list[dict] = []
+    scanned = 0
+    for fpath in files:
+        scanned += 1
+        if scanned > 200:
+            break
+        try:
+            with open(fpath, encoding="utf-8") as fh:
+                lines = [l for l in fh.readlines() if l.strip()]
+            if not lines:
+                continue
+            record = json.loads(lines[0])
+            if record.get("ai_vs_ai"):
+                continue
+            if player and record.get("player_name", "").lower() != player.lower():
+                continue
+            moves = record.get("moves", [])
+            board_at_8 = _compute_board_at_ply(moves, 8)
+            assessment: dict | None = None
+            if len(lines) >= 2:
+                try:
+                    assessment = json.loads(lines[1])
+                except Exception:
+                    pass
+            result.append({
+                "game_id":        fpath.stem,
+                "date":           (record.get("date") or "")[:10],
+                "winner":         record.get("winner"),
+                "draw_reason":    record.get("draw_reason"),
+                "total_plies":    len(moves),
+                "board_at_ply8":  board_at_8,
+                "has_assessment": assessment is not None,
+                "opening_name":   assessment.get("opening_name") if assessment else None,
+                "summary_text":   assessment.get("summary_text") if assessment else None,
+            })
+            if len(result) >= 10:
+                break
+        except Exception:
+            continue
+    return _JR(result)
 
 
 @app.get("/api/openings")
@@ -3386,7 +3485,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             if m.wdl_before is not None and m.wdl_after is not None
             and m.wdl_before != m.wdl_after
         ]
-        await _send(ws, {
+        _assessment_payload = {
             "type":           "assessment_result",
             "turning_points": tp_json,
             "poor_moves":     poor_moves,
@@ -3399,7 +3498,10 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             "ply_base":       final.ply_base,
             "winner":         winner,
             "signal_plies":   signal_plies,
-        })
+        }
+        await _send(ws, _assessment_payload)
+        # Persist assessment as second line in the game file (best-effort)
+        await asyncio.to_thread(_persist_assessment, record, _assessment_payload)
     except asyncio.CancelledError:
         return
 
@@ -3499,8 +3601,12 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
         # Tag softened games so DB loaders can skip them (Bug 8-A protection).
         if session.adaptive and session.adaptive.extra_blunder > 0:
             record["adaptive_softened"] = True
+        if session.player_name:
+            record["player_name"] = session.player_name
         session._last_game_record = record
         await asyncio.to_thread(session.coordinator.on_game_end, record)
+        # Also persist to games folder so profile history and assessment storage work.
+        await asyncio.to_thread(_persist_game_record, record)
         if hasattr(_overseer_advisor, "record_game_result"):
             await asyncio.to_thread(_overseer_advisor.record_game_result, record)
         await _commentary(ws, session)
@@ -3531,6 +3637,8 @@ async def _game_over(ws: WebSocket, session: Session) -> None:
             record["draw_reason"] = draw_reason
         if session.adaptive and session.adaptive.extra_blunder > 0:
             record["adaptive_softened"] = True
+        if session.player_name:
+            record["player_name"] = session.player_name
 
         # Populate opening recognition fields from the standalone recognizer.
         if session.opening_recognizer:
@@ -4446,6 +4554,8 @@ async def ws_endpoint(websocket: WebSocket):
                 _name_in_msg = msg.get("player_name", "").strip()[:50]
                 if _name_in_msg and is_valid_name(_name_in_msg):
                     player_name = _name_in_msg
+                    if session:
+                        session.player_name = player_name
                     if not adaptive._ever_played:
                         _profile = await asyncio.to_thread(load_profile, player_name)
                         player_elo = _profile.elo
@@ -4894,8 +5004,11 @@ async def ws_endpoint(websocket: WebSocket):
                     record = session.coordinator.build_game_record(
                         winner=session.human_color, human_color=session.human_color
                     )
+                    if session.player_name:
+                        record["player_name"] = session.player_name
                     session._last_game_record = record
                     await asyncio.to_thread(session.coordinator.on_game_end, record)
+                    await asyncio.to_thread(_persist_game_record, record)
                     if hasattr(_overseer_advisor, "record_game_result"):
                         await asyncio.to_thread(_overseer_advisor.record_game_result, record)
                     await _commentary(websocket, session)
@@ -4911,6 +5024,49 @@ async def ws_endpoint(websocket: WebSocket):
                 if session.coordinator:
                     session.coordinator._dominant_turn_streak = 0
                 log.info("Resignation declined — game continues.")
+
+            # ── human_resign — human player voluntarily resigns ───────────────────
+            elif kind == "human_resign" and session:
+                if session.engine.finished:
+                    continue
+                opp = "B" if session.human_color == "W" else "W"
+                session.engine.finished = True
+                session.engine.winner   = opp
+                opp_name = "White" if opp == "W" else "Black"
+                await _send(websocket, {
+                    "type":        "game_over",
+                    "winner":      opp,
+                    "draw_reason": None,
+                    "result":      "human_resignation",
+                    "message":     f"{opp_name} wins — you resigned.",
+                })
+                if session.coordinator:
+                    record = session.coordinator.build_game_record(
+                        winner=opp, human_color=session.human_color
+                    )
+                    if session.player_name:
+                        record["player_name"] = session.player_name
+                    session._last_game_record = record
+                    await asyncio.to_thread(session.coordinator.on_game_end, record)
+                    await asyncio.to_thread(_persist_game_record, record)
+                    if hasattr(_overseer_advisor, "record_game_result"):
+                        await asyncio.to_thread(_overseer_advisor.record_game_result, record)
+                    await _commentary(websocket, session)
+                    asyncio.create_task(_maybe_consolidate(websocket))
+                    session._assessment_task = asyncio.create_task(
+                        _run_game_assessment(websocket, session, record)
+                    )
+                elif session.game_ai is not None and not session.vs_human:
+                    record = dict(session.engine.game_record)
+                    record["winner"] = opp
+                    if session.player_name:
+                        record["player_name"] = session.player_name
+                    session._last_game_record = record
+                    await asyncio.to_thread(_persist_game_record, record)
+                    session._assessment_task = asyncio.create_task(
+                        _run_game_assessment(websocket, session, record)
+                    )
+                await _after_game_end()
 
             # ── get_diagnostic — score all legal moves for the overlay ──────────
             elif kind == "get_diagnostic" and session:

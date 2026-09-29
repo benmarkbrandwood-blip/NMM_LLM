@@ -141,6 +141,14 @@
           <p id="profile-empty-msg" style="font-size:.78rem;color:var(--text-dim);margin-top:6px">
             Enter your name above to track your stats and Elo across sessions.
           </p>
+          <div id="profile-games-section" hidden style="margin-top:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <span style="color:var(--tan);font-size:.82rem;font-weight:600">Recent Games</span>
+              <button id="btn-refresh-games" class="btn-small" style="padding:2px 8px;font-size:.75rem">&#8635;</button>
+            </div>
+            <div id="profile-games-grid"></div>
+            <div id="profile-game-detail" hidden style="margin-top:10px;padding:8px;background:#1a1608;border:1px solid var(--border);border-radius:4px;font-size:.75rem;color:var(--text-dim);font-family:monospace;white-space:pre-wrap;max-height:120px;overflow-y:auto"></div>
+          </div>
         </div>
       </div>
 
@@ -724,23 +732,32 @@
       <svg id="eval-graph" preserveAspectRatio="none"></svg>
       <div id="graph-tooltip" hidden></div>
     </div>
-    <button id="btn-force-move" hidden title="Stop AI search now and play best move found so far">Force Move</button>
-    <button id="btn-override" hidden title="Undo AI's last move and place or move it yourself">&#x21A9; Override</button>
-    <span id="resignation-offer" hidden>
-      AI offers to resign &nbsp;
-      <button id="btn-accept-resign" title="Accept — you win">Accept</button>
-      <button id="btn-decline-resign" title="Keep playing — force the AI to continue">Keep Playing</button>
-    </span>
-    <button id="btn-good-game" hidden title="Reinforce the AI for a strong draw — treats this game as a win for learning">&#x1F44D; Good Game</button>
-    <button id="btn-force-cap" disabled title="Force AI to capture aggressively — disables fly-sacrifice strategy">Force Capture</button>
-    <button id="btn-draw" disabled>Offer Draw</button>
-    <button id="btn-hint" disabled>Hint (3)</button>
-    <button id="btn-undo" disabled>&larr; Undo</button>
-    <button id="btn-handoff-w" hidden title="Hand White's pieces to the AI — AI continues playing White from here">White → AI</button>
-    <button id="btn-handoff-b" hidden title="Hand Black's pieces to the AI — AI continues playing Black from here">Black → AI</button>
-    <button id="btn-handoff-ava" hidden title="Let both sides be played by AI from the current position">&#x1F916; AI vs AI</button>
-    <button id="btn-takeover-w" hidden title="You take over White from the AI">Take over White</button>
-    <button id="btn-takeover-b" hidden title="You take over Black from the AI">Take over Black</button>
+    <div id="bottom-btns">
+      <!-- Row 1: contextual / game-state buttons -->
+      <div class="btn-row">
+        <button id="btn-force-move" hidden title="Stop AI search now and play best move found so far">Force Move</button>
+        <button id="btn-override" hidden title="Undo AI's last move and place or move it yourself">&#x21A9; Override</button>
+        <span id="resignation-offer" hidden>
+          AI offers to resign &nbsp;
+          <button id="btn-accept-resign" title="Accept — you win">Accept</button>
+          <button id="btn-decline-resign" title="Keep playing — force the AI to continue">Keep Playing</button>
+        </span>
+        <button id="btn-good-game" hidden title="Reinforce the AI for a strong draw — treats this game as a win for learning">&#x1F44D; Good Game</button>
+        <button id="btn-human-resign" hidden title="Resign this game">Resign</button>
+        <button id="btn-handoff-w" hidden title="Hand White's pieces to the AI — AI continues playing White from here">White → AI</button>
+        <button id="btn-handoff-b" hidden title="Hand Black's pieces to the AI — AI continues playing Black from here">Black → AI</button>
+        <button id="btn-handoff-ava" hidden title="Let both sides be played by AI from the current position">&#x1F916; AI vs AI</button>
+        <button id="btn-takeover-w" hidden title="You take over White from the AI">Take over White</button>
+        <button id="btn-takeover-b" hidden title="You take over Black from the AI">Take over Black</button>
+      </div>
+      <!-- Row 2: always-present controls -->
+      <div class="btn-row">
+        <button id="btn-force-cap" disabled title="Force AI to capture aggressively — disables fly-sacrifice strategy">Force 4-3 capture</button>
+        <button id="btn-draw" disabled>Offer Draw</button>
+        <button id="btn-hint" disabled>Hint (3)</button>
+        <button id="btn-undo" disabled>&larr; Undo</button>
+      </div>
+    </div>
   </div>
 
 </div>
