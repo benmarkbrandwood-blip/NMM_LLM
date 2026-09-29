@@ -2850,32 +2850,32 @@ def _sentinel_payload(adv) -> dict:
     }
 
 
-def _classify_commentary(line: str) -> tuple[str, str, str]:
-    """Parse '[Speaker] text' and return (speaker, text, section).
+_COMMENTARY_AI_SPEAKERS = {"GameAI", "Game", "MillsLLM"}
 
-    Section is 'human' (top box, LLM↔human) or 'ai' (bottom box, AI↔AI).
-    """
-    AI_SPEAKERS = {"GameAI", "Game", "MillsLLM"}
-    if line.startswith("[") and "]" in line:
-        end = line.index("]")
-        speaker = line[1:end]
-        text    = line[end + 2:]  # skip '] '
-    else:
-        speaker = "MillsAI"
-        text    = line
-    section = "ai" if speaker in AI_SPEAKERS else "human"
-    return speaker, text, section
+def _classify_commentary(entry: dict) -> tuple[str, str, str, str]:
+    """Parse a dialogue entry dict and return (speaker, text, section, tag)."""
+    speaker = entry.get("speaker", "MillsAI")
+    text    = entry.get("text", "")
+    tag     = entry.get("tag", "normal")
+    section = "ai" if speaker in _COMMENTARY_AI_SPEAKERS else "human"
+    return speaker, text, section, tag
 
 
 async def _commentary(ws: WebSocket, session: Session) -> None:
     if session.coordinator:
-        for line in session.coordinator.flush_dialogue():
-            speaker, text, section = _classify_commentary(line)
+        for entry in session.coordinator.flush_dialogue():
+            if entry.get("tag") == "signal_badge":
+                import json as _json
+                badge = _json.loads(entry.get("text", "{}"))
+                await _send(ws, {"type": "signal_badge", **badge})
+                continue
+            speaker, text, section, tag = _classify_commentary(entry)
             await _send(ws, {
                 "type": "commentary",
                 "speaker": speaker,
                 "text": text,
                 "section": section,
+                "tag": tag,
             })
 
 
@@ -2900,13 +2900,15 @@ def _build_stage1_summary(annotation: "PostGameAnnotation", winner: str) -> str:
           annotation.turning_point_oracle)]
         if annotation.turning_point_ply is not None else []
     )
-    if tp_list:
-        tp_ply, tp_quality, tp_oracle = tp_list[0]
+    for i, (tp_ply, tp_quality, tp_oracle) in enumerate(tp_list):
         if tp_ply is not None and tp_ply < len(moves):
             m = moves[tp_ply]
             c_name   = "White" if m.color == "W" else "Black"
             move_num = (tp_ply + ply_base + 1) // 2
-            label = "Turning point" if "malom" in tp_oracle else "Probable turning point"
+            if "malom" in tp_oracle:
+                label = "Turning point" if i == 0 else f"Turning point #{i + 1}"
+            else:
+                label = "Probable turning point" if i == 0 else f"Probable turning point #{i + 1}"
             lines.append(f"{label} — {c_name}, move {move_num} (ply {tp_ply + ply_base}): {m.move_played}")
             if m.best_alt and m.best_alt != m.move_played:
                 lines.append(f"  Better: {m.best_alt}")
@@ -2919,7 +2921,7 @@ def _build_stage1_summary(annotation: "PostGameAnnotation", winner: str) -> str:
 
 
 def _build_stage2_summary(annotation: "PostGameAnnotation") -> str:
-    """Stage 2 summary: generalist AI divergence section."""
+    """Stage 2 summary: generalist AI divergence + GapNet high-risk moves."""
     moves = annotation.moves
     ply_base = annotation.ply_base
     lines: list[str] = []
@@ -2938,6 +2940,18 @@ def _build_stage2_summary(annotation: "PostGameAnnotation") -> str:
             lines.append(
                 f"  Ply {gm.ply + ply_base} ({gn}, move {gmnum}) {gm.move_played}"
                 f" — AI preferred {gm.generalist_top_move}"
+            )
+    # GapNet high-risk positions (blunder zone score ≥ 0.65)
+    risky = [m for m in moves if m.blunder_zone_score is not None and m.blunder_zone_score >= 0.65]
+    if risky:
+        risky.sort(key=lambda m: m.blunder_zone_score, reverse=True)  # type: ignore[arg-type]
+        lines.append(f"GapNet high-risk ({len(risky)} moves):")
+        for rm in risky[:4]:
+            rn    = "White" if rm.color == "W" else "Black"
+            rmnum = (rm.ply + ply_base + 1) // 2
+            lines.append(
+                f"  Ply {rm.ply + ply_base} ({rn}, move {rmnum}) {rm.move_played}"
+                f" — risk {rm.blunder_zone_score:.2f}"
             )
     return "\n".join(lines)
 
@@ -3338,6 +3352,24 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             ],
             key=lambda d: d["count"],
         ),
+        "malom": sorted(
+            [
+                {
+                    **_sp_base(m),
+                    "wdl_before": m.wdl_before,
+                    "wdl_after":  m.wdl_after,
+                }
+                for m in final.moves
+                if m.wdl_before is not None and m.wdl_after is not None
+                and m.wdl_before != m.wdl_after
+            ],
+            # Sort most severe drops first: W→L > D→L > W→D > improvements
+            key=lambda d: {
+                ("W", "L"): 3, ("D", "L"): 2, ("W", "D"): 1,
+                ("L", "W"): -3, ("D", "W"): -2, ("L", "D"): -1,
+            }.get((d["wdl_before"], d["wdl_after"]), 0),
+            reverse=True,
+        ),
     }
 
     try:
@@ -3636,6 +3668,24 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
     return _gai
 
 
+def _make_nollm_coordinator(game_ai, human_color: str, vs_human: bool = True) -> "Coordinator":
+    """Minimal coordinator for heuristic-reasoning + signal display without an LLM."""
+    mem = MemoryManager(use_ollama_embeddings=False)
+    llm = MillsLLM(memory=mem, ollama_url="http://localhost:11434")
+    llm._client = None  # disable all LLM calls; _chat() returns "" when _client is None
+    coord = Coordinator(
+        game_ai=game_ai, mills_llm=llm, memory=mem,
+        vs_human=vs_human, human_color=human_color,
+        policy_advisor=_human_move_policy_advisor,
+        pref_advisor=_human_pref_net,
+        generalist_advisor=_generalist_advisor,
+        gap_net=_gap_net,
+        sentinel_advisor=_sentinel_advisor,
+    )
+    coord.on_game_start()
+    return coord
+
+
 async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
     """Drive an AI-vs-AI game: alternate moves for W and B until the game ends."""
     import time as _time
@@ -3728,13 +3778,19 @@ async def _run_ai_vs_ai_loop(ws: WebSocket, session: Session) -> None:
 
             # Flush commentary from the active coordinator
             if coord:
-                for line in coord.flush_dialogue():
-                    speaker, text, section = _classify_commentary(line)
+                for entry in coord.flush_dialogue():
+                    if entry.get("tag") == "signal_badge":
+                        import json as _json
+                        badge = _json.loads(entry.get("text", "{}"))
+                        await _send(ws, {"type": "signal_badge", **badge})
+                        continue
+                    speaker, text, section, tag = _classify_commentary(entry)
                     await _send(ws, {
                         "type": "commentary",
                         "speaker": speaker,
                         "text": text,
                         "section": section,
+                        "tag": tag,
                     })
 
             await _send(ws, _state(session))
@@ -4413,6 +4469,7 @@ async def ws_endpoint(websocket: WebSocket):
                     _t_pers = ""
                 vs_human  = bool(msg.get("vs_human", False))
                 use_llm   = bool(msg.get("use_llm", True))
+                llm_can_override_move = bool(msg.get("llm_can_override_move", True))
                 use_sentinel   = bool(msg.get("use_sentinel", False))
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")  # "advisory"|"score_adjust"|"reconsider"
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))  # min opportunity gap to intercede
@@ -4530,8 +4587,16 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_db=_endgame_db,
                             vs_human=True,  # coordinator always faces a human in web games
                             human_color=hc,
+                            policy_advisor=_human_move_policy_advisor,
+                            pref_advisor=_human_pref_net,
+                            generalist_advisor=_generalist_advisor,
+                            gap_net=_gap_net,
+                            sentinel_advisor=_sentinel_advisor,
+                            llm_can_override_move=llm_can_override_move,
                         )
                         await asyncio.to_thread(coord.on_game_start)
+                    else:
+                        coord = _make_nollm_coordinator(game_ai, hc, vs_human=True)
 
                 _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
@@ -4575,6 +4640,7 @@ async def ws_endpoint(websocket: WebSocket):
                 diff     = max(1, min(10, int(msg.get("difficulty", 3))))
                 vs_human = bool(msg.get("vs_human", False))
                 use_llm        = bool(msg.get("use_llm", True))
+                llm_can_override_move = bool(msg.get("llm_can_override_move", True))
                 use_sentinel   = bool(msg.get("use_sentinel", False))
                 sentinel_mode  = msg.get("sentinel_mode", "advisory")
                 sentinel_gap   = float(msg.get("sentinel_gap", 0.10))
@@ -4693,8 +4759,16 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_db=_endgame_db,
                             vs_human=True,
                             human_color=hc,
+                            policy_advisor=_human_move_policy_advisor,
+                            pref_advisor=_human_pref_net,
+                            generalist_advisor=_generalist_advisor,
+                            gap_net=_gap_net,
+                            sentinel_advisor=_sentinel_advisor,
+                            llm_can_override_move=llm_can_override_move,
                         )
                         await asyncio.to_thread(coord.on_game_start)
+                    else:
+                        coord = _make_nollm_coordinator(game_ai, hc, vs_human=True)
 
                 _cancel_prior_assessment(session)
                 session = Session(engine, game_ai, coord, hc, vs_human)
@@ -5226,6 +5300,7 @@ async def ws_endpoint(websocket: WebSocket):
                 human_color = "B" if handoff_color == "W" else "W"
                 diff = max(1, min(10, int(msg.get("difficulty", adaptive.current_difficulty))))
                 use_llm = bool(msg.get("use_llm", True))
+                llm_can_override_move = bool(msg.get("llm_can_override_move", True))
                 _aw = {**_evolved_weights, **settings.get("ai_weights", {}),
                        **(msg.get("ai_weights") or {})}
                 def _w(key, default): return int(_aw.get(key, default))
@@ -5277,6 +5352,12 @@ async def ws_endpoint(websocket: WebSocket):
                         endgame_db=_endgame_db,
                         vs_human=True,
                         human_color=human_color,
+                        policy_advisor=_human_move_policy_advisor,
+                        pref_advisor=_human_pref_net,
+                        generalist_advisor=_generalist_advisor,
+                        gap_net=_gap_net,
+                        sentinel_advisor=_sentinel_advisor,
+                        llm_can_override_move=llm_can_override_move,
                     )
                     # Seed coordinator with all moves played so far so trajectory hints work
                     for m in session.engine.game_record.get("moves", []):
@@ -5293,6 +5374,8 @@ async def ws_endpoint(websocket: WebSocket):
                         })
                         new_coord._turn_num += 1
                     await asyncio.to_thread(new_coord.on_game_start)
+                else:
+                    new_coord = _make_nollm_coordinator(new_ai, human_color, vs_human=True)
 
                 # Update the session — the handed-off side is now AI
                 session.game_ai    = new_ai
@@ -5839,6 +5922,12 @@ async def ws_endpoint(websocket: WebSocket):
                             endgame_db=_endgame_db,
                             vs_human=False,
                             human_color=_opp_color,  # each AI's "opponent" is the other color
+                            policy_advisor=_human_move_policy_advisor,
+                            pref_advisor=_human_pref_net,
+                            generalist_advisor=_generalist_advisor,
+                            gap_net=_gap_net,
+                            sentinel_advisor=_sentinel_advisor,
+                            llm_can_override_move=True,
                         )
                         await asyncio.to_thread(_coord.on_game_start)
                         if _ai_color == "W":

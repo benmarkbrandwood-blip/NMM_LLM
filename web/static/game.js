@@ -554,6 +554,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "sel-game-personality",type: "select" },
     { id: "sel-difficulty",      type: "select" },
     { id: "chk-llm",             type: "checkbox" },
+    { id: "chk-llm-override",   type: "checkbox" },
     { id: "chk-sentinel",        type: "checkbox" },
     { id: "sel-sentinel-mode",   type: "select" },
     { id: "rng-sentinel-gap",    type: "range" },
@@ -1188,6 +1189,11 @@ function startNewGame() {
   _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
   _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
   _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _hideReplayTPBadge();
+  _hideReplaySignalBadge();
+  { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  const _gnb = $("game-name-bar");
+  if (_gnb) _gnb.textContent = "";
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1229,6 +1235,7 @@ function startNewGame() {
       difficulty:   diff,
       vs_human:     vs,
       use_llm:      useLlm,
+      llm_can_override_move: ($("chk-llm-override")?.checked ?? true),
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,
@@ -1279,6 +1286,11 @@ function startAiVsAi() {
   _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
   _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
   _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _hideReplayTPBadge();
+  _hideReplaySignalBadge();
+  { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  const _gnbAva = $("game-name-bar");
+  if (_gnbAva) _gnbAva.textContent = "";
   hintsLeft = 0;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1351,6 +1363,7 @@ function _handoffToAI(color) {
     color,
     difficulty: diff,
     use_llm:    useLlm,
+    llm_can_override_move: ($("chk-llm-override")?.checked ?? true),
     ai_weights: _getWeights(),
   }));
 }
@@ -1499,6 +1512,11 @@ function startSetupGame() {
   _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
   _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
   _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  _hideReplayTPBadge();
+  _hideReplaySignalBadge();
+  { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  const _gnbSetup = $("game-name-bar");
+  if (_gnbSetup) _gnbSetup.textContent = "";
   hintsLeft = 3;
   drawUnlocked = false;
   forceAggressive = false;
@@ -1540,6 +1558,7 @@ function startSetupGame() {
       difficulty:   diff,
       vs_human:     vs,
       use_llm:      useLlm,
+      llm_can_override_move: ($("chk-llm-override")?.checked ?? true),
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,
@@ -1817,8 +1836,20 @@ function handleMessage(msg) {
       addCommentary("[Training]", "Good game noted — AI's moves reinforced as a win in the trajectory.", "ai");
       break;
 
+    case "signal_badge": {
+      const b = $("live-signal-badge");
+      if (!b) break;
+      const { label, detail, severity } = msg;
+      if (!label) { b.hidden = true; break; }
+      b.className = severity !== "neutral" ? `sev-${severity}` : "";
+      b.innerHTML = `<span class="sig-label">${label}</span>` +
+                    (detail ? `<span class="sig-detail">${detail}</span>` : "");
+      b.hidden = false;
+      break;
+    }
+
     case "commentary":
-      addCommentary(msg.speaker ?? "MillsAI", msg.text, msg.section);
+      addCommentary(msg.speaker ?? "MillsAI", msg.text, msg.section, msg.tag);
       break;
 
     case "hint":
@@ -2056,6 +2087,10 @@ function handleMessage(msg) {
       _assessmentTurningPoints = msg.turning_points || [];
       _stopAssessmentTimer();
       drawEvalGraph();
+      if (msg.opening_name) {
+        const bar = $("game-name-bar");
+        if (bar) bar.textContent = msg.opening_name;
+      }
       if (msg.summary_text) {
         const feed = $("commentary-human");
         if (feed) {
@@ -2115,10 +2150,8 @@ function handleMessage(msg) {
       // Update button state — stop pulse, show done
       const btn = $("btn-game-assessment");
       if (btn) btn.classList.add("assessment-done");
-      // Remove partial stage summaries — full summary replaces them
       const feed = $("commentary-human");
       if (feed) {
-        feed.querySelectorAll(".assessment-partial").forEach(el => el.remove());
         _renderAssessmentSignalSections(msg, feed);
       }
       break;
@@ -2680,8 +2713,8 @@ function drawEvalGraph() {
       const sx = pts[ply].x;
       svg.appendChild(mk("line", {
         x1: sx, y1: 0, x2: sx, y2: H,
-        stroke: sigColor, "stroke-width": "1",
-        "stroke-dasharray": "2 4", opacity: "0.5",
+        stroke: sigColor, "stroke-width": "1.5",
+        "stroke-dasharray": "3 3", opacity: "0.8",
       }));
     }
   }
@@ -3119,6 +3152,8 @@ function _showReplaySignalBadge(sigKey, item) {
     detail = `pref δ${item.delta > 0 ? "+" : ""}${item.delta.toFixed(2)}`;
   } else if (sigKey === "mobility" && item.count != null) {
     detail = `${item.count} legal moves`;
+  } else if (sigKey === "malom" && item.wdl_before && item.wdl_after) {
+    detail = `${item.wdl_before}→${item.wdl_after}`;
   }
   badge.innerHTML =
     `<span class="sig-badge-label" style="color:${meta.color}">${meta.label}</span>` +
@@ -3238,21 +3273,31 @@ function _highlightReplayMove(idx) {
 // All others go to the human-facing box (top).
 const _AI_SPEAKERS = new Set(["GameAI", "Game", "Error", "MillsLLM"]);
 
-function addCommentary(speaker, text, section) {
+function addCommentary(speaker, text, section, tag) {
   if (!text) return;
+  if (tag === "reasoning") {
+    const chk = $("showReasoning");
+    if (!chk || !chk.checked) return;
+  }
   // Determine target box: explicit section override, or classify by speaker
   const isAi  = section === "ai"  || (!section && _AI_SPEAKERS.has(speaker));
   const feedId = isAi ? "commentary-ai" : "commentary-human";
   const feed   = $(feedId);
   if (!feed) return;
 
+  const isReasoning = (tag === "reasoning");
   const div = document.createElement("div");
-  div.className = "commentary-line";
-  const label = document.createElement("span");
-  label.className   = "speaker";
-  label.textContent = speaker + ": ";
-  div.appendChild(label);
-  div.appendChild(document.createTextNode(text));
+  div.className = isReasoning ? "reasoning-line" : "commentary-line";
+
+  if (isReasoning) {
+    div.textContent = text;
+  } else {
+    const label = document.createElement("span");
+    label.className   = "speaker";
+    label.textContent = speaker + ": ";
+    div.appendChild(label);
+    div.appendChild(document.createTextNode(text));
+  }
   // Prepend so newest appears at top
   feed.insertBefore(div, feed.firstChild);
 }
@@ -3843,6 +3888,7 @@ function _handleTournamentNext(msg) {
       type:           "new_game",
       tournament_game: true,
       use_llm:        $("chk-llm").checked,
+      llm_can_override_move: ($("chk-llm-override")?.checked ?? true),
       use_sentinel:   $("chk-sentinel")  ? $("chk-sentinel").checked  : false,
       use_gap_net:    $("chk-gap-net")   ? $("chk-gap-net").checked   : true,
       gap_net_blend:  $("rng-gap-net-blend") ? parseInt($("rng-gap-net-blend").value) : 100,

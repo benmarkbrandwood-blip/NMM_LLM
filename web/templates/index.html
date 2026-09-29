@@ -217,9 +217,11 @@
 
       <div id="board-wrap">
         <svg id="board-svg"></svg>
-        <div id="replay-tp-badge" hidden></div>
-        <div id="replay-signal-badge" hidden></div>
       </div>
+      <div id="replay-tp-badge" hidden></div>
+      <div id="replay-signal-badge" hidden></div>
+      <div id="live-signal-badge" hidden></div>
+      <div id="game-name-bar"></div>
       <div id="status-bar">Configure a game and click New Game.</div>
       <div id="think-bar-wrap" title="AI search time">
         <div id="think-bar-fill"></div>
@@ -409,6 +411,11 @@
         <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-llm" checked>
           <label for="chk-llm" style="color:var(--text); font-size:.9rem;">MillsAI commentary (LLM)</label>
+        </div>
+
+        <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-llm-override" checked>
+          <label for="chk-llm-override" style="color:var(--text); font-size:.9rem;">MillsAI can influence move choice</label>
         </div>
 
         <div class="form-row" id="row-sentinel" style="flex-direction:row; align-items:center; gap:8px;">

@@ -56,7 +56,7 @@
   },
   "search_threads": 2,
   "ui_prefs": {
-    "sel-opponent": "human",
+    "sel-opponent": "ai",
     "sel-human-color": "W",
     "sel-game-personality": "balanced",
     "sel-difficulty": "8",
@@ -73,7 +73,7 @@
     "chk-ext-qsearch": false,
     "sel-traj-n": "",
     "sel-star-square": "cardinal",
-    "chk-ngram": false,
+    "chk-ngram": true,
     "chk-perfect-db": false
   }
 }

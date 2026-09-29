@@ -373,6 +373,18 @@ main {
   flex-shrink: 0;
 }
 
+.reasoning-line {
+  background: #181510;
+  border-left: 2px solid #5a4e30;
+  border-radius: 0 4px 4px 0;
+  padding: 3px 8px;
+  font-family: monospace;
+  font-size: .78rem;
+  color: #9a9078;
+  white-space: pre;
+  flex-shrink: 0;
+}
+
 .assessment-legend {
   flex-shrink: 0;
 }
@@ -428,19 +440,16 @@ main {
 }
 
 #replay-tp-badge {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
+  display: block;
+  text-align: center;
+  margin-top: 4px;
   background: rgba(20, 14, 8, 0.90);
   border: 1px solid #c62828;
   border-radius: 6px;
   padding: 4px 14px;
   font-size: .77rem;
   color: #ff8a80;
-  text-align: center;
   pointer-events: none;
-  z-index: 10;
   white-space: nowrap;
 }
 #replay-tp-badge.tp-secondary {
@@ -457,20 +466,26 @@ main {
 }
 
 #replay-signal-badge {
-  position: absolute;
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
+  display: block;
+  text-align: center;
+  margin-top: 2px;
   background: rgba(8, 14, 20, 0.90);
   border: 1px solid #555;
   border-radius: 6px;
   padding: 3px 12px;
   font-size: .74rem;
   color: #cccccc;
-  text-align: center;
   pointer-events: none;
-  z-index: 9;
   white-space: nowrap;
+}
+
+#game-name-bar {
+  font-size: .78rem;
+  color: #8aaa8a;
+  text-align: center;
+  min-height: 1.2em;
+  margin-top: 3px;
+  font-style: italic;
 }
 #replay-signal-badge .sig-badge-label {
   font-weight: bold;
@@ -480,6 +495,26 @@ main {
   opacity: 0.75;
   font-size: .70rem;
 }
+
+#live-signal-badge {
+  display: block;
+  text-align: center;
+  margin-top: 2px;
+  background: rgba(8, 14, 20, 0.90);
+  border: 1px solid #555;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: .74rem;
+  color: #cccccc;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: border-color 0.3s, color 0.3s;
+}
+#live-signal-badge.sev-warning { border-color: #c62828; color: #ff8a80; }
+#live-signal-badge.sev-caution { border-color: #e65100; color: #ffcc80; }
+#live-signal-badge.sev-good    { border-color: #2e7d32; color: #a5d6a7; }
+#live-signal-badge .sig-label  { font-weight: bold; margin-right: 6px; }
+#live-signal-badge .sig-detail { opacity: 0.75; font-size: .70rem; }
 
 #status-bar {
   font-size: .9rem;
@@ -713,6 +748,7 @@ main {
   cursor: pointer;
 }
 .btn-small:hover { border-color: var(--accent); color: var(--text); }
+.btn-small.btn-active { border-color: var(--tan); color: var(--tan); }
 
 /* ── Replay controls ─────────────────────────────────────────────────── */
 #replay-controls {
