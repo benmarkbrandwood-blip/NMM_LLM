@@ -58,12 +58,23 @@ class NGramOpponentModel:
 
         self._game_count += 1
 
-    def load_from_games(self, games_dir: Path | str) -> None:
-        """Load every *.jsonl file in `games_dir` (recursively) into the model."""
+    def load_from_games(
+        self,
+        games_dir: "Path | str",
+        player_filter: "str | None" = None,
+    ) -> None:
+        """Load every *.jsonl game file in `games_dir` into the model.
+
+        If `player_filter` is set, only include game records whose
+        ``player_name`` field matches (case-insensitive). Records with no
+        ``player_name`` field are included only when `player_filter` is None.
+        """
+        import json as _json
         games_dir = Path(games_dir)
         if not games_dir.exists():
             log.warning("NGramOpponentModel: games dir not found: %s", games_dir)
             return
+        pf = player_filter.lower().strip() if player_filter else None
         loaded = 0
         for path in sorted(games_dir.rglob("*.jsonl")):
             for line in path.read_text(encoding="utf-8").splitlines():
@@ -71,11 +82,17 @@ class NGramOpponentModel:
                 if not line:
                     continue
                 try:
-                    self.update(json.loads(line))
+                    record = _json.loads(line)
+                    if pf is not None:
+                        rp = (record.get("player_name") or "").lower().strip()
+                        if rp != pf:
+                            continue
+                    self.update(record)
                     loaded += 1
                 except Exception as exc:
                     log.debug("NGramOpponentModel: skipping line in %s — %s", path.name, exc)
-        log.info("NGramOpponentModel: loaded %d games from %s", loaded, games_dir)
+        tag = f" (player={player_filter})" if player_filter else ""
+        log.info("NGramOpponentModel: loaded %d games from %s%s", loaded, games_dir, tag)
 
     # ── Prediction ──────────────────────────────────────────────────────────
 

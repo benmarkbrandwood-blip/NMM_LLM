@@ -463,22 +463,9 @@ except Exception as _rqe:
     log.warning("Runtime game quarantine unavailable: %s", _rqe)
 
 # ── Overseer (ScaffoldedPolicyNet) — advisory pick-probability overlay ───────
+# v2 SpecialistRouter (three phase specialists) removed — no checkpoints exist.
+# GeneralistAgent fills this role directly.
 _overseer_advisor = None
-# Prefer v2 SpecialistRouter (three phase specialists) — falls back to legacy Overseer.
-try:
-    from learned_ai.agents.specialist_router import load_specialist_router as _load_specialist_router
-    _overseer_advisor = _load_specialist_router(
-        sentinel_advisor=_sentinel_advisor,
-        value_net=_value_net,
-        gap_net=_gap_net,
-        human_db=_human_db,
-        specialist_db=_specialist_db,
-        runtime_quarantine=_runtime_game_quarantine,
-    )
-    if _overseer_advisor is not None:
-        log.info("SpecialistRouter (v2 three-specialist) loaded — using in place of Overseer")
-except Exception as _sre:
-    log.warning("SpecialistRouter load failed (%s) — falling back to Overseer", _sre)
 
 _generalist_advisor = None
 try:
@@ -986,25 +973,29 @@ def _static_ver() -> str:
     return h.hexdigest()[:8]
 
 
-@app.on_event("startup")
-async def _startup_malom_deferred():
-    """Init MalomDB puzzle instance and prewarm hash cache after server is ready."""
+_malom_puzzle_db_lock = None  # threading.Lock, created on first use
+
+def _ensure_malom_puzzle_db() -> None:
+    """Lazy-init MalomDB on first puzzle request. Thread-safe."""
+    global _malom_puzzle_db, _malom_puzzle_db_lock
+    if _malom_puzzle_db is not None:
+        return
     if not _malom_db_path:
         return
     import threading as _threading
-    def _init_and_prewarm():
-        global _malom_puzzle_db
+    if _malom_puzzle_db_lock is None:
+        _malom_puzzle_db_lock = _threading.Lock()
+    with _malom_puzzle_db_lock:
+        if _malom_puzzle_db is not None:
+            return
         try:
             from ai.malom_db import MalomDB as _MalomDB
             _mpdb = _MalomDB(_malom_db_path)
             if _mpdb.is_available():
                 _malom_puzzle_db = _mpdb
-                log.info("MalomDB puzzle instance ready")
+                log.info("MalomDB puzzle instance ready (lazy-init)")
         except Exception as _e:
             log.warning("MalomDB puzzle init failed (non-fatal): %s", _e)
-        # Hash cache prewarm removed — puzzles are pre-generated and shipped;
-        # MalomDB validation queries warm lazily on first access per (W,B) pair.
-    _threading.Thread(target=_init_and_prewarm, daemon=True).start()
 
 
 _server_ready = False
@@ -1184,30 +1175,6 @@ async def save_personality(name: str, request: Request):
     return JSONResponse({"ok": True})
 
 
-@app.get("/api/profile/{name}")
-async def get_profile(name: str):
-    from fastapi.responses import JSONResponse
-    if not is_valid_name(name):
-        return JSONResponse({"error": "Invalid name"}, status_code=400)
-    profile = await asyncio.to_thread(load_profile, name)
-    return JSONResponse(profile.to_dict())
-
-
-@app.post("/api/profile/{name}")
-async def post_profile(name: str, request: Request):
-    from fastapi.responses import JSONResponse
-    if not is_valid_name(name):
-        return JSONResponse({"error": "Invalid name"}, status_code=400)
-    body = await request.json()
-    profile = await asyncio.to_thread(load_profile, name)
-    for field in ("elo", "wins", "losses", "draws", "current_difficulty",
-                  "win_streak", "loss_streak", "extra_blunder"):
-        if field in body:
-            setattr(profile, field, type(getattr(profile, field))(body[field]))
-    await asyncio.to_thread(save_profile, profile)
-    return JSONResponse(profile.to_dict())
-
-
 @app.get("/api/profile/games")
 async def api_profile_games(player: str = ""):
     """Return last 10 games (filtered by player name when provided) with ply-8 board snapshots."""
@@ -1260,6 +1227,30 @@ async def api_profile_games(player: str = ""):
         except Exception:
             continue
     return _JR(result)
+
+
+@app.get("/api/profile/{name}")
+async def get_profile(name: str):
+    from fastapi.responses import JSONResponse
+    if not is_valid_name(name):
+        return JSONResponse({"error": "Invalid name"}, status_code=400)
+    profile = await asyncio.to_thread(load_profile, name)
+    return JSONResponse(profile.to_dict())
+
+
+@app.post("/api/profile/{name}")
+async def post_profile(name: str, request: Request):
+    from fastapi.responses import JSONResponse
+    if not is_valid_name(name):
+        return JSONResponse({"error": "Invalid name"}, status_code=400)
+    body = await request.json()
+    profile = await asyncio.to_thread(load_profile, name)
+    for field in ("elo", "wins", "losses", "draws", "current_difficulty",
+                  "win_streak", "loss_streak", "extra_blunder"):
+        if field in body:
+            setattr(profile, field, type(getattr(profile, field))(body[field]))
+    await asyncio.to_thread(save_profile, profile)
+    return JSONResponse(profile.to_dict())
 
 
 @app.get("/api/openings")
@@ -1908,6 +1899,7 @@ async def api_malom_puzzle_random(
             content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
         )
 
+    _ensure_malom_puzzle_db()
     if _malom_puzzle_db is None:
         from fastapi.responses import JSONResponse
         return JSONResponse(
@@ -2195,6 +2187,7 @@ async def api_placement_puzzle_random(
             content={"error": "Malom DB not available. Configure malom_db_path in Settings."},
         )
 
+    _ensure_malom_puzzle_db()
     if _malom_puzzle_db is None:
         from fastapi.responses import JSONResponse
         return JSONResponse(
@@ -4374,6 +4367,7 @@ async def ws_endpoint(websocket: WebSocket):
     tournament: Optional[TournamentState] = None
     player_name: str = ""          # set from new_game; persists for the connection
     player_elo:  int = 1000        # updated when profile is loaded; used for hint cap
+    _session_ngram: "NGramOpponentModel | None" = None  # player-specific model, built on login
     diag_elo_band: str = "middle"  # updated from get_diagnostic; used by pre-AI overlay
 
     async def _after_game_end() -> None:
@@ -4569,6 +4563,29 @@ async def ws_endpoint(websocket: WebSocket):
                             "Profile loaded: player=%r elo=%d diff=%d",
                             player_name, _profile.elo, _profile.current_difficulty,
                         )
+                        # Build per-player NGram model in background; use it when game
+                        # count reaches minimum, otherwise fall back to global model.
+                        _MIN_PLAYER_NGRAM_GAMES = 30
+                        _pn_snap = player_name
+                        def _build_player_ngram(_pname=_pn_snap):
+                            m = NGramOpponentModel()
+                            m.load_from_games(_GAMES_PATH, player_filter=_pname)
+                            if _human_games_dir.exists():
+                                m.load_from_games(_human_games_dir, player_filter=_pname)
+                            if m.game_count >= _MIN_PLAYER_NGRAM_GAMES:
+                                nonlocal _session_ngram
+                                _session_ngram = m
+                                log.info(
+                                    "Per-player NGram model ready: player=%r games=%d",
+                                    _pname, m.game_count,
+                                )
+                            else:
+                                log.info(
+                                    "Per-player NGram: too few games (%d < %d) for %r — using global",
+                                    m.game_count, _MIN_PLAYER_NGRAM_GAMES, _pname,
+                                )
+                        import threading as _threading_ngram
+                        _threading_ngram.Thread(target=_build_player_ngram, daemon=True).start()
 
                 if is_tournament:
                     _tnxt   = tournament.current
@@ -4675,7 +4692,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai.use_gap_net = use_gap_net and _gap_net is not None
                     game_ai.use_extended_qsearch = use_extended_qsearch
                     game_ai.use_ngram_search = use_ngram_search
-                    game_ai._ngram_model = _ngram_model if use_ngram_search else None
+                    game_ai._ngram_model = (_session_ngram or _ngram_model) if use_ngram_search else None
                     game_ai.star_square_mode = star_square_mode
 
                     if use_llm:
@@ -4847,7 +4864,7 @@ async def ws_endpoint(websocket: WebSocket):
                     game_ai.use_gap_net = use_gap_net and _gap_net is not None
                     game_ai.use_extended_qsearch = use_extended_qsearch
                     game_ai.use_ngram_search = use_ngram_search
-                    game_ai._ngram_model = _ngram_model if use_ngram_search else None
+                    game_ai._ngram_model = (_session_ngram or _ngram_model) if use_ngram_search else None
                     game_ai.star_square_mode = star_square_mode
 
                     if use_llm:
