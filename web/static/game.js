@@ -1803,12 +1803,7 @@ function handleMessage(msg) {
           // detail already embedded in badge text above; avoid duplication
         }
       }
-      if (msg.thinking) {
-        const showReasoning = $("showReasoning");
-        if (showReasoning && showReasoning.checked) {
-          addThinkingTrace(msg.thinking);
-        }
-      }
+      // thinking trace intentionally omitted — heuristic reasoning lines cover this
       if (msg.can_mark_bad) {
         canOverride = true;
         $("btn-override").hidden = false;
