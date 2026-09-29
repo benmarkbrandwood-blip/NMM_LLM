@@ -246,10 +246,10 @@ header h1 {
 }
 
 /* ── Main 3-column grid ──────────────────────────────────────────────── */
-/*   [commentary 260px] [board 1fr] [side 280px]                         */
+/*   [commentary 25%] [board 1fr] [side 25%]                             */
 main {
   display: grid;
-  grid-template-columns: 260px 1fr 280px;
+  grid-template-columns: 25% 1fr 25%;
   gap: 14px;
   padding: 12px 0;
   min-height: 0;
@@ -896,7 +896,7 @@ main {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
-  max-height: 300px;
+  max-height: 450px;
   overflow-y: auto;
   padding-right: 2px;
 }
