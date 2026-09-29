@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS winning_lines (
 CREATE INDEX IF NOT EXISTS idx_wl_phase ON winning_lines(phase);
 CREATE INDEX IF NOT EXISTS idx_wl_wr   ON winning_lines(win_rate);
 
+CREATE TABLE IF NOT EXISTS winning_lines_by_diff (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    move_seq     TEXT    NOT NULL,
+    phase        TEXT    NOT NULL,
+    diff_level   INTEGER NOT NULL,
+    result       TEXT    NOT NULL,
+    wins         INTEGER NOT NULL DEFAULT 1,
+    times_played INTEGER NOT NULL DEFAULT 1,
+    win_rate     REAL    NOT NULL DEFAULT 1.0,
+    last_seen    TEXT    NOT NULL,
+    UNIQUE(move_seq, phase, diff_level)
+);
+
+CREATE INDEX IF NOT EXISTS idx_wlbd_diff  ON winning_lines_by_diff(diff_level);
+CREATE INDEX IF NOT EXISTS idx_wlbd_phase ON winning_lines_by_diff(phase);
+
 CREATE TABLE IF NOT EXISTS preferred_plays (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     tag          TEXT    NOT NULL,
@@ -253,6 +269,7 @@ class SpecialistDB:
         move_seq: List[str],
         phase: str,
         learner_color: str = None,
+        diff_level: int = 0,
     ) -> None:
         """Record all positions from a completed game and update winning lines.
 
@@ -265,6 +282,8 @@ class SpecialistDB:
         learner_color : 'W' or 'B' — when set, boards where board.turn != learner_color
                         are opponent-to-move; WDL is stored from the current player's
                         perspective, so W↔L are flipped for those boards.
+        diff_level    : when > 0, also writes winning/draw lines to winning_lines_by_diff
+                        keyed by (move_seq, phase, diff_level) for difficulty filtering.
         """
         self.require_writable()
         now = _now()
@@ -310,6 +329,28 @@ class SpecialistDB:
                         INSERT INTO winning_lines (move_seq, phase, result, wins, times_played, win_rate, last_seen)
                         VALUES (?, ?, ?, ?, 1, 1.0, ?)
                     """, (seq_json, phase, result, 1 if result == "W" else 0, now))
+
+                if diff_level > 0:
+                    d_row = self._conn.execute(
+                        "SELECT id, times_played, wins FROM winning_lines_by_diff "
+                        "WHERE move_seq=? AND phase=? AND diff_level=?",
+                        (seq_json, phase, int(diff_level))
+                    ).fetchone()
+                    if d_row:
+                        wid2, played2, wins2 = d_row
+                        new_played2 = played2 + 1
+                        new_wins2   = wins2 + (1 if result == "W" else 0)
+                        self._conn.execute(
+                            "UPDATE winning_lines_by_diff SET times_played=?, wins=?, win_rate=?, last_seen=? WHERE id=?",
+                            (new_played2, new_wins2, new_wins2 / new_played2, now, wid2)
+                        )
+                    else:
+                        self._conn.execute("""
+                            INSERT INTO winning_lines_by_diff
+                                (move_seq, phase, diff_level, result, wins, times_played, win_rate, last_seen)
+                            VALUES (?, ?, ?, ?, ?, 1, 1.0, ?)
+                        """, (seq_json, phase, int(diff_level), result,
+                              1 if result == "W" else 0, now))
 
             self._promote_lines(phase)
 
@@ -554,6 +595,9 @@ class SpecialistDB:
             "SELECT COUNT(*) FROM positions WHERE malom_label IS NOT NULL"
         ).fetchone()[0]
         lines = self._conn.execute("SELECT COUNT(*) FROM winning_lines").fetchone()[0]
+        lines_by_diff = self._conn.execute(
+            "SELECT COUNT(*) FROM winning_lines_by_diff"
+        ).fetchone()[0]
         prefs = self._conn.execute(
             "SELECT COUNT(*) FROM preferred_plays WHERE promoted=1"
         ).fetchone()[0]
@@ -564,6 +608,7 @@ class SpecialistDB:
             "malom_label_version": self._malom_label_version,
             "malom_labels_trusted": self._malom_labels_trusted,
             "winning_lines": lines,
+            "winning_lines_by_diff": lines_by_diff,
             "preferred_plays": prefs,
             "training_lineage_root_run_id": self.training_lineage_root_run_id,
         }
