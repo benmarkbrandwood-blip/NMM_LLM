@@ -174,6 +174,10 @@ export class Board {
     this._replayGroup = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._replayGroup);
 
+    // Malom trajectory overlay — full DTW-optimal path during replay
+    this._malomTrajGroup = _el("g", { "pointer-events":"none" });
+    svg.appendChild(this._malomTrajGroup);
+
     // DB overlay — trajectory/fullgame/endgame arrows and halos; below score labels
     this._dbGroup = _el("g", { "pointer-events":"none" });
     svg.appendChild(this._dbGroup);
@@ -409,6 +413,80 @@ export class Board {
     this._replayGroup.innerHTML = "";
   }
 
+  clearMalomTrajectory() {
+    this._malomTrajGroup.innerHTML = "";
+  }
+
+  // Draw the full Malom DTW-optimal trajectory chain on the board.
+  // steps: [{from, to, capture, wdl, dtw, is_winner_move}]
+  // Winner's moves are green; loser's best-resistance moves are red (dimmer).
+  drawMalomTrajectory(steps) {
+    this._malomTrajGroup.innerHTML = "";
+    if (!steps || !steps.length) return;
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const win  = step.is_winner_move;
+      const col  = win ? "#4caf50" : "#e05050";
+      const mrkr = win ? "arr-green" : "arr-red";
+      const op   = win ? "0.85" : "0.50";
+      const sw   = win ? "2.5" : "2";
+
+      const toC = step.to ? nodeXY(step.to) : null;
+      if (!toC) continue;
+      const [tx, ty] = toC;
+
+      if (step.from) {
+        const fromC = nodeXY(step.from);
+        if (fromC) {
+          const [fx, fy] = fromC;
+          const dx = tx - fx, dy = ty - fy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist > PIECE_R * 2) {
+            const sx = fx + dx / dist * PIECE_R;
+            const sy = fy + dy / dist * PIECE_R;
+            const ex = tx - dx / dist * PIECE_R;
+            const ey = ty - dy / dist * PIECE_R;
+            this._malomTrajGroup.appendChild(_el("line", {
+              x1: sx, y1: sy, x2: ex, y2: ey,
+              stroke: col, "stroke-width": sw, opacity: op,
+              "marker-end": `url(#${mrkr})`,
+            }));
+          }
+        }
+      } else {
+        this._malomTrajGroup.appendChild(_el("circle", {
+          cx: tx, cy: ty, r: PIECE_R + 6,
+          fill: win ? "rgba(76,175,80,0.12)" : "rgba(224,80,80,0.10)",
+          stroke: col, "stroke-width": "2", opacity: op,
+        }));
+      }
+
+      this._malomTrajGroup.appendChild(_el("circle", {
+        cx: tx, cy: ty, r: PIECE_R + 5,
+        fill: "none", stroke: col, "stroke-width": "1.8", opacity: op,
+      }));
+
+      if (step.capture) {
+        const capC = nodeXY(step.capture);
+        if (capC) {
+          const [cx, cy] = capC;
+          const S = 9;
+          this._malomTrajGroup.appendChild(_el("line", { x1: cx-S, y1: cy-S, x2: cx+S, y2: cy+S, stroke: col, "stroke-width": sw, opacity: op }));
+          this._malomTrajGroup.appendChild(_el("line", { x1: cx+S, y1: cy-S, x2: cx-S, y2: cy+S, stroke: col, "stroke-width": sw, opacity: op }));
+        }
+      }
+
+      if (step.dtw > 0) {
+        const bg = _el("circle", { cx: tx + 13, cy: ty - 13, r: 9, fill: "#1a1a2e", stroke: col, "stroke-width": "1.5", opacity: op });
+        const lbl = _el("text", { x: tx + 13, y: ty - 13, "font-size": "9", fill: col, "text-anchor": "middle", "dominant-baseline": "middle", opacity: op });
+        lbl.textContent = step.dtw;
+        this._malomTrajGroup.appendChild(bg);
+        this._malomTrajGroup.appendChild(lbl);
+      }
+    }
+  }
+
   // Draw a green suggested-move overlay (arrow for moves, ring for placements, X for captures).
   // Call AFTER setReplayQualityRings so it appends without clearing.
   drawSignalHint(notation) {
@@ -571,7 +649,9 @@ export class Board {
       }));
     };
 
-    const _drawArrow = (from, to, color, marker) => {
+    const dotted = !!data.dotted;
+
+    const _drawArrow = (from, to, color, marker, isDotted = false) => {
       if (!from || !to || from === to) return;
       const [fx, fy] = nodeXY(from);
       const [tx, ty] = nodeXY(to);
@@ -579,32 +659,38 @@ export class Board {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 1) return;
       const ux = dx / dist, uy = dy / dist;
-      g.appendChild(_el("line", {
+      const attrs = {
         x1: fx + ux * PIECE_R, y1: fy + uy * PIECE_R,
         x2: tx - ux * (PIECE_R + 4), y2: ty - uy * (PIECE_R + 4),
-        stroke: color, "stroke-width": "2.5", opacity: "0.85",
+        stroke: color, "stroke-width": "2.5", opacity: isDotted ? "0.65" : "0.85",
         "marker-end": marker,
-      }));
-      g.appendChild(_el("circle", { cx: fx, cy: fy, r: 4, fill: color, opacity: "0.7" }));
+      };
+      if (isDotted) attrs["stroke-dasharray"] = "6 4";
+      g.appendChild(_el("line", attrs));
+      g.appendChild(_el("circle", { cx: fx, cy: fy, r: 4, fill: color, opacity: isDotted ? "0.5" : "0.7" }));
     };
 
     // ── Primary formation (orange) ──────────────────────────────────────────
+    const primRingDash = dotted ? "3 3" : "4 3";
+    const primRingOp   = dotted ? 0.6   : 0.75;
     for (const pos of data.target_squares)
-      _drawRing(pos, ORANGE, PIECE_R + 8, "4 3", 0.10);
+      _drawRing(pos, ORANGE, PIECE_R + 8, primRingDash, 0.08, 1.5, primRingOp);
     for (const pos of (data.stay || []))
-      _drawRing(pos, STAY_COL, PIECE_R + 5, "none", 0, 2.5, 0.9);
+      _drawRing(pos, STAY_COL, PIECE_R + 5, "none", 0, 2.5, dotted ? 0.65 : 0.9);
     for (const { from, to } of (data.arrows || []))
-      _drawArrow(from, to, ORANGE, "url(#arr-orange)");
+      _drawArrow(from, to, ORANGE, "url(#arr-orange)", dotted);
 
     // ── Secondary formation (brown) ─────────────────────────────────────────
     const sec = data.secondary;
     if (sec && sec.target_squares && sec.target_squares.length) {
+      const secRingDash = dotted ? "2 3" : "3 4";
+      const secRingOp   = dotted ? 0.5   : 0.7;
       for (const pos of sec.target_squares)
-        _drawRing(pos, BROWN, PIECE_R + 12, "3 4", 0.07);
+        _drawRing(pos, BROWN, PIECE_R + 12, secRingDash, 0.05, 1.5, secRingOp);
       for (const pos of (sec.stay || []))
-        _drawRing(pos, BROWN, PIECE_R + 9, "none", 0, 2.0, 0.75);
+        _drawRing(pos, BROWN, PIECE_R + 9, "none", 0, 2.0, dotted ? 0.55 : 0.75);
       for (const { from, to } of (sec.arrows || []))
-        _drawArrow(from, to, BROWN, "url(#arr-brown)");
+        _drawArrow(from, to, BROWN, "url(#arr-brown)", dotted);
 
       // ── Anchor squares: gold ring on top (shared by both formations) ──────
       for (const pos of (sec.anchor_squares || [])) {
