@@ -131,6 +131,9 @@ class HeuristicWeights:
     black_fork_anticipation_early: int = 117  # fork_anticipation for Black at placement_index 0–4
     black_dual_threat_late: int     = 240  # dual_threat_placement for Black at placement_index 6–7
     white_independent_mills: int    = 280  # dual_threat_placement for White at placement_index 7–8
+    # ── Personality overlay (hybrid 2+4: H1 nudge within v2 window) ─────
+    personality_blend: int    = 0     # 0–100: max H1 contribution as % of v2 root spread
+    personality_window: int   = 8     # 0–100: % of v2 spread below best within which H1 fires
     # ── Behaviour (consumed by GameAI, not heuristics) ───────────────────
     make_mistakes: int        = 0     # blunder probability 0-100 %
     opening_adherence: int    = 50    # how strongly to follow the opening book (0-100)

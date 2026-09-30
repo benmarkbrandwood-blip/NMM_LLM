@@ -172,6 +172,11 @@ const WEIGHT_DEFAULTS = [
     tip: "How strongly the AI follows its chosen opening line. 0 = ignores the book entirely; 100 = always prefers the book destination over tactical moves." },
   { key: "loss_exploit",         group: "Behaviour",  label: "Exploit opponent losing lines %", def: 150, min: 0, max: 300, step: 10,
     tip: "How strongly to follow game lines where the opponent historically loses. 150 = 1.5× weight on opponent-loss trajectory hints." },
+  // ── Personality Strength ───────────────────────────────────────────────
+  { key: "personality_blend",    group: "Behaviour",  label: "Personality strength %",          def: 0,   min: 0,   max: 100,  step: 5,
+    tip: "How strongly the personality sliders (tactical weights) nudge move selection with Heuristics v2. 0 = off (pure v2). 50 = tactical weights can shift any move within the window by up to 50% of the score spread." },
+  { key: "personality_window",   group: "Behaviour",  label: "Personality window %",            def: 8,   min: 2,   max: 30,   step: 2,
+    tip: "How wide the 'indifference band' is for personality selection, as a % of v2 score spread. Moves outside this window from the best v2 move are decided by v2 alone — personality only acts within it." },
   // humanlike_blend lives in the Settings modal (Human-like play toggle + slider),
   // not here — it changes the AI's *style*, not its tuning constants.
 ];
@@ -185,6 +190,7 @@ const PERSONALITIES = [
   { value: "positional", label: "Positional — The Strategist"   },
   { value: "scholar",    label: "Scholar — The Bookworm"        },
   { value: "chaos",      label: "Chaos — The Trickster"         },
+  { value: "pure_h2",    label: "Pure H2 — The Purist"          },
 ];
 
 const PERSONALITY_PRESETS = {
@@ -196,6 +202,7 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 90, locked_mill_escape: 160, redirected_pin: 140,
     defer_for_chain: 300, block_cycling_priority: 120,
     value_net_blend: 80, make_mistakes: 0, opening_adherence: 50, loss_exploit: 150, move_variance_pct: 0,
+    personality_blend: 0, personality_window: 8,
   },
   // Hunts mills relentlessly; ignores cycling in favour of immediate mill closure.
   aggressive: {
@@ -206,6 +213,7 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 50, locked_mill_escape: 100, redirected_pin: 80,
     defer_for_chain: 200, block_cycling_priority: 60,
     value_net_blend: 75, make_mistakes: 0, opening_adherence: 15, loss_exploit: 200, move_variance_pct: 0,
+    personality_blend: 60, personality_window: 12,
   },
   // Smothers every opponent threat; wraps opponent mills; builds resilient diamond setups.
   defensive: {
@@ -216,6 +224,7 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 150, locked_mill_escape: 220, redirected_pin: 200,
     defer_for_chain: 350, block_cycling_priority: 200,
     value_net_blend: 80, make_mistakes: 0, opening_adherence: 25, loss_exploit: 100, move_variance_pct: 0,
+    personality_blend: 60, personality_window: 12,
   },
   // Spreads out, controls cross nodes, builds long-term structures.
   positional: {
@@ -226,6 +235,7 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 120, locked_mill_escape: 180, redirected_pin: 160,
     defer_for_chain: 320, block_cycling_priority: 180,
     value_net_blend: 80, make_mistakes: 0, opening_adherence: 40, loss_exploit: 180, move_variance_pct: 0,
+    personality_blend: 55, personality_window: 10,
   },
   // Methodical opening, solid diamond structures, strong book adherence.
   scholar: {
@@ -236,6 +246,7 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 100, locked_mill_escape: 230, redirected_pin: 100,
     defer_for_chain: 475, block_cycling_priority: 160,
     value_net_blend: 85, make_mistakes: 0, opening_adherence: 90, loss_exploit: 270, move_variance_pct: 0,
+    personality_blend: 45, personality_window: 8,
   },
   // Scatters pieces randomly, ignores strategy, makes frequent blunders.
   chaos: {
@@ -246,6 +257,18 @@ const PERSONALITY_PRESETS = {
     fork_anticipation: 20, locked_mill_escape: 50, redirected_pin: 30,
     defer_for_chain: 100, block_cycling_priority: 30,
     value_net_blend: 30, make_mistakes: 45, opening_adherence: 0, loss_exploit: 50, move_variance_pct: 25,
+    personality_blend: 70, personality_window: 20,
+  },
+  // Raw Heuristics v2 benchmark — no H1 overlay, no learned components. Neutral reference.
+  pure_h2: {
+    close_mill: 500, cycling_mill: 300, block_opponent_mill: 400,
+    stop_opponent_mills: 450, feeder_diamond: 200, mill_wrapping: 150,
+    cardinal_block: 200, scatter_placement: 75, setup_mill: 100, mill_opening: 200,
+    mill_count_scale: 100, mobility_scale: 100, blocked_scale: 100,
+    fork_anticipation: 90, locked_mill_escape: 160, redirected_pin: 140,
+    defer_for_chain: 300, block_cycling_priority: 120,
+    value_net_blend: 0, make_mistakes: 0, opening_adherence: 0, loss_exploit: 0, move_variance_pct: 0,
+    personality_blend: 0, personality_window: 8,
   },
 };
 
@@ -3858,12 +3881,15 @@ function _matchPersonality(weights) {
 
 // ── Tournament helpers ────────────────────────────────────────────────────────
 
+let _tournamentRosterSize = 7;  // updated at tournament_init
+
 function _renderTournamentInit(msg) {
   $("tournament-intro").hidden  = true;
   $("tournament-active").hidden = false;
   $("tournament-complete-info").hidden = true;
   $("btn-tournament-start").hidden = true;
   $("tournament-rows").innerHTML = "";
+  _tournamentRosterSize = msg.roster.length;
   $("tournament-elo").textContent   = msg.player_elo;
   $("tournament-total").textContent = "0";
   $("tournament-max").textContent   = msg.roster.length * 2;
@@ -3888,10 +3914,11 @@ function _setTournamentBadge(text) {
 
 function _handleTournamentNext(msg) {
   const colorName = msg.human_color === "W" ? "White" : "Black";
+  const total = _tournamentRosterSize;
   $("tournament-opponent-info").innerHTML =
-    `Game ${msg.game_idx + 1} of 6: <strong>${msg.label}</strong><br>` +
+    `Game ${msg.game_idx + 1} of ${total}: <strong>${msg.label}</strong><br>` +
     `You play as <strong>${colorName}</strong>`;
-  _setTournamentBadge(`🏆 Round ${msg.game_idx + 1}/6 — ${msg.label} · You play ${colorName}`);
+  _setTournamentBadge(`🏆 Round ${msg.game_idx + 1}/${total} — ${msg.label} · You play ${colorName}`);
   addCommentary("Tournament", `Game ${msg.game_idx + 1}: ${msg.label} — you play as ${colorName}`, "ai");
   // Auto-start the tournament game over the existing WebSocket
   if (ws && ws.readyState === WebSocket.OPEN) {

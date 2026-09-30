@@ -789,6 +789,12 @@ _PERSONALITY_WEIGHTS: dict[str, dict] = {
         "make_mistakes": 15, "scatter_placement": 50, "cardinal_block": 100,
         "feeder_diamond": 100, "cycling_mill": 150,
     },
+    "pure_h2": {
+        # Raw Heuristics v2 benchmark — no H1 overlay, no learned components.
+        # Acts as a neutral reference opponent.
+        "personality_blend": 0, "personality_window": 8,
+        "value_net_blend": 0, "opening_adherence": 0, "make_mistakes": 0,
+    },
 }
 
 
@@ -809,8 +815,9 @@ class TournamentState:
         {"name": "balanced",   "label": "Balanced",                    "elo": 960},
         {"name": "defensive",  "label": "Defensive — The Blocker",     "elo": 1020},
         {"name": "positional", "label": "Positional — The Strategist", "elo": 1080},
+        {"name": "pure_h2",    "label": "Pure H2 — The Purist",        "elo": 1140},
     ]
-    _COLORS = ["W", "B", "W", "B", "W", "B"]  # alternate for fairness
+    _COLORS = ["W", "B", "W", "B", "W", "B", "W"]  # alternate for fairness
 
     def __init__(self, player_elo: int = 1000) -> None:
         self.results: list[dict] = []
@@ -3781,6 +3788,8 @@ def _make_game_ai_for_personality(color: str, personality: str, difficulty: int)
         humanlike_blend=_w("humanlike_blend", 0),
         cross_mill_cycling=_w("cross_mill_cycling", 300),
         move_variance_pct=_w("move_variance_pct", 0),
+        personality_blend=_w("personality_blend", 0),
+        personality_window=_w("personality_window", 8),
     )
     _gai = GameAI(
         color=color, difficulty=difficulty, weights=hw,
@@ -5432,7 +5441,13 @@ async def ws_endpoint(websocket: WebSocket):
                             mv_e["sentinel_score"] = None
 
                     # ── Overseer overlay: per-move pick probabilities ─────────────
-                    if _overseer_advisor is not None and _overseer_advisor.is_loaded() and _mode != "capture":
+                    # Skip when neither overlay is enabled — score_moves is a full
+                    # neural-net inference pass and runs on every diagnostic request.
+                    _ov_session_active = (
+                        getattr(session, "use_overseer_player", False)
+                        or getattr(session, "use_generalist_player", False)
+                    )
+                    if _ov_session_active and _overseer_advisor is not None and _overseer_advisor.is_loaded() and _mode != "capture":
                         try:
                             ov_candidates = [
                                 {"from": mv_e.get("from"), "to": mv_e.get("to"),

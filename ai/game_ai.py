@@ -1791,6 +1791,56 @@ class GameAI:
             adjusted.append((move, raw + delta))
         return adjusted
 
+    def _apply_personality_overlay(
+        self,
+        scored: list[tuple[dict, int]],
+        board: "BoardState",
+    ) -> list[tuple[dict, int]]:
+        """Hybrid 2+4 personality overlay.
+
+        Computes a single-ply H1 tactical bonus for every root candidate,
+        normalises it so the maximum contribution is at most
+        ``personality_blend/100 × v2_spread``, then applies the nudge only to
+        candidates within ``personality_window/100 × v2_spread`` of the best v2
+        score.  Moves clearly better or worse are left untouched so v2 strength
+        is never compromised.
+        """
+        w = self._active_weights()
+        blend = getattr(w, "personality_blend", 0)
+        if blend <= 0 or not self.use_v2_heuristics or not scored:
+            return scored
+
+        best_v2 = max(s for _, s in scored)
+        v2_spread = max(1, best_v2 - min(s for _, s in scored))
+        window_pct = getattr(w, "personality_window", 8)
+        window_abs = (window_pct / 100.0) * v2_spread
+        max_h1_contribution = (blend / 100.0) * v2_spread
+
+        # Single-ply H1 delta per candidate (skip terminal/DB scores).
+        h1_deltas: list[float] = []
+        for move, score in scored:
+            if abs(score) >= INF // 2:
+                h1_deltas.append(0.0)
+                continue
+            nb = board.apply_move(move)
+            h1_deltas.append(float(
+                tactical_move_bonus(board, nb, self.color, w, self._opp_last_weak)
+            ))
+
+        # Normalise: scale so the strongest H1 signal = max_h1_contribution.
+        max_abs_h1 = max((abs(d) for d in h1_deltas), default=0.0)
+        if max_abs_h1 == 0:
+            return scored
+        h1_scale = max_h1_contribution / max_abs_h1
+
+        result: list[tuple[dict, int]] = []
+        for (move, score), h1_delta in zip(scored, h1_deltas):
+            if score >= best_v2 - window_abs and abs(score) < INF // 2:
+                result.append((move, score + int(h1_delta * h1_scale)))
+            else:
+                result.append((move, score))
+        return result
+
     def _store_killer(self, depth: int, from_sq: str | None, to_sq: str) -> None:
         """Record a quiet move that caused a beta cutoff at this remaining depth.
 
@@ -2468,11 +2518,16 @@ class GameAI:
             and getattr(self._weights, "humanlike_blend", 0) > 0
         )
         _vn_blend_active = self._vn_active(board)
+        _personality_active = (
+            self.use_v2_heuristics
+            and getattr(self._weights, "personality_blend", 0) > 0
+        )
         use_adjustments = (
             recognition is not None  # book bonus (applied last, guards novel/inactive internally)
             or (bool(trajectory_hints) and self._weights.opening_adherence > 0)
             or _humanlike_active
             or _vn_blend_active
+            or _personality_active
         )
         prev_score: int | None = None
 
@@ -2491,6 +2546,9 @@ class GameAI:
                     # Book bonus applied last so blends don't dilute it
                     if recognition is not None:
                         scored = self._apply_opening_adjustments(scored, recognition, board)
+                    # Personality overlay last: H1 nudge within v2-acceptable window
+                    if _personality_active:
+                        scored = self._apply_personality_overlay(scored, board)
                     if top_n > 1:
                         scored_sorted = sorted(scored, key=lambda x: x[1], reverse=True)
                         best_move = random.choice(scored_sorted[:top_n])[0]

@@ -13,11 +13,9 @@
     <div id="header-buttons">
       <div class="hdr-row">
         <button id="btn-new-game-header" class="hdr-bi">&#9658; New Game</button>
-        <button id="toggle-setup" class="hdr-bi">Game Setup</button>
-        <button id="btn-ai-vs-ai" class="hdr-bi" title="Watch two AIs play each other">&#x1F916; AI vs AI Games</button>
-        <button id="toggle-tournament" class="hdr-bi" title="Open Tournament Mode">&#127942; Tournament Games</button>
         <select id="hdr-personality" class="hdr-bi" title="AI Personality">
-          <option value="random" selected>Random</option>
+          <option value="pure_h2" selected>Pure H2 — The Purist</option>
+          <option value="random">Random</option>
           <option value="balanced">Balanced</option>
           <option value="aggressive">Aggressive</option>
           <option value="defensive">Defensive</option>
@@ -26,6 +24,9 @@
           <option value="chaos">Chaos</option>
           <option value="current">Custom</option>
         </select>
+        <button id="toggle-setup" class="hdr-bi">Game Setup</button>
+        <button id="btn-ai-vs-ai" class="hdr-bi" title="Watch two AIs play each other">&#x1F916; AI vs AI Games</button>
+        <button id="toggle-tournament" class="hdr-bi" title="Open Tournament Mode">&#127942; Tournament Games</button>
         <div id="assessment-btn-wrap" class="hdr-bi">
           <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
           <div id="assessment-progress-bar">
@@ -383,8 +384,9 @@
         <div class="form-row" id="row-personality">
           <label for="sel-game-personality">AI Personality</label>
           <select id="sel-game-personality">
+            <option value="pure_h2" selected>Pure H2 — The Purist</option>
             <option value="random">Random each game</option>
-            <option value="balanced" selected>Balanced</option>
+            <option value="balanced">Balanced</option>
             <option value="aggressive">Aggressive — The Crusher</option>
             <option value="defensive">Defensive — The Blocker</option>
             <option value="positional">Positional — The Strategist</option>
@@ -668,7 +670,7 @@
       <div class="panel-box" id="tournament-panel" hidden>
         <h3>&#127942; Tournament Mode</h3>
         <p id="tournament-intro" style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px;line-height:1.4">
-          Play through 6 AI personalities from weakest to strongest.
+          Play through 7 AI personalities from weakest to strongest and pure heuristics.
           You earn 2 pts for a win, 1 for a draw, 0 for a loss.
         </p>
         <div id="tournament-active" hidden>
@@ -767,6 +769,7 @@
         <option value="positional">Positional — The Strategist</option>
         <option value="scholar">Scholar — The Bookworm</option>
         <option value="chaos">Chaos — The Trickster</option>
+        <option value="pure_h2">Pure H2 — The Purist</option>
         <option value="generalist">Generalist AI</option>
       </select>
     </div>
@@ -779,6 +782,7 @@
         <option value="positional">Positional — The Strategist</option>
         <option value="scholar">Scholar — The Bookworm</option>
         <option value="chaos">Chaos — The Trickster</option>
+        <option value="pure_h2">Pure H2 — The Purist</option>
         <option value="generalist">Generalist AI</option>
       </select>
     </div>
