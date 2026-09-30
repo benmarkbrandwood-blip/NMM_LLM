@@ -1088,16 +1088,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     p.hidden = !p.hidden;
     $("toggle-tournament").classList.toggle("btn-active", !p.hidden);
   });
-  $("btn-tournament-start").addEventListener("click", () => {
-    if (ws) ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
-  });
+  $("btn-tournament-start").addEventListener("click", () => _sendTournamentStart());
   $("btn-tournament-restart").addEventListener("click", () => {
     $("tournament-complete-info").hidden = true;
     $("tournament-rows").innerHTML = "";
     $("tournament-active").hidden = true;
     $("btn-tournament-start").hidden = false;
     $("tournament-intro").hidden = false;
-    if (ws) ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
+    _sendTournamentStart();
   });
 
   // ── AI vs AI ──────────────────────────────────────────────────────────
@@ -3928,6 +3926,21 @@ function _matchPersonality(weights) {
 
 let _tournamentRosterSize = 7;  // updated at tournament_init
 let _isTournamentGame     = false; // true when current game is part of a tournament
+
+function _sendTournamentStart() {
+  const _doSend = () => ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    _doSend();
+    return;
+  }
+  // No active connection — open one now, then send tournament_start
+  if (ws) { ws.close(); ws = null; }
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.onopen    = _doSend;
+  ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
+  ws.onerror   = () => setStatus("Connection error.");
+  ws.onclose   = () => { if (phase !== "game_over") setStatus("Disconnected."); };
+}
 
 function _renderTournamentInit(msg) {
   $("tournament-intro").hidden  = true;
