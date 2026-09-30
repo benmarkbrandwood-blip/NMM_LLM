@@ -456,7 +456,7 @@ class PostGameAssessor:
                 _t0 = time.perf_counter()
                 probs = self._policy_advisor.probs(board, candidates, self._policy_elo_band)
                 ctx.t_policy += time.perf_counter() - _t0
-                if len(probs) > 0:
+                if len(probs) == len(candidates) and played_idx < len(probs):
                     policy_prob       = float(probs[played_idx])
                     top_idx           = int(np.argmax(probs))
                     policy_top_move   = _move_notation(candidates[top_idx])
@@ -476,7 +476,7 @@ class PostGameAssessor:
                 _t0 = time.perf_counter()
                 pref_probs = self._pref_advisor.probs(board, candidates, self._policy_elo_band)
                 ctx.t_pref += time.perf_counter() - _t0
-                if len(pref_probs) > 0:
+                if len(pref_probs) == len(candidates) and played_idx < len(pref_probs):
                     pref_prob_val     = float(pref_probs[played_idx])
                     policy_pref_delta = pref_prob_val - policy_prob
 

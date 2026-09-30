@@ -47,7 +47,7 @@ trap cleanup EXIT INT TERM
 # ── Launch server ─────────────────────────────────────────────────────────────
 info "Starting Nine Men's Morris at $URL ..."
 cd "$NMM_DIR"
-"$VENV_UV" web.app:app --host "$HOST" --port "$PORT" --reload \
+"$VENV_UV" web.app:app --host "$HOST" --port "$PORT" \
     --ws-ping-interval 60 --ws-ping-timeout 120 &
 SERVER_PID=$!
 

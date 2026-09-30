@@ -1029,6 +1029,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
 
+  // ── Cancel Assessment button (non-tournament only) ────────────────────
+  $("btn-cancel-assessment").addEventListener("click", () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "cancel_assessment" }));
+    }
+    _stopAssessmentTimer();
+    _updateAssessmentProgress(0);
+    const btn = $("btn-cancel-assessment");
+    if (btn) btn.style.display = "none";
+  });
+
+  // ── Tournament "Ready for next game" button ───────────────────────────
+  const _btnNextGame = $("btn-tournament-next-game");
+  if (_btnNextGame) {
+    _btnNextGame.addEventListener("click", () => {
+      _btnNextGame.style.display = "none";
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "tournament_next_ready" }));
+      }
+    });
+  }
+
   // ── Left column tab toggle ────────────────────────────────────────────
   $("tab-chat").addEventListener("click", () => _switchLeftTab("chat"));
   // Clicking the active profile tab closes it (returns to chat).
@@ -1209,6 +1231,7 @@ function startNewGame() {
     _loadPersonality(chosenPersonality);
   }
 
+  _isTournamentGame = false;
   clearCommentary();
   board && board.clearDiag();
   board && board.clearFormationGuide();
@@ -1216,6 +1239,7 @@ function startNewGame() {
   setStatus("Starting…");
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
+  { const _cb = $("btn-cancel-assessment"); if (_cb) _cb.style.display = "none"; }
   evalHistory = []; sentinelHistory = []; _humanColor = null;
   _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
   _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
@@ -1308,6 +1332,7 @@ function startAiVsAi() {
 
   $("ava-modal").style.display = "none";
 
+  _isTournamentGame = false;
   clearCommentary();
   board && board.clearDiag();
   setStatus("Starting AI vs AI…");
@@ -1535,6 +1560,7 @@ function startSetupGame() {
     _loadPersonality(p);
   }
 
+  _isTournamentGame = false;
   clearCommentary();
   board && board.clearDiag();
   setStatus("Starting setup game…");
@@ -2006,6 +2032,10 @@ function handleMessage(msg) {
       _handleTournamentNext(msg);
       break;
 
+    case "tournament_game_complete":
+      _handleTournamentGameComplete(msg);
+      break;
+
     case "tournament_update":
       _updateTournamentScoreboard(msg);
       break;
@@ -2167,6 +2197,7 @@ function handleMessage(msg) {
       _assessmentPlyBase       = msg.ply_base || 0;
       _assessmentReady = true;
       _stopAssessmentTimer();
+      _updateAssessmentProgress(0);
       // Redraw eval graph to show final (Malom-confirmed) turning-point markers
       drawEvalGraph();
       _annotateMovesListWithQuality();
@@ -2176,6 +2207,11 @@ function handleMessage(msg) {
       const feed = $("commentary-human");
       if (feed) {
         _renderAssessmentSignalSections(msg, feed);
+      }
+      // In a tournament game, show "Ready for next game" button
+      if (_isTournamentGame) {
+        const btnNext = $("btn-tournament-next-game");
+        if (btnNext) btnNext.style.display = "block";
       }
       break;
     }
@@ -2205,6 +2241,11 @@ function handleMessage(msg) {
         const reasonMap = { timeout: "Analysis timed out", cancelled: "Analysis cancelled", error: "Analysis failed" };
         div.textContent = reasonMap[msg.reason] || "Analysis unavailable";
         feed.insertBefore(div, feed.firstChild);
+      }
+      // In a tournament game, show "Ready for next game" even after failure/cancel
+      if (_isTournamentGame) {
+        const btnNext = $("btn-tournament-next-game");
+        if (btnNext) btnNext.style.display = "block";
       }
       break;
     }
@@ -3331,16 +3372,20 @@ function _updateAssessmentProgress(stage) {
   _assessmentActiveStage = stage;
   const bar   = $("assessment-progress-bar");
   const label = $("assessment-stage-label");
+  const cancelBtn = $("btn-cancel-assessment");
   if (!bar) return;
   if (stage === 0) {
     bar.style.display   = "none";
     if (label) { label.style.display = "none"; label.textContent = ""; }
+    if (cancelBtn) cancelBtn.style.display = "none";
     for (let i = 1; i <= 4; i++) {
       const seg = $(`ap-${i}`);
       if (seg) seg.className = "ap-seg";
     }
     return;
   }
+  // Show cancel button only for non-tournament games
+  if (cancelBtn) cancelBtn.style.display = _isTournamentGame ? "none" : "inline-block";
   bar.style.display = "flex";
   if (label) {
     label.style.display = "block";
@@ -3882,6 +3927,7 @@ function _matchPersonality(weights) {
 // ── Tournament helpers ────────────────────────────────────────────────────────
 
 let _tournamentRosterSize = 7;  // updated at tournament_init
+let _isTournamentGame     = false; // true when current game is part of a tournament
 
 function _renderTournamentInit(msg) {
   $("tournament-intro").hidden  = true;
@@ -3913,6 +3959,9 @@ function _setTournamentBadge(text) {
 }
 
 function _handleTournamentNext(msg) {
+  _isTournamentGame = true;
+  const btnNext = $("btn-tournament-next-game");
+  if (btnNext) btnNext.style.display = "none";
   const colorName = msg.human_color === "W" ? "White" : "Black";
   const total = _tournamentRosterSize;
   $("tournament-opponent-info").innerHTML =
@@ -3943,6 +3992,64 @@ function _handleTournamentNext(msg) {
       use_generalist_player: $("chk-generalist-player") ? $("chk-generalist-player").checked : false,
     }));
   }
+}
+
+function _handleTournamentGameComplete(msg) {
+  // Show a prompt asking whether to view game assessment before next game.
+  const overlay = document.createElement("div");
+  overlay.id = "tournament-assess-overlay";
+  overlay.style.cssText = [
+    "position:fixed","top:0","left:0","right:0","bottom:0","z-index:2000",
+    "background:rgba(0,0,0,.65)","display:flex","align-items:center","justify-content:center",
+  ].join(";");
+
+  const box = document.createElement("div");
+  box.style.cssText = [
+    "background:#2a220e","border:1px solid #6b5a2a","border-radius:6px",
+    "padding:20px 24px","max-width:340px","width:90%","text-align:center",
+    "color:#e8d9a0","font-size:.9rem",
+  ].join(";");
+
+  const title = document.createElement("div");
+  title.style.cssText = "font-weight:600;font-size:1rem;margin-bottom:10px";
+  title.textContent = "Game complete!";
+  box.appendChild(title);
+
+  const sub = document.createElement("div");
+  sub.style.cssText = "margin-bottom:16px;color:var(--text-dim);font-size:.85rem";
+  sub.textContent = "Would you like to view the game assessment before the next game?";
+  box.appendChild(sub);
+
+  const btnRow = document.createElement("div");
+  btnRow.style.cssText = "display:flex;gap:10px;justify-content:center";
+
+  const btnYes = document.createElement("button");
+  btnYes.textContent = "Yes, show assessment";
+  btnYes.style.cssText = "background:#3a5a30;color:#e8d9a0;border:1px solid #5a8a50;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:.85rem";
+  btnYes.addEventListener("click", () => {
+    overlay.remove();
+    // Assessment is already running in background. Show "Ready for next game" in the panel.
+    const btnNext = $("btn-tournament-next-game");
+    if (btnNext) btnNext.style.display = "block";
+    // Switch to chat tab so user sees the assessment
+    _switchLeftTab("chat");
+    addCommentary("Tournament", "Game assessment is running. Click 'Ready for Next Game' when you're done reviewing.", "ai");
+  });
+
+  const btnSkip = document.createElement("button");
+  btnSkip.textContent = "Skip, next game";
+  btnSkip.style.cssText = "background:#4a3020;color:#e8d9a0;border:1px solid #7a5a30;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:.85rem";
+  btnSkip.addEventListener("click", () => {
+    overlay.remove();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "tournament_next_ready" }));
+    }
+  });
+
+  btnRow.append(btnYes, btnSkip);
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 }
 
 function _updateTournamentScoreboard(msg) {

@@ -809,13 +809,13 @@ class TournamentState:
     # is NOT stored here — it is computed per-game from the player's live ELO
     # so every opponent plays at the same strength relative to the player.
     ROSTER: list[dict] = [
-        {"name": "chaos",      "label": "Chaos — The Trickster",      "elo": 720},
-        {"name": "aggressive", "label": "Aggressive — The Crusher",    "elo": 850},
-        {"name": "scholar",    "label": "Scholar — The Bookworm",      "elo": 900},
-        {"name": "balanced",   "label": "Balanced",                    "elo": 960},
-        {"name": "defensive",  "label": "Defensive — The Blocker",     "elo": 1020},
-        {"name": "positional", "label": "Positional — The Strategist", "elo": 1080},
-        {"name": "pure_h2",    "label": "Pure H2 — The Purist",        "elo": 1140},
+        {"name": "chaos",      "label": "Chaos — The Trickster",      "elo": 720,  "max_diff": 3},
+        {"name": "aggressive", "label": "Aggressive — The Crusher",    "elo": 850,  "max_diff": 4},
+        {"name": "scholar",    "label": "Scholar — The Bookworm",      "elo": 900,  "max_diff": 4},
+        {"name": "balanced",   "label": "Balanced",                    "elo": 960,  "max_diff": 5},
+        {"name": "defensive",  "label": "Defensive — The Blocker",     "elo": 1020, "max_diff": 5},
+        {"name": "positional", "label": "Positional — The Strategist", "elo": 1080, "max_diff": 6},
+        {"name": "pure_h2",    "label": "Pure H2 — The Purist",        "elo": 1140, "max_diff": 7},
     ]
     _COLORS = ["W", "B", "W", "B", "W", "B", "W"]  # alternate for fairness
 
@@ -843,16 +843,17 @@ class TournamentState:
         if self.complete:
             return None
         entry = self.ROSTER[self.current_idx]
+        diff  = min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99))
         return {
             **entry,
-            "diff":        self._diff_for_elo(self.player_elo),
+            "diff":        diff,
             "human_color": self._COLORS[self.current_idx],
             "game_idx":    self.current_idx,
         }
 
     def record(self, winner: str | None, human_color: str) -> None:
         entry     = self.ROSTER[self.current_idx]
-        diff      = self._diff_for_elo(self.player_elo)
+        diff      = min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99))
         human_won = (winner == human_color) if winner else None
         pts       = 2 if human_won is True else (1 if human_won is None else 0)
         ai_color = "B" if human_color == "W" else "W"
@@ -4430,8 +4431,10 @@ async def ws_endpoint(websocket: WebSocket):
         else:
             nxt = tournament.current
             await _send(websocket, {"type": "tournament_update", **tournament.summary()})
+            # Send tournament_game_complete so the client can prompt the user
+            # about assessment before auto-starting the next game.
             await _send(websocket, {
-                "type":        "tournament_next",
+                "type":        "tournament_game_complete",
                 "game_idx":    nxt["game_idx"],
                 "personality": nxt["name"],
                 "label":       nxt["label"],
@@ -6290,6 +6293,24 @@ async def ws_endpoint(websocket: WebSocket):
                     "difficulty":  nxt["diff"],
                     "human_color": nxt["human_color"],
                 })
+
+            # ── tournament_next_ready — client ready for next tournament game ──
+            elif kind == "tournament_next_ready":
+                if tournament is not None and not tournament.complete:
+                    nxt = tournament.current
+                    if nxt is not None:
+                        await _send(websocket, {
+                            "type":        "tournament_next",
+                            "game_idx":    nxt["game_idx"],
+                            "personality": nxt["name"],
+                            "label":       nxt["label"],
+                            "difficulty":  nxt["diff"],
+                            "human_color": nxt["human_color"],
+                        })
+
+            # ── cancel_assessment — user exits running assessment ─────────────
+            elif kind == "cancel_assessment":
+                _cancel_prior_assessment(session)
 
     except WebSocketDisconnect:
         log.info("WebSocket disconnected")

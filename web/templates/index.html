@@ -29,6 +29,7 @@
         <button id="toggle-tournament" class="hdr-bi" title="Open Tournament Mode">&#127942; Tournament Games</button>
         <div id="assessment-btn-wrap" class="hdr-bi">
           <button id="btn-game-assessment" title="Post-game analysis — turning point, poor moves, LLM commentary">&#128202; Game Assessment</button>
+          <button id="btn-cancel-assessment" style="display:none;font-size:.72rem;padding:2px 7px;background:#4a3030;border:1px solid #7a4a4a;color:#e8c8a0;border-radius:3px;cursor:pointer" title="Stop running assessment">Exit Assessment</button>
           <div id="assessment-progress-bar">
             <div class="ap-seg" id="ap-1" title="Turning points"></div>
             <div class="ap-seg" id="ap-2" title="AI divergence"></div>
@@ -692,6 +693,7 @@
           <div id="tournament-total-row" style="font-size:.82rem;color:var(--text-dim)">
             Points: <strong id="tournament-total">0</strong> / <strong id="tournament-max">12</strong>
           </div>
+          <button id="btn-tournament-next-game" style="display:none;margin-top:8px;width:100%" title="Proceed to next tournament game">&#9654; Ready for Next Game</button>
         </div>
         <div id="tournament-complete-info" hidden style="margin-top:8px;text-align:center">
           <div id="tournament-rank" style="font-size:1.1rem;font-weight:600;color:var(--tan)"></div>
