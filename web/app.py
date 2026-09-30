@@ -4549,8 +4549,34 @@ async def ws_endpoint(websocket: WebSocket):
                         )
                         _apply_search_depth(_re_ai)
 
+                    # Recreate coordinator so AI Discussion / LLM commentary work
+                    # in the resumed game, just as they would in a fresh new_game.
+                    _re_coord: "Coordinator | None" = None
+                    if not _vs_human and _re_ai is not None:
+                        if _module_mills_llm is not None:
+                            _re_llm = _module_mills_llm
+                            _re_mem = getattr(_re_llm, "_memory", None)
+                            if _re_mem is None:
+                                _re_mem = MemoryManager(use_ollama_embeddings=False)
+                            _re_coord = Coordinator(
+                                game_ai=_re_ai, mills_llm=_re_llm, memory=_re_mem,
+                                opening_recognizer=OpeningRecognizer(OpeningBook()),
+                                endgame_recognizer=EndgameRecognizer(),
+                                trajectory_db=_effective_tdb,
+                                endgame_db=_endgame_db,
+                                vs_human=True, human_color=_hc,
+                                policy_advisor=_human_move_policy_advisor,
+                                pref_advisor=_human_pref_net,
+                                generalist_advisor=_generalist_advisor,
+                                gap_net=_gap_net,
+                                sentinel_advisor=_sentinel_advisor,
+                            )
+                            await asyncio.to_thread(_re_coord.on_game_start)
+                        else:
+                            _re_coord = _make_nollm_coordinator(_re_ai, _hc, vs_human=False)
+
                     _cancel_prior_assessment(session)
-                    session = Session(_re_engine, _re_ai, None, _hc, _vs_human)
+                    session = Session(_re_engine, _re_ai, _re_coord, _hc, _vs_human)
                     log.info("Game restored from autosave: fen=%s diff=%d", _fen, _diff)
                     await _send(websocket, {"type": "game_restored"})
                     await _send(websocket, _state(session))

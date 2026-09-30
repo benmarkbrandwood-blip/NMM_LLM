@@ -186,6 +186,7 @@ class LiveMoveAnalyser:
         score_norm:   float,
         color:        str,
         ply:          int,
+        is_ai_move:   bool = False,
     ) -> LiveMoveSignals:
         """Compute signals for the given move and return a LiveMoveSignals."""
         from ai.coordinator import _move_str as _coord_move_str  # avoid circular at module level
@@ -263,12 +264,18 @@ class LiveMoveAnalyser:
                     except Exception:
                         pass
 
-        # ── Horizon regret (shallow vs deep) ──────────────────────────────────
+        # ── Horizon regret (shallow vs deep) — human moves only ───────────────
+        # Skip for AI moves: the AI already ran the deep search itself, so its
+        # score_norm IS the deep rank and a shallow re-rank adds nothing.
+        # Hard 1-second deadline prevents SE-8 extensions from blowing up the search.
         horizon_delta: Optional[float] = None
-        if self._shallow_ai is not None and legal_moves and move_idx is not None:
+        if self._shallow_ai is not None and not is_ai_move and legal_moves and move_idx is not None:
             try:
+                import time as _time
                 move_key = (move.get("from"), move["to"], move.get("capture"))
-                shallow_scored = self._shallow_ai.assess_position(board_before)
+                shallow_scored = self._shallow_ai.assess_position(
+                    board_before, deadline=_time.time() + 1.0
+                )
                 if shallow_scored:
                     s_all = [s for _, s in shallow_scored]
                     s_lo, s_hi = min(s_all), max(s_all)

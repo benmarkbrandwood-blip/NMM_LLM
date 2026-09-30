@@ -16922,5 +16922,79 @@
     "source_reference": "",
     "needs_llm_name": true,
     "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-827753a7",
+    "name": "The \"Central Blaze",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "c4",
+      "d7",
+      "a4",
+      "b4",
+      "b2",
+      "g4",
+      "d1",
+      "a7",
+      "g7",
+      "e4",
+      "f4",
+      "d2",
+      "f2",
+      "f6",
+      "e5",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".B......BW.............W|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.....WBW.....B.......W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.B...WBW....WB.......W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "BB.B.W.WBW....WB.......W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "BBWB.W.WBW....WB...B...W|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "BBWB.W.WBWBWWBWBB.WB...W|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
   }
 ]

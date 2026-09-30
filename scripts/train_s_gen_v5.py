@@ -226,6 +226,7 @@ BEST_CHECKPOINT_MIN_GAMES = 10
 # penalised for outcomes decided later in the game.  Winning/draw move sequences
 # (winning_lines / preferred_plays) still capture the full game line.
 SDB_PLY_THRESHOLD = 8
+SDB_OPENING_NOTATION_LEN = 6   # max learner placement moves recorded as opening key
 
 # ── Diff-20 completion gate ───────────────────────────────────────────────────
 
@@ -1512,6 +1513,20 @@ def _rollout(
                     [], "W", opponent_moves_notation, "gen",
                     learner_color=_opp_color,
                 )
+            # v5: record truncated placement-only opening key so preferred_plays
+            # accumulates across games (full game keys are near-unique and never
+            # reach the promotion threshold).
+            if _res == "W":
+                _place_moves = [
+                    m for m in learner_moves_notation
+                    if "-" not in m.split("x")[0]
+                ]
+                _open_seq = _place_moves[:SDB_OPENING_NOTATION_LEN]
+                if len(_open_seq) >= 3:
+                    specialist_db.record_game(
+                        [], "W", _open_seq, "opening",
+                        learner_color=learner_color,
+                    )
         except Exception:
             pass
         if malom_db is not None:

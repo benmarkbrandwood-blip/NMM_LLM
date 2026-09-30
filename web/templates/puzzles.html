@@ -482,6 +482,37 @@ window._savePuzzle = async function() {
   }
 };
 
+// ── Celebration ───────────────────────────────────────────────────────────────
+function _launchConfetti(durationMs = 3000) {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;';
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const colors = ['#ff4b4b','#ff9800','#ffeb3b','#4caf50','#03a9f4','#9c27b0','#e91e63','#00bcd4','#cddc39','#ff5722','#ffffff','#a8d8ff'];
+  const ps = Array.from({length: 130}, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * -canvas.height * 0.5,
+    w: Math.random() * 10 + 5, h: Math.random() * 5 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx: (Math.random() - 0.5) * 3, vy: Math.random() * 3 + 2,
+    angle: Math.random() * Math.PI * 2, spin: (Math.random() - 0.5) * 0.15,
+  }));
+  const start = performance.now();
+  function frame(ts) {
+    const elapsed = ts - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = elapsed > durationMs - 600 ? Math.max(0, (durationMs - elapsed) / 600) : 1;
+    for (const p of ps) {
+      p.x += p.vx; p.y += p.vy; p.angle += p.spin;
+      if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+      ctx.fillStyle = p.color; ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h); ctx.restore();
+    }
+    if (elapsed < durationMs) requestAnimationFrame(frame); else canvas.remove();
+  }
+  requestAnimationFrame(frame);
+}
+
 // ── Puzzle state ──────────────────────────────────────────────────────────────
 let puzzle      = null;
 let currentFen  = null;
@@ -766,6 +797,7 @@ async function submitMove(notation) {
       board.flashMills(posMap, puzzle.winning_side);
       setStatus('🎉 Excellent — forced win found!', 'ok');
       solved = true;
+      _launchConfetti();
     } else {
       showBoard();
       _opponentThinking = true;
@@ -790,7 +822,7 @@ async function autoPlayOpponent() {
         _opponentThinking = false;
         setupUserTurn(null);
         setStatus(data.game_over ? '🎉 You win — opponent has no moves!' : 'Free play — your turn.', 'info');
-        if (data.game_over) solved = true;
+        if (data.game_over) { solved = true; _launchConfetti(); }
         return;
       }
       movesDone.push(data.move);
@@ -802,6 +834,7 @@ async function autoPlayOpponent() {
       if (data.game_over) {
         setStatus(`Opponent played ${data.move}. Game over.`, 'info');
         solved = true;
+        _launchConfetti();
       } else {
         setupUserTurn(null);
         setStatus(`Free play — opponent played ${data.move}. Your turn.`, 'info');
@@ -818,6 +851,7 @@ async function autoPlayOpponent() {
   if (soFar >= puzzle.solution_line.length) {
     setStatus('🎉 Puzzle complete!', 'ok');
     solved = true;
+    _launchConfetti();
     return;
   }
   const oppMove   = puzzle.solution_line[soFar];

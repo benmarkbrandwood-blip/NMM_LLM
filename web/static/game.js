@@ -1881,6 +1881,8 @@ function handleMessage(msg) {
       break;
 
     case "game_over": {
+      const _wasVsHuman = isVsHuman;
+      const _wasAiVsAi  = isAiVsAi;
       phase = "game_over";
       stopThinkingTimer();
       board && board.clearFormationGuide();
@@ -1934,6 +1936,13 @@ function handleMessage(msg) {
         const tb = $("toggle-tournament");
         tb.disabled = false;
         tb.title = "Open Tournament Mode";
+      }
+
+      // Win/loss celebration (skip AI-vs-AI spectator mode)
+      if (msg.winner && !_wasAiVsAi) {
+        const humanWon = _wasVsHuman || !_humanColor || msg.winner === _humanColor;
+        if (humanWon) _launchConfetti(3000);
+        else _showSadFace(2500);
       }
       break;
     }
@@ -3495,6 +3504,7 @@ const _ASSESSMENT_LEGEND_ITEMS = [
   ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
   ["Unconventional",  "Moves ranked low by the Predictive net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
   ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped.", "mobility"],
+  ["Horizon Regret",  "Flags moves that look better at shallow (2-ply) search than they do at full depth — a classic sign of the horizon effect. Positive delta means the move ranked higher shallow than deep; larger values indicate the move is more deceptive.", "horizon"],
 ];
 
 function _buildAssessmentLegend() {
@@ -4448,4 +4458,64 @@ function _updateGuideWarning(data) {
     el.textContent = "⚠ " + parts.join(" · ");
     el.className = (threat <= 1 || dtwWarn) ? "guide-warn-urgent" : "guide-warn";
   }
+}
+
+// ── Celebration effects ───────────────────────────────────────────────────────
+
+function _launchConfetti(durationMs = 3000) {
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;";
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext("2d");
+  const colors = ["#ff4b4b","#ff9800","#ffeb3b","#4caf50","#03a9f4","#9c27b0","#e91e63","#00bcd4","#cddc39","#ff5722","#ffffff","#a8d8ff"];
+  const particles = Array.from({ length: 130 }, () => ({
+    x:     Math.random() * canvas.width,
+    y:     Math.random() * -canvas.height * 0.5,
+    w:     Math.random() * 10 + 5,
+    h:     Math.random() * 5 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    vx:    (Math.random() - 0.5) * 3,
+    vy:    Math.random() * 3 + 2,
+    angle: Math.random() * Math.PI * 2,
+    spin:  (Math.random() - 0.5) * 0.15,
+  }));
+  const start = performance.now();
+  function frame(ts) {
+    const elapsed = ts - start;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.globalAlpha = elapsed > durationMs - 600 ? Math.max(0, (durationMs - elapsed) / 600) : 1;
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.angle += p.spin;
+      if (p.y > canvas.height + 20) { p.y = -20; p.x = Math.random() * canvas.width; }
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    }
+    if (elapsed < durationMs) requestAnimationFrame(frame);
+    else canvas.remove();
+  }
+  requestAnimationFrame(frame);
+}
+
+function _showSadFace(durationMs = 2500) {
+  const el = document.createElement("div");
+  el.style.cssText = "position:fixed;top:50%;left:50%;transform:translate(-50%,-55%) scale(0.5);font-size:110px;z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.35s ease,transform 0.35s ease;text-shadow:0 4px 24px rgba(0,0,0,0.6);";
+  el.textContent = "😢";
+  document.body.appendChild(el);
+  requestAnimationFrame(() => {
+    el.style.opacity  = "1";
+    el.style.transform = "translate(-50%,-55%) scale(1)";
+    setTimeout(() => {
+      el.style.opacity = "0";
+      el.style.transform = "translate(-50%,-55%) scale(0.8)";
+      setTimeout(() => el.remove(), 400);
+    }, durationMs - 400);
+  });
 }

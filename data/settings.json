@@ -59,7 +59,7 @@
     "sel-opponent": "ai",
     "sel-human-color": "W",
     "sel-game-personality": "balanced",
-    "sel-difficulty": "8",
+    "sel-difficulty": "6",
     "chk-llm": true,
     "chk-llm-override": false,
     "chk-sentinel": false,

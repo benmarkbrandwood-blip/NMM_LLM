@@ -588,7 +588,8 @@ class Coordinator:
 
         move_str = _move_str(move)
         _ai_signals = self._live_analyser.analyse(
-            board, move, legal, ai_score, self.game_ai.color, self._turn_num
+            board, move, legal, ai_score, self.game_ai.color, self._turn_num,
+            is_ai_move=True,
         )
         self._emit_signal_badge(_ai_signals)
         self._emit_reasoning(board, move, self.game_ai.color, self._turn_num)

@@ -513,6 +513,7 @@
             <option value="">Off</option>
             <option value="inner_square">Inner square (b/f × 2/6)</option>
             <option value="cardinal">Cardinal (row 4 / col d)</option>
+            <option value="both">Both cardinal + middle ring</option>
           </select>
           <span style="font-size:.72rem; color:var(--text-dim);">— restricts first 3 AI placements</span>
         </div>
@@ -525,17 +526,8 @@
           </label>
         </div>
 
-        <div class="form-row" id="row-overseer" style="flex-direction:row; align-items:center; gap:8px; display:none">
-          <input type="checkbox" id="chk-overseer" disabled>
-          <label for="chk-overseer" style="color:var(--text); font-size:.9rem;">
-            AI choice overlay
-            <span style="font-size:.75rem; color:var(--text-dim);">(policy probabilities — requires trained checkpoint)</span>
-          </label>
-        </div>
-
-        <!-- Specialist AI toggle removed — failed experiment.  Keep a hidden
-             #chk-overseer-player input so any legacy client script that reads
-             `.checked` doesn't throw, and its value stays false forever. -->
+        <!-- AI choice overlay removed — superseded by live signal badge. -->
+        <input type="checkbox" id="chk-overseer" style="display:none;" aria-hidden="true">
         <input type="checkbox" id="chk-overseer-player" style="display:none;" aria-hidden="true">
 
         <div class="form-row" id="row-generalist-player" style="flex-direction:row; align-items:center; gap:8px;">

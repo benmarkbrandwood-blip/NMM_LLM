@@ -54,6 +54,7 @@ _INNER_SQUARE_POSITIONS: frozenset[str] = frozenset({
     "d2", "b2",         # bottom edge
     "b4",               # left edge
 })
+_BOTH_STAR_INNER: frozenset[str] = _STAR_SQUARES | _INNER_SQUARE_POSITIONS
 
 
 def _stm_can_close_mill(board: BoardState, color: str) -> bool:
@@ -1369,6 +1370,7 @@ class GameAI:
         if self.star_square_mode and board.pieces_placed.get(self.color, 0) < 3 and board.phase == "place":
             _ss_pool = (
                 _INNER_SQUARE_POSITIONS if self.star_square_mode == "inner_square"
+                else _BOTH_STAR_INNER   if self.star_square_mode == "both"
                 else _STAR_SQUARES
             )
             _empty_pool = {sq for sq in _ss_pool if board.positions.get(sq, "") == ""}
@@ -1579,12 +1581,16 @@ class GameAI:
             return 1.0
         return (my_score - lo) / (hi - lo)
 
-    def assess_position(self, board: BoardState) -> list[tuple[dict, int]]:
-        """Score all legal moves with no time deadline.
+    def assess_position(
+        self, board: BoardState, deadline: float | None = None
+    ) -> list[tuple[dict, int]]:
+        """Score all legal moves with an optional time deadline.
 
         Returns [(move, raw_int_score), ...] sorted best-first (mover's perspective).
-        Intended for PostGameAssessor only — not safe during live play.
-        Caller should set self.max_search_depth to a low value (e.g. 4) before use.
+        Pass deadline=None (default) for post-game use with no time cap.
+        Pass deadline=time.time()+N for live use — search aborts after N seconds and
+        returns partial results (unscored moves receive the worst score seen so far).
+        Caller should set self.max_search_depth to a low value (e.g. 2) before live use.
         """
         moves = get_all_legal_moves(board)
         if not moves:
@@ -1592,7 +1598,7 @@ class GameAI:
         total_on_board = sum(board.pieces_on_board.values())
         depth = max(2, _opening_ramp_depth(self.max_search_depth, total_on_board) - 1)
         old_deadline = self._deadline
-        self._deadline = math.inf
+        self._deadline = deadline if deadline is not None else math.inf
         try:
             scored = self._score_all(board, moves, depth)
         finally:
