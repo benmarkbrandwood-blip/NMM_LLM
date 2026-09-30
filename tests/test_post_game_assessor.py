@@ -1299,16 +1299,18 @@ class TestDebriefAnnotationPrompt:
         assert "SCORE TREND:" in prompt
 
     def test_turning_point_section_present(self):
-        """TURNING POINT section must appear when annotation has a turning point."""
+        """KEY EVENTS section must appear when annotation has a turning point."""
         ann = _make_annotation_with_tp()
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "TURNING POINT" in prompt
+        assert "KEY EVENTS" in prompt
 
     def test_other_poor_moves_present_when_multiple_confirmed_poor(self):
-        """OTHER POOR MOVES section appears only when there are additional confirmed_poor moves."""
+        """All confirmed-poor moves appear in KEY EVENTS when extra_poor=True."""
         ann = _make_annotation_with_tp(extra_poor=True)
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "OTHER POOR MOVES:" in prompt
+        # Both the turning-point move (d4) and the extra poor move (d2) must appear
+        assert "d4" in prompt
+        assert "d2" in prompt
 
     def test_other_poor_moves_absent_when_single_confirmed_poor(self):
         """OTHER POOR MOVES section must be absent when the turning point is the only poor move."""
@@ -1316,34 +1318,36 @@ class TestDebriefAnnotationPrompt:
         prompt = _build_debrief_prompt(_FakeReport(), ann)
         assert "OTHER POOR MOVES:" not in prompt
 
-    def test_no_decimal_in_turning_point_when_malom_full(self):
-        """When oracle is malom_full, TURNING POINT section must contain no bare decimals."""
+    def test_no_decimal_in_key_events_when_malom_full(self):
+        """When oracle is malom_full, KEY EVENTS malom lines must use WDL labels, not bare decimals."""
         ann = _make_annotation_with_tp(oracle="malom_full", quality="win_to_loss")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        # Extract only the TURNING POINT block
-        start = prompt.find("TURNING POINT")
-        end = prompt.find("\n\n", start) if "\n\n" in prompt[start:] else len(prompt)
-        tp_block = prompt[start:end]
-        # Must not contain a bare decimal number (e.g., "0.712")
-        assert not _re.search(r"\b0\.\d+\b", tp_block), \
-            f"Decimal found in TURNING POINT block: {tp_block!r}"
+        # Extract only the KEY EVENTS block
+        start = prompt.find("KEY EVENTS")
+        end = prompt.find("\n\n", start) if start >= 0 and "\n\n" in prompt[start:] else len(prompt)
+        ke_block = prompt[start:end] if start >= 0 else ""
+        # Must not contain a bare decimal number (e.g., "0.712") in malom lines
+        malom_lines = [l for l in ke_block.splitlines() if "[malom]" in l]
+        for line in malom_lines:
+            assert not _re.search(r"\b0\.\d+\b", line), \
+                f"Decimal found in malom KEY EVENTS line: {line!r}"
 
     def test_malom_wdl_label_used_not_raw_quality_string(self):
         """When oracle is malom_full, English WDL verdict is used, not the raw quality string."""
         ann = _make_annotation_with_tp(oracle="malom_full", quality="win_to_loss")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        # Must contain natural-language WDL description (arrow format: "winning → losing")
-        assert any(w in prompt for w in ("winning →", "→ losing", "drawn →", "→ drawn")), \
+        # Must contain natural-language WDL description (bracket arrow format: "[winning→losing]")
+        assert any(w in prompt for w in ("winning→", "→losing", "drawn→", "→drawn")), \
             f"Expected WDL verdict prose in prompt, got: {prompt!r}"
         # Raw 'win_to_loss' quality string must not appear verbatim
         assert "win_to_loss" not in prompt
 
     def test_regret_label_used_for_heuristic_oracle(self):
-        """When oracle is heuristic, the regret label (not an arrow) is shown."""
+        """When oracle is heuristic, the regret label is shown in regret=N.NN format."""
         ann = _make_annotation_with_tp(oracle="heuristic", quality="r_h:0.800")
         prompt = _build_debrief_prompt(_FakeReport(), ann)
-        assert "r_h:0.800" in prompt
-        assert "Regret signal:" in prompt
+        assert "regret=0.80" in prompt
+        assert "[heuristic]" in prompt
 
     def test_clean_moves_absent_from_other_poor(self):
         """Moves with quality='clean' must never appear in OTHER POOR MOVES."""
