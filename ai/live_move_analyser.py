@@ -24,9 +24,9 @@ STRONG_SCORE_THRESHOLD    = 0.75   # score_norm above this → strong (heuristic
 WEAK_PREF_THRESHOLD       = -0.20  # pref_delta below this → weak (human preference)
 STRONG_PREF_THRESHOLD     =  0.15  # pref_delta above this → strong (human preference)
 WEAK_SENTINEL_THRESHOLD   =  0.40  # sentinel quality below this → weak
-RISKY_BLUNDER_THRESHOLD   =  0.65  # blunder_zone above this → risky position
-GEN_DIVERGE_THRESHOLD     =  0.15  # generalist prob gap above this → significant divergence
-HORIZON_THRESHOLD         =  0.25  # horizon_delta above this → short-sighted move
+RISKY_BLUNDER_THRESHOLD   =  0.55  # blunder_zone above this → risky position
+GEN_DIVERGE_THRESHOLD     =  0.08  # generalist prob gap above this → significant divergence
+HORIZON_THRESHOLD         =  0.18  # horizon_delta above this → short-sighted move
 
 
 @dataclass
@@ -83,13 +83,13 @@ class LiveMoveSignals:
                 "strong" if self.sentinel_quality > 0.65 else "acceptable"
             )
             lines.append(f"  Sentinel quality: {self.sentinel_quality:.2f} ({label})")
-        if self.blunder_zone is not None and self.blunder_zone > 0.45:
+        if self.blunder_zone is not None and self.blunder_zone > 0.40:
+            label = "high" if self.blunder_zone > RISKY_BLUNDER_THRESHOLD else "moderate"
             lines.append(
-                f"  Blunder-zone risk: {self.blunder_zone:.2f} "
-                f"({'high' if self.blunder_zone > RISKY_BLUNDER_THRESHOLD else 'moderate'})"
+                f"  GapNet blunder-zone risk: {self.blunder_zone:.2f} ({label})"
             )
         if self.generalist_top is not None:
-            lines.append(f"  Generalist AI preferred: {self.generalist_top}")
+            lines.append(f"  Generalist AI preferred move: {self.generalist_top}")
         if self.horizon_delta is not None and self.horizon_delta >= HORIZON_THRESHOLD:
             lines.append(
                 f"  Horizon regret: {self.horizon_delta:+.2f} "
@@ -248,9 +248,9 @@ class LiveMoveAnalyser:
                 except Exception:
                     pass
 
-            # ── Generalist divergence (heavy, alternating plies) ──────────────
+            # ── Generalist divergence ─────────────────────────────────────────
             if self._generalist is not None and getattr(self._generalist, "is_loaded", lambda: False)():
-                if ply % 2 == 1:   # odd plies only
+                if True:   # run every ply; lower GEN_DIVERGE_THRESHOLD filters noise
                     try:
                         probs_gen = self._generalist.score_moves(board_before, legal_moves, color)
                         if probs_gen is not None and len(probs_gen) == len(legal_moves):

@@ -735,10 +735,14 @@ class Coordinator:
                 signals.horizon_delta is not None
                 and signals.horizon_delta >= self._horizon_threshold
             )
+            _blunder_notable = (
+                signals.blunder_zone is not None and signals.blunder_zone > 0.50
+            )
             _signal_fires = (
                 signals.is_weak
                 or signals.is_unconventional
                 or signals.is_risky
+                or _blunder_notable
                 or signals.generalist_top is not None
                 or _horizon_fires
             )

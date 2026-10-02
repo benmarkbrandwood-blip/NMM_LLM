@@ -801,28 +801,39 @@ _PERSONALITY_WEIGHTS: dict[str, dict] = {
 # ── Tournament ────────────────────────────────────────────────────────────────
 
 class TournamentState:
-    """Tracks one tournament run — 6 games vs the personality roster."""
+    """Tracks one tournament run vs a sampled slice of the full personality roster."""
 
     QUALIFY_GAMES = 0  # no qualification required — tournament always available
 
-    # Roster defines personality style and ELO rating for scoring; difficulty
-    # is NOT stored here — it is computed per-game from the player's live ELO
-    # so every opponent plays at the same strength relative to the player.
-    ROSTER: list[dict] = [
-        {"name": "chaos",      "label": "Chaos — The Trickster",      "elo": 720,  "max_diff": 3},
-        {"name": "aggressive", "label": "Aggressive — The Crusher",    "elo": 850,  "max_diff": 4},
-        {"name": "scholar",    "label": "Scholar — The Bookworm",      "elo": 900,  "max_diff": 4},
-        {"name": "balanced",   "label": "Balanced",                    "elo": 960,  "max_diff": 5},
-        {"name": "defensive",  "label": "Defensive — The Blocker",     "elo": 1020, "max_diff": 5},
-        {"name": "positional", "label": "Positional — The Strategist", "elo": 1080, "max_diff": 6},
-        {"name": "pure_h2",    "label": "Pure H2 — The Purist",        "elo": 1140, "max_diff": 7},
+    FULL_ROSTER: list[dict] = [
+        {"name": "chaos",       "label": "Chaos — The Trickster",         "elo": 720,  "max_diff": 3},
+        {"name": "aggressive",  "label": "Aggressive — The Crusher",       "elo": 850,  "max_diff": 4},
+        {"name": "scholar",     "label": "Scholar — The Bookworm",         "elo": 900,  "max_diff": 4},
+        {"name": "balanced",    "label": "Balanced",                       "elo": 960,  "max_diff": 5},
+        {"name": "defensive",   "label": "Defensive — The Blocker",        "elo": 1020, "max_diff": 5},
+        {"name": "positional",  "label": "Positional — The Strategist",    "elo": 1080, "max_diff": 6},
+        {"name": "pure_h2",     "label": "Pure H2 — The Purist",           "elo": 1140, "max_diff": 7},
+        {"name": "generalist",  "label": "Generalist — Neural Specialist", "elo": 1200, "max_diff": 8, "generalist_mode": True},
     ]
-    _COLORS = ["W", "B", "W", "B", "W", "B", "W"]  # alternate for fairness
+    _COLORS = ["W", "B", "W", "B", "W", "B", "W", "B"]  # alternate for fairness
 
-    def __init__(self, player_elo: int = 1000) -> None:
+    def __init__(
+        self,
+        player_elo: int = 1000,
+        player_count: int | None = None,
+        diff_level: int = 1,
+    ) -> None:
+        import random as _rand
         self.results: list[dict] = []
         self.current_idx: int   = 0
         self.player_elo: int    = player_elo
+        self.diff_level: int    = max(1, min(5, diff_level))
+        n = player_count or len(self.FULL_ROSTER)
+        n = max(2, min(n, len(self.FULL_ROSTER)))
+        if n >= len(self.FULL_ROSTER):
+            self.roster: list[dict] = list(self.FULL_ROSTER)
+        else:
+            self.roster = sorted(_rand.sample(self.FULL_ROSTER, n), key=lambda e: e["elo"])
 
     @staticmethod
     def _diff_for_elo(elo: int) -> int:
@@ -834,33 +845,62 @@ class TournamentState:
         if elo < 1600: return 7
         return 8
 
+    @staticmethod
+    def _time_cap_for_idx(idx: int, n: int, diff_level: int = 1) -> float:
+        """Linearly space search time based on roster position and progressive diff level."""
+        if n <= 1:
+            return 15.0
+        # Base range expands with progressive diff level (1→3s–20s, 3→5s–30s, 5→10s–45s)
+        lo = min(3.0 + (diff_level - 1) * 1.75, 10.0)
+        hi = min(20.0 + (diff_level - 1) * 6.25, 45.0)
+        return round(lo + (hi - lo) * idx / (n - 1), 1)
+
+    @staticmethod
+    def _depth_for_idx(idx: int, n: int, diff_level: int = 1) -> int:
+        """Scale max_search_depth from shallow (easiest) to deep (hardest)."""
+        if n <= 1:
+            return 8
+        # Base range 4–12; each diff_level adds 1 to the ceiling (max 5 extra = 4–17)
+        lo = 4
+        hi = min(12 + (diff_level - 1), 17)
+        return round(lo + (hi - lo) * idx / (n - 1))
+
     @property
     def complete(self) -> bool:
-        return self.current_idx >= len(self.ROSTER)
+        return self.current_idx >= len(self.roster)
 
     @property
     def current(self) -> dict | None:
         if self.complete:
             return None
-        entry = self.ROSTER[self.current_idx]
-        diff  = min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99))
+        entry    = self.roster[self.current_idx]
+        diff     = min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99))
+        dl       = getattr(self, "diff_level", 1)
+        n        = len(self.roster)
+        time_cap = self._time_cap_for_idx(self.current_idx, n, dl)
+        depth    = self._depth_for_idx(self.current_idx, n, dl)
         return {
             **entry,
             "diff":        diff,
-            "human_color": self._COLORS[self.current_idx],
+            "time_cap":    time_cap,
+            "search_depth": depth,
+            "human_color": self._COLORS[self.current_idx % len(self._COLORS)],
             "game_idx":    self.current_idx,
         }
 
     def record(self, winner: str | None, human_color: str) -> None:
-        entry     = self.ROSTER[self.current_idx]
+        entry     = self.roster[self.current_idx]
         diff      = min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99))
+        dl        = getattr(self, "diff_level", 1)
+        n         = len(self.roster)
+        time_cap  = self._time_cap_for_idx(self.current_idx, n, dl)
         human_won = (winner == human_color) if winner else None
         pts       = 2 if human_won is True else (1 if human_won is None else 0)
-        ai_color = "B" if human_color == "W" else "W"
         self.results.append({
             "personality":       entry["name"],
             "label":             entry["label"],
             "difficulty":        diff,
+            "time_cap":          time_cap,
             "human_color":       human_color,
             "white_personality": "Human" if human_color == "W" else entry["label"],
             "black_personality": "Human" if human_color == "B" else entry["label"],
@@ -873,11 +913,118 @@ class TournamentState:
         self.player_elo = max(100, int(self.player_elo + 32 * (actual - expected)))
         self.current_idx += 1
 
+    def simulate_remaining(self) -> None:
+        """Append ELO-based simulated results for FULL_ROSTER entries not in roster."""
+        import random as _rand
+        played_names = {r["personality"] for r in self.results}
+        rng = _rand.Random(self.player_elo)
+        for entry in self.FULL_ROSTER:
+            if entry["name"] in played_names:
+                continue
+            p_win  = 1.0 / (1.0 + 10.0 ** ((entry["elo"] - self.player_elo) / 400.0))
+            p_draw = min(0.15, p_win * (1.0 - p_win) * 2.0)
+            r = rng.random()
+            if r < p_win - p_draw / 2:
+                result, pts = "W", 2
+            elif r < p_win + p_draw / 2:
+                result, pts = "D", 1
+            else:
+                result, pts = "L", 0
+            idx         = len(self.results)
+            human_color = self._COLORS[idx % len(self._COLORS)]
+            self.results.append({
+                "personality":       entry["name"],
+                "label":             entry["label"],
+                "difficulty":        min(self._diff_for_elo(self.player_elo), entry.get("max_diff", 99)),
+                "human_color":       human_color,
+                "white_personality": "Human" if human_color == "W" else entry["label"],
+                "black_personality": "Human" if human_color == "B" else entry["label"],
+                "result":            result,
+                "points":            pts,
+                "simulated":         True,
+            })
+
+    def build_full_matrix(self, player_name: str = "You") -> dict:
+        """Build a full N×N round-robin results matrix for the tournament splash screen.
+
+        Participants: [human, roster[0], roster[1], ...]
+        matrix[i][j] = points scored by participant_i vs participant_j
+                       (2=win, 1=draw, 0=loss, None=diagonal)
+        Human row/col filled from actual results; AI vs AI filled by ELO simulation.
+        """
+        import random as _rand
+
+        participants = [{"name": "human", "label": player_name, "elo": self.player_elo, "is_human": True}]
+        for entry in self.roster:
+            participants.append({
+                "name":  entry["name"],
+                "label": entry["label"],
+                "elo":   entry["elo"],
+                "is_human": False,
+            })
+
+        n = len(participants)
+        matrix: list[list] = [[None] * n for _ in range(n)]
+
+        # Fill human results (row 0 / col 0) from actual recorded games
+        name_to_idx = {p["name"]: i for i, p in enumerate(participants)}
+        for result in self.results:
+            if result.get("simulated"):
+                continue
+            col = name_to_idx.get(result["personality"])
+            if col is None:
+                continue
+            human_pts = result["points"]       # 2=human win, 1=draw, 0=human loss
+            opp_pts   = 2 - human_pts          # symmetric
+            matrix[0][col] = human_pts
+            matrix[col][0] = opp_pts
+
+        # Simulate AI vs AI using ELO probabilities (deterministic seed)
+        rng = _rand.Random(self.player_elo * 31337 + len(self.roster))
+        for i in range(1, n):
+            for j in range(i + 1, n):
+                if matrix[i][j] is not None:
+                    continue
+                elo_i = participants[i]["elo"]
+                elo_j = participants[j]["elo"]
+                p_i_win  = 1.0 / (1.0 + 10.0 ** ((elo_j - elo_i) / 400.0))
+                p_draw   = min(0.15, p_i_win * (1.0 - p_i_win) * 2.0)
+                r = rng.random()
+                if r < p_i_win - p_draw / 2:
+                    pts_i, pts_j = 2, 0
+                elif r < p_i_win + p_draw / 2:
+                    pts_i, pts_j = 1, 1
+                else:
+                    pts_i, pts_j = 0, 2
+                matrix[i][j] = pts_i
+                matrix[j][i] = pts_j
+
+        # Per-player stats
+        stats = []
+        for i in range(n):
+            row = [v for v in matrix[i] if v is not None]
+            stats.append({
+                "points": sum(row),
+                "wins":   sum(1 for v in row if v == 2),
+                "draws":  sum(1 for v in row if v == 1),
+                "losses": sum(1 for v in row if v == 0),
+            })
+        # Rank by points descending (ties share rank)
+        sorted_pts = sorted({s["points"] for s in stats}, reverse=True)
+        rank_map   = {pts: i + 1 for i, pts in enumerate(sorted_pts)}
+        for s in stats:
+            s["rank"] = rank_map[s["points"]]
+
+        return {"participants": participants, "matrix": matrix, "stats": stats}
+
     def total_points(self) -> int:
-        return sum(r["points"] for r in self.results)
+        return sum(r["points"] for r in self.results if not r.get("simulated"))
 
     def rank_label(self) -> str:
-        pct = self.total_points() / (len(self.ROSTER) * 2)
+        played = [r for r in self.results if not r.get("simulated")]
+        if not played:
+            return "Apprentice"
+        pct = sum(r["points"] for r in played) / (len(self.roster) * 2)
         if pct >= 0.80: return "Master"
         if pct >= 0.60: return "Advanced"
         if pct >= 0.40: return "Intermediate"
@@ -888,7 +1035,7 @@ class TournamentState:
         return {
             "results":     self.results,
             "points":      self.total_points(),
-            "max_points":  len(self.ROSTER) * 2,
+            "max_points":  len(self.roster) * 2,
             "player_elo":  self.player_elo,
             "complete":    self.complete,
             "current_idx": self.current_idx,
@@ -988,7 +1135,7 @@ def _static_ver() -> str:
     """Short content hash used as a cache-busting query string for JS/CSS."""
     import hashlib
     h = hashlib.md5()
-    for name in ("game.js", "style.css", "board.js", "tools.js", "tools.css"):
+    for name in ("game.js", "style.css", "board.js", "tools.js", "tools.css", "explorer.js"):
         p = _WEB / "static" / name
         if p.exists():
             h.update(p.read_bytes())
@@ -1038,6 +1185,11 @@ async def ping():
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html", {"v": _static_ver()})
+
+
+@app.get("/tournament-results")
+async def tournament_results(request: Request):
+    return templates.TemplateResponse(request, "tournament_results.html", {"v": _static_ver()})
 
 
 @app.get("/api/weights")
@@ -1251,6 +1403,46 @@ async def api_profile_games(player: str = ""):
     return _JR(result)
 
 
+@app.get("/api/profile/games/{game_id}")
+async def get_profile_game(game_id: str):
+    """Return full move list and metadata for a saved game."""
+    from fastapi.responses import JSONResponse as _JR
+    import re as _re
+    if not _re.fullmatch(r'[a-zA-Z0-9_\-]{1,80}', game_id):
+        return _JR({"error": "Invalid game_id"}, status_code=400)
+    fpath = _GAMES_PATH / f"{game_id}.jsonl"
+    if not fpath.exists():
+        return _JR({"error": "Not found"}, status_code=404)
+    try:
+        lines = [l for l in fpath.read_text(encoding="utf-8").splitlines() if l.strip()]
+        record = json.loads(lines[0]) if lines else {}
+        assessment = json.loads(lines[1]) if len(lines) >= 2 else None
+        return _JR({
+            "game_id":      game_id,
+            "record":       record,
+            "assessment":   assessment,
+        })
+    except Exception as e:
+        return _JR({"error": str(e)}, status_code=500)
+
+
+@app.delete("/api/profile/games/{game_id}")
+async def delete_profile_game(game_id: str):
+    """Delete a single saved game file by stem ID."""
+    from fastapi.responses import JSONResponse as _JR
+    import re as _re
+    if not _re.fullmatch(r'[a-zA-Z0-9_\-]{1,80}', game_id):
+        return _JR({"error": "Invalid game_id"}, status_code=400)
+    fpath = _GAMES_PATH / f"{game_id}.jsonl"
+    if not fpath.exists():
+        return _JR({"error": "Not found"}, status_code=404)
+    try:
+        fpath.unlink()
+        return _JR({"ok": True})
+    except Exception as e:
+        return _JR({"error": str(e)}, status_code=500)
+
+
 @app.get("/api/profile/{name}")
 async def get_profile(name: str):
     from fastapi.responses import JSONResponse
@@ -1337,6 +1529,18 @@ def _notation_to_move_dict(n: str) -> dict:
     return {"from": None, "to": base, "capture": cap}
 
 
+def _fen_at(moves: list[str]) -> str | None:
+    """Replay moves from the opening book and return the FEN at the final ply."""
+    try:
+        from game.board import BoardState
+        b = BoardState.new_game()
+        for n in moves:
+            b = b.apply_move(_notation_to_move_dict(n))
+        return b.to_fen_string()
+    except Exception:
+        return None
+
+
 def _build_opening_tree(max_depth: int = 14) -> dict:
     """Build a prefix trie from the opening book + HumanDB frequencies.
 
@@ -1395,6 +1599,19 @@ def _build_opening_tree(max_depth: int = 14) -> dict:
                          else "human"  if "human"  in curated
                          else "book")   # teacher-predicted counts as curated book
 
+            # Family/child badge: child openings use "Family — CXX" naming
+            family_tag = None
+            for op in ops_here:
+                if ' — ' in op.name:
+                    parts = op.name.split(' — ', 1)
+                    family_tag = {"family": parts[0].strip(), "child": parts[1].strip()}
+                    break
+            if family_tag is None:
+                for op in ops_here:
+                    if op.family and op.family not in ("novel",):
+                        family_tag = {"family": op.family, "child": None}
+                        break
+
             children = _recurse(new_board, ply + 1, prefix + (move,))
             nodes.append({
                 "move":            move,
@@ -1406,6 +1623,7 @@ def _build_opening_tree(max_depth: int = 14) -> dict:
                 "b_wins":          entry.get("b", 0),
                 "opening_names":   term_names,
                 "through_openings": all_names,
+                "family_tag":      family_tag,
                 "children":        children,
             })
 
@@ -1426,6 +1644,150 @@ async def api_opening_tree(depth: int = 14, refresh: bool = False):
         _opening_tree_cache[d] = await asyncio.to_thread(_build_opening_tree, d)
     from fastapi.responses import JSONResponse
     return JSONResponse(_opening_tree_cache[d])
+
+
+@app.get("/api/opening_tree/sym_children")
+async def api_opening_tree_sym_children(path: str = ""):
+    """Return D4-symmetry-equivalent children for a path not in the book."""
+    from fastapi.responses import JSONResponse
+    from ai.board_symmetry import prefix_query_canonicals, transform_notation, SYM_INVERSE
+
+    moves = [m.strip() for m in path.split(",") if m.strip()] if path else []
+    if not moves:
+        return JSONResponse({"sym_idx": 0, "sym_name": None, "children": []})
+
+    d = max(2, min(16, len(moves) + 6))
+    if d not in _opening_tree_cache:
+        _opening_tree_cache[d] = await asyncio.to_thread(_build_opening_tree, d)
+    tree = _opening_tree_cache[d]
+
+    _SYM_NAMES = ["identity", "90° CCW", "180°", "270° CCW",
+                  "flip x-axis", "flip y-axis", "main diagonal", "anti-diagonal"]
+
+    # Collect ALL non-identity matches; return the one with the most children
+    # so that sparse sub-trees don't shadow richer canonical equivalents.
+    best: dict | None = None
+    for canonical_key, sym_idx in prefix_query_canonicals(moves, len(moves)):
+        if sym_idx == 0:
+            continue  # identity = user's own path, already handled client-side
+        canonical_moves = canonical_key.split("|") if canonical_key else []
+        node: dict = tree
+        for mv in canonical_moves:
+            node = next((c for c in node.get("children", []) if c["move"] == mv), None)
+            if node is None:
+                break
+        if node is None:
+            continue
+        inv = SYM_INVERSE[sym_idx]
+        result_children = []
+        for child in node.get("children", []):
+            tmove = transform_notation(child["move"], inv)
+            if tmove is not None:
+                result_children.append({**child, "move": tmove})
+        if result_children and (best is None or len(result_children) > len(best["children"])):
+            best = {
+                "sym_idx": sym_idx,
+                "sym_name": _SYM_NAMES[sym_idx],
+                "children": result_children,
+            }
+
+    return JSONResponse(best if best else {"sym_idx": 0, "sym_name": None, "children": []})
+
+
+@app.get("/api/opening_tree/children_for_family")
+async def api_family_children(family: str = ""):
+    """Return all openings for the given family as child entries, with FEN snapshots."""
+    from fastapi.responses import JSONResponse
+    if not family:
+        return JSONResponse([])
+    book = OpeningBook()
+    results = []
+    for op in book.values():
+        if op.family != family:
+            continue
+        if " — " in op.name:
+            child_code = op.name.split(" — ", 1)[1].strip()
+        elif op.name.startswith(family + " ") and op.name != family:
+            # "Closed Z Mill A01" → "A01"
+            child_code = op.name[len(family):].strip()
+        elif op.seed_source == "human":
+            # Human DB patterns are individually named siblings worth browsing
+            child_code = op.name
+        else:
+            # Placeholder/AI entries with no child structure — skip
+            continue
+        sigs = sorted(op.opening_fen_signatures, key=lambda s: s["ply"])
+        target_sig = sigs[-1] if sigs else None
+        fen = target_sig["fen"] if target_sig else _fen_at(op.line_moves)
+        results.append({
+            "opening_id":   op.opening_id,
+            "name":         op.name,
+            "child_code":   child_code,
+            "line_moves":   op.line_moves,
+            "fen":          fen,
+            "source":       op.seed_source,
+            "favored_side": getattr(op, "favored_side", "unknown"),
+        })
+    results.sort(key=lambda r: r["child_code"])
+    return JSONResponse(results)
+
+
+@app.get("/api/opening_families")
+async def api_opening_families():
+    """Return all book/human opening families grouped for the browse panel.
+
+    Excludes 'learned' / 'novel' entries. Each opening gets a final-ply FEN
+    so sibling child lines within the same family show distinct board positions.
+    """
+    from fastapi.responses import JSONResponse
+
+    EXCLUDE_SOURCES = {"learned"}
+    EXCLUDE_FAMILIES = {"novel"}
+
+    book = OpeningBook()
+    families: dict[str, dict] = {}
+
+    for op in book.values():
+        if op.seed_source in EXCLUDE_SOURCES:
+            continue
+        if op.family in EXCLUDE_FAMILIES:
+            continue
+        fam_key = op.family or op.name
+
+        if fam_key not in families:
+            source_type = "human" if op.seed_source == "human" else "book"
+            families[fam_key] = {
+                "family": fam_key,
+                "source": source_type,
+                "openings": [],
+            }
+
+        # Prefer last FEN signature; fall back to computing from moves
+        sigs = sorted(op.opening_fen_signatures, key=lambda s: s["ply"])
+        if sigs:
+            fen = sigs[-1]["fen"]
+        else:
+            fen = await asyncio.to_thread(_fen_at, op.line_moves)
+
+        families[fam_key]["openings"].append({
+            "opening_id": op.opening_id,
+            "name":       op.name,
+            "line_moves": op.line_moves,
+            "fen":        fen,
+            "ply_count":  len(op.line_moves),
+            "source":     op.seed_source,
+        })
+
+    # Sort openings within each family by ply_count then name
+    for fam in families.values():
+        fam["openings"].sort(key=lambda o: (o["ply_count"], o["name"]))
+
+    # Sort families: book first, then human; alphabetically within each group
+    family_list = sorted(
+        families.values(),
+        key=lambda f: (0 if f["source"] == "book" else 1, f["family"]),
+    )
+    return JSONResponse({"families": family_list})
 
 
 @app.post("/api/opening_tree/save")
@@ -4082,7 +4444,11 @@ async def _pre_ai_static_diag(ws: WebSocket, board, session, elo_band: str = "mi
             m.setdefault("sentinel_score", None)
 
         # ── Overseer ──────────────────────────────────────────────────────────
-        if _overseer_advisor is not None and _overseer_advisor.is_loaded():
+        _pre_ov_active = (
+            getattr(session, "use_overseer_player", False)
+            or getattr(session, "use_generalist_player", False)
+        )
+        if _pre_ov_active and _overseer_advisor is not None and _overseer_advisor.is_loaded():
             try:
                 ov_probs = await asyncio.to_thread(
                     _overseer_advisor.score_moves, board, candidates, color,
@@ -4163,7 +4529,18 @@ async def _ai_turn(ws: WebSocket, session: Session, elo_band: str = "middle") ->
         else _moves_played // 2 + 1
     )
 
-    exp   = _expected_think_seconds(diff, total)
+    # For tournament games use actual graded depth/time-cap for an accurate countdown.
+    if session.is_tournament_game and session.game_ai is not None:
+        _t_depth = session.game_ai.max_search_depth
+        _t_cap   = getattr(session.game_ai, "_override_time_budget", None) or 15.0
+        _DEPTH_TIMES = {4: 1, 5: 3, 6: 8, 7: 15, 8: 30, 9: 45, 10: 60, 11: 60, 12: 60}
+        _uncapped = float(_DEPTH_TIMES.get(_t_depth, max(1, (_t_depth - 3) * 4)))
+        exp = min(_uncapped, _t_cap)
+    else:
+        exp = _expected_think_seconds(diff, total)
+    _think_cap = float(_load_settings().get("think_time_seconds", 0))
+    if _think_cap > 0 and session.game_ai is not None:
+        session.game_ai.user_think_cap = _think_cap
     max_depth_exp = getattr(session.game_ai, "max_search_depth", 0) if session.game_ai else 0
     log.info("AI turn start  color=%s diff=%s total_pieces=%s turn=%d ai_turn=%d",
              board.turn, diff, total, _turn_num, _ai_turn_num)
@@ -4427,7 +4804,20 @@ async def ws_endpoint(websocket: WebSocket):
             return
         tournament.record(session.engine.winner, session.human_color)
         if tournament.complete:
-            await _send(websocket, {"type": "tournament_complete", **tournament.summary()})
+            tournament.simulate_remaining()
+            summ = tournament.summary()
+            summ["diff_level"]   = tournament.diff_level
+            summ["matrix_data"]  = tournament.build_full_matrix(player_name or "You")
+            await _send(websocket, {"type": "tournament_complete", **summ})
+            # Persist tournament result in player profile
+            if player_name and is_valid_name(player_name):
+                try:
+                    _tp = await asyncio.to_thread(load_profile, player_name)
+                    _tp.record_tournament(summ)
+                    await asyncio.to_thread(save_profile, _tp)
+                    await _send(websocket, {"type": "profile_update", **_tp.to_dict()})
+                except Exception:
+                    pass
         else:
             nxt = tournament.current
             await _send(websocket, {"type": "tournament_update", **tournament.summary()})
@@ -4452,7 +4842,7 @@ async def ws_endpoint(websocket: WebSocket):
             _exp   = _expected_think_seconds(_diff, _total)
         else:
             _exp = 10.0
-        _grace = 5.0
+        _grace = 1.5
 
         async def _auto_force():
             await asyncio.sleep(_exp + _grace)
@@ -4599,6 +4989,126 @@ async def ws_endpoint(websocket: WebSocket):
                     await _send(websocket, {"type": "error", "message": "Could not restore game"})
                 continue
 
+            # ── load_saved_game — load any saved game in replay mode ─────────
+            if kind == "load_saved_game":
+                import re as _re_lg
+                _lg_id = str(msg.get("game_id", ""))
+                if not _re_lg.fullmatch(r'[a-zA-Z0-9_\-]{1,80}', _lg_id):
+                    await _send(websocket, {"type": "error", "message": "Invalid game ID"})
+                    continue
+                _lg_path = _GAMES_PATH / f"{_lg_id}.jsonl"
+                if not _lg_path.exists():
+                    await _send(websocket, {"type": "error", "message": "Game not found"})
+                    continue
+                try:
+                    _lg_lines = [l for l in _lg_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+                    _lg_rec   = json.loads(_lg_lines[0]) if _lg_lines else {}
+                    _lg_moves = _lg_rec.get("moves", [])
+                    _lg_hc    = _lg_rec.get("human_color", "W")
+                    _lg_diff  = int(_lg_rec.get("difficulty", 3))
+                    _lg_winner = _lg_rec.get("winner")
+
+                    # Replay moves through BoardState to get the final position
+                    try:
+                        _lg_final_board_obj = BoardState.new_game()
+                        for _lgm in _lg_moves:
+                            _lg_mv_d = {"from": _lgm.get("from"), "to": _lgm.get("to"), "capture": _lgm.get("capture")}
+                            _lg_final_board_obj = _lg_final_board_obj.apply_move(_lg_mv_d)
+                        _lg_final_fen   = _lg_final_board_obj.to_fen_string()
+                        _lg_final_board = dict(_lg_final_board_obj.positions)
+                    except Exception:
+                        _lg_final_fen   = ""
+                        _lg_final_board = _compute_board_at_ply(_lg_moves, len(_lg_moves))
+
+                    # Transform moves to have fen field (same format as _state() moves)
+                    _lg_moves_xfm = [
+                        {
+                            "color":    m.get("color", "?"),
+                            "notation": m.get("notation", ""),
+                            "fen":      m.get("board_fen_before", ""),
+                            "to":       m.get("to", ""),
+                        }
+                        for m in _lg_moves
+                    ]
+
+                    # Build engine in replay mode — board stays at initial position
+                    _lg_engine = GameEngine(human_color=_lg_hc)
+                    _lg_engine.game_record.update(_lg_rec)
+
+                    session = Session(_lg_engine, None, None, _lg_hc, False)
+                    session.player_name = player_name
+
+                    await _send(websocket, {
+                        **_state(session),
+                        "type":        "game_start",
+                        "replay_mode": True,
+                        "human_color": _lg_hc,
+                        "moves":       _lg_moves_xfm,
+                        "final_board": _lg_final_board,
+                        "final_fen":   _lg_final_fen,
+                        "winner":      _lg_winner,
+                        "draw_reason": _lg_rec.get("draw_reason"),
+                    })
+                    log.info("Loaded saved game %s for replay (%d moves)", _lg_id, len(_lg_moves))
+                except Exception as _lg_exc:
+                    log.warning("load_saved_game failed: %s", _lg_exc)
+                    await _send(websocket, {"type": "error", "message": "Could not load game"})
+                continue
+
+            # ── continue_saved_game — resume an unfinished saved game ─────────
+            if kind == "continue_saved_game":
+                import re as _re_csg
+                _csg_id = str(msg.get("game_id", ""))
+                if not _re_csg.fullmatch(r'[a-zA-Z0-9_\-]{1,80}', _csg_id):
+                    await _send(websocket, {"type": "error", "message": "Invalid game ID"})
+                    continue
+                _csg_path = _GAMES_PATH / f"{_csg_id}.jsonl"
+                if not _csg_path.exists():
+                    await _send(websocket, {"type": "error", "message": "Game not found"})
+                    continue
+                try:
+                    _csg_lines = [l for l in _csg_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+                    _csg_rec   = json.loads(_csg_lines[0]) if _csg_lines else {}
+                    _csg_moves = _csg_rec.get("moves", [])
+                    _csg_hc    = _csg_rec.get("human_color", "W")
+                    _csg_diff  = int(_csg_rec.get("difficulty", 3))
+
+                    # Replay all moves to reach the saved board position
+                    _csg_board = BoardState.new_game()
+                    for _csgm in _csg_moves:
+                        _csg_mv = {"from": _csgm.get("from"), "to": _csgm.get("to"), "capture": _csgm.get("capture")}
+                        try:
+                            _csg_board = _csg_board.apply_move(_csg_mv)
+                        except Exception:
+                            break
+
+                    _csg_engine = GameEngine(human_color=_csg_hc)
+                    _csg_engine.board = _csg_board
+                    _csg_engine.game_record.update(_csg_rec)
+
+                    _csg_ai = GameAI(
+                        color="B" if _csg_hc == "W" else "W",
+                        difficulty=_csg_diff,
+                        fullgame_db=_fullgame_db,
+                        endgame_solved_db=_endgame_solved_db,
+                        malom_db=_malom_db,
+                        value_net=_value_net,
+                        gap_net=_gap_net,
+                    )
+                    _apply_search_depth(_csg_ai)
+
+                    _cancel_prior_assessment(session)
+                    session = Session(_csg_engine, _csg_ai, None, _csg_hc, False)
+                    session.player_name = player_name
+                    log.info("Continued saved game %s (%d moves replayed)", _csg_id, len(_csg_moves))
+                    await _send(websocket, _state(session))
+                    if not _csg_engine.finished:
+                        _maybe_start_ai()
+                except Exception as _csg_exc:
+                    log.warning("continue_saved_game failed: %s", _csg_exc)
+                    await _send(websocket, {"type": "error", "message": "Could not continue game"})
+                continue
+
             # ── new_game ──────────────────────────────────────────────────────
             if kind == "new_game":
                 import random as _random
@@ -4672,6 +5182,9 @@ async def ws_endpoint(websocket: WebSocket):
                 use_learned_ai = bool(msg.get("use_learned_ai", False))
                 use_overseer_player = bool(msg.get("use_overseer_player", False))
                 use_generalist_player = bool(msg.get("use_generalist_player", False)) or diff >= 9
+                # Tournament games against the generalist personality always use neural move selection
+                if is_tournament and _t_pers == "generalist":
+                    use_generalist_player = True
                 star_square_mode = str(msg.get("star_square_mode", ""))
                 settings  = _load_settings()
 
@@ -4728,6 +5241,17 @@ async def ws_endpoint(websocket: WebSocket):
                     )
                     game_ai.suppress_fork_variety = _random.random() < 0.5
                     _apply_search_depth(game_ai)
+                    # Tournament: grade difficulty by roster position (depth + time cap)
+                    if is_tournament and tournament is not None:
+                        _tnxt_now  = tournament.current or {}
+                        _t_time_cap   = _tnxt_now.get("time_cap", 15.0)
+                        _t_srch_depth = _tnxt_now.get("search_depth", game_ai.max_search_depth)
+                        game_ai._override_time_budget = _t_time_cap
+                        game_ai.max_search_depth      = _t_srch_depth
+                        log.info(
+                            "Tournament: opponent %s depth=%d time=%.1fs",
+                            _t_pers, _t_srch_depth, _t_time_cap,
+                        )
                     log.info(
                         "Adaptive: requested diff=%d effective diff=%d extra_blunder=%.2f",
                         diff, eff_diff, adaptive.extra_blunder,
@@ -5174,6 +5698,13 @@ async def ws_endpoint(websocket: WebSocket):
 
                 # Pre-extract from msg before spawning — msg is overwritten each iteration.
                 _diag_prefix = list(msg.get("prefix", [])) if fen_override else []
+                _diag_diff = session.game_ai.difficulty if session.game_ai else 5
+                # Per-feature model gates — sentinel always runs; others depend on client needs.
+                _needs = msg.get("needs") or {}
+                _diag_need_gapnet   = bool(_needs.get("gapnet",   True))
+                _diag_need_valuenet = bool(_needs.get("valuenet",  True))
+                _diag_need_pref     = bool(_needs.get("pref",      True))
+                _diag_need_overseer = bool(_needs.get("overseer",  False))
 
                 # Run the heavy computation as a background task so the WS loop can
                 # continue receiving messages (e.g. force_move) while scoring runs.
@@ -5181,6 +5712,9 @@ async def ws_endpoint(websocket: WebSocket):
                 async def _run_diag(
                     _mode=diag_mode, _depth=diag_depth, _seq=diag_seq,
                     _fen=fen_override, _band=diag_elo_band, _prefix=_diag_prefix,
+                    _need_gap=_diag_need_gapnet, _need_val=_diag_need_valuenet,
+                    _need_pref_=_diag_need_pref, _need_ov=_diag_need_overseer,
+                    _diff=_diag_diff,
                 ):
                     # Determine board to analyse
                     if _mode == "capture" and session._proj_board is not None:
@@ -5235,14 +5769,14 @@ async def ws_endpoint(websocket: WebSocket):
                                                return_breakdown=True)
                             ev    = int(_heval(after, color))
                             gapnet_score = None
-                            if _gap_net is not None:
+                            if _need_gap and _gap_net is not None:
                                 try:
                                     _gn_raw = _gap_net.predict(after, color)
                                     gapnet_score = round((_gn_raw + 1) / 2, 4)
                                 except Exception:
                                     pass
                             value_score = None
-                            if _value_net is not None:
+                            if _need_val and _value_net is not None:
                                 try:
                                     _vn_raw = _value_net.predict(after, color)
                                     value_score = round((_vn_raw + 1) / 2, 4)
@@ -5261,7 +5795,7 @@ async def ws_endpoint(websocket: WebSocket):
                                 "pref_score":    None,  # filled below
                             })
                         # PrefNet scores — computed before sort so indices match legal order
-                        if _human_pref_net is not None and legal:
+                        if _need_pref_ and _human_pref_net is not None and legal:
                             try:
                                 pref_probs = await asyncio.to_thread(
                                     _human_pref_net.probs, diag_board, legal)
@@ -5295,18 +5829,18 @@ async def ws_endpoint(websocket: WebSocket):
                         except Exception:
                             pass
 
-                    # FullGame DB: per-move WIN/LOSS/NEUTRAL delta
+                    # FullGame DB: per-move WIN/LOSS/NEUTRAL delta (diff ≥ 5 only)
                     db_deltas: dict = {}
-                    if _fullgame_db and _fullgame_db.is_available():
+                    if _diff >= 5 and _fullgame_db and _fullgame_db.is_available():
                         try:
                             db_deltas = _fullgame_db.score_delta(diag_board, color)
                         except Exception:
                             pass
 
-                    # Endgame DB: probe each resulting position for WDL
+                    # Endgame DB: probe each resulting position for WDL (diff ≥ 6 only)
                     eg_flags: dict = {}
                     eg_dtws:  dict = {}   # per-move absolute depth-to-mate (Malom only)
-                    if _endgame_solved_db:
+                    if _diff >= 6 and _endgame_solved_db:
                         total_pc = sum(diag_board.pieces_on_board.values())
                         all_placed = (diag_board.pieces_placed.get("W", 0) >= 9
                                       and diag_board.pieces_placed.get("B", 0) >= 9)
@@ -5446,10 +5980,7 @@ async def ws_endpoint(websocket: WebSocket):
                     # ── Overseer overlay: per-move pick probabilities ─────────────
                     # Skip when neither overlay is enabled — score_moves is a full
                     # neural-net inference pass and runs on every diagnostic request.
-                    _ov_session_active = (
-                        getattr(session, "use_overseer_player", False)
-                        or getattr(session, "use_generalist_player", False)
-                    )
+                    _ov_session_active = _need_ov
                     if _ov_session_active and _overseer_advisor is not None and _overseer_advisor.is_loaded() and _mode != "capture":
                         try:
                             ov_candidates = [
@@ -6277,11 +6808,24 @@ async def ws_endpoint(websocket: WebSocket):
                         _t_start_elo = _t_profile.elo
                     except Exception:
                         pass
-                tournament = TournamentState(player_elo=_t_start_elo)
+                _t_count_raw  = msg.get("player_count")
+                _t_count      = int(_t_count_raw) if _t_count_raw else None
+                _t_diff_level = 1
+                if _t_player_name and is_valid_name(_t_player_name):
+                    try:
+                        _t_p2 = await asyncio.to_thread(load_profile, _t_player_name)
+                        _t_diff_level = max(1, _t_p2.tournament_diff_level)
+                    except Exception:
+                        pass
+                tournament = TournamentState(
+                    player_elo=_t_start_elo,
+                    player_count=_t_count,
+                    diff_level=_t_diff_level,
+                )
                 nxt = tournament.current
                 await _send(websocket, {
                     "type":          "tournament_init",
-                    "roster":        TournamentState.ROSTER,
+                    "roster":        tournament.roster,
                     "qualify_games": TournamentState.QUALIFY_GAMES,
                     "player_elo":    tournament.player_elo,
                 })
@@ -6291,6 +6835,8 @@ async def ws_endpoint(websocket: WebSocket):
                     "personality": nxt["name"],
                     "label":       nxt["label"],
                     "difficulty":  nxt["diff"],
+                    "time_cap":    nxt["time_cap"],
+                    "search_depth": nxt["search_depth"],
                     "human_color": nxt["human_color"],
                 })
 
@@ -6305,6 +6851,8 @@ async def ws_endpoint(websocket: WebSocket):
                             "personality": nxt["name"],
                             "label":       nxt["label"],
                             "difficulty":  nxt["diff"],
+                            "time_cap":    nxt["time_cap"],
+                    "search_depth": nxt["search_depth"],
                             "human_color": nxt["human_color"],
                         })
 

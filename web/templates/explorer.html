@@ -31,12 +31,12 @@
     #main { display: flex; flex: 1; overflow: hidden; }
 
     /* ── 3D canvas ── */
-    #canvas-wrap { flex: 1; position: relative; }
+    #canvas-wrap { flex: 1; position: relative; min-width: 0; }
     #board-canvas { width: 100%; height: 100%; display: block; }
 
     /* ── Side panel ── */
     #side-panel {
-      width: 280px; flex-shrink: 0; background: #221c12; border-left: 1px solid #5a4a2a;
+      width: 330px; flex-shrink: 0; background: #221c12; border-left: 1px solid #5a4a2a;
       display: flex; flex-direction: column; overflow: hidden;
     }
     .panel-section { padding: 0.75rem; border-bottom: 1px solid #3a2e1e; }
@@ -52,16 +52,19 @@
     .stat-label { color: #8a7a5a; }
     .stat-val { color: #e8d9c0; font-weight: 600; }
     .wdl-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin: 0.4rem 0; }
-    .wdl-bar .w { background: #22c55e; }
-    .wdl-bar .d { background: #f59e0b; }
-    .wdl-bar .l { background: #ef4444; }
+    .wdl-bar .w { background: #d4c9a0; }
+    .wdl-bar .d { background: #6a6460; }
+    .wdl-bar .l { background: #3a3440; }
     .malom-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 600; margin-top: 0.3rem; }
     .malom-w { background: #16532a; color: #4ade80; }
     .malom-d { background: #78350f; color: #fcd34d; }
     .malom-l { background: #7f1d1d; color: #fca5a5; }
 
     /* Move list */
-    #move-list { flex: 1; overflow-y: auto; }
+    #moves-section { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #moves-section h3 { padding: 0.75rem 0.75rem 0; flex-shrink: 0; }
+    #move-list { flex: 1; min-height: 0; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: #3a2e1e transparent; }
     .move-item {
       padding: 0.45rem 0.75rem; border-bottom: 1px solid #2a2018; cursor: pointer;
       display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem;
@@ -76,13 +79,23 @@
     .move-item-no-db { opacity: 0.85; }
     .move-sentinel { font-size: 0.72rem; color: #e07030; }
     .move-heuristic { font-size: 0.72rem; color: #c8a96e; }
-    .move-net-val { font-size: 0.72rem; min-width: 3.2em; text-align: right; }
+    .move-net-val { font-size: 0.7rem; min-width: 3.0em; text-align: right; }
     .move-list-net-hdr {
       display: flex; align-items: center; padding: 0.15rem 0.75rem;
-      font-size: 0.68rem; border-bottom: 1px solid #2a2018; gap: 0;
+      font-size: 0.65rem; border-bottom: 1px solid #2a2018; gap: 0;
     }
     .move-list-net-hdr-spacer { flex: 1; }
-    .move-net-hdr { min-width: 3.2em; text-align: right; font-weight: 600; font-size: 0.68rem; }
+    .move-net-hdr { min-width: 3.0em; text-align: right; font-weight: 600; font-size: 0.65rem; white-space: nowrap; }
+    .move-net-hdr-btn {
+      min-width: 3.0em; text-align: right; font-weight: 600; font-size: 0.65rem;
+      white-space: nowrap; background: none; border: none; cursor: pointer;
+      padding: 0.1rem 0.15rem; border-radius: 3px; transition: background .1s;
+    }
+    .move-net-hdr-btn:hover { background: rgba(255,255,255,0.07); }
+    .move-net-hdr-active {
+      background: rgba(255,255,255,0.12) !important;
+      text-decoration: underline; text-underline-offset: 2px;
+    }
 
     /* Colour legend */
     #color-legend { padding: 0.6rem 0.75rem; border-top: 1px solid #3a2e1e; }
@@ -179,7 +192,7 @@
 
     /* ── Opening tree left panel ── */
     #ot-left-panel {
-      width: 690px; flex-shrink: 0; background: #1e1812; border-right: 1px solid #4a3c28;
+      width: 520px; flex-shrink: 0; background: #1e1812; border-right: 1px solid #4a3c28;
       display: flex; flex-direction: column; overflow: hidden;
     }
     #ot-header {
@@ -208,12 +221,12 @@
     .ot-crumb-sep { font-size: 0.68rem; color: #5a4a2a; }
     .ot-ply-label { font-size: 0.66rem; color: #5a4a2a; margin-left: 0.2rem; }
 
-    /* Tree rows — horizontal grid layout for 690px panel */
+    /* Tree rows — horizontal grid layout for 520px panel */
     #ot-rows { display: flex; flex-direction: column; gap: 0.2rem; }
     .ot-row {
-      display: grid; grid-template-columns: 8rem 1fr 9rem 14rem;
-      align-items: center; gap: 0.5rem;
-      padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;
+      display: grid; grid-template-columns: 6.5rem 1fr 7rem 10rem;
+      align-items: center; gap: 0.4rem;
+      padding: 0.3rem 0.5rem; border-radius: 4px; cursor: pointer;
       border: 1px solid transparent;
     }
     .ot-row:hover { background: #2a2018; border-color: #4a3c28; }
@@ -233,6 +246,36 @@
     }
     .ot-expand-hint { font-size: 0.64rem; color: #5a4a2a; margin-left: auto; flex-shrink: 0; }
     .ot-diverge-msg { font-size: 0.76rem; color: #d97706; padding: 0.4rem 0; }
+    .ot-sym-badge { font-size: 0.72rem; color: #7ab8d9; background: #0e2030;
+      border: 1px solid #1e4060; border-radius: 3px; padding: 0.25rem 0.5rem; margin-bottom: 0.3rem; }
+    .ot-family-badge { font-size: 0.72rem; color: #e8c860; background: #2a2008;
+      border: 1px solid #5a4a10; border-radius: 3px; padding: 0.2rem 0.5rem; margin-bottom: 0.4rem;
+      display: inline-block; font-weight: 600; letter-spacing: 0.03em; }
+    .board-thumb { border-radius: 3px; display: block; flex-shrink: 0; }
+
+    /* Family child-opening dropdown */
+    .ot-family-dropdown { margin-bottom: 0.5rem; }
+    .ot-family-dropdown-summary {
+      font-size: 0.68rem; color: #8a7a5a; cursor: pointer; list-style: none;
+      padding: 0.15rem 0; user-select: none;
+    }
+    .ot-family-dropdown-summary::-webkit-details-marker { display: none; }
+    .ot-family-dropdown-summary::before { content: '▾ '; }
+    details.ot-family-dropdown:not([open]) .ot-family-dropdown-summary::before { content: '▸ '; }
+    .ot-family-strip {
+      display: flex; gap: 0.4rem; overflow-x: auto; padding: 0.4rem 0 0.3rem;
+      scrollbar-width: thin; scrollbar-color: #3a2e1e transparent;
+    }
+    .ot-family-card {
+      display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
+      flex-shrink: 0; cursor: pointer; border-radius: 4px; padding: 0.25rem;
+      border: 1px solid #3a2e1e; background: #1a1610;
+      transition: border-color .12s, background .12s;
+    }
+    .ot-family-card:hover { border-color: #8a7a4a; background: #252010; }
+    .ot-family-card-active { border-color: #c8a96e !important; background: #2a2010 !important; }
+    .ot-family-card-lbl { font-size: 0.64rem; color: #c8a96e; font-weight: 700; letter-spacing: 0.04em; }
+    .ot-family-card-side { font-size: 0.58rem; font-weight: 600; }
 
     /* Human% bar */
     .ot-pct-cell { display: flex; align-items: center; gap: 0.3rem; }
@@ -243,9 +286,9 @@
     /* W/D/L bar */
     .ot-wdl-cell { display: flex; align-items: center; gap: 0.3rem; }
     .ot-wdl-bar { flex: 1; display: flex; height: 5px; border-radius: 2px; overflow: hidden; }
-    .ot-wdl-w { background: #4ade80; }
-    .ot-wdl-d { background: #a06040; }
-    .ot-wdl-b { background: #ef4444; }
+    .ot-wdl-w { background: #d4c9a0; }
+    .ot-wdl-d { background: #6a6460; }
+    .ot-wdl-b { background: #3a3440; }
     .ot-wdl-text { font-size: 0.66rem; color: #8a7a5a; white-space: nowrap; flex-shrink: 0; }
 
     #ot-empty { font-size: 0.78rem; color: #5a4a2a; padding: 0.4rem 0; }
@@ -255,8 +298,62 @@
     .ot-src { font-size: 0.58rem; font-weight: 700; padding: 0.05rem 0.3rem; border-radius: 3px; letter-spacing: 0.04em; flex-shrink: 0; }
     .ot-src-human { background: #1e3a5f; color: #5ba3d9; border: 1px solid #2a4a6f; }
     .ot-src-novel { background: #3a2010; color: #c87040; border: 1px solid #5a3010; }
+    .ot-src-book  { background: #1a2e12; color: #5aba5a; border: 1px solid #2a4a22; }
     .ot-row-novel { opacity: 0.75; }
     .ot-row-novel:hover { opacity: 1.0; }
+
+    /* Filter chips */
+    #ot-filter-chips { display: flex; gap: 0.3rem; padding: 0.2rem 0 0.4rem; flex-wrap: wrap; }
+    .ot-chip {
+      font-size: 0.65rem; font-weight: 600; padding: 0.15rem 0.5rem;
+      border-radius: 3px; background: #2a2018; border: 1px solid #4a3c28;
+      color: #8a7a5a; cursor: pointer; transition: all .12s;
+    }
+    .ot-chip:hover { background: #3a2e1e; color: #c8a96e; }
+    .ot-chip.ot-chip-active { background: #3a2e10; border-color: #c8a96e; color: #e8c860; }
+
+    /* Browse-all-openings panel */
+    #ot-browse-panel {
+      border-top: 1px solid #3a2e1e; margin-bottom: 0.4rem;
+    }
+    #ot-browse-panel > summary {
+      font-size: 0.68rem; color: #8a7a5a; cursor: pointer; list-style: none;
+      padding: 0.3rem 0.4rem; user-select: none; display: flex; align-items: center; gap: 0.3rem;
+    }
+    #ot-browse-panel > summary::-webkit-details-marker { display: none; }
+    #ot-browse-panel > summary::before { content: '▸ '; }
+    #ot-browse-panel[open] > summary::before { content: '▾ '; }
+    #ot-browse-panel > summary:hover { color: #c8a96e; }
+    #ot-browse-content { padding: 0 0.1rem 0.4rem; max-height: 220px; overflow-y: auto;
+      scrollbar-width: thin; scrollbar-color: #3a2e1e transparent; }
+    .ot-browse-family { margin-bottom: 0.5rem; }
+    .ot-browse-strip {
+      display: flex; flex-wrap: wrap; gap: 0.35rem; padding: 0.3rem 0 0.2rem;
+    }
+    .ot-browse-family-hdr {
+      font-size: 0.66rem; font-weight: 700; color: #8a7a5a;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      padding: 0.15rem 0.2rem; margin-bottom: 0.15rem;
+      border-bottom: 1px solid #2a2010;
+    }
+    .ot-family-card-name {
+      font-size: 0.58rem; color: #8a7a5a; text-align: center;
+      max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    /* Sibling nav buttons */
+    #ot-nav-btns {
+      display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+      padding: 0.3rem 0.6rem; border-top: 1px solid #3a2e1e; flex-shrink: 0;
+    }
+    .ot-nav-btn {
+      font-size: 0.72rem; font-family: monospace; font-weight: 700;
+      padding: 0.18rem 0.55rem; border-radius: 3px;
+      background: #2a2018; border: 1px solid #4a3c28; color: #8a7a5a;
+      cursor: pointer; transition: all .12s; letter-spacing: -0.02em;
+    }
+    .ot-nav-btn:hover { background: #3a2e1e; color: #c8a96e; border-color: #6a5a38; }
+    #ot-nav-counter { font-size: 0.68rem; color: #5a4a2a; min-width: 4rem; text-align: center; font-family: monospace; }
 
     /* Save-opening form */
     #ot-save-bar {
@@ -279,6 +376,7 @@
 
 <header>
   <a href="/" class="btn-back">&#8592; Game</a>
+  <button id="ot-toggle-btn" class="btn-secondary" style="white-space:nowrap">&#9651; Opening Tree</button>
   <span class="hdr-sep">|</span>
   <h1>Position Explorer</h1>
   <span class="hdr-sep">|</span>
@@ -330,7 +428,7 @@
     </select>
   </label>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label"><input type="checkbox" id="ot-toggle"> Opening tree</label>
+  <input type="checkbox" id="ot-toggle" style="display:none">
 </header>
 
 <div id="main">
@@ -359,8 +457,25 @@
       <button id="ot-refresh-btn" title="Reload tree from server" style="font-size:0.66rem;padding:0.1rem 0.4rem;border:1px solid #4a3c28;border-radius:3px;background:#2a2018;color:#8a7a5a;cursor:pointer">&#x27F3;</button>
     </div>
     <div id="ot-body">
+      <details id="ot-browse-panel">
+        <summary>Browse all openings</summary>
+        <div id="ot-browse-content"><span style="font-size:0.72rem;color:#5a4a2a">Loading…</span></div>
+      </details>
       <div id="ot-breadcrumb"></div>
+      <div id="ot-filter-chips">
+        <button type="button" class="ot-chip ot-chip-active" data-filter="all">All</button>
+        <button type="button" class="ot-chip" data-filter="book">Book</button>
+        <button type="button" class="ot-chip" data-filter="human">Human</button>
+        <button type="button" class="ot-chip" data-filter="novel">Novel</button>
+      </div>
       <div id="ot-rows"><div id="ot-loading">Loading…</div></div>
+    </div>
+    <div id="ot-nav-btns">
+      <button type="button" class="ot-nav-btn" id="ot-nav-first" title="First sibling">|&#8592;</button>
+      <button type="button" class="ot-nav-btn" id="ot-nav-prev"  title="Previous sibling">&#171;&#171;</button>
+      <span id="ot-nav-counter">—</span>
+      <button type="button" class="ot-nav-btn" id="ot-nav-next"  title="Next sibling">&#187;&#187;</button>
+      <button type="button" class="ot-nav-btn" id="ot-nav-last"  title="Last sibling">&#8594;|</button>
     </div>
     <div id="ot-save-bar">
       <label>Save path as opening:</label>
@@ -416,7 +531,7 @@
       </div>
     </div>
 
-    <div class="panel-section">
+    <div class="panel-section" id="moves-section">
       <h3>Next moves</h3>
       <div id="move-list"></div>
     </div>

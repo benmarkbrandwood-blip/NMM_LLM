@@ -43,6 +43,7 @@ const QUALIFY_GAMES = 0;      // no qualification required — tournament always
 // ── Player profile state ──────────────────────────────────────────────────────
 let playerName = localStorage.getItem("nmm_player_name") || "";
 let _pureAiMode = false;
+let _activePersonality = "";
 
 // ── Diagnostic overlay state ──────────────────────────────────────────────────
 let diagEnabled     = false;        // true when Static or Negamax chip is active (drives eval-bar + score labels)
@@ -80,6 +81,24 @@ const GAME_NET_DEFS = {
 
 function _diagActive() {
   return diagStatic || diagNegamax || diagTraj || diagDB || diagOverseer || gameNetSlots.some(Boolean);
+}
+
+// Per-feature needs object sent with every diagnostic request.
+// Sentinel is always run server-side (eval graph); other models only when needed.
+function _diagNeedsObj() {
+  const llmOn = $("chk-llm")?.checked ?? true;
+  return {
+    gapnet:   llmOn || gameNetSlots.includes('gapnet'),
+    valuenet: llmOn || gameNetSlots.includes('value'),
+    pref:     llmOn || gameNetSlots.includes('pref'),
+    overseer: diagOverseer,
+  };
+}
+
+function _updatePerfWarning() {
+  const heavy = [diagStatic, diagNegamax, diagOverseer, gameNetSlots.some(Boolean)].filter(Boolean).length;
+  const w = $("perf-warning");
+  if (w) w.hidden = heavy < 2;
 }
 
 function _mvNotation(mv) {
@@ -191,6 +210,7 @@ const PERSONALITIES = [
   { value: "scholar",    label: "Scholar — The Bookworm"        },
   { value: "chaos",      label: "Chaos — The Trickster"         },
   { value: "pure_h2",    label: "Pure H2 — The Purist"          },
+  { value: "generalist", label: "Generalist AI — Neural"         },
 ];
 
 const PERSONALITY_PRESETS = {
@@ -579,6 +599,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "sel-difficulty",      type: "select" },
     { id: "chk-llm",             type: "checkbox" },
     { id: "chk-llm-override",   type: "checkbox" },
+    { id: "chk-live-chat",      type: "checkbox" },
     { id: "chk-sentinel",        type: "checkbox" },
     { id: "sel-sentinel-mode",   type: "select" },
     { id: "rng-sentinel-gap",    type: "range" },
@@ -746,6 +767,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!el) return;
     el.addEventListener('change', () => {
       gameNetSlots[i] = el.value;
+      _updatePerfWarning();
       if (el.value === 'regret') {
         _ensureGameRegret();
       } else {
@@ -765,6 +787,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!diagStatic) { _diagStaticData = null; }
     diagEnabled = diagStatic || diagNegamax;
     $("eval-bar").hidden = !diagEnabled;
+    _updatePerfWarning();
     if (diagStatic) { _diagTrigger(); } else { _diagRender(); }
   });
 
@@ -774,6 +797,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!diagNegamax) { _diagNegamaxData = null; }
     diagEnabled = diagStatic || diagNegamax;
     $("eval-bar").hidden = !diagEnabled;
+    _updatePerfWarning();
     _diagRender();
     if (diagNegamax) _diagRequestNegamax();
   });
@@ -811,6 +835,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   $("diag-btn-overseer") && $("diag-btn-overseer").addEventListener("click", () => {
     diagOverseer = !diagOverseer;
+    _updatePerfWarning();
     if (diagOverseer) { _diagTrigger(); } else { _diagRender(); }
     $("diag-btn-overseer").classList.toggle("diag-chip-active", diagOverseer);
     const chkOv = $("chk-overseer");
@@ -821,6 +846,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (chkOverseer) {
     chkOverseer.addEventListener("change", () => {
       diagOverseer = chkOverseer.checked;
+      _updatePerfWarning();
       if (diagOverseer) { if (!_diagStaticData) _diagRequestAll(); else _diagRequestStatic(); }
       else _diagRender();
       const chip = $("diag-btn-overseer");
@@ -1095,6 +1121,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     $("tournament-active").hidden = true;
     $("btn-tournament-start").hidden = false;
     $("tournament-intro").hidden = false;
+    $("tournament-intro-options").hidden = false;
     _sendTournamentStart();
   });
 
@@ -1223,10 +1250,13 @@ function startNewGame() {
   if (gamePSelect && gamePSelect.value !== "current" && !_pureAiMode) {
     let chosenPersonality = gamePSelect.value;
     if (chosenPersonality === "random") {
-      const opts = PERSONALITIES.map(p => p.value);
+      const opts = PERSONALITIES.filter(p => p.value !== "generalist").map(p => p.value);
       chosenPersonality = opts[Math.floor(Math.random() * opts.length)];
     }
-    _loadPersonality(chosenPersonality);
+    _activePersonality = chosenPersonality;
+    if (chosenPersonality !== "generalist") _loadPersonality(chosenPersonality);
+  } else {
+    _activePersonality = gamePSelect ? gamePSelect.value : "";
   }
 
   _isTournamentGame = false;
@@ -1303,7 +1333,7 @@ function startNewGame() {
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
       use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       use_overseer_player: $("chk-overseer-player") ? $("chk-overseer-player").checked : false,
-      use_generalist_player: $("chk-generalist-player") ? $("chk-generalist-player").checked : false,
+      use_generalist_player: _activePersonality === "generalist",
       ai_weights:   _getWeights(),
       player_name:  playerName,
     }));
@@ -1552,10 +1582,13 @@ function startSetupGame() {
   if (gamePSelect && gamePSelect.value !== "current") {
     let p = gamePSelect.value;
     if (p === "random") {
-      const opts = PERSONALITIES.map(x => x.value);
+      const opts = PERSONALITIES.filter(x => x.value !== "generalist").map(x => x.value);
       p = opts[Math.floor(Math.random() * opts.length)];
     }
-    _loadPersonality(p);
+    _activePersonality = p;
+    if (p !== "generalist") _loadPersonality(p);
+  } else {
+    _activePersonality = gamePSelect ? gamePSelect.value : "";
   }
 
   _isTournamentGame = false;
@@ -1628,7 +1661,7 @@ function startSetupGame() {
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
       use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       use_overseer_player: $("chk-overseer-player") ? $("chk-overseer-player").checked : false,
-      use_generalist_player: $("chk-generalist-player") ? $("chk-generalist-player").checked : false,
+      use_generalist_player: _activePersonality === "generalist",
       ai_weights:   _getWeights(),
       positions:    positions,
       phase:        $("sel-setup-phase").value,
@@ -1755,7 +1788,8 @@ function handleMessage(msg) {
       // before search starts so the user can see the scores immediately.
       board && board.clearDiag();
       if (_diagActive()) { _diagStaticData = null; _diagNegamaxData = null; }
-      _diagRequestStatic();   // bypasses _diagRequestAll's _aiThinking guard; fires for sentinel graph too
+      // Always fire for sentinel (eval graph); needs object controls which models run.
+      _diagSend("static", { needs: _diagNeedsObj() });
       startThinkingTimer(msg.color, msg.expected_seconds ?? 0, ws, msg.max_depth_expected ?? 0);
       $("btn-force-move").hidden = false;
       canOverride = false;
@@ -2138,6 +2172,47 @@ function handleMessage(msg) {
       addCommentary("Error", msg.message, "ai");
       break;
 
+    case "game_start": {
+      if (!msg.replay_mode) break;
+      // Replay mode: board is at initial position; navigate to final position via replayMoves.
+      evalHistory = []; sentinelHistory = []; _humanColor = msg.human_color || null;
+      phase = "game_over";
+      replayIdx = -1;
+      _isTournamentGame = false;
+      isVsHuman = false; isAiVsAi = false;
+      stopThinkingTimer();
+
+      // Build a synthetic gameState so replayGo(length) can show the final board.
+      gameState = {
+        board:       msg.final_board || {},
+        fen:         msg.final_fen   || "",
+        human_color: msg.human_color,
+        winner:      msg.winner,
+        draw_reason: msg.draw_reason,
+        finished:    true,
+        moves:       msg.moves || [],
+      };
+
+      replayMoves = msg.moves || [];
+      if (replayMoves.length > 0) {
+        renderMoves(replayMoves);
+        _setReplayButtonsDisabled(false);
+        replayGo(replayMoves.length);
+      }
+
+      const _gsWinner = msg.winner
+        ? (msg.winner === "W" ? "White" : "Black") + " won"
+        : msg.draw_reason ? `Draw (${msg.draw_reason})` : "Game loaded";
+      setStatus(`Replay: ${_gsWinner} · ${replayMoves.length} plies`);
+      setTurnBadge(null, msg.winner);
+      addCommentary("Game", `Loaded ${replayMoves.length}-ply game for replay. Use ◀ ▶ to navigate.`, "ai");
+      $("btn-undo").disabled = true;
+      $("btn-force-cap").disabled = true;
+      updateHintButton(false);
+      $("btn-game-assessment").classList.add("assessment-ready");
+      break;
+    }
+
     case "autosave_available":
       _showAutosaveBanner(msg);
       break;
@@ -2440,6 +2515,8 @@ function sendPlayerMessage() {
   const input = $("player-chat-input");
   const text  = input.value.trim();
   if (!text || !ws || phase === "idle") return;
+  const _liveChat = document.getElementById("chk-live-chat");
+  if (_liveChat && !_liveChat.checked) return;  // live chat disabled
   ws.send(JSON.stringify({ type: "player_message", text }));
   input.value = "";
 }
@@ -3382,8 +3459,7 @@ function _updateAssessmentProgress(stage) {
     }
     return;
   }
-  // Show cancel button only for non-tournament games
-  if (cancelBtn) cancelBtn.style.display = _isTournamentGame ? "none" : "inline-block";
+  if (cancelBtn) cancelBtn.style.display = "inline-block";
   bar.style.display = "flex";
   if (label) {
     label.style.display = "block";
@@ -3553,7 +3629,10 @@ function _renderAssessmentSignalSections(msg, feed) {
     outer.appendChild(clean);
   }
 
-  feed.insertBefore(outer, feed.firstChild);
+  // Insert signal cards AFTER the legend (if present) so the legend stays at top
+  const _existingLegend = feed.querySelector(".assessment-legend");
+  const _insertRef = _existingLegend ? _existingLegend.nextSibling : feed.firstChild;
+  feed.insertBefore(outer, _insertRef);
   feed.scrollTop = 0;
 }
 
@@ -3896,7 +3975,7 @@ function _updateSliderLabel(key, value) {
 }
 
 function _getWeights() {
-  if (_pureAiMode) return {};
+  if (_pureAiMode || _activePersonality === "generalist") return {};
   const weights = {};
   WEIGHT_DEFAULTS.forEach(w => {
     const el = $(`slider-${w.key}`);
@@ -3928,7 +4007,13 @@ let _tournamentRosterSize = 7;  // updated at tournament_init
 let _isTournamentGame     = false; // true when current game is part of a tournament
 
 function _sendTournamentStart() {
-  const _doSend = () => ws.send(JSON.stringify({ type: "tournament_start", player_name: playerName }));
+  const sizeEl = $("sel-tournament-size");
+  const playerCount = sizeEl ? parseInt(sizeEl.value, 10) : 8;
+  const _doSend = () => ws.send(JSON.stringify({
+    type: "tournament_start",
+    player_name: playerName,
+    player_count: playerCount,
+  }));
   if (ws && ws.readyState === WebSocket.OPEN) {
     _doSend();
     return;
@@ -3944,6 +4029,7 @@ function _sendTournamentStart() {
 
 function _renderTournamentInit(msg) {
   $("tournament-intro").hidden  = true;
+  $("tournament-intro-options").hidden = true;
   $("tournament-active").hidden = false;
   $("tournament-complete-info").hidden = true;
   $("btn-tournament-start").hidden = true;
@@ -3973,15 +4059,21 @@ function _setTournamentBadge(text) {
 
 function _handleTournamentNext(msg) {
   _isTournamentGame = true;
+  // Reset eval graph and assessment state so each tournament game starts clean
+  evalHistory = []; sentinelHistory = []; _humanColor = null;
+  _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
+  _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
+  _stopAssessmentTimer(); _updateAssessmentProgress(0);
   const btnNext = $("btn-tournament-next-game");
   if (btnNext) btnNext.style.display = "none";
   const colorName = msg.human_color === "W" ? "White" : "Black";
   const total = _tournamentRosterSize;
+  const diffTag = msg.search_depth ? ` · depth ${msg.search_depth}, ${msg.time_cap}s` : (msg.time_cap ? ` · ${msg.time_cap}s` : "");
   $("tournament-opponent-info").innerHTML =
     `Game ${msg.game_idx + 1} of ${total}: <strong>${msg.label}</strong><br>` +
-    `You play as <strong>${colorName}</strong>`;
+    `You play as <strong>${colorName}</strong>${diffTag ? `<span style="color:var(--text-dim);font-size:.8em"> ${diffTag}</span>` : ""}`;
   _setTournamentBadge(`🏆 Round ${msg.game_idx + 1}/${total} — ${msg.label} · You play ${colorName}`);
-  addCommentary("Tournament", `Game ${msg.game_idx + 1}: ${msg.label} — you play as ${colorName}`, "ai");
+  addCommentary("Tournament", `Game ${msg.game_idx + 1}: ${msg.label} — you play as ${colorName}${diffTag}`, "ai");
   // Auto-start the tournament game over the existing WebSocket
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({
@@ -4002,7 +4094,7 @@ function _handleTournamentNext(msg) {
       use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
       use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       use_overseer_player: $("chk-overseer-player") ? $("chk-overseer-player").checked : false,
-      use_generalist_player: $("chk-generalist-player") ? $("chk-generalist-player").checked : false,
+      use_generalist_player: _activePersonality === "generalist",
     }));
   }
 }
@@ -4068,7 +4160,9 @@ function _handleTournamentGameComplete(msg) {
 function _updateTournamentScoreboard(msg) {
   $("tournament-elo").textContent   = msg.player_elo;
   $("tournament-total").textContent = msg.points;
-  $("tournament-rows").innerHTML = (msg.results || []).map(r => {
+  // Only show actual played games (not simulated) in the sidebar scoreboard
+  const played = (msg.results || []).filter(r => !r.simulated);
+  $("tournament-rows").innerHTML = played.map(r => {
     const cls = r.result === "W" ? "t-win" : r.result === "L" ? "t-loss" : "t-draw";
     const sym = r.result === "W" ? "Win" : r.result === "L" ? "Loss" : "Draw";
     const wp  = r.white_personality || "—";
@@ -4082,17 +4176,99 @@ function _updateTournamentScoreboard(msg) {
   }).join("");
 }
 
-function _handleTournamentComplete(msg) {
+let _lastTournamentMsg = null;  // stored so the Results button can show it anytime
+
+function _revealTournamentResults(msg) {
+  _lastTournamentMsg = msg;
+  // Persist for the results page (new tab)
+  try { localStorage.setItem("nmm_last_tournament", JSON.stringify(msg)); } catch {}
   _updateTournamentScoreboard(msg);
   _setTournamentBadge(null);
   $("tournament-opponent-info").textContent = "Tournament complete!";
   $("tournament-complete-info").hidden = false;
   $("tournament-rank").textContent      = msg.rank_label;
   $("tournament-final-elo").textContent = `Final Elo: ${msg.player_elo}`;
+  const tPanel = $("tournament-panel");
+  if (tPanel) tPanel.hidden = false;
+  const tToggle = $("toggle-tournament");
+  if (tToggle) tToggle.classList.add("btn-active");
+  const btnNext = $("btn-tournament-next-game");
+  if (btnNext) btnNext.style.display = "none";
   addCommentary("Tournament",
     `Tournament complete! Rank: ${msg.rank_label}  |  ` +
     `Points: ${msg.points}/${msg.max_points}  |  Elo: ${msg.player_elo}`, "ai");
+  // Wire Results button to open dedicated results page
+  const btnResults = $("btn-tournament-results");
+  if (btnResults) btnResults.onclick = () => window.open("/tournament-results", "_blank");
+  // Auto-open results page
+  window.open("/tournament-results", "_blank");
 }
+
+function _handleTournamentComplete(msg) {
+  // Show the same assessment-choice overlay as mid-tournament games,
+  // but the "continue" action reveals results instead of starting a new game.
+  const overlay = document.createElement("div");
+  overlay.id = "tournament-assess-overlay";
+  overlay.style.cssText = [
+    "position:fixed","top:0","left:0","right:0","bottom:0","z-index:2000",
+    "background:rgba(0,0,0,.65)","display:flex","align-items:center","justify-content:center",
+  ].join(";");
+
+  const box = document.createElement("div");
+  box.style.cssText = [
+    "background:#2a220e","border:1px solid #6b5a2a","border-radius:6px",
+    "padding:20px 24px","max-width:340px","width:90%","text-align:center",
+    "color:#e8d9a0","font-size:.9rem",
+  ].join(";");
+
+  const title = document.createElement("div");
+  title.style.cssText = "font-weight:600;font-size:1rem;margin-bottom:10px";
+  title.textContent = "Tournament complete!";
+  box.appendChild(title);
+
+  const sub = document.createElement("div");
+  sub.style.cssText = "margin-bottom:16px;color:var(--text-dim);font-size:.85rem";
+  sub.textContent = "Would you like to view the final game assessment before seeing your results?";
+  box.appendChild(sub);
+
+  const btnRow = document.createElement("div");
+  btnRow.style.cssText = "display:flex;gap:10px;justify-content:center";
+
+  const btnYes = document.createElement("button");
+  btnYes.textContent = "Yes, show assessment";
+  btnYes.style.cssText = "background:#3a5a30;color:#e8d9a0;border:1px solid #5a8a50;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:.85rem";
+  btnYes.addEventListener("click", () => {
+    overlay.remove();
+    _switchLeftTab("chat");
+    // Repurpose the next-game button as "View tournament results"
+    const btnNext = $("btn-tournament-next-game");
+    if (btnNext) {
+      btnNext.textContent = "🏆 View tournament results";
+      btnNext.style.display = "block";
+      btnNext.onclick = () => {
+        btnNext.style.display = "none";
+        btnNext.textContent = "▶ Ready for Next Game";
+        btnNext.onclick = null;
+        _revealTournamentResults(msg);
+      };
+    }
+    addCommentary("Tournament", "Final game assessment is running. Click 'View tournament results' when you're done reviewing.", "ai");
+  });
+
+  const btnSkip = document.createElement("button");
+  btnSkip.textContent = "Skip, show results";
+  btnSkip.style.cssText = "background:#4a3020;color:#e8d9a0;border:1px solid #7a5a30;padding:7px 14px;border-radius:4px;cursor:pointer;font-size:.85rem";
+  btnSkip.addEventListener("click", () => {
+    overlay.remove();
+    _revealTournamentResults(msg);
+  });
+
+  btnRow.append(btnYes, btnSkip);
+  box.appendChild(btnRow);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
 
 // ── Left column tab toggle ────────────────────────────────────────────────────
 
@@ -4132,6 +4308,44 @@ function _renderProfile(p) {
   $("profile-difficulty").textContent = p.current_difficulty ?? 3;
   $("profile-last-played").textContent = p.last_played ?? "—";
   $("profile-created").textContent     = p.created_at ?? "—";
+
+  // Tournament history
+  const hist = p.tournament_history || [];
+  const thSection = $("profile-tournament-history");
+  const thRows    = $("profile-tournament-rows");
+  if (thSection && thRows) {
+    thSection.hidden = hist.length === 0;
+    // Summary: last result + average score %
+    let summaryHtml = "";
+    if (hist.length > 0) {
+      const last = hist[0];
+      const lastPct = last.max_points > 0
+        ? Math.round(last.points / last.max_points * 100) : 0;
+      const avgPct = hist.length > 1
+        ? Math.round(hist.reduce((s, t) => s + (t.max_points > 0 ? t.points / t.max_points : 0), 0) / hist.length * 100)
+        : null;
+      const dlStr = p.tournament_diff_level > 1
+        ? ` · Difficulty level ${p.tournament_diff_level}` : "";
+      summaryHtml = `<div style="display:flex;justify-content:space-between;font-size:.75rem;` +
+        `color:var(--text-dim);margin-bottom:4px">` +
+        `<span>Last: <strong style="color:var(--tan)">${last.rank_label}</strong> ${lastPct}%${dlStr}</span>` +
+        (avgPct !== null ? `<span>Avg: ${avgPct}%</span>` : "") +
+        `</div>`;
+    }
+    thRows.innerHTML = summaryHtml + hist.map(t => {
+      const pts  = `${t.points ?? 0}/${t.max_points ?? 0}`;
+      const opp  = t.roster_size ? ` · ${t.roster_size} opp` : "";
+      const dlv  = t.diff_level > 1 ? ` L${t.diff_level}` : "";
+      const pct  = t.max_points > 0 ? ` (${Math.round(t.points / t.max_points * 100)}%)` : "";
+      return `<div style="display:flex;justify-content:space-between;align-items:baseline;` +
+        `padding:2px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.75rem">` +
+        `<span style="color:var(--text-dim)">${t.date ?? ""}${opp}${dlv}</span>` +
+        `<span style="color:var(--tan)">${t.rank_label ?? ""}</span>` +
+        `<span>${pts}${pct}</span>` +
+        `</div>`;
+    }).join("");
+  }
+
   // Load game history now that a named profile is loaded
   _fetchProfileGames();
 }
@@ -4188,6 +4402,19 @@ function _miniBoardSVG(boardMap, size = 80) {
   return svg;
 }
 
+function _hiddenGamesKey() {
+  return `nmm_hidden_games_${playerName || "guest"}`;
+}
+function _getHiddenGames() {
+  try { return new Set(JSON.parse(localStorage.getItem(_hiddenGamesKey()) || "[]")); }
+  catch { return new Set(); }
+}
+function _addHiddenGame(gameId) {
+  const hidden = _getHiddenGames();
+  hidden.add(gameId);
+  localStorage.setItem(_hiddenGamesKey(), JSON.stringify([...hidden]));
+}
+
 function _fetchProfileGames() {
   const section = $("profile-games-section");
   const grid    = $("profile-games-grid");
@@ -4197,10 +4424,34 @@ function _fetchProfileGames() {
     .then(r => r.json())
     .then(games => {
       if (!games || !games.length) { section.hidden = true; return; }
+      const hidden = _getHiddenGames();
+      const visible = games.filter(g => !hidden.has(g.game_id));
+      if (!visible.length) { section.hidden = true; return; }
       section.hidden = false;
       grid.innerHTML = "";
       $("profile-game-detail").hidden = true;
-      for (const g of games) {
+      for (const g of visible) {
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "position:relative;display:inline-block";
+
+        // Delete button — left side, hides on hover
+        const btnDel = document.createElement("button");
+        btnDel.textContent = "✕";
+        btnDel.title = "Remove from list";
+        btnDel.style.cssText = [
+          "position:absolute","top:2px","left:2px","z-index:10",
+          "background:rgba(80,20,20,.85)","color:#e88a8a","border:none",
+          "border-radius:3px","font-size:.65rem","padding:1px 4px",
+          "cursor:pointer","display:none",
+        ].join(";");
+        btnDel.addEventListener("click", e => {
+          e.stopPropagation();
+          _addHiddenGame(g.game_id);
+          wrap.remove();
+        });
+        wrap.addEventListener("mouseenter", () => { btnDel.style.display = "block"; });
+        wrap.addEventListener("mouseleave", () => { btnDel.style.display = "none"; });
+
         const div  = document.createElement("div");
         div.className = "game-thumb";
         div.innerHTML = _miniBoardSVG(g.board_at_ply8 || {});
@@ -4211,17 +4462,81 @@ function _fetchProfileGames() {
           : g.draw_reason ? "Draw" : `${g.total_plies} plies`;
         label.textContent = `${g.date || ""} · ${winText}`;
         div.appendChild(label);
+        div.title = "Click to load game";
+
+        // Click to load game for replay/display
         div.addEventListener("click", () => {
           document.querySelectorAll(".game-thumb").forEach(el => el.classList.remove("selected"));
           div.classList.add("selected");
-          const detail = $("profile-game-detail");
-          detail.hidden = false;
-          detail.textContent = g.summary_text || g.opening_name || "(No assessment yet)";
+          _loadGameFromProfile(g.game_id);
         });
-        grid.appendChild(div);
+
+        wrap.appendChild(btnDel);
+        wrap.appendChild(div);
+        grid.appendChild(wrap);
       }
     })
     .catch(() => { if (section) section.hidden = true; });
+}
+
+function _loadGameFromProfile(gameId) {
+  const detail = $("profile-game-detail");
+  if (!detail) return;
+  detail.hidden = false;
+  detail.innerHTML = `<span style="color:var(--text-dim);font-style:italic">Loading…</span>`;
+
+  fetch(`/api/profile/games/${encodeURIComponent(gameId)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { detail.textContent = `Error: ${data.error}`; return; }
+      const rec  = data.record || {};
+      const asmt = data.assessment || {};
+      const winText = rec.winner === "W" ? "White won"
+        : rec.winner === "B" ? "Black won"
+        : rec.draw_reason ? `Draw (${rec.draw_reason})` : "Incomplete";
+      const moves = (rec.moves || []).length;
+      const opening = asmt.opening_name || rec.opening_name || "";
+
+      // Build detail content
+      let html = `<strong>${winText}</strong> · ${moves} plies`;
+      if (opening) html += ` · ${opening}`;
+      html += "<br><br>";
+      if (asmt.summary_text) {
+        html += `<span style="white-space:pre-wrap;font-size:.8em">${asmt.summary_text}</span>`;
+      } else {
+        html += `<span style="color:var(--text-dim);font-style:italic">No assessment saved.</span>`;
+      }
+
+      // Action buttons
+      html += `<br><br>`;
+      if (rec.winner || rec.draw_reason) {
+        html += `<button id="btn-load-replay-${gameId}" class="btn-small" style="margin-right:6px">▶ Replay</button>`;
+      } else {
+        html += `<button id="btn-load-continue-${gameId}" class="btn-small btn-active" style="margin-right:6px">▶ Continue playing</button>`;
+        html += `<button id="btn-load-replay-${gameId}" class="btn-small">◀▶ View moves</button>`;
+      }
+      detail.innerHTML = html;
+
+      const btnReplay = document.getElementById(`btn-load-replay-${gameId}`);
+      if (btnReplay) {
+        btnReplay.onclick = () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "load_saved_game", game_id: gameId }));
+            _switchLeftTab("chat");
+          }
+        };
+      }
+      const btnContinue = document.getElementById(`btn-load-continue-${gameId}`);
+      if (btnContinue) {
+        btnContinue.onclick = () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: "continue_saved_game", game_id: gameId }));
+            _switchLeftTab("chat");
+          }
+        };
+      }
+    })
+    .catch(() => { detail.textContent = "Failed to load game data."; });
 }
 
 // ── Diagnostic overlay ────────────────────────────────────────────────────────
@@ -4261,9 +4576,9 @@ function _diagRequestAll(fen, prefix) {
     if (_aiThinking) return;    // re-check after debounce fires
     _diagStaticData  = null;
     _diagNegamaxData = null;
-    // Always fire static for sentinel graph data + any active overlays.
     _diagPending = _diagSeq + 1 + (diagNegamax ? 1 : 0);
-    _diagSend("static", fen ? { fen, prefix: prefix || [] } : {});
+    // needs: per-feature flags — sentinel always runs server-side; other models only when required.
+    _diagSend("static", { ...(fen ? { fen, prefix: prefix || [] } : {}), needs: _diagNeedsObj() });
     if (diagNegamax) _diagRequestNegamax(fen, prefix);
   }, 300);  // 300ms debounce — longer to absorb rapid replay + prevent flood
 }
@@ -4524,9 +4839,8 @@ function _requestFormationGuide() {
   const guidePieces  = humanColor === "W" ? w_positions : b_positions;
   const otherPieces  = humanColor === "W" ? b_positions : w_positions;
 
-  // Show for 6 or 7 pieces (solid), or 8 pieces with ≤5 opponents (dotted early guide)
-  if (guidePieces.length < 6 || guidePieces.length > 8 ||
-      (guidePieces.length === 8 && otherPieces.length > 5)) {
+  // Show for 6-8 guide pieces only when opponent is down to ≤5 (endgame territory)
+  if (guidePieces.length < 6 || guidePieces.length > 8 || otherPieces.length > 5) {
     board.clearFormationGuide();
     return;
   }

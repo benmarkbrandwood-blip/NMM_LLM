@@ -1457,6 +1457,10 @@ class GameAI:
             _time_cap = 30.0
         else:
             _time_cap = 15.0
+        # Apply user-configured think cap if set (bypasses difficulty caps when > 0).
+        _user_cap = getattr(self, "user_think_cap", 0.0)
+        if _user_cap > 0 and total_on_board > 4:
+            _time_cap = min(_time_cap, _user_cap)
         _time_ms: int = int(min(_time_cap, 3600.0) * 1000)
         if (
             _in_placement
@@ -1496,7 +1500,8 @@ class GameAI:
                 moves=moves,
                 max_depth=depth,
             )
-        move = self._apply_sentinel_intervention(board, move, moves)
+        if not self._force_stop:
+            move = self._apply_sentinel_intervention(board, move, moves)
         self._populate_thinking(board, move, _forced_block=bool(threats))
         return move
 
@@ -2679,8 +2684,8 @@ class GameAI:
             _search_options = {
                 "preferred_root": _preferred if _preferred else None,
                 "tt_handle": self._rust_tt_handle,
-                "db_handle": self._rust_fullgame_db_handle,
-                "endgame_db_handle": self._rust_endgame_solved_handle,
+                "db_handle": self._rust_fullgame_db_handle if self.difficulty >= 5 else None,
+                "endgame_db_handle": self._rust_endgame_solved_handle if self.difficulty >= 6 else None,
                 "opp_ext_moves": _opp_ext if _opp_ext else None,
                 "threads": _threads,
                 "mill_scale": self._weights.mill_count_scale,

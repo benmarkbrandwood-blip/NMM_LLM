@@ -414,8 +414,12 @@ Comment briefly on the human's last move using the factual signal data provided.
 OUTPUT RULES:
 - Write exactly one short sentence, max 18 words
 - Ground your comment in MOVE FACTS — do not contradict them
-- Pick the single most interesting signal: low human preference, rare choice,
-  weak sentinel quality, high blunder-zone risk, or generalist AI disagreement
+- Pick the single most interesting signal and name its source when relevant:
+  * GapNet blunder-zone risk → mention the neural analysis flagging this area as dangerous
+  * Generalist AI preferred move → mention the AI disagreeing with the choice
+  * Weak sentinel quality → mention the position evaluation concern
+  * Horizon regret → mention the move looking better at first glance than deeper search reveals
+  * Low human preference / rare choice → comment on the unconventional nature
 - Do not suggest a specific move
 - Do not mention chess
 - If MOVE FACTS show no weak or risky signals, reply exactly: NO_COMMENT

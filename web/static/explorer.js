@@ -96,6 +96,9 @@ let selectedNets = ['sentinel', null, null];
 let generalistRingEnabled = false;
 let _regretFen = null;  // FEN for which regret_score is currently injected into moves
 
+// Sort key for the NEXT MOVES list: 'hum' | a NET_DEFS key
+let _moveListSortKey = 'hum';
+
 // Wilson score lower bound (z=1.645 → 95% one-sided confidence)
 function wilsonLower(wins, total, z = 1.645) {
   if (total === 0) return 0;
@@ -690,6 +693,7 @@ const malomToggle = document.getElementById('malom-toggle');
 if (malomToggle) {
   malomToggle.addEventListener('change', () => {
     malomGroup.visible = malomToggle.checked;
+    if (currentData) updatePanel(currentData);
   });
 }
 
@@ -952,6 +956,8 @@ function _refreshAfterStateChange() {
   rebuildHints(allMoves, currentData?.has_traj_data);
   updatePieceHighlights();
   updateStatusIndicator();
+  // Re-render move list so column headers/values match current selectedNets
+  if (currentData) updatePanel(currentData);
 }
 
 // ── Raycasting / hover / click ────────────────────────────────────────────────
@@ -1346,37 +1352,69 @@ function updatePanel(data) {
       return `<span class="move-net-val" style="color:${def.cssColor}">${pct}%</span>`;
     };
 
-    // Column header row (net names, right-aligned to match row values)
-    if (activeNets.length > 0) {
+    // Validate sort key — reset if the sorted net is no longer active
+    if (_moveListSortKey !== 'hum' && !activeNets.includes(_moveListSortKey)) {
+      _moveListSortKey = 'hum';
+    }
+
+    // Sort moves by selected column (descending)
+    const sortedMoves = data.moves.slice().sort((a, b) => {
+      if (_moveListSortKey === 'hum') {
+        return (b.win_pct ?? 0) - (a.win_pct ?? 0);
+      }
+      const def = NET_DEFS[_moveListSortKey];
+      if (!def) return 0;
+      const aVal = _moveListSortKey === 'regret' ? (a.regret_score ?? -Infinity) : (a[def.field] ?? -Infinity);
+      const bVal = _moveListSortKey === 'regret' ? (b.regret_score ?? -Infinity) : (b[def.field] ?? -Infinity);
+      return def.isHigherBetter ? bVal - aVal : aVal - bVal;
+    });
+
+    // Column header row — each label is a sort button
+    {
       const hdrEl = document.createElement('div');
       hdrEl.className = 'move-list-net-hdr';
-      hdrEl.innerHTML =
-        '<span class="move-list-net-hdr-spacer"></span>' +
-        activeNets.map(k => {
-          const def = NET_DEFS[k];
-          return def ? `<span class="move-net-hdr" style="color:${def.cssColor}">${def.label}</span>` : '';
-        }).join('');
+
+      const spacer = document.createElement('span');
+      spacer.className = 'move-list-net-hdr-spacer';
+      hdrEl.appendChild(spacer);
+
+      const makeHdrBtn = (key, label, color) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'move-net-hdr-btn' + (_moveListSortKey === key ? ' move-net-hdr-active' : '');
+        btn.textContent = label;
+        btn.style.color = color;
+        btn.addEventListener('click', () => {
+          _moveListSortKey = key;
+          if (currentData) updatePanel(currentData);
+        });
+        return btn;
+      };
+
+      hdrEl.appendChild(makeHdrBtn('hum', 'Hum%', '#c8a96e'));
+      for (const k of activeNets) {
+        const def = NET_DEFS[k];
+        if (def) hdrEl.appendChild(makeHdrBtn(k, def.label, def.cssColor));
+      }
       listEl.appendChild(hdrEl);
     }
 
-    for (const mv of data.moves) {
+    for (const mv of sortedMoves) {
       const col    = barColor(mv);
       const colHex = '#' + col.getHexString();
       const netCells = activeNets.map(k => _fmtNetCell(mv, k)).join('');
+      const humanCell = mv.has_db_data
+        ? `<span class="move-net-val" style="color:${colHex}">${(mv.win_pct*100).toFixed(1)}%</span>`
+        : '<span class="move-net-val" style="color:#444">—</span>';
 
+      const _malomSpan = w => `<span class="move-malom" style="background:${w==='L'?'#16532a':w==='W'?'#7f1d1d':'#78350f'};color:${w==='L'?'#4ade80':w==='W'?'#fca5a5':'#fcd34d'}">${w}${mv.malom_dtw_after!=null?' '+mv.malom_dtw_after:''}</span>`;
       let rightContent = '';
       if (mv.has_db_data) {
-        const wdl = mv.malom_wdl_after
-          ? `<span class="move-malom" style="background:${mv.malom_wdl_after==='L'?'#16532a':mv.malom_wdl_after==='W'?'#7f1d1d':'#78350f'};color:${mv.malom_wdl_after==='L'?'#4ade80':mv.malom_wdl_after==='W'?'#fca5a5':'#fcd34d'}">${mv.malom_wdl_after}${mv.malom_dtw_after!=null?' '+mv.malom_dtw_after:''}</span>`
-          : '';
-        rightContent = `
-          <span class="move-sub">${mv.total}</span>
-          ${wdl}
-          <span class="move-pct" style="color:${colHex}">${(mv.win_pct*100).toFixed(1)}%</span>
-          ${netCells}
-        `;
+        const wdl = mv.malom_wdl_after ? _malomSpan(mv.malom_wdl_after) : '';
+        rightContent = `<span class="move-sub">${mv.total}</span>${wdl}${humanCell}${netCells}`;
       } else {
-        rightContent = `<span style="flex:1"></span>${netCells}`;
+        const wdl = (mv.malom_wdl_after && malomToggle?.checked) ? _malomSpan(mv.malom_wdl_after) : '';
+        rightContent = `<span style="flex:1"></span>${wdl}${humanCell}${netCells}`;
       }
 
       const item = document.createElement('div');
@@ -1641,12 +1679,111 @@ updateNetLegend();  // populate legend before first position loads
 const _urlFen = new URLSearchParams(window.location.search).get('fen');
 loadPosition(_urlFen || '........................|W|0|0');
 
+// ── Mini-board SVG thumbnail ──────────────────────────────────────────────────
+
+// NMM board: 24 positions in POSITIONS order (matches FEN char order).
+// Coordinate system: column a–g → x 0–6, row 1–7 → y 6–0 (y=0 at top).
+const _THUMB_POS_COORDS = {
+  a7:[0,0],d7:[3,0],g7:[6,0], g4:[6,3],g1:[6,6], d1:[3,6],a1:[0,6],a4:[0,3],
+  b6:[1,1],d6:[3,1],f6:[5,1], f4:[5,3],f2:[5,5], d2:[3,5],b2:[1,5],b4:[1,3],
+  c5:[2,2],d5:[3,2],e5:[4,2], e4:[4,3],e3:[4,4], d3:[3,4],c3:[2,4],c4:[2,3],
+};
+// Order matches POSITIONS array (FEN chars 0–23)
+const _THUMB_POS_ORDER = [
+  'a7','d7','g7','g4','g1','d1','a1','a4',
+  'b6','d6','f6','f4','f2','d2','b2','b4',
+  'c5','d5','e5','e4','e3','d3','c3','c4',
+];
+// Board lines: [from_pos, to_pos]
+const _THUMB_LINES = [
+  // Outer square
+  ['a7','d7'],['d7','g7'],['g7','g4'],['g4','g1'],['g1','d1'],['d1','a1'],['a1','a4'],['a4','a7'],
+  // Middle square
+  ['b6','d6'],['d6','f6'],['f6','f4'],['f4','f2'],['f2','d2'],['d2','b2'],['b2','b4'],['b4','b6'],
+  // Inner square
+  ['c5','d5'],['d5','e5'],['e5','e4'],['e4','e3'],['e3','d3'],['d3','c3'],['c3','c4'],['c4','c5'],
+  // Cross connectors
+  ['d7','d6'],['d6','d5'],  ['g4','f4'],['f4','e4'],
+  ['d1','d2'],['d2','d3'],  ['a4','b4'],['b4','c4'],
+];
+
+function drawBoardThumb(fenStr, size = 80) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('class', 'board-thumb');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+
+  const pad = size * 0.11;   // ~10% padding
+  const inner = size - pad * 2;
+  const scale = inner / 6;   // 6 grid units span the board
+
+  // Background
+  const bg = document.createElementNS(ns, 'rect');
+  bg.setAttribute('width', size); bg.setAttribute('height', size);
+  bg.setAttribute('fill', '#141008'); bg.setAttribute('rx', '3');
+  svg.appendChild(bg);
+
+  function toSvg(gx, gy) {
+    return [pad + gx * scale, pad + gy * scale];
+  }
+
+  // Board lines
+  for (const [a, b] of _THUMB_LINES) {
+    const [ax, ay] = toSvg(..._THUMB_POS_COORDS[a]);
+    const [bx, by] = toSvg(..._THUMB_POS_COORDS[b]);
+    const ln = document.createElementNS(ns, 'line');
+    ln.setAttribute('x1', ax); ln.setAttribute('y1', ay);
+    ln.setAttribute('x2', bx); ln.setAttribute('y2', by);
+    ln.setAttribute('stroke', '#3a3020'); ln.setAttribute('stroke-width', '0.8');
+    svg.appendChild(ln);
+  }
+
+  // Parse FEN — just the 24-char position string before first '|'
+  const posStr = (fenStr || '').split('|')[0];
+  const pieceR = Math.max(2, size * 0.055);
+
+  for (let i = 0; i < 24; i++) {
+    const ch = posStr[i] || '.';
+    const pos = _THUMB_POS_ORDER[i];
+    const [gx, gy] = _THUMB_POS_COORDS[pos];
+    const [cx, cy] = toSvg(gx, gy);
+
+    if (ch === '.') {
+      // Empty intersection — faint dot
+      const dot = document.createElementNS(ns, 'circle');
+      dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
+      dot.setAttribute('r', Math.max(1, size * 0.018));
+      dot.setAttribute('fill', '#3a2e1e');
+      svg.appendChild(dot);
+    } else {
+      // Piece
+      const circle = document.createElementNS(ns, 'circle');
+      circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+      circle.setAttribute('r', pieceR);
+      if (ch === 'W') {
+        circle.setAttribute('fill', '#e8dfc0');
+        circle.setAttribute('stroke', '#a09060'); circle.setAttribute('stroke-width', '0.6');
+      } else {
+        circle.setAttribute('fill', '#2a2830');
+        circle.setAttribute('stroke', '#6a6888'); circle.setAttribute('stroke-width', '0.6');
+      }
+      svg.appendChild(circle);
+    }
+  }
+
+  return svg;
+}
+
 // ── Opening Tree ──────────────────────────────────────────────────────────────
 
-let _otData      = null;   // full tree JSON from /api/opening_tree
-let _otPath      = [];     // current drilldown path (array of move strings)
-let _otLoaded    = false;
-let _otSyncToken = 0;      // request token to cancel stale board-sync fetches
+let _otData          = null;   // full tree JSON from /api/opening_tree
+let _otPath          = [];     // current drilldown path (array of move strings)
+let _otLoaded        = false;
+let _otSyncToken     = 0;      // request token to cancel stale board-sync fetches
+let _otFilterSource  = 'all'; // active source filter chip
+let _otCurrentSiblings = [];  // siblings at current path depth, for nav buttons
 
 const _otLeftPanel = document.getElementById('ot-left-panel');
 const _otBody      = document.getElementById('ot-body');
@@ -1655,6 +1792,63 @@ const _otRows      = document.getElementById('ot-rows');
 const _otDepthIn   = document.getElementById('ot-depth');
 const _otDepthVal  = document.getElementById('ot-depth-val');
 const _otToggle    = document.getElementById('ot-toggle');
+const _otToggleBtn = document.getElementById('ot-toggle-btn');
+if (_otToggleBtn) _otToggleBtn.addEventListener('click', () => _otToggle.click());
+
+// ── OT sibling navigation ──────────────────────────────────────────────────────
+function _otUpdateNavBar() {
+  const counter = document.getElementById('ot-nav-counter');
+  if (!counter) return;
+  const total = _otCurrentSiblings.length;
+  if (total === 0 || _otPath.length === 0) {
+    counter.textContent = total > 0 ? `— / ${total}` : '—';
+    return;
+  }
+  const lastMove = _otPath[_otPath.length - 1];
+  const idx = _otCurrentSiblings.findIndex(c => c.move === lastMove);
+  counter.textContent = idx >= 0 ? `${idx + 1} / ${total}` : `— / ${total}`;
+}
+
+function _otNavSibling(dir) {
+  if (!_otCurrentSiblings.length) return;
+  const lastMove = _otPath.length > 0 ? _otPath[_otPath.length - 1] : null;
+  const curIdx = _otCurrentSiblings.findIndex(c => c.move === lastMove);
+
+  let nextIdx;
+  if (dir === 'first') nextIdx = 0;
+  else if (dir === 'last')  nextIdx = _otCurrentSiblings.length - 1;
+  else if (dir === 'prev')  nextIdx = curIdx <= 0 ? _otCurrentSiblings.length - 1 : curIdx - 1;
+  else /* 'next' */         nextIdx = curIdx >= _otCurrentSiblings.length - 1 ? 0 : curIdx + 1;
+
+  const target = _otCurrentSiblings[nextIdx];
+  if (!target) return;
+  if (_otPath.length === 0) _otPath = [target.move];
+  else _otPath = [..._otPath.slice(0, -1), target.move];
+  document.getElementById('btn-back').disabled = false;
+  _otRender();
+}
+
+const _otNavFirst = document.getElementById('ot-nav-first');
+const _otNavPrev  = document.getElementById('ot-nav-prev');
+const _otNavNext  = document.getElementById('ot-nav-next');
+const _otNavLast  = document.getElementById('ot-nav-last');
+if (_otNavFirst) _otNavFirst.addEventListener('click', () => _otNavSibling('first'));
+if (_otNavPrev)  _otNavPrev .addEventListener('click', () => _otNavSibling('prev'));
+if (_otNavNext)  _otNavNext .addEventListener('click', () => _otNavSibling('next'));
+if (_otNavLast)  _otNavLast .addEventListener('click', () => _otNavSibling('last'));
+
+// Source filter chips
+const _otFilterChips = document.getElementById('ot-filter-chips');
+if (_otFilterChips) {
+  _otFilterChips.addEventListener('click', e => {
+    const chip = e.target.closest('[data-filter]');
+    if (!chip) return;
+    _otFilterSource = chip.dataset.filter;
+    _otFilterChips.querySelectorAll('.ot-chip').forEach(c =>
+      c.classList.toggle('ot-chip-active', c === chip));
+    _otRender(false);
+  });
+}
 
 function _otNodeAtPath(data, path) {
   let node = data;
@@ -1694,7 +1888,183 @@ function _otRenderBreadcrumb() {
   }
 }
 
-function _otRender(syncBoard = true) {
+async function _otSymLookup(path) {
+  if (!path.length) return null;
+  try {
+    const res = await fetch(`/api/opening_tree/sym_children?path=${encodeURIComponent(path.join(','))}`);
+    const data = await res.json();
+    return data.sym_name ? data : null;
+  } catch { return null; }
+}
+
+// ── Browse-all-openings panel ──────────────────────────────────────────────────
+
+let _otBrowseLoaded = false;
+
+function _otBuildBrowseContent(families) {
+  const container = document.getElementById('ot-browse-content');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!families || !families.length) {
+    container.innerHTML = '<span style="font-size:0.72rem;color:#5a4a2a">No curated openings found.</span>';
+    return;
+  }
+
+  // Collect root entries per source group into flat lists so all cards go in
+  // one strip per section → natural 5-per-row wrapping, not 1-per-family.
+  // Root entry = name exactly matches family name; if none, use all entries.
+  const bookEntries = [];
+  const humanEntries = [];
+
+  for (const fam of families) {
+    let roots = fam.openings.filter(op => op.name === fam.family);
+    if (!roots.length) roots = fam.openings.slice(); // AI Preferred, Human DB etc.
+    for (const op of roots) {
+      if (fam.source === 'human') humanEntries.push({ op, fam });
+      else bookEntries.push({ op, fam });
+    }
+  }
+
+  function makeCard(op, fam) {
+    const card = document.createElement('div');
+    card.className = 'ot-family-card';
+    card.title = op.name;
+
+    if (op.fen) {
+      card.appendChild(drawBoardThumb(op.fen, 72));
+    } else {
+      const ph = document.createElement('div');
+      ph.style.cssText = 'width:72px;height:72px;background:#1a1610;border-radius:3px;';
+      card.appendChild(ph);
+    }
+
+    const lbl = document.createElement('div');
+    lbl.className = 'ot-family-card-lbl';
+    lbl.textContent = op.name;  // entry name: family root for book, individual name for human/AI
+    lbl.style.cssText = 'max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center';
+    card.appendChild(lbl);
+
+    const srcBadge = document.createElement('span');
+    srcBadge.className = 'ot-src ot-src-' + (op.source === 'human' ? 'human' : 'book');
+    srcBadge.textContent = op.source === 'human' ? 'Human' : 'Book';
+    card.appendChild(srcBadge);
+
+    // Navigate to one move before the end so the last move is visible as a
+    // child row in the OT, with the family thumbnail strip above it.
+    card.addEventListener('click', () => {
+      _otPath = op.line_moves.length > 1
+        ? op.line_moves.slice(0, -1)
+        : op.line_moves.slice();
+      _otRender();
+      const panel = document.getElementById('ot-browse-panel');
+      if (panel) panel.open = false;
+    });
+
+    return card;
+  }
+
+  function addSection(label, entries) {
+    if (!entries.length) return;
+    const hdr = document.createElement('div');
+    hdr.className = 'ot-browse-family-hdr';
+    hdr.textContent = label;
+    container.appendChild(hdr);
+
+    const strip = document.createElement('div');
+    strip.className = 'ot-browse-strip';
+    for (const { op, fam } of entries) strip.appendChild(makeCard(op, fam));
+    container.appendChild(strip);
+  }
+
+  addSection('Book Openings', bookEntries);
+  addSection('Human DB', humanEntries);
+}
+
+// Lazy-load browse content on first open
+const _otBrowsePanel = document.getElementById('ot-browse-panel');
+if (_otBrowsePanel) {
+  _otBrowsePanel.addEventListener('toggle', async () => {
+    if (!_otBrowsePanel.open || _otBrowseLoaded) return;
+    _otBrowseLoaded = true;
+    try {
+      const res = await fetch('/api/opening_families');
+      const data = await res.json();
+      _otBuildBrowseContent(data.families || []);
+    } catch (e) {
+      const c = document.getElementById('ot-browse-content');
+      if (c) c.innerHTML = '<span style="font-size:0.72rem;color:#c87040">Failed to load openings.</span>';
+    }
+  });
+}
+
+// Cache so we only fetch each family once per page load
+const _otFamilyChildCache = {};
+
+async function _otBuildFamilyDropdown(familyTag) {
+  const family = familyTag.family;
+  if (!_otFamilyChildCache[family]) {
+    try {
+      const res = await fetch(`/api/opening_tree/children_for_family?family=${encodeURIComponent(family)}`);
+      _otFamilyChildCache[family] = await res.json();
+    } catch { _otFamilyChildCache[family] = []; }
+  }
+  const children = _otFamilyChildCache[family];
+  if (!children.length) return null;
+
+  const details = document.createElement('details');
+  details.className = 'ot-family-dropdown';
+  details.open = true;
+
+  const summary = document.createElement('summary');
+  summary.className = 'ot-family-dropdown-summary';
+  summary.textContent = `${family} — child openings (${children.length})`;
+  details.appendChild(summary);
+
+  const strip = document.createElement('div');
+  strip.className = 'ot-family-strip';
+
+  for (const ch of children) {
+    const isActive = familyTag.child === ch.child_code;
+    const card = document.createElement('div');
+    card.className = 'ot-family-card' + (isActive ? ' ot-family-card-active' : '');
+    card.title = ch.name;
+
+    if (ch.fen) {
+      card.appendChild(drawBoardThumb(ch.fen, 72));
+    }
+
+    const lbl = document.createElement('div');
+    lbl.className = 'ot-family-card-lbl';
+    lbl.textContent = ch.child_code;
+    card.appendChild(lbl);
+
+    if (ch.favored_side && ch.favored_side !== 'unknown' && ch.favored_side !== 'equal') {
+      const side = document.createElement('div');
+      side.className = 'ot-family-card-side';
+      side.textContent = ch.favored_side === 'W' ? '↑ W' : '↑ B';
+      side.style.color = ch.favored_side === 'W' ? '#e8dfc0' : '#9898c0';
+      card.appendChild(side);
+    }
+
+    // Click: navigate OT to this child's full path
+    card.addEventListener('click', () => {
+      _otPath = ch.line_moves.slice();
+      _otRender();
+    });
+
+    strip.appendChild(card);
+  }
+  details.appendChild(strip);
+  return details;
+}
+
+async function _otRender(syncBoard = true) {
+  // Keep chip active state in sync with the JS source-of-truth variable
+  if (_otFilterChips) {
+    _otFilterChips.querySelectorAll('.ot-chip').forEach(c =>
+      c.classList.toggle('ot-chip-active', c.dataset.filter === _otFilterSource));
+  }
   if (!_otData) {
     _otRows.innerHTML = '<div id="ot-loading">Loading…</div>';
     return;
@@ -1702,36 +2072,97 @@ function _otRender(syncBoard = true) {
   _otRenderBreadcrumb();
   _otUpdateSaveBar();
   const node = _otNodeAtPath(_otData, _otPath);
-  const children = node ? (node.children || []) : [];
+  let children = node ? (node.children || []) : [];
+  let symName = null;
 
   _otRows.innerHTML = '';
 
-  // Show divergence message when off-book
-  if (_otPath.length > 0 && !node) {
-    const divergePly = (() => {
-      let n = _otData;
-      for (let i = 0; i < _otPath.length; i++) {
-        const c = (n.children || []).find(ch => ch.move === _otPath[i]);
-        if (!c) return i + 1;
-        n = c;
+  // D4 symmetry augmentation for all non-root paths
+  if (_otPath.length > 0) {
+    const symResult = await _otSymLookup(_otPath);
+    if (!node) {
+      // Completely off-book: use sym children as replacement, or show diverge
+      if (symResult && symResult.children && symResult.children.length > 0) {
+        children = symResult.children;
+        symName = symResult.sym_name;
+      } else {
+        const divergePly = (() => {
+          let n = _otData;
+          for (let i = 0; i < _otPath.length; i++) {
+            const c = (n.children || []).find(ch => ch.move === _otPath[i]);
+            if (!c) return i + 1;
+            n = c;
+          }
+          return _otPath.length;
+        })();
+        const msg = document.createElement('div');
+        msg.className = 'ot-diverge-msg';
+        msg.textContent = `Path left book coverage at ply ${divergePly} (no D4-equivalent found). Enter a name below to save this path.`;
+        _otRows.appendChild(msg);
+        if (syncBoard) _otSyncBoard();
+        return;
       }
-      return _otPath.length;
-    })();
-    const msg = document.createElement('div');
-    msg.className = 'ot-diverge-msg';
-    msg.textContent = `Diverged from book at ply ${divergePly}. Enter a name below to save this path.`;
-    _otRows.appendChild(msg);
+    } else if (symResult && symResult.children && symResult.children.length > 0) {
+      // Node found but may be sparse — merge in canonical equivalents
+      const existingMoves = new Set(children.map(c => c.move));
+      const newChildren = symResult.children.filter(c => !existingMoves.has(c.move));
+      if (newChildren.length > 0) {
+        children = [...children, ...newChildren];
+        symName = symResult.sym_name;
+      }
+    }
+  }
+
+  const showNovel = document.getElementById('ot-show-novel')?.checked !== false;
+  let visibleChildren = showNovel ? children : children.filter(c => (c.source || 'book') !== 'learned');
+
+  // Stage 4: source filter chip
+  if (_otFilterSource !== 'all') {
+    visibleChildren = visibleChildren.filter(c => {
+      const src = c.source || 'book';
+      return _otFilterSource === 'novel' ? src === 'learned' : src === _otFilterSource;
+    });
+  }
+
+  // Compute siblings at parent level for nav buttons (same filter applied)
+  {
+    const parentNode = _otPath.length === 0
+      ? _otData
+      : (_otNodeAtPath(_otData, _otPath.slice(0, -1)) ?? _otData);
+    let sib = (parentNode.children || []);
+    if (!showNovel) sib = sib.filter(c => (c.source || 'book') !== 'learned');
+    if (_otFilterSource !== 'all') sib = sib.filter(c => {
+      const src = c.source || 'book';
+      return _otFilterSource === 'novel' ? src === 'learned' : src === _otFilterSource;
+    });
+    _otCurrentSiblings = sib;
+    _otUpdateNavBar();
+  }
+
+  // Family badge + dropdown rendered before any early return so it shows at terminal nodes too
+  if (node && node.family_tag && _otPath.length >= 6) {
+    const ft = node.family_tag;
+    const badge = document.createElement('div');
+    badge.className = 'ot-family-badge';
+    badge.textContent = ft.child ? `${ft.family} · ${ft.child}` : ft.family;
+    _otRows.appendChild(badge);
+    _otBuildFamilyDropdown(ft).then(el => { if (el) _otRows.insertBefore(el, badge.nextSibling); });
+  }
+
+  if (!visibleChildren.length) {
+    const emptyDiv = document.createElement('div');
+    emptyDiv.id = 'ot-empty';
+    emptyDiv.textContent = 'No data at this depth.';
+    _otRows.appendChild(emptyDiv);
     if (syncBoard) _otSyncBoard();
     return;
   }
 
-  const showNovel = document.getElementById('ot-show-novel')?.checked !== false;
-  const visibleChildren = showNovel ? children : children.filter(c => (c.source || 'book') !== 'learned');
-
-  if (!visibleChildren.length) {
-    _otRows.innerHTML = '<div id="ot-empty">No data at this depth.</div>';
-    if (syncBoard) _otSyncBoard();
-    return;
+  if (symName) {
+    const badge = document.createElement('div');
+    badge.className = 'ot-sym-badge';
+    badge.textContent = `↻ ${symName} equivalent — rotated continuations`;
+    _otRows.appendChild(badge);
   }
 
   for (const child of visibleChildren) {
@@ -1845,8 +2276,8 @@ async function _otSyncBoard() {
 }
 
 function _otApplyCameraPan(open) {
-  controls.target.set(open ? 2.2 : 0, 0, 0);
-  camera.position.set(open ? 2.2 : 0, 8, 9);
+  controls.target.set(open ? 1.5 : 0, 0, 0);
+  camera.position.set(open ? 1.5 : 0, 11, 12);
   controls.update();
 }
 
@@ -1863,6 +2294,11 @@ _otToggle.addEventListener('change', () => {
     _otLeftPanel.style.display = 'none';
     _otApplyCameraPan(false);
     if (_pmPanel) _pmPanel.style.display = 'flex';
+  }
+  if (_otToggleBtn) {
+    _otToggleBtn.style.background  = _otToggle.checked ? '#3a2e10' : '';
+    _otToggleBtn.style.borderColor = _otToggle.checked ? '#c8a96e' : '';
+    _otToggleBtn.style.color       = _otToggle.checked ? '#e8c860' : '';
   }
 });
 

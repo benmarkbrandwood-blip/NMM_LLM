@@ -14,7 +14,8 @@
       <div class="hdr-row">
         <button id="btn-new-game-header" class="hdr-bi">&#9658; New Game</button>
         <select id="hdr-personality" class="hdr-bi" title="AI Personality">
-          <option value="pure_h2" selected>Pure H2 — The Purist</option>
+          <option value="generalist" selected>Generalist AI — Neural</option>
+          <option value="pure_h2">Pure H2 — The Purist</option>
           <option value="random">Random</option>
           <option value="balanced">Balanced</option>
           <option value="aggressive">Aggressive</option>
@@ -67,7 +68,11 @@
       <div id="chat-view">
         <!-- Human ↔ LLM section (top) -->
         <div class="panel-box commentary-panel" id="commentary-human-panel">
-          <h3>MillsAI Chat</h3>
+          <h3 style="display:flex;align-items:center;">MillsAI Chat
+            <label style="font-size:.8rem;display:flex;align-items:center;gap:4px;cursor:pointer;margin-left:auto;">
+              <input type="checkbox" id="chk-live-chat" checked> Live Chat
+            </label>
+          </h3>
           <div id="commentary-human"></div>
         </div>
         <!-- Player chat input — static between the two panels -->
@@ -139,6 +144,10 @@
               <span style="color:var(--text-dim)">Member since</span>
               <span id="profile-created" style="font-size:.78rem;color:var(--text-dim)">—</span>
             </div>
+          </div>
+          <div id="profile-tournament-history" hidden style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">
+            <div style="color:var(--tan);font-size:.8rem;font-weight:600;margin-bottom:5px">Tournament History</div>
+            <div id="profile-tournament-rows"></div>
           </div>
           <p id="profile-empty-msg" style="font-size:.78rem;color:var(--text-dim);margin-top:6px">
             Enter your name above to track your stats and Elo across sessions.
@@ -385,7 +394,8 @@
         <div class="form-row" id="row-personality">
           <label for="sel-game-personality">AI Personality</label>
           <select id="sel-game-personality">
-            <option value="pure_h2" selected>Pure H2 — The Purist</option>
+            <option value="generalist" selected>Generalist AI — Neural</option>
+            <option value="pure_h2">Pure H2 — The Purist</option>
             <option value="random">Random each game</option>
             <option value="balanced">Balanced</option>
             <option value="aggressive">Aggressive — The Crusher</option>
@@ -408,14 +418,9 @@
             <option value="6" selected>6 — Expert</option>
             <option value="7">7 — Master</option>
             <option value="8">8 — Grandmaster</option>
-            <option value="9">9 — Deep search (30 s)</option>
-            <option value="10">10 — Deep search (60 s)</option>
           </select>
           <div style="font-size:.72rem; color:var(--text-dim); margin-top:4px;">
             Diff 1-8: classical heuristic with your selected blends (VN / gap net / sentinel).
-            Diff 9-10: phase-routed specialist AI — the classical engine's 30 s / 60 s
-            search feeds the top-K candidates to the specialist, which re-ranks them
-            using its own sentinel + gap + VN + trajectory + human-frequency features.
           </div>
         </div>
 
@@ -533,13 +538,8 @@
         <input type="checkbox" id="chk-overseer" style="display:none;" aria-hidden="true">
         <input type="checkbox" id="chk-overseer-player" style="display:none;" aria-hidden="true">
 
-        <div class="form-row" id="row-generalist-player" style="flex-direction:row; align-items:center; gap:8px;">
-          <input type="checkbox" id="chk-generalist-player">
-          <label for="chk-generalist-player" style="color:#4fc3f7; font-size:.9rem;">
-            Generalist AI
-            <span style="font-size:.75rem; color:var(--text-dim);">(single full-game model)</span>
-          </label>
-        </div>
+        <!-- Generalist AI is now a personality option in the dropdown above -->
+        <input type="checkbox" id="chk-generalist-player" style="display:none" aria-hidden="true">
 
         <div class="form-row" id="row-perfect-db" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-perfect-db">
@@ -671,9 +671,17 @@
       <div class="panel-box" id="tournament-panel" hidden>
         <h3>&#127942; Tournament Mode</h3>
         <p id="tournament-intro" style="font-size:.78rem;color:var(--text-dim);margin-bottom:8px;line-height:1.4">
-          Play through 7 AI personalities from weakest to strongest and pure heuristics.
-          You earn 2 pts for a win, 1 for a draw, 0 for a loss.
+          Challenge AI personalities from weakest to strongest.<br>
+          2 pts win · 1 pt draw · 0 pts loss
         </p>
+        <div id="tournament-intro-options" style="margin-bottom:8px;font-size:.8rem">
+          <label for="sel-tournament-size" style="color:var(--text-dim)">Opponents:&nbsp;</label>
+          <select id="sel-tournament-size" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:3px;font-size:.8rem;padding:2px 4px">
+            <option value="3">3 (quick)</option>
+            <option value="5">5 (standard)</option>
+            <option value="8" selected>8 (full)</option>
+          </select>
+        </div>
         <div id="tournament-active" hidden>
           <div id="tournament-opponent-info" style="margin-bottom:8px;font-size:.85rem;"></div>
           <table id="tournament-scoreboard" style="width:100%;font-size:.78rem;border-collapse:collapse">
@@ -698,7 +706,10 @@
         <div id="tournament-complete-info" hidden style="margin-top:8px;text-align:center">
           <div id="tournament-rank" style="font-size:1.1rem;font-weight:600;color:var(--tan)"></div>
           <div id="tournament-final-elo" style="font-size:.85rem;color:var(--text-dim);margin-top:4px"></div>
-          <button id="btn-tournament-restart" class="btn-small" style="margin-top:10px;width:100%">&#127942; Play Again</button>
+          <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap">
+            <button id="btn-tournament-results" class="btn-small" style="flex:1;background:#2a3a1a;border-color:#5a7a3a" title="View full round-robin results">&#127351; Results</button>
+            <button id="btn-tournament-restart" class="btn-small" style="flex:1">&#127942; Play Again</button>
+          </div>
         </div>
         <button id="btn-tournament-start" style="margin-top:8px;width:100%">&#9654; Start Tournament</button>
       </div>
@@ -715,6 +726,9 @@
       </div>
 
     </div><!-- /side-panel -->
+  <div id="perf-warning" hidden style="text-align:center;font-size:.78rem;color:#c8552a;padding:2px 8px;background:rgba(200,85,42,.12);border-radius:4px;margin:2px 8px 4px;">
+    &#9888; Multiple overlays active — analysis may slow gameplay
+  </div>
   </main>
 
   <!-- Bottom bar: strength graph + undo -->
@@ -821,6 +835,7 @@
   </div>
 </div>
 
+<script src="/static/html2canvas.min.js?v={{ v }}"></script>
 <script type="module" src="/static/game.js?v={{ v }}"></script>
 </body>
 </html>

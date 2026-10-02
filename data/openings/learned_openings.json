@@ -257,9 +257,11 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 0,
+      "W": 2,
       "B": 0,
-      "D": 0
+      "D": 0,
+      "ai_wins": 2,
+      "human_losses": 2
     },
     "confidence": 0.8,
     "tags": [
@@ -387,9 +389,11 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 2,
-      "B": 18,
-      "D": 0
+      "W": 3,
+      "B": 19,
+      "D": 0,
+      "ai_wins": 1,
+      "human_losses": 1
     },
     "confidence": 0.8,
     "tags": [
@@ -453,8 +457,8 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 103,
-      "B": 7,
+      "W": 104,
+      "B": 8,
       "D": 0
     },
     "confidence": 0.8,
@@ -904,7 +908,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 2,
+      "W": 3,
       "B": 0,
       "D": 0
     },
@@ -6080,9 +6084,11 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 0,
+      "W": 3,
       "B": 1,
-      "D": 0
+      "D": 0,
+      "ai_wins": 3,
+      "human_losses": 3
     },
     "confidence": 0.3,
     "tags": [
@@ -10246,7 +10252,7 @@
   },
   {
     "opening_id": "novel-e3ca31a8",
-    "name": "Novel — d6-d2-a7 Var. d6-d2-a7",
+    "name": "The \"Central Conquest",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -10298,7 +10304,7 @@
     },
     "outcome_stats": {
       "W": 0,
-      "B": 0,
+      "B": 1,
       "D": 0
     },
     "confidence": 0.3,
@@ -13480,7 +13486,7 @@
   },
   {
     "opening_id": "novel-a7862ee5",
-    "name": "Novel — a7-d6-f4 Var. a7-d6-f4",
+    "name": "Riverbank Gambit Defense",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -13531,7 +13537,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 1,
+      "W": 2,
       "B": 0,
       "D": 0
     },
@@ -16629,7 +16635,7 @@
   },
   {
     "opening_id": "novel-ab5fcade",
-    "name": "Eastern Sentinel's Pride",
+    "name": "Midlands Cascade",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -16689,7 +16695,7 @@
     },
     "outcome_stats": {
       "W": 1,
-      "B": 0,
+      "B": 1,
       "D": 0
     },
     "confidence": 0.3,
@@ -16986,6 +16992,376 @@
     "outcome_stats": {
       "W": 0,
       "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-6cff2bed",
+    "name": "The Fierce Citadel Rush",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "c3",
+      "a4",
+      "b2",
+      "c4",
+      "b4",
+      "d2",
+      "f4",
+      "d1",
+      "d3",
+      "e3",
+      "a7",
+      "d7",
+      "g1",
+      "e5",
+      "e4",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".......BBW............W.|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".......BBW....W.......WB|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".......BBW...BWW......WB|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".....B.BBW.W.BWW......WB|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".....B.BBW.W.BWW....BWWB|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "WB.BWB.BBW.W.BWW..BWBWWB|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-bf6d15bf",
+    "name": "The Iron Fortress Opening",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "g4",
+      "d7",
+      "e3",
+      "d5",
+      "d6",
+      "f4",
+      "d1",
+      "d2",
+      "c4",
+      "f2",
+      "b2",
+      "f6",
+      "b2",
+      "b4",
+      "c3",
+      "c5",
+      "d3",
+      "a4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".B.W.............B..W...|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.W.....W.B.....B..W...|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.W.W...W.B.B...B..W...|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.W.W...W.BBB...B..W..W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B.W.W...WBBBBW..B..W..W|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": ".B.W.W.B.WBBBBWBBB..WWWW|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-19a737e3",
+    "name": "The \"Auroran Bridge",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "a7",
+      "a4",
+      "d1",
+      "d6",
+      "b2",
+      "c4",
+      "b4",
+      "d2",
+      "f4",
+      "e3",
+      "b6",
+      "d2",
+      "e5",
+      "c3",
+      "d5",
+      "c5",
+      "d3",
+      "g1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W....W.B.B..............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W....W.B.B....W........B|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W....W.B.B...BWW.......B|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W....W.B.B.W.BWW....B..B|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "W....W.BWB.W.BWW....B..B|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "W...BW.BWB.W.BWWBWW.BWBB|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-fa4d31ad",
+    "name": "The \"Falcon's Ascension",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d2",
+      "f4",
+      "d6",
+      "d2",
+      "g4",
+      "a4",
+      "e5",
+      "d7",
+      "g4",
+      "e4",
+      "g4",
+      "d3",
+      "d1",
+      "a7",
+      "g7",
+      "g7",
+      "a1",
+      "c3"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".........W.B.B..........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "...W...B.W.B.B..........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.W...B.W.B.B....W.....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.W...B.W.B.B....WB....|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B.W...B.W.B.B....WB.B..|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "BBBW.WWB.W.B.B....WB.BB.|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-9cec1168",
+    "name": "The Winding Chain Formation",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "b2",
+      "d7",
+      "e4",
+      "g4",
+      "f2",
+      "d5",
+      "a4",
+      "d1",
+      "c3",
+      "g1",
+      "e3",
+      "e5",
+      "d3",
+      "d2",
+      "d1",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": ".B.......W...BW.........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": ".B.B.....W...BW....W....|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".B.B.....W..WBW..B.W....|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".B.B.B.W.W..WBW..B.W....|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".B.BBB.W.W..WBW..B.W..W.|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": ".B.BBW.W.W..WBW..BBWWWW.|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
       "D": 0
     },
     "confidence": 0.3,

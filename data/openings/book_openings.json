@@ -8604,5 +8604,434 @@
     "source_reference": "s_gen_v3 generalist + SpecialistDB v3",
     "needs_llm_name": false,
     "favored_side": "unknown"
+  },
+  {
+    "opening_id": "human-23-d6-d2-b4-f4-a7-a4-g1-d7",
+    "name": "Outer Ring Race",
+    "aliases": [],
+    "family": "Human DB",
+    "side": "W",
+    "seed_source": "human",
+    "line_moves": [
+      "d6",
+      "d2",
+      "b4",
+      "f4",
+      "a7",
+      "a4",
+      "g1",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Top human-DB pattern #23 \u2014 White and Black race along the outer ring, contesting corner g1/d7 placements.",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.85,
+    "tags": [
+      "human-db",
+      "pattern"
+    ],
+    "source_reference": "Human DB ELO \u2265 1400",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "human-24-d6-d2-b4-f4-b6-b2-f2-d5",
+    "name": "B-Column Double",
+    "aliases": [],
+    "family": "Human DB",
+    "side": "W",
+    "seed_source": "human",
+    "line_moves": [
+      "d6",
+      "d2",
+      "b4",
+      "f4",
+      "b6",
+      "b2",
+      "f2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Top human-DB pattern #24 \u2014 White builds both b-column pieces (b4, b6) while Black mirrors with b2; White extends with f2 to threaten the f-column mill.",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.85,
+    "tags": [
+      "human-db",
+      "pattern"
+    ],
+    "source_reference": "Human DB ELO \u2265 1400",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "mill-rush-perpendicular",
+    "name": "Mill Rush \u2014 Perpendicular",
+    "aliases": [],
+    "family": "Mill Rush",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xf2",
+      "f2",
+      "e5",
+      "e4",
+      "d5",
+      "c5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Mill Rush trunk with White completing the f6-d6-b6 mill and capturing Black\u2019s f2 (perpendicular capture) instead of b4; White then drives the inner-e5 rush.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 Mill Rush Perpendicular",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d01",
+    "name": "Open Z Mill \u2014 D01",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "a7",
+      "b2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black avoids d7 and plays a7; White responds b2, Black d5.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d02",
+    "name": "Open Z Mill \u2014 D02",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "g7",
+      "b2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays g7 (top-right outer); White responds b2, Black d5.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d03",
+    "name": "Open Z Mill \u2014 D03",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "c5",
+      "b2",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays inner c5; White b2, Black d7.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d04",
+    "name": "Open Z Mill \u2014 D04",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "d5",
+      "b2",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays d5; White b2, Black g4.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d05",
+    "name": "Open Z Mill \u2014 D05",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "e3",
+      "d3",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays inner e3; White d3, Black d5.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d06",
+    "name": "Open Z Mill \u2014 D06",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "g1",
+      "d1",
+      "d7"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays outer g1; White d1, Black d7.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d07",
+    "name": "Open Z Mill \u2014 D07",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "e3",
+      "b2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black plays e3; White b2 (instead of d3), Black d5.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "open-z-mill-d08",
+    "name": "Open Z Mill \u2014 D08",
+    "aliases": [],
+    "family": "Open Z Mill",
+    "side": "W",
+    "seed_source": "book",
+    "line_moves": [
+      "d6",
+      "d2",
+      "f4",
+      "b4",
+      "f6",
+      "f2",
+      "b6xb4",
+      "b4",
+      "c4",
+      "b2",
+      "d3",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [],
+    "strategic_notes": "Open Z Mill trunk; Black immediately contests b2; White d3, Black d5.",
+    "common_blunders": [],
+    "recommended_responses": {},
+    "outcome_stats": {
+      "W": 0,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 1.0,
+    "tags": [
+      "book"
+    ],
+    "source_reference": "Opening plays docx \u2014 B05 continuations",
+    "needs_llm_name": false,
+    "favored_side": "unknown"
   }
 ]

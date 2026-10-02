@@ -755,27 +755,133 @@ When `value_net=None`, slots 59/61 fall back to pure heuristic values (backward-
 
 ### Production deployment
 
-**Checkpoint:** `learned_ai/checkpoints/scaffolded/s_gen_v2/best.pt`  
+**Checkpoint:** `learned_ai/checkpoints/scaffolded/s_gen_v5/from_v4/best.pt`  
+**Configured via:** `data/settings.json` — `generalist_output_dir` + `generalist_checkpoint` fields  
 **Loaded via:** `load_generalist()` in `learned_ai/agents/specialist_router.py`  
 **Served by:** `OverseerAdvisor` (`learned_ai/models/overseer.py`) — wraps `ScaffoldedPolicyNet` and exposes `score_moves(board, candidates, color) → list[float]`
 
 When the generalist loads successfully, app.py sets it as `_overseer_advisor`, which drives the "O:XX%" pick-probability overlay in the game UI.
 
-### Specialists
+---
 
-Three phase-specific checkpoints complement the generalist:
+### Generalist training history
 
-| Specialist | Checkpoint path | Phase active |
-|------------|-----------------|--------------|
-| Opening | `s_open_v2/best.pt` | Early placement |
-| Midgame | `s_mid_v2/best.pt` | Mid-to-late placement and early movement |
-| Endgame | `s_end_v2/best.pt` | Late movement and fly |
+#### Gen4 — BWDB run (current best weights, 2026-10-01)
 
-The `SpecialistRouter` routes positions to the appropriate specialist by phase, falling back to the generalist when specialists are unavailable.
+The first generalist to reach a useful skill level. Script: `scripts/train_s_gen_v4.py`.  
+Checkpoint folder: `learned_ai/checkpoints/scaffolded/s_gen_v4/BWDB/`  
+Specialist DB: `data/specialist_db_v4.sqlite`
 
-### Value net in the generalist
+Reached **difficulty 19** at ~14 258 games. Key outcome metrics at termination:
+`best_win_rate ≈ 0.47`, `malom_win_move_rate ≈ 1.0` (consistently selects Malom-optimal moves).
 
-Slots [59] and [61] in the per-move feature vector incorporate the value net signal (blended 50/50 with the heuristic). After the v3 promotion (2026-09-26), the move-phase and fly-phase value net provides a stronger urgency signal in these slots; the placement-phase retains the v2 net. See §7 for value net details.
+**Full training command:**
+```bash
+.venv/bin/python scripts/train_s_gen_v4.py \
+  --run-name BWDB \
+  --max-games 50000 \
+  --batch-games 6 \
+  --self-play-ratio 0.25 \
+  --max-ply 120 \
+  --temp-floor 0.6 \
+  --temp-anneal-games 3000 \
+  --advance-rehearsal-games 20 \
+  --advance-temp-boost-frac 0.6 \
+  --hot-explore-games 100 \
+  --auto-resume-best
+```
+
+All other parameters used script defaults:  
+`lr=1e-4`, `gamma_td=0.99`, `entropy_coef=0.01`, `update_every=64`,  
+`rolling_win=40`, `diff_max=20`, `sim_ply_depth=12`, `policy_hidden=[256,128]`,  
+`s1b_refresher_epochs=3`, `s1b_refresher_lr=3e-4`, `advance_rehearsal_prob=0.45`.
+
+---
+
+#### Gen5 — two failed from-scratch runs (2026-10-01 – 2026-10-02)
+
+The gen5 script (`scripts/train_s_gen_v5.py`) adds one significant capability over gen4: it calls `record_game_diff()` on the specialist DB, which tags winning and drawing lines by the **difficulty level** they were played at. This populates the `winning_lines_by_diff` and `positions_by_diff` tables in `specialist_db_v5.sqlite`, which in turn feed the `preferred_plays` table — the intended source of AI-preferred opening moves for the Opening Explorer.
+
+Two gen5 runs were started from random initial weights and both failed, becoming stuck at **difficulty 7** with win rates in the 10–15% range. Neither improved beyond that level despite extended training. Entropy remained high, indicating the policy never collapsed onto confident opening choices.
+
+Root cause: without a strong prior, the model cannot bootstrap past the difficulty-7 opponent in the time budget available. Gen4 succeeded because it was trained over a much longer cold-start period.
+
+---
+
+#### Gen5 — from_v4 run (current production, 2026-10-02 onwards)
+
+Gen4's weights are used as the starting point for the gen5 script so that the stronger opening knowledge carries over, and the difficulty-tagged DB recording adds the new data needed for `preferred_plays`.
+
+The model is expected to resume at difficulty 19, advance to difficulty 20, then freeze weights (`freeze_after_level=20`) and continue as a pure data-collection run for the remaining games. This produces a growing `specialist_db_v5.sqlite` of high-quality, difficulty-tagged game lines.
+
+**Goal:** once enough games accumulate at difficulty 19–20, query `preferred_plays` (keyed by `tag` and `pos_sequence`) to extract the model's preferred opening moves and import them into the Opening Explorer as "AI Preferred" entries.
+
+Checkpoint folder: `learned_ai/checkpoints/scaffolded/s_gen_v5/from_v4/`  
+Specialist DB: `data/specialist_db_v5.sqlite`
+
+**Full training command:**
+```bash
+.venv/bin/python scripts/train_s_gen_v5.py \
+  --run-name from_v4 \
+  --resume learned_ai/checkpoints/scaffolded/s_gen_v4/BWDB/best.pt \
+  --freeze-after-level 20 \
+  --max-games 50000 \
+  --batch-games 6 \
+  --self-play-ratio 0.25 \
+  --max-ply 120 \
+  --temp-floor 0.6 \
+  --temp-anneal-games 3000 \
+  --advance-rehearsal-games 30 \
+  --advance-temp-boost-frac 0.6 \
+  --hot-explore-games 100
+```
+
+Differences vs gen4 BWDB:  
+`advance_rehearsal_games 20→30`, `freeze_after_level=20` (new), `specialist_db=specialist_db_v5.sqlite`.
+
+**Progress monitoring:**
+```bash
+.venv/bin/python tools/plot_gen5_progress.py        # live dashboard from game 14263
+.venv/bin/python tools/plot_gen5_progress.py --no-loop  # single render
+```
+
+### Specialists — abandoned
+
+Three phase-specific checkpoints (opening, midgame, endgame) were trained alongside the generalist under the original plan. They did not produce useful models — none reached a difficulty level where they outperformed the heuristic baseline, and routing positions through them degraded overall play quality compared to using the generalist alone.
+
+The `SpecialistRouter` and its wiring remain in the codebase (`learned_ai/agents/specialist_router.py`) but the specialist checkpoints are not deployed. The generalist handles all phases directly. Do not attempt to retrain phase specialists without first establishing why they failed — the likely cause is insufficient training signal at phase boundaries where positions are ambiguous.
+
+### Human teacher opponent (gen4 onwards)
+
+A key factor in gen4's success was training against an opponent that plays like a human rather than purely like the heuristic engine. Two human-signal sources are blended into the training opponent pool:
+
+**HumanPrefNet** (`data/human_pref_net.npz`) — learned preferences extracted from the human game database, blended at 50% into the opponent's heuristic weights. Used in ~5% of training games (`vs_heuristic_humanlike`).
+
+**HumanMovePolicyAdvisor / teacher net** (`data/human_move_policy_net_v4_branching.npz`) — a dedicated policy network trained to predict human moves from 103 k source games, 2.3 M positions. Used in **~25% of training games** (`vs_heuristic_teacher`). This is the more significant of the two.
+
+The teacher net was retrained for gen4 (2026-09-19) using a **branching-factor loss weighting** scheme: each training sample is up-weighted by `log(1 + n_legal_moves)` so the model learns preferences at high-branching positions (opening, middle game) rather than only at tactical chokepoints. Network: `human_move_policy_net_v4_branching.npz`. Full training details: `docs/Human_Trainer.md`.
+
+During a gen4 training game, the teacher-blended opponent's difficulty and blend weight are varied together:
+
+| Opponent difficulty | Teacher blend | Effect |
+|---------------------|---------------|--------|
+| 1–3 | 75 % | Beginner-like: mostly human probabilities |
+| 4–6 | 50 % | Balanced: human flavour at mid strength |
+| 7+  | 25 % | Strong: human tendencies only, mostly heuristic |
+
+The lower-difficulty teacher games teach the learner to navigate typical human patterns (slow development, missed mills, imprecise captures) rather than only optimal play. The full training game-type distribution in gen4:
+
+| Game type | ~% | Opponent |
+|-----------|----|----------|
+| `vs_heuristic_hard` | 10 | Difficulty+1 pure heuristic |
+| `vs_blended` | 5 | Blended signal (value net + gap net + sentinel) |
+| `vs_heuristic_humanlike` | 5 | HumanPrefNet at 50% |
+| `vs_heuristic_teacher` | 25 | HumanMovePolicyAdvisor at 25–75% |
+| `vs_frozen` / `vs_heuristic` | 55 | Self-play or standard difficulty heuristic |
+
+**Why this mattered:** the raw-board A2C approach used before gen4 failed because it only saw heuristic opponents and never learned to handle human-like pressure. Adding 30% human-signal games gave the model exposure to a qualitatively different opponent style and is credited as a major factor in gen4 reaching difficulty 19 where earlier approaches stalled below difficulty 10.
+
+The same teacher setup carries forward into gen5 (`from_v4`) with identical blend weights and game-type fractions.
 
 ---
 

@@ -74,6 +74,7 @@ class EndgameRecognizer:
         self.current_state: EndgameState = INACTIVE_ENDGAME
         self._announced_endgame: bool = False
         self._announced_deep: bool = False
+        self._three_piece_moves: int = 0  # consecutive moves at 3-vs-6 configuration
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -81,6 +82,7 @@ class EndgameRecognizer:
         self.current_state = INACTIVE_ENDGAME
         self._announced_endgame = False
         self._announced_deep = False
+        self._three_piece_moves = 0
 
     def update(self, board: "BoardState") -> EndgameState:
         """Compute and cache the current endgame state. Call after every move."""
@@ -101,12 +103,21 @@ class EndgameRecognizer:
         else:
             phase = "deep_endgame"
 
+        # Track consecutive turns at 3-vs-6 flying configuration
+        _min_pc = min(pieces_w, pieces_b)
+        _max_pc = max(pieces_w, pieces_b)
+        if placement_done and _min_pc == 3 and _max_pc == 6:
+            self._three_piece_moves += 1
+        else:
+            self._three_piece_moves = 0
+        _suppress_3v6 = self._three_piece_moves >= 4
+
         # Endgame is active when total pieces fall below the threshold OR when
         # either side individually reaches ≤5 pieces (asymmetric endgame begins
         # even when the other side still has more pieces on board).
         active = placement_done and (
             total <= self.active_threshold or min(pieces_w, pieces_b) <= 5
-        )
+        ) and not _suppress_3v6
         deep = placement_done and total <= self.deep_threshold
 
         mob_w = _mobility(board, "W")
