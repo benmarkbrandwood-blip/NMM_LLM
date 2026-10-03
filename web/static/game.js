@@ -132,7 +132,7 @@ const _SIGNAL_META = {
   malom:          { color: "#5a7acc", label: "Malom WDL Shift" },
   gapnet:         { color: "#cc5555", label: "Blunder Risk" },
   generalist:     { color: "#e07830", label: "Generalist Divergence" },
-  unconventional: { color: "#9e9e9e", label: "Unconventional Move" },
+  unconventional: { color: "#ff6eb4", label: "Unconventional Move" },
   pref:           { color: "#c4a020", label: "Pref Divergence" },
   mobility:       { color: "#50aaaa", label: "Mobility Warning" },
   horizon:        { color: "#7b1fa2", label: "Horizon Regret" },
