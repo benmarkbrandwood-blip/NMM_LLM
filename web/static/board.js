@@ -95,6 +95,7 @@ export class Board {
     for (const [id, col] of [
       ["arr-green","#4caf50"],["arr-red","#e05050"],["arr-grey","#666"],["arr-blue","#7bbfff"],
       ["arr-orange","#ff8c00"],["arr-brown","#a0522d"],
+      ["arr-white","#e0e0e0"],["arr-pink","#ff6eb4"],["arr-silver","#9e9e9e"],["arr-purple","#7b1fa2"],["arr-cyan","#26c6da"],
     ]) {
       const mk = _el("marker", { id, markerWidth:"7", markerHeight:"5", refX:"5", refY:"2.5", orient:"auto" });
       const poly = _el("polygon", { points:"0 0,7 2.5,0 5", fill:col });
@@ -487,9 +488,11 @@ export class Board {
     }
   }
 
-  // Draw a green suggested-move overlay (arrow for moves, ring for placements, X for captures).
-  // Call AFTER setReplayQualityRings so it appends without clearing.
-  drawSignalHint(notation) {
+  // Draw a suggested-move overlay (arrow for moves, ring for placements, X for captures).
+  // color: CSS hex color string (defaults to green). Call AFTER setReplayQualityRings.
+  // In fly phase, the from-square may be empty (piece already moved in the actual move);
+  // skip the arrow in that case to avoid misleading visuals.
+  drawSignalHint(notation, color) {
     if (!notation) return;
     const parsed = _parseFullNotation(notation);
     if (!parsed) return;
@@ -497,12 +500,15 @@ export class Board {
     const toCoords = nodeXY(to);
     if (!toCoords) return;
     const [tx, ty] = toCoords;
-    const G = "#4caf50";
+    const C = color || "#4caf50";
+    const markerMap = { "#e0e0e0": "arr-white", "#ff6eb4": "arr-pink", "#4caf50": "arr-green", "#9e9e9e": "arr-silver", "#7b1fa2": "arr-purple", "#26c6da": "arr-cyan" };
+    const arrId = markerMap[C.toLowerCase()] || "arr-green";
     const g = this._replayGroup;
 
     if (from) {
+      // Only draw the arrow if the source square is currently occupied (fly-phase guard).
       const fromCoords = nodeXY(from);
-      if (fromCoords) {
+      if (fromCoords && this.grid[from]) {
         const [fx, fy] = fromCoords;
         const dx = tx - fx, dy = ty - fy;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -513,33 +519,42 @@ export class Board {
           const ey = ty - dy / dist * PIECE_R;
           g.appendChild(_el("line", {
             x1: sx, y1: sy, x2: ex, y2: ey,
-            stroke: G, "stroke-width": "2.5", opacity: "0.9",
-            "marker-end": "url(#arr-green)",
+            stroke: C, "stroke-width": "2.5", opacity: "0.9",
+            "marker-end": `url(#${arrId})`,
           }));
         }
       }
     } else {
-      // Placement: filled halo at destination
+      // Placement: filled halo at destination with black outline for board visibility
+      const rv = parseInt(C.slice(1,3),16), gv = parseInt(C.slice(3,5),16), bv = parseInt(C.slice(5,7),16);
+      g.appendChild(_el("circle", {
+        cx: tx, cy: ty, r: PIECE_R + 7,
+        fill: "none", stroke: "rgba(0,0,0,0.45)", "stroke-width": "3",
+      }));
       g.appendChild(_el("circle", {
         cx: tx, cy: ty, r: PIECE_R + 6,
-        fill: "rgba(76,175,80,0.18)", stroke: G, "stroke-width": "2", opacity: "0.85",
+        fill: `rgba(${rv},${gv},${bv},0.18)`, stroke: C, "stroke-width": "2", opacity: "0.85",
       }));
     }
 
-    // Green destination ring
+    // Destination ring with black shadow for visibility on light boards
+    g.appendChild(_el("circle", {
+      cx: tx, cy: ty, r: PIECE_R + 6,
+      fill: "none", stroke: "rgba(0,0,0,0.35)", "stroke-width": "3",
+    }));
     g.appendChild(_el("circle", {
       cx: tx, cy: ty, r: PIECE_R + 5,
-      fill: "none", stroke: G, "stroke-width": "1.8", opacity: "0.8",
+      fill: "none", stroke: C, "stroke-width": "1.8", opacity: "0.8",
     }));
 
-    // Green X at capture square
+    // X at capture square
     if (capture) {
       const capCoords = nodeXY(capture);
       if (capCoords) {
-        const [cx, cy] = capCoords;
+        const [cpx, cpy] = capCoords;
         const S = 9;
-        g.appendChild(_el("line", { x1: cx - S, y1: cy - S, x2: cx + S, y2: cy + S, stroke: G, "stroke-width": "2.5", opacity: "0.85" }));
-        g.appendChild(_el("line", { x1: cx + S, y1: cy - S, x2: cx - S, y2: cy + S, stroke: G, "stroke-width": "2.5", opacity: "0.85" }));
+        g.appendChild(_el("line", { x1: cpx-S, y1: cpy-S, x2: cpx+S, y2: cpy+S, stroke: C, "stroke-width": "2.5", opacity: "0.85" }));
+        g.appendChild(_el("line", { x1: cpx+S, y1: cpy-S, x2: cpx-S, y2: cpy+S, stroke: C, "stroke-width": "2.5", opacity: "0.85" }));
       }
     }
   }
@@ -824,7 +839,7 @@ export class Board {
             ty -= 11;
           }
           if (plbl) {
-            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#5591c7",
+            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#ff6eb4",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
@@ -940,7 +955,7 @@ export class Board {
             ty -= 10;
           }
           if (plbl) {
-            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#5591c7",
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#ff6eb4",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
@@ -1054,7 +1069,7 @@ export class Board {
           const sentOffset = srcHasSentP.has(src) ? -11 : 0;
           const t = _el("text", { x, y: y - PIECE_R - 3 + sentOffset,
             "font-size":"10", "font-weight":"bold",
-            fill:"#5591c7", "text-anchor":"middle", "font-family":"monospace",
+            fill:"#ff6eb4", "text-anchor":"middle", "font-family":"monospace",
             stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
             "paint-order":"stroke" });
           t.textContent = lbl;

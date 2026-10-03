@@ -29,7 +29,7 @@ html, body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   height: 100%;
-  max-width: 1200px;
+  max-width: none;
   margin: 0 auto;
   padding: 0 12px;
 }
@@ -246,10 +246,10 @@ header h1 {
 }
 
 /* ── Main 3-column grid ──────────────────────────────────────────────── */
-/*   [commentary 25%] [board 1fr] [side 25%]                             */
+/*   [chat 320px] [board 1fr] [right-panel 524px]                        */
 main {
   display: grid;
-  grid-template-columns: 25% 1fr 25%;
+  grid-template-columns: 320px 1fr 524px;
   gap: 14px;
   padding: 12px 0;
   min-height: 0;
@@ -419,14 +419,15 @@ main {
   gap: 8px;
   align-items: center;
   min-height: 0;
+  height: 100%;
 }
 
 #board-wrap {
   position: relative;
-  width: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   aspect-ratio: 1;
-  /* Never taller than what the viewport can fit above the bottom bar */
-  max-height: calc(100vh - 160px);
+  max-width: 100%;
   background: #2a1f14;
   border-radius: 10px;
   box-shadow: 0 4px 24px rgba(0,0,0,.6);
@@ -516,6 +517,11 @@ main {
 #live-signal-badge .sig-label  { font-weight: bold; margin-right: 6px; }
 #live-signal-badge .sig-detail { opacity: 0.75; font-size: .70rem; }
 
+/* Ensure HTML hidden attribute works even when CSS specifies display:block */
+#replay-tp-badge[hidden],
+#replay-signal-badge[hidden],
+#live-signal-badge[hidden] { display: none; }
+
 #status-bar {
   font-size: .9rem;
   color: var(--text-dim);
@@ -604,13 +610,86 @@ main {
   padding: 1px 3px;
 }
 
-/* ── Side panel (right) ──────────────────────────────────────────────── */
+/* ── Right panel: 2-column grid with analysis bar spanning top ───────── */
+#right-panel {
+  display: grid;
+  grid-template-columns: 250px 260px;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+#analysis-panel-top {
+  grid-column: 1 / span 2;
+}
+
+/* ── Side panel (left sub-column of right panel) ─────────────────────── */
 #side-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
+  min-height: 0;
 }
+
+/* ── Analysis column (right sub-column of right panel) ──────────────── */
+#analysis-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Think-progress area in analysis column */
+#think-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Book panel ──────────────────────────────────────────────────────── */
+#book-panel {
+  flex-shrink: 0;
+  margin-top: auto;
+}
+#book-panel a {
+  display: block;
+  text-decoration: none;
+}
+#book-panel img {
+  width: 100%;
+  border-radius: 4px;
+  display: block;
+  margin-bottom: 8px;
+  opacity: 0.9;
+  transition: opacity .15s;
+}
+#book-panel a:hover img { opacity: 1; }
+#book-panel .book-title {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--tan);
+  margin-bottom: 5px;
+}
+#book-panel .book-desc {
+  font-size: .72rem;
+  color: var(--text-dim);
+  line-height: 1.45;
+  margin-bottom: 6px;
+}
+#book-panel .book-buy-btn {
+  display: inline-block;
+  background: #f90;
+  color: #111;
+  font-size: .75rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 4px;
+  text-decoration: none;
+  letter-spacing: .02em;
+}
+#book-panel .book-buy-btn:hover { background: #ffaa00; }
 
 /* ── Panel box (shared card style) ──────────────────────────────────── */
 .panel-box {
@@ -776,7 +855,7 @@ main {
   text-align: center;
 }
 
-/* ── Bottom bar: eval graph + undo ───────────────────────────────────── */
+/* ── Bottom bar: position strength graph + game controls ─────────────── */
 #bottom-bar {
   display: flex;
   align-items: center;
@@ -1065,5 +1144,8 @@ main {
   }
   #commentary-col { min-height: 200px; max-height: 35vh; }
   #board-col { align-items: center; }
-  #side-panel { max-height: 40vh; }
+  #right-panel {
+    grid-template-columns: 1fr 1fr;
+    max-height: 40vh;
+  }
 }

@@ -70,11 +70,11 @@ let _gameRegret     = {};           // notation → regret_score, fetched async
 let _gameRegretFen  = null;         // FEN for which _gameRegret is valid
 
 const GAME_NET_DEFS = {
-  sentinel: { label:'Sentinel',  prefix:'S:', cssColor:'#e07030', field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
+  sentinel: { label:'Sentinel',  prefix:'S:', cssColor:'#e0e0e0', field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
   gapnet:   { label:'GapNet',    prefix:'G:', cssColor:'#cc5555', field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
   value:    { label:'ValueNet',  prefix:'V:', cssColor:'#50aaaa', field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
   pref:     { label:'PrefNet',   prefix:'F:', cssColor:'#c4a020', field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
-  pred:     { label:'Pred',      prefix:'P:', cssColor:'#5591c7', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  pred:     { label:'Pred',      prefix:'P:', cssColor:'#ff6eb4', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   teacher:  { label:'Pred',      prefix:'M:', cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   regret:   { label:'Regret',    prefix:'R:', cssColor:'#ff6020', field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
 };
@@ -132,11 +132,12 @@ const _SIGNAL_META = {
   malom:          { color: "#5a7acc", label: "Malom WDL Shift" },
   gapnet:         { color: "#cc5555", label: "Blunder Risk" },
   generalist:     { color: "#e07830", label: "Generalist Divergence" },
-  unconventional: { color: "#9a60cc", label: "Unconventional Move" },
+  unconventional: { color: "#9e9e9e", label: "Unconventional Move" },
   pref:           { color: "#c4a020", label: "Pref Divergence" },
   mobility:       { color: "#50aaaa", label: "Mobility Warning" },
-  horizon:        { color: "#c47820", label: "Horizon Regret" },
-  value:          { color: "#50aaaa", label: "ValueNet" },
+  horizon:        { color: "#7b1fa2", label: "Horizon Regret" },
+  value:          { color: "#26c6da", label: "ValueNet" },
+  sentinel:       { color: "#e0e0e0", label: "Sentinel" },
 };
 
 // ── AI weight defaults (Stage 5.13) ──────────────────────────────────────────
@@ -1275,6 +1276,8 @@ function startNewGame() {
   _hideReplayTPBadge();
   _hideReplaySignalBadge();
   { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  if (board && board.clearReplayOverlay) board.clearReplayOverlay();
+  if (board && board.clearMalomTrajectory) board.clearMalomTrajectory();
   const _gnb = $("game-name-bar");
   if (_gnb) _gnb.textContent = "";
   hintsLeft = 3;
@@ -1374,6 +1377,8 @@ function startAiVsAi() {
   _hideReplayTPBadge();
   _hideReplaySignalBadge();
   { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  if (board && board.clearReplayOverlay) board.clearReplayOverlay();
+  if (board && board.clearMalomTrajectory) board.clearMalomTrajectory();
   const _gnbAva = $("game-name-bar");
   if (_gnbAva) _gnbAva.textContent = "";
   hintsLeft = 0;
@@ -1604,6 +1609,8 @@ function startSetupGame() {
   _hideReplayTPBadge();
   _hideReplaySignalBadge();
   { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+  if (board && board.clearReplayOverlay) board.clearReplayOverlay();
+  if (board && board.clearMalomTrajectory) board.clearMalomTrajectory();
   const _gnbSetup = $("game-name-bar");
   if (_gnbSetup) _gnbSetup.textContent = "";
   hintsLeft = 3;
@@ -1966,6 +1973,7 @@ function handleMessage(msg) {
       const _wasAiVsAi  = isAiVsAi;
       phase = "game_over";
       stopThinkingTimer();
+      { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
       board && board.clearFormationGuide();
       _updateGuideWarning(null);
       $("btn-force-move").hidden = true;
@@ -2271,6 +2279,11 @@ function handleMessage(msg) {
       _assessmentReady = true;
       _stopAssessmentTimer();
       _updateAssessmentProgress(0);
+      { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
+      // Populate eval graph with full-game heuristic curve from assessment
+      if (msg.eval_curve && msg.eval_curve.length > 0) {
+        evalHistory = msg.eval_curve;
+      }
       // Redraw eval graph to show final (Malom-confirmed) turning-point markers
       drawEvalGraph();
       _annotateMovesListWithQuality();
@@ -3211,6 +3224,7 @@ function _applyReplayAnnotations(idx) {
   board.clearReplayOverlay();
   _hideReplayTPBadge();
   _hideReplaySignalBadge();
+  { const _lb = $("live-signal-badge"); if (_lb) _lb.hidden = true; }
 
   // Malom trajectory: shown when DB/Malom overlay is active
   if (diagDB) {
@@ -3250,7 +3264,10 @@ function _applyReplayAnnotations(idx) {
     const preferredNotation = (tpData && tpData.best_alt)
       ? tpData.best_alt
       : (topSig && (topSig.item.preferred || topSig.item.best_alt)) || null;
-    if (preferredNotation && board.drawSignalHint) board.drawSignalHint(preferredNotation);
+    if (preferredNotation && board.drawSignalHint) {
+      const hintColor = topSig ? ((_SIGNAL_META[topSig.key] || {}).color || "#4caf50") : "#4caf50";
+      board.drawSignalHint(preferredNotation, hintColor);
+    }
   }
 
   if (tpData)  _showReplayTPBadge(tpRank, tpData);
@@ -3293,6 +3310,12 @@ function _showReplaySignalBadge(sigKey, item) {
     detail = `${item.count} legal moves`;
   } else if (sigKey === "malom" && item.wdl_before && item.wdl_after) {
     detail = `${item.wdl_before}→${item.wdl_after}`;
+  } else if (sigKey === "sentinel" && item.r_s != null) {
+    detail = `r_s +${item.r_s.toFixed(2)} (played ${item.played != null ? item.played.toFixed(2) : "?"})`;
+  } else if (sigKey === "horizon" && item.delta != null) {
+    detail = `horizon δ${item.delta >= 0 ? "+" : ""}${item.delta.toFixed(2)}`;
+  } else if (sigKey === "value" && item.regret != null) {
+    detail = `regret +${item.regret.toFixed(2)}${item.preferred ? ` (preferred: ${item.preferred})` : ""}`;
   }
   badge.innerHTML =
     `<span class="sig-badge-label" style="color:${meta.color}">${meta.label}</span>` +
@@ -3619,9 +3642,28 @@ function _renderAssessmentSignalSections(msg, feed) {
     if (c) outer.appendChild(c);
   }
 
+  const sentSp = sp.sentinel || [];
+  if (sentSp.length) {
+    const lines = sentSp.slice(0, 6).map(it => {
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  r_s=+${it.r_s.toFixed(2)} (played ${it.played.toFixed(2)} vs best ${it.best.toFixed(2)})`;
+    }).concat(_plyTail(sentSp, 6));
+    const c = _card("sentinel", `Sentinel Divergence (${sentSp.length} flagged)`, lines);
+    if (c) outer.appendChild(c);
+  }
+
+  const valueSp = sp.value || [];
+  if (valueSp.length) {
+    const lines = valueSp.slice(0, 6).map(it => {
+      const pref = it.preferred ? `  preferred: ${it.preferred}` : "";
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  regret+${it.regret.toFixed(2)}${pref}`;
+    }).concat(_plyTail(valueSp, 6));
+    const c = _card("value", `ValueNet Divergence (${valueSp.length} flagged)`, lines);
+    if (c) outer.appendChild(c);
+  }
+
   // If nothing was flagged, show a clean-game message
   const hasAny = tps.length || malomShifts.length ||
-    gapnet.length || gen.length || unconv.length || pref.length || mob.length || horizon.length;
+    gapnet.length || gen.length || unconv.length || pref.length || mob.length || horizon.length || sentSp.length || valueSp.length;
   if (!hasAny) {
     const clean = document.createElement("div");
     clean.style.cssText = "font-size:.8rem;color:#6aaa6a;padding:4px 2px";
@@ -3641,10 +3683,10 @@ const _ASSESSMENT_LEGEND_ITEMS = [
   ["Turning point",   "The ply where the position evaluation shifted most sharply, then cross-checked against Malom's perfect database to confirm it was a genuine game-state change — not just a heuristic fluctuation.", "turning_point"],
   ["Malom",           "A perfect solver covering every Nine Men's Morris position. It provides a definitive Win / Draw / Loss verdict for any board state, so WDL shifts mark moves that provably changed the theoretical game outcome.", "malom"],
   ["Heuristic eval",  "The classical AI's board score, based on mills formed, piece mobility, and blocked opponent pieces. Used to detect large evaluation swings and identify the first-pass turning point before Malom confirmation.", null],
-  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness.", null],
+  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness.", "sentinel"],
   ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs.", "gapnet"],
   ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment.", "generalist"],
-  ["Predictive",      "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", null],
+  ["Predictive",      "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", "unconventional"],
   ["ValueNet",        "A positional value network trained on Malom distance-to-win (DTW) labels — the number of optimal moves to force a win or avoid a loss. Higher scores mean White is closer to a theoretical win; lower scores mean Black is ahead. Used by the AI to blend long-range positional judgement with the classical heuristic.", "value"],
   ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
   ["Unconventional",  "Moves ranked low by the Predictive net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],

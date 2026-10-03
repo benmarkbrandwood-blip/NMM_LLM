@@ -54,6 +54,7 @@ class Coordinator:
         generalist_advisor     = None,   # GeneralistAgent | SpecialistRouter | None
         gap_net                = None,   # GapNet (ValueNet) | None
         sentinel_advisor       = None,   # SentinelAdvisor | None
+        value_net              = None,   # ValueNet | PhaseValueNet | None
         llm_can_override_move: bool = True,
     ) -> None:
         self.game_ai = game_ai
@@ -81,6 +82,7 @@ class Coordinator:
             gap_net=gap_net,
             sentinel_advisor=sentinel_advisor,
             shallow_ai=_shallow,
+            value_net=value_net,
         )
 
         self.dialogue_log: list[dict] = []

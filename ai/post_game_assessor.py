@@ -120,6 +120,10 @@ class MoveAnnotation:
     horizon_shallow_score: Optional[float] = None    # normalised move score at shallow depth
     horizon_deep_score: Optional[float] = None       # normalised move score at deep depth (= score_played)
 
+    # ValueNet divergence
+    vnet_regret:   Optional[float] = None   # normalised vnet regret [0,1]
+    vnet_top_move: Optional[str]   = None   # ValueNet's preferred alternative notation
+
     # Suspicious-position deep re-score (Fix 3)
     r_h_deep: Optional[float] = None    # r_h at deep_depth search; replaces r_h for turning-point selection
     deep_scored: bool = False           # True when this ply was re-scored at deep_depth
@@ -226,6 +230,7 @@ class PostGameAssessor:
         shallow_depth: Optional[int] = None,
         deep_depth: Optional[int] = None,
         threat_delta_threshold: float = 200.0,
+        value_net=None,
     ) -> None:
         self._ai = GameAI(color="W", difficulty=difficulty)
         self._ai.max_search_depth = depth
@@ -251,6 +256,7 @@ class PostGameAssessor:
         self._r_h_threshold = r_h_threshold
         self._r_s_threshold = r_s_threshold
         self._r_h_solo_threshold = r_h_solo_threshold
+        self._value_net = value_net
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -392,7 +398,9 @@ class PostGameAssessor:
             if scored:
                 all_s = [s for _, s in scored]
                 lo, hi = min(all_s), max(all_s)
-                best_alt_move     = scored[0][0]
+                # scored is sorted best-first from White's perspective (GameAI color="W").
+                # For Black's turn the best move for Black is the last entry (lowest White score).
+                best_alt_move     = scored[0][0] if color == "W" else scored[-1][0]
                 best_alt_notation = _move_notation(best_alt_move)
                 move_key = (played_move.get("from"), played_move["to"], played_move.get("capture"))
                 played_raw = next(
@@ -405,7 +413,9 @@ class PostGameAssessor:
                 elif played_raw is None:
                     score_played_norm = 0.0
                 else:
-                    score_played_norm = (played_raw - lo) / (hi - lo)
+                    raw_norm = (played_raw - lo) / (hi - lo)
+                    # White's perspective: high = good for White. Invert for Black.
+                    score_played_norm = raw_norm if color == "W" else 1.0 - raw_norm
                 score_best_norm = 1.0
             else:
                 score_played_norm = 1.0
@@ -508,6 +518,25 @@ class PostGameAssessor:
                     horizon_deep_score = score_played_norm
                     horizon_delta      = horizon_shallow_score - horizon_deep_score
 
+            # ── ValueNet divergence ───────────────────────────────────────────────
+            vnet_regret:   Optional[float] = None
+            vnet_top_move: Optional[str]   = None
+            if self._value_net is not None and candidates:
+                try:
+                    vnet_scores = [
+                        float(self._value_net.predict(board.apply_move(c), color))
+                        for c in candidates
+                    ]
+                    vn_lo, vn_hi = min(vnet_scores), max(vnet_scores)
+                    if vn_hi != vn_lo:
+                        played_vn_norm = (vnet_scores[played_idx] - vn_lo) / (vn_hi - vn_lo)
+                        vnet_regret = max(0.0, 1.0 - played_vn_norm)
+                        best_vn_idx = int(max(range(len(vnet_scores)), key=lambda i: vnet_scores[i]))
+                        if best_vn_idx != played_idx:
+                            vnet_top_move = _move_notation(candidates[best_vn_idx])
+                except Exception:
+                    pass
+
             # ── Poor-candidate flagging (heuristic-only; Malom overrides in Pass 3) ──
             quality = "clean"
             if r_s is not None:
@@ -542,6 +571,8 @@ class PostGameAssessor:
                 horizon_delta=horizon_delta,
                 horizon_shallow_score=horizon_shallow_score,
                 horizon_deep_score=horizon_deep_score,
+                vnet_regret=vnet_regret,
+                vnet_top_move=vnet_top_move,
                 legal_move_count=legal_move_count,
                 quality=quality,
                 generalist_self_assessed=generalist_self_assessed,

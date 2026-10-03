@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import logging.handlers
 from pathlib import Path
 from typing import Optional
@@ -3438,6 +3439,14 @@ def _build_stage2_summary(annotation: "PostGameAnnotation") -> str:
 async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) -> None:
     """Three-pass streaming assessment: emits assessment_stage_1/2 and assessment_result."""
     global _module_mills_llm
+    # Resolve the best available MalomDB for assessment:
+    # 1. The MalomDB already loaded inside ExternalSolvedDB (_malom_db._malom) — always
+    #    ready when the Malom overlay is active; requires no lazy-init.
+    # 2. Fallback to _malom_puzzle_db (lazy-init via _ensure_malom_puzzle_db).
+    _assessor_malom_db = getattr(_malom_db, '_malom', None) if _malom_db is not None else None
+    if _assessor_malom_db is None or not _assessor_malom_db.is_available():
+        await asyncio.to_thread(_ensure_malom_puzzle_db)
+        _assessor_malom_db = _malom_puzzle_db
     from ai.post_game_assessor import (
         PostGameAssessor,
         _R_H_POOR_THRESHOLD,
@@ -3450,7 +3459,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         shallow_depth=2,
         sentinel=_sentinel_advisor,
         gap_net=_gap_net,
-        malom_db=_malom_puzzle_db,
+        malom_db=_assessor_malom_db,
         trajectory_db=_trajectory_db,
         policy_advisor=_human_move_policy_advisor,
         pref_advisor=_human_pref_net,
@@ -3458,6 +3467,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         r_h_threshold=_R_H_POOR_THRESHOLD,
         r_s_threshold=_R_S_POOR_THRESHOLD,
         r_h_solo_threshold=_R_H_SOLO_THRESHOLD,
+        value_net=_value_net,
     )
 
     winner = record.get("winner", "?")
@@ -3619,6 +3629,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     has_gapnet     = any(m.blunder_zone_score is not None for m in final.moves)
     has_pref       = any(m.policy_pref_delta is not None for m in final.moves)
     has_generalist = any(m.generalist_policy_prob is not None for m in final.moves)
+    has_valuenet   = any(m.vnet_regret is not None for m in final.moves)
     signals = ["heuristic"]
     if has_sentinel:   signals.append("sentinel")
     if has_malom:      signals.append("malom")
@@ -3627,6 +3638,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     if has_gapnet:     signals.append("gapnet")
     if has_pref:       signals.append("pref")
     if has_generalist: signals.append("generalist")
+    if has_valuenet:   signals.append("value")
 
     lines: list[str] = []
     if final.opening_name:
@@ -3832,13 +3844,34 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             ],
             key=lambda d: d["count"],
         ),
+        "sentinel": sorted(
+            [
+                {
+                    **_sp_base(m),
+                    "r_s":    round(m.r_s, 3),
+                    "played": round(m.sentinel_played, 3),
+                    "best":   round(m.sentinel_best,   3),
+                }
+                for m in final.moves
+                if m.r_s is not None and m.r_s >= 0.15
+            ],
+            key=lambda d: d["r_s"], reverse=True,
+        ),
         "horizon": sorted(
             [
                 {**_sp_base(m), "delta": round(m.horizon_delta, 3)}
                 for m in final.moves
-                if m.horizon_delta is not None and m.horizon_delta >= 0.25
+                if m.horizon_delta is not None and m.horizon_delta >= 0.18
             ],
             key=lambda d: d["delta"], reverse=True,
+        ),
+        "value": sorted(
+            [
+                {**_sp_base(m), "regret": round(m.vnet_regret, 3), "preferred": m.vnet_top_move}
+                for m in final.moves
+                if m.vnet_regret is not None and m.vnet_regret >= 0.20
+            ],
+            key=lambda d: d["regret"], reverse=True,
         ),
         "malom": sorted(
             [
@@ -3874,6 +3907,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             if m.wdl_before is not None and m.wdl_after is not None
             and m.wdl_before != m.wdl_after
         ]
+        _STRENGTH_SCALE = {"place": 800.0, "move": 1500.0, "fly": 3000.0}
         _assessment_payload = {
             "type":           "assessment_result",
             "turning_points": tp_json,
@@ -3887,6 +3921,10 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
             "ply_base":       final.ply_base,
             "winner":         winner,
             "signal_plies":   signal_plies,
+            "eval_curve":     [
+                round(math.tanh(m.heuristic_score_white / _STRENGTH_SCALE.get(m.phase, 1500.0)), 4)
+                for m in final.moves
+            ],
         }
         await _send(ws, _assessment_payload)
         # Persist assessment as second line in the game file (best-effort)
@@ -4180,6 +4218,7 @@ def _make_nollm_coordinator(game_ai, human_color: str, vs_human: bool = True) ->
         generalist_advisor=_generalist_advisor,
         gap_net=_gap_net,
         sentinel_advisor=_sentinel_advisor,
+        value_net=_value_net,
     )
     coord.on_game_start()
     return coord
@@ -4972,6 +5011,7 @@ async def ws_endpoint(websocket: WebSocket):
                                 generalist_advisor=_generalist_advisor,
                                 gap_net=_gap_net,
                                 sentinel_advisor=_sentinel_advisor,
+                                value_net=_value_net,
                             )
                             await asyncio.to_thread(_re_coord.on_game_start)
                         else:
@@ -5307,6 +5347,7 @@ async def ws_endpoint(websocket: WebSocket):
                             generalist_advisor=_generalist_advisor,
                             gap_net=_gap_net,
                             sentinel_advisor=_sentinel_advisor,
+                            value_net=_value_net,
                             llm_can_override_move=llm_can_override_move,
                         )
                         await asyncio.to_thread(coord.on_game_start)
@@ -5480,6 +5521,7 @@ async def ws_endpoint(websocket: WebSocket):
                             generalist_advisor=_generalist_advisor,
                             gap_net=_gap_net,
                             sentinel_advisor=_sentinel_advisor,
+                            value_net=_value_net,
                             llm_can_override_move=llm_can_override_move,
                         )
                         await asyncio.to_thread(coord.on_game_start)
@@ -6133,6 +6175,7 @@ async def ws_endpoint(websocket: WebSocket):
                         generalist_advisor=_generalist_advisor,
                         gap_net=_gap_net,
                         sentinel_advisor=_sentinel_advisor,
+                        value_net=_value_net,
                         llm_can_override_move=llm_can_override_move,
                     )
                     # Seed coordinator with all moves played so far so trajectory hints work

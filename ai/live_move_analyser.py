@@ -27,6 +27,7 @@ WEAK_SENTINEL_THRESHOLD   =  0.40  # sentinel quality below this → weak
 RISKY_BLUNDER_THRESHOLD   =  0.55  # blunder_zone above this → risky position
 GEN_DIVERGE_THRESHOLD     =  0.08  # generalist prob gap above this → significant divergence
 HORIZON_THRESHOLD         =  0.18  # horizon_delta above this → short-sighted move
+VNET_DIVERGE_THRESHOLD    =  0.20  # vnet_delta above this → value network disagrees
 
 
 @dataclass
@@ -51,6 +52,10 @@ class LiveMoveSignals:
 
     # Horizon regret (None when shallow AI not wired up)
     horizon_delta:     Optional[float] = None   # shallow_rank − deep_rank; positive = short-sighted
+
+    # ValueNet divergence (None when value_net not wired up)
+    vnet_top:   Optional[str]   = None   # notation of ValueNet's top move if it diverges
+    vnet_delta: Optional[float] = None   # normalised vnet regret [0,1]; positive = value left behind
 
     # Derived flags
     is_unconventional: bool = False   # policy_prob < UNCONVENTIONAL_THRESHOLD
@@ -95,6 +100,11 @@ class LiveMoveSignals:
                 f"  Horizon regret: {self.horizon_delta:+.2f} "
                 "(move looks better at shallow depth than it does with deeper search)"
             )
+        if self.vnet_delta is not None and self.vnet_delta >= VNET_DIVERGE_THRESHOLD:
+            lines.append(
+                f"  ValueNet regret: {self.vnet_delta:+.2f} "
+                "(value network prefers a different continuation)"
+            )
         if self.is_strong:
             lines.append("  Overall assessment: strong move")
         elif self.is_weak:
@@ -122,6 +132,8 @@ class LiveMoveSignals:
             return ("Unusual", f"{self.policy_prob:.0%}", "caution")
         if self.generalist_top is not None:
             return ("AI preferred", self.generalist_top, "caution")
+        if self.vnet_top is not None:
+            return ("ValueNet", self.vnet_top, "caution")
         if self.is_strong:
             if self.pref_delta is not None and self.pref_delta >= STRONG_PREF_THRESHOLD:
                 return ("Pref", f"δ{self.pref_delta:+.2f}", "good")
@@ -159,6 +171,7 @@ class LiveMoveAnalyser:
         gap_net            = None,   # GapNet (ValueNet) | None
         sentinel_advisor   = None,   # SentinelAdvisor | None
         shallow_ai         = None,   # GameAI at low depth for horizon regret; None = skip
+        value_net          = None,   # ValueNet | PhaseValueNet | None
     ) -> None:
         self._policy      = policy_advisor
         self._pref        = pref_advisor
@@ -166,6 +179,7 @@ class LiveMoveAnalyser:
         self._gap_net     = gap_net
         self._sentinel    = sentinel_advisor
         self._shallow_ai  = shallow_ai
+        self._value_net   = value_net
 
     @property
     def has_signals(self) -> bool:
@@ -176,6 +190,7 @@ class LiveMoveAnalyser:
             or self._gap_net is not None
             or self._sentinel is not None
             or self._shallow_ai is not None
+            or self._value_net is not None
         )
 
     def analyse(
@@ -264,6 +279,31 @@ class LiveMoveAnalyser:
                     except Exception:
                         pass
 
+        # ── ValueNet divergence ───────────────────────────────────────────────
+        vnet_top:   Optional[str]   = None
+        vnet_delta: Optional[float] = None
+        if self._value_net is not None:
+            try:
+                vnet_scores = [
+                    float(self._value_net.predict(board_before.apply_move(cand), color))
+                    for cand in legal_moves
+                ]
+                if vnet_scores:
+                    vn_lo, vn_hi = min(vnet_scores), max(vnet_scores)
+                    if vn_hi != vn_lo:
+                        best_vn_idx = int(max(range(len(vnet_scores)), key=lambda i: vnet_scores[i]))
+                        if move_idx is not None:
+                            played_vn_norm = (vnet_scores[move_idx] - vn_lo) / (vn_hi - vn_lo)
+                            vnet_delta = max(0.0, 1.0 - played_vn_norm)
+                        if (
+                            best_vn_idx != move_idx
+                            and vnet_delta is not None
+                            and vnet_delta >= VNET_DIVERGE_THRESHOLD
+                        ):
+                            vnet_top = _move_str(legal_moves[best_vn_idx])
+            except Exception:
+                pass
+
         # ── Horizon regret (shallow vs deep) — human moves only ───────────────
         # Skip for AI moves: the AI already ran the deep search itself, so its
         # score_norm IS the deep rank and a shallow re-rank adds nothing.
@@ -318,6 +358,8 @@ class LiveMoveAnalyser:
             blunder_zone=blunder_zone,
             sentinel_quality=sentinel_quality,
             horizon_delta=horizon_delta,
+            vnet_top=vnet_top,
+            vnet_delta=vnet_delta,
             is_unconventional=is_unconventional,
             closed_mill=closed_mill,
             captured=captured,
