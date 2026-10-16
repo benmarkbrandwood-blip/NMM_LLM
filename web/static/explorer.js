@@ -82,12 +82,12 @@ const C = {
 // Net definitions — field names, colors, sort direction, normalization
 // isAbsNorm: true = heuristic-style (raw eval, normalize by abs max)
 const NET_DEFS = {
-  sentinel: { label:'Sentinel',  cssColor:'#e07030', hexColor:0xe07030, field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
+  sentinel: { label:'Sentinel',  cssColor:'#e0e0e0', hexColor:0xe0e0e0, field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
   heuristic:{ label:'Heuristic', cssColor:'#c8a96e', hexColor:0xc8a96e, field:'heuristic_score', isHigherBetter:true,  isAbsNorm:true  },
   gapnet:   { label:'GapNet',    cssColor:'#cc5555', hexColor:0xcc5555, field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
   value:    { label:'ValueNet',  cssColor:'#50aaaa', hexColor:0x50aaaa, field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
   pref:     { label:'PrefNet',   cssColor:'#c4a020', hexColor:0xc4a020, field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
-  pred:     { label:'Pred',      cssColor:'#a06fe0', hexColor:0xa06fe0, field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  pred:     { label:'Pred',      cssColor:'#ff6eb4', hexColor:0xff6eb4, field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   regret:   { label:'Regret',    cssColor:'#ff6020', hexColor:0xff6020, field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
 };
 
@@ -124,7 +124,7 @@ function sentinelColor(score) {
 
 function barColor(moveData) {
   if (moveData.has_db_data) return winPctColor(moveData.win_pct);
-  if (moveData.pred_human_prob != null) return new THREE.Color(0x5591c7);
+  if (moveData.pred_human_prob != null) return new THREE.Color(0xff6eb4);
   return new THREE.Color(0x555555);
 }
 
@@ -1210,7 +1210,7 @@ function showTooltip(cx, cy, mv) {
     const trajRow = hasTrajData !== false && trajPct > 0
       ? `<div class="tt-row"><span class="tt-label">T (piece)</span><span>T:${trajPct}%</span></div>`
       : hasTrajData === false && predPct > 0
-        ? `<div class="tt-row"><span class="tt-label">P (piece)</span><span style="color:#5591c7">P:${predPct}%</span></div>`
+        ? `<div class="tt-row"><span class="tt-label">P (piece)</span><span style="color:#ff6eb4">P:${predPct}%</span></div>`
         : '';
     let netRows = '';
     if (mv._bestByNet) {
@@ -1268,7 +1268,7 @@ function showTooltip(cx, cy, mv) {
   }
 
   const predRow = mv.pred_human_prob != null
-    ? `<div class="tt-row"><span class="tt-label" style="color:#a06fe0">Pred</span><span style="color:#a06fe0">P:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
+    ? `<div class="tt-row"><span class="tt-label" style="color:#ff6eb4">Pred</span><span style="color:#ff6eb4">P:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
     : '';
   const gapnetRow = mv.gapnet_score != null
     ? `<div class="tt-row"><span class="tt-label" style="color:#cc5555">GapNet risk</span><span style="color:#cc5555">${(mv.gapnet_score * 100).toFixed(1)}%</span></div>`
@@ -1287,7 +1287,7 @@ function showTooltip(cx, cy, mv) {
     <div class="tt-notation">${mv.notation}</div>
     ${dbRows}
     ${trajRow}
-    <div class="tt-row"><span class="tt-label" style="color:#e07030">Sentinel</span><span style="color:#e07030">${sentText}</span></div>
+    <div class="tt-row"><span class="tt-label" style="color:#e0e0e0">Sentinel</span><span style="color:#e0e0e0">${sentText}</span></div>
     <div class="tt-row"><span class="tt-label" style="color:#c8a96e">Heuristic</span><span style="color:#c8a96e">${heurText}</span></div>
     ${predRow}${gapnetRow}${valueRow}${prefRow}${regretRow}
   `;
