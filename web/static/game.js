@@ -30,6 +30,7 @@ let canMarkGoodGame   = false; // true after a draw ends (AI vs human)
 let isVsHuman         = false; // true when current game is human vs human (handoff buttons visible)
 let replayMoves       = [];   // moves with FEN data, populated when game ends
 let replayIdx         = -1;   // -1 = not replaying; 0..n-1 = ply index
+let _preReplayStatus  = "";   // status bar text saved on replay entry; restored on exit
 let _openingsData     = [];   // cached openings from /api/openings
 let _currentMoves     = [];   // latest moves array, kept for copyMoveNotation()
 
@@ -70,13 +71,14 @@ let _gameRegret     = {};           // notation → regret_score, fetched async
 let _gameRegretFen  = null;         // FEN for which _gameRegret is valid
 
 const GAME_NET_DEFS = {
-  sentinel: { label:'Sentinel',  prefix:'S:', cssColor:'#e0e0e0', field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
-  gapnet:   { label:'GapNet',    prefix:'G:', cssColor:'#cc5555', field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
-  value:    { label:'ValueNet',  prefix:'V:', cssColor:'#50aaaa', field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
-  pref:     { label:'PrefNet',   prefix:'F:', cssColor:'#c4a020', field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
-  pred:     { label:'Pred',      prefix:'P:', cssColor:'#ff6eb4', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
-  teacher:  { label:'Pred',      prefix:'M:', cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
-  regret:   { label:'Regret',    prefix:'R:', cssColor:'#ff6020', field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
+  sentinel:   { label:'Sentinel',   prefix:'S:',   cssColor:'#e0e0e0', field:'sentinel_score',  isHigherBetter:true,  isAbsNorm:false },
+  gapnet:     { label:'GapNet',     prefix:'G:',   cssColor:'#cc5555', field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
+  value:      { label:'ValueNet',   prefix:'V:',   cssColor:'#50aaaa', field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
+  pref:       { label:'PrefNet',    prefix:'F:',   cssColor:'#c4a020', field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
+  pred:       { label:'Pred',       prefix:'P:',   cssColor:'#ff6eb4', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  teacher:    { label:'Teacher',    prefix:'Tch:', cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  generalist: { label:'Generalist', prefix:'Gen:', cssColor:'#e07830', field:'overseer_prob',   isHigherBetter:true,  isAbsNorm:false },
+  regret:     { label:'Regret',     prefix:'R:',   cssColor:'#ff6020', field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
 };
 
 function _diagActive() {
@@ -91,7 +93,7 @@ function _diagNeedsObj() {
     gapnet:   llmOn || gameNetSlots.includes('gapnet'),
     valuenet: llmOn || gameNetSlots.includes('value'),
     pref:     llmOn || gameNetSlots.includes('pref'),
-    overseer: diagOverseer,
+    overseer: diagOverseer || gameNetSlots.includes('generalist'),
   };
 }
 
@@ -3153,6 +3155,8 @@ function replayGo(idx) {
   // idx=0 → initial board (before any moves)
   // idx=k → board after move k  (1 ≤ k ≤ replayMoves.length)
   idx = Math.max(0, Math.min(replayMoves.length, idx));
+  // Save current status bar text on first entry into replay
+  if (replayIdx === -1) _preReplayStatus = $("status-bar").textContent;
   replayIdx = idx;
 
   if (idx === 0) {
@@ -3174,6 +3178,16 @@ function replayGo(idx) {
     }
   }
 
+  // Update status bar with side-to-move at this ply
+  const total = replayMoves.length;
+  let sideStr = "";
+  if (idx === 0) {
+    sideStr = " · White to move";
+  } else if (idx < total) {
+    sideStr = replayMoves[idx].color === "W" ? " · White to move" : " · Black to move";
+  }
+  setStatus(`Replay: ${idx}/${total}${sideStr}`);
+
   _updateReplayLabel();
   _highlightReplayMove(idx);
   drawEvalGraph();
@@ -3193,6 +3207,7 @@ function exitReplay() {
     board.render(gameState);
     if (gameState.move_pairs) board.setMovePairs(gameState.move_pairs);
   }
+  if (_preReplayStatus) { setStatus(_preReplayStatus); _preReplayStatus = ""; }
   _updateReplayLabel();
   _highlightReplayMove(-1);
   drawEvalGraph();
@@ -4106,6 +4121,18 @@ function _handleTournamentNext(msg) {
   _assessmentTurningPoints = []; _assessmentPlyQuality = []; _assessmentReady = false;
   _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
   _stopAssessmentTimer(); _updateAssessmentProgress(0);
+  // Clear all board overlay groups that persist across board.render() calls
+  replayIdx = -1;
+  clearTimeout(_replayOverlayTimer);
+  _replayOverlayTimer = null;
+  if (board) {
+    if (board.clearDiag) board.clearDiag();
+    if (board.clearFormationGuide) board.clearFormationGuide();
+    if (board.clearMalomTrajectory) board.clearMalomTrajectory();
+    if (board.clearReplayOverlay) board.clearReplayOverlay();
+    board.render({ board: {}, phase: "place", is_human_turn: false,
+                   legal_dests: [], legal_sources: [], pieces_placed: 0 });
+  }
   const btnNext = $("btn-tournament-next-game");
   if (btnNext) btnNext.style.display = "none";
   const colorName = msg.human_color === "W" ? "White" : "Black";

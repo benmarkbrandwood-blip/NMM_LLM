@@ -177,80 +177,83 @@
         <span id="diag-mode-label" class="diag-mode-label">static</span>
       </div>
 
-      <!-- Diagnostic controls (overlay + score chips — always visible) -->
-      <div id="diag-controls">
-        <span class="diag-section-label">Overlay:</span>
-        <select id="game-net-1" title="Overlay slot 1" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
-          <option value="">— Off —</option>
-          <option value="sentinel">Sentinel</option>
-          <option value="gapnet">GapNet</option>
-          <option value="value">ValueNet</option>
-          <option value="pref">PrefNet</option>
-          <option value="pred">Pred</option>
-          <option value="regret">Regret</option>
-        </select>
-        <select id="game-net-2" title="Overlay slot 2" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
-          <option value="">— Off —</option>
-          <option value="sentinel">Sentinel</option>
-          <option value="gapnet">GapNet</option>
-          <option value="value">ValueNet</option>
-          <option value="pref">PrefNet</option>
-          <option value="pred">Pred</option>
-          <option value="regret">Regret</option>
-        </select>
-        <select id="game-net-3" title="Overlay slot 3" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
-          <option value="">— Off —</option>
-          <option value="sentinel">Sentinel</option>
-          <option value="gapnet">GapNet</option>
-          <option value="value">ValueNet</option>
-          <option value="pref">PrefNet</option>
-          <option value="pred">Pred</option>
-          <option value="regret">Regret</option>
-        </select>
-        <span class="diag-sep">|</span>
-        <span class="diag-section-label">Scores:</span>
-        <button id="diag-btn-static"  class="diag-chip" title="Static: tactic bonus + position eval (fast)">Static</button>
-        <button id="diag-btn-negamax" class="diag-chip" title="Negamax: deep search scores (slow)">Negamax d3</button>
-        <span class="diag-depth-wrap">
-          <label for="diag-depth" class="diag-section-label">d</label>
-          <input id="diag-depth" type="number" min="1" max="5" value="3" class="diag-depth-input">
-        </span>
-        <span class="diag-sep">|</span>
-        <span class="diag-section-label">DB:</span>
-        <button id="diag-btn-traj"  class="diag-chip" title="Trajectory DB: move frequency from human games; falls back to Pred Human (P:XX%) when no trajectory data">Traj/Pred</button>
-        <select id="sel-traj-n" title="Show sample count in trajectory labels" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
-          <option value="">T%</option>
-          <option value="n">T%(n=)</option>
-        </select>
-        <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
-          <option value="all">All</option>
-          <option value="lower">Lower</option>
-          <option value="middle" selected>Middle</option>
-          <option value="upper">Upper</option>
-        </select>
-        <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB + Malom: WIN (green) / LOSS (red) arrows">DB/Malom</button>
-        <button id="diag-btn-overseer" class="diag-chip" title="AI choice: ScaffoldedPolicyNet pick probability per move (O:XX%)">AI choice</button>
-        <span id="diag-overseer-status" style="font-size:.75rem;color:#888;display:none" title="Overseer checkpoint not loaded">(no model)</span>
-        <span style="font-size:.63rem;color:#777;margin-left:6px" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</span>
-      </div>
-
       <div id="board-wrap">
         <svg id="board-svg"></svg>
       </div>
-      <div id="replay-tp-badge" hidden></div>
-      <div id="replay-signal-badge" hidden></div>
-      <div id="live-signal-badge" hidden></div>
       <div id="game-name-bar"></div>
       <div id="status-bar">Configure a game and click New Game.</div>
-      <div id="think-bar-wrap" title="AI search time">
-        <div id="think-bar-fill"></div>
-      </div>
-      <div id="ply-progress" style="font-size:.75rem;color:#888;text-align:center;min-height:1.2em;margin-top:2px"></div>
-      <div id="think-time-info" style="font-size:.8rem;color:#aaa;text-align:center;min-height:1.3em;margin-top:1px;font-variant-numeric:tabular-nums"></div>
     </div>
 
-    <!-- Right column: moves list, status badge, game info, settings -->
-    <div id="side-panel">
+    <!-- Right panel: analysis controls (full width) + two sub-columns -->
+    <div id="right-panel">
+
+      <!-- Analysis overlay controls — spans both sub-columns -->
+      <div class="panel-box" id="analysis-panel-top" style="padding:6px 8px">
+        <h3 style="margin-bottom:5px">Analysis</h3>
+        <div id="diag-controls">
+          <span class="diag-section-label">Overlay:</span>
+          <select id="game-net-1" title="Overlay slot 1" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+            <option value="">— Off —</option>
+            <option value="sentinel">Sentinel</option>
+            <option value="gapnet">GapNet</option>
+            <option value="value">ValueNet</option>
+            <option value="pref">PrefNet</option>
+            <option value="pred">Pred</option>
+            <option value="teacher">Teacher</option>
+            <option value="generalist">Generalist</option>
+            <option value="regret">Regret</option>
+          </select>
+          <select id="game-net-2" title="Overlay slot 2" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+            <option value="">— Off —</option>
+            <option value="sentinel">Sentinel</option>
+            <option value="gapnet">GapNet</option>
+            <option value="value">ValueNet</option>
+            <option value="pref">PrefNet</option>
+            <option value="pred">Pred</option>
+            <option value="teacher">Teacher</option>
+            <option value="generalist">Generalist</option>
+            <option value="regret">Regret</option>
+          </select>
+          <select id="game-net-3" title="Overlay slot 3" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+            <option value="">— Off —</option>
+            <option value="sentinel">Sentinel</option>
+            <option value="gapnet">GapNet</option>
+            <option value="value">ValueNet</option>
+            <option value="pref">PrefNet</option>
+            <option value="pred">Pred</option>
+            <option value="teacher">Teacher</option>
+            <option value="generalist">Generalist</option>
+            <option value="regret">Regret</option>
+          </select>
+          <span class="diag-sep">|</span>
+          <span class="diag-section-label">Scores:</span>
+          <button id="diag-btn-static"  class="diag-chip" title="Static: tactic bonus + position eval (fast)">Static</button>
+          <button id="diag-btn-negamax" class="diag-chip" title="Negamax: deep search scores (slow)">Negamax d3</button>
+          <span class="diag-depth-wrap">
+            <label for="diag-depth" class="diag-section-label">d</label>
+            <input id="diag-depth" type="number" min="1" max="5" value="3" class="diag-depth-input">
+          </span>
+          <span class="diag-sep">|</span>
+          <span class="diag-section-label">DB:</span>
+          <button id="diag-btn-traj"  class="diag-chip" title="Trajectory DB: move frequency from human games; falls back to Pred Human (P:XX%) when no trajectory data">Traj/Pred</button>
+          <select id="sel-traj-n" title="Show sample count in trajectory labels" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+            <option value="">T%</option>
+            <option value="n">T%(n=)</option>
+          </select>
+          <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+            <option value="all">All</option>
+            <option value="lower">Lower</option>
+            <option value="middle" selected>Middle</option>
+            <option value="upper">Upper</option>
+          </select>
+          <button id="diag-btn-db"    class="diag-chip" title="FullGame/Endgame DB + Malom: WIN (green) / LOSS (red) arrows">DB/Malom</button>
+          <button id="diag-btn-overseer" class="diag-chip" title="AI choice: ScaffoldedPolicyNet pick probability per move (O:XX%)">AI choice</button>
+          <span id="diag-overseer-status" style="font-size:.75rem;color:#888;display:none" title="Overseer checkpoint not loaded">(no model)</span>
+          <span style="font-size:.63rem;color:#777" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</span>
+        </div>
+      </div>
+
+      <div id="side-panel">
 
       <!-- Moves list (always visible) -->
       <div class="panel-box" id="moves-panel">
@@ -667,6 +670,52 @@
         <button id="btn-paste-cancel" class="btn-small" style="margin-top:6px;width:100%">Cancel</button>
       </div>
 
+      <!-- Personality Tuning panel (toggled via header button, stays open during play) -->
+      <div class="panel-box" id="ai-tuning-panel" hidden>
+        <h3>Personality Tuning</h3>
+        <div id="ai-weight-sliders"></div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <button id="btn-reset-weights" class="btn-small">Reset defaults</button>
+          <button id="btn-save-weights"  class="btn-small">Save settings</button>
+        </div>
+        <div id="vn-status-line" style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">Value net: —</div>
+      </div>
+
+    </div><!-- /side-panel -->
+
+    <!-- Analysis column (right sub-column of right panel) -->
+    <div id="analysis-col">
+
+      <!-- Live / replay signal badges -->
+      <div id="replay-tp-badge" hidden></div>
+      <div id="replay-signal-badge" hidden></div>
+      <div id="live-signal-badge" hidden></div>
+
+      <!-- AI search progress -->
+      <div class="panel-box" style="padding:8px 10px">
+        <h3 style="margin-bottom:4px">Search Progress</h3>
+        <div id="think-progress-wrap">
+          <div id="think-bar-wrap" title="AI search time">
+            <div id="think-bar-fill"></div>
+          </div>
+          <div id="ply-progress" style="font-size:.75rem;color:#888;min-height:1.2em;margin-top:2px"></div>
+          <div id="think-time-info" style="font-size:.8rem;color:#aaa;min-height:1.3em;margin-top:1px;font-variant-numeric:tabular-nums"></div>
+          <div id="perf-warning" hidden style="font-size:.78rem;color:#c8552a;padding:2px 4px;background:rgba(200,85,42,.12);border-radius:4px;margin:2px 0 0;">
+            &#9888; Multiple overlays active — analysis may slow gameplay
+          </div>
+        </div>
+      </div>
+
+      <!-- Book panel — scrolls off when tournament fills column above -->
+      <div class="panel-box" id="book-panel">
+        <h3>The Book</h3>
+        <a href="https://www.amazon.com/dp/0646735853?lv=shuf&channelId=500&plpRedirect=mhFallback" target="_blank" rel="noopener">
+          <img src="/static/book_cover.jpg?v={{ v }}" alt="Nine Men's Morris book cover">
+        </a>
+        <p class="book-desc">A history of the game, ancient and modern, plus mastering the winning endgame to navigating opening plays, this book offers a well-rounded approach to strategic gameplay.</p>
+        <a class="book-buy-btn" href="https://www.amazon.com/dp/0646735853?lv=shuf&channelId=500&plpRedirect=mhFallback" target="_blank" rel="noopener">Buy on Amazon</a>
+      </div>
+
       <!-- Tournament panel (toggled via header button) -->
       <div class="panel-box" id="tournament-panel" hidden>
         <h3>&#127942; Tournament Mode</h3>
@@ -714,24 +763,12 @@
         <button id="btn-tournament-start" style="margin-top:8px;width:100%">&#9654; Start Tournament</button>
       </div>
 
-      <!-- Personality Tuning panel (toggled via header button, stays open during play) -->
-      <div class="panel-box" id="ai-tuning-panel" hidden>
-        <h3>Personality Tuning</h3>
-        <div id="ai-weight-sliders"></div>
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-          <button id="btn-reset-weights" class="btn-small">Reset defaults</button>
-          <button id="btn-save-weights"  class="btn-small">Save settings</button>
-        </div>
-        <div id="vn-status-line" style="margin-top:8px;font-size:.75rem;color:var(--text-dim)">Value net: —</div>
-      </div>
+    </div><!-- /analysis-col -->
 
-    </div><!-- /side-panel -->
-  <div id="perf-warning" hidden style="text-align:center;font-size:.78rem;color:#c8552a;padding:2px 8px;background:rgba(200,85,42,.12);border-radius:4px;margin:2px 8px 4px;">
-    &#9888; Multiple overlays active — analysis may slow gameplay
-  </div>
+    </div><!-- /right-panel -->
   </main>
 
-  <!-- Bottom bar: strength graph + undo -->
+  <!-- Bottom bar: position strength graph + game controls -->
   <div id="bottom-bar">
     <div id="eval-graph-wrap">
       <div class="eval-graph-labels">
