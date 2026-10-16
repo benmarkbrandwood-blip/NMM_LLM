@@ -716,11 +716,9 @@ class GameAI:
         from ``moves`` are ever returned.
         """
         # Perfect DB mode: use Malom DB directly, bypassing the sentinel model.
+        # Always invoke _db_score_adjust — no probabilistic gate here.
         if self.use_perfect_db:
-            import random as _random
-            if self._sentinel_activation_prob >= 1.0 or _random.random() <= self._sentinel_activation_prob:
-                return self._db_score_adjust(board, move, moves)
-            return move
+            return self._db_score_adjust(board, move, moves)
 
         if self.sentinel is None:
             # DB fallback when sentinel unavailable but probability gate would fire
@@ -880,7 +878,8 @@ class GameAI:
         malom = self._malom_db
         esdb  = self._endgame_solved_db
         fgdb  = self._fullgame_db
-        _db_gate = getattr(self, "_db_active_this_move", True)
+        # use_perfect_db bypasses the probabilistic gate — Malom is always authoritative.
+        _db_gate = self.use_perfect_db or getattr(self, "_db_active_this_move", True)
         malom_ok = malom is not None and malom.is_available() and _db_gate
         esdb_ok  = esdb is not None and _db_gate
         if not malom_ok and not esdb_ok and not (fgdb and fgdb.is_available()):
@@ -1098,7 +1097,7 @@ class GameAI:
         # EndgameSolvedDB.query() returns None for piece counts with no loaded table,
         # so no piece-count cap is needed here — the DB handles its own validity.
         _esdb = self._endgame_solved_db
-        if _esdb is not None and _esdb.is_available() and self._db_active_this_move:
+        if _esdb is not None and _esdb.is_available() and (self.use_perfect_db or self._db_active_this_move):
             if (board.pieces_placed.get("W", 0) >= 9
                     and board.pieces_placed.get("B", 0) >= 9):
                 try:
@@ -1160,7 +1159,7 @@ class GameAI:
         if (not fast_early_game
                 and _mdb is not None
                 and _mdb.is_available()
-                and self._db_active_this_move):
+                and (self.use_perfect_db or self._db_active_this_move)):
             try:
                 _mdb_results = _mdb.query_all_moves(board, self.color)
             except Exception:

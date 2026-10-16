@@ -796,6 +796,12 @@ _PERSONALITY_WEIGHTS: dict[str, dict] = {
         "personality_blend": 0, "personality_window": 8,
         "value_net_blend": 0, "opening_adherence": 0, "make_mistakes": 0,
     },
+    "unbeatable": {
+        # Malom-governed perfect play.  H1/personality sliders are bypassed
+        # because Malom always overrides the final move selection.
+        "personality_blend": 0, "personality_window": 8,
+        "value_net_blend": 0, "opening_adherence": 0, "make_mistakes": 0,
+    },
 }
 
 
@@ -5301,10 +5307,17 @@ async def ws_endpoint(websocket: WebSocket):
 
                     _sent_prob = SENTINEL_PROB_BY_DIFF.get(eff_diff, 0.0)
                     if use_perfect_db:
-                        game_ai.use_perfect_db = True
-                        game_ai.sentinel_mode = "score_adjust"
-                        game_ai._sentinel_activation_prob = _sent_prob
-                        log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", eff_diff, _sent_prob * 100)
+                        if _malom_db is not None and _malom_db.is_available():
+                            game_ai.use_perfect_db = True
+                            game_ai.sentinel_mode = "score_adjust"
+                            game_ai._sentinel_activation_prob = 1.0  # always invoke Malom
+                            log.info("Malom perfect DB guidance enabled (diff=%d)", eff_diff)
+                        else:
+                            # Malom unavailable — fall back to Sentinel + GapNet guidance
+                            log.warning("Malom DB unavailable; unbeatable falls back to Sentinel score_adjust")
+                            if _sentinel_advisor is not None and _sentinel_advisor.is_loaded():
+                                game_ai.set_sentinel(_sentinel_advisor, mode="score_adjust")
+                                game_ai._sentinel_activation_prob = 1.0
                     elif use_learned_ai and _learned_advisor is not None and _learned_advisor.is_loaded():
                         game_ai.set_sentinel(_learned_advisor, mode="score_adjust")
                         game_ai._sentinel_activation_prob = 1.0
@@ -5474,11 +5487,10 @@ async def ws_endpoint(websocket: WebSocket):
                     _apply_search_depth(game_ai)
 
                     if use_perfect_db:
-                        _sent_prob_s = SENTINEL_PROB_BY_DIFF.get(diff, 0.0)
                         game_ai.use_perfect_db = True
                         game_ai.sentinel_mode = "score_adjust"
-                        game_ai._sentinel_activation_prob = _sent_prob_s
-                        log.info("Malom perfect DB guidance enabled (diff=%d, prob=%.0f%%)", diff, _sent_prob_s * 100)
+                        game_ai._sentinel_activation_prob = 1.0  # always invoke Malom
+                        log.info("Malom perfect DB guidance enabled (diff=%d)", diff)
                     elif use_learned_ai and _learned_advisor is not None and _learned_advisor.is_loaded():
                         game_ai.set_sentinel(_learned_advisor, mode="score_adjust")
                         game_ai._sentinel_activation_prob = 1.0

@@ -214,6 +214,7 @@ const PERSONALITIES = [
   { value: "chaos",      label: "Chaos — The Trickster"         },
   { value: "pure_h2",    label: "Pure H2 — The Purist"          },
   { value: "generalist", label: "Generalist AI — Neural"         },
+  { value: "unbeatable", label: "Unbeatable — Perfect Play"      },
 ];
 
 const PERSONALITY_PRESETS = {
@@ -1253,11 +1254,11 @@ function startNewGame() {
   if (gamePSelect && gamePSelect.value !== "current" && !_pureAiMode) {
     let chosenPersonality = gamePSelect.value;
     if (chosenPersonality === "random") {
-      const opts = PERSONALITIES.filter(p => p.value !== "generalist").map(p => p.value);
+      const opts = PERSONALITIES.filter(p => p.value !== "generalist" && p.value !== "unbeatable").map(p => p.value);
       chosenPersonality = opts[Math.floor(Math.random() * opts.length)];
     }
     _activePersonality = chosenPersonality;
-    if (chosenPersonality !== "generalist") _loadPersonality(chosenPersonality);
+    if (chosenPersonality !== "generalist" && chosenPersonality !== "unbeatable") _loadPersonality(chosenPersonality);
   } else {
     _activePersonality = gamePSelect ? gamePSelect.value : "";
   }
@@ -1318,10 +1319,11 @@ function startNewGame() {
   ws = new WebSocket(wsUrl);
 
   ws.onopen = () => {
+    const _isUnbeatable = _activePersonality === "unbeatable";
     ws.send(JSON.stringify({
       type:        "new_game",
       human_color:  hc,
-      difficulty:   diff,
+      difficulty:   _isUnbeatable ? 8 : diff,
       vs_human:     vs,
       use_llm:      useLlm,
       llm_can_override_move: ($("chk-llm-override")?.checked ?? true),
@@ -1335,7 +1337,7 @@ function startNewGame() {
       use_ngram_search: $("chk-ngram") ? $("chk-ngram").checked : false,
       sentinel_mode:  $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory",
       sentinel_gap:   $("rng-sentinel-gap")  ? parseInt($("rng-sentinel-gap").value, 10) / 100 : 0.10,
-      use_perfect_db: $("chk-perfect-db") ? $("chk-perfect-db").checked : false,
+      use_perfect_db: _isUnbeatable || ($("chk-perfect-db") ? $("chk-perfect-db").checked : false),
       use_learned_ai: $("chk-learned-ai") ? $("chk-learned-ai").checked : false,
       use_overseer_player: $("chk-overseer-player") ? $("chk-overseer-player").checked : false,
       use_generalist_player: _activePersonality === "generalist",
@@ -1589,11 +1591,11 @@ function startSetupGame() {
   if (gamePSelect && gamePSelect.value !== "current") {
     let p = gamePSelect.value;
     if (p === "random") {
-      const opts = PERSONALITIES.filter(x => x.value !== "generalist").map(x => x.value);
+      const opts = PERSONALITIES.filter(x => x.value !== "generalist" && x.value !== "unbeatable").map(x => x.value);
       p = opts[Math.floor(Math.random() * opts.length)];
     }
     _activePersonality = p;
-    if (p !== "generalist") _loadPersonality(p);
+    if (p !== "generalist" && p !== "unbeatable") _loadPersonality(p);
   } else {
     _activePersonality = gamePSelect ? gamePSelect.value : "";
   }
