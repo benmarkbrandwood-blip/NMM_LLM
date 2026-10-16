@@ -2792,11 +2792,25 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
         ms = db_by_notation.get(notation)
         has_db = ms is not None
         malom_after = ms.malom_wdl_after if has_db else None
-        if malom_after is None and _malom_db is not None and _malom_db.is_available():
-            try:
-                malom_after = _malom_db.query(after)
-            except Exception:
-                pass
+        malom_dtw_after = ms.malom_dtw_after if has_db else None
+        _malom_inner = getattr(_malom_db, "_malom", None)
+        if (_malom_db is not None and _malom_db.is_available()):
+            if malom_after is None or malom_dtw_after is None:
+                try:
+                    # Use inner MalomDB (already loaded) to get WDL + DTW.
+                    # Convention: outcome is from after.turn (opponent) perspective —
+                    # "L" means opponent loses = good for us.  No flip needed.
+                    if _malom_inner is not None:
+                        _r = _malom_inner.query(after)
+                        if _r is not None:
+                            if malom_after is None:
+                                malom_after = _r.get("outcome")
+                            if malom_dtw_after is None and _r.get("dtw") is not None:
+                                malom_dtw_after = abs(int(_r["dtw"]))
+                    elif malom_after is None:
+                        malom_after = _malom_db.query(after)
+                except Exception:
+                    pass
         moves_out.append({
             "notation":          notation,
             "from_sq":           from_sq,
@@ -2811,7 +2825,7 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
             "win_pct":           round(ms.win_pct, 4)  if has_db else None,
             "avg_moves_to_end":  round(ms.avg_moves_to_end, 1) if has_db else None,
             "malom_wdl_after":   malom_after,
-            "malom_dtw_after":   ms.malom_dtw_after    if has_db else None,
+            "malom_dtw_after":   malom_dtw_after,
             # Always present
             "heuristic_score":   heuristic_score,
             "tac_total":         int(tac["total"]),
@@ -2886,6 +2900,48 @@ async def explorer_position(fen: str = "........................|W|0|0", elo_ban
                 generalist_top_from = candidates_ordered[best_i].get("from")  # None in place phase
         except Exception as _ge:
             log.debug("Explorer generalist scoring failed: %s", _ge)
+
+    # ── Opponent pressure: fraction of opponent's responses that are wins/draws/losses ──
+    _exp_malom = _malom_db if (_malom_db is not None and _malom_db.is_available()) else None
+    if _exp_malom is not None:
+        _exp_opp_color = "B" if color == "W" else "W"
+        for _emv in moves_out:
+            try:
+                _emv_move = {"from": _emv.get("from_sq"), "to": _emv.get("to_sq"),
+                             "capture": _emv.get("capture_sq")}
+                _eafter = board.apply_move(_emv_move)
+                if _eafter.turn == color:  # mill-forming move — skip (not opponent's turn yet)
+                    _emv["opp_pressure"] = None
+                    continue
+                _eopp_moves = get_all_legal_moves(_eafter)
+                if not _eopp_moves:
+                    _emv["opp_pressure"] = None
+                    continue
+                _en_w = _en_d = _en_l = 0
+                for _ermv in _eopp_moves:
+                    try:
+                        _erafter = _eafter.apply_move(_ermv)
+                        _erwdl = _exp_malom.query(_erafter)
+                        if _erwdl == "W":   _en_l += 1  # we win = opp loses
+                        elif _erwdl == "L": _en_w += 1  # we lose = opp wins
+                        elif _erwdl == "D": _en_d += 1
+                    except Exception:
+                        pass
+                _etotal = _en_w + _en_d + _en_l
+                if _etotal > 0:
+                    _emv["opp_pressure"] = {
+                        "pct_opp_win":  round(_en_w / _etotal, 3),
+                        "pct_opp_draw": round(_en_d / _etotal, 3),
+                        "pct_opp_loss": round(_en_l / _etotal, 3),
+                        "n_total":      _etotal,
+                    }
+                else:
+                    _emv["opp_pressure"] = None
+            except Exception:
+                _emv["opp_pressure"] = None
+    else:
+        for _emv in moves_out:
+            _emv["opp_pressure"] = None
 
     # ── Sort: DB moves first (by total desc), then non-DB (by heuristic desc) ─
     db_moves    = sorted([m for m in moves_out if m["has_db_data"]],
@@ -5757,10 +5813,11 @@ async def ws_endpoint(websocket: WebSocket):
                 _diag_diff = session.game_ai.difficulty if session.game_ai else 5
                 # Per-feature model gates — sentinel always runs; others depend on client needs.
                 _needs = msg.get("needs") or {}
-                _diag_need_gapnet   = bool(_needs.get("gapnet",   True))
-                _diag_need_valuenet = bool(_needs.get("valuenet",  True))
-                _diag_need_pref     = bool(_needs.get("pref",      True))
-                _diag_need_overseer = bool(_needs.get("overseer",  False))
+                _diag_need_gapnet    = bool(_needs.get("gapnet",    True))
+                _diag_need_valuenet  = bool(_needs.get("valuenet",   True))
+                _diag_need_pref      = bool(_needs.get("pref",       True))
+                _diag_need_overseer  = bool(_needs.get("overseer",   False))
+                _diag_need_pressure  = bool(_needs.get("pressure",   False))
 
                 # Run the heavy computation as a background task so the WS loop can
                 # continue receiving messages (e.g. force_move) while scoring runs.
@@ -5770,6 +5827,7 @@ async def ws_endpoint(websocket: WebSocket):
                     _fen=fen_override, _band=diag_elo_band, _prefix=_diag_prefix,
                     _need_gap=_diag_need_gapnet, _need_val=_diag_need_valuenet,
                     _need_pref_=_diag_need_pref, _need_ov=_diag_need_overseer,
+                    _need_pressure=_diag_need_pressure,
                     _diff=_diag_diff,
                 ):
                     # Determine board to analyse
@@ -5935,10 +5993,14 @@ async def ws_endpoint(websocket: WebSocket):
 
                     # Malom perfect DB: fill eg_flags for any move not covered above,
                     # and eg_dtws (moves-to-mate absolute value) whenever Malom is loaded.
-                    # _malom_puzzle_db (MalomDB) returns {"outcome":str, "dtw":int}; if unavailable
-                    # fall back to _malom_db (ExternalSolvedDB) which returns just "W"/"L"/"D".
+                    # Prefer _malom_db._malom (MalomDB already loaded inside ExternalSolvedDB,
+                    # always available once _malom_db is loaded) over the lazily-init'd
+                    # _malom_puzzle_db to ensure DTW is populated without an extra lazy-init.
                     _malom_ext = _malom_db if (_malom_db is not None and _malom_db.is_available()) else None
-                    _malom_puz = _malom_puzzle_db
+                    _malom_puz = (
+                        getattr(_malom_db, "_malom", None)
+                        or _malom_puzzle_db
+                    )
                     if _malom_puz is not None or _malom_ext is not None:
                         _flip = {"W": "L", "L": "W", "D": "D"}
                         def _malom_probe(board_after):
@@ -5994,6 +6056,50 @@ async def ws_endpoint(websocket: WebSocket):
                                 except Exception:
                                     pass
 
+                    # ── Opponent pressure: for each of our moves, what fraction of
+                    # the opponent's legal responses are wins/draws/losses for them?
+                    # Helps players choose moves that maximise opponent mistake risk.
+                    # Only computed when needs.pressure=True and Malom is available.
+                    opp_pressure: dict[str, dict] = {}  # ntn → {pct_win, pct_draw, pct_loss}
+                    if _need_pressure and _malom_ext is not None and _mode != "capture":
+                        try:
+                            _our_legal = get_all_legal_moves(diag_board)
+                        except Exception:
+                            _our_legal = []
+                        for _omv in _our_legal:
+                            _ontn = _diag_ntn(_omv)
+                            try:
+                                _after_our = diag_board.apply_move(_omv)
+                                # Skip mill-forming moves: turn stays the same, opponent hasn't moved yet.
+                                # Pressure is undefined when we still need to choose a capture.
+                                if _after_our.turn == color:
+                                    continue
+                                _opp_moves = get_all_legal_moves(_after_our)
+                                if not _opp_moves:
+                                    continue
+                                _n_w = _n_d = _n_l = 0
+                                for _rmv in _opp_moves:
+                                    try:
+                                        # After opponent moves, _erafter.turn = us.
+                                        # _malom_ext.query returns WDL for _erafter.turn = us.
+                                        _after_opp = _after_our.apply_move(_rmv)
+                                        _rwdl = _malom_ext.query(_after_opp)
+                                        if _rwdl == "W":   _n_l += 1  # we win = opp loses
+                                        elif _rwdl == "L": _n_w += 1  # we lose = opp wins
+                                        elif _rwdl == "D": _n_d += 1
+                                    except Exception:
+                                        pass
+                                _total = _n_w + _n_d + _n_l
+                                if _total > 0:
+                                    opp_pressure[_ontn] = {
+                                        "pct_opp_win":  round(_n_w / _total, 3),
+                                        "pct_opp_draw": round(_n_d / _total, 3),
+                                        "pct_opp_loss": round(_n_l / _total, 3),
+                                        "n_total":      _total,
+                                    }
+                            except Exception:
+                                pass
+
                     for mv_e in moves_out:
                         ntn = _diag_ntn(mv_e)
                         mv_e["traj_freq"] = round(float(traj_freqs.get(ntn, 0.0)), 3)
@@ -6003,8 +6109,9 @@ async def ws_endpoint(websocket: WebSocket):
                         # Capture mode eg_flags keyed by captured square
                         cap_pos = mv_e.get("to") if _mode == "capture" else None
                         _key = cap_pos or ntn
-                        mv_e["eg_flag"] = eg_flags.get(_key)   # "W"/"L"/"D"/None
-                        mv_e["eg_dtw"]  = eg_dtws.get(_key)    # int moves-to-mate or None
+                        mv_e["eg_flag"]       = eg_flags.get(_key)       # "W"/"L"/"D"/None
+                        mv_e["eg_dtw"]        = eg_dtws.get(_key)        # int moves-to-mate or None
+                        mv_e["opp_pressure"]  = opp_pressure.get(_key) or opp_pressure.get(ntn)
 
                     # ── Sentinel overlay: score each legal move ───────────────────
                     # 2D: sentinel/overseer are skipped in capture mode — they encode

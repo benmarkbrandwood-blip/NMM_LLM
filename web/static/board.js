@@ -715,8 +715,8 @@ export class Board {
   }
 
   // ── DB overlay (trajectory / fullgame / endgame) ──────────────────────────
-  // moves: [{from, to, capture, traj_freq, db_delta, eg_flag}, ...]
-  // opts: {phase, selectedSrc, showTraj, showDB}
+  // moves: [{from, to, capture, traj_freq, db_delta, eg_flag, opp_pressure}, ...]
+  // opts: {phase, selectedSrc, showTraj, showDB, showPressure}
   renderDiagDB(moves, opts = {}) {
     this._dbGroup.innerHTML = "";
     if (!moves || !moves.length) return;
@@ -730,6 +730,7 @@ export class Board {
     const showPredHuman = opts.showPredHuman || false;
     const teacherFallback = opts.teacherFallback || false;
     const hasTrajData   = opts.hasTrajData !== false;
+    const showPressure  = opts.showPressure || false;
     const showTrajN     = opts.showTrajN || false;
     const visFrac       = opts.visibilityFraction != null ? opts.visibilityFraction : 1.0;
 
@@ -791,6 +792,21 @@ export class Board {
       if (!showDB || dtw == null || dtw <= 0) return null;
       return `M#${dtw}`;
     };
+    // Helper: opponent pressure label.
+    // pctLoss = fraction of opponent's responses that are losses for them (good for us).
+    // Returns {text, color} pair or null when not applicable.
+    const pressureInfo = (press) => {
+      if (!showPressure || !press) return null;
+      const pctL = press.pct_opp_loss ?? 0;
+      const pctW = press.pct_opp_win  ?? 0;
+      // Show dominant signal — loss% if ≥ win%, otherwise win%
+      if (pctL >= pctW && pctL > 0) {
+        return { text: `L:${Math.round(pctL * 100)}%`, color: "#4caf50" };  // green — opponent in trouble
+      } else if (pctW > pctL && pctW > 0) {
+        return { text: `W:${Math.round(pctW * 100)}%`, color: "#e05050" };  // red — opponent has good moves
+      }
+      return null;
+    };
     // Helper: pick display color that ALWAYS returns something when DB Lines is on
     // and a piece is selected — grey ("#888") as a fallback so every legal move
     // of the selected piece gets an arrow.
@@ -808,14 +824,21 @@ export class Board {
         const dlbl = dtwLabel(mv.eg_dtw);
         const plbl = predLabel(mv.pred_human_prob);
         const tlbl = teacherLabel(mv.pred_human_prob);
+        const prss = pressureInfo(mv.opp_pressure);
         const showDash = hasTrajData && showTraj && freq === 0;
 
+        if (prss) {
+          const [x, y] = nodeXY(pos);
+          this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 14,
+            fill: "none", stroke: prss.color, "stroke-width": 1.5, opacity: 0.5,
+            "stroke-dasharray": "4 3" }));
+        }
         if (col) {
           const [x, y] = nodeXY(pos);
           this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 9,
             fill: "none", stroke: col, "stroke-width": 2.5, opacity: 0.7 }));
         }
-        if (slbl || olbl || dlbl || plbl || tlbl || freq > 0 || showDash) {
+        if (slbl || olbl || dlbl || plbl || tlbl || prss || freq > 0 || showDash) {
           const [x, y] = nodeXY(pos);
           const hasPiece = !!this.grid[pos];
           let ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
@@ -885,6 +908,15 @@ export class Board {
               "paint-order":"stroke" });
             t.textContent = olbl;
             this._dbGroup.appendChild(t);
+            ty -= 11;
+          }
+          if (prss) {
+            const t = _el("text", { x, y: ty, "font-size":"9", "font-weight":"bold",
+              fill: prss.color, "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = prss.text;
+            this._dbGroup.appendChild(t);
           }
         }
       }
@@ -908,8 +940,9 @@ export class Board {
         const dlbl = selSrc ? dtwLabel(mv.eg_dtw) : null;
         const plbl = selSrc ? predLabel(mv.pred_human_prob) : null;
         const tlbl = selSrc ? teacherLabel(mv.pred_human_prob) : null;
+        const prss = pressureInfo(mv.opp_pressure);
         const showDashMv = selSrc && hasTrajData && showTraj && freq === 0;
-        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl && !tlbl) continue;
+        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl && !tlbl && !prss) continue;
 
         const [x1, y1] = nodeXY(mv.from);
         const [x2, y2] = nodeXY(mv.to);
@@ -932,7 +965,14 @@ export class Board {
             }));
           }
         }
-        if (slbl || olbl || dlbl || plbl || tlbl || freq > 0 || showDashMv) {
+        if (prss && !selSrc) {
+          // Show pressure halo on destination square even without a piece selected
+          const [px, py] = nodeXY(mv.to);
+          this._dbGroup.appendChild(_el("circle", { cx:px, cy:py, r: PIECE_R + 9,
+            fill: "none", stroke: prss.color, "stroke-width": 1.5, opacity: 0.45,
+            "stroke-dasharray": "4 3" }));
+        }
+        if (slbl || olbl || dlbl || plbl || tlbl || prss || freq > 0 || showDashMv) {
           const [x, y] = nodeXY(mv.to);
           let ty = y - PIECE_R - 4;
           if (freq > 0 && (!selSrc || mv.from === selSrc)) {
@@ -999,6 +1039,15 @@ export class Board {
               stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = olbl;
+            this._dbGroup.appendChild(t);
+            ty -= 11;
+          }
+          if (prss && (selSrc || showPressure)) {
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"9", "font-weight":"bold",
+              fill: prss.color, "text-anchor":"middle", "font-family":"monospace",
+              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
+              "paint-order":"stroke" });
+            t.textContent = prss.text;
             this._dbGroup.appendChild(t);
           }
         }

@@ -1407,14 +1407,24 @@ function updatePanel(data) {
         ? `<span class="move-net-val" style="color:${colHex}">${(mv.win_pct*100).toFixed(1)}%</span>`
         : '<span class="move-net-val" style="color:#444">—</span>';
 
-      const _malomSpan = w => `<span class="move-malom" style="background:${w==='L'?'#16532a':w==='W'?'#7f1d1d':'#78350f'};color:${w==='L'?'#4ade80':w==='W'?'#fca5a5':'#fcd34d'}">${w}${mv.malom_dtw_after!=null?' '+mv.malom_dtw_after:''}</span>`;
+      const _malomSpan = w => `<span class="move-malom" style="background:${w==='L'?'#16532a':w==='W'?'#7f1d1d':'#78350f'};color:${w==='L'?'#4ade80':w==='W'?'#fca5a5':'#fcd34d'}">${w}${mv.malom_dtw_after!=null?' M#'+Math.abs(mv.malom_dtw_after):''}</span>`;
+      const _pressSpan = (pr) => {
+        if (!pr) return '';
+        const pL = Math.round((pr.pct_opp_loss ?? 0) * 100);
+        const pW = Math.round((pr.pct_opp_win  ?? 0) * 100);
+        if (pL >= pW && pL > 0) return `<span class="move-pressure" style="color:#4caf50" title="Opponent has ${pL}% losing replies">L:${pL}%</span>`;
+        if (pW > pL  && pW > 0) return `<span class="move-pressure" style="color:#e05050" title="Opponent has ${pW}% winning replies">W:${pW}%</span>`;
+        return '';
+      };
       let rightContent = '';
       if (mv.has_db_data) {
         const wdl = mv.malom_wdl_after ? _malomSpan(mv.malom_wdl_after) : '';
-        rightContent = `<span class="move-sub">${mv.total}</span>${wdl}${humanCell}${netCells}`;
+        const prs = malomToggle?.checked ? _pressSpan(mv.opp_pressure) : '';
+        rightContent = `<span class="move-sub">${mv.total}</span>${wdl}${prs}${humanCell}${netCells}`;
       } else {
         const wdl = (mv.malom_wdl_after && malomToggle?.checked) ? _malomSpan(mv.malom_wdl_after) : '';
-        rightContent = `<span style="flex:1"></span>${wdl}${humanCell}${netCells}`;
+        const prs = malomToggle?.checked ? _pressSpan(mv.opp_pressure) : '';
+        rightContent = `<span style="flex:1"></span>${wdl}${prs}${humanCell}${netCells}`;
       }
 
       const item = document.createElement('div');

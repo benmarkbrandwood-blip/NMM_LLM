@@ -53,6 +53,7 @@ let diagNegamax     = false;        // show negamax scores
 let diagTraj        = false;        // show trajectory DB frequencies
 let diagDB          = false;        // show fullgame/endgame DB arrows
 let diagOverseer    = false;        // show Overseer pick-probability overlay
+let diagPressure    = false;        // show Malom opponent-pressure overlay
 let diagDepth       = 3;            // negamax depth
 let currentDifficulty = 3;          // updated from state messages; gates overlay visibility
 let _diagStaticData  = null;        // last received static diagnostic response
@@ -82,7 +83,7 @@ const GAME_NET_DEFS = {
 };
 
 function _diagActive() {
-  return diagStatic || diagNegamax || diagTraj || diagDB || diagOverseer || gameNetSlots.some(Boolean);
+  return diagStatic || diagNegamax || diagTraj || diagDB || diagOverseer || diagPressure || gameNetSlots.some(Boolean);
 }
 
 // Per-feature needs object sent with every diagnostic request.
@@ -90,10 +91,11 @@ function _diagActive() {
 function _diagNeedsObj() {
   const llmOn = $("chk-llm")?.checked ?? true;
   return {
-    gapnet:   llmOn || gameNetSlots.includes('gapnet'),
-    valuenet: llmOn || gameNetSlots.includes('value'),
-    pref:     llmOn || gameNetSlots.includes('pref'),
-    overseer: diagOverseer || gameNetSlots.includes('generalist'),
+    gapnet:    llmOn || gameNetSlots.includes('gapnet'),
+    valuenet:  llmOn || gameNetSlots.includes('value'),
+    pref:      llmOn || gameNetSlots.includes('pref'),
+    overseer:  diagOverseer || gameNetSlots.includes('generalist'),
+    pressure:  diagPressure,
   };
 }
 
@@ -835,6 +837,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     diagDB = !diagDB;
     $("diag-btn-db").classList.toggle("diag-chip-active", diagDB);
     if (diagDB) { _diagTrigger(); } else _diagRender();
+  });
+
+  $("diag-btn-pressure") && $("diag-btn-pressure").addEventListener("click", () => {
+    diagPressure = !diagPressure;
+    $("diag-btn-pressure").classList.toggle("diag-chip-active", diagPressure);
+    if (diagPressure) { _diagTrigger(); } else _diagRender();
   });
 
   $("diag-btn-overseer") && $("diag-btn-overseer").addEventListener("click", () => {
@@ -4781,7 +4789,7 @@ function _diagRender() {
     // Pred slot pairs with Traj: when both active, pred fills the traj fallback channel
     // and is suppressed from the independent net overlay when no traj data is available.
     const predInTraj = diagTraj && gameNetSlots.includes('pred');
-    const showDbLayer = (diagTraj || diagDB || diagOverseer) && dbSource?.moves;
+    const showDbLayer = (diagTraj || diagDB || diagOverseer || diagPressure) && dbSource?.moves;
 
     if (showDbLayer) {
       board.renderDiagDB(dbSource.moves, {
@@ -4794,6 +4802,7 @@ function _diagRender() {
         showDB:             diagDB,
         showSentinel:       false,
         showOverseer:       diagOverseer,
+        showPressure:       diagPressure,
         teacherFallback:    predInTraj,
         visibilityFraction: visFrac,
       });
