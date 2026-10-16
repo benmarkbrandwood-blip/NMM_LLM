@@ -499,6 +499,9 @@ export class Board {
     const { from, to, capture } = parsed;
     const toCoords = nodeXY(to);
     if (!toCoords) return;
+    // Don't draw a hint to an occupied square — the board state has changed
+    // since the annotation was computed (e.g. a piece moved there after the ply).
+    if (this.grid[to]) return;
     const [tx, ty] = toCoords;
     const C = color || "#4caf50";
     const markerMap = { "#e0e0e0": "arr-white", "#ff6eb4": "arr-pink", "#4caf50": "arr-green", "#9e9e9e": "arr-silver", "#7b1fa2": "arr-purple", "#26c6da": "arr-cyan" };

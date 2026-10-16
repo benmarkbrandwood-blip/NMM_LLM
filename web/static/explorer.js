@@ -89,6 +89,7 @@ const NET_DEFS = {
   pref:     { label:'PrefNet',   cssColor:'#c4a020', hexColor:0xc4a020, field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
   pred:     { label:'Pred',      cssColor:'#ff6eb4', hexColor:0xff6eb4, field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   regret:   { label:'Regret',    cssColor:'#ff6020', hexColor:0xff6020, field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
+  pressure: { label:'Pressure',  cssColor:'#4caf50', hexColor:0x4caf50, field:'pressure_score',  isHigherBetter:true,  isAbsNorm:false },
 };
 
 // User-selected overlay nets for the 3 ring/bar slots (null = slot off)
@@ -1562,6 +1563,11 @@ async function loadPosition(fen) {
     const data = await res.json();
     if (data.error) { alert('Error: ' + data.error); return; }
     currentData  = data;
+    // Pre-compute pressure_score (net opponent disadvantage) for NET_DEFS ring/sort
+    for (const mv of data.moves || []) {
+      const pr = mv.opp_pressure;
+      mv.pressure_score = pr ? pr.pct_opp_loss : null;
+    }
     currentTurn  = data.turn;
     currentPhase = data.phase || 'move';
     document.getElementById('fen-input').value = data.fen;
