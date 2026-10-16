@@ -3452,6 +3452,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         _R_H_POOR_THRESHOLD,
         _R_H_SOLO_THRESHOLD,
         _R_S_POOR_THRESHOLD,
+        _R_GAPNET_POOR_THRESHOLD,
     )
     assessor = PostGameAssessor(
         difficulty=3,
@@ -3467,6 +3468,7 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         r_h_threshold=_R_H_POOR_THRESHOLD,
         r_s_threshold=_R_S_POOR_THRESHOLD,
         r_h_solo_threshold=_R_H_SOLO_THRESHOLD,
+        gapnet_threshold=_R_GAPNET_POOR_THRESHOLD,
         value_net=_value_net,
     )
 

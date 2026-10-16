@@ -217,7 +217,7 @@ def sentinel_assessor():
 
 @pytest.fixture(scope="module")
 def sentinel_annotation(sentinel_assessor):
-    record = build_game_record(n_plies=6)
+    record = build_game_record(n_plies=12)  # needs >= _TP_MIN_PLY+1 for tier-2 drop detection
     return sentinel_assessor.assess(record)
 
 
@@ -282,8 +282,8 @@ class TestPostGameAssessorStage2:
         assert all(v is None for v in result.sentinel_curve)
 
     def test_oracle_sentinel_heuristic_with_sentinel(self, sentinel_annotation):
-        """After Stage 5, sentinel presence upgrades the oracle to 'sentinel+heuristic'."""
-        assert sentinel_annotation.turning_point_oracle == "sentinel+heuristic"
+        """Sentinel presence uses sentinel+gapnet oracle (heuristic term removed)."""
+        assert sentinel_annotation.turning_point_oracle == "sentinel+gapnet"
 
 
 # ── Stage 2: GapNet blunder-zone density ──────────────────────────────────────
@@ -735,13 +735,13 @@ class TestPostGameAssessorStage5:
         assert result.turning_point_oracle == "malom_full"
 
     def test_sentinel_heuristic_oracle_path(self):
-        """Sentinel present, no Malom → oracle == 'sentinel+heuristic'."""
+        """Sentinel present, no Malom → oracle == 'sentinel+gapnet'."""
         assessor = PostGameAssessor(
             difficulty=1, depth=3, sentinel=_make_mock_sentinel()
         )
-        result = assessor.assess(build_game_record(n_plies=4))
-        assert result.turning_point_oracle == "sentinel+heuristic"
-        assert result.turning_point_quality.startswith("r_h+r_s:")
+        result = assessor.assess(build_game_record(n_plies=12))  # needs >= _TP_MIN_PLY+1
+        assert result.turning_point_oracle == "sentinel+gapnet"
+        assert result.turning_point_quality.startswith("gapnet_ds:")
 
     def test_heuristic_only_oracle_path(self):
         """No sentinel, no Malom → oracle == 'heuristic'."""
@@ -1105,7 +1105,10 @@ class TestFix2TurningPointUsesRh:
     def test_turning_point_oracle_is_heuristic_when_no_malom_sentinel(self):
         assessor = PostGameAssessor(difficulty=1, depth=3)
         result = assessor.assess(build_game_record(n_plies=8))
-        assert result.turning_point_oracle in ("heuristic", "sentinel+heuristic", "malom_full", "")
+        assert result.turning_point_oracle in (
+            "heuristic", "gapnet", "sentinel", "gapnet+sentinel",
+            "sentinel+gapnet", "malom_full", ""
+        )
 
     def test_turning_point_quality_contains_r_h_label(self):
         """Quality string uses 'r_h:' prefix in heuristic-only path."""

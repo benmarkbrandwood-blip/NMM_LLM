@@ -48,6 +48,10 @@ _MALOM_TRANSITION_LABEL: dict = {
 _R_H_POOR_THRESHOLD  = 0.30  # when sentinel also confirms
 _R_H_SOLO_THRESHOLD  = 0.50  # when only heuristic is available
 _R_S_POOR_THRESHOLD  = 0.20  # sentinel r_s confirmation floor
+# GapNet blunder-zone threshold for poor_candidate and deep-rescore trigger.
+# Evidence: GapNet ROC-AUC=0.697 vs r_h=0.499 (coin flip) on 1000-game analysis.
+_R_GAPNET_POOR_THRESHOLD  = 0.55   # poor_candidate gate (GapNet + Sentinel path)
+_GAPNET_DEEP_THRESHOLD    = 0.60   # deep-rescore trigger (GapNet-only, no Sentinel)
 
 # Tier 3 turning-point detection: skip early placement plies where the full
 # evaluator has high positional variance but the strategic consequence is low.
@@ -227,6 +231,7 @@ class PostGameAssessor:
         r_h_threshold: float = float("inf"),
         r_s_threshold: float = float("inf"),
         r_h_solo_threshold: float = float("inf"),
+        gapnet_threshold: float = float("inf"),
         shallow_depth: Optional[int] = None,
         deep_depth: Optional[int] = None,
         threat_delta_threshold: float = 200.0,
@@ -256,6 +261,7 @@ class PostGameAssessor:
         self._r_h_threshold = r_h_threshold
         self._r_s_threshold = r_s_threshold
         self._r_h_solo_threshold = r_h_solo_threshold
+        self._gapnet_threshold = gapnet_threshold
         self._value_net = value_net
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -537,12 +543,24 @@ class PostGameAssessor:
                 except Exception:
                     pass
 
-            # ── Poor-candidate flagging (heuristic-only; Malom overrides in Pass 3) ──
+            # ── Poor-candidate flagging (Malom overrides in Pass 3) ──────────────
+            # Priority: GapNet+Sentinel > Sentinel-only > GapNet-only > r_h fallback.
+            # r_h alone (AUC=0.499) is a coin flip; GapNet (AUC=0.697) is the best
+            # available non-Malom signal (1000-game analysis, data/signal_1k.csv).
             quality = "clean"
-            if r_s is not None:
+            if r_s is not None and blunder_zone_score is not None:
+                # Best path: dangerous position (GapNet) AND bad move (Sentinel)
+                if blunder_zone_score > self._gapnet_threshold and r_s > self._r_s_threshold:
+                    quality = "poor_candidate"
+            elif r_s is not None:
+                # Sentinel only (GapNet not loaded): keep original r_h gate
                 if r_h > self._r_h_threshold and r_s > self._r_s_threshold:
                     quality = "poor_candidate"
+            elif blunder_zone_score is not None and blunder_zone_score > self._gapnet_threshold:
+                # GapNet only (Sentinel not loaded)
+                quality = "poor_candidate"
             elif r_h > self._r_h_solo_threshold:
+                # Last resort: heuristic alone
                 quality = "poor_candidate"
 
             generalist_self_assessed = (ctx.ai_color is not None and color == ctx.ai_color)
@@ -732,24 +750,27 @@ class PostGameAssessor:
                 for a in sorted_malom
             ]
 
-        # Tier 2 — Sentinel + Heuristic combined curve drop (always computed)
+        # Tier 2 — Sentinel curve drop, weighted by GapNet blunder-zone.
+        # Heuristic term (dh) removed: r_h AUC=0.499 (coin flip) degrades the
+        # Sentinel signal. GapNet (AUC=0.697) amplifies drops at dangerous positions.
         sentinel_ranked: list[tuple[int, str, str]] = []
         has_sentinel = any(a.sentinel_score_white is not None for a in annotations)
         if has_sentinel:
             drops: list[tuple[float, int]] = []
             for i in range(1, len(annotations)):
-                dh = (annotations[i - 1].heuristic_score_white
-                      - annotations[i].heuristic_score_white)
+                if i < _TP_MIN_PLY:
+                    continue  # early placement scores oscillate; not real blunders
                 s_prev = annotations[i - 1].sentinel_score_white
                 s_curr = annotations[i].sentinel_score_white
                 ds = (s_prev - s_curr) if (s_prev is not None and s_curr is not None) else 0.0
-                drops.append((dh + ds, i))
+                gn = annotations[i].blunder_zone_score
+                gapnet_weight = (1.0 + gn) if gn is not None else 1.0
+                drops.append((ds * gapnet_weight, i))
             drops.sort(reverse=True)
-            top3 = [idx for (drop, idx) in drops[:3] if drop > 0.0]
-            for idx in top3:
+            top3 = [(score, idx) for (score, idx) in drops[:3] if score > 0.0]
+            for score, idx in top3:
                 ann = annotations[idx]
-                r_s_val = ann.r_s if ann.r_s is not None else 0.0
-                sentinel_ranked.append((ann.ply, f"r_h+r_s:{ann.r_h + r_s_val:.3f}", "sentinel+heuristic"))
+                sentinel_ranked.append((ann.ply, f"gapnet_ds:{score:.3f}", "sentinel+gapnet"))
 
         # If Malom found TPs, return merged list with Malom first
         if malom_ranked:
@@ -763,27 +784,39 @@ class PostGameAssessor:
             primary = sentinel_ranked[0]
             return primary[0], primary[1], primary[2], sentinel_ranked
 
-        # Tier 3 — Heuristic-only: top-3 by effective r_h, skipping early placement.
-        # Fix 2: use decision quality (r_h) rather than post-hoc curve collapse.
-        # Fix 3: prefer r_h_deep (deep re-score) when available on suspicious plies.
-        candidates: list[tuple[float, int]] = []
+        # Tier 3 — GapNet × Sentinel composite; r_h only when neither is available.
+        # Cascade: GapNet×(1+r_s) → GapNet → r_s → r_h (last resort).
+        # Evidence: GapNet AUC=0.697, Sentinel AUC=0.586, r_h AUC=0.499 (coin flip).
+        candidates: list[tuple[float, int, str, str]] = []
         for i, ann in enumerate(annotations):
             if i < _TP_MIN_PLY:
                 continue
-            val = ann.r_h_deep if ann.r_h_deep is not None else ann.r_h
+            gn = ann.blunder_zone_score
+            rs = ann.r_s
+            if gn is not None and rs is not None:
+                val    = gn * (1.0 + rs)
+                label  = f"gapnet_rs:{val:.3f}"
+                oracle = "gapnet+sentinel"
+            elif gn is not None:
+                val    = gn
+                label  = f"gapnet:{val:.3f}"
+                oracle = "gapnet"
+            elif rs is not None:
+                val    = rs
+                label  = f"r_s:{val:.3f}"
+                oracle = "sentinel"
+            else:
+                val    = ann.r_h_deep if ann.r_h_deep is not None else ann.r_h
+                label  = (f"r_h_deep:{ann.r_h_deep:.3f}" if ann.r_h_deep is not None
+                          else f"r_h:{ann.r_h:.3f}")
+                oracle = "heuristic"
             if val > 0.0:
-                candidates.append((val, i))
+                candidates.append((val, i, label, oracle))
         candidates.sort(reverse=True)
         top3 = candidates[:3]
         if not top3:
             return None, "", "heuristic", []
-        ranked_list = []
-        for (val, i) in top3:
-            ann = annotations[i]
-            if ann.r_h_deep is not None:
-                ranked_list.append((ann.ply, f"r_h_deep:{ann.r_h_deep:.3f}", "heuristic"))
-            else:
-                ranked_list.append((ann.ply, f"r_h:{ann.r_h:.3f}", "heuristic"))
+        ranked_list = [(annotations[i].ply, lbl, orc) for (_, i, lbl, orc) in top3]
         primary = ranked_list[0]
         return primary[0], primary[1], primary[2], ranked_list
 
@@ -819,9 +852,14 @@ class PostGameAssessor:
                     if 0 <= candidate < n:
                         capture_lookback.add(candidate)
 
+        # GapNet-elevated plies where Sentinel has not scored: these are the
+        # positions most likely to be genuine blunders (AUC 0.697 evidence).
+        # Heuristic curve-jump replaced: r_h is a coin flip for Malom blunders.
         threat_delta: set[int] = set()
-        for i in range(1, len(heuristic_curve)):
-            if abs(heuristic_curve[i] - heuristic_curve[i - 1]) >= self._threat_delta_threshold:
+        for i, ann in enumerate(annotations):
+            if (ann.blunder_zone_score is not None
+                    and ann.blunder_zone_score > _GAPNET_DEEP_THRESHOLD
+                    and ann.r_s is None):
                 threat_delta.add(i)
 
         ordered = sorted(capture_lookback) + sorted(threat_delta - capture_lookback)
