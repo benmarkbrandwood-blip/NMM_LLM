@@ -59,10 +59,10 @@
     "sel-opponent": "ai",
     "sel-human-color": "W",
     "sel-game-personality": "generalist",
-    "sel-difficulty": "6",
+    "sel-difficulty": "1",
     "chk-llm": true,
     "chk-llm-override": false,
-    "chk-live-chat": false,
+    "chk-live-chat": true,
     "chk-sentinel": false,
     "sel-sentinel-mode": "score_adjust",
     "rng-sentinel-gap": "35",
@@ -74,7 +74,7 @@
     "rng-value-net-blend": "15",
     "chk-ext-qsearch": false,
     "sel-traj-n": "",
-    "sel-star-square": "cardinal",
+    "sel-star-square": "both",
     "chk-ngram": true,
     "chk-perfect-db": false
   }
