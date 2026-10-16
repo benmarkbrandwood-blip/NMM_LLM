@@ -122,6 +122,8 @@ class HeuristicWeights:
     placement_fork_penalty: int = 50  # penalty per extra unblockable closing sq in opp placement fork
     # ── B-83: Cross-block (pivot-blocker) bonus ────────────────────────────────
     cross_block_bonus: int = 250  # bonus per own piece in ≥2 opp 1-config mill lines (blocks multiple setups)
+    # ── B-100: Cross-line contest (cardinal mill contest) ────────────────────
+    cross_line_contest: int = 160  # bonus for contesting opp's first piece on a cross-line segment
     # ── B-47: Side-specific placement emphasis ───────────────────────────────
     # White and Black have different strategic goals in placement (White: proactive
     # cardinal claim; Black: reactive disruption + last-move advantage).
@@ -178,6 +180,16 @@ _CARDINAL_NODES = frozenset({"b4", "d2", "d6", "f4"})
 
 # Cross nodes: 3 connections each — outer and inner ring midpoints.
 _CROSS_NODES_3 = frozenset({"d7", "g4", "d1", "a4", "d5", "e4", "d3", "c4"})
+
+# B-100: The 4 cardinal cross-line mill segments.
+# Used for cross-line contest: if opponent has 1 piece on a segment and we have 0,
+# bonus for contesting that segment in early placement.
+_CROSS_LINE_SEGMENTS: tuple[frozenset, ...] = (
+    frozenset({"d5", "d6", "d7"}),
+    frozenset({"d1", "d2", "d3"}),
+    frozenset({"a4", "b4", "c4"}),
+    frozenset({"e4", "f4", "g4"}),
+)
 
 # Union used for cardinal_block bonus (rewards placing on any high-mobility node).
 _CROSS_NODES = _CARDINAL_NODES | _CROSS_NODES_3
@@ -3254,6 +3266,24 @@ def tactical_move_bonus(
             if _placed_sq_b36 in _uca_before:
                 cardinal_alert_bonus = int(weights.block_opponent_mill * 0.75)
 
+    # B-100: Cross-line contest — early placement only (placement_index < 5).
+    # If the opponent has exactly 1 piece on a cross-line segment and we have none,
+    # reward placing on that same segment to contest the cross-line.
+    cross_line_contest_bonus = 0
+    if _is_placement and placement_index < 5:
+        _placed_sq_b100 = next(
+            (p for p in POSITIONS if after.positions[p] == color and before.positions[p] != color),
+            None,
+        )
+        if _placed_sq_b100 is not None:
+            for _seg in _CROSS_LINE_SEGMENTS:
+                if _placed_sq_b100 in _seg:
+                    opp_in_seg = sum(1 for p in _seg if before.positions[p] == opp)
+                    own_in_seg = sum(1 for p in _seg if before.positions[p] == color)
+                    if opp_in_seg == 1 and own_in_seg == 0:
+                        cross_line_contest_bonus = weights.cross_line_contest
+                    break
+
     # B-37: Opponent placement chain detection.
     # Reward moves that reduce the opponent's forcing-chain level; penalise moves
     # that leave a high opponent chain intact. Level-4 opponent chain is treated
@@ -3346,6 +3376,7 @@ def tactical_move_bonus(
         ("Fly free-close bonus",           fly_free_close_bonus),
         ("Ring cardinal placement",        ring_cardinal_bonus),
         ("Cardinal mill alert block (B-36)", cardinal_alert_bonus),
+        ("Cross-line contest (B-100)",     cross_line_contest_bonus),
         ("Dead-block forcing quality (B-33)", dead_block_quality_bonus),
         ("Fork anticipation (B-4)",        fork_anticip_bonus),
         ("Own fork setup (SE-10)",         own_fork_anticip_bonus),

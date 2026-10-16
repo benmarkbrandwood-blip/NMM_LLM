@@ -67,7 +67,48 @@ FAMILY_NAMES = {
     ("b4", "d5"): "Reverse Center",
     ("d6", "a7"): "Corner Setup",
     ("b4", "d2"): "Column Mirror",
+    # gen v5 families
+    ("d2", "f6"): "Column Diagonal",
+    ("d2", "f2"): "North Hold",
+    ("f2", "d1"): "Star-Square",
+    ("d6", "f6"): "Top Flank",
 }
+
+# ── cardinal cross-line filtering ──────────────────────────────────────────────
+_CARDINAL_SEGMENTS: list[frozenset] = [
+    frozenset({"d5", "d6", "d7"}),
+    frozenset({"d1", "d2", "d3"}),
+    frozenset({"a4", "b4", "c4"}),
+    frozenset({"e4", "f4", "g4"}),
+]
+_CARDINAL    = {p for s in _CARDINAL_SEGMENTS for p in s}
+_OUTER_CARD  = {"d1", "d7", "a4", "g4"}   # outer-ring cross endpoints
+_D_COL       = {"d1", "d2", "d3", "d5", "d6", "d7"}
+
+
+def _same_segment(p1: str, p2: str) -> bool:
+    return any(p1 in s and p2 in s for s in _CARDINAL_SEGMENTS)
+
+
+def _unnatural_opening(w1: str, b1: str) -> bool:
+    """Return True for first-two-move pairs that represent unnatural/illegal openings.
+
+    Three rejection patterns:
+      1. Both moves on d-column but different segments (d-north vs d-south clash).
+      2. Both cardinal, one is an outer endpoint and they are not on the same segment.
+      3. W1 is an outer cardinal endpoint and B1 does not block the same segment.
+    """
+    if w1 in _CARDINAL and b1 in _CARDINAL and not _same_segment(w1, b1):
+        # d-column opposite-segment clash (e.g. d6/d3, d2/d5)
+        if w1 in _D_COL and b1 in _D_COL:
+            return True
+        # outer cardinal on different segment (e.g. f4/d7)
+        if b1 in _OUTER_CARD or w1 in _OUTER_CARD:
+            return True
+    # outer cardinal opener with no same-segment block (e.g. d1/f2)
+    if w1 in _OUTER_CARD and not _same_segment(w1, b1):
+        return True
+    return False
 
 # ── board geometry ─────────────────────────────────────────────────────────────
 
@@ -300,13 +341,24 @@ def extract_families(db_path: str, min_diff: int = 0):
         if len(place_games) < MIN_PLACE_GAMES:
             continue  # skip family — not enough clean-placement trunk data
 
-        rank += 1
-        code = f"A{rank:02d}"
         prefix8: collections.Counter = collections.Counter()
         for g in place_games:
             prefix8[tuple(g[:8])] += 1
         trunk8, trunk_cnt = prefix8.most_common(1)[0]
-        assert len(trunk8) == 8, f"{code}: trunk has {len(trunk8)} moves (expected 8)"
+        assert len(trunk8) == 8, f"trunk has {len(trunk8)} moves (expected 8)"
+
+        # Filter 1: no duplicate positions in trunk (catches one-sided replay artefacts)
+        tos = [m.split("x")[-1] if "x" in m else m for m in trunk8]
+        if len(set(tos)) < len(tos):
+            continue  # duplicate square in trunk — illegal board
+
+        # Filter 2: reject unnatural first-move pairs (cardinal-mill cross-axis, etc.)
+        trunk_w1, trunk_b1 = trunk8[0], trunk8[1]
+        if _unnatural_opening(trunk_w1, trunk_b1):
+            continue
+
+        rank += 1
+        code = f"A{rank:02d}"
         result.append((code, name, raw_key, list(trunk8), len(games)))
     return result, len(rows)
 
@@ -344,14 +396,15 @@ def _para(doc, text: str, bold: bool = False, size: int = 10):
 
 # ── plays illustrated builder ──────────────────────────────────────────────────
 
-def build_plays_illustrated(families, total_games: int, difficulty, game_count: int) -> Document:
+def build_plays_illustrated(families, total_games: int, difficulty, game_count: int,
+                            db_path: str = DB_PATH, gen_label: str = "gen v4") -> Document:
     doc = Document()
-    doc.core_properties.title = "NMM AI Opening Plays — Illustrated (gen v4)"
+    doc.core_properties.title = f"NMM AI Opening Plays — Illustrated ({gen_label})"
 
-    doc.add_heading("NMM AI Opening Plays — gen v4 (Illustrated)", level=0)
+    doc.add_heading(f"NMM AI Opening Plays — {gen_label} (Illustrated)", level=0)
     _para(doc,
-        f"Top 11 opening families · Generalist v4 · difficulty {difficulty}/20 · "
-        f"{game_count:,} games · {total_games:,} winning/draw lines from {DB_PATH}.",
+        f"Top opening families · {gen_label} · difficulty {difficulty}/20 · "
+        f"{game_count:,} games · {total_games:,} winning/draw lines from {db_path}.",
         size=10)
     _para(doc,
         "Board shows trunk position after 8 plies. ● cream = White, ● dark = Black. "
@@ -470,21 +523,22 @@ def build_continuation_cells_with_boards(
     return cells[:9]
 
 
-def build_continuations_illustrated(families, model, device: str, difficulty) -> Document:
+def build_continuations_illustrated(families, model, device: str, difficulty,
+                                    gen_label: str = "gen v4") -> Document:
     doc = Document()
-    doc.core_properties.title = "NMM AI Opening Continuations — Illustrated (gen v4)"
+    doc.core_properties.title = f"NMM AI Opening Continuations — Illustrated ({gen_label})"
 
-    doc.add_heading("NMM AI Opening Continuations — gen v4 (Illustrated)", level=0)
+    doc.add_heading(f"NMM AI Opening Continuations — {gen_label} (Illustrated)", level=0)
     _para(doc,
         f"Top 9 continuations per family from W5/B5 to W6/B6 (3 W choices × 3 B responses, 4 moves deep). "
-        f"★ gen v4 = Generalist v4 policy (difficulty {difficulty}/20). "
+        f"★ {gen_label} = policy (difficulty {difficulty}/20). "
         f"Gold ring = last move. Red dot = mill.", size=10)
     doc.add_page_break()
 
     for code, name, key, trunk, game_count_fam in families:
         doc.add_heading(f"{code}  {name}", level=1)
         _para(doc, f"Trunk (8-ply):  {format_trunk(trunk)}", size=9)
-        _para(doc, f"★ = Generalist v4 · DB: {game_count_fam} games", size=9)
+        _para(doc, f"★ = {gen_label} · DB: {game_count_fam} games", size=9)
         doc.add_paragraph()
 
         print(f"  Generating continuations for {code} {name} ...", flush=True)
@@ -522,11 +576,14 @@ def build_continuations_illustrated(families, model, device: str, difficulty) ->
 def main() -> None:
     import argparse
     ap = argparse.ArgumentParser(description="Generate NMM AI opening docs")
-    ap.add_argument("--db",       default=DB_PATH,  help="SpecialistDB path")
-    ap.add_argument("--ckpt",     default=CKPT_PATH, help="Model checkpoint path")
-    ap.add_argument("--min-diff", type=int, default=0,
+    ap.add_argument("--db",        default=DB_PATH,   help="SpecialistDB path")
+    ap.add_argument("--ckpt",      default=CKPT_PATH,  help="Model checkpoint path")
+    ap.add_argument("--min-diff",  type=int, default=0,
                     help="Minimum difficulty level for winning_lines_by_diff filter "
-                         "(0 = use aggregate winning_lines, gen v4 style)")
+                         "(0 = use aggregate winning_lines)")
+    ap.add_argument("--out-plays", default=OUT_PLAYS,  help="Output path for plays doc")
+    ap.add_argument("--out-conts", default=OUT_CONTS,  help="Output path for continuations doc")
+    ap.add_argument("--gen-label", default="gen v4",   help="Generation label shown in docs")
     args = ap.parse_args()
 
     os.makedirs("docs", exist_ok=True)
@@ -535,19 +592,24 @@ def main() -> None:
     families, total_games = extract_families(args.db, min_diff=args.min_diff)
     print(f"  {len(families)} families, {total_games} total games")
 
-    print("Loading gen v4 model …")
-    model, device, difficulty, game_count = load_model(CKPT_PATH)
+    print(f"Loading {args.gen_label} model …")
+    model, device, difficulty, game_count = load_model(args.ckpt)
     print(f"  difficulty={difficulty}, game_count={game_count:,}")
 
-    print("Building ai_opening_plays_illustrated.docx …")
-    plays_doc = build_plays_illustrated(families, total_games, difficulty, game_count)
-    plays_doc.save(OUT_PLAYS)
-    print(f"  Saved: {OUT_PLAYS}")
+    print(f"Building {os.path.basename(args.out_plays)} …")
+    plays_doc = build_plays_illustrated(
+        families, total_games, difficulty, game_count,
+        db_path=args.db, gen_label=args.gen_label,
+    )
+    plays_doc.save(args.out_plays)
+    print(f"  Saved: {args.out_plays}")
 
-    print("Building ai_opening_continuations_illustrated.docx …")
-    conts_doc = build_continuations_illustrated(families, model, device, difficulty)
-    conts_doc.save(OUT_CONTS)
-    print(f"  Saved: {OUT_CONTS}")
+    print(f"Building {os.path.basename(args.out_conts)} …")
+    conts_doc = build_continuations_illustrated(
+        families, model, device, difficulty, gen_label=args.gen_label,
+    )
+    conts_doc.save(args.out_conts)
+    print(f"  Saved: {args.out_conts}")
 
     print("Done.")
 
