@@ -419,8 +419,13 @@ def load_generalist(
         gen_path = ckpt_dir / "s_gen_v4" / "BWDB" / "best.pt"
     log.info("GeneralistAgent: checkpoint path = %s", gen_path)
     m_gen, _ = _load_spec_model(gen_path)
+    if m_gen is None and gen_path.name != "best.pt":
+        # latest.pt not found — fall back to best.pt (shipped base checkpoint)
+        fallback = gen_path.parent / "best.pt"
+        log.info("GeneralistAgent: %s not found, trying fallback %s", gen_path.name, fallback)
+        m_gen, _ = _load_spec_model(fallback)
     if m_gen is None:
-        log.info("GeneralistAgent: no checkpoint at %s", gen_path)
+        log.info("GeneralistAgent: no checkpoint found at %s", gen_path)
         return None
 
     evaluate_fn = get_heuristic_evaluate()
