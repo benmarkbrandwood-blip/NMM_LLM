@@ -1,0 +1,73 @@
+{
+  "_comment": "SHA256 + byte size for each IA bundle. Update sha256/size each upload. Version = YYYY-MM-DD of the upload.",
+  "ia_item": "nine-mens-morris-ai",
+  "ia_base_url": "https://archive.org/download/nine-mens-morris-ai",
+  "bundles": {
+    "nmm_endgame_lite": {
+      "filename": "nmm_endgame_lite.tar.gz",
+      "version": "2026-10-18",
+      "sha256": "fae4a67fc97cdaf51e710ed26b978f09c0fa31c6894e1cbfa8abc1f94e4daab9",
+      "size_bytes": 52170736,
+      "size_display": "49.8 MB",
+      "description": "Endgame WDL tables (lite — current build)",
+      "optional": true,
+      "extract_to": "data/endgame",
+      "replaces": null
+    },
+    "nmm_fullgame": {
+      "filename": "nmm_fullgame.bin.gz",
+      "version": "2026-10-18",
+      "sha256": "5730584705de045854a9c97c8254aa4f94b56da5f74fb4b3e4b591a9ba17b8aa",
+      "size_bytes": 51924039,
+      "size_display": "49.5 MB",
+      "description": "Full-game binary (opening + midgame DB)",
+      "optional": true,
+      "extract_to": "data/endgame",
+      "replaces": null
+    },
+    "nmm_nets": {
+      "filename": "nmm_nets.tar.gz",
+      "version": "2026-10-18",
+      "sha256": "874b1628a43fa96de30c7954c326cca23035aeff769ccc679b5e22773b644975",
+      "size_bytes": 6397617,
+      "size_display": "6.1 MB",
+      "description": "Neural network models and base checkpoints",
+      "optional": false,
+      "extract_to": ".",
+      "replaces": null
+    },
+    "nmm_human_db_full": {
+      "filename": "nmm_human_db_full.sqlite.gz",
+      "version": "2026-10-18",
+      "sha256": "d367c9ac8db01e43944aab45140f3b91de845d3b7f9724840f19faa3a91ff0dc",
+      "size_bytes": 405946224,
+      "size_display": "387.2 MB",
+      "description": "Human game database — full (22 895 games, opening explorer)",
+      "optional": true,
+      "extract_to": "data",
+      "replaces": "nmm_human_db_lite"
+    },
+    "nmm_human_db_lite": {
+      "filename": "nmm_human_db_lite.sqlite.gz",
+      "version": "2026-10-18",
+      "sha256": "14dd0c3a3544fc41590f3ea7af71951fad9bd3c5c742e3a76d964676950c887d",
+      "size_bytes": 187755185,
+      "size_display": "179.1 MB",
+      "description": "Human game database — lite (smaller download, opening explorer)",
+      "optional": true,
+      "extract_to": "data",
+      "replaces": null
+    },
+    "nmm_specialist_db_v5": {
+      "filename": "nmm_specialist_db_v5.sqlite.gz",
+      "version": "2026-10-18",
+      "sha256": "7577dcabeb6d00b9a2db77dd71be75437a4945a8eab87afa4d51bf32c579562c",
+      "size_bytes": 116832358,
+      "size_display": "111.4 MB",
+      "description": "Specialist AI game database v5 (gen5 training games)",
+      "optional": true,
+      "extract_to": "data",
+      "replaces": null
+    }
+  }
+}
