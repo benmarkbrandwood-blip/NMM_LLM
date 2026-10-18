@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NMM Databases</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+  <link rel="stylesheet" href="/static/tools.css?v={{ v }}">
+  <style>
+    .db-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin-bottom: 0.5rem;
+    }
+    .db-table th {
+      text-align: left;
+      color: var(--tan);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 4px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .db-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      color: var(--text);
+    }
+    .db-table tr:last-child td { border-bottom: none; }
+    .db-table .col-name  { min-width: 160px; }
+    .db-table .col-size  { white-space: nowrap; color: var(--text-dim); }
+    .db-table .col-desc  { color: var(--text-dim); }
+    .db-table .col-act   { white-space: nowrap; text-align: right; }
+
+    .bid-label { font-size: 0.72rem; color: var(--text-dim); display: block; }
+
+    .badge-state {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+    .badge-current          { background: rgba(80,200,80,0.15);  color: var(--green); }
+    .badge-update-available { background: rgba(200,140,0,0.15);  color: #c8a010; }
+    .badge-missing          { background: rgba(120,120,120,0.12); color: var(--text-dim); }
+    .badge-missing-required { background: rgba(200,60,60,0.15);  color: var(--red); }
+
+    .cmd-row td {
+      background: var(--bg);
+      padding: 8px 12px;
+    }
+    .cmd-pre {
+      margin: 0 0 4px;
+      padding: 6px 10px;
+      background: #111;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-family: monospace;
+      color: #ccc;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .cmd-meta {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      font-family: monospace;
+    }
+    .btn-show-cmd {
+      font-size: 0.75rem;
+      padding: 3px 9px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+    }
+    .btn-show-cmd:hover { color: var(--text); border-color: var(--tan); }
+    .btn-show-cmd.active { color: var(--tan); border-color: var(--tan); }
+
+    .replaces-note {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      display: block;
+      margin-top: 2px;
+    }
+
+    .restart-banner {
+      margin-top: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--tan);
+      border-radius: 4px;
+      font-size: 0.82rem;
+      color: var(--tan);
+    }
+  </style>
+</head>
+<body>
+<div id="tools-app">
+  <header>
+    <h1>&#x1F5C4; Nine Men's Morris — Databases</h1>
+    <a href="/" class="btn-back">&#8592; Back to Game</a>
+    <a href="/tools" class="btn-back" style="margin-left:0.5rem">&#x1F6E0; Tools</a>
+  </header>
+
+  <main>
+
+    <!-- ── IA Bundle Status ──────────────────────────────────────────── -->
+    <section class="tools-section">
+      <h2>Internet Archive Bundles</h2>
+      <p class="tool-desc" id="db-remote-note">Loading status…</p>
+      <div id="db-bundle-wrap">
+        <table class="db-table">
+          <thead>
+            <tr>
+              <th class="col-name">Bundle</th>
+              <th>Status</th>
+              <th class="col-size">Size</th>
+              <th class="col-desc">Description</th>
+              <th class="col-act"></th>
+            </tr>
+          </thead>
+          <tbody id="db-bundle-tbody">
+            <tr><td colspan="5" style="color:var(--text-dim);padding:12px 8px">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button id="btn-refresh-db" class="btn-refresh">&#x21BB; Refresh</button>
+    </section>
+
+    <!-- ── Malom Perfect DB Configurator ────────────────────────────── -->
+    <section class="tools-section">
+      <h2>Malom Perfect Database</h2>
+      <p class="tool-desc">
+        The Malom perfect database (by Gábor E. Gevay &amp; Gábor Danner) provides exact
+        Win/Draw/Loss values for every legal position. It is a large external download
+        not included in the IA bundles above. Point this to the directory containing
+        the <code>.sec2</code> sector files after extracting.
+        Changes take effect after a server restart.
+      </p>
+      <div class="tool-form">
+        <label style="display:flex;align-items:center;gap:0.5rem;width:100%">
+          Malom DB directory
+          <input type="text" id="malom-path" value="{{ malom_db_path }}"
+                 placeholder="/path/to/malom/Std_DD_89adjusted"
+                 style="flex:1;min-width:0;width:auto">
+        </label>
+      </div>
+      <button id="btn-malom-test" class="btn-refresh">&#x1F50D; Test Path</button>
+      <button id="btn-malom-save" class="btn-run" style="margin-left:0.5rem">&#x2714; Save</button>
+      <span id="malom-test-status" style="margin-left:1em; font-size:0.82rem"></span>
+      <div id="restart-banner" class="restart-banner" style="display:none">
+        &#x26A0; Malom DB path saved. Restart the server to activate the new path.
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function () {
+
+  let _status = null;
+
+  // ── Fetch & render bundle table ─────────────────────────────────────────
+
+  async function loadStatus() {
+    document.getElementById('db-bundle-tbody').innerHTML =
+      '<tr><td colspan="5" style="color:var(--text-dim);padding:12px 8px">Loading…</td></tr>';
+    try {
+      const r = await fetch('/api/db/status');
+      _status = await r.json();
+      renderBundles(_status);
+    } catch (e) {
+      document.getElementById('db-bundle-tbody').innerHTML =
+        `<tr><td colspan="5" style="color:var(--red)">Error: ${e.message}</td></tr>`;
+    }
+  }
+
+  function stateLabel(state) {
+    return { current: 'Installed', update_available: 'Update available',
+             missing: 'Not installed', missing_required: 'Required — missing' }[state] || state;
+  }
+
+  function stateBadgeClass(state) {
+    return { current: 'badge-current', update_available: 'badge-update-available',
+             missing: 'badge-missing', missing_required: 'badge-missing-required' }[state] || 'badge-missing';
+  }
+
+  function buildCmd(b, baseUrl, root) {
+    const url = `${baseUrl}/${b.filename}`;
+    if (b.extract_type === 'tar') {
+      return `curl -L "${url}" -o /tmp/${b.filename} \\
+  && tar xzf /tmp/${b.filename} -C "${root}"`;
+    }
+    if (b.extract_type === 'gzip') {
+      const dest = `${root}/${b.extract_to}`;
+      const dir  = dest.substring(0, dest.lastIndexOf('/'));
+      return `mkdir -p "${dir}" \\
+  && curl -L "${url}" | gunzip -c > "${dest}"`;
+    }
+    return `curl -L "${url}" -o "${root}/${b.extract_to}"`;
+  }
+
+  function renderBundles(status) {
+    const bundles   = status.bundles   || {};
+    const baseUrl   = status.ia_base_url || '';
+    const root      = status.project_root || '';
+    const reachable = status.remote_reachable;
+
+    const note = document.getElementById('db-remote-note');
+    if (!reachable) {
+      note.textContent = 'Remote manifest unreachable — showing local install state only.';
+      note.style.color = 'var(--text-dim)';
+    } else if ((status.updates_available || []).length > 0) {
+      note.textContent = `Remote reachable — ${status.updates_available.length} update(s) available.`;
+      note.style.color = '#c8a010';
+    } else {
+      note.textContent = 'Remote reachable — all installed bundles are current.';
+      note.style.color = 'var(--green)';
+    }
+
+    const tbody = document.getElementById('db-bundle-tbody');
+    tbody.innerHTML = '';
+
+    for (const [bid, b] of Object.entries(bundles)) {
+      const badgeClass = stateBadgeClass(b.state);
+      const label      = stateLabel(b.state);
+      const cmd        = buildCmd(b, baseUrl, root);
+
+      const replacesNote = b.replaces
+        ? `<span class="replaces-note">Replaces: ${b.replaces}</span>` : '';
+
+      // Main row
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="col-name">
+          <strong>${b.label}</strong>
+          <span class="bid-label">${bid}</span>
+          ${replacesNote}
+        </td>
+        <td><span class="badge-state ${badgeClass}">${label}</span></td>
+        <td class="col-size">${b.size_display}</td>
+        <td class="col-desc">${b.description}</td>
+        <td class="col-act">
+          <button class="btn-show-cmd" data-bid="${bid}">Install cmd…</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      // Command row (hidden by default)
+      const sha = b.repo_sha || '—';
+      const cmdRow = document.createElement('tr');
+      cmdRow.className = 'cmd-row';
+      cmdRow.id = `cmd-${bid}`;
+      cmdRow.style.display = 'none';
+      cmdRow.innerHTML = `
+        <td colspan="5">
+          <pre class="cmd-pre">${escHtml(cmd)}</pre>
+          <div class="cmd-meta">SHA256: ${sha}  ·  version ${b.version || '—'}</div>
+        </td>
+      `;
+      tbody.appendChild(cmdRow);
+    }
+
+    // Wire toggle buttons
+    tbody.querySelectorAll('.btn-show-cmd').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const bid     = btn.dataset.bid;
+        const cmdRow  = document.getElementById(`cmd-${bid}`);
+        const visible = cmdRow.style.display !== 'none';
+        cmdRow.style.display = visible ? 'none' : '';
+        btn.classList.toggle('active', !visible);
+        btn.textContent = visible ? 'Install cmd…' : 'Hide';
+      });
+    });
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  document.getElementById('btn-refresh-db').addEventListener('click', loadStatus);
+
+  // ── Malom path test / save ──────────────────────────────────────────────
+
+  document.getElementById('btn-malom-test').addEventListener('click', async () => {
+    const path   = document.getElementById('malom-path').value.trim();
+    const status = document.getElementById('malom-test-status');
+    status.style.color = 'var(--text-dim)';
+    status.textContent  = 'Testing…';
+    try {
+      const r    = await fetch('/api/db/malom_test', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path}),
+      });
+      const data = await r.json();
+      if (data.valid) {
+        status.style.color = 'var(--green)';
+        status.textContent  = `OK — ${data.sectors} sector file(s) found`;
+      } else {
+        status.style.color = 'var(--red)';
+        status.textContent  = `Invalid: ${data.error || 'unknown error'}`;
+      }
+    } catch (e) {
+      status.style.color = 'var(--red)';
+      status.textContent  = `Request failed: ${e.message}`;
+    }
+  });
+
+  document.getElementById('btn-malom-save').addEventListener('click', async () => {
+    const path   = document.getElementById('malom-path').value.trim();
+    const status = document.getElementById('malom-test-status');
+    status.style.color = 'var(--text-dim)';
+    status.textContent  = 'Saving…';
+    try {
+      const r = await fetch('/api/db/malom_save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path}),
+      });
+      const data = await r.json();
+      if (data.ok) {
+        status.style.color  = 'var(--green)';
+        status.textContent   = 'Saved.';
+        document.getElementById('restart-banner').style.display = '';
+      } else {
+        status.style.color = 'var(--red)';
+        status.textContent  = `Save failed: ${data.error || 'unknown'}`;
+      }
+    } catch (e) {
+      status.style.color = 'var(--red)';
+      status.textContent  = `Request failed: ${e.message}`;
+    }
+  });
+
+  // ── Init ────────────────────────────────────────────────────────────────
+  loadStatus();
+
+})();
+</script>
+</body>
+</html>

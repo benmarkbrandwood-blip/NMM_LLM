@@ -118,18 +118,23 @@ async def run_startup_check() -> None:
             present and remote_ok and remote_sha and remote_sha != repo_sha
         )
 
+        optional = bdata.get("optional", True)
         bundle_status[bid] = {
             "present":          present,
             "update_available": update_available,
+            "state":            _bundle_state(present, update_available, optional),
             "repo_sha":         repo_sha,
             "local_sha":        local_sha,
             "remote_sha":       remote_sha,
-            "optional":         bdata.get("optional", True),
+            "optional":         optional,
             "label":            bdata.get("label", bid),
             "description":      bdata.get("description", ""),
             "size_display":     bdata.get("size_display", ""),
             "filename":         bdata.get("filename", ""),
             "version":          bdata.get("version", ""),
+            "extract_to":       bdata.get("extract_to", ""),
+            "extract_type":     bdata.get("extract_type", ""),
+            "replaces":         bdata.get("replaces"),
         }
 
         if update_available:
@@ -138,10 +143,12 @@ async def run_startup_check() -> None:
             missing_required.append(bid)
 
     _db_status = {
-        "bundles":          bundle_status,
+        "bundles":           bundle_status,
         "updates_available": updates_available,
         "missing_required":  missing_required,
         "remote_reachable":  remote_ok,
+        "ia_base_url":       base_url,
+        "project_root":      str(_ROOT),
     }
 
     if missing_required:
@@ -150,6 +157,12 @@ async def run_startup_check() -> None:
         log.info("DB updates available: %s", updates_available)
     else:
         log.info("DB status check complete — all bundles current.")
+
+
+def _bundle_state(present: bool, update_available: bool, optional: bool) -> str:
+    if present:
+        return "update_available" if update_available else "current"
+    return "missing" if optional else "missing_required"
 
 
 def get_db_status() -> dict:

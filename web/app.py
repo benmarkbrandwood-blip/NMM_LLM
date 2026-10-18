@@ -1904,6 +1904,45 @@ async def tools_page(request: Request):
     return templates.TemplateResponse(request, "tools.html", {"v": _static_ver()})
 
 
+@app.get("/databases")
+async def databases_page(request: Request):
+    settings = _load_settings()
+    return templates.TemplateResponse(request, "databases.html", {
+        "v":              _static_ver(),
+        "malom_db_path":  settings.get("malom_db_path", ""),
+    })
+
+
+@app.post("/api/db/malom_test")
+async def db_malom_test(request: Request):
+    from fastapi.responses import JSONResponse
+    from pathlib import Path as _Path
+    body = await request.json()
+    path = (body.get("path") or "").strip()
+    if not path:
+        return JSONResponse({"valid": False, "error": "No path provided"})
+    p = _Path(path).expanduser()
+    if not p.exists():
+        return JSONResponse({"valid": False, "error": "Path does not exist"})
+    if not p.is_dir():
+        return JSONResponse({"valid": False, "error": "Not a directory"})
+    sec2_files = list(p.glob("*.sec2"))
+    if not sec2_files:
+        return JSONResponse({"valid": False, "error": "No .sec2 files found in directory"})
+    return JSONResponse({"valid": True, "sectors": len(sec2_files)})
+
+
+@app.post("/api/db/malom_save")
+async def db_malom_save(request: Request):
+    from fastapi.responses import JSONResponse
+    body = await request.json()
+    path = (body.get("path") or "").strip()
+    settings = _load_settings()
+    settings["malom_db_path"] = path
+    _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
+    return JSONResponse({"ok": True})
+
+
 @app.get("/explorer")
 async def explorer_page(request: Request):
     return templates.TemplateResponse(request, "explorer.html", {"v": _static_ver()})
