@@ -8,82 +8,62 @@ A browser-based Nine Men's Morris game with a classical minimax engine, an Ollam
 
 ## Quick Start
 
-### Linux / macOS
+### Download and run (recommended for most users)
 
-```
-git clone \\\<repo-url\\\>    
-cd NMM\\\_ollama    
-./install.sh      \\\# one-time setup: venv + Ollama + model    
-./run\\\_nmm.sh      \\\# starts server and opens browser
-```
+1. Download **`nmm_source_v1.0.0.zip`** from the [Releases page](https://github.com/benmarkbrandwood-blip/NMM_LLM/releases)
+2. Extract to any folder
+3. Run the installer:
 
-### Windows
-
-```
-git clone \\\<repo-url\\\>    
-cd NMM\\\_ollama    
-install.bat       :: one-time setup: venv + Ollama + model    
-run\\\_nmm.bat       :: starts server and opens browser
+**Linux / macOS**
+```bash
+cd NMM_LLM-v1.0.0
+./install.sh
 ```
 
-`install.bat` is the recommended entry point on Windows — you can also double-click it from Explorer. It just launches `install.ps1` with `-ExecutionPolicy Bypass` so PowerShell's default execution policy doesn't block the script. If you'd rather call PowerShell directly:
-
+**Windows** — double-click `install.bat`, or from a terminal:
 ```
-powershell -ExecutionPolicy Bypass -File .\\\\install.ps1
+install.bat
 ```
 
-Optional flags (work on either `install.bat` or `install.ps1`):
+The installer sets up a Python virtual environment, installs dependencies, optionally installs [Ollama](https://ollama.com) for LLM commentary, and walks you through downloading the AI models and databases.
+
+4. Start the game:
+   - Linux/macOS: `./run_nmm.sh`
+   - Windows: double-click `run_nmm.bat`
+
+   The browser opens automatically at `http://127.0.0.1:8000`.
+
+5. First run: click **Databases** in the header and download at minimum the **AI models** bundle (~6 MB). The endgame tables and full-game database are recommended for strongest play.
+
+> **Developers / git users:** see [docs/INSTALL_FROM_SOURCE.md](docs/INSTALL_FROM_SOURCE.md) for the clone-and-build path.
+
+---
+
+### Windows installer flags
 
 | Flag | Effect |
-| - | - |
-| `/noollama` (`-NoOllama`) | Skip Ollama install and model download |
-| `/yes` (`-Yes`) | Non-interactive; auto-installs Ollama |
-| `/model NAME` (`-Model NAME`) | Override the LLM model (e.g. `mistral:7b`) |
+|------|--------|
+| `install.bat /noollama` | Skip Ollama and model download |
+| `install.bat /yes` | Non-interactive; auto-installs Ollama |
+| `install.bat /model mistral:7b` | Use a different LLM model |
 
-
-The installer will:
-
-- Create a Python venv at `.venv/`
-
-- Install all Python dependencies
-
-- Install [Ollama](https://ollama.com/) if not already present (optional on Windows)
-
-- Pull the configured LLM model (`llama3.1:8b` by default)
-
-The launcher (`run\\\_nmm.sh` / `run\\\_nmm.bat`) will:
-
-- Start Ollama if it isn't running
-
-- Launch the FastAPI server (`uvicorn`)
-
-- Open `http://127.0.0.1:8000` in your browser automatically
-
-**Optional — neural AI training** (PyTorch, only needed if you want to train the learned engine):
-
-```
-\\\# Linux / macOS    
-source .venv/bin/activate    
-pip install -r requirements\\\_learned\\\_ai.txt    
-    
-\\\# Windows    
-.venv\\\\Scripts\\\\activate    
-pip install -r requirements\\\_learned\\\_ai.txt
+Or call PowerShell directly:
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1 -NoOllama
 ```
 
-See [Learned (Neural) AI](#learned-neural-ai) for the full training walkthrough.
+---
 
-## Requirements
+## System Requirements
 
-- **Python 3.10+** — on Windows, install from [https://www.python.org/downloads/](https://www.python.org/downloads/) and tick **"Add python.exe to PATH"** during setup. The Microsoft Store stub is detected and skipped automatically.
+- **Python 3.10+** — Windows: install from [python.org](https://www.python.org/downloads/), tick **"Add python.exe to PATH"** during setup
+- **Linux / macOS / Windows 10 1803+** (WSL2 also works)
+- ~5 GB disk for the default LLM model (optional — the game plays without it)
+- **Windows:** if `chromadb` fails to install, get [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (select *Desktop development with C++*) and re-run `install.bat`
 
-- **Linux / macOS / Windows 10+** (WSL2 also works)
+## Issues
 
-- **curl** on Linux/macOS (for Ollama install). Built into Windows 10+.
-
-- ~5 GB disk for the default LLM model
-
-- **Windows only — if `chromadb` fails to install**, install the free [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (check "Desktop development with C++") and re-run `install.bat`.
+[Report bugs at GitHub Issues](https://github.com/benmarkbrandwood-blip/NMM_LLM/issues)
 
 ## Features
 
