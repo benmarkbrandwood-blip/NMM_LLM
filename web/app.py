@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from web.db_checker import run_startup_check, get_db_status
 
 _ROOT = Path(__file__).parent.parent
 _WEB  = Path(__file__).parent
@@ -1180,6 +1181,7 @@ _server_ready = False
 async def _mark_server_ready():
     global _server_ready
     _server_ready = True
+    asyncio.create_task(run_startup_check())
 
 @app.get("/api/ping")
 async def ping():
@@ -1188,6 +1190,12 @@ async def ping():
     if not _server_ready:
         return JSONResponse({"ok": False}, status_code=503)
     return JSONResponse({"ok": True})
+
+@app.get("/api/db/status")
+async def db_status():
+    """Returns database bundle status: what's installed, what has updates, what's missing."""
+    from fastapi.responses import JSONResponse
+    return JSONResponse(get_db_status())
 
 @app.get("/")
 async def index(request: Request):
