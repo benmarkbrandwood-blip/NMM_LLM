@@ -8,6 +8,7 @@ NMM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_DIR="$NMM_DIR/.venv"
 PYTHON="${PYTHON:-python3}"
 MODEL="llama3.1:8b"
+OS_TYPE="$(uname -s 2>/dev/null || echo unknown)"
 
 # ── Detect model from settings.json if present ────────────────────────────────
 SETTINGS="$NMM_DIR/data/settings.json"
@@ -65,7 +66,16 @@ if command -v ollama &>/dev/null; then
     info "Ollama already installed ($(ollama --version 2>/dev/null | head -1))."
 else
     info "Installing Ollama..."
-    if command -v curl &>/dev/null; then
+    if [ "$OS_TYPE" = "Darwin" ]; then
+        # macOS: official installer script doesn't support Mac; use Homebrew
+        if command -v brew &>/dev/null; then
+            brew install ollama
+        else
+            warn "Homebrew not found. Install Ollama manually from https://ollama.com/download/mac"
+            warn "Then re-run this script."
+            exit 1
+        fi
+    elif command -v curl &>/dev/null; then
         curl -fsSL https://ollama.com/install.sh | sh
     else
         error "curl not found. Install curl and re-run, or install Ollama manually from https://ollama.com"

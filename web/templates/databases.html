@@ -192,8 +192,43 @@
              missing: 'badge-missing', missing_required: 'badge-missing-required' }[state] || 'badge-missing';
   }
 
+  function detectOS() {
+    const ua = navigator.userAgent || '';
+    const pl = (navigator.platform  || '').toLowerCase();
+    if (pl.startsWith('win') || /windows/i.test(ua)) return 'windows';
+    if (pl.startsWith('mac') || /mac os/i.test(ua))  return 'mac';
+    return 'linux';
+  }
+
+  const _os = detectOS();
+
+  function osLabel() {
+    return { windows: 'PowerShell (Windows)', mac: 'Bash (macOS)', linux: 'Bash (Linux)' }[_os];
+  }
+
   function buildCmd(b, baseUrl, root) {
     const url = `${baseUrl}/${b.filename}`;
+
+    if (_os === 'windows') {
+      // Windows: curl.exe + tar (both built into Win10+); gzip via Python (required by app)
+      const winDest = (root + '\\' + b.extract_to).replace(/\//g, '\\');
+      const winDestDir = winDest.substring(0, winDest.lastIndexOf('\\'));
+      if (b.extract_type === 'tar') {
+        return `curl.exe -L "${url}" -o "$env:TEMP\\${b.filename}"
+tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
+      }
+      if (b.extract_type === 'gzip') {
+        // Self-contained Python one-liner: download + gunzip, no extra tools needed
+        return `python -c "import urllib.request,gzip,shutil,os; ` +
+               `_t=os.path.join(os.environ.get('TEMP','.'),r'${b.filename}'); ` +
+               `urllib.request.urlretrieve('${url}',_t); ` +
+               `os.makedirs(r'${winDestDir}',exist_ok=True); ` +
+               `shutil.copyfileobj(gzip.open(_t),open(r'${winDest}','wb'))"`;
+      }
+      return `curl.exe -L "${url}" -o "${winDest}"`;
+    }
+
+    // Linux & macOS — identical bash commands
     if (b.extract_type === 'tar') {
       return `curl -L "${url}" -o /tmp/${b.filename} \\
   && tar xzf /tmp/${b.filename} -C "${root}"`;
@@ -261,6 +296,7 @@
       cmdRow.style.display = 'none';
       cmdRow.innerHTML = `
         <td colspan="5">
+          <div class="cmd-meta" style="margin-bottom:3px">${osLabel()}</div>
           <pre class="cmd-pre">${escHtml(cmd)}</pre>
           <div class="cmd-meta">SHA256: ${sha}  ·  version ${b.version || '—'}</div>
         </td>
