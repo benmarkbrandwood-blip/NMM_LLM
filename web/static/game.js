@@ -375,6 +375,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       : "Value net: not found — run Train Value Network in Tools to build one";
   }).catch(() => {});
 
+  // DB update badge on the Databases nav link
+  fetch("/api/db/status", {cache: "no-store"}).then(r => r.json()).then(s => {
+    const dot = $("db-update-dot");
+    if (!dot) return;
+    const hasMissing = (s.missing_required  || []).length > 0;
+    const hasUpdates = (s.updates_available || []).length > 0;
+    if (hasMissing) {
+      dot.textContent = "●"; dot.style.color = "var(--red)"; dot.style.display = "";
+    } else if (hasUpdates) {
+      dot.textContent = "●"; dot.style.color = "#c8a010"; dot.style.display = "";
+    }
+  }).catch(() => {});
+
   function _updateSentinelRows() {
     const checked = $("chk-sentinel") && $("chk-sentinel").checked;
     const mode    = $("sel-sentinel-mode") ? $("sel-sentinel-mode").value : "advisory";

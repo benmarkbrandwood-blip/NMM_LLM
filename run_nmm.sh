@@ -44,6 +44,14 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+# ── Pre-flight: AI model checkpoints ─────────────────────────────────────────
+CKPT_GEN="$NMM_DIR/learned_ai/checkpoints/scaffolded/s_gen_v5/from_v4/best.pt"
+CKPT_SEN="$NMM_DIR/learned_ai/sentinel/checkpoints/best.pt"
+if [ ! -f "$CKPT_GEN" ] || [ ! -f "$CKPT_SEN" ]; then
+    warn "AI model checkpoints not found — AI features will be limited."
+    warn "Download them via ./install.sh or open /databases in the game."
+fi
+
 # ── Launch server ─────────────────────────────────────────────────────────────
 info "Starting Nine Men's Morris at $URL ..."
 cd "$NMM_DIR"

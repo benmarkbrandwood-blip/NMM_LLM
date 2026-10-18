@@ -24,6 +24,9 @@ env/
 # Per-machine training paths (copy from training_paths.example.json)
 data/training_paths.local.json
 
+# Per-install DB state — written after each successful bundle download
+data/db_manifest_local.json
+
 # ChromaDB data (generated at runtime)
 data/chroma/
 

@@ -117,6 +117,12 @@ for d in data/games data/ai_games data/human_games data/session_memory \
 done
 info "Data directories ready."
 
+# ── 8. Default settings ──────────────────────────────────────────────────────
+if [ ! -f "$NMM_DIR/data/settings.json" ] && [ -f "$NMM_DIR/data/settings.template.json" ]; then
+    cp "$NMM_DIR/data/settings.template.json" "$NMM_DIR/data/settings.json"
+    info "Default settings created at data/settings.json."
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}Installation complete!${NC}"
