@@ -318,6 +318,25 @@ foreach ($d in @(
 }
 Write-Info "Data directories ready."
 
+# === 10. Default settings ====================================================
+$TEMPLATE = Join-Path $NMM_DIR "data\settings.template.json"
+if (-not (Test-Path -LiteralPath $SETTINGS) -and (Test-Path -LiteralPath $TEMPLATE)) {
+    Copy-Item -LiteralPath $TEMPLATE -Destination $SETTINGS
+    Write-Info "Default settings created at data\settings.json."
+}
+
+# === 11. Download databases ==================================================
+$installDbs = Join-Path $NMM_DIR "tools\install_dbs.py"
+if (Test-Path -LiteralPath $installDbs) {
+    Write-Host ""
+    & $VENV_PY $installDbs $NMM_DIR
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warn "Database setup encountered an error -- continue at /databases in the game."
+    }
+} else {
+    Write-Warn "tools\install_dbs.py not found -- skipping database download."
+}
+
 # === Done ===================================================================
 Write-Host ""
 Write-Host "  Installation complete!" -ForegroundColor Green

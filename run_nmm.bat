@@ -32,12 +32,24 @@ if %errorlevel%==0 (
     set "PORT=8080"
 )
 
+rem -- Pre-flight: AI model checkpoints --
+set "CKPT_GEN=%NMM_DIR%learned_ai\checkpoints\scaffolded\s_gen_v5\from_v4\best.pt"
+set "CKPT_SEN=%NMM_DIR%learned_ai\sentinel\checkpoints\best.pt"
+if not exist "%CKPT_GEN%" (
+    echo [NMM] WARNING: AI model checkpoints not found -- AI features will be limited.
+    echo [NMM] Download them at /databases in the game or re-run install.bat.
+)
+if not exist "%CKPT_SEN%" (
+    echo [NMM] WARNING: Sentinel checkpoint not found -- Sentinel overlay unavailable.
+)
+
 echo [NMM] Starting Nine Men's Morris at http://%HOST%:%PORT% ...
 cd /d "%NMM_DIR%"
 
 rem -- Launch uvicorn via 'python -m uvicorn' so we don't depend on the
 rem -- .exe shim location (more robust when install paths contain spaces) --
-start /B "" "%VENV_PY%" -m uvicorn web.app:app --host %HOST% --port %PORT%
+start /B "" "%VENV_PY%" -m uvicorn web.app:app --host %HOST% --port %PORT% ^
+    --ws-ping-interval 60 --ws-ping-timeout 120
 
 rem -- Poll /api/ping until the server is ready (up to 60s) --
 echo [NMM] Waiting for server to be ready...

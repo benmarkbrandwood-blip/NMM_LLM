@@ -123,6 +123,15 @@ if [ ! -f "$NMM_DIR/data/settings.json" ] && [ -f "$NMM_DIR/data/settings.templa
     info "Default settings created at data/settings.json."
 fi
 
+# ── 9. Download databases ─────────────────────────────────────────────────────
+if [ -f "$NMM_DIR/tools/install_dbs.py" ]; then
+    echo ""
+    "$VENV_PY" "$NMM_DIR/tools/install_dbs.py" "$NMM_DIR" || \
+        warn "Database setup encountered an error — continue at /databases in the game."
+else
+    warn "tools/install_dbs.py not found — skipping database download."
+fi
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}Installation complete!${NC}"

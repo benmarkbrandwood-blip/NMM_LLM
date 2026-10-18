@@ -98,6 +98,54 @@
       font-size: 0.82rem;
       color: var(--tan);
     }
+
+    .btn-dl {
+      font-size: 0.75rem;
+      padding: 3px 9px;
+      cursor: pointer;
+      background: transparent;
+      color: var(--green);
+      border: 1px solid var(--green);
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+    .btn-dl:hover { opacity: 0.85; }
+    .btn-dl:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .dl-row td { background: var(--bg); padding: 6px 12px; }
+    .dl-bar-wrap {
+      background: rgba(255,255,255,0.1);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+      margin: 4px 0;
+    }
+    .dl-bar-fill {
+      background: var(--green);
+      height: 100%;
+      width: 0%;
+      transition: width 0.15s;
+    }
+    .dl-status { font-size: 0.75rem; color: var(--text-dim); font-family: monospace; }
+
+    .malom-steps {
+      margin: 0.6rem 0 0.6rem 1.4rem;
+      padding: 0;
+      font-size: 0.82rem;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .malom-steps li { margin-bottom: 0.3rem; }
+    .malom-note {
+      margin-top: 0.75rem;
+      padding: 0.45rem 0.75rem;
+      border-left: 3px solid var(--tan);
+      background: rgba(255,255,255,0.03);
+      border-radius: 0 4px 4px 0;
+      font-size: 0.80rem;
+      color: var(--text-dim);
+    }
+    .malom-note a { color: var(--tan); }
   </style>
 </head>
 <body>
@@ -133,15 +181,56 @@
       <button id="btn-refresh-db" class="btn-refresh">&#x21BB; Refresh</button>
     </section>
 
+    <!-- ── Malom Download Guide ──────────────────────────────────────── -->
+    <section class="tools-section">
+      <h2>Getting the Malom Perfect Database</h2>
+      <p class="tool-desc">
+        The Malom perfect database was created by
+        <strong>Gábor Danner</strong> and <strong>Gábor E. Gévay</strong>
+        (University of Szeged, Hungary). It provides an exact Win/Draw/Loss value
+        for every legal Nine Men's Morris position, enabling the Perfect DB overlay
+        and Malom adjudication features. Source code is available under GPLv3 at
+        <a href="https://github.com/ggevay/malom" target="_blank" rel="noopener">github.com/ggevay/malom</a>.
+      </p>
+      <p class="tool-desc" style="margin-top:0.4rem">
+        The <em>Standard</em> rules variant is what this game uses.
+        It is distributed via BitTorrent — use any torrent client to download it.
+      </p>
+      <ol class="malom-steps">
+        <li>
+          <strong>Download the torrent:</strong>
+          <a href="https://www.inf.u-szeged.hu/~danner/mills/dl.php?file=Malom_Standard_Ultra-strong_1.1.0.torrent"
+             target="_blank" rel="noopener">Malom Standard Ultra-strong v1.1.0</a>
+          — 12 GB compressed · 78 GB uncompressed.
+        </li>
+        <li>
+          <strong>Open it in a BitTorrent client</strong> (qBittorrent, Transmission, etc.)
+          and download to a permanent location on a drive with enough free space.
+        </li>
+        <li>
+          <strong>Locate the extracted folder</strong> — it should contain many
+          <code>.sec2</code> sector files (e.g. <code>Std_DD_89adjusted/</code>).
+        </li>
+        <li>
+          <strong>Paste the folder path</strong> into the configurator below and click Save.
+        </li>
+      </ol>
+      <p class="malom-note">
+        <strong>Windows:</strong> the Gábor binaries
+        (<a href="https://www.inf.u-szeged.hu/~danner/mills/dl.php?file=Malom_binaries_1.1.0.zip"
+            target="_blank" rel="noopener">Malom_binaries_1.1.0.zip</a>, 2.7 MB)
+        include a standalone solver application for querying positions outside the game.
+        Requires .NET Framework 4.5 on 64-bit Windows.
+        Download the binaries separately — the database torrent above works on all platforms.
+      </p>
+    </section>
+
     <!-- ── Malom Perfect DB Configurator ────────────────────────────── -->
     <section class="tools-section">
-      <h2>Malom Perfect Database</h2>
+      <h2>Malom Database Path</h2>
       <p class="tool-desc">
-        The Malom perfect database (by Gábor E. Gevay &amp; Gábor Danner) provides exact
-        Win/Draw/Loss values for every legal position. It is a large external download
-        not included in the IA bundles above. Point this to the directory containing
-        the <code>.sec2</code> sector files after extracting.
-        Changes take effect after a server restart.
+        Point this to the directory containing the <code>.sec2</code> sector files
+        from the torrent download above. Changes take effect after a server restart.
       </p>
       <div class="tool-form">
         <label style="display:flex;align-items:center;gap:0.5rem;width:100%">
@@ -284,6 +373,7 @@ tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
         <td class="col-desc">${b.description}</td>
         <td class="col-act">
           <button class="btn-show-cmd" data-bid="${bid}">Install cmd…</button>
+          ${b.state !== 'current' ? `<button class="btn-dl" id="btn-dl-${bid}" data-bid="${bid}">&#x2B07; Download</button>` : ''}
         </td>
       `;
       tbody.appendChild(tr);
@@ -302,6 +392,18 @@ tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
         </td>
       `;
       tbody.appendChild(cmdRow);
+
+      const dlRow = document.createElement('tr');
+      dlRow.className = 'dl-row';
+      dlRow.id = `dl-${bid}`;
+      dlRow.style.display = 'none';
+      dlRow.innerHTML = `
+        <td colspan="5">
+          <div class="dl-bar-wrap"><div class="dl-bar-fill" id="dl-fill-${bid}"></div></div>
+          <div class="dl-status" id="dl-status-${bid}"></div>
+        </td>
+      `;
+      tbody.appendChild(dlRow);
     }
 
     // Wire toggle buttons
@@ -315,10 +417,78 @@ tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
         btn.textContent = visible ? 'Install cmd…' : 'Hide';
       });
     });
+
+    // Wire download buttons
+    tbody.querySelectorAll('.btn-dl').forEach(btn => {
+      btn.addEventListener('click', () => downloadBundle(btn.dataset.bid));
+    });
   }
 
   function escHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── WS download ─────────────────────────────────────────────────────────────
+
+  let _wsDl = null;
+
+  function formatBytes(n) {
+    if (n < 1024)        return n + ' B';
+    if (n < 1048576)     return (n / 1024).toFixed(1) + ' KB';
+    if (n < 1073741824)  return (n / 1048576).toFixed(1) + ' MB';
+    return (n / 1073741824).toFixed(2) + ' GB';
+  }
+
+  function setDlStatus(bid, pct, text, color) {
+    const fill   = document.getElementById(`dl-fill-${bid}`);
+    const status = document.getElementById(`dl-status-${bid}`);
+    if (fill   && pct  !== null) fill.style.width  = pct + '%';
+    if (status && text !== null) status.textContent = text;
+    if (status && color)         status.style.color = color;
+  }
+
+  function finishDl(bid, ok, text) {
+    const btn = document.getElementById(`btn-dl-${bid}`);
+    if (btn) { btn.disabled = false; btn.textContent = ok ? '✓ Done' : '↓ Retry'; }
+    setDlStatus(bid, ok ? 100 : 0, text, ok ? 'var(--green)' : 'var(--red)');
+    if (ok) setTimeout(loadStatus, 800);
+  }
+
+  function downloadBundle(bid) {
+    if (_wsDl) { _wsDl.close(); _wsDl = null; }
+    const btn   = document.getElementById(`btn-dl-${bid}`);
+    const dlRow = document.getElementById(`dl-${bid}`);
+    if (btn)   { btn.disabled = true; btn.textContent = '…'; }
+    if (dlRow) dlRow.style.display = '';
+    setDlStatus(bid, 0, 'Connecting…', null);
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    _wsDl = new WebSocket(`${proto}//${location.host}/ws/db/download`);
+
+    _wsDl.onopen = () => _wsDl.send(JSON.stringify({bundle_id: bid}));
+
+    _wsDl.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+      if (msg.type === 'progress') {
+        const pct  = msg.pct || 0;
+        const text = msg.total
+          ? `${pct}%  ${formatBytes(msg.bytes)} / ${formatBytes(msg.total)}`
+          : `${formatBytes(msg.bytes)} downloaded`;
+        setDlStatus(bid, pct, text, null);
+      } else if (msg.type === 'log') {
+        setDlStatus(bid, null, msg.text, null);
+      } else if (msg.type === 'done') {
+        finishDl(bid, true, msg.text || 'Done');
+        _wsDl = null;
+      } else if (msg.type === 'error') {
+        finishDl(bid, false, msg.text || 'Error');
+        _wsDl = null;
+      }
+    };
+
+    _wsDl.onerror = () => { finishDl(bid, false, 'WebSocket error'); _wsDl = null; };
+    _wsDl.onclose = () => { if (_wsDl) { finishDl(bid, false, 'Connection closed'); _wsDl = null; } };
   }
 
   document.getElementById('btn-refresh-db').addEventListener('click', loadStatus);

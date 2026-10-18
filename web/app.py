@@ -1894,9 +1894,34 @@ async def api_set_family(body: dict):
 import collections as _collections
 from fastapi.responses import JSONResponse as _JSONResponse
 
-_TOOLS_LOCK = asyncio.Lock()
+_TOOLS_LOCK       = asyncio.Lock()
+_DB_DOWNLOAD_LOCK = asyncio.Lock()
 _tools_proc: "asyncio.subprocess.Process | None" = None
 _tools_log: "_collections.deque[str]" = _collections.deque(maxlen=500)
+
+
+def _extract_bundle(tmp_path: "Path", extract_type: str, extract_to: str, project_root: "Path") -> None:
+    """Sync extraction helper — run via asyncio.to_thread."""
+    import gzip as _gzip
+    import shutil as _shutil
+    import tarfile as _tarfile
+
+    if extract_type == "tar":
+        with _tarfile.open(tmp_path) as tf:
+            try:
+                tf.extractall(project_root, filter="data")
+            except TypeError:
+                # Python < 3.12 doesn't have the filter kwarg
+                tf.extractall(project_root)
+    elif extract_type == "gzip":
+        dest = project_root / extract_to
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with _gzip.open(tmp_path, "rb") as gz, dest.open("wb") as out:
+            _shutil.copyfileobj(gz, out)
+    else:
+        dest = project_root / extract_to
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        _shutil.copy2(tmp_path, dest)
 
 
 @app.get("/tools")
@@ -1941,6 +1966,103 @@ async def db_malom_save(request: Request):
     settings["malom_db_path"] = path
     _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
     return JSONResponse({"ok": True})
+
+
+@app.websocket("/ws/db/download")
+async def ws_db_download(websocket: WebSocket):
+    import hashlib as _hashlib
+    import os as _os
+    import tempfile as _tempfile
+    import httpx as _httpx
+    from web.db_checker import load_manifest, mark_bundle_installed
+    await websocket.accept()
+
+    bundle_id = "?"
+
+    async def _send(type_: str, **kwargs) -> None:
+        try:
+            await websocket.send_json({"type": type_, **kwargs})
+        except Exception:
+            pass
+
+    try:
+        msg       = await websocket.receive_json()
+        bundle_id = msg.get("bundle_id", "?")
+
+        manifest = load_manifest()
+        bundles  = manifest.get("bundles", {})
+        if bundle_id not in bundles:
+            await _send("error", text=f"Unknown bundle: {bundle_id!r}")
+            return
+
+        bdata = bundles[bundle_id]
+
+        if _DB_DOWNLOAD_LOCK.locked():
+            await _send("error", text="Another download is already in progress.")
+            return
+
+        async with _DB_DOWNLOAD_LOCK:
+            base_url     = manifest.get("ia_base_url", "").rstrip("/")
+            filename     = bdata["filename"]
+            url          = f"{base_url}/{filename}"
+            total        = bdata.get("size_bytes", 0)
+            expected_sha = bdata.get("sha256", "")
+
+            await _send("log",      text=f"Downloading {filename} ({bdata.get('size_display', '')})…")
+            await _send("progress", pct=0, bytes=0, total=total)
+
+            h          = _hashlib.sha256()
+            downloaded = 0
+            last_pct   = -1
+
+            tmp_fd, tmp_name = _tempfile.mkstemp(suffix=f"_{filename}")
+            tmp_path = Path(tmp_name)
+            try:
+                _os.close(tmp_fd)
+                timeout = _httpx.Timeout(10.0, read=3600.0)
+                async with _httpx.AsyncClient(timeout=timeout) as client:
+                    async with client.stream("GET", url, follow_redirects=True) as r:
+                        r.raise_for_status()
+                        with tmp_path.open("wb") as out:
+                            async for chunk in r.aiter_bytes(65536):
+                                out.write(chunk)
+                                h.update(chunk)
+                                downloaded += len(chunk)
+                                pct = int(downloaded * 100 // total) if total else 0
+                                if pct != last_pct:
+                                    await _send("progress", pct=pct, bytes=downloaded, total=total)
+                                    last_pct = pct
+
+                await _send("progress", pct=100, bytes=downloaded, total=total or downloaded)
+                actual_sha = h.hexdigest()
+
+                if expected_sha and actual_sha != expected_sha:
+                    await _send("error",
+                                text=f"SHA256 mismatch — download may be corrupt.\n"
+                                     f"Expected: {expected_sha}\nGot:      {actual_sha}")
+                    return
+
+                await _send("log", text="Extracting…")
+                extract_type = bdata.get("extract_type", "tar")
+                extract_to   = bdata.get("extract_to", ".")
+                await asyncio.to_thread(_extract_bundle, tmp_path, extract_type, extract_to, _ROOT)
+
+                mark_bundle_installed(bundle_id, actual_sha)
+                await run_startup_check()
+
+                await _send("done", text=f"{bdata.get('label', bundle_id)} installed successfully.")
+
+            finally:
+                try:
+                    tmp_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+    except WebSocketDisconnect:
+        log.info("DB download WS disconnected (bundle=%s)", bundle_id)
+    except Exception as exc:
+        log.error("DB download WS error (bundle=%s): %s", bundle_id, exc, exc_info=True)
+        await _send("error", text=f"Error: {exc}")
 
 
 @app.get("/explorer")
