@@ -15,12 +15,32 @@ the latest commits, submit issues with exact version info, or contribute to the 
 
 ## Clone and install
 
-### Linux / macOS
+### macOS
 
 ```bash
 git clone https://github.com/benmarkbrandwood-blip/NMM_LLM.git
 cd NMM_LLM
 ./install.sh
+```
+
+Then start the game — either double-click `run_nmm.command` in Finder (right-click → Open the first time to bypass Gatekeeper), or from Terminal:
+
+```bash
+./run_nmm.sh
+```
+
+### Linux
+
+```bash
+git clone https://github.com/benmarkbrandwood-blip/NMM_LLM.git
+cd NMM_LLM
+./install.sh
+```
+
+Then start the game from a terminal:
+
+```bash
+./run_nmm.sh
 ```
 
 `install.sh` will:
@@ -30,15 +50,9 @@ cd NMM_LLM
 - Pull the configured LLM model (`llama3.1:8b` by default)
 - Prompt you to download AI models and game databases
 
-Then start the game:
-
-```bash
-./run_nmm.sh
-```
-
 ### Windows
 
-Open a terminal (PowerShell or Command Prompt) in the cloned folder:
+Double-click `install.bat` in Explorer, or open a terminal (PowerShell or Command Prompt) in the cloned folder:
 
 ```
 git clone https://github.com/benmarkbrandwood-blip/NMM_LLM.git
@@ -46,13 +60,11 @@ cd NMM_LLM
 install.bat
 ```
 
-Then start the game:
+Then start the game — double-click `run_nmm.bat` in Explorer, or from a terminal:
 
 ```
 run_nmm.bat
 ```
-
-Or double-click either `.bat` file from Explorer.
 
 ---
 

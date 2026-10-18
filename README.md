@@ -14,13 +14,19 @@ A browser-based Nine Men's Morris game with a classical minimax engine, an Ollam
 2. Extract to any folder
 3. Run the installer:
 
-**Linux / macOS**
+**macOS** — double-click `install.command` in Finder (right-click → Open the first time to bypass Gatekeeper), or from Terminal:
 ```bash
 cd NMM_LLM-v1.0.0
 ./install.sh
 ```
 
-**Windows** — double-click `install.bat`, or from a terminal:
+**Linux** — open a terminal in the extracted folder and run:
+```bash
+cd NMM_LLM-v1.0.0
+./install.sh
+```
+
+**Windows** — double-click `install.bat` in Explorer, or from a Command Prompt / PowerShell:
 ```
 install.bat
 ```
@@ -28,8 +34,12 @@ install.bat
 The installer sets up a Python virtual environment, installs dependencies, optionally installs [Ollama](https://ollama.com) for LLM commentary, and walks you through downloading the AI models and databases.
 
 4. Start the game:
-   - Linux/macOS: `./run_nmm.sh`
-   - Windows: double-click `run_nmm.bat`
+
+   **macOS** — double-click `run_nmm.command` in Finder (right-click → Open the first time), or from Terminal: `./run_nmm.sh`
+
+   **Linux** — open a terminal in the game folder and run: `./run_nmm.sh`
+
+   **Windows** — double-click `run_nmm.bat` in Explorer, or from a terminal: `run_nmm.bat`
 
    The browser opens automatically at `http://127.0.0.1:8000`.
 
