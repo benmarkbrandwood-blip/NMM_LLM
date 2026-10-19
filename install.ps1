@@ -45,16 +45,24 @@ function Write-Info { param($msg) Write-Host "[NMM] $msg" -ForegroundColor Green
 function Write-Warn { param($msg) Write-Host "[NMM] $msg" -ForegroundColor Yellow }
 function Write-Fail { param($msg) Write-Host "[NMM] ERROR: $msg" -ForegroundColor Red; exit 1 }
 
+# ── Locale detection + message file ──────────────────────────────────────────
+$_ui = [System.Globalization.CultureInfo]::CurrentUICulture.TwoLetterISOLanguageName
+$_supported = @("zh","de","hu","fa","ar","ru","ro","it","fr","pl","cs","es","da","nb","sv","nl","pt")
+$_lang = if ($_supported -contains $_ui) { $_ui } else { "en" }
+$_i18n = Join-Path $NMM_DIR "install_i18n\$_lang.ps1"
+if (-not (Test-Path -LiteralPath $_i18n)) { $_i18n = Join-Path $NMM_DIR "install_i18n\en.ps1" }
+. $_i18n
+
 Write-Host ""
-Write-Host "  +======================================+" -ForegroundColor Cyan
-Write-Host "  |   Nine Men's Morris -- Installer     |" -ForegroundColor Cyan
-Write-Host "  +======================================+" -ForegroundColor Cyan
+Write-Host $P_TITLE_1 -ForegroundColor Cyan
+Write-Host $P_TITLE_2 -ForegroundColor Cyan
+Write-Host $P_TITLE_3 -ForegroundColor Cyan
 Write-Host ""
-Write-Info "Install directory: $NMM_DIR"
+Write-Info ($P_INSTALL_DIR -f $NMM_DIR)
 
 # Refuse to run inside paths PowerShell can't handle reliably.
 if ($NMM_DIR -match '[\[\]]') {
-    Write-Fail "Install path contains '[' or ']' which PowerShell handles poorly. Move the folder to a simpler path (e.g. C:\NMM) and re-run."
+    Write-Fail $P_PATH_ERROR
 }
 
 # === 1. Read model from settings.json =======================================
@@ -73,7 +81,7 @@ if ($Model -eq "" -and (Test-Path -LiteralPath $SETTINGS)) {
 if ($Model -eq "") { $Model = "llama3.1:8b" }
 
 # === 2. Find a usable Python 3.10+ ==========================================
-Write-Info "Looking for Python 3.10 or newer..."
+Write-Info $P_PYTHON_SEARCH
 
 function Get-PythonVersion {
     param([string]$Exe, [string[]]$PreArgs = @())
@@ -128,40 +136,40 @@ foreach ($c in $candidates) {
         $pythonExe  = $c.Exe
         $pythonArgs = $c.Args
         $displayCmd = if ($c.Args.Count -gt 0) { "$($c.Exe) $($c.Args -join ' ')" } else { $c.Exe }
-        Write-Info "Using Python $($v.Major).$($v.Minor) via '$displayCmd'."
+        Write-Info ($P_PYTHON_FOUND -f $v.Major, $v.Minor, $displayCmd)
         break
     } else {
-        Write-Warn "'$($c.Exe)' is Python $($v.Major).$($v.Minor) -- need 3.10+; trying next."
+        Write-Warn ($P_PYTHON_OLD -f $c.Exe, $v.Major, $v.Minor)
     }
 }
 
 if (-not $pythonExe) {
     Write-Host ""
-    Write-Host "  Python 3.10 or newer was not found." -ForegroundColor Red
-    Write-Host "  Install it from https://www.python.org/downloads/" -ForegroundColor White
-    Write-Host "  IMPORTANT: tick 'Add python.exe to PATH' during install." -ForegroundColor White
+    Write-Host "  $P_PYTHON_MISSING" -ForegroundColor Red
+    Write-Host "  $P_PYTHON_URL"     -ForegroundColor White
+    Write-Host "  $P_PYTHON_PATH"    -ForegroundColor White
     Write-Host ""
-    Write-Fail "Python 3.10+ is required."
+    Write-Fail $P_PYTHON_FAIL
 }
 
 # === 3. Create the virtual environment ======================================
 if (Test-Path -LiteralPath $VENV_PY) {
-    Write-Info "Existing .venv found -- reusing it."
+    Write-Info $P_VENV_EXISTS
 } else {
-    Write-Info "Creating virtual environment in .venv ..."
+    Write-Info $P_VENV_CREATE
     & $pythonExe @pythonArgs -m venv "$VENV_DIR"
     if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $VENV_PY)) {
-        Write-Fail "Failed to create virtual environment. Make sure the Python 'venv' module is available."
+        Write-Fail $P_VENV_FAIL
     }
 }
 
 # === 4. Upgrade pip via 'python -m pip' (NEVER call pip.exe directly on Windows) ===
 # Calling pip.exe to upgrade itself fails on Windows because the .exe is held
 # open while it tries to overwrite itself. 'python -m pip' avoids this.
-Write-Info "Upgrading pip / setuptools / wheel..."
+Write-Info $P_PIP_UPGRADE
 & $VENV_PY -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
 if ($LASTEXITCODE -ne 0) {
-    Write-Warn "pip upgrade returned a non-zero exit code; continuing anyway."
+    Write-Warn $P_PIP_WARN
 }
 
 # === 5. Install Python requirements =========================================
@@ -170,36 +178,36 @@ if (-not (Test-Path -LiteralPath $REQS)) {
     Write-Fail "requirements.txt not found at $REQS"
 }
 
-Write-Info "Installing Python requirements (this can take a few minutes)..."
+Write-Info $P_REQS_INSTALL
 & $VENV_PY -m pip install --disable-pip-version-check -r "$REQS"
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
     Write-Warn "Some packages failed to install."
-    Write-Warn "On Windows, chromadb sometimes needs the 'Microsoft C++ Build Tools'."
-    Write-Warn "Install from https://visualstudio.microsoft.com/visual-cpp-build-tools/"
-    Write-Warn "then re-run install.bat."
-    Write-Fail "Python dependency install failed."
+    Write-Warn $P_REQS_CPP
+    Write-Warn $P_REQS_CPP_URL
+    Write-Warn $P_REQS_CPP_RERUN
+    Write-Fail $P_REQS_FAIL
 }
-Write-Info "Python packages installed."
+Write-Info $P_REQS_DONE
 
 # === 6. Ollama (optional) ===================================================
 $installOllama = $false
 
 if ($NoOllama) {
-    Write-Info "Skipping Ollama (-NoOllama flag set). LLM features will be disabled."
+    Write-Info $P_OLLAMA_SKIP
 } elseif ($Yes) {
     $installOllama = $true
-    Write-Info "Auto-installing Ollama (-Yes flag set)."
+    Write-Info $P_OLLAMA_AUTO
 } else {
     Write-Host ""
-    Write-Host "  Ollama enables AI commentary and LLM-powered move analysis." -ForegroundColor White
-    Write-Host "  The default model ($Model) is ~5 GB and requires a download." -ForegroundColor White
+    Write-Host "  $P_OLLAMA_PROMPT1" -ForegroundColor White
+    Write-Host "  $($P_OLLAMA_PROMPT2 -f $Model)" -ForegroundColor White
     Write-Host ""
-    $choice = Read-Host "[NMM] Install Ollama for LLM features? [Y/n]"
+    $choice = Read-Host $P_OLLAMA_YN
     if ($choice -eq "" -or $choice -match "^[Yy]") {
         $installOllama = $true
     } else {
-        Write-Info "Skipping Ollama. Run install.ps1 again (without -NoOllama) to add it later."
+        Write-Info $P_OLLAMA_SKIP2
     }
 }
 
@@ -207,9 +215,9 @@ if ($installOllama) {
     $ollamaExe = Get-Command ollama -ErrorAction SilentlyContinue
     if ($ollamaExe) {
         $ollamaVer = (& ollama --version 2>&1 | Select-Object -First 1)
-        Write-Info "Ollama already installed ($ollamaVer)."
+        Write-Info ($P_OLLAMA_EXISTS -f $ollamaVer)
     } else {
-        Write-Info "Downloading Ollama installer..."
+        Write-Info $P_OLLAMA_DOWNLOAD
         $installer = Join-Path $env:TEMP "OllamaSetup.exe"
         try {
             # Use TLS 1.2+; older Windows defaults can refuse the GitHub redirect.
@@ -222,17 +230,17 @@ if ($installOllama) {
             Invoke-WebRequest -Uri "https://ollama.com/download/OllamaSetup.exe" `
                 -OutFile $installer -UseBasicParsing -ErrorAction Stop
         } catch {
-            Write-Warn "Could not download Ollama installer automatically: $($_.Exception.Message)"
-            Write-Warn "Install it manually from https://ollama.com then re-run install.bat."
+            Write-Warn ($P_OLLAMA_DL_FAIL -f $_.Exception.Message)
+            Write-Warn $P_OLLAMA_DL_MANUAL
             $installOllama = $false
         }
 
         if ($installOllama) {
-            Write-Info "Running Ollama installer (follow the prompts)..."
+            Write-Info $P_OLLAMA_RUN
             try {
                 Start-Process -FilePath $installer -Wait -ErrorAction Stop
             } catch {
-                Write-Warn "Ollama installer did not complete: $($_.Exception.Message)"
+                Write-Warn ($P_OLLAMA_RUN_FAIL -f $_.Exception.Message)
                 $installOllama = $false
             }
             Remove-Item -LiteralPath $installer -Force -ErrorAction SilentlyContinue
@@ -243,11 +251,11 @@ if ($installOllama) {
             $env:Path = "$machinePath;$userPath"
 
             if (-not (Get-Command ollama -ErrorAction SilentlyContinue)) {
-                Write-Warn "Ollama not found in PATH after install."
-                Write-Warn "Restart your terminal, then run:  ollama pull $Model"
+                Write-Warn $P_OLLAMA_PATH
+                Write-Warn ($P_OLLAMA_PATH_HINT -f $Model)
                 $installOllama = $false
             } else {
-                Write-Info "Ollama installed."
+                Write-Info $P_OLLAMA_DONE
             }
         }
     }
@@ -260,11 +268,11 @@ if ($installOllama) {
         Invoke-WebRequest -Uri "http://localhost:11434/api/tags" `
             -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop | Out-Null
         $ollamaReady = $true
-        Write-Info "Ollama service already running."
+        Write-Info $P_OLLAMA_RUNNING
     } catch {}
 
     if (-not $ollamaReady) {
-        Write-Info "Starting Ollama service..."
+        Write-Info $P_OLLAMA_START
         try {
             Start-Process -FilePath "ollama" -ArgumentList "serve" -WindowStyle Hidden -ErrorAction Stop
         } catch {
@@ -281,25 +289,25 @@ if ($installOllama) {
             } catch {}
         }
         if ($ollamaReady) {
-            Write-Info "Ollama service started."
+            Write-Info $P_OLLAMA_DONE
         } else {
-            Write-Warn "Ollama service did not respond in time. Start it manually: ollama serve"
+            Write-Warn $P_OLLAMA_TIMEOUT
         }
     }
 
     # === 8. Pull LLM model ===================================================
     if ($ollamaReady) {
-        Write-Info "Checking for model '$Model'..."
+        Write-Info ($P_MODEL_CHECK -f $Model)
         & ollama show $Model 2>&1 | Out-Null
         if ($LASTEXITCODE -eq 0) {
-            Write-Info "Model '$Model' already present."
+            Write-Info ($P_MODEL_EXISTS -f $Model)
         } else {
-            Write-Info "Pulling '$Model' -- this may take several minutes..."
+            Write-Info ($P_MODEL_PULL -f $Model)
             & ollama pull $Model
             if ($LASTEXITCODE -ne 0) {
-                Write-Warn "Model pull failed. Run manually later: ollama pull $Model"
+                Write-Warn ($P_MODEL_PULL_FAIL -f $Model)
             } else {
-                Write-Info "Model '$Model' ready."
+                Write-Info ($P_MODEL_READY -f $Model)
             }
         }
     }
@@ -316,13 +324,13 @@ foreach ($d in @(
         New-Item -ItemType Directory -Path $path -Force | Out-Null
     }
 }
-Write-Info "Data directories ready."
+Write-Info $P_DIRS_READY
 
 # === 10. Default settings ====================================================
 $TEMPLATE = Join-Path $NMM_DIR "data\settings.template.json"
 if (-not (Test-Path -LiteralPath $SETTINGS) -and (Test-Path -LiteralPath $TEMPLATE)) {
     Copy-Item -LiteralPath $TEMPLATE -Destination $SETTINGS
-    Write-Info "Default settings created at data\settings.json."
+    Write-Info $P_SETTINGS_CREATED
 }
 
 # === 11. Download databases ==================================================
@@ -331,16 +339,16 @@ if (Test-Path -LiteralPath $installDbs) {
     Write-Host ""
     & $VENV_PY $installDbs $NMM_DIR
     if ($LASTEXITCODE -ne 0) {
-        Write-Warn "Database setup encountered an error -- continue at /databases in the game."
+        Write-Warn $P_DB_ERROR
     }
 } else {
-    Write-Warn "tools\install_dbs.py not found -- skipping database download."
+    Write-Warn $P_DB_MISSING
 }
 
 # === Done ===================================================================
 Write-Host ""
-Write-Host "  Installation complete!" -ForegroundColor Green
+Write-Host "  $P_DONE" -ForegroundColor Green
 Write-Host ""
-Write-Host "  To start the game:" -ForegroundColor White
-Write-Host "    .\run_nmm.bat" -ForegroundColor Cyan
+Write-Host "  $P_START_HINT" -ForegroundColor White
+Write-Host $P_START_CMD -ForegroundColor Cyan
 Write-Host ""

@@ -10,6 +10,19 @@ PYTHON="${PYTHON:-python3}"
 MODEL="llama3.1:8b"
 OS_TYPE="$(uname -s 2>/dev/null || echo unknown)"
 
+# ── Locale detection + message file ──────────────────────────────────────────
+_lang="${LANG:-en}"
+case "$_lang" in
+    zh*) _L="zh" ;; de*) _L="de" ;; hu*) _L="hu" ;; fa*) _L="fa" ;;
+    ar*) _L="ar" ;; ru*) _L="ru" ;; ro*) _L="ro" ;; it*) _L="it" ;;
+    fr*) _L="fr" ;; pl*) _L="pl" ;; cs*) _L="cs" ;; es*) _L="es" ;;
+    da*) _L="da" ;; nb*|no*) _L="nb" ;; sv*) _L="sv" ;; nl*) _L="nl" ;;
+    pt*) _L="pt" ;; *)  _L="en" ;;
+esac
+_I18N="$NMM_DIR/install_i18n/${_L}.sh"
+# shellcheck disable=SC1090
+if [ -f "$_I18N" ]; then source "$_I18N"; else source "$NMM_DIR/install_i18n/en.sh"; fi
+
 # ── Detect model from settings.json if present ────────────────────────────────
 SETTINGS="$NMM_DIR/data/settings.json"
 if command -v jq &>/dev/null && [ -f "$SETTINGS" ]; then
@@ -26,53 +39,53 @@ warn()  { echo -e "${YELLOW}[NMM]${NC} $*"; }
 error() { echo -e "${RED}[NMM]${NC} $*" >&2; exit 1; }
 
 echo ""
-echo "  ╔══════════════════════════════════════╗"
-echo "  ║   Nine Men's Morris — Installer      ║"
-echo "  ╚══════════════════════════════════════╝"
+echo "$I_TITLE_1"
+echo "$I_TITLE_2"
+echo "$I_TITLE_3"
 echo ""
 
 # ── 1. Python 3.10+ ───────────────────────────────────────────────────────────
-info "Checking Python..."
-$PYTHON --version &>/dev/null || error "Python 3 not found. Install python3 and retry."
+info "$I_PYTHON_CHECK"
+$PYTHON --version &>/dev/null || error "$I_PYTHON_MISSING"
 PY_VER=$($PYTHON -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 PY_MAJOR=$($PYTHON -c "import sys; print(sys.version_info.major)")
 PY_MINOR=$($PYTHON -c "import sys; print(sys.version_info.minor)")
 if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
-    error "Python 3.10+ required (found $PY_VER)."
+    error "$(printf "$I_PYTHON_OLD" "$PY_VER")"
 fi
-info "Python $PY_VER — OK"
+info "$(printf "$I_PYTHON_OK" "$PY_VER")"
 
 # ── 2. Virtual environment ────────────────────────────────────────────────────
 if [ -d "$VENV_DIR" ]; then
-    info "Existing venv found at .venv — skipping creation."
+    info "$I_VENV_EXISTS"
 else
-    info "Creating virtual environment in .venv ..."
+    info "$I_VENV_CREATE"
     $PYTHON -m venv "$VENV_DIR"
 fi
 
 VENV_PY="$VENV_DIR/bin/python"
 VENV_PIP="$VENV_DIR/bin/pip"
 
-info "Upgrading pip..."
+info "$I_PIP_UPGRADE"
 "$VENV_PIP" install --quiet --upgrade pip
 
 # ── 3. Python dependencies ────────────────────────────────────────────────────
-info "Installing Python requirements..."
+info "$I_REQS_INSTALL"
 "$VENV_PIP" install --quiet -r "$NMM_DIR/requirements.txt"
-info "Python packages installed."
+info "$I_REQS_DONE"
 
 # ── 4. Ollama ─────────────────────────────────────────────────────────────────
 if command -v ollama &>/dev/null; then
-    info "Ollama already installed ($(ollama --version 2>/dev/null | head -1))."
+    info "$(printf "$I_OLLAMA_EXISTS" "$(ollama --version 2>/dev/null | head -1)")"
 else
-    info "Installing Ollama..."
+    info "$I_OLLAMA_INSTALL"
     if [ "$OS_TYPE" = "Darwin" ]; then
         # macOS: official installer script doesn't support Mac; use Homebrew
         if command -v brew &>/dev/null; then
             brew install ollama
         else
-            warn "Homebrew not found. Install Ollama manually from https://ollama.com/download/mac"
-            warn "Then re-run this script."
+            warn "$I_BREW_MISSING"
+            warn "$I_BREW_RERUN"
             exit 1
         fi
     elif command -v curl &>/dev/null; then
@@ -80,33 +93,33 @@ else
     else
         error "curl not found. Install curl and re-run, or install Ollama manually from https://ollama.com"
     fi
-    info "Ollama installed."
+    info "$I_OLLAMA_DONE"
 fi
 
 # ── 5. Start Ollama service (if not running) ──────────────────────────────────
 if ! curl -s http://localhost:11434/api/tags &>/dev/null; then
-    info "Starting Ollama service..."
+    info "$I_OLLAMA_START"
     ollama serve &>/dev/null &
     OLLAMA_PID=$!
     # Wait up to 15 s for it to be ready
     for i in $(seq 1 15); do
         sleep 1
         curl -s http://localhost:11434/api/tags &>/dev/null && break
-        [ "$i" -eq 15 ] && error "Ollama service did not start in time."
+        [ "$i" -eq 15 ] && error "$I_OLLAMA_TIMEOUT"
     done
-    info "Ollama service started (pid $OLLAMA_PID)."
+    info "$(printf "$I_OLLAMA_STARTED" "$OLLAMA_PID")"
 else
-    info "Ollama service already running."
+    info "$I_OLLAMA_RUNNING"
 fi
 
 # ── 6. Pull the LLM model ─────────────────────────────────────────────────────
-info "Checking for model '$MODEL'..."
+info "$(printf "$I_MODEL_CHECK" "$MODEL")"
 if ollama show "$MODEL" &>/dev/null; then
-    info "Model '$MODEL' already present."
+    info "$(printf "$I_MODEL_EXISTS" "$MODEL")"
 else
-    info "Pulling '$MODEL' — this may take several minutes..."
+    info "$(printf "$I_MODEL_PULL" "$MODEL")"
     ollama pull "$MODEL"
-    info "Model '$MODEL' ready."
+    info "$(printf "$I_MODEL_READY" "$MODEL")"
 fi
 
 # ── 7. Create data directories ────────────────────────────────────────────────
@@ -115,27 +128,27 @@ for d in data/games data/ai_games data/human_games data/session_memory \
           data/logs learned_ai/sentinel/checkpoints; do
     mkdir -p "$NMM_DIR/$d"
 done
-info "Data directories ready."
+info "$I_DIRS_READY"
 
 # ── 8. Default settings ──────────────────────────────────────────────────────
 if [ ! -f "$NMM_DIR/data/settings.json" ] && [ -f "$NMM_DIR/data/settings.template.json" ]; then
     cp "$NMM_DIR/data/settings.template.json" "$NMM_DIR/data/settings.json"
-    info "Default settings created at data/settings.json."
+    info "$I_SETTINGS_CREATED"
 fi
 
 # ── 9. Download databases ─────────────────────────────────────────────────────
 if [ -f "$NMM_DIR/tools/install_dbs.py" ]; then
     echo ""
     "$VENV_PY" "$NMM_DIR/tools/install_dbs.py" "$NMM_DIR" || \
-        warn "Database setup encountered an error — continue at /databases in the game."
+        warn "$I_DB_ERROR"
 else
-    warn "tools/install_dbs.py not found — skipping database download."
+    warn "$I_DB_MISSING"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}Installation complete!${NC}"
+echo -e "${GREEN}${I_DONE}${NC}"
 echo ""
-echo "  To start the game:"
-echo "    ./run_nmm.sh"
+echo "  $I_START_HINT"
+echo "$I_START_CMD"
 echo ""
