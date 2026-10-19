@@ -22,6 +22,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
+const _t = (key, vars) => window.i18n?.t(key, vars) ?? key;
+
 // ── Sprite text helper (for DTW numbers) ─────────────────────────────────────
 function makeDtwSprite(text, hexColor) {
   const W = 64, H = 32;
@@ -906,11 +908,11 @@ function updateStatusIndicator() {
   }
   let msg;
   if (selectionState === 'capture') {
-    msg = '▶ Click an opponent piece to capture  ·  Esc or click empty to cancel';
+    msg = _t('explorer.sel_capture');
   } else if (selectionState === 'piece_selected') {
-    msg = `▶ ${selectedPieceSq} selected — click a destination square`;
+    msg = _t('explorer.sel_piece', {sq: selectedPieceSq});
   } else {
-    msg = '▶ Click one of your pieces to move';
+    msg = _t('explorer.sel_move');
   }
   el.textContent = msg;
   el.style.display = 'block';
@@ -920,20 +922,20 @@ function updateNetLegend() {
   const legendEl = document.getElementById('hint-ring-legend');
   if (!legendEl) return;
   const slotSizes = [{ w:14, h:14 }, { w:10, h:10 }, { w:7, h:7 }];
-  const slotTitles = ['2nd ring', '3rd ring', 'Innermost ring'];
-  let html = `<div class="legend-row" style="margin:0;" title="Outermost ring">` +
-    `<div style="width:18px;height:18px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>&nbsp;HumanDB best</div>`;
+  const slotTitles = [_t('explorer.ring_2nd'), _t('explorer.ring_3rd'), _t('explorer.ring_inner')];
+  let html = `<div class="legend-row" style="margin:0;" title="${_t('explorer.ring_outer')}">` +
+    `<div style="width:18px;height:18px;border-radius:50%;border:2px solid #ffd700;flex-shrink:0;"></div>&nbsp;${_t('explorer.legend_humandb_best')}</div>`;
   for (let i = 0; i < 3; i++) {
     const netKey = selectedNets[i];
     if (!netKey) continue;
     const def = NET_DEFS[netKey];
     const s = slotSizes[i];
     html += `<div class="legend-row" style="margin:0;" title="${slotTitles[i]}">` +
-      `<div style="width:${s.w}px;height:${s.h}px;border-radius:50%;border:2px solid ${def.cssColor};flex-shrink:0;"></div>&nbsp;${def.label} best</div>`;
+      `<div style="width:${s.w}px;height:${s.h}px;border-radius:50%;border:2px solid ${def.cssColor};flex-shrink:0;"></div>&nbsp;${_t('explorer.legend_net_best', {name: def.label})}</div>`;
   }
   if (generalistRingEnabled) {
     html += `<div class="legend-row" style="margin:0;" title="Generalist AI (outer ring, orange)">` +
-      `<div style="width:18px;height:18px;border-radius:50%;border:2px solid #e07830;flex-shrink:0;"></div>&nbsp;Generalist best</div>`;
+      `<div style="width:18px;height:18px;border-radius:50%;border:2px solid #e07830;flex-shrink:0;"></div>&nbsp;${_t('explorer.legend_generalist_best')}</div>`;
   }
   html += `<div style="font-size:.65rem;color:#666;margin-top:0.3rem;line-height:1.5"` +
     ` title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</div>`;
@@ -944,7 +946,7 @@ function updateBestBtn() {
   const btn = document.getElementById('btn-best');
   if (!btn) return;
   const hasMalom = currentData?.position_stats?.canonical_winning_move != null;
-  btn.textContent = (hasMalom ? 'Malom best' : 'Heuristic best') + ' →';
+  btn.textContent = hasMalom ? _t('explorer.best_malom') : _t('explorer.best_heuristic');
 }
 
 function _refreshAfterStateChange() {
@@ -1225,10 +1227,10 @@ function showTooltip(cx, cy, mv) {
       }
     }
     tooltip.innerHTML = `
-      <div class="tt-notation">${mv._src} — all moves</div>
+      <div class="tt-notation">${mv._src} — ${_t('explorer.tt_all_moves')}</div>
       ${mv.total > 0 ? `
-      <div class="tt-row"><span class="tt-label">Win%</span><span>${winPct}</span></div>
-      <div class="tt-row"><span class="tt-label">W/D/L</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
+      <div class="tt-row"><span class="tt-label">${_t('explorer.tt_win_pct')}</span><span>${winPct}</span></div>
+      <div class="tt-row"><span class="tt-label">${_t('explorer.tt_wdl')}</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
       <div class="tt-row"><span class="tt-label">Total games</span><span>${mv.total}</span></div>
       ` : ''}
       ${trajRow}
@@ -1259,20 +1261,20 @@ function showTooltip(cx, cy, mv) {
       : '—';
     const tPct = posTotal > 0 ? (mv.total / posTotal * 100).toFixed(1) : '—';
     dbRows = `
-    <div class="tt-row"><span class="tt-label">Win%</span><span>${(mv.win_pct*100).toFixed(1)}%</span></div>
-    <div class="tt-row"><span class="tt-label">W/D/L</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
-    <div class="tt-row"><span class="tt-label">T choice</span><span>T:${tPct}% (n=${mv.total})</span></div>
-    <div class="tt-row"><span class="tt-label">Avg plies left</span><span>${mv.avg_moves_to_end.toFixed(0)}</span></div>
-    <div class="tt-row"><span class="tt-label">Malom (after)</span><span>${wdlText}</span></div>`;
+    <div class="tt-row"><span class="tt-label">${_t('explorer.tt_win_pct')}</span><span>${(mv.win_pct*100).toFixed(1)}%</span></div>
+    <div class="tt-row"><span class="tt-label">${_t('explorer.tt_wdl')}</span><span>${mv.wins}/${mv.draws}/${mv.losses}</span></div>
+    <div class="tt-row"><span class="tt-label">${_t('explorer.tt_t_choice')}</span><span>T:${tPct}% (n=${mv.total})</span></div>
+    <div class="tt-row"><span class="tt-label">${_t('explorer.tt_avg_plies')}</span><span>${mv.avg_moves_to_end.toFixed(0)}</span></div>
+    <div class="tt-row"><span class="tt-label">${_t('explorer.tt_malom_after')}</span><span>${wdlText}</span></div>`;
   } else if (hasTrajData) {
-    trajRow = `<div class="tt-row"><span class="tt-label" style="opacity:0.55">T choice</span><span style="opacity:0.55">T:— not observed</span></div>`;
+    trajRow = `<div class="tt-row"><span class="tt-label" style="opacity:0.55">${_t('explorer.tt_t_choice')}</span><span style="opacity:0.55">${_t('explorer.tt_t_not_seen')}</span></div>`;
   }
 
   const predRow = mv.pred_human_prob != null
     ? `<div class="tt-row"><span class="tt-label" style="color:#ff6eb4">Pred</span><span style="color:#ff6eb4">P:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
     : '';
   const gapnetRow = mv.gapnet_score != null
-    ? `<div class="tt-row"><span class="tt-label" style="color:#cc5555">GapNet risk</span><span style="color:#cc5555">${(mv.gapnet_score * 100).toFixed(1)}%</span></div>`
+    ? `<div class="tt-row"><span class="tt-label" style="color:#cc5555">${_t('explorer.tt_gapnet_risk')}</span><span style="color:#cc5555">${(mv.gapnet_score * 100).toFixed(1)}%</span></div>`
     : '';
   const valueRow = mv.value_score != null
     ? `<div class="tt-row"><span class="tt-label" style="color:#50aaaa">ValueNet</span><span style="color:#50aaaa">${(mv.value_score * 100).toFixed(1)}%</span></div>`
@@ -1289,7 +1291,7 @@ function showTooltip(cx, cy, mv) {
     ${dbRows}
     ${trajRow}
     <div class="tt-row"><span class="tt-label" style="color:#e0e0e0">Sentinel</span><span style="color:#e0e0e0">${sentText}</span></div>
-    <div class="tt-row"><span class="tt-label" style="color:#c8a96e">Heuristic</span><span style="color:#c8a96e">${heurText}</span></div>
+    <div class="tt-row"><span class="tt-label" style="color:#c8a96e">${_t('explorer.tt_heuristic')}</span><span style="color:#c8a96e">${heurText}</span></div>
     ${predRow}${gapnetRow}${valueRow}${prefRow}${regretRow}
   `;
   const wr = wrap.getBoundingClientRect();
@@ -1306,13 +1308,13 @@ function showTooltip(cx, cy, mv) {
 
 function updatePanel(data) {
   const badge = document.getElementById('turn-badge');
-  badge.textContent = data.turn === 'W' ? 'White' : 'Black';
+  badge.textContent = data.turn === 'W' ? _t('color.white') : _t('color.black');
   badge.className   = 'turn-badge ' + (data.turn === 'W' ? 'white' : 'black');
 
   const posEl = document.getElementById('pos-stats');
   const ps    = data.position_stats;
   if (!ps) {
-    posEl.innerHTML = '<div id="no-data-notice">No HumanDB data for this position.</div>';
+    posEl.innerHTML = `<div id="no-data-notice">${_t('explorer.no_humandb')}</div>`;
   } else {
     const tot = Math.max(1, ps.total_games);
     const wp  = (ps.wins   / tot * 100).toFixed(1);
@@ -1322,15 +1324,15 @@ function updatePanel(data) {
       ? `<span class="malom-badge malom-${ps.malom_wdl.toLowerCase()}">${ps.malom_wdl}${ps.malom_dtw != null ? ` DTW ${ps.malom_dtw}` : ''}</span>`
       : '';
     posEl.innerHTML = `
-      <div class="stat-row"><span class="stat-label">Games</span><span class="stat-val">${ps.total_games.toLocaleString()}</span></div>
+      <div class="stat-row"><span class="stat-label">${_t('explorer.stat_games')}</span><span class="stat-val">${ps.total_games.toLocaleString()}</span></div>
       <div class="wdl-bar">
         <div class="w" style="width:${wp}%"></div>
         <div class="d" style="width:${dp}%"></div>
         <div class="l" style="width:${lp}%"></div>
       </div>
-      <div class="stat-row"><span class="stat-label">Win%</span><span class="stat-val" style="color:#22c55e">${wp}%</span></div>
-      <div class="stat-row"><span class="stat-label">Draw%</span><span class="stat-val" style="color:#f59e0b">${dp}%</span></div>
-      <div class="stat-row"><span class="stat-label">Loss%</span><span class="stat-val" style="color:#ef4444">${lp}%</span></div>
+      <div class="stat-row"><span class="stat-label">${_t('explorer.stat_win')}</span><span class="stat-val" style="color:#22c55e">${wp}%</span></div>
+      <div class="stat-row"><span class="stat-label">${_t('explorer.stat_draw')}</span><span class="stat-val" style="color:#f59e0b">${dp}%</span></div>
+      <div class="stat-row"><span class="stat-label">${_t('explorer.stat_loss')}</span><span class="stat-val" style="color:#ef4444">${lp}%</span></div>
       ${malomHtml}
     `;
   }
@@ -1392,7 +1394,7 @@ function updatePanel(data) {
         return btn;
       };
 
-      hdrEl.appendChild(makeHdrBtn('hum', 'Hum%', '#c8a96e'));
+      hdrEl.appendChild(makeHdrBtn('hum', _t('explorer.col_hum'), '#c8a96e'));
       for (const k of activeNets) {
         const def = NET_DEFS[k];
         if (def) hdrEl.appendChild(makeHdrBtn(k, def.label, def.cssColor));
@@ -1413,8 +1415,8 @@ function updatePanel(data) {
         if (!pr) return '';
         const pL = Math.round((pr.pct_opp_loss ?? 0) * 100);
         const pW = Math.round((pr.pct_opp_win  ?? 0) * 100);
-        if (pL >= pW && pL > 0) return `<span class="move-pressure" style="color:#4caf50" title="Opponent has ${pL}% losing replies">L:${pL}%</span>`;
-        if (pW > pL  && pW > 0) return `<span class="move-pressure" style="color:#e05050" title="Opponent has ${pW}% winning replies">W:${pW}%</span>`;
+        if (pL >= pW && pL > 0) return `<span class="move-pressure" style="color:#4caf50" title="${_t('explorer.press_losing', {pct: pL})}">L:${pL}%</span>`;
+        if (pW > pL  && pW > 0) return `<span class="move-pressure" style="color:#e05050" title="${_t('explorer.press_winning', {pct: pW})}">W:${pW}%</span>`;
         return '';
       };
       let rightContent = '';
@@ -1457,7 +1459,7 @@ function updatePanel(data) {
       listEl.appendChild(item);
     }
   } else {
-    listEl.innerHTML = '<div style="padding:0.5rem 0.75rem;color:#8a7a5a;font-size:0.8rem">No move data.</div>';
+    listEl.innerHTML = `<div style="padding:0.5rem 0.75rem;color:#8a7a5a;font-size:0.8rem">${_t('explorer.no_move_data')}</div>`;
   }
 
   const lineEl = document.getElementById('winning-line');
@@ -1482,7 +1484,7 @@ const _pmEmpty    = document.getElementById('pm-empty');
 function _renderPlayedMoves() {
   _pmBody.innerHTML = '';
   if (_playedMoves.length === 0) {
-    _pmBody.appendChild(Object.assign(document.createElement('div'), { id: 'pm-empty', textContent: 'No moves yet.' }));
+    _pmBody.appendChild(Object.assign(document.createElement('div'), { id: 'pm-empty', textContent: _t('explorer.no_moves') }));
     return;
   }
   // Header
@@ -1538,10 +1540,10 @@ function _copyPlayedMoves() {
   const text = `FEN: ${startFen}\n${moveText}`;
   navigator.clipboard.writeText(text).then(() => {
     const prev = _pmCopyBtn.textContent;
-    _pmCopyBtn.textContent = 'Copied!';
+    _pmCopyBtn.textContent = _t('explorer.copied');
     setTimeout(() => { _pmCopyBtn.textContent = prev; }, 1500);
   }).catch(() => {
-    prompt('Copy this game:', text);
+    prompt(_t('explorer.copy_game_prompt'), text);
   });
 }
 
@@ -1561,7 +1563,7 @@ async function loadPosition(fen) {
   try {
     const res  = await fetch('/api/explorer/position?fen=' + encodeURIComponent(fen) + '&elo_band=' + explorerEloBand);
     const data = await res.json();
-    if (data.error) { alert('Error: ' + data.error); return; }
+    if (data.error) { alert(_t('explorer.error_pos', {msg: data.error})); return; }
     currentData  = data;
     // Pre-compute pressure_score (net opponent disadvantage) for NET_DEFS ring/sort
     for (const mv of data.moves || []) {
@@ -1589,7 +1591,7 @@ async function loadPosition(fen) {
     // If any net slot shows regret, fetch async and re-render when ready
     if (selectedNets.includes('regret')) _ensureRegret();
   } catch (err) {
-    alert('Failed to load position: ' + err.message);
+    alert(_t('explorer.error_pos', {msg: err.message}));
   } finally {
     loading.style.display = 'none';
   }
@@ -1880,7 +1882,7 @@ function _otRenderBreadcrumb() {
   _otBreadcrumb.innerHTML = '';
   const root = document.createElement('span');
   root.className = 'ot-crumb ot-crumb-root';
-  root.textContent = 'Opening tree';
+  root.textContent = _t('explorer.opening_tree');
   root.onclick = () => { _otPath = []; _otRender(); };
   _otBreadcrumb.appendChild(root);
   for (let i = 0; i < _otPath.length; i++) {
@@ -1899,7 +1901,7 @@ function _otRenderBreadcrumb() {
   if (_otPath.length > 0) {
     const plyLabel = document.createElement('span');
     plyLabel.className = 'ot-ply-label';
-    plyLabel.textContent = `(ply ${_otPath.length})`;
+    plyLabel.textContent = _t('explorer.ot_ply', {n: _otPath.length});
     _otBreadcrumb.appendChild(plyLabel);
   }
 }
@@ -1963,7 +1965,7 @@ function _otBuildBrowseContent(families) {
 
     const srcBadge = document.createElement('span');
     srcBadge.className = 'ot-src ot-src-' + (op.source === 'human' ? 'human' : 'book');
-    srcBadge.textContent = op.source === 'human' ? 'Human' : 'Book';
+    srcBadge.textContent = op.source === 'human' ? _t('explorer.filter_human') : _t('explorer.filter_book');
     card.appendChild(srcBadge);
 
     // Navigate to one move before the end so the last move is visible as a
@@ -1993,8 +1995,8 @@ function _otBuildBrowseContent(families) {
     container.appendChild(strip);
   }
 
-  addSection('Book Openings', bookEntries);
-  addSection('Human DB', humanEntries);
+  addSection(_t('explorer.book_group'), bookEntries);
+  addSection(_t('explorer.humandb_group'), humanEntries);
 }
 
 // Lazy-load browse content on first open
@@ -2113,7 +2115,7 @@ async function _otRender(syncBoard = true) {
         })();
         const msg = document.createElement('div');
         msg.className = 'ot-diverge-msg';
-        msg.textContent = `Path left book coverage at ply ${divergePly} (no D4-equivalent found). Enter a name below to save this path.`;
+        msg.textContent = _t('explorer.ot_book_diverge', {n: divergePly});
         _otRows.appendChild(msg);
         if (syncBoard) _otSyncBoard();
         return;
@@ -2168,7 +2170,7 @@ async function _otRender(syncBoard = true) {
   if (!visibleChildren.length) {
     const emptyDiv = document.createElement('div');
     emptyDiv.id = 'ot-empty';
-    emptyDiv.textContent = 'No data at this depth.';
+    emptyDiv.textContent = _t('explorer.no_data_depth');
     _otRows.appendChild(emptyDiv);
     if (syncBoard) _otSyncBoard();
     return;
@@ -2177,7 +2179,7 @@ async function _otRender(syncBoard = true) {
   if (symName) {
     const badge = document.createElement('div');
     badge.className = 'ot-sym-badge';
-    badge.textContent = `↻ ${symName} equivalent — rotated continuations`;
+    badge.textContent = _t('explorer.sym_equiv', {name: symName});
     _otRows.appendChild(badge);
   }
 
@@ -2267,7 +2269,7 @@ async function _otLoad(forceRefresh = false) {
     _otLoaded = true;
     _otRender(false); // keep current board on initial load
   } catch (e) {
-    _otRows.innerHTML = `<div id="ot-empty">Failed to load tree: ${e.message}</div>`;
+    _otRows.innerHTML = `<div id="ot-empty">${_t('explorer.tree_load_failed', {msg: e.message})}</div>`;
   }
 }
 
@@ -2363,9 +2365,9 @@ function _otUpdateSaveBar() {
 
 _otSaveBtn.addEventListener('click', async () => {
   const name = _otSaveName.value.trim();
-  if (!name) { _otSaveMsg.textContent = 'Enter a name first.'; _otSaveMsg.style.color = '#ef4444'; return; }
+  if (!name) { _otSaveMsg.textContent = _t('explorer.save_name_required'); _otSaveMsg.style.color = '#ef4444'; return; }
   _otSaveBtn.disabled = true;
-  _otSaveMsg.textContent = 'Saving…';
+  _otSaveMsg.textContent = _t('explorer.saving');
   _otSaveMsg.style.color = '#8a7a5a';
   try {
     const customFamily = _otSaveFamilyCustom?.value.trim();
@@ -2377,7 +2379,7 @@ _otSaveBtn.addEventListener('click', async () => {
     });
     const data = await res.json();
     if (data.ok) {
-      _otSaveMsg.textContent = `Saved as "${name}".`;
+      _otSaveMsg.textContent = _t('explorer.saved_as', {name});
       _otSaveMsg.style.color = '#4ade80';
       _otSaveName.value = '';
       _otLastSavedId = data.opening_id ?? null;
@@ -2386,11 +2388,11 @@ _otSaveBtn.addEventListener('click', async () => {
       _otLoaded = false;
       _otLoad();
     } else {
-      _otSaveMsg.textContent = data.error || 'Save failed.';
+      _otSaveMsg.textContent = data.error || _t('explorer.save_failed');
       _otSaveMsg.style.color = '#ef4444';
     }
   } catch (e) {
-    _otSaveMsg.textContent = 'Network error.';
+    _otSaveMsg.textContent = _t('explorer.network_error');
     _otSaveMsg.style.color = '#ef4444';
   } finally {
     _otSaveBtn.disabled = false;
@@ -2401,7 +2403,7 @@ if (_otAssessBtn) {
   _otAssessBtn.addEventListener('click', async () => {
     if (!_otLastSavedId) return;
     _otAssessBtn.disabled = true;
-    _otSaveMsg.textContent = 'Assessing…';
+    _otSaveMsg.textContent = _t('explorer.assessing');
     _otSaveMsg.style.color = '#8a7a5a';
     try {
       const res = await fetch('/api/opening_tree/audit', {
@@ -2411,19 +2413,28 @@ if (_otAssessBtn) {
       });
       const data = await res.json();
       if (data.ok) {
-        const labels = { W: '♙ favours White', B: '♟ favours Black', equal: '⚖ balanced', unknown: '— unknown' };
+        const labels = { W: _t('explorer.favours_white'), B: _t('explorer.favours_black'), equal: _t('explorer.balanced'), unknown: _t('explorer.unknown_result') };
         _otSaveMsg.textContent = labels[data.favored_side] || data.favored_side;
         _otSaveMsg.style.color = data.favored_side === 'W' ? '#e8c87a' : data.favored_side === 'B' ? '#aaa' : '#4ade80';
         _otAssessBtn.style.display = 'none';
       } else {
-        _otSaveMsg.textContent = 'Assess failed: ' + (data.error || '');
+        _otSaveMsg.textContent = _t('explorer.assess_failed', {msg: data.error || ''});
         _otSaveMsg.style.color = '#ef4444';
       }
     } catch (e) {
-      _otSaveMsg.textContent = 'Network error.';
+      _otSaveMsg.textContent = _t('explorer.network_error');
       _otSaveMsg.style.color = '#ef4444';
     } finally {
       _otAssessBtn.disabled = false;
     }
   });
 }
+
+window.addEventListener('languagechange', () => {
+  if (currentData) updatePanel(currentData);
+  updateStatusIndicator();
+  updateNetLegend();
+  updateBestBtn();
+  _renderPlayedMoves();
+  if (_otData) _otRender();
+});

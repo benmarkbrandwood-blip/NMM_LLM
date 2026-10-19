@@ -1924,9 +1924,9 @@ def _extract_bundle(tmp_path: "Path", extract_type: str, extract_to: str, projec
         _shutil.copy2(tmp_path, dest)
 
 
-@app.get("/tools")
-async def tools_page(request: Request):
-    return templates.TemplateResponse(request, "tools.html", {"v": _static_ver()})
+@app.get("/overlays")
+async def overlays_page(request: Request):
+    return templates.TemplateResponse(request, "overlays.html", {"v": _static_ver()})
 
 
 @app.get("/databases")

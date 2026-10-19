@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="overlay.page_title">AI Overlays — Nine Men's Morris</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+  <link rel="stylesheet" href="/static/rtl.css?v={{ v }}">
+  <link rel="stylesheet" href="/static/tools.css?v={{ v }}">
+  <script type="module" src="/static/i18n.js?v={{ v }}"></script>
+  <style>
+    .ov-card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1rem 1.25rem; margin-bottom:.75rem; }
+    .ov-card-header { display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem; }
+    .ov-badge { font-size:.72rem; font-family:monospace; font-weight:bold; padding:2px 7px; border-radius:3px; }
+    .ov-name { font-size:1rem; color:var(--tan); font-weight:bold; }
+    .ov-tag { font-size:.8rem; color:var(--text-dim); margin-left:.25rem; }
+    .ov-row { display:flex; gap:.4rem; margin-bottom:.25rem; font-size:.82rem; line-height:1.45; }
+    .ov-lbl { flex-shrink:0; width:8em; color:var(--text-dim); font-size:.75rem; padding-top:.1em; }
+    .ov-body { color:var(--text); }
+    .ov-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:.75rem; margin-top:.5rem; }
+    .ov-section-desc { font-size:.82rem; color:var(--text-dim); margin:.25rem 0 .75rem; line-height:1.45; }
+  </style>
+</head>
+<body>
+<div id="tools-app">
+  <header>
+    <h1>&#128270; <span data-i18n="overlay.h1">AI Overlay Guide</span></h1>
+    <a href="/" class="btn-back" data-i18n="overlay.back">← Game</a>
+    <a href="/explorer" class="btn-back" style="margin-left:.5rem" data-i18n="nav.explorer">Game / Opening Explorer</a>
+  </header>
+
+  <main>
+    <p class="tool-desc" data-i18n="overlay.intro">Overlays show per-move scores from neural networks and databases, helping you understand and analyse each position. Select up to three in the analysis panel dropdowns; toggle diagnostic chips for additional annotation layers.</p>
+
+    <!-- ── Move-Score Overlays (net slot dropdowns) ──────────────────── -->
+    <section class="tools-section">
+      <h2 data-i18n="overlay.section_net">Move-Score Overlays</h2>
+      <p class="ov-section-desc" data-i18n="overlay.section_net_desc">Three dropdown slots in the analysis panel. Each colours move arrows on the board by the selected model's score for that move.</p>
+
+      <div class="ov-grid">
+
+        <!-- Sentinel -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#444;color:#e0e0e0">S:</span>
+            <span class="ov-name" data-i18n="overlay.sentinel_name">Sentinel</span>
+            <span class="ov-tag" data-i18n="overlay.sentinel_tag">Neural move-quality scorer</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.sentinel_what">Scores each legal move 0–1 (1 = winning, 0 = losing) from the current player's perspective.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.sentinel_how">Trained on AI vs AI and human games with Malom database win/draw/loss labels. A contrastive ranking loss ensures winning moves rank above losing moves within each position.</span>
+          </div>
+        </div>
+
+        <!-- GapNet -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#441111;color:#cc5555">G:</span>
+            <span class="ov-name" data-i18n="overlay.gapnet_name">GapNet</span>
+            <span class="ov-tag" data-i18n="overlay.gapnet_tag">Positional gap evaluator</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.gapnet_what">Estimates positional vulnerability after each move. Lower G: scores indicate safer resulting positions.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.gapnet_how">Trained on game outcome data to identify positional gaps. GapNet v3 is a calibrated neural network; v1 is an older fallback if v3 is unavailable.</span>
+          </div>
+        </div>
+
+        <!-- ValueNet -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#103030;color:#50aaaa">V:</span>
+            <span class="ov-name" data-i18n="overlay.value_name">ValueNet</span>
+            <span class="ov-tag" data-i18n="overlay.value_tag">Position value predictor</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.value_what">Predicts the long-term win probability of the resulting position. Higher V: = stronger position for the mover.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.value_how">Phase-specific model (v3): separate networks for placement, movement, and fly phases, trained with DTW-weighted game outcome targets. Promotes decisive outcomes.</span>
+          </div>
+        </div>
+
+        <!-- PrefNet -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#302010;color:#c4a020">F:</span>
+            <span class="ov-name" data-i18n="overlay.pref_name">PrefNet</span>
+            <span class="ov-tag" data-i18n="overlay.pref_tag">Human preference ranker</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.pref_what">Ranks moves by how likely a human player is to choose them. F: values are normalised probabilities.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.pref_how">Trained on over 22,000 human games (640,000+ positions) using a pairwise ranking loss. Strongest in constrained late-game positions where move choices are limited.</span>
+          </div>
+        </div>
+
+        <!-- Pred -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#3a1030;color:#ff6eb4">P:</span>
+            <span class="ov-name" data-i18n="overlay.pred_name">Pred</span>
+            <span class="ov-tag" data-i18n="overlay.pred_tag">Human move predictor</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.pred_what">Predicted probability (%) that a human player at the selected Elo band would play each move. Use the band selector to filter by strength.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.pred_how">Teacher v4 model, trained with log-scaled branching-factor weighting. Achieves significantly better accuracy on high-branching positions (openings, early midgame) than earlier models.</span>
+          </div>
+        </div>
+
+        <!-- Teacher -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#1e1040;color:#a06fe0">Tch:</span>
+            <span class="ov-name" data-i18n="overlay.teacher_name">Teacher</span>
+            <span class="ov-tag" data-i18n="overlay.teacher_tag">Human move predictor (alt. colour)</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.teacher_what">Same data as Pred — Teacher v4 predicted human move probability — shown in a different colour so it can be used alongside the Pred slot.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.teacher_how">The Teacher model also serves as a training opponent for the Generalist AI at a 25% humanlike blend, contributing human-style move diversity to self-play.</span>
+          </div>
+        </div>
+
+        <!-- Generalist -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#2a1800;color:#e07830">Gen:</span>
+            <span class="ov-name" data-i18n="overlay.generalist_name">Generalist</span>
+            <span class="ov-tag" data-i18n="overlay.generalist_tag">AI pick probability</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.generalist_what">Probability (%) that the Generalist AI would pick each move in this position. Gen: 100% means it always picks that move here.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
+            <span class="ov-body" data-i18n="overlay.generalist_how">ScaffoldedPolicyNet trained through reinforcement learning with heuristic scaffolding and 25% human-teacher opponent blending. Expert features include Sentinel scores, heuristic evaluations, and Malom WDL signals.</span>
+          </div>
+        </div>
+
+        <!-- Regret -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-badge" style="background:#2a0e00;color:#ff6020">R:</span>
+            <span class="ov-name" data-i18n="overlay.regret_name">Regret</span>
+            <span class="ov-tag" data-i18n="overlay.regret_tag">Malom counterfactual cost</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.regret_what">How much worse a move is compared to the Malom-optimal move, measured in depth-to-mate units. R: 0 = optimal. Higher values = more costly deviation.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.regret_how">Computed directly from the Malom perfect database (DTM values). Only meaningful when Malom is installed. Requires Malom DB to be configured in Databases.</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ── Diagnostic Overlays (chip buttons) ────────────────────────── -->
+    <section class="tools-section">
+      <h2 data-i18n="overlay.section_diag">Diagnostic Overlays</h2>
+      <p class="ov-section-desc" data-i18n="overlay.section_diag_desc">Toggle buttons in the analysis panel. Each adds an annotation layer to all legal moves simultaneously, and can be combined with the net-slot overlays.</p>
+
+      <div class="ov-grid">
+
+        <!-- Static -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.static_name">Static</span>
+            <span class="ov-tag" data-i18n="overlay.static_tag">Fast heuristic evaluation</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.static_what">Tactic bonus (mill threats, piece count, mobility) plus position evaluation for each move. Instant — no lookahead.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.static_how">Classic NMM heuristic function used by the AI engine for move ordering. Useful for a quick sanity check of the tactical situation.</span>
+          </div>
+        </div>
+
+        <!-- Negamax -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.negamax_name">Negamax d3</span>
+            <span class="ov-tag" data-i18n="overlay.negamax_tag">Deep search scores</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.negamax_what">Alpha-beta search score for each move at the selected depth (default 3 plies). Slower to compute — refreshes once per position request.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.negamax_how">Uses the same negamax engine as the AI player, with transposition table and move ordering. Disabled while the AI is calculating its own move.</span>
+          </div>
+        </div>
+
+        <!-- Traj/Pred -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.traj_name">Traj/Pred</span>
+            <span class="ov-tag" data-i18n="overlay.traj_tag">Human trajectory + prediction</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.traj_what">T: = % of human games in the database that used this move from this exact position. P: = Teacher v4 model probability when no trajectory data exists for a move (T:—).</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.traj_how">T: data is indexed from 22,000+ human games. When a position has never been seen in the database, P: falls back to the Teacher v4 model for an Elo-conditioned estimate.</span>
+          </div>
+        </div>
+
+        <!-- DB/Malom -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.db_name">DB/Malom</span>
+            <span class="ov-tag" data-i18n="overlay.db_tag">Perfect database annotations</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.db_what">WIN (green) or LOSS (red) arrows from the endgame and Malom databases. Shows M# (moves to forced mate) where Malom data is available.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.db_how">Three layers: FullGame DB (common human game positions), retrograde Endgame DB (all ≤11-piece positions, perfectly solved), and the Malom perfect database (complete game tree). Malom requires separate installation.</span>
+          </div>
+        </div>
+
+        <!-- Opp. Pressure -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.pressure_name">Opp. Pressure</span>
+            <span class="ov-tag" data-i18n="overlay.pressure_tag">Opponent response analysis</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.pressure_what">For each move you can make, shows L: % (green) of opponent responses that are losing for them, and W: % (red) that are winning for them. Choose moves that maximise L:.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.pressure_how">Computed from the Malom perfect database by evaluating all opponent responses to each candidate move. Requires Malom DB. Helps identify moves that give the opponent the most chances to err.</span>
+          </div>
+        </div>
+
+        <!-- AI Choice -->
+        <div class="ov-card">
+          <div class="ov-card-header">
+            <span class="ov-name" data-i18n="overlay.overseer_name">AI Choice</span>
+            <span class="ov-tag" data-i18n="overlay.overseer_tag">Generalist AI pick probability</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
+            <span class="ov-body" data-i18n="overlay.overseer_what">O: % — how likely the Generalist AI is to choose each move in this position. Highlights the AI's preferred move and how it distributes probability across alternatives.</span>
+          </div>
+          <div class="ov-row">
+            <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
+            <span class="ov-body" data-i18n="overlay.overseer_how">Same ScaffoldedPolicyNet as the Generalist net-slot overlay, displayed as a chip annotation rather than a colour scale. The chip button is dimmed if the Generalist model has not loaded.</span>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

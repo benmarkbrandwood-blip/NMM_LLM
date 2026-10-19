@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NMM Databases</title>
   <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+  <link rel="stylesheet" href="/static/rtl.css?v={{ v }}">
   <link rel="stylesheet" href="/static/tools.css?v={{ v }}">
+  <script type="module" src="/static/i18n.js?v={{ v }}"></script>
   <style>
     .db-table {
       width: 100%;
@@ -151,25 +153,25 @@
 <body>
 <div id="tools-app">
   <header>
-    <h1>&#x1F5C4; Nine Men's Morris — Databases</h1>
-    <a href="/" class="btn-back">&#8592; Back to Game</a>
-    <a href="/tools" class="btn-back" style="margin-left:0.5rem">&#x1F6E0; Tools</a>
+    <h1>&#x1F5C4; <span data-i18n="db.heading">Nine Men's Morris — Databases</span></h1>
+    <a href="/" class="btn-back" data-i18n="db.back">← Back to Game</a>
+
   </header>
 
   <main>
 
     <!-- ── IA Bundle Status ──────────────────────────────────────────── -->
     <section class="tools-section">
-      <h2>Internet Archive Bundles</h2>
-      <p class="tool-desc" id="db-remote-note">Loading status…</p>
+      <h2 data-i18n="db.ia_heading">Internet Archive Bundles</h2>
+      <p class="tool-desc" id="db-remote-note" data-i18n="db.loading">Loading status…</p>
       <div id="db-bundle-wrap">
         <table class="db-table">
           <thead>
             <tr>
-              <th class="col-name">Bundle</th>
-              <th>Status</th>
-              <th class="col-size">Size</th>
-              <th class="col-desc">Description</th>
+              <th class="col-name" data-i18n="db.th_bundle">Bundle</th>
+              <th data-i18n="db.th_status">Status</th>
+              <th class="col-size" data-i18n="db.th_size">Size</th>
+              <th class="col-desc" data-i18n="db.th_desc">Description</th>
               <th class="col-act"></th>
             </tr>
           </thead>
@@ -178,12 +180,12 @@
           </tbody>
         </table>
       </div>
-      <button id="btn-refresh-db" class="btn-refresh">&#x21BB; Refresh</button>
+      <button id="btn-refresh-db" class="btn-refresh" data-i18n="db.refresh">↻ Refresh</button>
     </section>
 
     <!-- ── Malom Download Guide ──────────────────────────────────────── -->
     <section class="tools-section">
-      <h2>Getting the Malom Perfect Database</h2>
+      <h2 data-i18n="db.malom_heading">Getting the Malom Perfect Database</h2>
       <p class="tool-desc">
         The Malom perfect database was created by
         <strong>Gábor Danner</strong> and <strong>Gábor E. Gévay</strong>
@@ -227,24 +229,24 @@
 
     <!-- ── Malom Perfect DB Configurator ────────────────────────────── -->
     <section class="tools-section">
-      <h2>Malom Database Path</h2>
+      <h2 data-i18n="db.path_heading">Malom Database Path</h2>
       <p class="tool-desc">
         Point this to the directory containing the <code>.sec2</code> sector files
         from the torrent download above. Changes take effect after a server restart.
       </p>
       <div class="tool-form">
         <label style="display:flex;align-items:center;gap:0.5rem;width:100%">
-          Malom DB directory
+          <span data-i18n="db.malom_dir">Malom DB directory</span>
           <input type="text" id="malom-path" value="{{ malom_db_path }}"
                  placeholder="/path/to/malom/Std_DD_89adjusted"
                  style="flex:1;min-width:0;width:auto">
         </label>
       </div>
-      <button id="btn-malom-test" class="btn-refresh">&#x1F50D; Test Path</button>
-      <button id="btn-malom-save" class="btn-run" style="margin-left:0.5rem">&#x2714; Save</button>
+      <button id="btn-malom-test" class="btn-refresh" data-i18n="db.test">🔍 Test Path</button>
+      <button id="btn-malom-save" class="btn-run" style="margin-left:0.5rem" data-i18n="db.save">✔ Save</button>
       <span id="malom-test-status" style="margin-left:1em; font-size:0.82rem"></span>
-      <div id="restart-banner" class="restart-banner" style="display:none">
-        &#x26A0; Malom DB path saved. Restart the server to activate the new path.
+      <div id="restart-banner" class="restart-banner" style="display:none" data-i18n="db.restart_banner">
+        ⚠ Malom DB path saved. Restart the server to activate the new path.
       </div>
     </section>
 
@@ -272,8 +274,13 @@
   }
 
   function stateLabel(state) {
-    return { current: 'Installed', update_available: 'Update available',
-             missing: 'Not installed', missing_required: 'Required — missing' }[state] || state;
+    const _t = (k, fb) => window.i18n?.t(k) || fb;
+    return {
+      current:          _t('db.installed',         'Installed'),
+      update_available: _t('db.update_avail',      'Update available'),
+      missing:          _t('db.not_installed',      'Not installed'),
+      missing_required: _t('db.required_missing',  'Required — missing'),
+    }[state] || state;
   }
 
   function stateBadgeClass(state) {
@@ -414,7 +421,8 @@ tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
         const visible = cmdRow.style.display !== 'none';
         cmdRow.style.display = visible ? 'none' : '';
         btn.classList.toggle('active', !visible);
-        btn.textContent = visible ? 'Install cmd…' : 'Hide';
+        const _t = (k, fb) => window.i18n?.t(k) || fb;
+        btn.textContent = visible ? _t('db.install_cmd', 'Install cmd…') : _t('db.cmd_hide', 'Hide');
       });
     });
 
@@ -547,6 +555,7 @@ tar xzf "$env:TEMP\\${b.filename}" -C "${root}"`;
   });
 
   // ── Init ────────────────────────────────────────────────────────────────
+  document.addEventListener('languagechange', () => { if (_status) renderBundles(_status); });
   loadStatus();
 
 })();

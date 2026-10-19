@@ -5,6 +5,7 @@ import { Board } from "./board.js";
 import { playSound } from "./sounds.js";
 
 const $ = id => document.getElementById(id);
+const _t = (key, vars) => window.i18n?.t(key, vars) ?? key;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
@@ -307,10 +308,10 @@ async function _waitForServer(maxMs = 45000, interval = 800) {
       const r = await fetch("/api/ping", { cache: "no-store" });
       if (r.ok) return true;
     } catch (_) {}
-    setStatus("Connecting to server…");
+    setStatus(_t("status.connecting"));
     await new Promise(res => setTimeout(res, interval));
   }
-  setStatus("Server not responding — please refresh the page.");
+  setStatus(_t("status.server_error"));
   return false;
 }
 
@@ -1066,6 +1067,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   $("moves-panel").hidden     = false;   // show moves by default
   _setReplayButtonsDisabled(true);
   renderIdle();
+
+  document.addEventListener("languagechange", () => {
+    if (phase === "idle") renderIdle();
+  });
+
   _loadOpenings();
 
   // ── Game Assessment button ────────────────────────────────────────────
@@ -1202,8 +1208,8 @@ function startFromExplorerFen(fen) {
     }));
   };
   ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
-  ws.onerror   = () => setStatus("Connection error.");
-  ws.onclose   = () => { if (phase !== "game_over") setStatus("Disconnected."); };
+  ws.onerror   = () => setStatus(_t("status.conn_error"));
+  ws.onclose   = () => { if (phase !== "game_over") setStatus(_t("status.disconnected")); };
 }
 
 async function loadFromPaste() {
@@ -1252,7 +1258,7 @@ async function loadFromPaste() {
 }
 
 function renderIdle() {
-  setStatus("Configure a game and click New Game.");
+  setStatus(_t("status.initial"));
   setTurnBadge(null, null);
 }
 
@@ -1289,7 +1295,7 @@ function startNewGame() {
   board && board.clearDiag();
   board && board.clearFormationGuide();
   _updateGuideWarning(null);
-  setStatus("Starting…");
+  setStatus(_t("status.starting"));
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   { const _cb = $("btn-cancel-assessment"); if (_cb) _cb.style.display = "none"; }
@@ -1369,9 +1375,9 @@ function startNewGame() {
   };
 
   ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
-  ws.onerror   = () => setStatus("Connection error.");
+  ws.onerror   = () => setStatus(_t("status.conn_error"));
   ws.onclose   = () => {
-    if (phase !== "game_over") setStatus("Disconnected.");
+    if (phase !== "game_over") setStatus(_t("status.disconnected"));
   };
 }
 
@@ -1391,7 +1397,7 @@ function startAiVsAi() {
   _isTournamentGame = false;
   clearCommentary();
   board && board.clearDiag();
-  setStatus("Starting AI vs AI…");
+  setStatus(_t("status.starting_ava"));
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   isAiVsAi = true;
@@ -1452,10 +1458,10 @@ function startAiVsAi() {
   };
 
   ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
-  ws.onerror   = () => setStatus("Connection error.");
+  ws.onerror   = () => setStatus(_t("status.conn_error"));
   ws.onclose   = () => {
     isAiVsAi = false;
-    if (phase !== "game_over") setStatus("Disconnected.");
+    if (phase !== "game_over") setStatus(_t("status.disconnected"));
   };
 }
 
@@ -1540,7 +1546,7 @@ function enterSetupMode() {
 
   _renderSetupBoard();
   _updateSetupUI();
-  setStatus("Setup mode — click nodes to place pieces.");
+  setStatus(_t("status.setup_mode"));
 }
 
 function exitSetupMode() {
@@ -1553,7 +1559,7 @@ function exitSetupMode() {
   if (gameState) {
     board.render(gameState);
     if (gameState.move_pairs) board.setMovePairs(gameState.move_pairs);
-    setStatus(phase === "playing" ? "Setup cancelled — game continues." : "");
+    setStatus(phase === "playing" ? _t("status.setup_cancelled") : "");
   } else {
     renderIdle();
   }
@@ -1624,7 +1630,7 @@ function startSetupGame() {
   _isTournamentGame = false;
   clearCommentary();
   board && board.clearDiag();
-  setStatus("Starting setup game…");
+  setStatus(_t("status.starting_setup"));
   phase = "idle";
   $("btn-game-assessment").classList.remove("assessment-ready", "assessment-done", "assessment-failed");
   evalHistory = []; sentinelHistory = []; _humanColor = null;
@@ -1705,9 +1711,9 @@ function startSetupGame() {
   };
 
   ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
-  ws.onerror   = () => setStatus("Connection error.");
+  ws.onerror   = () => setStatus(_t("status.conn_error"));
   ws.onclose   = () => {
-    if (phase !== "game_over") setStatus("Disconnected.");
+    if (phase !== "game_over") setStatus(_t("status.disconnected"));
   };
 }
 
@@ -1773,11 +1779,7 @@ function handleMessage(msg) {
         board._drawHints();
       }
       if (msg.is_human_turn && replayIdx === -1 && !inGuidanceMode) {
-        setStatus(
-          msg.phase === "place"
-            ? "Your turn — click a green node to place."
-            : "Your turn — select a piece, then its destination."
-        );
+        setStatus(msg.phase === "place" ? _t("status.your_turn_place") : _t("status.your_turn_move"));
       }
       // Formation guide: refresh on every state update
       if (_guideMode > 0) _requestFormationGuide();
@@ -1804,7 +1806,7 @@ function handleMessage(msg) {
       if (msg.projected_board) board.grid = msg.projected_board;
       board._drawPieces();
       board.enterCapture(msg.legal_captures);
-      setStatus("Mill! Click an opponent piece to capture.");
+      setStatus(_t("status.mill"));
       // Store projected FEN for diagnostic capture scoring
       _diagCaptureFen = msg.projected_fen || null;
       if (_diagActive()) _diagRequestCapture();
@@ -1941,11 +1943,7 @@ function handleMessage(msg) {
 
     case "override_ready":
       inGuidanceMode = true;
-      setStatus(
-        gameState && gameState.phase === "place"
-          ? "Override: click an empty node to place the AI's piece."
-          : "Override: select an AI piece, then its destination."
-      );
+      setStatus(gameState && gameState.phase === "place" ? _t("status.override_place") : _t("status.override_move"));
       break;
 
     case "resignation_offer":
@@ -2017,7 +2015,7 @@ function handleMessage(msg) {
       _updateHandoffButtons();
       const isResign = msg.result === "ai_resignation";
       const statusText = isResign
-        ? `${msg.winner === "W" ? "White" : "Black"} wins — AI resigns!`
+        ? _t("status.resign", { color: _t(msg.winner === "W" ? "color.white" : "color.black") })
         : msg.message;
       setStatus(statusText);
       setTurnBadge(null, msg.winner);
@@ -2537,7 +2535,7 @@ function onNodeClick(name) {
       board._drawPieces();
       board._drawHints();
       if (_diagActive()) board.clearDiag();
-      setStatus("Move sent — AI calculating…");
+      setStatus(_t("status.move_sent"));
       ws.send(JSON.stringify({ type: "move", from: src, to: name }));
     } else if (gameState.legal_sources.includes(name) &&
                gameState.board[name] === gameState.turn) {
@@ -2659,9 +2657,9 @@ function startThinkingTimer(color, expectedSec, socket, maxDepth) {
         : `${elapsed.toFixed(1)}s elapsed`;
     }
     if (remaining > 0) {
-      setStatus(`AI (${colorName}) thinking… ${elapsed.toFixed(1)}s / ~${_fmtSec(expectedSec)}`);
+      setStatus(_t("status.ai_thinking", { color: colorName, elapsed: elapsed.toFixed(1), expected: _fmtSec(expectedSec) }));
     } else {
-      setStatus(`AI (${colorName}) finalizing…`);
+      setStatus(_t("status.ai_finalizing", { color: colorName }));
       if (!autoFired && socket && socket.readyState === WebSocket.OPEN) {
         autoFired = true;
         socket.send(JSON.stringify({ type: "force_move" }));
@@ -2715,10 +2713,10 @@ function updateHintButton(isHumanTurn = false) {
   stopHintCountdown();
   const btn = $("btn-hint");
   if (hintsLeft <= 0) {
-    btn.textContent = "No hints left";
+    btn.textContent = _t("btn.no_hints");
     btn.disabled = true;
   } else {
-    btn.textContent = `Hint (${hintsLeft})`;
+    btn.textContent = _t("btn.hint", { n: hintsLeft });
     btn.disabled = !isHumanTurn || phase === "idle" || phase === "game_over";
   }
 }
@@ -3120,10 +3118,10 @@ function _showMoveTextBox(text) {
 function setTurnBadge(name, winner) {
   const el = $("turn-badge");
   if (winner) {
-    el.textContent = winner === "W" ? "⬜ White wins" : "⬛ Black wins";
+    el.textContent = winner === "W" ? _t("badge.white_wins") : _t("badge.black_wins");
     el.className   = "badge " + (winner === "W" ? "badge-white" : "badge-black");
   } else if (name) {
-    el.textContent = name === "White" ? "⬜ White to move" : "⬛ Black to move";
+    el.textContent = name === "White" ? _t("badge.white_move") : _t("badge.black_move");
     el.className   = "badge " + (name === "White" ? "badge-white" : "badge-black");
   } else {
     el.textContent = "";
@@ -3887,7 +3885,7 @@ function _showOpeningInfo() {
 }
 
 function startReplayOpening() {
-  if (!ws) { setStatus("Connect first — start a new game."); return; }
+  if (!ws) { setStatus(_t("status.no_game")); return; }
   const id      = $("sel-opening").value;
   if (!id) return;
   const speedMs = parseInt($("rng-replay-speed").value);
@@ -3897,7 +3895,7 @@ function startReplayOpening() {
     opening_id: id,
     speed_ms:   speedMs,
   }));
-  setStatus("Replaying opening…");
+  setStatus(_t("status.replaying"));
 }
 
 function _showOpeningContinueButtons() {
@@ -3980,7 +3978,8 @@ function _buildWeightSliders() {
       currentGroup = w.group;
       const hdr = document.createElement("div");
       hdr.className = "slider-group-hdr";
-      hdr.textContent = w.group;
+      hdr.dataset.i18n = "weight_group." + w.group.toLowerCase();
+      hdr.textContent = _t(hdr.dataset.i18n) || w.group;
       container.appendChild(hdr);
     }
 
@@ -3992,7 +3991,8 @@ function _buildWeightSliders() {
     labelRow.title = w.tip;
 
     const name = document.createElement("span");
-    name.textContent = w.label;
+    name.dataset.i18n = "weight." + w.key;
+    name.textContent = _t(name.dataset.i18n) || w.label;
     name.style.color = "var(--text-dim)";
 
     const val = document.createElement("span");
@@ -4103,8 +4103,8 @@ function _sendTournamentStart() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onopen    = _doSend;
   ws.onmessage = evt => handleMessage(JSON.parse(evt.data));
-  ws.onerror   = () => setStatus("Connection error.");
-  ws.onclose   = () => { if (phase !== "game_over") setStatus("Disconnected."); };
+  ws.onerror   = () => setStatus(_t("status.conn_error"));
+  ws.onclose   = () => { if (phase !== "game_over") setStatus(_t("status.disconnected")); };
 }
 
 function _renderTournamentInit(msg) {

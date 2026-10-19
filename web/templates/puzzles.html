@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NMM Endgame Puzzles</title>
+<script type="module" src="/static/i18n.js?v={{ v }}"></script>
 <style>
   body { font-family: monospace; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 20px; }
   h1 { color: #a8d8ff; margin-bottom: 4px; }
@@ -113,7 +114,7 @@
 </style>
 </head>
 <body>
-<a class="back" href="/">← Back to game</a>
+<a class="back" href="/" data-i18n="puzzles.back">← Back to game</a>
 <h1 id="page-title">NMM Puzzles</h1>
 <p class="subtitle" id="page-subtitle">Find the forced win.</p>
 <p class="attrib">Endgame &amp; midgame puzzles derived from the
@@ -121,99 +122,99 @@
 by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
 
 <div class="controls" style="margin-bottom:8px">
-  <button id="mode-endgame" class="btn-active" onclick="window._setMode('endgame')">Endgame</button>
-  <button id="mode-midgame" onclick="window._setMode('midgame')">Midgame</button>
-  <button id="mode-placement" onclick="window._setMode('placement')">Placement</button>
-  <button id="mode-formation" onclick="window._setMode('formation')">Formation</button>
+  <button id="mode-endgame" class="btn-active" onclick="window._setMode('endgame')" data-i18n="puzzles.mode_endgame">Endgame</button>
+  <button id="mode-midgame" onclick="window._setMode('midgame')" data-i18n="puzzles.mode_midgame">Midgame</button>
+  <button id="mode-placement" onclick="window._setMode('placement')" data-i18n="puzzles.mode_placement">Placement</button>
+  <button id="mode-formation" onclick="window._setMode('formation')" data-i18n="puzzles.mode_formation">Formation</button>
 </div>
 
 <div class="controls" id="endgame-controls">
   <select id="sel-side">
-    <option value="random">Side: random</option>
-    <option value="W">White to move</option>
-    <option value="B">Black to move</option>
+    <option value="random" data-i18n="puzzles.side_random">Side: random</option>
+    <option value="W" data-i18n="puzzles.side_white">White to move</option>
+    <option value="B" data-i18n="puzzles.side_black">Black to move</option>
   </select>
   <select id="sel-depth">
-    <option value="0">Depth: random</option>
-    <option value="3">Win in 3</option>
-    <option value="4">Win in 4</option>
-    <option value="5">Win in 5</option>
-    <option value="6">Win in 6</option>
-    <option value="7">Win in 7</option>
-    <option value="8">Win in 8</option>
-    <option value="9">Win in 9</option>
-    <option value="10">Win in 10</option>
+    <option value="0" data-i18n="puzzles.depth_random">Depth: random</option>
+    <option value="3" data-i18n="puzzles.win_3">Win in 3</option>
+    <option value="4" data-i18n="puzzles.win_4">Win in 4</option>
+    <option value="5" data-i18n="puzzles.win_5">Win in 5</option>
+    <option value="6" data-i18n="puzzles.win_6">Win in 6</option>
+    <option value="7" data-i18n="puzzles.win_7">Win in 7</option>
+    <option value="8" data-i18n="puzzles.win_8">Win in 8</option>
+    <option value="9" data-i18n="puzzles.win_9">Win in 9</option>
+    <option value="10" data-i18n="puzzles.win_10">Win in 10</option>
   </select>
-  <button id="btn-new" onclick="window._loadPuzzle()">New puzzle</button>
-  <button id="btn-enter" class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
+  <button id="btn-new" onclick="window._loadPuzzle()" data-i18n="puzzles.new_puzzle">New puzzle</button>
+  <button id="btn-enter" class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()" data-i18n="puzzles.enter_puzzle">Enter puzzle</button>
 </div>
 
 <div class="controls" id="midgame-controls" style="display:none">
   <select id="sel-side-mlm">
-    <option value="random">Side: random</option>
-    <option value="W">White to move</option>
-    <option value="B">Black to move</option>
+    <option value="random" data-i18n="puzzles.side_random">Side: random</option>
+    <option value="W" data-i18n="puzzles.side_white">White to move</option>
+    <option value="B" data-i18n="puzzles.side_black">Black to move</option>
   </select>
   <select id="sel-depth-mlm">
-    <option value="0">Depth: any (4–10)</option>
-    <option value="4">Win in 4</option>
-    <option value="5">Win in 5</option>
-    <option value="6">Win in 6</option>
-    <option value="7">Win in 7</option>
-    <option value="8">Win in 8</option>
-    <option value="9">Win in 9</option>
-    <option value="10">Win in 10</option>
+    <option value="0" data-i18n="puzzles.depth_any">Depth: any (4–10)</option>
+    <option value="4" data-i18n="puzzles.win_4">Win in 4</option>
+    <option value="5" data-i18n="puzzles.win_5">Win in 5</option>
+    <option value="6" data-i18n="puzzles.win_6">Win in 6</option>
+    <option value="7" data-i18n="puzzles.win_7">Win in 7</option>
+    <option value="8" data-i18n="puzzles.win_8">Win in 8</option>
+    <option value="9" data-i18n="puzzles.win_9">Win in 9</option>
+    <option value="10" data-i18n="puzzles.win_10">Win in 10</option>
   </select>
-  <button id="btn-new-mlm" onclick="window._loadMalomPuzzle()">New puzzle</button>
-  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
+  <button id="btn-new-mlm" onclick="window._loadMalomPuzzle()" data-i18n="puzzles.new_puzzle">New puzzle</button>
+  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()" data-i18n="puzzles.enter_puzzle">Enter puzzle</button>
 </div>
 
 <div class="controls" id="placement-controls" style="display:none">
   <select id="sel-side-plc">
-    <option value="random">Side: random</option>
-    <option value="W">White to move</option>
-    <option value="B">Black to move</option>
+    <option value="random" data-i18n="puzzles.side_random">Side: random</option>
+    <option value="W" data-i18n="puzzles.side_white">White to move</option>
+    <option value="B" data-i18n="puzzles.side_black">Black to move</option>
   </select>
   <select id="sel-depth-plc">
-    <option value="0">Depth: any (4–10)</option>
-    <option value="4">Win in 4</option>
-    <option value="5">Win in 5</option>
-    <option value="6">Win in 6</option>
-    <option value="7">Win in 7</option>
-    <option value="8">Win in 8</option>
-    <option value="9">Win in 9</option>
-    <option value="10">Win in 10</option>
+    <option value="0" data-i18n="puzzles.depth_any">Depth: any (4–10)</option>
+    <option value="4" data-i18n="puzzles.win_4">Win in 4</option>
+    <option value="5" data-i18n="puzzles.win_5">Win in 5</option>
+    <option value="6" data-i18n="puzzles.win_6">Win in 6</option>
+    <option value="7" data-i18n="puzzles.win_7">Win in 7</option>
+    <option value="8" data-i18n="puzzles.win_8">Win in 8</option>
+    <option value="9" data-i18n="puzzles.win_9">Win in 9</option>
+    <option value="10" data-i18n="puzzles.win_10">Win in 10</option>
   </select>
-  <button id="btn-new-plc" onclick="window._loadPlacementPuzzle()">New puzzle</button>
-  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
+  <button id="btn-new-plc" onclick="window._loadPlacementPuzzle()" data-i18n="puzzles.new_puzzle">New puzzle</button>
+  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()" data-i18n="puzzles.enter_puzzle">Enter puzzle</button>
 </div>
 
 <div class="controls" id="formation-controls" style="display:none">
   <select id="sel-side-fmn">
-    <option value="random">Side: random</option>
-    <option value="W">White to move</option>
-    <option value="B">Black to move</option>
+    <option value="random" data-i18n="puzzles.side_random">Side: random</option>
+    <option value="W" data-i18n="puzzles.side_white">White to move</option>
+    <option value="B" data-i18n="puzzles.side_black">Black to move</option>
   </select>
   <select id="sel-depth-fmn">
-    <option value="0">Depth: any</option>
-    <option value="2">Win in 2</option>
-    <option value="3">Win in 3</option>
-    <option value="4">Win in 4</option>
-    <option value="5">Win in 5</option>
-    <option value="6">Win in 6</option>
-    <option value="7">Win in 7</option>
-    <option value="8">Win in 8</option>
+    <option value="0" data-i18n="puzzles.depth_any_short">Depth: any</option>
+    <option value="2" data-i18n="puzzles.win_2">Win in 2</option>
+    <option value="3" data-i18n="puzzles.win_3">Win in 3</option>
+    <option value="4" data-i18n="puzzles.win_4">Win in 4</option>
+    <option value="5" data-i18n="puzzles.win_5">Win in 5</option>
+    <option value="6" data-i18n="puzzles.win_6">Win in 6</option>
+    <option value="7" data-i18n="puzzles.win_7">Win in 7</option>
+    <option value="8" data-i18n="puzzles.win_8">Win in 8</option>
   </select>
-  <button id="btn-new-fmn" onclick="window._loadFormationPuzzle()">New puzzle</button>
-  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()">Enter puzzle</button>
+  <button id="btn-new-fmn" onclick="window._loadFormationPuzzle()" data-i18n="puzzles.new_puzzle">New puzzle</button>
+  <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()" data-i18n="puzzles.enter_puzzle">Enter puzzle</button>
 </div>
 
 <!-- Setup panel (hidden by default) -->
 <div id="setup-panel" style="display:none">
-  <h3>Enter a Puzzle</h3>
+  <h3 data-i18n="puzzles.setup_heading">Enter a Puzzle</h3>
 
   <div class="setup-row">
-    <span class="setup-label">Palette</span>
+    <span class="setup-label" data-i18n="puzzles.palette">Palette</span>
     <div class="palette">
       <button class="swatch swatch-erase active" id="sw-erase" onclick="window._setBrush('')" title="Erase">✕</button>
       <button class="swatch swatch-w" id="sw-w" onclick="window._setBrush('W')" title="White piece">⬜</button>
@@ -223,14 +224,14 @@ by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
   </div>
 
   <div class="setup-row">
-    <span class="setup-label">Winning side</span>
+    <span class="setup-label" data-i18n="puzzles.winning_side">Winning side</span>
     <button class="side-btn active" id="ws-btn-W" onclick="window._setWinningSide('W')">White</button>
     <button class="side-btn"        id="ws-btn-B" onclick="window._setWinningSide('B')">Black</button>
     <span style="color:#888;font-size:0.82em;margin-left:4px">(Turn is set to match winning side)</span>
   </div>
 
   <div class="setup-row" style="flex-direction:column;align-items:flex-start;gap:4px">
-    <span class="setup-label">Solution moves</span>
+    <span class="setup-label" data-i18n="puzzles.solution_label">Solution moves</span>
     <input id="setup-solution" type="text"
            placeholder="e.g.  g4-c4  g7-a4  b4-c5xa1  d5-c3  (winning moves alternating with opponent replies)"
            oninput="window._onSolutionInput()">
@@ -240,9 +241,9 @@ by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
   <div id="setup-error"></div>
 
   <div class="setup-actions">
-    <button class="btn-save" id="btn-save-puzzle" onclick="window._savePuzzle()" disabled>Save puzzle</button>
-    <button class="btn-small" onclick="window._clearSetupBoard()">Clear board</button>
-    <button class="btn-small" onclick="window._toggleSetup()">Cancel</button>
+    <button class="btn-save" id="btn-save-puzzle" onclick="window._savePuzzle()" disabled data-i18n="puzzles.save_puzzle">Save puzzle</button>
+    <button class="btn-small" onclick="window._clearSetupBoard()" data-i18n="puzzles.clear_board">Clear board</button>
+    <button class="btn-small" onclick="window._toggleSetup()" data-i18n="puzzles.cancel">Cancel</button>
   </div>
 </div>
 
@@ -254,18 +255,18 @@ by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
   <div class="info-panel">
     <div id="puzzle-num" class="puzzle-num"></div>
     <div id="meta" class="meta"></div>
-    <div id="status" class="status info">Load a puzzle to begin.</div>
-    <div id="capture-prompt" class="capture-prompt" style="display:none">
+    <div id="status" class="status info" data-i18n="puzzles.load_begin">Load a puzzle to begin.</div>
+    <div id="capture-prompt" class="capture-prompt" style="display:none" data-i18n="puzzles.capture_prompt">
       Click an opponent piece to capture it.
     </div>
     <div id="move-log" class="move-log"></div>
     <div id="btn-area" class="extra-btns" style="display:none">
-      <button class="hint-btn" onclick="window._showHint()">💡 Hint</button>
-      <button class="reveal-btn" onclick="window._revealSolution()">🔍 Show solution</button>
-      <button class="btn-small" onclick="window._resetPuzzle()">↺ Try again</button>
-      <button class="btn-small" onclick="window._openExplorer()">🔭 Explorer</button>
-      <button class="btn-play btn-small" onclick="window._playPuzzle()">▶ Play</button>
-      <button class="btn-delete btn-small" onclick="window._deletePuzzle()">🗑 Delete</button>
+      <button class="hint-btn" onclick="window._showHint()" data-i18n="puzzles.hint_btn">💡 Hint</button>
+      <button class="reveal-btn" onclick="window._revealSolution()" data-i18n="puzzles.show_solution">🔍 Show solution</button>
+      <button class="btn-small" onclick="window._resetPuzzle()" data-i18n="puzzles.try_again_btn">↺ Try again</button>
+      <button class="btn-small" onclick="window._openExplorer()" data-i18n="puzzles.explorer_btn">🔭 Explorer</button>
+      <button class="btn-play btn-small" onclick="window._playPuzzle()" data-i18n="puzzles.play_btn">▶ Play</button>
+      <button class="btn-delete btn-small" onclick="window._deletePuzzle()" data-i18n="puzzles.delete_btn">🗑 Delete</button>
     </div>
     <div id="tags" class="tags"></div>
     <p id="alt-note" class="alt-note" style="display:none">
@@ -1315,11 +1316,11 @@ window._loadPlacementPuzzle = async function() {
 <!-- Wrong-move dialog -->
 <div id="wrong-move-overlay">
   <div id="wrong-move-dialog">
-    <h3>Wrong move</h3>
-    <p id="wmd-msg">That's not on the solution path — but you may still find a win!</p>
+    <h3 data-i18n="puzzles.wrong_title">Wrong move</h3>
+    <p id="wmd-msg" data-i18n="puzzles.wrong_msg">That's not on the solution path — but you may still find a win!</p>
     <div class="wmd-btns">
-      <button id="wmd-retry"    onclick="window._wrongMoveRetry()">Try again</button>
-      <button id="wmd-continue" onclick="window._wrongMoveContinue()">Continue vs AI</button>
+      <button id="wmd-retry"    onclick="window._wrongMoveRetry()" data-i18n="puzzles.retry_btn">Try again</button>
+      <button id="wmd-continue" onclick="window._wrongMoveContinue()" data-i18n="puzzles.continue_ai">Continue vs AI</button>
     </div>
   </div>
 </div>

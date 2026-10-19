@@ -1136,6 +1136,25 @@ main {
 .opening-name-skip { border-color: var(--text-dim); color: var(--text-dim); }
 .opening-name-skip:hover { background: var(--text-dim); color: #111; }
 
+/* ── Overlay info button (ⓘ) ───────────────────────────────────── */
+.overlay-info-btn {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.85rem;
+  vertical-align: middle;
+  margin: 0 3px;
+  display: inline-block;
+  animation: overlay-info-pulse 2.4s ease-in-out infinite;
+}
+.overlay-info-btn:hover {
+  color: #ffb830;
+  animation: none;
+}
+@keyframes overlay-info-pulse {
+  0%, 100% { color: var(--text-dim); opacity: 0.6; }
+  50%       { color: #ff9900;         opacity: 1;   }
+}
+
 @media (max-width: 860px) {
   main {
     grid-template-columns: 1fr;

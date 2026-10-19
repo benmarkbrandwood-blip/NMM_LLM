@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>NMM Position Explorer</title>
   <link rel="stylesheet" href="/static/style.css?v={{ v }}">
+  <link rel="stylesheet" href="/static/rtl.css?v={{ v }}">
+  <script type="module" src="/static/i18n.js?v={{ v }}"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #1a1612; color: #e8d9c0; font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
@@ -376,21 +378,21 @@
 <body>
 
 <header>
-  <a href="/" class="btn-back">&#8592; Game</a>
-  <button id="ot-toggle-btn" class="btn-secondary" style="white-space:nowrap">&#9651; Opening Tree</button>
+  <a href="/" class="btn-back" data-i18n="explorer.back">← Game</a>
+  <button id="ot-toggle-btn" class="btn-secondary" style="white-space:nowrap">&#9651; <span data-i18n="explorer.opening_tree">Opening Tree</span></button>
   <span class="hdr-sep">|</span>
-  <h1>Position Explorer</h1>
+  <h1 data-i18n="explorer.title">Position Explorer</h1>
   <span class="hdr-sep">|</span>
   <input id="fen-input" type="text" placeholder="FEN position string…" spellcheck="false">
-  <button class="btn-primary" id="btn-go">Go</button>
-  <button class="btn-secondary" id="btn-back" disabled>&#8592; Back</button>
-  <button class="btn-secondary" id="btn-best">Best move &#8594;</button>
-  <button class="btn-secondary" id="btn-reset">&#8635; Reset</button>
+  <button class="btn-primary" id="btn-go" data-i18n="explorer.go">Go</button>
+  <button class="btn-secondary" id="btn-back" disabled data-i18n="explorer.back_btn">← Back</button>
+  <button class="btn-secondary" id="btn-best" data-i18n="explorer.best_move">Best move &#8594;</button>
+  <button class="btn-secondary" id="btn-reset">&#8635; <span data-i18n="explorer.reset">Reset</span></button>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label"><input type="checkbox" id="malom-toggle"> Malom</label>
-  <label class="toggle-label"><input type="checkbox" id="generalist-toggle"> Generalist</label>
+  <label class="toggle-label"><input type="checkbox" id="malom-toggle"> <span data-i18n="explorer.malom">Malom</span></label>
+  <label class="toggle-label"><input type="checkbox" id="generalist-toggle"> <span data-i18n="explorer.generalist">Generalist</span></label>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label" style="gap:4px">Pred band:
+  <label class="toggle-label" style="gap:4px"><span data-i18n="explorer.pred_band">Pred band:</span>
     <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
       <option value="all">All</option>
       <option value="lower">Lower</option>
@@ -399,7 +401,7 @@
     </select>
   </label>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label" style="gap:4px">Nets:
+  <label class="toggle-label" style="gap:4px"><span data-i18n="explorer.nets">Nets:</span><a href="/overlays" target="_blank" rel="noopener" class="overlay-info-btn" title="About overlays" data-i18n-title="overlay.info_btn_title">ⓘ</a>
     <select id="net-slot-0" class="net-slot-sel" title="Ring slot 1 (2nd outermost ring)">
       <option value="sentinel" selected>Sentinel</option>
       <option value="gapnet">GapNet</option>
@@ -439,38 +441,38 @@
   <!-- ── Played-moves history panel (shown when OT is OFF) ── -->
   <div id="pm-panel">
     <div id="pm-header">
-      <h3>&#9654; Move history</h3>
-      <button id="pm-copy-btn" title="Copy moves + starting FEN">Copy</button>
+      <h3>&#9654; <span data-i18n="explorer.move_hist">Move history</span></h3>
+      <button id="pm-copy-btn" title="Copy moves + starting FEN" data-i18n="explorer.copy">Copy</button>
     </div>
     <div id="pm-body">
-      <div id="pm-empty">No moves yet.</div>
+      <div id="pm-empty" data-i18n="explorer.no_moves">No moves yet.</div>
     </div>
   </div>
 
   <!-- ── Opening tree left panel ── -->
   <div id="ot-left-panel" style="display:none">
     <div id="ot-header">
-      <h3>&#9651; Opening Tree</h3>
+      <h3>&#9651; <span data-i18n="explorer.opening_tree">Opening Tree</span></h3>
       <div class="depth-wrap">
-        Depth&nbsp;<input type="range" id="ot-depth" min="2" max="16" value="8">
+        <span data-i18n="explorer.depth">Depth</span>&nbsp;<input type="range" id="ot-depth" min="2" max="16" value="8">
         <span id="ot-depth-val">8</span>
       </div>
       <label style="font-size:0.68rem;color:#8a7a5a;display:flex;align-items:center;gap:0.25rem;cursor:pointer;white-space:nowrap" title="Show user-saved novel openings in the tree">
-        <input type="checkbox" id="ot-show-novel" checked style="accent-color:#c87040"> Novel
+        <input type="checkbox" id="ot-show-novel" checked style="accent-color:#c87040"> <span data-i18n="explorer.novel_chk">Novel</span>
       </label>
       <button id="ot-refresh-btn" title="Reload tree from server" style="font-size:0.66rem;padding:0.1rem 0.4rem;border:1px solid #4a3c28;border-radius:3px;background:#2a2018;color:#8a7a5a;cursor:pointer">&#x27F3;</button>
     </div>
     <div id="ot-body">
       <details id="ot-browse-panel">
-        <summary>Browse all openings</summary>
+        <summary data-i18n="explorer.browse_all">Browse all openings</summary>
         <div id="ot-browse-content"><span style="font-size:0.72rem;color:#5a4a2a">Loading…</span></div>
       </details>
       <div id="ot-breadcrumb"></div>
       <div id="ot-filter-chips">
-        <button type="button" class="ot-chip ot-chip-active" data-filter="all">All</button>
-        <button type="button" class="ot-chip" data-filter="book">Book</button>
-        <button type="button" class="ot-chip" data-filter="human">Human</button>
-        <button type="button" class="ot-chip" data-filter="novel">Novel</button>
+        <button type="button" class="ot-chip ot-chip-active" data-filter="all" data-i18n="explorer.filter_all">All</button>
+        <button type="button" class="ot-chip" data-filter="book" data-i18n="explorer.filter_book">Book</button>
+        <button type="button" class="ot-chip" data-filter="human" data-i18n="explorer.filter_human">Human</button>
+        <button type="button" class="ot-chip" data-filter="novel" data-i18n="explorer.filter_novel">Novel</button>
       </div>
       <div id="ot-rows"><div id="ot-loading">Loading…</div></div>
     </div>
@@ -482,12 +484,12 @@
       <button type="button" class="ot-nav-btn" id="ot-nav-last"  title="Last sibling">&#8594;|</button>
     </div>
     <div id="ot-save-bar">
-      <label>Save path as opening:</label>
-      <input id="ot-save-name" type="text" placeholder="Opening name…">
+      <label data-i18n="explorer.save_label">Save path as opening:</label>
+      <input id="ot-save-name" type="text" data-i18n-ph="explorer.name_ph" placeholder="Opening name…">
       <div style="display:flex;gap:0.4rem;align-items:center">
         <select id="ot-save-family" style="flex:1">
-          <option value="novel">Novel (user discovery)</option>
-          <optgroup label="Book openings">
+          <option value="novel" data-i18n="explorer.novel_option">Novel (user discovery)</option>
+          <optgroup data-i18n="explorer.book_group" label="Book openings">
             <option value="Mill Rush">Mill Rush</option>
             <option value="Inverted Mill Rush">Inverted Mill Rush</option>
             <option value="Battle Lines">Battle Lines</option>
@@ -500,14 +502,14 @@
             <option value="Black into White">Black into White</option>
             <option value="Black away from White">Black away from White</option>
           </optgroup>
-          <optgroup label="Human DB">
+          <optgroup data-i18n="explorer.humandb_group" label="Human DB">
             <option value="Human DB">Human DB Pattern</option>
           </optgroup>
         </select>
         <input id="ot-save-family-custom" type="text" placeholder="New heading…" style="flex:1;background:#1a1612;border:1px solid #5a4a2a;color:#e8d9c0;padding:0.25rem 0.4rem;border-radius:4px;font-size:0.76rem;">
       </div>
       <div id="ot-save-row">
-        <button id="ot-save-btn">Save</button>
+        <button id="ot-save-btn" data-i18n="explorer.save">Save</button>
         <button id="ot-assess-btn" style="display:none;background:#7c3aed;color:#fff;font-weight:600;font-size:0.76rem;padding:0.25rem 0.6rem;border-radius:4px;border:none;cursor:pointer">&#9670; Assess</button>
         <span id="ot-save-msg"></span>
       </div>
@@ -523,33 +525,33 @@
 
   <div id="side-panel">
     <div class="panel-section">
-      <h3>To move</h3>
-      <span id="turn-badge" class="white">White</span>
+      <h3 data-i18n="explorer.to_move">To move</h3>
+      <span id="turn-badge" class="white" data-i18n="color.white">White</span>
       <div id="hint-ring-legend" style="display:flex;gap:1rem;margin-top:0.5rem;flex-wrap:wrap;"></div>
     </div>
 
     <div class="panel-section">
-      <h3>Position</h3>
+      <h3 data-i18n="explorer.position">Position</h3>
       <div id="pos-stats">
-        <div id="no-data-notice">No HumanDB data for this position.</div>
+        <div id="no-data-notice" data-i18n="explorer.no_humandb">No HumanDB data for this position.</div>
       </div>
     </div>
 
     <div class="panel-section" id="moves-section">
-      <h3>Next moves</h3>
+      <h3 data-i18n="explorer.next_moves">Next moves</h3>
       <div id="move-list"></div>
     </div>
 
     <div class="panel-section">
-      <h3>Canonical winning line</h3>
+      <h3 data-i18n="explorer.winning_line">Canonical winning line</h3>
       <div id="winning-line">—</div>
     </div>
 
     <div id="color-legend">
-      <h3>Colour key</h3>
-      <div class="legend-row"><div class="legend-swatch legend-swatch-db"></div>Win rate (human games)</div>
-      <div class="legend-row"><div class="legend-swatch" style="background:#a06fe0"></div>Pred (no-DB fallback)</div>
-      <div class="legend-row"><div class="legend-swatch legend-swatch-none"></div>No data</div>
+      <h3 data-i18n="explorer.colour_key">Colour key</h3>
+      <div class="legend-row"><div class="legend-swatch legend-swatch-db"></div><span data-i18n="explorer.legend_winrate">Win rate (human games)</span></div>
+      <div class="legend-row"><div class="legend-swatch" style="background:#a06fe0"></div><span data-i18n="explorer.legend_pred">Pred (no-DB fallback)</span></div>
+      <div class="legend-row"><div class="legend-swatch legend-swatch-none"></div><span data-i18n="explorer.legend_nodata">No data</span></div>
     </div>
   </div>
 </div>

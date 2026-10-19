@@ -1,0 +1,54 @@
+/* rtl.css — Right-to-left layout overrides for Arabic (ar) and Persian (fa).
+   Applied automatically by i18n.js via [dir="rtl"] on <html>.
+   All selectors are scoped to [dir="rtl"] so there is zero cost for LTR languages.
+*/
+
+/* ── Base ──────────────────────────────────────────────────────────── */
+/* CSS direction:rtl on <html> already flips most flex rows and text   */
+/* alignment.  These rules handle the cases that need explicit help.   */
+
+/* Flex rows that contain text labels — let them read right-to-left */
+[dir="rtl"] .hdr-row                { flex-direction: row-reverse; }
+[dir="rtl"] #bottom-bar             { flex-direction: row-reverse; }
+[dir="rtl"] #diag-controls          { flex-direction: row-reverse; flex-wrap: wrap; }
+[dir="rtl"] .tool-form              { flex-direction: row-reverse; flex-wrap: wrap; }
+[dir="rtl"] .tool-form label        { flex-direction: row-reverse; }
+
+/* Panel headings */
+[dir="rtl"] .panel-box h3           { text-align: right; }
+[dir="rtl"] .tools-section h2       { text-align: right; }
+
+/* Move list entries */
+[dir="rtl"] #move-list li           { flex-direction: row-reverse; text-align: right; }
+
+/* Opening Explorer header row */
+[dir="rtl"] #explorer-header        { flex-direction: row-reverse; }
+[dir="rtl"] .toggle-label           { flex-direction: row-reverse; }
+
+/* Overlay card rows */
+[dir="rtl"] .ov-card-header         { flex-direction: row-reverse; }
+[dir="rtl"] .ov-row                 { flex-direction: row-reverse; text-align: right; }
+[dir="rtl"] .ov-lbl                 { text-align: left; }
+
+/* Text inputs — keep cursor/caret at the right edge */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] textarea                { direction: rtl; text-align: right; }
+
+/* Select dropdowns */
+[dir="rtl"] select                  { direction: rtl; }
+
+/* Back links that start with ← should be mirrored to → */
+[dir="rtl"] .btn-back               { direction: rtl; }
+
+/* Tournament / profile tables */
+[dir="rtl"] table                   { direction: rtl; }
+[dir="rtl"] th, [dir="rtl"] td      { text-align: right; }
+
+/* ── Fonts ─────────────────────────────────────────────────────────── */
+/* Font faces are injected lazily by i18n.js; these rules consume them. */
+
+:root:lang(zh) { font-family: "Noto Sans SC", "Segoe UI", system-ui, sans-serif; }
+:root:lang(ar),
+:root:lang(fa) { font-family: "Noto Sans Arabic", system-ui, sans-serif; }
+:root:lang(ru) { font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif; }
