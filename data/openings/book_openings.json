@@ -8397,7 +8397,7 @@
     "opening_id": "ai-01-d6-d2-d7-d5-f4-d3-d1-g4",
     "name": "Forward Press",
     "aliases": [],
-    "family": "AI Preferred",
+    "family": "AI Openings",
     "side": "W",
     "seed_source": "ai",
     "line_moves": [
@@ -8450,7 +8450,7 @@
     "opening_id": "ai-02-d6-f4-d2-e4-g4-b4-d7-d5",
     "name": "Central Anchor",
     "aliases": [],
-    "family": "AI Preferred",
+    "family": "AI Openings",
     "side": "W",
     "seed_source": "ai",
     "line_moves": [
@@ -8503,7 +8503,7 @@
     "opening_id": "ai-03-d6-f4-d2-e4-g4-b4-a4-d5",
     "name": "Diagonal Drive",
     "aliases": [],
-    "family": "AI Preferred",
+    "family": "AI Openings",
     "side": "W",
     "seed_source": "ai",
     "line_moves": [
@@ -8556,7 +8556,7 @@
     "opening_id": "ai-04-d6-d2-d7-d5-f4-e4-f6-b6",
     "name": "Wing Deploy",
     "aliases": [],
-    "family": "AI Preferred",
+    "family": "AI Openings",
     "side": "W",
     "seed_source": "ai",
     "line_moves": [
