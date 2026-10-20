@@ -1288,6 +1288,22 @@ async def save_ui_prefs(request: Request):
     return JSONResponse({"ok": True})
 
 
+@app.get("/api/settings")
+async def get_settings():
+    from fastapi.responses import JSONResponse
+    return JSONResponse(_load_settings())
+
+
+@app.post("/api/settings")
+async def patch_settings(request: Request):
+    from fastapi.responses import JSONResponse
+    body = await request.json()
+    settings = _load_settings()
+    settings.update(body)
+    _SETTINGS_PATH.write_text(json.dumps(settings, indent=2))
+    return JSONResponse({"ok": True})
+
+
 @app.get("/api/vn_status")
 async def get_vn_status():
     from fastapi.responses import JSONResponse
@@ -3714,9 +3730,10 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
         try:
             _s     = _load_settings()
             _url   = _s.get("ollama_url",   "http://localhost:11434")
-            _model = _s.get("ollama_model", "llama3.1:8b")
+            _model = _s.get("ollama_model", "qwen3:4b-instruct")
             _mem   = MemoryManager(ollama_url=_url, ollama_model=_model)
-            llm    = MillsLLM(memory=_mem, ollama_url=_url, model=_model)
+            llm    = MillsLLM(memory=_mem, ollama_url=_url, model=_model,
+                              language=_s.get("language", "en"))
             _module_mills_llm = llm
         except Exception as exc:
             log.debug("Could not create LLM for assessment: %s", exc)
@@ -5562,9 +5579,10 @@ async def ws_endpoint(websocket: WebSocket):
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
-                        model = settings.get("ollama_model", "llama3.1:8b")
+                        model = settings.get("ollama_model", "qwen3:4b-instruct")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
-                        llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                        llm   = MillsLLM(memory=mem, ollama_url=url, model=model,
+                                         language=settings.get("language", "en"))
                         _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
@@ -5735,9 +5753,10 @@ async def ws_endpoint(websocket: WebSocket):
 
                     if use_llm:
                         url   = settings.get("ollama_url",   "http://localhost:11434")
-                        model = settings.get("ollama_model", "llama3.1:8b")
+                        model = settings.get("ollama_model", "qwen3:4b-instruct")
                         mem   = MemoryManager(ollama_url=url, ollama_model=model)
-                        llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                        llm   = MillsLLM(memory=mem, ollama_url=url, model=model,
+                                         language=settings.get("language", "en"))
                         _module_mills_llm = llm
                         book  = OpeningBook()
                         rec   = OpeningRecognizer(book)
@@ -6440,9 +6459,10 @@ async def ws_endpoint(websocket: WebSocket):
                 if use_llm:
                     _s = _load_settings()
                     url   = _s.get("ollama_url",   "http://localhost:11434")
-                    model = _s.get("ollama_model", "llama3.1:8b")
+                    model = _s.get("ollama_model", "qwen3:4b-instruct")
                     mem   = MemoryManager(ollama_url=url, ollama_model=model)
-                    llm   = MillsLLM(memory=mem, ollama_url=url, model=model)
+                    llm   = MillsLLM(memory=mem, ollama_url=url, model=model,
+                                     language=_s.get("language", "en"))
                     _module_mills_llm = llm
                     book  = OpeningBook()
                     rec   = OpeningRecognizer(book)
@@ -7009,12 +7029,13 @@ async def ws_endpoint(websocket: WebSocket):
 
                 if use_llm:
                     url   = _s.get("ollama_url",   "http://localhost:11434")
-                    model = _s.get("ollama_model", "llama3.1:8b")
+                    model = _s.get("ollama_model", "qwen3:4b-instruct")
                     for _ai_inst, _ai_color, _opp_color in [
                         (gai_w, "W", "B"), (gai_b, "B", "W"),
                     ]:
                         _mem  = MemoryManager(ollama_url=url, ollama_model=model)
-                        _llm  = MillsLLM(memory=_mem, ollama_url=url, model=model)
+                        _llm  = MillsLLM(memory=_mem, ollama_url=url, model=model,
+                                         language=_s.get("language", "en"))
                         _book = OpeningBook()
                         _rec  = OpeningRecognizer(_book)
                         _egr  = EndgameRecognizer(

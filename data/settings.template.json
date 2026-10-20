@@ -3,7 +3,7 @@
   "think_time_seconds": 6,
   "difficulty": 6,
   "human_color": "random",
-  "ollama_model": "llama3.1:8b",
+  "ollama_model": "qwen3:4b-instruct",
   "ollama_url": "http://localhost:11434",
   "llm_question_frequency": 0.3,
   "max_chat_history_turns": 20,
@@ -52,6 +52,7 @@
     "max": 16
   },
   "search_threads": 2,
+  "language": "en",
   "ui_prefs": {
     "sel-opponent": "ai",
     "sel-human-color": "W",

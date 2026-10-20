@@ -15,6 +15,9 @@ build/
 venv/
 env/
 
+# Private Python runtime (downloaded by install.sh / install.ps1 — not committed)
+runtime/
+
 # IDE / editor lock files
 .~lock.*
 

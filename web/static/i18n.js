@@ -119,4 +119,7 @@ window.i18n = { t, setLanguage, getLanguage, saveLanguage };
   if (!supported.includes(code)) code = 'en';
 
   await setLanguage(code);
+  // Always persist to the backend so settings.json stays in sync after a
+  // server restart (localStorage may have a language the server hasn't seen).
+  saveLanguage(code);
 })();

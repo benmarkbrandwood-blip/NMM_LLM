@@ -13,6 +13,15 @@ if TYPE_CHECKING:
     from ai.live_move_analyser import LiveMoveSignals
 
 _MAX_HISTORY = 16
+_SETTINGS_PATH = pathlib.Path(__file__).parent.parent / "data" / "settings.json"
+
+_LANGUAGE_NAMES: dict[str, str] = {
+    "de": "German", "fr": "French", "es": "Spanish", "it": "Italian",
+    "nl": "Dutch",  "pt": "Portuguese", "sv": "Swedish", "da": "Danish",
+    "nb": "Norwegian", "ro": "Romanian", "pl": "Polish", "cs": "Czech",
+    "hu": "Hungarian", "ru": "Russian", "zh": "Chinese", "ar": "Arabic",
+    "fa": "Persian",
+}
 
 # ── Phase strategy guide ───────────────────────────────────────────────────────
 # Load docs/phase_strategy.md once at import time; injected into LLM prompts.
@@ -681,10 +690,12 @@ class MillsLLM:
         memory: "MemoryManager",
         ollama_url: str = "http://localhost:11434",
         model: str = "llama3.1:8b",
+        language: str = "en",
     ) -> None:
         self.model = model
         self._url = ollama_url
         self._memory = memory
+        self._language = language
         self.conversation_history: list[dict] = []
         self.narrative_memory: str = ""
         self.bad_moves_context: list[dict] = []
@@ -706,6 +717,16 @@ class MillsLLM:
     def _chat(self, system: str, user: str, keep_history: bool = False) -> str:
         if self._client is None:
             return ""
+        # Always read language from settings.json so a UI language change
+        # takes effect immediately without restarting the game or server.
+        try:
+            import json as _json
+            _lang = _json.loads(_SETTINGS_PATH.read_text()).get("language", self._language)
+        except Exception:
+            _lang = self._language
+        lang_name = _LANGUAGE_NAMES.get(_lang)
+        if lang_name:
+            system = system + f"\n\nRespond entirely in {lang_name}. Do not use English."
         messages = [{"role": "system", "content": system}]
         if keep_history:
             messages.extend(self.conversation_history[-_MAX_HISTORY:])

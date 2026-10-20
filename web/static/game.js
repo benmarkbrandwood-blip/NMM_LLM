@@ -1848,13 +1848,13 @@ function handleMessage(msg) {
 
       if (origNotation) {
         // Sentinel redirected — show both engine intention and the redirected result
-        addCommentary("GameAI", `Engine intended: ${origNotation} → Sentinel redirected to: ${playedStr}${cap}`, "ai");
+        addCommentary("GameAI", _t("gameai.sentinel_redirect", {orig: origNotation, move: playedStr}) + cap, "ai");
       } else {
         // No redirect — show what the engine played
-        addCommentary("GameAI", `Played: ${playedStr}${cap}${blunder}`, "ai");
+        addCommentary("GameAI", _t("gameai.played", {move: playedStr}) + cap + blunder, "ai");
         // If sentinel was observing and had a different recommendation, surface it
         if (sentBest && engineNote && sentBest !== engineNote) {
-          addCommentary("Sentinel", `Engine played: ${engineNote} — Sentinel recommends: ${sentBest}`, "ai");
+          addCommentary("Sentinel", _t("gameai.sentinel_recommends", {engine: engineNote, sentinel: sentBest}), "ai");
         }
       }
 
@@ -1912,7 +1912,7 @@ function handleMessage(msg) {
       }
       if (msg.sentinel && msg.sentinel.intervention) {
         const detail = msg.sentinel.intervention_detail || msg.sentinel.intervention;
-        addCommentary("Sentinel", `Intervention: ${detail}`, "ai");
+        addCommentary("Sentinel", _t("gameai.intervention", {detail}), "ai");
         const txt   = $("sentinel-text");
         const badge = $("sentinel-advisory");
         if (txt && badge && badge.style.display !== "none") {
@@ -2136,18 +2136,18 @@ function handleMessage(msg) {
 
       const label = document.createElement("span");
       label.className = "speaker";
-      label.textContent = "[Opening]: ";
+      label.textContent = _t("opening.speaker") + ": ";
       div.appendChild(label);
 
       const preview = document.createElement("span");
-      preview.textContent = `New sequence detected: "${autoNm}" · Rename: `;
+      preview.textContent = _t("opening.new_seq", {name: autoNm});
       div.appendChild(preview);
 
       const input = document.createElement("input");
       input.type = "text";
       input.className = "opening-name-input";
       input.value = autoNm;
-      input.placeholder = "Opening name…";
+      input.placeholder = _t("opening.placeholder");
       div.appendChild(input);
 
       const familySel = document.createElement("select");
@@ -2163,13 +2163,13 @@ function handleMessage(msg) {
       const familyCustom = document.createElement("input");
       familyCustom.type = "text";
       familyCustom.className = "opening-name-input";
-      familyCustom.placeholder = "New heading…";
+      familyCustom.placeholder = _t("opening.new_heading");
       familyCustom.style.cssText = "width:9em;margin-left:4px";
       div.appendChild(familyCustom);
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "opening-name-btn";
-      saveBtn.textContent = "Save";
+      saveBtn.textContent = _t("opening.save");
       saveBtn.onclick = () => {
         const name = input.value.trim();
         if (!name) return;
@@ -2181,7 +2181,7 @@ function handleMessage(msg) {
 
       const skipBtn = document.createElement("button");
       skipBtn.className = "opening-name-btn opening-name-skip";
-      skipBtn.textContent = "Skip";
+      skipBtn.textContent = _t("opening.skip");
       skipBtn.onclick = () => div.remove();
       div.appendChild(skipBtn);
 
@@ -2191,7 +2191,7 @@ function handleMessage(msg) {
 
     case "rename_opening_ack":
       _loadOpenings();
-      addCommentary("[Opening]", `Saved as "${msg.name}".`, "ai");
+      addCommentary(_t("opening.speaker"), _t("opening.saved", {name: msg.name}), "ai");
       break;
 
     case "prune_opening_ack":
@@ -2276,7 +2276,7 @@ function handleMessage(msg) {
           div.className = "commentary-line assessment-partial";
           const lbl = document.createElement("span");
           lbl.className = "speaker";
-          lbl.textContent = "Game Analysis (partial): ";
+          lbl.textContent = _t("assess.partial_lbl") + ": ";
           div.appendChild(lbl);
           const pre = document.createElement("span");
           pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
@@ -2326,8 +2326,27 @@ function handleMessage(msg) {
     }
 
     case "assessment_llm": {
-      // Route to MillsAI Chat (commentary-human), not AI Discussion
-      if (msg.text) addCommentary("MillsAI", msg.text, "human");
+      if (msg.text) {
+        if (!msg.stage) {
+          // Stage 4: full synthesis — append after signal cards (bottom of wrapper)
+          _appendToAssessment(msg.text, "MillsAI");
+        } else {
+          // Stage 1: early analysis — insert at top of wrapper (intro before signal reference)
+          const wrapper = _getOrCreateAssessmentWrapper();
+          if (wrapper) {
+            const div = document.createElement("div");
+            div.className = "commentary-line assessment-llm-text";
+            const lbl = document.createElement("span");
+            lbl.className = "speaker";
+            lbl.textContent = "MillsAI: ";
+            div.appendChild(lbl);
+            div.appendChild(document.createTextNode(msg.text));
+            wrapper.insertBefore(div, wrapper.firstChild);
+          } else {
+            addCommentary("MillsAI", msg.text, "human");
+          }
+        }
+      }
       // Stage 4 LLM arrives without stage field — mark progress bar done
       if (!msg.stage) _updateAssessmentProgress(0);
       break;
@@ -2347,9 +2366,15 @@ function handleMessage(msg) {
         const div = document.createElement("div");
         div.className = "commentary-line assessment-running-msg";
         div.style.cssText = "color:#c07830;font-style:italic;padding:4px 0";
-        const reasonMap = { timeout: "Analysis timed out", cancelled: "Analysis cancelled", error: "Analysis failed" };
-        div.textContent = reasonMap[msg.reason] || "Analysis unavailable";
-        feed.insertBefore(div, feed.firstChild);
+        const reasonMap = {
+          timeout: _t("assess.timeout"),
+          cancelled: _t("assess.cancelled"),
+          error: _t("assess.failed"),
+        };
+        div.textContent = reasonMap[msg.reason] || _t("assess.failed");
+        const wrapper = feed.querySelector(".assessment-wrapper");
+        if (wrapper) wrapper.appendChild(div);
+        else feed.insertBefore(div, feed.firstChild);
       }
       // In a tournament game, show "Ready for next game" even after failure/cancel
       if (_isTournamentGame) {
@@ -3500,7 +3525,7 @@ function addCommentary(speaker, text, section, tag) {
   feed.insertBefore(div, feed.firstChild);
 }
 
-const _AP_LABELS = ["Turning points", "AI divergence", "Malom regret", "Commentary"];
+const _AP_LABELS = () => [_t("assess.ap_1"), _t("assess.ap_2"), _t("assess.ap_3"), _t("assess.ap_4")];
 
 function _updateAssessmentProgress(stage) {
   _assessmentActiveStage = stage;
@@ -3522,7 +3547,7 @@ function _updateAssessmentProgress(stage) {
   bar.style.display = "flex";
   if (label) {
     label.style.display = "block";
-    label.textContent   = _AP_LABELS[stage - 1] || "";
+    label.textContent   = _AP_LABELS()[stage - 1] || "";
   }
   for (let i = 1; i <= 4; i++) {
     const seg = $(`ap-${i}`);
@@ -3536,7 +3561,7 @@ function _updateAssessmentProgress(stage) {
 function _renderAssessmentSignalSections(msg, feed) {
   // Build colored signal-card summary to replace the plain pre-wrap text block.
   const base     = msg.ply_base || 0;
-  const _sideName = c => c === "W" ? "White" : "Black";
+  const _sideName = c => c === "W" ? _t("color.white") : _t("color.black");
   const _absPly   = p => p + base;
   const _plyTail  = (items, top) => {
     const rest = items.length - top;
@@ -3592,13 +3617,12 @@ function _renderAssessmentSignalSections(msg, feed) {
   if (tps.length) {
     const lines = tps.map((tp, i) => {
       const absPly  = tp.ply + base;
-      const moveNum = Math.ceil(absPly / 2);
       const side    = tp.color ? ` (${_sideName(tp.color)})` : "";
       const mv      = tp.move  ? `: ${tp.move}` : "";
-      const alt     = tp.best_alt ? `  →better: ${tp.best_alt}` : "";
+      const alt     = tp.best_alt ? `  ${_t("assess.better", {move: tp.best_alt})}` : "";
       return `ply ${absPly}${side}${mv}${alt}`;
     });
-    const c = _card("turning_point", `Turning Point (${tps.length})`, lines);
+    const c = _card("turning_point", _t("assess.turning_point_hdr", {n: tps.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3606,12 +3630,12 @@ function _renderAssessmentSignalSections(msg, feed) {
   const malomShifts = msg.malom_wdl_shifts || [];
   if (malomShifts.length) {
     const lines = malomShifts.slice(0, 8).map(ms => {
-      const side = ms.color === "W" ? "White" : "Black";
+      const side = _sideName(ms.color);
       const moveNum = Math.ceil(ms.ply / 2);
       return `ply ${ms.ply} (${side}, move ${moveNum}): ${ms.wdl_before}→${ms.wdl_after}`;
     });
     if (malomShifts.length > 8) lines.push(`… +${malomShifts.length - 8} more`);
-    const c = _card("malom", `Malom WDL Shifts (${malomShifts.length})`, lines);
+    const c = _card("malom", _t("assess.malom_shifts_hdr", {n: malomShifts.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3621,50 +3645,50 @@ function _renderAssessmentSignalSections(msg, feed) {
   const gapnet = sp.gapnet || [];
   if (gapnet.length) {
     const lines = gapnet.slice(0, 6).map(it => {
-      const risk = it.score >= 0.72 ? "HIGH" : it.score.toFixed(2);
-      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — blunder-zone ${risk}`;
+      const risk = it.score >= 0.72 ? _t("assess.blunder_zone_high") : _t("assess.blunder_zone", {score: it.score.toFixed(2)});
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — ${risk}`;
     }).concat(_plyTail(gapnet, 6));
-    const c = _card("gapnet", `Blunder Risk / GapNet (${gapnet.length} flagged)`, lines);
+    const c = _card("gapnet", _t("assess.gapnet_hdr", {n: gapnet.length}), lines);
     if (c) outer.appendChild(c);
   }
 
   const gen = sp.generalist || [];
   if (gen.length) {
     const lines = gen.slice(0, 6).map(it => {
-      const alt = it.preferred ? `  preferred: ${it.preferred}` : "";
+      const alt = it.preferred ? `  ${_t("assess.preferred", {move: it.preferred})}` : "";
       return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}${alt}`;
     }).concat(_plyTail(gen, 6));
-    const c = _card("generalist", `Generalist Divergence (${gen.length} flagged)`, lines);
+    const c = _card("generalist", _t("assess.generalist_hdr", {n: gen.length}), lines);
     if (c) outer.appendChild(c);
   }
 
   const unconv = sp.unconventional || [];
   if (unconv.length) {
     const lines = unconv.slice(0, 6).map(it => {
-      const common = it.preferred ? `  common: ${it.preferred}` : "";
+      const common = it.preferred ? `  ${_t("assess.common", {move: it.preferred})}` : "";
       const prob   = it.prob != null ? `  (prob ${(it.prob * 100).toFixed(0)}%)` : "";
       return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}${common}${prob}`;
     }).concat(_plyTail(unconv, 6));
-    const c = _card("unconventional", `Unconventional Moves (${unconv.length} flagged)`, lines);
+    const c = _card("unconventional", _t("assess.unconv_hdr", {n: unconv.length}), lines);
     if (c) outer.appendChild(c);
   }
 
   const pref = sp.pref || [];
   if (pref.length) {
     const lines = pref.slice(0, 6).map(it => {
-      const dir = it.delta < 0 ? "weaker-player choice" : "stronger-player choice";
+      const dir = it.delta < 0 ? _t("assess.weaker_player") : _t("assess.stronger_player");
       return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  δ${it.delta > 0 ? "+" : ""}${it.delta.toFixed(2)} (${dir})`;
     }).concat(_plyTail(pref, 6));
-    const c = _card("pref", `Pref Divergence (${pref.length} flagged)`, lines);
+    const c = _card("pref", _t("assess.pref_hdr", {n: pref.length}), lines);
     if (c) outer.appendChild(c);
   }
 
   const mob = sp.mobility || [];
   if (mob.length) {
     const lines = mob.slice(0, 6).map(it =>
-      `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — ${it.count} legal moves`
+      `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  — ${_t("assess.legal_moves", {count: it.count})}`
     ).concat(_plyTail(mob, 6));
-    const c = _card("mobility", `Mobility Warning (${mob.length} tight plies)`, lines);
+    const c = _card("mobility", _t("assess.mobility_hdr", {n: mob.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3674,7 +3698,7 @@ function _renderAssessmentSignalSections(msg, feed) {
       const d = it.delta >= 0 ? `+${it.delta.toFixed(2)}` : it.delta.toFixed(2);
       return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  δ${d}`;
     }).concat(_plyTail(horizon, 6));
-    const c = _card("horizon", `Horizon Regret (${horizon.length} flagged)`, lines);
+    const c = _card("horizon", _t("assess.horizon_hdr", {n: horizon.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3683,17 +3707,17 @@ function _renderAssessmentSignalSections(msg, feed) {
     const lines = sentSp.slice(0, 6).map(it => {
       return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  r_s=+${it.r_s.toFixed(2)} (played ${it.played.toFixed(2)} vs best ${it.best.toFixed(2)})`;
     }).concat(_plyTail(sentSp, 6));
-    const c = _card("sentinel", `Sentinel Divergence (${sentSp.length} flagged)`, lines);
+    const c = _card("sentinel", _t("assess.sentinel_hdr", {n: sentSp.length}), lines);
     if (c) outer.appendChild(c);
   }
 
   const valueSp = sp.value || [];
   if (valueSp.length) {
     const lines = valueSp.slice(0, 6).map(it => {
-      const pref = it.preferred ? `  preferred: ${it.preferred}` : "";
-      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  regret+${it.regret.toFixed(2)}${pref}`;
+      const vpref = it.preferred ? `  ${_t("assess.preferred", {move: it.preferred})}` : "";
+      return `ply ${_absPly(it.ply)} (${_sideName(it.color)}): ${it.move}  regret+${it.regret.toFixed(2)}${vpref}`;
     }).concat(_plyTail(valueSp, 6));
-    const c = _card("value", `ValueNet Divergence (${valueSp.length} flagged)`, lines);
+    const c = _card("value", _t("assess.value_hdr", {n: valueSp.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3703,31 +3727,32 @@ function _renderAssessmentSignalSections(msg, feed) {
   if (!hasAny) {
     const clean = document.createElement("div");
     clean.style.cssText = "font-size:.8rem;color:#6aaa6a;padding:4px 2px";
-    clean.textContent = "No flagged signals — clean game.";
+    clean.textContent = _t("assess.clean_game");
     outer.appendChild(clean);
   }
 
-  // Insert signal cards AFTER the legend (if present) so the legend stays at top
-  const _existingLegend = feed.querySelector(".assessment-legend");
-  const _insertRef = _existingLegend ? _existingLegend.nextSibling : feed.firstChild;
-  feed.insertBefore(outer, _insertRef);
-  feed.scrollTop = 0;
+  // Append legend then signal cards to the assessment wrapper (ordered: legend → cards → LLM)
+  const wrapper = _getOrCreateAssessmentWrapper();
+  const target = wrapper || feed;
+  if (!target.querySelector(".assessment-legend")) target.appendChild(_buildAssessmentLegend());
+  target.appendChild(outer);
+  if (feed) feed.scrollTop = 0;
 }
 
-// [label, description, signal_key_or_null]
+// [i18n_label_key, i18n_desc_key, signal_key_or_null]
 const _ASSESSMENT_LEGEND_ITEMS = [
-  ["Turning point",   "The ply where the position evaluation shifted most sharply, then cross-checked against Malom's perfect database to confirm it was a genuine game-state change — not just a heuristic fluctuation.", "turning_point"],
-  ["Malom",           "A perfect solver covering every Nine Men's Morris position. It provides a definitive Win / Draw / Loss verdict for any board state, so WDL shifts mark moves that provably changed the theoretical game outcome.", "malom"],
-  ["Heuristic eval",  "The classical AI's board score, based on mills formed, piece mobility, and blocked opponent pieces. Used to detect large evaluation swings and identify the first-pass turning point before Malom confirmation.", null],
-  ["Sentinel",        "A small neural network trained to evaluate strategic position quality, scoring 0–1 independently of the classical heuristic. High sentinel scores indicate positional strength; low scores flag structural weakness.", "sentinel"],
-  ["GapNet",          "A neural network trained to detect 'blunder zone' positions — boards where one side is at high exploitation risk. Scores 0–1; ≥ 0.72 is flagged HIGH. Useful for spotting tactical danger before a blunder occurs.", "gapnet"],
-  ["Generalist AI",   "The reinforcement-learning model trained through self-play. Divergence marks plies where it would have chosen a different move, suggesting a potentially stronger option was available at that moment.", "generalist"],
-  ["Predictive",      "A network trained on thousands of human games. Its top-1 pick defines the statistically 'common' move for any position — the baseline for flagging unconventional play.", "unconventional"],
-  ["ValueNet",        "A positional value network trained on Malom distance-to-win (DTW) labels — the number of optimal moves to force a win or avoid a loss. Higher scores mean White is closer to a theoretical win; lower scores mean Black is ahead. Used by the AI to blend long-range positional judgement with the classical heuristic.", "value"],
-  ["PrefNet",         "Scores moves by how much stronger players historically preferred them over weaker players. Negative delta = a choice favoured by lower-rated players; positive = a choice favoured by stronger players.", "pref"],
-  ["Unconventional",  "Moves ranked low by the Predictive net — choices that human players rarely make in the same position. A common alternative is shown where available so you can compare.", "unconventional"],
-  ["Mobility",        "Count of legal moves available in the movement phase. Being squeezed to 3 or fewer options is a warning sign; 2 or fewer typically indicates a position on the way to being trapped.", "mobility"],
-  ["Horizon Regret",  "Flags moves that look better at shallow (2-ply) search than they do at full depth — a classic sign of the horizon effect. Positive delta means the move ranked higher shallow than deep; larger values indicate the move is more deceptive.", "horizon"],
+  ["assess.ref_turning_point_lbl", "assess.ref_turning_point_desc", "turning_point"],
+  ["assess.ref_malom_lbl",         "assess.ref_malom_desc",         "malom"],
+  ["assess.ref_heuristic_lbl",     "assess.ref_heuristic_desc",     null],
+  ["assess.ref_sentinel_lbl",      "assess.ref_sentinel_desc",      "sentinel"],
+  ["assess.ref_gapnet_lbl",        "assess.ref_gapnet_desc",        "gapnet"],
+  ["assess.ref_generalist_lbl",    "assess.ref_generalist_desc",    "generalist"],
+  ["assess.ref_predictive_lbl",    "assess.ref_predictive_desc",    "unconventional"],
+  ["assess.ref_valuenet_lbl",      "assess.ref_valuenet_desc",      "value"],
+  ["assess.ref_prefnet_lbl",       "assess.ref_prefnet_desc",       "pref"],
+  ["assess.ref_unconventional_lbl","assess.ref_unconventional_desc","unconventional"],
+  ["assess.ref_mobility_lbl",      "assess.ref_mobility_desc",      "mobility"],
+  ["assess.ref_horizon_lbl",       "assess.ref_horizon_desc",       "horizon"],
 ];
 
 function _buildAssessmentLegend() {
@@ -3740,11 +3765,11 @@ function _buildAssessmentLegend() {
   ].join(";");
   const hdr = document.createElement("div");
   hdr.style.cssText = "font-size:.72rem;font-weight:700;color:#5a8a5a;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase";
-  hdr.textContent = "Signal reference";
+  hdr.textContent = _t("assess.ref_title");
   wrap.appendChild(hdr);
   const grid = document.createElement("div");
   grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:4px 14px";
-  for (const [label, desc, sigKey] of _ASSESSMENT_LEGEND_ITEMS) {
+  for (const [lblKey, descKey, sigKey] of _ASSESSMENT_LEGEND_ITEMS) {
     const item = document.createElement("div");
     item.style.cssText = "padding:3px 0;border-top:1px solid #1e2e1e";
     const lbl = document.createElement("span");
@@ -3756,38 +3781,47 @@ function _buildAssessmentLegend() {
       dot.style.cssText = `background-color:${sigColor};margin-right:4px;vertical-align:middle`;
       lbl.appendChild(dot);
     }
-    lbl.appendChild(document.createTextNode(label + ": "));
+    lbl.appendChild(document.createTextNode(_t(lblKey) + ": "));
     item.appendChild(lbl);
-    item.appendChild(document.createTextNode(desc));
+    item.appendChild(document.createTextNode(_t(descKey)));
     grid.appendChild(item);
   }
   wrap.appendChild(grid);
   return wrap;
 }
 
+function _getOrCreateAssessmentWrapper() {
+  const feed = $("commentary-human");
+  if (!feed) return null;
+  let wrapper = feed.querySelector(".assessment-wrapper");
+  if (!wrapper) {
+    wrapper = document.createElement("div");
+    wrapper.className = "assessment-wrapper";
+    feed.prepend(wrapper);
+  }
+  return wrapper;
+}
+
 function _startAssessmentTimer() {
   if (_assessmentTimerInterval) return;
   _assessmentStartTime = Date.now();
-  const feed = $("commentary-human");
-  if (!feed) return;
-  const old = feed.querySelector(".assessment-running-msg");
+  const wrapper = _getOrCreateAssessmentWrapper();
+  if (!wrapper) return;
+  const old = wrapper.querySelector(".assessment-running-msg");
   if (old) old.remove();
-  // Insert legend first so timer prepends above it
-  const oldLegend = feed.querySelector(".assessment-legend");
-  if (!oldLegend) feed.prepend(_buildAssessmentLegend());
   const div = document.createElement("div");
   div.className = "commentary-line assessment-running-msg";
   div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
-  div.textContent = "Analysis running… 0s";
-  feed.prepend(div);
+  div.textContent = _t("assess.running_s", {s: 0});
+  wrapper.appendChild(div);
   _assessmentTimerInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - _assessmentStartTime) / 1000);
-    const msg = feed.querySelector(".assessment-running-msg");
+    const msg = wrapper.querySelector(".assessment-running-msg");
     if (!msg) { clearInterval(_assessmentTimerInterval); _assessmentTimerInterval = null; return; }
     const mins = Math.floor(elapsed / 60);
     msg.textContent = mins > 0
-      ? `Analysis running… ${mins}m ${elapsed % 60}s`
-      : `Analysis running… ${elapsed}s`;
+      ? _t("assess.running_ms", {m: mins, s: elapsed % 60})
+      : _t("assess.running_s", {s: elapsed});
   }, 1000);
 }
 
@@ -3801,6 +3835,19 @@ function _stopAssessmentTimer() {
     const msg = feed.querySelector(".assessment-running-msg");
     if (msg) msg.remove();
   }
+}
+
+function _appendToAssessment(text, speakerKey) {
+  const wrapper = _getOrCreateAssessmentWrapper();
+  if (!wrapper) { addCommentary(speakerKey || "MillsAI", text, "human"); return; }
+  const div = document.createElement("div");
+  div.className = "commentary-line assessment-llm-text";
+  const label = document.createElement("span");
+  label.className = "speaker";
+  label.textContent = (speakerKey || "MillsAI") + ": ";
+  div.appendChild(label);
+  div.appendChild(document.createTextNode(text));
+  wrapper.appendChild(div);
 }
 
 function clearCommentary() {

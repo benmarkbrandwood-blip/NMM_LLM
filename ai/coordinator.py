@@ -33,6 +33,31 @@ from ai.move_guidance import (
 )
 from game.rules import get_all_legal_moves, get_game_phase
 
+import pathlib as _pathlib
+
+_COORD_I18N_DIR = _pathlib.Path(__file__).parent.parent / "web" / "static" / "i18n"
+_COORD_SETTINGS  = _pathlib.Path(__file__).parent.parent / "data" / "settings.json"
+_coord_i18n_cache: dict = {}
+
+
+def _t(key: str, **kwargs) -> str:
+    """Return the UI-language translation of key, with {placeholder} substitution."""
+    try:
+        lang = json.loads(_COORD_SETTINGS.read_text()).get("language", "en")
+    except Exception:
+        lang = "en"
+    for _lang in (lang, "en"):
+        if _lang not in _coord_i18n_cache:
+            try:
+                p = _COORD_I18N_DIR / f"{_lang}.json"
+                _coord_i18n_cache[_lang] = json.loads(p.read_text())
+            except Exception:
+                _coord_i18n_cache[_lang] = {}
+    s = _coord_i18n_cache[lang].get(key) or _coord_i18n_cache.get("en", {}).get(key) or key
+    for k, v in kwargs.items():
+        s = s.replace(f"{{{k}}}", str(v))
+    return s
+
 
 class Coordinator:
     def __init__(
@@ -201,9 +226,10 @@ class Coordinator:
                     first_mv = f" → {first_mv}"
                 self.emit(
                     "GameAI",
-                    f"Targeting opening: {self._target_opening.name} "
-                    f"(score {self._target_opening.opening_score(self.game_ai.color):.2f})"
-                    f"{first_mv}",
+                    _t("gameai.targeting_opening",
+                       name=self._target_opening.name,
+                       score=f"{self._target_opening.opening_score(self.game_ai.color):.2f}",
+                       first_mv=first_mv),
                 )
 
         recent = self.memory.load_recent_games(n=10)
@@ -505,14 +531,14 @@ class Coordinator:
         # 3. Tactical pre-screen: log urgency level so the AI and LLM know the context
         tac = self._tactical_situation(board)
         if tac["can_close_mill"]:
-            self.emit("GameAI", "Mill closure available — prioritising tactical completion")
+            self.emit("GameAI", _t("gameai.mill_closure"))
         elif tac["must_block_opponent"]:
-            self.emit("GameAI", "Opponent threatens a mill — defensive priority")
+            self.emit("GameAI", _t("gameai.opp_mill_threat"))
         elif tac["opp_double_mills"]:
             pivots = ", ".join(tac["opp_double_mills"][:2])
-            self.emit("GameAI", f"Disrupting opponent cycling mill pivot at {pivots}")
+            self.emit("GameAI", _t("gameai.cycling_disrupt", pivots=pivots))
         elif tac.get("6v4_sacrifice_viable"):
-            self.emit("GameAI", "6v4 position — own fly nucleus ready, evaluating sacrifice path to winning endgame")
+            self.emit("GameAI", _t("gameai.endgame_sacrifice"))
 
         # 4. GameAI picks its best move (with opening bonus, trajectory hints, endgame depth)
         # Force the book move for the AI's first 2 placements so opening variety is
@@ -571,15 +597,16 @@ class Coordinator:
                     move = llm_move
                     self.emit(
                         "GameAI",
-                        f"Engine intended {_move_str(ai_move)} (score {ai_score:.2f}); "
-                        f"MillsLLM recommends {llm_notation} (score {llm_score:.2f}) — adopting",
+                        _t("gameai.llm_adopting",
+                           ai_move=_move_str(ai_move), ai_score=f"{ai_score:.2f}",
+                           move=llm_notation, score=f"{llm_score:.2f}"),
                     )
                 else:
                     self.emit(
                         "GameAI",
-                        f"MillsLLM suggests {llm_notation} "
-                        f"(score {llm_score:.2f}), engine stays with {_move_str(ai_move)} "
-                        f"(score {ai_score:.2f})",
+                        _t("gameai.llm_rejected",
+                           move=llm_notation, score=f"{llm_score:.2f}",
+                           ai_move=_move_str(ai_move), ai_score=f"{ai_score:.2f}"),
                     )
 
         # 5. Log LLM's reasoning only when it successfully recommended a move
@@ -595,7 +622,7 @@ class Coordinator:
         )
         self._emit_signal_badge(_ai_signals)
         self._emit_reasoning(board, move, self.game_ai.color, self._turn_num)
-        self.emit("GameAI", f"Playing {move_str}")
+        self.emit("GameAI", _t("gameai.playing", move=move_str))
 
         # Resignation check: if human has dominated for 3 consecutive AI turns
         if not self.resignation_offered:
@@ -674,9 +701,9 @@ class Coordinator:
                 human_move.get("to", ""), board_after
             )
             if recognition.status == "exact" and recognition.name:
-                self.emit("MillsAI", f"Opening recognised: {recognition.name}")
+                self.emit("MillsAI", _t("opening.recognised", name=recognition.name))
             elif recognition.status == "transposition" and recognition.name:
-                self.emit("MillsAI", f"Transposition to: {recognition.name}")
+                self.emit("MillsAI", _t("opening.transposition", name=recognition.name))
 
         legal_moves  = get_all_legal_moves(board_before)
         score_before = self.game_ai.score_move(board_before, human_move)

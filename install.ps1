@@ -8,7 +8,7 @@
     Skip Ollama installation and model download entirely.
 .PARAMETER Model
     Override the Ollama model to pull (default: read from data\settings.json,
-    fallback to llama3.1:8b).
+    fallback to qwen3:4b-instruct).
 .PARAMETER Yes
     Non-interactive: assume "Yes" to all prompts (installs Ollama by default).
 .EXAMPLE
@@ -27,7 +27,8 @@
 param(
     [switch]$NoOllama,
     [string]$Model = "",
-    [switch]$Yes
+    [switch]$Yes,
+    [switch]$Repair
 )
 
 # NOTE: Set-StrictMode is deliberately NOT enabled here.
@@ -38,8 +39,8 @@ $ErrorActionPreference = "Continue"
 $NMM_DIR  = $PSScriptRoot
 if (-not $NMM_DIR) { $NMM_DIR = (Get-Location).Path }
 
-$VENV_DIR = Join-Path $NMM_DIR ".venv"
-$VENV_PY  = Join-Path $VENV_DIR "Scripts\python.exe"
+$VENV_DIR  = Join-Path $NMM_DIR ".venv"
+$VENV_PY   = Join-Path $VENV_DIR "Scripts\python.exe"
 
 function Write-Info { param($msg) Write-Host "[NMM] $msg" -ForegroundColor Green }
 function Write-Warn { param($msg) Write-Host "[NMM] $msg" -ForegroundColor Yellow }
@@ -78,117 +79,69 @@ if ($Model -eq "" -and (Test-Path -LiteralPath $SETTINGS)) {
         Write-Warn "Could not parse data\settings.json -- using default model."
     }
 }
-if ($Model -eq "") { $Model = "llama3.1:8b" }
+if ($Model -eq "") { $Model = "qwen3:4b-instruct" }
 
-# === 2. Find a usable Python 3.10+ ==========================================
-Write-Info $P_PYTHON_SEARCH
-
-function Get-PythonVersion {
-    param([string]$Exe, [string[]]$PreArgs = @())
-    try {
-        $argList = @()
-        $argList += $PreArgs
-        $argList += "--version"
-        # Capture both streams; some shims write to stderr.
-        $output = & $Exe @argList 2>&1
-        if ($null -eq $output) { return $null }
-        $text = ($output | Out-String)
-        if ($text -match "Python\s+(\d+)\.(\d+)") {
-            return [pscustomobject]@{
-                Major = [int]$Matches[1]
-                Minor = [int]$Matches[2]
-                Raw   = $text.Trim()
-            }
-        }
-    } catch {
-        return $null
-    }
-    return $null
-}
-
-# Build candidate list: each entry is @{ Exe = ...; Args = @(...) }
-# 'py -3' is preferred on Windows because it skips the Microsoft Store stub.
-$candidates = @(
-    @{ Exe = "py";      Args = @("-3") },
-    @{ Exe = "py";      Args = @() },
-    @{ Exe = "python";  Args = @() },
-    @{ Exe = "python3"; Args = @() }
-)
-
-$pythonExe  = $null
-$pythonArgs = @()
-
-foreach ($c in $candidates) {
-    $cmd = Get-Command $c.Exe -ErrorAction SilentlyContinue
-    if (-not $cmd) { continue }
-
-    # Skip the Windows App Execution Alias stub for python.exe (it lives under
-    # WindowsApps and opens the Microsoft Store instead of running Python).
-    if ($c.Exe -eq "python" -and $cmd.Source -match "WindowsApps") {
-        Write-Warn "Skipping Microsoft Store 'python' stub at $($cmd.Source)."
-        continue
-    }
-
-    $v = Get-PythonVersion -Exe $c.Exe -PreArgs $c.Args
-    if ($null -eq $v) { continue }
-
-    if ($v.Major -gt 3 -or ($v.Major -eq 3 -and $v.Minor -ge 10)) {
-        $pythonExe  = $c.Exe
-        $pythonArgs = $c.Args
-        $displayCmd = if ($c.Args.Count -gt 0) { "$($c.Exe) $($c.Args -join ' ')" } else { $c.Exe }
-        Write-Info ($P_PYTHON_FOUND -f $v.Major, $v.Minor, $displayCmd)
-        break
-    } else {
-        Write-Warn ($P_PYTHON_OLD -f $c.Exe, $v.Major, $v.Minor)
+# === 2. Repair mode: delete .venv and reinstall ==============================
+if ($Repair) {
+    Write-Info "Repair mode: removing .venv (data\ and runtime\ are preserved)."
+    if (Test-Path -LiteralPath $VENV_DIR) {
+        Remove-Item -Recurse -Force -LiteralPath $VENV_DIR
     }
 }
 
-if (-not $pythonExe) {
-    Write-Host ""
-    Write-Host "  $P_PYTHON_MISSING" -ForegroundColor Red
-    Write-Host "  $P_PYTHON_URL"     -ForegroundColor White
-    Write-Host "  $P_PYTHON_PATH"    -ForegroundColor White
-    Write-Host ""
-    Write-Fail $P_PYTHON_FAIL
+# === 3. Bootstrap private Python 3.12 via uv =================================
+Write-Info "Ensuring private Python 3.12 ..."
+$bootstrapScript = Join-Path $NMM_DIR "packaging\bootstrap_python.ps1"
+if (-not (Test-Path -LiteralPath $bootstrapScript)) {
+    Write-Fail "Cannot find packaging\bootstrap_python.ps1"
+}
+# Dot-source so $UV_CMD, $UV_PYTHON_INSTALL_DIR, $NMM_PYTHON are set here.
+. $bootstrapScript
+if (-not $UV_CMD -or -not $NMM_PYTHON) {
+    Write-Fail "bootstrap_python.ps1 did not set required variables."
 }
 
-# === 3. Create the virtual environment ======================================
+# === 4. Create virtual environment ===========================================
 if (Test-Path -LiteralPath $VENV_PY) {
-    Write-Info $P_VENV_EXISTS
-} else {
-    Write-Info $P_VENV_CREATE
-    & $pythonExe @pythonArgs -m venv "$VENV_DIR"
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $VENV_PY)) {
-        Write-Fail $P_VENV_FAIL
+    $venvVer = & $VENV_PY -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
+    if ($venvVer -like "3.12*") {
+        Write-Info "Virtual environment already exists (Python $venvVer)."
+    } else {
+        Write-Info "Virtual environment is Python $venvVer; recreating with 3.12."
+        Remove-Item -Recurse -Force -LiteralPath $VENV_DIR
+        & $UV_CMD venv --python $NMM_PYTHON "$VENV_DIR"
+        if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to create virtual environment." }
     }
+} else {
+    Write-Info "Creating virtual environment ..."
+    & $UV_CMD venv --python $NMM_PYTHON "$VENV_DIR"
+    if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to create virtual environment." }
 }
 
-# === 4. Upgrade pip via 'python -m pip' (NEVER call pip.exe directly on Windows) ===
-# Calling pip.exe to upgrade itself fails on Windows because the .exe is held
-# open while it tries to overwrite itself. 'python -m pip' avoids this.
-Write-Info $P_PIP_UPGRADE
-& $VENV_PY -m pip install --disable-pip-version-check --upgrade pip setuptools wheel
-if ($LASTEXITCODE -ne 0) {
-    Write-Warn $P_PIP_WARN
+# === 5. Install Python requirements from locked files ========================
+$PLAYER_LOCK = Join-Path $NMM_DIR "packaging\requirements-player.lock"
+$TORCH_LOCK  = Join-Path $NMM_DIR "packaging\requirements-torch-cpu.lock"
+if (-not (Test-Path -LiteralPath $PLAYER_LOCK)) {
+    Write-Fail "requirements-player.lock not found at $PLAYER_LOCK"
+}
+if (-not (Test-Path -LiteralPath $TORCH_LOCK)) {
+    Write-Fail "requirements-torch-cpu.lock not found at $TORCH_LOCK"
 }
 
-# === 5. Install Python requirements =========================================
-$REQS = Join-Path $NMM_DIR "requirements.txt"
-if (-not (Test-Path -LiteralPath $REQS)) {
-    Write-Fail "requirements.txt not found at $REQS"
-}
+Write-Info "Installing Python requirements (may take a few minutes on first run) ..."
+& $UV_CMD pip install --python $VENV_PY --require-hashes -r "$PLAYER_LOCK"
+if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to install Python requirements." }
 
-Write-Info $P_REQS_INSTALL
-& $VENV_PY -m pip install --disable-pip-version-check -r "$REQS"
-if ($LASTEXITCODE -ne 0) {
-    Write-Host ""
-    Write-Warn "Some packages failed to install."
-    Write-Warn $P_REQS_CPP
-    Write-Warn $P_REQS_CPP_URL
-    Write-Warn $P_REQS_CPP_RERUN
-    Write-Fail $P_REQS_FAIL
-}
-Write-Info $P_REQS_DONE
+Write-Info "Installing CPU torch ..."
+& $UV_CMD pip install --python $VENV_PY `
+    --index-url https://download.pytorch.org/whl/cpu `
+    --extra-index-url https://pypi.org/simple `
+    --index-strategy unsafe-best-match `
+    --require-hashes `
+    -r "$TORCH_LOCK"
+if ($LASTEXITCODE -ne 0) { Write-Fail "Failed to install torch." }
+
+Write-Info "Requirements installed."
 
 # === 6. Ollama (optional) ===================================================
 $installOllama = $false
@@ -343,6 +296,26 @@ if (Test-Path -LiteralPath $installDbs) {
     }
 } else {
     Write-Warn $P_DB_MISSING
+}
+
+# === Desktop shortcut ========================================================
+$createShortcut = $false
+$shortcutScript = Join-Path $NMM_DIR "tools\create_shortcut.ps1"
+
+if ($Yes) {
+    $createShortcut = $true
+} elseif (Test-Path -LiteralPath $shortcutScript) {
+    Write-Host ""
+    $scChoice = Read-Host "  Create a Desktop shortcut? [Y/n]"
+    if ($scChoice -eq "" -or $scChoice -match "^[Yy]") { $createShortcut = $true }
+}
+
+if ($createShortcut -and (Test-Path -LiteralPath $shortcutScript)) {
+    try {
+        & $shortcutScript
+    } catch {
+        Write-Warn "Shortcut creation failed: $($_.Exception.Message). Re-run: .\tools\create_shortcut.ps1"
+    }
 }
 
 # === Done ===================================================================
