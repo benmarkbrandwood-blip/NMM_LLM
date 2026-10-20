@@ -446,6 +446,7 @@
   "gameai.opp_mill_threat": "Opponent threatens a mill — defensive priority",
   "gameai.cycling_disrupt": "Disrupting opponent cycling mill pivot at {pivots}",
   "gameai.endgame_sacrifice": "6v4 position — own fly nucleus ready, evaluating sacrifice path to winning endgame",
+  "gameai.dual_mill_block": "Dual-mill junction threat detected — forced block at {sq}",
   "gameai.playing": "Playing {move}",
   "gameai.targeting_opening": "Targeting opening: {name} (score {score}){first_mv}",
   "gameai.llm_adopting": "MillsLLM recommends {move} (score {score}) — adopting",

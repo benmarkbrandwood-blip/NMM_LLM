@@ -515,5 +515,6 @@
   "assess.ap_3": "Разочарование Malom",
   "assess.ap_4": "Комментарий",
   "opening.recognised": "Дебют распознан: {name}",
-  "opening.transposition": "Транспозиция к: {name}"
+  "opening.transposition": "Транспозиция к: {name}",
+  "gameai.dual_mill_block": "Обнаружен угроза соединения двойных миль — принудительное блокирование на {sq}"
 }

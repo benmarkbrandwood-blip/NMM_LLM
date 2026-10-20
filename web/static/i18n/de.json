@@ -515,5 +515,6 @@
   "assess.ap_3": "Malom-Verlust",
   "assess.ap_4": "Kommentar",
   "opening.recognised": "Eröffnung erkannt: {name}",
-  "opening.transposition": "Transposition zu: {name}"
+  "opening.transposition": "Transposition zu: {name}",
+  "gameai.dual_mill_block": "Doppel-Mill-Verbindung bedroht — erzwungener Block an {sq}"
 }

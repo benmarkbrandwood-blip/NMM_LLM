@@ -454,7 +454,6 @@
   "gameai.sentinel_redirect": "Engine intenționa: {orig} → Sentinel redirecționat la: {move}",
   "gameai.sentinel_recommends": "Engine a jucat: {engine} — Sentinel recomandă: {sentinel}",
   "gameai.intervention": "Intervenție: {detail}",
-
   "opening.speaker": "[Deschidere]",
   "opening.new_seq": "Secvență nouă detectată: \"{name}\" · Redenumire: ",
   "opening.skip": "Salt",
@@ -491,8 +490,8 @@
   "assess.gapnet_hdr": "Blunder Risk / GapNet ({n} flagged)",
   "assess.generalist_hdr": "Generalist Divergence ({n} flagged)",
   "assess.unconv_hdr": "Unconventional Moves ({n} flagged)",
-  "assess.pref_hdr": "Pref Divergence ({n} flagged)",
-  "assess.mobility_hdr": "Mobility Warning ({n} tight plies)",
+  "assess.pref_hdr": "Divergența Preferinței ({n} marcate)",
+  "assess.mobility_hdr": "Avertizare de Mobilitate ({n} pliuri strânsă)",
   "assess.horizon_hdr": "Horizon Regret ({n} flagged)",
   "assess.sentinel_hdr": "Sentinel Divergence ({n} flagged)",
   "assess.value_hdr": "ValueNet Divergence ({n} flagged)",
@@ -514,5 +513,8 @@
   "assess.ap_1": "Punctele de rost",
   "assess.ap_2": "Divergența AI",
   "assess.ap_3": "Regretul Malom",
-  "assess.ap_4": "Comentariu"
+  "assess.ap_4": "Comentariu",
+  "opening.recognised": "Deschidere recunoscuta: {name}",
+  "opening.transposition": "Transpoziție la: {name}",
+  "gameai.dual_mill_block": "Pericol de intersectare dual-mill detectat — blocare forțată la {sq}"
 }

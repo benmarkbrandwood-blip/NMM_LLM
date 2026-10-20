@@ -492,7 +492,7 @@
   "assess.gapnet_hdr": "خطر الأخطاء / GapNet ({n} مُصنف)",
   "assess.generalist_hdr": "انحراف المُعمّر ({n} مُصنف)",
   "assess.unconv_hdr": "أفعال غير تقليدية ({n} مُصنف)",
-  "assess.pref_hdr": "Pref Divergence ({n} flagged)",
+  "assess.pref_hdr": "انحراف Pref ({n} مُحدد)",
   "assess.mobility_hdr": "تحذير الحركة ({n} طبقات ضيقة)",
   "assess.horizon_hdr": "إحساس الحدود ({n} مُصنف)",
   "assess.sentinel_hdr": "انحراف Sentinel ({n} مُصنف)",
@@ -515,5 +515,6 @@
   "assess.ap_1": "نقاط التحوّل",
   "assess.ap_2": "انفصال الذكاء الاصطناعي",
   "assess.ap_3": "Malom regret",
-  "assess.ap_4": "تعليق"
+  "assess.ap_4": "تعليق",
+  "gameai.dual_mill_block": "تم اكتشاف تهديد لربط الميلين — ضرورة تثبيت في {sq}"
 }

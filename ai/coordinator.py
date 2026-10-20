@@ -540,6 +540,34 @@ class Coordinator:
         elif tac.get("6v4_sacrifice_viable"):
             self.emit("GameAI", _t("gameai.endgame_sacrifice"))
 
+        # 3a. Placement-phase dual-mill intervention (difficulty >= 5).
+        # When the human has a closed mill and can complete a second mill that shares
+        # a piece with it in one placement, block that closing square unconditionally.
+        # Defers to same-turn mill-closes and 1-ply blocks, which take higher priority.
+        _forced_dual_block = None
+        if (self.game_ai.difficulty >= 5
+                and get_game_phase(board, board.turn) == "place"
+                and not tac["can_close_mill"]
+                and not tac["must_block_opponent"]):
+            from ai.heuristics import _dual_connected_mill_alert
+            from game.board import MILLS as _H_MILLS
+            _opp_c = "B" if board.turn == "W" else "W"
+            _dual_threats = _dual_connected_mill_alert(board, _opp_c)
+            if _dual_threats:
+                _threat_set = set(_dual_threats)
+                _blocking = [m for m in legal if m.get("to") in _threat_set]
+                if _blocking:
+                    # Prefer the blocking square that also creates an AI 2-config.
+                    def _two_config_gain(mv):
+                        nb = board.apply_move(mv)
+                        return sum(
+                            1 for mill in _H_MILLS
+                            if mv["to"] in mill
+                            and [nb.positions[p] for p in mill].count(board.turn) == 2
+                        )
+                    _forced_dual_block = max(_blocking, key=_two_config_gain)
+                    self.emit("GameAI", _t("gameai.dual_mill_block", sq=_forced_dual_block["to"]))
+
         # 4. GameAI picks its best move (with opening bonus, trajectory hints, endgame depth)
         # Force the book move for the AI's first 2 placements so opening variety is
         # visible regardless of adherence slider.  At 100% adherence the book move is
@@ -547,16 +575,21 @@ class Coordinator:
         force_book_early = compute_force_book_early(
             board, self._game_moves, self.game_ai.color,
         )
-        ai_move = self.game_ai.choose_move(
-            board,
-            recognition=recognition,
-            endgame_state=endgame_state,
-            trajectory_hints=trajectory_hints,
-            force_book_early=force_book_early,
-            trajectory_db=self.trajectory_db,
-        )
-        self.last_thinking = self.game_ai.last_thinking
-        ai_score = self.game_ai.score_move(board, ai_move)
+        if _forced_dual_block:
+            ai_move = _forced_dual_block
+            ai_score = self.game_ai.score_move(board, ai_move)
+            self.last_thinking = []
+        else:
+            ai_move = self.game_ai.choose_move(
+                board,
+                recognition=recognition,
+                endgame_state=endgame_state,
+                trajectory_hints=trajectory_hints,
+                force_book_early=force_book_early,
+                trajectory_db=self.trajectory_db,
+            )
+            self.last_thinking = self.game_ai.last_thinking
+            ai_score = self.game_ai.score_move(board, ai_move)
 
         # 5. Expose score hint to MillsLLM for its prompt
         self.mills_llm._last_ai_score = ai_score
@@ -566,7 +599,9 @@ class Coordinator:
         # so skip the opinion here and play the search move immediately.
         # LLM commentary still fires via react_to_human_move on the human's turns.
         _notations_so_far = [m.get("notation", "") for m in self._game_moves if m.get("notation")]
-        _use_llm_opinion = self.game_ai.difficulty > 4 and not self.game_ai._force_stop
+        _use_llm_opinion = (self.game_ai.difficulty > 4
+                            and not self.game_ai._force_stop
+                            and not _forced_dual_block)
         if _use_llm_opinion:
             opinion, llm_notation = self.mills_llm.ask_for_move_opinion(
                 board, legal, ai_move, recognition=recognition, endgame_state=endgame_state,
@@ -592,7 +627,7 @@ class Coordinator:
                 llm_score = self.game_ai.score_move(board, llm_move)
                 # Never let the LLM override the engine during tactical emergencies
                 # (must-block or own-mill-closure), regardless of score delta.
-                _tac_lock = tac["must_block_opponent"] or tac["can_close_mill"]
+                _tac_lock = tac["must_block_opponent"] or tac["can_close_mill"] or bool(_forced_dual_block)
                 if self.llm_can_override_move and llm_score + self.LLM_BONUS > ai_score and not _tac_lock:
                     move = llm_move
                     self.emit(

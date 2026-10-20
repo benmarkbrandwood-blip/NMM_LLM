@@ -514,5 +514,6 @@
   "assess.ap_3": "Malom szomjúság",
   "assess.ap_4": "Megjegyzés",
   "opening.recognised": "Megnyitó felismerve: {name}",
-  "opening.transposition": "Transzpozíció: {name}"
+  "opening.transposition": "Transzpozíció: {name}",
+  "gameai.dual_mill_block": "Duplák mill összeköttetési veszély észlelt — erőltetett blokk a {sq} helyen"
 }

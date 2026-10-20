@@ -514,5 +514,6 @@
   "assess.ap_3": "Malom regret",
   "assess.ap_4": "توضیحات",
   "opening.recognised": "شروع شناسایی شد: {name}",
-  "opening.transposition": "ترانسپوزیشن به: {name}"
+  "opening.transposition": "ترانسپوزیشن به: {name}",
+  "gameai.dual_mill_block": "تهدید جوینت دو میل دیده شد — بلوک مجبور در {sq}"
 }

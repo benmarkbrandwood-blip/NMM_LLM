@@ -514,5 +514,6 @@
   "assess.ap_3": "Malom遗憾",
   "assess.ap_4": "解说",
   "opening.recognised": "已识别开局：{name}",
-  "opening.transposition": "移调至：{name}"
+  "opening.transposition": "移调至：{name}",
+  "gameai.dual_mill_block": "检测到双三连点威胁——必须在 {sq} 处进行阻挡"
 }
