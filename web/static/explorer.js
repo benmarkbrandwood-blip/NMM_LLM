@@ -89,7 +89,7 @@ const NET_DEFS = {
   gapnet:   { label:'GapNet',    cssColor:'#cc5555', hexColor:0xcc5555, field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
   value:    { label:'ValueNet',  cssColor:'#50aaaa', hexColor:0x50aaaa, field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
   pref:     { label:'PrefNet',   cssColor:'#c4a020', hexColor:0xc4a020, field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
-  pred:     { label:'Pred',      cssColor:'#ff6eb4', hexColor:0xff6eb4, field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  teacher:  { label:'Hum%',      cssColor:'#a06fe0', hexColor:0xa06fe0, field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   regret:   { label:'Regret',    cssColor:'#ff6020', hexColor:0xff6020, field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
   pressure: { label:'Pressure',  cssColor:'#4caf50', hexColor:0x4caf50, field:'pressure_score',  isHigherBetter:true,  isAbsNorm:false },
 };
@@ -700,7 +700,7 @@ if (malomToggle) {
   });
 }
 
-const _explorerBandSel = document.getElementById('pred-band-select');
+const _explorerBandSel = document.getElementById('hum-band-select');
 if (_explorerBandSel) {
   _explorerBandSel.addEventListener('change', () => {
     explorerEloBand = _explorerBandSel.value;
@@ -733,7 +733,7 @@ if (_generalistToggle) {
   });
 }
 
-// ── Hint rings (HumanDB gold, Pred Human blue-purple, Sentinel blue, Heuristic purple) ──
+// ── Hint rings (HumanDB gold, Hum% purple, Sentinel blue, Heuristic purple) ──
 // Each indicator uses a distinct ring radius so overlapping hints remain visible as
 // concentric rings rather than z-fighting on the same geometry.
 
@@ -1213,7 +1213,7 @@ function showTooltip(cx, cy, mv) {
     const trajRow = hasTrajData !== false && trajPct > 0
       ? `<div class="tt-row"><span class="tt-label">T (piece)</span><span>T:${trajPct}%</span></div>`
       : hasTrajData === false && predPct > 0
-        ? `<div class="tt-row"><span class="tt-label">P (piece)</span><span style="color:#ff6eb4">P:${predPct}%</span></div>`
+        ? `<div class="tt-row"><span class="tt-label">H (piece)</span><span style="color:#a06fe0">H:${predPct}%</span></div>`
         : '';
     let netRows = '';
     if (mv._bestByNet) {
@@ -1271,7 +1271,7 @@ function showTooltip(cx, cy, mv) {
   }
 
   const predRow = mv.pred_human_prob != null
-    ? `<div class="tt-row"><span class="tt-label" style="color:#ff6eb4">Pred</span><span style="color:#ff6eb4">P:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
+    ? `<div class="tt-row"><span class="tt-label" style="color:#a06fe0">Hum%</span><span style="color:#a06fe0">H:${(mv.pred_human_prob * 100).toFixed(1)}%</span></div>`
     : '';
   const gapnetRow = mv.gapnet_score != null
     ? `<div class="tt-row"><span class="tt-label" style="color:#cc5555">${_t('explorer.tt_gapnet_risk')}</span><span style="color:#cc5555">${(mv.gapnet_score * 100).toFixed(1)}%</span></div>`

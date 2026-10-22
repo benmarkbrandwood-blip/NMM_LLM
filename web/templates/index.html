@@ -222,8 +222,7 @@
             <option value="gapnet">GapNet</option>
             <option value="value">ValueNet</option>
             <option value="pref">PrefNet</option>
-            <option value="pred">Pred</option>
-            <option value="teacher">Teacher</option>
+            <option value="teacher">Hum%</option>
             <option value="generalist">Generalist</option>
             <option value="regret">Regret</option>
           </select>
@@ -233,8 +232,7 @@
             <option value="gapnet">GapNet</option>
             <option value="value">ValueNet</option>
             <option value="pref">PrefNet</option>
-            <option value="pred">Pred</option>
-            <option value="teacher">Teacher</option>
+            <option value="teacher">Hum%</option>
             <option value="generalist">Generalist</option>
             <option value="regret">Regret</option>
           </select>
@@ -244,8 +242,7 @@
             <option value="gapnet">GapNet</option>
             <option value="value">ValueNet</option>
             <option value="pref">PrefNet</option>
-            <option value="pred">Pred</option>
-            <option value="teacher">Teacher</option>
+            <option value="teacher">Hum%</option>
             <option value="generalist">Generalist</option>
             <option value="regret">Regret</option>
           </select>
@@ -259,12 +256,12 @@
           </span>
           <span class="diag-sep">|</span>
           <span class="diag-section-label" data-i18n="analysis.db">DB:</span>
-          <button id="diag-btn-traj"  class="diag-chip" title="Trajectory DB: move frequency from human games; falls back to Pred Human (P:XX%) when no trajectory data">Traj/Pred</button>
+          <button id="diag-btn-traj"  class="diag-chip" title="Trajectory DB: move frequency from human games; falls back to Hum% model (H:XX%) when no trajectory data">Traj/Hum</button>
           <select id="sel-traj-n" title="Show sample count in trajectory labels" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
             <option value="">T%</option>
             <option value="n">T%(n=)</option>
           </select>
-          <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+          <select id="hum-band-select" title="Elo band for Hum% predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
             <option value="all">All</option>
             <option value="lower">Lower</option>
             <option value="middle" selected>Middle</option>
@@ -274,7 +271,7 @@
           <button id="diag-btn-pressure" class="diag-chip" title="Malom Pressure: for each move you can make, shows % of opponent&#39;s responses that are losing (green L:%) or winning (red W:%) for them &#8212; choose moves that maximise their mistake risk">Opp. Pressure</button>
           <button id="diag-btn-overseer" class="diag-chip" title="AI choice: ScaffoldedPolicyNet pick probability per move (O:XX%)">AI choice</button>
           <span id="diag-overseer-status" style="font-size:.75rem;color:#888;display:none" title="Overseer checkpoint not loaded">(no model)</span>
-          <span style="font-size:.63rem;color:#777" title="T = observed move frequency from human trajectory data&#10;P = model-predicted human move probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; P=pred &nbsp; T:—=unseen</span>
+          <span style="font-size:.63rem;color:#777" title="T = observed move frequency from human trajectory data&#10;H = Hum% model probability (Elo-conditioned)&#10;T:— = move not seen in trajectory sample">T=traj &nbsp; H=hum% &nbsp; T:—=unseen</span>
         </div>
       </div>
 
@@ -461,6 +458,16 @@
         <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
           <input type="checkbox" id="chk-llm-override" checked>
           <label for="chk-llm-override" style="color:var(--text); font-size:.9rem;" data-i18n="newgame.llm_override">MillsAI can influence move choice</label>
+        </div>
+
+        <div style="font-size:.85rem;font-weight:600;color:var(--tan);margin:8px 0 2px">Assessment commentary</div>
+        <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-assess-llm-stage1" checked>
+          <label for="chk-assess-llm-stage1" style="color:var(--text); font-size:.9rem;">Early summary (##Session, pre-Malom)</label>
+        </div>
+        <div class="form-row" style="flex-direction:row; align-items:center; gap:8px;">
+          <input type="checkbox" id="chk-assess-llm-stage4" checked>
+          <label for="chk-assess-llm-stage4" style="color:var(--text); font-size:.9rem;">Final synthesis (stage 4, with Malom)</label>
         </div>
 
         <div class="form-row" id="row-sentinel" style="flex-direction:row; align-items:center; gap:8px;">

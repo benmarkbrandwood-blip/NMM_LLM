@@ -195,7 +195,8 @@ fi
 # ── 6. Create data directories ────────────────────────────────────────────────
 for d in data/games data/ai_games data/human_games data/session_memory \
           data/chroma data/players data/weights data/endgame data/backups \
-          data/logs learned_ai/sentinel/checkpoints; do
+          data/logs learned_ai/sentinel/checkpoints \
+          data/puzzles/endgame data/puzzles/malom data/puzzles/placement data/puzzles/formation; do
     mkdir -p "$NMM_DIR/$d"
 done
 info "Data directories ready."

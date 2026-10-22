@@ -107,37 +107,20 @@
           </div>
         </div>
 
-        <!-- Pred -->
+        <!-- Hum% -->
         <div class="ov-card">
           <div class="ov-card-header">
-            <span class="ov-badge" style="background:#3a1030;color:#ff6eb4">P:</span>
-            <span class="ov-name" data-i18n="overlay.pred_name">Pred</span>
-            <span class="ov-tag" data-i18n="overlay.pred_tag">Human move predictor</span>
+            <span class="ov-badge" style="background:#1e1040;color:#a06fe0">H:</span>
+            <span class="ov-name" data-i18n="overlay.teacher_name">Hum%</span>
+            <span class="ov-tag" data-i18n="overlay.teacher_tag">Human move probability</span>
           </div>
           <div class="ov-row">
             <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
-            <span class="ov-body" data-i18n="overlay.pred_what">Predicted probability (%) that a human player at the selected Elo band would play each move. Use the band selector to filter by strength.</span>
+            <span class="ov-body" data-i18n="overlay.teacher_what">Predicted probability (%) that a human player at the selected Elo band would play each move. Use the band selector to filter by strength.</span>
           </div>
           <div class="ov-row">
             <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
-            <span class="ov-body" data-i18n="overlay.pred_how">Teacher v4 model, trained with log-scaled branching-factor weighting. Achieves significantly better accuracy on high-branching positions (openings, early midgame) than earlier models.</span>
-          </div>
-        </div>
-
-        <!-- Teacher -->
-        <div class="ov-card">
-          <div class="ov-card-header">
-            <span class="ov-badge" style="background:#1e1040;color:#a06fe0">Tch:</span>
-            <span class="ov-name" data-i18n="overlay.teacher_name">Teacher</span>
-            <span class="ov-tag" data-i18n="overlay.teacher_tag">Human move predictor (alt. colour)</span>
-          </div>
-          <div class="ov-row">
-            <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
-            <span class="ov-body" data-i18n="overlay.teacher_what">Same data as Pred — Teacher v4 predicted human move probability — shown in a different colour so it can be used alongside the Pred slot.</span>
-          </div>
-          <div class="ov-row">
-            <span class="ov-lbl" data-i18n="overlay.lbl_how">Training</span>
-            <span class="ov-body" data-i18n="overlay.teacher_how">The Teacher model also serves as a training opponent for the Generalist AI at a 25% humanlike blend, contributing human-style move diversity to self-play.</span>
+            <span class="ov-body" data-i18n="overlay.teacher_how">Teacher v4 model, trained on 22,000+ human games with log-scaled branching-factor weighting. Also serves as a training opponent for the Generalist AI at a 25% humanlike blend.</span>
           </div>
         </div>
 
@@ -217,19 +200,19 @@
           </div>
         </div>
 
-        <!-- Traj/Pred -->
+        <!-- Traj/Hum -->
         <div class="ov-card">
           <div class="ov-card-header">
-            <span class="ov-name" data-i18n="overlay.traj_name">Traj/Pred</span>
-            <span class="ov-tag" data-i18n="overlay.traj_tag">Human trajectory + prediction</span>
+            <span class="ov-name" data-i18n="overlay.traj_name">Traj/Hum</span>
+            <span class="ov-tag" data-i18n="overlay.traj_tag">Human trajectory + Hum% fallback</span>
           </div>
           <div class="ov-row">
             <span class="ov-lbl" data-i18n="overlay.lbl_what">What it shows</span>
-            <span class="ov-body" data-i18n="overlay.traj_what">T: = % of human games in the database that used this move from this exact position. P: = Teacher v4 model probability when no trajectory data exists for a move (T:—).</span>
+            <span class="ov-body" data-i18n="overlay.traj_what">T: = % of human games in the database that used this move from this exact position. H: = Hum% model probability when no trajectory data exists for a move (T:—).</span>
           </div>
           <div class="ov-row">
             <span class="ov-lbl" data-i18n="overlay.lbl_how">Source</span>
-            <span class="ov-body" data-i18n="overlay.traj_how">T: data is indexed from 22,000+ human games. When a position has never been seen in the database, P: falls back to the Teacher v4 model for an Elo-conditioned estimate.</span>
+            <span class="ov-body" data-i18n="overlay.traj_how">T: data is indexed from 22,000+ human games. When a position has never been seen in the database, H: falls back to the Hum% model for an Elo-conditioned estimate.</span>
           </div>
         </div>
 

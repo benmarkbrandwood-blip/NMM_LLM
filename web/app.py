@@ -173,12 +173,19 @@ def _reconstruct_missing_placements(starting_board: "BoardState") -> "list[dict]
 
 
 def _persist_game_record(record: dict) -> None:
-    """Write a completed game record to the games JSONL folder (no LLM required)."""
+    """Write a completed game record to the games JSONL folder (no LLM required).
+
+    Skips the write when the coordinator path already wrote the file via
+    MemoryManager.save_game_record — both target the same filename so a second
+    append would create a duplicate line that blocks _persist_assessment.
+    """
     import uuid as _uuid
     from datetime import datetime as _dt
     session_id = record.get("session_id") or str(_uuid.uuid4())
     date_str = (record.get("date") or _dt.now().isoformat())[:10]
     fname = _GAMES_PATH / f"game_{date_str}_{session_id[:8]}.jsonl"
+    if fname.exists():
+        return  # already written by MemoryManager (coordinator on_game_end path)
     with open(fname, "a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")
     log.info("Game saved: %s", fname.name)
@@ -2091,6 +2098,21 @@ async def puzzles_page(request: Request):
     return templates.TemplateResponse(request, "puzzles.html", {"v": _static_ver()})
 
 
+@app.get("/api/puzzles/counts")
+async def api_puzzle_counts():
+    """Return the number of available cached puzzles for each type."""
+    import pathlib
+    base = _ROOT / "data" / "puzzles"
+    def _count(d: pathlib.Path) -> int:
+        return len(list(d.glob("*.json"))) if d.exists() else 0
+    return {
+        "endgame":   _count(base / "endgame"),
+        "midgame":   _count(base / "malom"),
+        "placement": _count(base / "placement"),
+        "formation": _count(base / "formation"),
+    }
+
+
 _PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "endgame"
 _PUZZLE_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 _MALOM_PUZZLE_CACHE_DIR = _ROOT / "data" / "puzzles" / "malom"
@@ -2881,6 +2903,89 @@ def _mv_notation(mv: dict) -> str:
     if capture:
         return f"{base}x{capture}"
     return base
+
+
+@app.get("/api/drill/malom_labels")
+async def api_drill_malom_labels(fen: str):
+    """Return per-square WDL labels for the Opening Drill.
+
+    For each empty square, returns the best WDL outcome the current player
+    can achieve by placing there (considering all legal captures after a mill).
+    """
+    import asyncio as _asyncio
+    from fastapi.responses import JSONResponse
+    from collections import defaultdict
+
+    _ensure_malom_puzzle_db()
+    if _malom_puzzle_db is None or not _malom_puzzle_db.is_available():
+        return JSONResponse({"labels": {}, "available": False})
+
+    try:
+        from game.board import BoardState
+        from game.rules import get_all_legal_moves
+
+        board = BoardState.from_fen_string(fen)
+
+        def _compute():
+            sq_wdls: dict[str, list[str]] = defaultdict(list)
+            flip = {"W": "L", "L": "W", "D": "D"}
+            for move in get_all_legal_moves(board):
+                sq = move["to"]
+                child = board.apply_move(move)
+                val = _malom_puzzle_db.query_value(child)
+                if val is None:
+                    continue
+                # val.outcome is from the child mover's perspective; flip for parent
+                sq_wdls[sq].append(flip.get(val.outcome, "D"))
+            order = {"W": 2, "D": 1, "L": 0}
+            return {
+                sq: max(wdls, key=lambda w: order.get(w, 0))
+                for sq, wdls in sq_wdls.items()
+            }
+
+        labels = await _asyncio.to_thread(_compute)
+        return JSONResponse({"labels": labels, "available": True})
+    except Exception as exc:
+        log.debug("drill/malom_labels error: %s", exc)
+        return JSONResponse({"labels": {}, "available": False})
+
+
+@app.get("/api/drill/ai_move")
+async def api_drill_ai_move(fen: str):
+    """Pick the best placement square for the current player using the Generalist AI.
+
+    Used as fallback in the Opening Drill when Malom WDL labels are unavailable.
+    Returns {"square": str | null}
+    """
+    import asyncio as _asyncio
+    import random as _random
+    from fastapi.responses import JSONResponse
+    from game.board import BoardState
+    from game.rules import get_all_legal_moves
+
+    try:
+        board = BoardState.from_fen_string(fen)
+    except Exception:
+        return JSONResponse({"square": None})
+
+    moves = get_all_legal_moves(board)
+    place_moves = [m for m in moves if m["from"] is None]
+    if not place_moves:
+        return JSONResponse({"square": None})
+
+    color = board.turn
+    cands = [{"from": m["from"], "to": m["to"], "capture": m["capture"]} for m in place_moves]
+
+    if _generalist_advisor is not None and _generalist_advisor.is_loaded():
+        try:
+            probs = await _asyncio.to_thread(_generalist_advisor.score_moves, board, cands, color)
+            if probs:
+                best = max(range(len(probs)), key=lambda i: probs[i])
+                return JSONResponse({"square": place_moves[best]["to"]})
+        except Exception as exc:
+            log.debug("drill/ai_move generalist error: %s", exc)
+
+    return JSONResponse({"square": _random.choice(place_moves)["to"]})
 
 
 @app.get("/api/explorer/position")
@@ -3749,6 +3854,61 @@ async def _run_game_assessment(ws: WebSocket, session: Session, record: dict) ->
     if not ctx.moves_raw:
         await _send(ws, {"type": "assessment_timeout", "reason": "error"})
         return
+
+    # Signal client to reset any previous assessment display for this game
+    await _send(ws, {"type": "assessment_start"})
+
+    # ── Early Malom scan (runs before Pass 1, ~5-17s) ─────────────────────────
+    # Sends malom_wdl_shifts to the client immediately so the Malom card appears
+    # even if the user cancels before the full assessment completes.  The late
+    # _pass_oracle at Stage 3 still runs to populate quality overrides on the full
+    # annotation objects; this is purely a UI-timing improvement.
+    if _assessor_malom_db is not None and _assessor_malom_db.is_available():
+        def _malom_scan():
+            shifts = []
+            for i, mr in enumerate(ctx.moves_raw):
+                board = ctx.board_seq[i]
+                parent = _assessor_malom_db.query_value(board)
+                if parent is None or parent.outcome == "L":
+                    continue
+                pm = {"from": mr.get("from"), "to": mr["to"], "capture": mr.get("capture")}
+                r = _assessor_malom_db.query_regret(board, pm)
+                if not r.available or parent.outcome == r.omv.outcome:
+                    continue
+                color = mr.get("color", board.turn)
+                notation = mr.get("notation") or (
+                    (f"{mr['from']}-" if mr.get("from") else "") + mr["to"]
+                    + (f"x{mr['capture']}" if mr.get("capture") else "")
+                )
+                best_alt = None
+                if r.best_legal_move is not None and r.best_legal_move != pm:
+                    bm = r.best_legal_move
+                    best_alt = (
+                        (f"{bm['from']}-" if bm.get("from") else "") + bm["to"]
+                        + (f"x{bm['capture']}" if bm.get("capture") else "")
+                    )
+                shifts.append({
+                    "ply":           i + ctx.ply_base,
+                    "color":         color,
+                    "wdl_before":    parent.outcome,
+                    "wdl_after":     r.omv.outcome,
+                    "move":          notation,
+                    "malom_best_alt": best_alt,
+                })
+            return shifts
+        try:
+            _early_shifts = await asyncio.to_thread(_malom_scan)
+            if _early_shifts:
+                await _send(ws, {
+                    "type":            "assessment_malom",
+                    "malom_wdl_shifts": _early_shifts,
+                    "ply_base":        ctx.ply_base,
+                })
+        except asyncio.CancelledError:
+            await _send(ws, {"type": "assessment_timeout", "reason": "cancelled"})
+            return
+        except Exception as exc:
+            log.debug("Early Malom scan failed: %s", exc)
 
     # ── Stage 1: heuristic + sentinel + policy + pref + horizon ──────────────
     try:

@@ -63,8 +63,17 @@
     width: 480px; height: 480px; background: #2a1f14;
     border-radius: 10px; box-shadow: 0 4px 24px rgba(0,0,0,.6);
     padding: 8px; box-sizing: border-box; flex-shrink: 0;
+    position: relative;
   }
   #board-svg { width: 100%; height: 100%; display: block; }
+  #gt-board-label {
+    display: none; position: absolute; top: 14px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 2.6em; font-weight: bold; color: #ffe080;
+    font-family: monospace; letter-spacing: 0.12em;
+    background: rgba(26,26,46,0.88); border-radius: 6px;
+    padding: 2px 18px; z-index: 20; pointer-events: none; white-space: nowrap;
+  }
   .info-panel { flex: 1; min-width: 260px; }
   .meta { color: #aaa; font-size: 0.85em; margin-bottom: 12px; }
   .meta span { color: #ccc; }
@@ -111,6 +120,28 @@
   .attrib { color: #666; font-size: 0.78em; margin: -14px 0 18px; }
   .attrib a { color: #888; }
   .attrib a:hover { color: #aaa; }
+  /* ── Grid Tester ── */
+  #gt-timer-wrap { width:100%; max-width:480px; height:12px; background:#1a1a3e;
+                   border-radius:6px; margin-bottom:12px; overflow:hidden; }
+  #gt-timer-bar  { height:100%; background:#5a9aff; border-radius:6px; width:100%; transition:background 0.2s; }
+  #gt-timer-bar.warn { background:#ff9840; }
+  #gt-timer-bar.crit { background:#ff4444; }
+  #gt-question   { font-size:2.2em; color:#ffe080; text-align:center; letter-spacing:0.08em;
+                   font-weight:bold; margin:12px 0; min-height:1.4em; font-family:monospace; }
+  #gt-feedback   { font-size:1em; min-height:1.4em; text-align:center; margin-bottom:8px; }
+  #gt-stats      { color:#aaa; font-size:0.9em; text-align:center; margin-bottom:12px; }
+  .gt-hs         { color:#ffd080; }
+  /* ── Opening Drill ── */
+  #od-info       { background:#1e1a32; border:1px solid #5a3a9e; border-radius:6px;
+                   padding:10px 14px; margin-bottom:12px; font-size:0.9em; }
+  #od-score-line { color:#ffe080; font-size:1em; margin-bottom:4px; }
+  #od-move-line  { color:#aaa; font-size:0.85em; }
+  .od-status     { padding:8px 10px; border-radius:4px; margin:8px 0; font-size:0.95em; }
+  .od-gold   { background:#3a3a1e; border-left:3px solid #ffd080; color:#ffd080; }
+  .od-green  { background:#1a3a1e; border-left:3px solid #4caf50; color:#4caf50; }
+  .od-yellow { background:#3a3a1e; border-left:3px solid #ffaa40; color:#ffaa40; }
+  .od-red    { background:#3a1a1a; border-left:3px solid #f44336; color:#f44336; }
+  .od-info   { background:#1a2a4e; border-left:3px solid #5a8abe; color:#aab8d0; }
 </style>
 </head>
 <body>
@@ -122,10 +153,12 @@
 by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
 
 <div class="controls" style="margin-bottom:8px">
-  <button id="mode-endgame" class="btn-active" onclick="window._setMode('endgame')" data-i18n="puzzles.mode_endgame">Endgame</button>
-  <button id="mode-midgame" onclick="window._setMode('midgame')" data-i18n="puzzles.mode_midgame">Midgame</button>
-  <button id="mode-placement" onclick="window._setMode('placement')" data-i18n="puzzles.mode_placement">Placement</button>
-  <button id="mode-formation" onclick="window._setMode('formation')" data-i18n="puzzles.mode_formation">Formation</button>
+  <button id="mode-endgame" class="btn-active" onclick="window._setMode('endgame')" data-i18n="puzzles.mode_endgame">Endgame<span id="cnt-endgame" style="font-size:.75em;opacity:.7;margin-left:4px"></span></button>
+  <button id="mode-midgame" onclick="window._setMode('midgame')" data-i18n="puzzles.mode_midgame">Midgame<span id="cnt-midgame" style="font-size:.75em;opacity:.7;margin-left:4px"></span></button>
+  <button id="mode-placement" onclick="window._setMode('placement')" data-i18n="puzzles.mode_placement">Placement<span id="cnt-placement" style="font-size:.75em;opacity:.7;margin-left:4px"></span></button>
+  <button id="mode-formation" onclick="window._setMode('formation')" data-i18n="puzzles.mode_formation">Formation<span id="cnt-formation" style="font-size:.75em;opacity:.7;margin-left:4px"></span></button>
+  <button id="mode-grid-test" onclick="window._setMode('grid-test')" data-i18n="puzzles.mode_grid_test">Grid Test</button>
+  <button id="mode-opening-drill" onclick="window._setMode('opening-drill')" data-i18n="puzzles.mode_opening_drill">Drill</button>
 </div>
 
 <div class="controls" id="endgame-controls">
@@ -209,6 +242,36 @@ by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
   <button class="btn-enter btn-enter-toggle" onclick="window._toggleSetup()" data-i18n="puzzles.enter_puzzle">Enter puzzle</button>
 </div>
 
+<div class="controls" id="grid-test-controls" style="display:none">
+  <select id="gt-mode-sel">
+    <option value="node">Nodes only</option>
+    <option value="mixed" selected>Mixed</option>
+    <option value="move">Moves only</option>
+  </select>
+  <button id="gt-start-btn" onclick="window._gtStart()">Start</button>
+  <span id="gt-hs-display" style="font-size:0.85em;color:#ffd080">Best: 0</span>
+</div>
+
+<div class="controls" id="opening-drill-controls" style="display:none">
+  <select id="od-family-sel"><option value="">All families</option></select>
+  <select id="od-side-sel">
+    <option value="random">Either side</option>
+    <option value="W">Play White</option>
+    <option value="B">Play Black</option>
+  </select>
+  <select id="od-start-ply">
+    <option value="0">From ply 1</option>
+    <option value="2">From ply 3</option>
+    <option value="4">From ply 5</option>
+    <option value="6">From ply 7</option>
+    <option value="8">From ply 9</option>
+  </select>
+  <button onclick="window._odStart()">Start Drill</button>
+  <button id="od-hint-btn" onclick="window._odHint()" style="display:none">Hint (3)</button>
+  <button id="od-flash-btn" onclick="window._odFlash()" style="display:none">Flash line</button>
+  <button id="od-back-btn" onclick="window._odBack()" style="display:none" disabled>↩ Back</button>
+</div>
+
 <!-- Setup panel (hidden by default) -->
 <div id="setup-panel" style="display:none">
   <h3 data-i18n="puzzles.setup_heading">Enter a Puzzle</h3>
@@ -247,14 +310,31 @@ by Gábor Danner &amp; Gábor E. Gévay (University of Szeged).</p>
   </div>
 </div>
 
+<div id="grid-test-panel" style="display:none">
+  <div id="gt-timer-wrap"><div id="gt-timer-bar"></div></div>
+  <div id="gt-feedback"></div>
+  <div id="gt-stats"></div>
+  <div id="gt-game-over" style="display:none" class="status info"></div>
+</div>
+
+<div id="opening-drill-panel" style="display:none">
+  <div id="od-info">
+    <div id="od-score-line">Score: 0</div>
+    <div id="od-move-line">Choose a family and start.</div>
+  </div>
+  <div id="od-status" class="od-status od-info">Select a family and click Start Drill.</div>
+</div>
+
 <div id="goal-label" class="goal" style="display:none"></div>
 <div class="board-area">
   <div class="board-wrap">
+    <div id="gt-board-label">—</div>
     <svg id="board-svg"></svg>
   </div>
   <div class="info-panel">
     <div id="puzzle-num" class="puzzle-num"></div>
     <div id="meta" class="meta"></div>
+    <div id="puzzle-hist-stats" style="display:none; font-size:0.8em; color:#aaa; margin-bottom:6px"></div>
     <div id="status" class="status info" data-i18n="puzzles.load_begin">Load a puzzle to begin.</div>
     <div id="capture-prompt" class="capture-prompt" style="display:none" data-i18n="puzzles.capture_prompt">
       Click an opponent piece to capture it.
@@ -291,6 +371,67 @@ const MILLS = [
   ['c5','d5','e5'],['e5','e4','e3'],['e3','d3','c3'],['c3','c4','c5'],
   ['d7','d6','d5'],['g4','f4','e4'],['d1','d2','d3'],['a4','b4','c4'],
 ];
+
+const NMM_ADJ = {
+  a7:['d7','a4'],  d7:['a7','g7','d6'], g7:['d7','g4'],
+  g4:['g7','g1','f4'], g1:['g4','d1'], d1:['g1','a1','d2'],
+  a1:['d1','a4'],  a4:['a7','a1','b4'],
+  b6:['d6','b4'],  d6:['b6','f6','d7','d5'], f6:['d6','f4'],
+  f4:['f6','f2','g4','e4'], f2:['f4','d2'], d2:['f2','b2','d1','d3'],
+  b2:['d2','b4'],  b4:['b6','b2','a4','c4'],
+  c5:['d5','c4'],  d5:['c5','e5','d6'], e5:['d5','e4'],
+  e4:['e5','e3','f4'], e3:['e4','d3'], d3:['e3','c3','d2'],
+  c3:['d3','c4'],  c4:['c3','c5','b4'],
+};
+
+const GT_LEVELS = [
+  { min:0,  bonus:3600, penalty:2400, maxMs:18000 },
+  { min:8,  bonus:2000, penalty:1600, maxMs:9000  },
+  { min:16, bonus:800,  penalty:1000, maxMs:5000  },
+  { min:25, bonus:700,  penalty:1100, maxMs:4500  },
+  { min:35, bonus:600,  penalty:1200, maxMs:4000  },
+  { min:50, bonus:500,  penalty:1400, maxMs:3500  },
+  { min:70, bonus:400,  penalty:1600, maxMs:3000  },
+  { min:90, bonus:350,  penalty:1800, maxMs:2500  },
+];
+
+// ── Puzzle stats (localStorage) ───────────────────────────────────────────────
+class PuzzleStats {
+  _key(type) { return `nmm_stats_${type}`; }
+  get(type) {
+    try { return JSON.parse(localStorage.getItem(this._key(type))) || { solved:0, failed:0, streak:0, best:0 }; }
+    catch { return { solved:0, failed:0, streak:0, best:0 }; }
+  }
+  recordSolve(type) {
+    const s = this.get(type);
+    s.solved++; s.streak++; if (s.streak > s.best) s.best = s.streak;
+    localStorage.setItem(this._key(type), JSON.stringify(s)); return s;
+  }
+  recordFail(type) {
+    const s = this.get(type);
+    s.failed++; s.streak = 0;
+    localStorage.setItem(this._key(type), JSON.stringify(s)); return s;
+  }
+  html(type) {
+    const s = this.get(type);
+    const total = s.solved + s.failed;
+    const pct   = total ? Math.round(100 * s.solved / total) : 0;
+    return `<span style="color:#4caf50">✓${s.solved}</span>`
+         + `&thinsp;<span style="color:#f44336">✗${s.failed}</span>`
+         + ` &nbsp;·&nbsp; Streak <b>${s.streak}</b> / Best <b>${s.best}</b>`
+         + ` &nbsp;·&nbsp; <b>${pct}%</b>`;
+  }
+}
+const puzzleStats = new PuzzleStats();
+
+function _updatePuzzleHistStats() {
+  const el = document.getElementById('puzzle-hist-stats');
+  if (!el) return;
+  const isPuzzle = ['endgame','midgame','placement','formation'].includes(puzzleMode);
+  if (!isPuzzle) { el.style.display = 'none'; return; }
+  el.innerHTML = puzzleStats.html(puzzleMode);
+  el.style.display = '';
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parseFen(fen) {
@@ -456,6 +597,7 @@ window._savePuzzle = async function() {
     movesDone    = [];
     solved       = false;
     failed       = false;
+    _statRecorded = false;
     freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('goal-label').style.display = '';
@@ -527,6 +669,7 @@ let posMap      = {};
 let movesDone   = [];
 let solved      = false;
 let failed      = false;
+let _statRecorded = false;
 let pendingMove = null;
 let puzzleMode  = 'endgame';  // 'endgame' | 'midgame' | 'placement'
 let freePlayMode = false;       // true after user chooses "Continue vs AI" on a wrong move
@@ -612,6 +755,9 @@ function showBoard() {
 
 // ── Click handler ─────────────────────────────────────────────────────────────
 function onNodeClick(pos) {
+  if (puzzleMode === 'grid-test')    { gridTester.onClick(pos);   return; }
+  if (puzzleMode === 'opening-drill'){ openingDrill.onClick(pos); return; }
+
   // Setup mode: place / erase pieces
   if (setupMode) {
     if (setupBrush === '') {
@@ -799,11 +945,13 @@ async function submitMove(notation) {
       showBoard();
       setStatus('❌ That move throws away the win! Load a new puzzle to try again.', 'fail');
       failed = true;
+      if (!_statRecorded) { _statRecorded = true; puzzleStats.recordFail(puzzleMode); _updatePuzzleHistStats(); }
     } else if (oppCount < 3 || !data.child_wdl) {
       showBoard();
       board.flashMills(posMap, puzzle.winning_side);
       setStatus('🎉 Excellent — forced win found!', 'ok');
       solved = true;
+      if (!_statRecorded) { _statRecorded = true; puzzleStats.recordSolve(puzzleMode); _updatePuzzleHistStats(); }
       _launchConfetti();
     } else {
       showBoard();
@@ -858,6 +1006,7 @@ async function autoPlayOpponent() {
   if (soFar >= puzzle.solution_line.length) {
     setStatus('🎉 Puzzle complete!', 'ok');
     solved = true;
+    if (!_statRecorded) { _statRecorded = true; puzzleStats.recordSolve(puzzleMode); _updatePuzzleHistStats(); }
     _launchConfetti();
     return;
   }
@@ -1006,6 +1155,7 @@ window._resetPuzzle = function() {
   movesDone    = [];
   solved       = false;
   failed       = false;
+  _statRecorded = false;
   freePlayMode = false;
   pendingMove  = null;
   document.getElementById('capture-prompt').style.display = 'none';
@@ -1046,6 +1196,7 @@ window._loadPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
+    _statRecorded = false;
     freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
@@ -1087,20 +1238,29 @@ window._loadPuzzle = async function() {
 
 // ── Mode switching ────────────────────────────────────────────────────────────
 window._setMode = function(mode) {
+  if (mode !== 'grid-test' && gridTester.active) gridTester.stop();
   puzzleMode = mode;
   document.getElementById('mode-endgame').classList.toggle('btn-active', mode === 'endgame');
   document.getElementById('mode-midgame').classList.toggle('btn-active', mode === 'midgame');
   document.getElementById('mode-placement').classList.toggle('btn-active', mode === 'placement');
   document.getElementById('mode-formation').classList.toggle('btn-active', mode === 'formation');
-  document.getElementById('endgame-controls').style.display   = mode === 'endgame'   ? '' : 'none';
-  document.getElementById('midgame-controls').style.display   = mode === 'midgame'   ? '' : 'none';
-  document.getElementById('placement-controls').style.display = mode === 'placement' ? '' : 'none';
-  document.getElementById('formation-controls').style.display = mode === 'formation' ? '' : 'none';
+  document.getElementById('mode-grid-test').classList.toggle('btn-active', mode === 'grid-test');
+  document.getElementById('mode-opening-drill').classList.toggle('btn-active', mode === 'opening-drill');
+  document.getElementById('endgame-controls').style.display    = mode === 'endgame'       ? '' : 'none';
+  document.getElementById('midgame-controls').style.display    = mode === 'midgame'       ? '' : 'none';
+  document.getElementById('placement-controls').style.display  = mode === 'placement'     ? '' : 'none';
+  document.getElementById('formation-controls').style.display  = mode === 'formation'     ? '' : 'none';
+  document.getElementById('grid-test-controls').style.display  = mode === 'grid-test'     ? '' : 'none';
+  document.getElementById('opening-drill-controls').style.display = mode === 'opening-drill' ? '' : 'none';
+  document.getElementById('grid-test-panel').style.display     = mode === 'grid-test'     ? '' : 'none';
+  document.getElementById('opening-drill-panel').style.display = mode === 'opening-drill' ? '' : 'none';
   const titles = {
-    endgame:   ['NMM Endgame Puzzles',   'Find the forced win — endgame positions from the retrograde tablebase.'],
-    midgame:   ['NMM Midgame Puzzles',   'Find the forced win — midgame positions from the Malom perfect database.'],
-    placement: ['NMM Placement Puzzles', 'Find the forced win — placement-phase positions from the Malom perfect database.'],
-    formation: ['NMM Formation Puzzles', 'Navigate a 6v4 endgame to the forced win — based on the 42 Spiller catalogue formations.'],
+    endgame:        ['NMM Endgame Puzzles',   'Find the forced win — endgame positions from the retrograde tablebase.'],
+    midgame:        ['NMM Midgame Puzzles',   'Find the forced win — midgame positions from the Malom perfect database.'],
+    placement:      ['NMM Placement Puzzles', 'Find the forced win — placement-phase positions from the Malom perfect database.'],
+    formation:      ['NMM Formation Puzzles', 'Navigate a 6v4 endgame to the forced win — based on the 42 Spiller catalogue formations.'],
+    'grid-test':    ['NMM Grid Tester',       'Train your board vision — name that square before time runs out!'],
+    'opening-drill':['NMM Opening Drill',     'Drill placement-phase opening lines from the opening family database.'],
   };
   document.getElementById('page-title').textContent    = titles[mode][0];
   document.getElementById('page-subtitle').textContent = titles[mode][1];
@@ -1108,7 +1268,7 @@ window._setMode = function(mode) {
   currentFen = null;
   posMap = {};
   movesDone = [];
-  solved = failed = false;
+  solved = failed = _statRecorded = false;
   pendingMove = null;
   document.getElementById('goal-label').style.display  = 'none';
   document.getElementById('btn-area').style.display    = 'none';
@@ -1116,13 +1276,19 @@ window._setMode = function(mode) {
   document.getElementById('puzzle-num').textContent    = '';
   document.getElementById('meta').innerHTML            = '';
   document.getElementById('tags').innerHTML            = '';
+  if (mode === 'opening-drill' && openingDrill.allFamilies.length === 0) {
+    openingDrill.loadFamilies();
+  }
   const hints = {
-    endgame:   'Click "New puzzle" to load an endgame puzzle.',
-    midgame:   'Click "New puzzle" to load a midgame puzzle.',
-    placement: 'Click "New puzzle" to load a placement puzzle.',
-    formation: 'Click "New puzzle" to load a formation puzzle.',
+    endgame:        'Click "New puzzle" to load an endgame puzzle.',
+    midgame:        'Click "New puzzle" to load a midgame puzzle.',
+    placement:      'Click "New puzzle" to load a placement puzzle.',
+    formation:      'Click "New puzzle" to load a formation puzzle.',
+    'grid-test':    'Select a mode and click Start to begin.',
+    'opening-drill':'Select a family and click Start Drill.',
   };
   setStatus(hints[mode], 'info');
+  _updatePuzzleHistStats();
   showBoard();
 };
 
@@ -1150,6 +1316,7 @@ window._loadMalomPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
+    _statRecorded = false;
     freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
@@ -1213,6 +1380,7 @@ window._loadFormationPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
+    _statRecorded = false;
     freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
@@ -1276,6 +1444,7 @@ window._loadPlacementPuzzle = async function() {
     movesDone   = [];
     solved       = false;
     failed       = false;
+    _statRecorded = false;
     freePlayMode = false; _opponentThinking = false;
     pendingMove  = null;
     document.getElementById('capture-prompt').style.display = 'none';
@@ -1311,6 +1480,570 @@ window._loadPlacementPuzzle = async function() {
     btn.textContent = 'New puzzle';
   }
 };
+
+// ── Grid Tester ───────────────────────────────────────────────────────────────
+const GT_NODE_FILL = '#b8935a';
+
+class GridTester {
+  constructor() {
+    this.active = false; this.score = 0; this.timeMs = 0; this.rafId = null;
+    this.lastTs = null; this.target = null; this.qType = 'node'; this.srcNode = null;
+    this.mode = 'mixed'; this._flashing = false;
+    this.hs = parseInt(localStorage.getItem('nmm_grid_hs') || '0');
+    this.games = parseInt(localStorage.getItem('nmm_grid_games') || '0');
+    this.totalScore = parseInt(localStorage.getItem('nmm_grid_total') || '0');
+  }
+  get _cfg() {
+    let c = GT_LEVELS[0];
+    for (const l of GT_LEVELS) { if (this.score >= l.min) c = l; }
+    return c;
+  }
+  get level() {
+    let lv = 1;
+    for (let i = 0; i < GT_LEVELS.length; i++) { if (this.score >= GT_LEVELS[i].min) lv = i + 1; }
+    return lv;
+  }
+  start(mode) {
+    this.mode = mode || 'mixed'; this.score = 0; this.timeMs = this._cfg.maxMs;
+    this.active = true; this.lastTs = null; this._flashing = false;
+    document.getElementById('gt-start-btn').textContent = 'Restart';
+    document.getElementById('gt-game-over').style.display = 'none';
+    document.getElementById('gt-feedback').textContent = '';
+    this._next(); this._updateBar(); this._updateStats();
+    requestAnimationFrame(ts => this._tick(ts));
+  }
+  stop() {
+    this.active = false; this._flashing = false;
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+    document.getElementById('gt-board-label').style.display = 'none';
+  }
+  _setLabel(text) {
+    const el = document.getElementById('gt-board-label');
+    el.textContent = text; el.style.display = '';
+  }
+  _next() {
+    const useMove = this.mode === 'move' ||
+      (this.mode === 'mixed' && this.score >= 5 && Math.random() < 0.4);
+    if (useMove) {
+      const src = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+      const adj = NMM_ADJ[src];
+      const dst = adj[Math.floor(Math.random() * adj.length)];
+      this.qType = 'move'; this.srcNode = src; this.target = dst;
+      const g = {}; for (const p of POSITIONS) g[p] = null; g[src] = 'W';
+      board.render({ board: g, phase: 'move', is_human_turn: false, legal_sources: [], legal_dests: [] });
+      this._setLabel(`${src}→?`);
+    } else {
+      this.qType = 'node'; this.srcNode = null;
+      this.target = POSITIONS[Math.floor(Math.random() * POSITIONS.length)];
+      board.render({ board: {}, phase: 'move', is_human_turn: false, legal_sources: [], legal_dests: [] });
+      this._setLabel(this.target);
+    }
+  }
+  onClick(pos) {
+    if (!this.active || this._flashing) return;
+    const cfg = this._cfg;
+    const fb = document.getElementById('gt-feedback');
+    if (pos === this.target) {
+      this._flashing = true;
+      this.score++;
+      this.timeMs = Math.min(this.timeMs + cfg.bonus, cfg.maxMs);
+      if (this.score > this.hs) { this.hs = this.score; localStorage.setItem('nmm_grid_hs', this.hs); }
+      fb.innerHTML = `<span style="color:#4caf50">✓ ${pos}</span>`;
+      board._nodeEls[pos].setAttribute('fill', '#4caf50');
+      this._updateStats();
+      setTimeout(() => { this._flashing = false; this._next(); }, 350);
+    } else {
+      this._flashing = true;
+      this.timeMs = Math.max(0, this.timeMs - cfg.penalty);
+      fb.innerHTML = `<span style="color:#f44336">✗ ${pos}</span>`;
+      board._nodeEls[pos].setAttribute('fill', '#f44336');
+      if (board._nodeEls[this.target]) board._nodeEls[this.target].setAttribute('fill', '#ffd080');
+      this._updateStats();
+      setTimeout(() => {
+        if (board._nodeEls[pos])         board._nodeEls[pos].setAttribute('fill', GT_NODE_FILL);
+        if (board._nodeEls[this.target]) board._nodeEls[this.target].setAttribute('fill', GT_NODE_FILL);
+        this._flashing = false;
+      }, 600);
+    }
+  }
+  _tick(ts) {
+    if (!this.active) return;
+    const dt = ts - (this.lastTs ?? ts); this.lastTs = ts; this.timeMs -= dt;
+    if (this.timeMs <= 0) { this.timeMs = 0; this._updateBar(); this._over(); return; }
+    this._updateBar();
+    this.rafId = requestAnimationFrame(ts2 => this._tick(ts2));
+  }
+  _updateBar() {
+    const bar = document.getElementById('gt-timer-bar');
+    const pct = Math.max(0, Math.min(100, 100 * this.timeMs / this._cfg.maxMs));
+    bar.style.width = pct + '%';
+    bar.className = pct > 40 ? '' : (pct > 20 ? 'warn' : 'crit');
+  }
+  _updateStats() {
+    const avg = this.games > 0 ? (this.totalScore / this.games).toFixed(1) : '—';
+    document.getElementById('gt-stats').innerHTML =
+      `Level <b>${this.level}</b> &nbsp;·&nbsp; Score <b>${this.score}</b>`
+      + ` &nbsp;·&nbsp; Best <b class="gt-hs">${this.hs}</b>`
+      + ` &nbsp;·&nbsp; Avg <b>${avg}</b> (${this.games} games)`;
+    document.getElementById('gt-hs-display').textContent = `Best: ${this.hs}`;
+  }
+  _over() {
+    this.active = false; this._flashing = false;
+    if (this.rafId) { cancelAnimationFrame(this.rafId); this.rafId = null; }
+    this.games++; this.totalScore += this.score;
+    localStorage.setItem('nmm_grid_games', this.games);
+    localStorage.setItem('nmm_grid_total', this.totalScore);
+    const avg = (this.totalScore / this.games).toFixed(1);
+    const el = document.getElementById('gt-game-over');
+    el.style.display = '';
+    el.innerHTML = `Time up! Score: <b>${this.score}</b> &nbsp;·&nbsp; Best: <b class="gt-hs">${this.hs}</b>`
+                 + ` &nbsp;·&nbsp; Avg: <b>${avg}</b> (${this.games} games)`;
+    document.getElementById('gt-board-label').style.display = 'none';
+    this._updateStats();
+    board.render({ board: {}, phase: 'move', is_human_turn: false, legal_sources: [], legal_dests: [] });
+  }
+}
+
+// ── Opening Drill ─────────────────────────────────────────────────────────────
+function _odLegalCaps(grid, color) {
+  const opp = color === 'W' ? 'B' : 'W';
+  const opps = POSITIONS.filter(p => grid[p] === opp);
+  const noMill = opps.filter(p => !checksMill(grid, p, opp));
+  return noMill.length ? noMill : opps;
+}
+
+class OpeningDrill {
+  constructor() {
+    this.active = false; this.allFamilies = []; this.refLine = [];
+    this.userSide = 'W'; this.ply = 0; this.pool = []; this.pool12 = [];
+    this.grid = {}; this.wPlaced = 0; this.bPlaced = 0;
+    this.gameMoves = []; // gameMoves[i] = square placed at ply i
+    this.score = 0; this.hintsLeft = 3;
+    this.labels = {}; this.childMoves = new Set();
+    this.hintShown = new Set(); this._pendingCap = false; this._capColor = null;
+    this._history = []; // snapshots at each user-turn entry for back button
+  }
+
+  // Max ply covered by the reference lines in the current pool
+  get _maxLinePly() {
+    const lines = this.pool12.length ? this.pool12 : this.pool;
+    return lines.reduce((m, op) => Math.max(m, (op.line_moves || []).length), 0);
+  }
+
+  // ── Family loading ────────────────────────────────────────────────────────
+  async loadFamilies() {
+    try {
+      const r = await fetch('/api/opening_families');
+      const d = await r.json();
+      this.allFamilies = d.families || [];
+      const sel = document.getElementById('od-family-sel');
+      while (sel.options.length > 1) sel.remove(1);
+      for (const fam of this.allFamilies) {
+        if (fam.family === 'Human DB') {
+          // Each named Human DB opening is its own drill option
+          const sorted = [...fam.openings].sort((a, b) => a.name.localeCompare(b.name));
+          for (const op of sorted) {
+            const opt = document.createElement('option');
+            opt.value = `__human_id__${op.opening_id}`;
+            opt.textContent = `Human: ${op.name}`;
+            sel.appendChild(opt);
+          }
+        } else {
+          const opt = document.createElement('option');
+          opt.value = fam.family;
+          opt.textContent = `${fam.family} (${fam.openings.length})`;
+          sel.appendChild(opt);
+        }
+      }
+    } catch (e) { console.error(e); }
+  }
+
+  // ── Find which family an opening belongs to ───────────────────────────────
+  _findOpFamily(openingId) {
+    for (const fam of this.allFamilies) {
+      if (fam.openings.some(o => o.opening_id === openingId)) return fam.family;
+    }
+    return null;
+  }
+
+  // ── Build pool from current family selection ──────────────────────────────
+  _buildPool(famName) {
+    const pool = [];
+    for (const fam of this.allFamilies) {
+      if (famName.startsWith('__human_id__')) {
+        if (fam.family !== 'Human DB') continue;
+        const id = famName.slice(12);
+        for (const op of fam.openings) {
+          if (op.opening_id === id) { pool.push(op); break; }
+        }
+      } else {
+        if (famName && fam.family !== famName) continue;
+        pool.push(...fam.openings);
+      }
+    }
+    return pool;
+  }
+
+  // ── Start ─────────────────────────────────────────────────────────────────
+  async start() {
+    const famName = document.getElementById('od-family-sel').value;
+    const sidePref = document.getElementById('od-side-sel').value;
+    const startPly = parseInt(document.getElementById('od-start-ply').value) || 0;
+    this.userSide = sidePref === 'random' ? (Math.random() < 0.5 ? 'W' : 'B') : sidePref;
+    this.pool = this._buildPool(famName);
+    if (!this.pool.length) { this._status('No openings available.', 'od-red'); return; }
+    // Prefer 12-ply children; fall back to whatever pool has
+    this.pool12 = this.pool.filter(op => (op.line_moves || []).length >= 12);
+    const refPool = this.pool12.length ? this.pool12 : this.pool;
+    const op = refPool[Math.floor(Math.random() * refPool.length)];
+    this.refLine = op.line_moves || [];
+    // Restrict pool12 to the chosen opening's family so the AI never drifts
+    // to a different family's child lines (e.g. Battle Lines when drilling Z Mill).
+    const opFam = this._findOpFamily(op.opening_id);
+    if (opFam) {
+      const famPool = this._buildPool(opFam);
+      this.pool12 = famPool.filter(o => (o.line_moves || []).length >= 12);
+      if (!this.pool12.length) this.pool12 = [...famPool];
+    }
+    this.grid = {}; for (const p of POSITIONS) this.grid[p] = null;
+    this.wPlaced = this.bPlaced = 0; this.ply = 0; this.score = 0; this.hintsLeft = 3;
+    this.gameMoves = []; this._history = [];
+    this.labels = {}; this.childMoves = new Set();
+    this.hintShown = new Set(); this._pendingCap = false; this._capColor = null;
+    this.active = true;
+    const hb = document.getElementById('od-hint-btn');
+    hb.style.display = ''; hb.disabled = false; hb.textContent = `Hint (${this.hintsLeft})`;
+    document.getElementById('od-flash-btn').style.display = '';
+    const bb = document.getElementById('od-back-btn');
+    if (bb) { bb.style.display = ''; bb.disabled = true; }
+    document.getElementById('od-score-line').textContent = 'Score: 0';
+    document.getElementById('od-move-line').textContent =
+      `${op.name} — You play ${this.userSide === 'W' ? 'White ○' : 'Black ●'}`;
+    showBoard();
+    if (startPly > 0) {
+      this._status(`Auto-playing first ${startPly} plies…`, 'od-info');
+      await this._autoPlayNPly(startPly);
+      if (!this.active) return;
+      await new Promise(r => setTimeout(r, 300));
+    }
+    await this._advance();
+  }
+
+  // ── Auto-play N plies (for start-ply skip) ───────────────────────────────
+  async _autoPlayNPly(n) {
+    for (let i = 0; i < n && this.ply < 18 && this.active; i++) {
+      await this._playSinglePly(this.ply % 2 === 0 ? 'W' : 'B');
+      board.render({ board: this.grid, phase: 'place', is_human_turn: false, legal_sources: [], legal_dests: [] });
+      await new Promise(r => setTimeout(r, 260));
+    }
+  }
+
+  // ── Find best-matching child move for the computer at this.ply ───────────
+  _findBestChildMove() {
+    const lines = this.pool12.length ? this.pool12 : this.pool;
+    let bestMv = null, bestScore = -1;
+    for (const op of lines) {
+      const lm = op.line_moves || [];
+      if (this.ply >= lm.length) continue;
+      const mv = lm[this.ply];
+      const sq = mv.split('x')[0];
+      if (this.grid[sq]) continue; // occupied — can't play here
+      let score = 0;
+      for (let q = 0; q < this.ply && q < lm.length; q++) {
+        if (this.gameMoves[q] === lm[q].split('x')[0]) score++;
+      }
+      if (score > bestScore) { bestScore = score; bestMv = mv; }
+    }
+    return bestMv; // null if no valid child found
+  }
+
+  // ── Best Malom move for the computer (post-line free play) ───────────────
+  async _bestMalomMove() {
+    try {
+      const fen = this._fen();
+      const r = await fetch(`/api/drill/malom_labels?fen=${encodeURIComponent(fen)}`);
+      const d = await r.json();
+      if (d.available && d.labels) {
+        const order = { W: 2, D: 1, L: 0 };
+        const ranked = Object.entries(d.labels)
+          .filter(([sq]) => !this.grid[sq])
+          .sort(([, a], [, b]) => (order[b] || 0) - (order[a] || 0));
+        if (ranked.length) return ranked[0][0];
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // ── AI-guided fallback move (Sentinel/GapNet) ────────────────────────────
+  async _aiMove() {
+    try {
+      const r = await fetch(`/api/drill/ai_move?fen=${encodeURIComponent(this._fen())}`);
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.square || null;
+    } catch { return null; }
+  }
+
+  // ── Play one ply (computer side) ─────────────────────────────────────────
+  async _playSinglePly(color) {
+    let sq = null, capSq = null;
+
+    if (this.ply < this._maxLinePly) {
+      // In-line phase: follow the best-matching child
+      const mv = this._findBestChildMove();
+      if (mv) { sq = mv.split('x')[0]; capSq = mv.includes('x') ? mv.split('x')[1] : null; }
+    }
+
+    if (!sq) {
+      // Post-line phase (or line square blocked): use Malom WDL
+      sq = await this._bestMalomMove();
+      if (!this.active) return;
+    }
+
+    if (!sq) {
+      // AI-guided fallback when Malom unavailable (Sentinel / GapNet)
+      sq = await this._aiMove();
+      if (!this.active) return;
+    }
+
+    if (!sq) {
+      // Final fallback: random empty square
+      const empty = POSITIONS.filter(p => !this.grid[p]);
+      if (!empty.length) { this._finish(); return; }
+      sq = empty[Math.floor(Math.random() * empty.length)];
+    }
+
+    this.gameMoves[this.ply] = sq;
+    this.grid[sq] = color;
+    if (color === 'W') this.wPlaced++; else this.bPlaced++;
+    if (capSq && this.grid[capSq] && this.grid[capSq] !== color) {
+      this.grid[capSq] = null;
+    } else if (checksMill(this.grid, sq, color)) {
+      const caps = _odLegalCaps(this.grid, color);
+      if (caps.length) this.grid[caps[0]] = null;
+    }
+    this.ply++;
+  }
+
+  // ── Flash reference line ──────────────────────────────────────────────────
+  async flash() {
+    if (!this.active) return;
+    const btn = document.getElementById('od-flash-btn');
+    if (btn) btn.disabled = true;
+    const savedGrid = {}; for (const p of POSITIONS) savedGrid[p] = this.grid[p];
+    const tmpGrid = {}; for (const p of POSITIONS) tmpGrid[p] = null;
+    const flashN = Math.min(8, this.refLine.length);
+    for (let i = 0; i < flashN; i++) {
+      const color = i % 2 === 0 ? 'W' : 'B';
+      const mv = this.refLine[i];
+      const sq = mv.split('x')[0];
+      const capSq = mv.includes('x') ? mv.split('x')[1] : null;
+      if (!tmpGrid[sq]) {
+        tmpGrid[sq] = color;
+        if (capSq && tmpGrid[capSq] && tmpGrid[capSq] !== color) {
+          tmpGrid[capSq] = null;
+        } else if (checksMill(tmpGrid, sq, color)) {
+          const caps = _odLegalCaps(tmpGrid, color);
+          if (caps.length) tmpGrid[caps[0]] = null;
+        }
+      }
+      board.render({ board: {...tmpGrid}, phase: 'place', is_human_turn: false, legal_sources: [], legal_dests: [] });
+      await new Promise(r => setTimeout(r, 380));
+    }
+    await new Promise(r => setTimeout(r, 500));
+    // Restore
+    for (const p of POSITIONS) this.grid[p] = savedGrid[p];
+    const empty = POSITIONS.filter(p => !this.grid[p]);
+    board.render({ board: this.grid, phase: 'place', is_human_turn: true, legal_sources: [], legal_dests: empty });
+    if (btn) btn.disabled = false;
+  }
+
+  // ── User turn ─────────────────────────────────────────────────────────────
+  async _userTurn() {
+    if (!this.active) return;
+    // Save snapshot so the back button can restore this state
+    this._history.push({
+      grid: Object.assign({}, this.grid),
+      ply: this.ply,
+      wPlaced: this.wPlaced,
+      bPlaced: this.bPlaced,
+      gameMoves: this.gameMoves.slice(),
+      score: this.score,
+    });
+    const bb = document.getElementById('od-back-btn');
+    if (bb) bb.disabled = this._history.length <= 1;
+    this.labels = {}; this.childMoves = new Set(); this.hintShown = new Set();
+    const fen = this._fen();
+    try {
+      const r = await fetch(`/api/drill/malom_labels?fen=${encodeURIComponent(fen)}`);
+      const d = await r.json();
+      if (d.available) this.labels = d.labels || {};
+    } catch (e) {}
+    // childMoves only apply while within the reference line window
+    const inLine = this.ply < this._maxLinePly;
+    if (inLine) {
+      const lines = this.pool12.length ? this.pool12 : this.pool;
+      for (const op of lines) {
+        if (op.line_moves && op.line_moves.length > this.ply)
+          this.childMoves.add(op.line_moves[this.ply].split('x')[0]);
+      }
+    }
+    const empty = POSITIONS.filter(p => !this.grid[p]);
+    board.render({ board: this.grid, phase: 'place', is_human_turn: true, legal_sources: [], legal_dests: empty });
+    // Status: distinguish in-line vs free-play
+    const maxLinePly = this._maxLinePly;
+    if (inLine) {
+      const lineUserMoves = maxLinePly / 2; // 6 for 12-ply, 4 for 8-ply
+      const userMoveNum = this.userSide === 'W' ? this.ply / 2 + 1 : (this.ply + 1) / 2;
+      this._status(`Move ${userMoveNum}/${lineUserMoves} on-line — place a piece (${this.userSide}).`, 'od-info');
+    } else {
+      const freeTotal = this.userSide === 'W' ? Math.ceil((18 - maxLinePly) / 2) : Math.floor((18 - maxLinePly) / 2);
+      const freeDone = this.userSide === 'W'
+        ? Math.floor((this.ply - maxLinePly) / 2) + 1
+        : Math.ceil((this.ply - maxLinePly) / 2);
+      this._status(`Free play ${freeDone}/${freeTotal} — place a piece (${this.userSide}).`, 'od-yellow');
+    }
+  }
+
+  // ── Click ─────────────────────────────────────────────────────────────────
+  onClick(sq) {
+    if (!this.active) return;
+    if (this._pendingCap) {
+      const opp = this._capColor === 'W' ? 'B' : 'W';
+      if (this.grid[sq] !== opp) return;
+      this.grid[sq] = null; this._pendingCap = false; this.ply++;
+      this._advance(); return;
+    }
+    const color = this.ply % 2 === 0 ? 'W' : 'B';
+    if (color !== this.userSide) return;
+    if (this.grid[sq] !== null) return;
+    this.gameMoves[this.ply] = sq; // track before ply++
+    const wdl = this.labels[sq]; const isChild = this.childMoves.has(sq);
+    let pts = 0, msg = '', cls = 'od-info';
+    if (wdl === 'W' && isChild)            { pts = 2; msg = '★ Family line! +2';      cls = 'od-gold'; }
+    else if (wdl === 'W')                  { pts = 1; msg = '✓ Winning move +1';      cls = 'od-green'; }
+    else if (wdl === undefined && isChild) { pts = 1; msg = '✓ Theory move +1';       cls = 'od-green'; }
+    else if (isChild)                      { pts = 1; msg = '△ Theory move +1';       cls = 'od-yellow'; }
+    else if (!wdl || wdl === 'D')          { pts = 0; msg = '○ Neutral — no points'; cls = 'od-yellow'; }
+    else                                   { pts = -1; msg = '✗ Losing move −1';      cls = 'od-red'; }
+    this.score = Math.max(0, this.score + pts);
+    document.getElementById('od-score-line').textContent = `Score: ${this.score}`;
+    this.grid[sq] = color;
+    if (color === 'W') this.wPlaced++; else this.bPlaced++;
+    if (checksMill(this.grid, sq, color)) {
+      const caps = _odLegalCaps(this.grid, color);
+      if (caps.length) {
+        this._pendingCap = true; this._capColor = color;
+        board.render({ board: this.grid, phase: 'place', is_human_turn: true, legal_sources: [], legal_dests: [] });
+        board.enterCapture(caps);
+        this._status(`${msg} — Mill! Click opponent piece to capture.`, cls);
+        return;
+      }
+    }
+    this._status(msg, cls); this.ply++; this._advance();
+  }
+
+  // ── Advance ───────────────────────────────────────────────────────────────
+  async _advance() {
+    if (!this.active) return;
+    if (this.ply >= 18 || (this.wPlaced >= 9 && this.bPlaced >= 9)) { this._finish(); return; }
+    const nextColor = this.ply % 2 === 0 ? 'W' : 'B';
+    if (nextColor !== this.userSide) {
+      await new Promise(r => setTimeout(r, 500));
+      await this._playSinglePly(nextColor);
+      board.render({ board: this.grid, phase: 'place', is_human_turn: false, legal_sources: [], legal_dests: [] });
+      await this._advance();
+    } else {
+      await this._userTurn();
+    }
+  }
+
+  // ── Back (undo to previous user turn) ────────────────────────────────────
+  back() {
+    if (this._history.length <= 1 || !this.active) return;
+    this._history.pop(); // discard current user-turn entry
+    const state = this._history.pop(); // pop the previous entry (will be re-pushed by _userTurn)
+    this.grid = Object.assign({}, state.grid);
+    this.ply = state.ply;
+    this.wPlaced = state.wPlaced;
+    this.bPlaced = state.bPlaced;
+    this.gameMoves = state.gameMoves.slice();
+    this.score = state.score;
+    this._pendingCap = false;
+    document.getElementById('od-score-line').textContent = `Score: ${this.score}`;
+    this._userTurn();
+  }
+
+  // ── Hint ──────────────────────────────────────────────────────────────────
+  hint() {
+    if (!this.active || this.hintsLeft <= 0) return;
+    const cands = [...this.childMoves].filter(sq => !this.hintShown.has(sq) && !this.grid[sq]);
+    if (!cands.length) {
+      const wm = Object.entries(this.labels)
+        .filter(([sq, w]) => w === 'W' && !this.hintShown.has(sq) && !this.grid[sq])
+        .map(([sq]) => sq);
+      if (wm.length) cands.push(wm[0]);
+    }
+    if (!cands.length) return;
+    const h = cands[0]; this.hintShown.add(h); this.hintsLeft--;
+    board.showHint(null, h);
+    const hb = document.getElementById('od-hint-btn');
+    hb.textContent = this.hintsLeft > 0 ? `Hint (${this.hintsLeft})` : 'No hints left';
+    if (this.hintsLeft <= 0) hb.disabled = true;
+  }
+
+  // ── Finish ────────────────────────────────────────────────────────────────
+  _finish() {
+    this.active = false;
+    const bb = document.getElementById('od-back-btn');
+    if (bb) bb.style.display = 'none';
+    const mlp = this._maxLinePly;
+    const lineUserMoves = mlp / 2;
+    const freeUserMoves = (18 - mlp) / 2;
+    const maxScore = lineUserMoves * 2 + freeUserMoves * 1;
+    const pct = maxScore > 0 ? this.score / maxScore : 0;
+    const grade = pct >= 0.8 ? 'Excellent!' : pct >= 0.5 ? 'Good job!' : 'Keep practising!';
+    // Persist history
+    let dh; try { dh = JSON.parse(localStorage.getItem('nmm_drill_stats')) || {}; } catch { dh = {}; }
+    dh.sessions = (dh.sessions || 0) + 1;
+    dh.totalScore = (dh.totalScore || 0) + this.score;
+    dh.maxPossible = (dh.maxPossible || 0) + maxScore;
+    if (this.score > (dh.bestScore || 0)) dh.bestScore = this.score;
+    localStorage.setItem('nmm_drill_stats', JSON.stringify(dh));
+    const avgPct = dh.maxPossible > 0 ? Math.round(100 * dh.totalScore / dh.maxPossible) : 0;
+    const histLine = `${dh.sessions} drills · Best ${dh.bestScore} · Avg ${avgPct}%`;
+    this._status(`Score: ${this.score}/${maxScore} — ${grade} | History: ${histLine}`, 'od-green');
+    board.render({ board: this.grid, phase: 'place', is_human_turn: false, legal_sources: [], legal_dests: [] });
+  }
+  _fen() {
+    return POSITIONS.map(p => this.grid[p] || '.').join('') +
+           `|${this.ply % 2 === 0 ? 'W' : 'B'}|${this.wPlaced}|${this.bPlaced}`;
+  }
+  _status(msg, cls) {
+    const el = document.getElementById('od-status');
+    el.textContent = msg; el.className = `od-status ${cls}`;
+  }
+}
+
+const gridTester   = new GridTester();
+const openingDrill = new OpeningDrill();
+window._gtStart  = function() { const mode = document.getElementById('gt-mode-sel').value; gridTester.start(mode); };
+window._odStart  = function() { openingDrill.start(); };
+window._odHint   = function() { openingDrill.hint(); };
+window._odFlash  = function() { openingDrill.flash(); };
+window._odBack   = function() { openingDrill.back(); };
+
+// Populate puzzle counts on the mode buttons
+fetch('/api/puzzles/counts')
+  .then(r => r.json())
+  .then(counts => {
+    for (const [type, n] of Object.entries(counts)) {
+      const el = document.getElementById(`cnt-${type}`);
+      if (el && n > 0) el.textContent = `(${n})`;
+    }
+  })
+  .catch(() => {});
 </script>
 
 <!-- Wrong-move dialog -->

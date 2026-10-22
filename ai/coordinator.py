@@ -543,12 +543,13 @@ class Coordinator:
         # 3a. Placement-phase dual-mill intervention (difficulty >= 5).
         # When the human has a closed mill and can complete a second mill that shares
         # a piece with it in one placement, block that closing square unconditionally.
-        # Defers to same-turn mill-closes and 1-ply blocks, which take higher priority.
+        # Only defers to same-turn mill-closes (can_close_mill); must_block_opponent is
+        # intentionally NOT excluded — the generalist fails to block dual-junction threats
+        # even when tactical pre-screen detects them.
         _forced_dual_block = None
         if (self.game_ai.difficulty >= 5
                 and get_game_phase(board, board.turn) == "place"
-                and not tac["can_close_mill"]
-                and not tac["must_block_opponent"]):
+                and not tac["can_close_mill"]):
             from ai.heuristics import _dual_connected_mill_alert
             from game.board import MILLS as _H_MILLS
             _opp_c = "B" if board.turn == "W" else "W"

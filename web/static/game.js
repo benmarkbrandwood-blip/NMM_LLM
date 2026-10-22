@@ -68,7 +68,7 @@ let _diagCaptureFen = null;         // FEN of projected board in capture mode
 let _aiThinking     = false;        // true while AI is computing — block diagnostics
 
 // ── Net overlay state (3 dropdown slots) ─────────────────────────────────────
-let gameNetSlots    = ['', '', ''];  // values: ''|'sentinel'|'gapnet'|'value'|'pref'|'pred'|'regret'
+let gameNetSlots    = ['', '', ''];  // values: ''|'sentinel'|'gapnet'|'value'|'pref'|'teacher'|'regret'
 let _gameRegret     = {};           // notation → regret_score, fetched async
 let _gameRegretFen  = null;         // FEN for which _gameRegret is valid
 
@@ -77,8 +77,7 @@ const GAME_NET_DEFS = {
   gapnet:     { label:'GapNet',     prefix:'G:',   cssColor:'#cc5555', field:'gapnet_score',    isHigherBetter:false, isAbsNorm:false },
   value:      { label:'ValueNet',   prefix:'V:',   cssColor:'#50aaaa', field:'value_score',     isHigherBetter:true,  isAbsNorm:false },
   pref:       { label:'PrefNet',    prefix:'F:',   cssColor:'#c4a020', field:'pref_score',      isHigherBetter:true,  isAbsNorm:false },
-  pred:       { label:'Pred',       prefix:'P:',   cssColor:'#ff6eb4', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
-  teacher:    { label:'Teacher',    prefix:'Tch:', cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
+  teacher:    { label:'Hum%',       prefix:'H:',   cssColor:'#a06fe0', field:'pred_human_prob', isHigherBetter:true,  isAbsNorm:false },
   generalist: { label:'Generalist', prefix:'Gen:', cssColor:'#e07830', field:'overseer_prob',   isHigherBetter:true,  isAbsNorm:false },
   regret:     { label:'Regret',     prefix:'R:',   cssColor:'#ff6020', field:'regret_score',    isHigherBetter:true,  isAbsNorm:false },
 };
@@ -834,7 +833,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (diagTraj) { _diagTrigger(); } else _diagRender();
   });
 
-  const _predBandSel = $("pred-band-select");
+  const _predBandSel = $("hum-band-select");
   if (_predBandSel) {
     _predBandSel.addEventListener("change", () => {
       diagEloBand = _predBandSel.value;
@@ -2252,6 +2251,18 @@ function handleMessage(msg) {
       _removeAutosaveBanner();
       break;
 
+    case "assessment_start": {
+      // Server signals a fresh assessment run — reset all slots to avoid stale content
+      _stopAssessmentTimer();
+      _assessmentReady = false;
+      _assessmentTurningPoints = []; _assessmentPlyQuality = [];
+      _assessmentSignalPlies = {}; _assessmentMalomShifts = []; _assessmentPlyBase = 0;
+      const wrapper = _getOrCreateAssessmentWrapper();
+      if (wrapper) wrapper.querySelectorAll(".assessment-slot").forEach(s => { s.innerHTML = ""; });
+      _startAssessmentTimer();
+      break;
+    }
+
     case "assessment_progress": {
       _updateAssessmentProgress(msg.stage || 0);
       break;
@@ -2267,11 +2278,9 @@ function handleMessage(msg) {
         if (bar) bar.textContent = msg.opening_name;
       }
       if (msg.summary_text) {
-        const feed = $("commentary-human");
-        if (feed) {
-          // Remove any previous partial summary before adding new one
-          const old = feed.querySelector(".assessment-partial");
-          if (old) old.remove();
+        const slot = _getSlot("partial");
+        if (slot) {
+          slot.innerHTML = "";
           const div = document.createElement("div");
           div.className = "commentary-line assessment-partial";
           const lbl = document.createElement("span");
@@ -2282,8 +2291,9 @@ function handleMessage(msg) {
           pre.style.cssText = "white-space:pre-wrap;display:inline;font-size:.82rem";
           pre.textContent = msg.summary_text;
           div.appendChild(pre);
-          feed.insertBefore(div, feed.firstChild);
-          feed.scrollTop = 0;
+          slot.appendChild(div);
+          const feed = $("commentary-human");
+          if (feed) feed.scrollTop = 0;
         }
       }
       break;
@@ -2292,6 +2302,56 @@ function handleMessage(msg) {
     case "assessment_stage_2":
       // superseded by assessment_result signal cards — no-op
       break;
+
+    case "assessment_malom": {
+      // Early Malom WDL shifts — arrive before Pass 1 (~5-17s after assessment starts).
+      // Shows the Malom card immediately so users who cancel early still see it.
+      _assessmentMalomShifts = msg.malom_wdl_shifts || [];
+      _assessmentPlyBase     = msg.ply_base || _assessmentPlyBase;
+      drawEvalGraph();
+      _annotateMovesListWithQuality();
+      const feed = $("commentary-human");
+      if (!feed || !msg.malom_wdl_shifts || !msg.malom_wdl_shifts.length) break;
+      const prev = feed.querySelector(".assessment-malom-early");
+      if (prev) prev.remove();
+      const shifts = msg.malom_wdl_shifts;
+      const base = msg.ply_base || 0;
+      const sideName = c => c === "W" ? _t("color.white") : _t("color.black");
+      const lines = shifts.map(ms => {
+        const moveNum = Math.ceil(ms.ply / 2);
+        return `ply ${ms.ply} (${sideName(ms.color)}, move ${moveNum}): ${ms.wdl_before}→${ms.wdl_after}`;
+      });
+      const meta = _SIGNAL_META["malom"] || { color: "#5a7acc" };
+      const card = document.createElement("div");
+      card.style.cssText = "margin:3px 0;border-radius:3px;overflow:hidden";
+      const hdr = document.createElement("div");
+      hdr.style.cssText = [
+        `background:${meta.color}22`, `border-left:3px solid ${meta.color}`,
+        "padding:3px 7px", "font-size:.73rem", "font-weight:700",
+        `color:${meta.color}`, "letter-spacing:.03em",
+      ].join(";");
+      const dot = document.createElement("span");
+      dot.className = "sig-dot";
+      dot.style.cssText = `background-color:${meta.color};margin-right:5px;vertical-align:middle`;
+      hdr.appendChild(dot);
+      hdr.appendChild(document.createTextNode(_t("assess.malom_shifts_hdr", {n: shifts.length})));
+      card.appendChild(hdr);
+      const body = document.createElement("div");
+      body.style.cssText = "padding:3px 10px 5px;font-size:.74rem;color:#aaaaaa;line-height:1.6;background:#0c130c";
+      for (const line of lines) {
+        const ln = document.createElement("div"); ln.textContent = line; body.appendChild(ln);
+      }
+      card.appendChild(body);
+      const outer = document.createElement("div");
+      outer.className = "commentary-line assessment-malom-early assessment-summary";
+      outer.style.cssText = "padding:4px 0";
+      outer.appendChild(card);
+      const malomSlot = _getSlot("malom");
+      if (malomSlot) { malomSlot.innerHTML = ""; malomSlot.appendChild(outer); }
+      else { feed.insertBefore(outer, feed.firstChild); }
+      feed.scrollTop = 0;
+      break;
+    }
 
     case "assessment_result": {
       _assessmentTurningPoints = msg.turning_points || [];
@@ -2315,6 +2375,9 @@ function handleMessage(msg) {
       if (btn) btn.classList.add("assessment-done");
       const feed = $("commentary-human");
       if (feed) {
+        // Clear malom slot — _renderAssessmentSignalSections will fill it with authoritative data
+        const malomSlot = _getSlot("malom");
+        if (malomSlot) malomSlot.innerHTML = "";
         _renderAssessmentSignalSections(msg, feed);
       }
       // In a tournament game, show "Ready for next game" button
@@ -2327,13 +2390,14 @@ function handleMessage(msg) {
 
     case "assessment_llm": {
       if (msg.text) {
-        if (!msg.stage) {
-          // Stage 4: full synthesis — append after signal cards (bottom of wrapper)
-          _appendToAssessment(msg.text, "MillsAI");
-        } else {
-          // Stage 1: early analysis — insert at top of wrapper (intro before signal reference)
-          const wrapper = _getOrCreateAssessmentWrapper();
-          if (wrapper) {
+        const isStage1 = !!msg.stage;
+        const chkId = isStage1 ? "chk-assess-llm-stage1" : "chk-assess-llm-stage4";
+        const chk = $(chkId);
+        const enabled = !chk || chk.checked;
+        if (enabled) {
+          const slotName = isStage1 ? "llm" : "analysis";
+          const slot = _getSlot(slotName);
+          if (slot) {
             const div = document.createElement("div");
             div.className = "commentary-line assessment-llm-text";
             const lbl = document.createElement("span");
@@ -2341,7 +2405,7 @@ function handleMessage(msg) {
             lbl.textContent = "MillsAI: ";
             div.appendChild(lbl);
             div.appendChild(document.createTextNode(msg.text));
-            wrapper.insertBefore(div, wrapper.firstChild);
+            slot.appendChild(div);
           } else {
             addCommentary("MillsAI", msg.text, "human");
           }
@@ -2372,9 +2436,9 @@ function handleMessage(msg) {
           error: _t("assess.failed"),
         };
         div.textContent = reasonMap[msg.reason] || _t("assess.failed");
-        const wrapper = feed.querySelector(".assessment-wrapper");
-        if (wrapper) wrapper.appendChild(div);
-        else feed.insertBefore(div, feed.firstChild);
+        const timerSlot = _getSlot("timer");
+        if (timerSlot) timerSlot.appendChild(div);
+        else { const wrapper = feed.querySelector(".assessment-wrapper"); if (wrapper) wrapper.appendChild(div); else feed.insertBefore(div, feed.firstChild); }
       }
       // In a tournament game, show "Ready for next game" even after failure/cancel
       if (_isTournamentGame) {
@@ -2916,6 +2980,38 @@ function drawEvalGraph() {
         stroke: sigColor, "stroke-width": "1.5",
         "stroke-dasharray": "3 3", opacity: "0.8",
       }));
+    }
+  }
+
+  // Malom WDL shift markers — drawn last so they appear on top of signal lines
+  // Labels pinned to the top of the graph for visibility
+  if (_assessmentMalomShifts && _assessmentMalomShifts.length) {
+    const malomCol = (_SIGNAL_META["malom"] || { color: "#5a7acc" }).color;
+    const tpPlySet = new Set(_assessmentTurningPoints.map(tp => tp.ply));
+    let labelOffset = 0;  // stagger labels vertically to avoid overlap
+    for (const shift of _assessmentMalomShifts) {
+      const evalIdx = shift.ply - _assessmentPlyBase;
+      if (evalIdx < 0 || evalIdx >= n) continue;
+      const mx = pts[evalIdx].x;
+      // Draw line over everything else (including other signal lines)
+      svg.appendChild(mk("line", {
+        x1: mx, y1: 0, x2: mx, y2: H,
+        stroke: malomCol, "stroke-width": "1.5",
+        "stroke-dasharray": "3 2", opacity: "0.85",
+      }));
+      // Label pinned near top, staggered to prevent overlap
+      const labelText = shift.wdl_before + "→" + shift.wdl_after;
+      const lx = mx + 2 > W - 30 ? mx - 2 : mx + 2;
+      const anchor = mx + 2 > W - 30 ? "end" : "start";
+      const ly = 9 + labelOffset;
+      const lbl = mk("text", {
+        x: lx, y: ly,
+        fill: malomCol, "font-size": "7.5", "font-family": "monospace",
+        "font-weight": "700", "text-anchor": anchor, opacity: "0.9",
+      });
+      lbl.textContent = labelText;
+      svg.appendChild(lbl);
+      labelOffset = (labelOffset + 9) % 27;  // cycle through 3 heights to avoid overlap
     }
   }
 
@@ -3612,6 +3708,8 @@ function _renderAssessmentSignalSections(msg, feed) {
     return card;
   }
 
+  const malomShifts = msg.malom_wdl_shifts || [];
+
   // ── Turning points ──────────────────────────────────────────────────────────
   const tps = msg.turning_points || [];
   if (tps.length) {
@@ -3623,19 +3721,6 @@ function _renderAssessmentSignalSections(msg, feed) {
       return `ply ${absPly}${side}${mv}${alt}`;
     });
     const c = _card("turning_point", _t("assess.turning_point_hdr", {n: tps.length}), lines);
-    if (c) outer.appendChild(c);
-  }
-
-  // ── Malom WDL shifts ────────────────────────────────────────────────────────
-  const malomShifts = msg.malom_wdl_shifts || [];
-  if (malomShifts.length) {
-    const lines = malomShifts.slice(0, 8).map(ms => {
-      const side = _sideName(ms.color);
-      const moveNum = Math.ceil(ms.ply / 2);
-      return `ply ${ms.ply} (${side}, move ${moveNum}): ${ms.wdl_before}→${ms.wdl_after}`;
-    });
-    if (malomShifts.length > 8) lines.push(`… +${malomShifts.length - 8} more`);
-    const c = _card("malom", _t("assess.malom_shifts_hdr", {n: malomShifts.length}), lines);
     if (c) outer.appendChild(c);
   }
 
@@ -3731,11 +3816,38 @@ function _renderAssessmentSignalSections(msg, feed) {
     outer.appendChild(clean);
   }
 
-  // Append legend then signal cards to the assessment wrapper (ordered: legend → cards → LLM)
-  const wrapper = _getOrCreateAssessmentWrapper();
-  const target = wrapper || feed;
-  if (!target.querySelector(".assessment-legend")) target.appendChild(_buildAssessmentLegend());
-  target.appendChild(outer);
+  // Route content into fixed-order slots
+  const legendSlot   = _getSlot("legend");
+  const signalsSlot  = _getSlot("signals");
+  const malomSlotFin = _getSlot("malom");
+
+  // Legend — only build once
+  if (legendSlot && !legendSlot.querySelector(".assessment-legend")) {
+    legendSlot.appendChild(_buildAssessmentLegend());
+  }
+
+  // Malom WDL card into its own slot
+  if (malomSlotFin && malomShifts.length) {
+    malomSlotFin.innerHTML = "";
+    const malomLines = malomShifts.map(ms => {
+      const side = _sideName(ms.color);
+      const moveNum = Math.ceil(ms.ply / 2);
+      return `ply ${ms.ply} (${side}, move ${moveNum}): ${ms.wdl_before}→${ms.wdl_after}`;
+    });
+    const mc = _card("malom", _t("assess.malom_shifts_hdr", {n: malomShifts.length}), malomLines);
+    if (mc) {
+      const mw = document.createElement("div");
+      mw.className = "commentary-line assessment-summary";
+      mw.style.cssText = "padding:4px 0";
+      mw.appendChild(mc);
+      malomSlotFin.appendChild(mw);
+    }
+  }
+
+  // Signal cards
+  if (signalsSlot) { signalsSlot.innerHTML = ""; signalsSlot.appendChild(outer); }
+  else { const wrapper = _getOrCreateAssessmentWrapper(); (wrapper || feed).appendChild(outer); }
+
   if (feed) feed.scrollTop = 0;
 }
 
@@ -3797,26 +3909,37 @@ function _getOrCreateAssessmentWrapper() {
   if (!wrapper) {
     wrapper = document.createElement("div");
     wrapper.className = "assessment-wrapper";
+    for (const name of ["analysis","malom","timer","partial","signals","legend","llm"]) {
+      const slot = document.createElement("div");
+      slot.className = `assessment-slot slot-${name}`;
+      wrapper.appendChild(slot);
+    }
     feed.prepend(wrapper);
   }
   return wrapper;
 }
 
-function _startAssessmentTimer() {
-  if (_assessmentTimerInterval) return;
-  _assessmentStartTime = Date.now();
+function _getSlot(name) {
   const wrapper = _getOrCreateAssessmentWrapper();
-  if (!wrapper) return;
-  const old = wrapper.querySelector(".assessment-running-msg");
+  return wrapper ? wrapper.querySelector(`.slot-${name}`) : null;
+}
+
+function _startAssessmentTimer() {
+  if (_assessmentTimerInterval) { clearInterval(_assessmentTimerInterval); _assessmentTimerInterval = null; }
+  _assessmentStartTime = Date.now();
+  const slot = _getSlot("timer");
+  if (!slot) return;
+  const old = slot.querySelector(".assessment-running-msg");
   if (old) old.remove();
   const div = document.createElement("div");
   div.className = "commentary-line assessment-running-msg";
   div.style.cssText = "color:var(--text-dim);font-style:italic;padding:4px 0";
   div.textContent = _t("assess.running_s", {s: 0});
-  wrapper.appendChild(div);
+  slot.appendChild(div);
   _assessmentTimerInterval = setInterval(() => {
     const elapsed = Math.floor((Date.now() - _assessmentStartTime) / 1000);
-    const msg = wrapper.querySelector(".assessment-running-msg");
+    const timerSlot = _getSlot("timer");
+    const msg = timerSlot && timerSlot.querySelector(".assessment-running-msg");
     if (!msg) { clearInterval(_assessmentTimerInterval); _assessmentTimerInterval = null; return; }
     const mins = Math.floor(elapsed / 60);
     msg.textContent = mins > 0
@@ -3838,8 +3961,8 @@ function _stopAssessmentTimer() {
 }
 
 function _appendToAssessment(text, speakerKey) {
-  const wrapper = _getOrCreateAssessmentWrapper();
-  if (!wrapper) { addCommentary(speakerKey || "MillsAI", text, "human"); return; }
+  const slot = _getSlot("analysis");
+  if (!slot) { addCommentary(speakerKey || "MillsAI", text, "human"); return; }
   const div = document.createElement("div");
   div.className = "commentary-line assessment-llm-text";
   const label = document.createElement("span");
@@ -3847,7 +3970,7 @@ function _appendToAssessment(text, speakerKey) {
   label.textContent = (speakerKey || "MillsAI") + ": ";
   div.appendChild(label);
   div.appendChild(document.createTextNode(text));
-  wrapper.appendChild(div);
+  slot.appendChild(div);
 }
 
 function clearCommentary() {
@@ -4769,7 +4892,7 @@ function _diagOnReceive(msg) {
   const humanLabel = document.getElementById("to-move-human-label");
   if (diagTraj && humanLabel && msg.mode !== "capture") {
     const hasTrajData = msg.has_traj_data !== false;
-    humanLabel.textContent = hasTrajData ? "HumanDB best" : "Pred Human";
+    humanLabel.textContent = hasTrajData ? "HumanDB best" : "Hum%";
     humanLabel.style.color = hasTrajData ? "#a86fdf" : "#5591c7";
   }
   _diagRender();
@@ -4846,9 +4969,6 @@ function _diagRender() {
   } else {
     const dbSource = anyScore || _diagStaticData;  // use static even when diagStatic=off
     const hasTrajData = dbSource?.has_traj_data !== false;
-    // Pred slot pairs with Traj: when both active, pred fills the traj fallback channel
-    // and is suppressed from the independent net overlay when no traj data is available.
-    const predInTraj = diagTraj && gameNetSlots.includes('pred');
     const showDbLayer = (diagTraj || diagDB || diagOverseer || diagPressure) && dbSource?.moves;
 
     if (showDbLayer) {
@@ -4856,14 +4976,13 @@ function _diagRender() {
         phase:              curPhase,
         selectedSrc:        board.selected,
         showTraj:           diagTraj,
-        showPredHuman:      diagTraj && !predInTraj,
+        showPredHuman:      diagTraj,
         hasTrajData:        hasTrajData,
         showTrajN:          $("sel-traj-n") ? $("sel-traj-n").value === "n" : false,
         showDB:             diagDB,
         showSentinel:       false,
         showOverseer:       diagOverseer,
         showPressure:       diagPressure,
-        teacherFallback:    predInTraj,
         visibilityFraction: visFrac,
       });
     } else {
@@ -4871,12 +4990,7 @@ function _diagRender() {
     }
 
     if (anyNetSlot && dbSource?.moves) {
-      // Suppress pred from the net overlay when it's paired with traj and no traj data
-      // (pred predictions are already rendered via the traj fallback channel in that case)
-      const slotsForOverlay = (predInTraj && !hasTrajData)
-        ? gameNetSlots.map(k => k === 'pred' ? '' : k)
-        : gameNetSlots;
-      board.renderNetOverlay(dbSource.moves, slotsForOverlay, GAME_NET_DEFS, {
+      board.renderNetOverlay(dbSource.moves, gameNetSlots, GAME_NET_DEFS, {
         phase:        curPhase,
         selectedSrc:  board.selected,
         regretScores: _gameRegret,

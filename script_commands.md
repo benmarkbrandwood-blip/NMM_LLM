@@ -1937,6 +1937,46 @@ Batch mode is resume-aware: already-met quotas are skipped.
 }
 ```
 
+---
+
+### Human-DB Puzzle Extractor (recommended — positions from real games)
+
+`tools/db_puzzle_extractor.py` seeds the search from `data/human_db_candidate_new.sqlite`
+instead of random board sampling.  Malom WDL labels already stored in the DB
+pre-screen ~540K winning positions from 2.3M total, eliminating the ~95%
+rejection rate of blind random sampling.  Outputs to the same directories as
+`unified_puzzle_generator.py` (`data/puzzles/endgame/`, `data/puzzles/malom/`,
+`data/puzzles/placement/`).
+
+```bash
+# Midgame puzzles from human DB positions, up to 100:
+.venv/bin/python tools/db_puzzle_extractor.py --type midgame --count 100
+
+# Placement puzzles seen in ≥3 human games:
+.venv/bin/python tools/db_puzzle_extractor.py --type placement --count 50 --min-games 3
+
+# Endgame (fly-phase) puzzles — process all candidates:
+.venv/bin/python tools/db_puzzle_extractor.py --type endgame
+
+# Win-in-5 midgame only, from common positions, 4 workers:
+.venv/bin/python tools/db_puzzle_extractor.py --type midgame --depth 5 --min-games 5 --count 30 --workers 4
+```
+
+| Flag | Default | Description |
+| - | - | - |
+| `--type endgame\|midgame\|placement` | — | **Required.** Puzzle type to generate |
+| `--count N` | 0 | Puzzles to produce (0 = process all candidates) |
+| `--depth N` | 0 | Target win depth (0 = any 4–10) |
+| `--min-games N` | 1 | Minimum human games reaching the position |
+| `--max-winning-moves N` | 1 | Reject positions with more than N winning first moves |
+| `--min-hardness F` | 3.0 | Minimum hardness score |
+| `--dtw-min N` | type-specific | Override lower DTW bound (placement:7, midgame:7, endgame:3) |
+| `--dtw-max N` | type-specific | Override upper DTW bound (placement:19, midgame/endgame:20) |
+| `--candidates N` | 50000 | Max candidates to pull from the DB per run |
+| `--workers N` | cpu_count−1 | Parallel verification workers |
+| `--db PATH` | `data/human_db_candidate_new.sqlite` | Override human DB path |
+| `--out DIR` | type-specific default | Override output directory |
+
 | Flag | Default | Description |
 | - | - | - |
 | `--type endgame\|midgame\|placement` | — | Puzzle type (required unless `--batch`) |

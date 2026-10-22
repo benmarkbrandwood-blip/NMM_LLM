@@ -2,7 +2,7 @@
   "think_time_seconds": 6,
   "difficulty": 6,
   "human_color": "random",
-  "ollama_model": "llama3.1:8b",
+  "ollama_model": "qwen3:4b-instruct",
   "ollama_url": "http://localhost:11434",
   "llm_question_frequency": 0.3,
   "max_chat_history_turns": 20,
@@ -59,7 +59,7 @@
     "sel-opponent": "ai",
     "sel-human-color": "W",
     "sel-game-personality": "generalist",
-    "sel-difficulty": "6",
+    "sel-difficulty": "5",
     "chk-llm": true,
     "chk-llm-override": false,
     "chk-live-chat": true,
@@ -77,5 +77,6 @@
     "sel-star-square": "both",
     "chk-ngram": true,
     "chk-perfect-db": false
-  }
+  },
+  "language": "en"
 }

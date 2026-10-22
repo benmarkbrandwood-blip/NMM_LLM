@@ -26,13 +26,24 @@ warn() { echo -e "${YELLOW}[rust]${NC} $*"; }
 # ── Pick the interpreter / pip (prefer the project venv) ──────────────────────
 if [ -x "$VENV_DIR/bin/python" ]; then
     PY="$VENV_DIR/bin/python"
-    PIP="$VENV_DIR/bin/pip"
     info "Using project venv: $VENV_DIR"
 else
     PY="${PYTHON:-python3}"
-    PIP="$PY -m pip"
     warn "No .venv found — using system interpreter ($PY)."
 fi
+
+# uv venv does not install a pip binary — prefer bundled uv pip when available,
+# fall back to pip binary, then python -m pip.
+_UV_BIN="$NMM_DIR/runtime/uv/uv"
+_pip_install() {
+    if [ -x "$_UV_BIN" ]; then
+        "$_UV_BIN" pip install --python "$PY" "$@"
+    elif [ -x "$VENV_DIR/bin/pip" ]; then
+        "$VENV_DIR/bin/pip" install "$@"
+    else
+        "$PY" -m pip install "$@"
+    fi
+}
 
 # ── Rust toolchain check (non-fatal) ──────────────────────────────────────────
 if ! command -v cargo &>/dev/null; then
@@ -53,7 +64,7 @@ info "cargo $(cargo --version | awk '{print $2}') found."
 # ── maturin ───────────────────────────────────────────────────────────────────
 if ! $PY -c "import maturin" &>/dev/null; then
     info "Installing maturin build backend..."
-    $PIP install "maturin>=1.4,<2.0" || { warn "maturin install failed; skipping Rust build."; exit 0; }
+    _pip_install "maturin>=1.4,<2.0" || { warn "maturin install failed; skipping Rust build."; exit 0; }
 fi
 
 # ── Build + install ───────────────────────────────────────────────────────────
@@ -69,12 +80,12 @@ if [ -n "${VIRTUAL_ENV:-}" ] || [ -x "$VENV_DIR/bin/python" ]; then
         info "nmm_core installed into the venv."
     else
         warn "maturin develop failed; falling back to wheel build + pip install."
-        maturin build --release && $PIP install --force-reinstall target/wheels/nmm_core-*.whl
+        maturin build --release && _pip_install --force-reinstall target/wheels/nmm_core-*.whl
     fi
 else
     info "Building wheel (no venv) and pip-installing..."
     maturin build --release || { warn "Rust build failed; Python fallback remains active."; exit 0; }
-    $PIP install --force-reinstall target/wheels/nmm_core-*.whl || warn "wheel install failed; Python fallback remains active."
+    _pip_install --force-reinstall target/wheels/nmm_core-*.whl || warn "wheel install failed; Python fallback remains active."
 fi
 
 # ── Verify ────────────────────────────────────────────────────────────────────

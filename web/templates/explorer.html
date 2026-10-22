@@ -392,8 +392,8 @@
   <label class="toggle-label"><input type="checkbox" id="malom-toggle"> <span data-i18n="explorer.malom">Malom</span></label>
   <label class="toggle-label"><input type="checkbox" id="generalist-toggle"> <span data-i18n="explorer.generalist">Generalist</span></label>
   <span class="hdr-sep">|</span>
-  <label class="toggle-label" style="gap:4px"><span data-i18n="explorer.pred_band">Pred band:</span>
-    <select id="pred-band-select" title="Elo band for Pred Human predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
+  <label class="toggle-label" style="gap:4px"><span data-i18n="explorer.hum_band">Hum% band:</span>
+    <select id="hum-band-select" title="Elo band for Hum% predictions" style="font-size:.72rem;padding:1px 3px;background:#2a2016;color:#c8a96e;border:1px solid #5a4a2a;border-radius:3px;cursor:pointer;height:22px">
       <option value="all">All</option>
       <option value="lower">Lower</option>
       <option value="middle" selected>Middle</option>
@@ -407,7 +407,7 @@
       <option value="gapnet">GapNet</option>
       <option value="value">ValueNet</option>
       <option value="pref">PrefNet</option>
-      <option value="pred">Pred</option>
+      <option value="teacher">Hum%</option>
       <option value="regret">Regret</option>
       <option value="pressure">Pressure</option>
       <option value="">Off</option>
@@ -417,7 +417,7 @@
       <option value="gapnet">GapNet</option>
       <option value="value">ValueNet</option>
       <option value="pref">PrefNet</option>
-      <option value="pred">Pred</option>
+      <option value="teacher">Hum%</option>
       <option value="regret">Regret</option>
       <option value="pressure">Pressure</option>
       <option value="" selected>Off</option>
@@ -427,7 +427,7 @@
       <option value="gapnet">GapNet</option>
       <option value="value">ValueNet</option>
       <option value="pref">PrefNet</option>
-      <option value="pred">Pred</option>
+      <option value="teacher">Hum%</option>
       <option value="regret">Regret</option>
       <option value="pressure">Pressure</option>
       <option value="" selected>Off</option>
@@ -550,7 +550,7 @@
     <div id="color-legend">
       <h3 data-i18n="explorer.colour_key">Colour key</h3>
       <div class="legend-row"><div class="legend-swatch legend-swatch-db"></div><span data-i18n="explorer.legend_winrate">Win rate (human games)</span></div>
-      <div class="legend-row"><div class="legend-swatch" style="background:#a06fe0"></div><span data-i18n="explorer.legend_pred">Pred (no-DB fallback)</span></div>
+      <div class="legend-row"><div class="legend-swatch" style="background:#a06fe0"></div><span data-i18n="explorer.legend_hum">Hum% (no-DB fallback)</span></div>
       <div class="legend-row"><div class="legend-swatch legend-swatch-none"></div><span data-i18n="explorer.legend_nodata">No data</span></div>
     </div>
   </div>

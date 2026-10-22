@@ -323,7 +323,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 2,
+      "W": 3,
       "B": 2,
       "D": 0
     },
@@ -7018,7 +7018,7 @@
   },
   {
     "opening_id": "novel-4589926f",
-    "name": "Novel — d6-f4-b4",
+    "name": "Beneath the Gridline",
     "aliases": [],
     "family": "novel",
     "side": "both",
@@ -7069,7 +7069,7 @@
       "B": []
     },
     "outcome_stats": {
-      "W": 1,
+      "W": 6,
       "B": 0,
       "D": 0
     },
@@ -18000,6 +18000,375 @@
     "outcome_stats": {
       "W": 0,
       "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-6acfce67",
+    "name": "Dawn of the Central Line",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "b6",
+      "b4",
+      "d2",
+      "d2",
+      "f4",
+      "f4",
+      "g4",
+      "g7",
+      "d7",
+      "a7",
+      "d7",
+      "a1",
+      "a4",
+      "d1",
+      "d3",
+      "g1",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........BW...B.W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........BW.B.W.W........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "...B....BW.W.W.W........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".BWB....BW.W.W.W........|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "WBWB....BW.W.W.W........|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "WBWBWWWBBW.W.W.W.....B..|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 2,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-f1824de5",
+    "name": "Der Beginn der sieben Stäbe",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "f4",
+      "b6",
+      "f6",
+      "f2",
+      "f2",
+      "b6",
+      "b6",
+      "a4",
+      "d3",
+      "a4",
+      "c5",
+      "d7",
+      "c3",
+      "e3",
+      "e3",
+      "g4"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........WWBB............|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........WWBBB...........|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "........BWBBB...........|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".......WBWBBB........B..|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": ".......WBWBBB...B....B..|W|6|6"
+      },
+      {
+        "ply": 17,
+        "fen": ".W.W...WBWBBB...B...BBB.|B|9|8"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-ce9eb418",
+    "name": "Bridges of the First Move",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "b4",
+      "f4",
+      "a7",
+      "a1",
+      "c4",
+      "a4",
+      "d1",
+      "d6",
+      "d5",
+      "d3",
+      "g7",
+      "d7",
+      "c5",
+      "e5",
+      "c3",
+      "a4",
+      "d2",
+      "f2"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W.....B....B...W........|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W.....BB...B...W.......W|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "W....WBB.B.B...W.......W|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "W....WBB.B.B...W.W...B.W|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "WBW..WBB.B.B...W.W...B.W|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "WBW..WBB.B.BBW.WWWB..BWW|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-b67e522a",
+    "name": "Dawn of the Central Line",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "d2",
+      "a7",
+      "d5",
+      "f4",
+      "b4",
+      "g7",
+      "d7",
+      "g4",
+      "e4",
+      "g1",
+      "e4",
+      "f6",
+      "b6",
+      "f2",
+      "d7",
+      "b2",
+      "d1"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "W........W...B...B......|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "W........W.W.B.B.B......|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": "WBW......W.W.B.B.B......|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": "WBWW.....W.W.B.B.B.B....|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "WBWWW....W.W.B.B.B.B....|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "WBWWWB..BWWWWBWB.B.B....|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 0,
+      "B": 1,
+      "D": 0
+    },
+    "confidence": 0.3,
+    "tags": [
+      "novel",
+      "learned"
+    ],
+    "source_reference": "",
+    "needs_llm_name": true,
+    "favored_side": "unknown"
+  },
+  {
+    "opening_id": "novel-87eee532",
+    "name": "Dawn of the Center Line",
+    "aliases": [],
+    "family": "novel",
+    "side": "both",
+    "seed_source": "learned",
+    "line_moves": [
+      "d6",
+      "f4",
+      "c3",
+      "b6",
+      "f2",
+      "d3",
+      "a4",
+      "d2",
+      "e4",
+      "d3",
+      "g4",
+      "f4",
+      "e3",
+      "e5",
+      "e5",
+      "d3",
+      "d2",
+      "d5"
+    ],
+    "branch_moves": [],
+    "opening_fen_signatures": [
+      {
+        "ply": 4,
+        "fen": "........BW.B..........W.|W|2|2"
+      },
+      {
+        "ply": 6,
+        "fen": "........BW.BW........BW.|W|3|3"
+      },
+      {
+        "ply": 8,
+        "fen": ".......WBW.BWB.......BW.|W|4|4"
+      },
+      {
+        "ply": 10,
+        "fen": ".......WBW.BWB.....W.BW.|W|5|5"
+      },
+      {
+        "ply": 12,
+        "fen": "...W...WBW.BWB.....W.BW.|W|6|6"
+      },
+      {
+        "ply": 18,
+        "fen": "...W...WBW.BWW...BWWWBW.|W|9|9"
+      }
+    ],
+    "strategic_notes": "",
+    "common_blunders": [],
+    "recommended_responses": {
+      "W": [],
+      "B": []
+    },
+    "outcome_stats": {
+      "W": 1,
+      "B": 0,
       "D": 0
     },
     "confidence": 0.3,

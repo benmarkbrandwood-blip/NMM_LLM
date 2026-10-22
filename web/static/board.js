@@ -731,7 +731,6 @@ export class Board {
     const showSentinel  = opts.showSentinel || false;
     const showOverseer  = opts.showOverseer || false;
     const showPredHuman = opts.showPredHuman || false;
-    const teacherFallback = opts.teacherFallback || false;
     const hasTrajData   = opts.hasTrajData !== false;
     const showPressure  = opts.showPressure || false;
     const showTrajN     = opts.showTrajN || false;
@@ -773,21 +772,13 @@ export class Board {
       if (pct < 1) return null;
       return `AI:${pct}%`;
     };
-    // Helper: predicted-human probability label ("P:37%"), blue. Only shown when
+    // Helper: Hum% probability label ("H:37%"). Only shown when
     // showPredHuman is on AND there is no real trajectory data for this position.
-    const predLabel = (prob) => {
+    const humLabel = (prob) => {
       if (!showPredHuman || hasTrajData || prob == null) return null;
       const pct = Math.round(prob * 100);
       if (pct < 1) return null;
-      return `P:${pct}%`;
-    };
-    // Helper: teacher-net fallback label ("M:37%"), purple. Shown instead of predLabel
-    // when teacherFallback is on — Teacher net fills the traj channel when no DB data.
-    const teacherLabel = (prob) => {
-      if (!teacherFallback || hasTrajData || prob == null) return null;
-      const pct = Math.round(prob * 100);
-      if (pct < 1) return null;
-      return `M:${pct}%`;
+      return `H:${pct}%`;
     };
     // Helper: moves-to-mate label ("M#5"). Suppressed unless DB overlay is on.
     // dtw is the absolute depth-to-mate returned by Malom perfect DB.
@@ -825,8 +816,7 @@ export class Board {
         const slbl = sentinelLabel(mv.sentinel_score);
         const olbl = overseerLabel(mv.overseer_prob);
         const dlbl = dtwLabel(mv.eg_dtw);
-        const plbl = predLabel(mv.pred_human_prob);
-        const tlbl = teacherLabel(mv.pred_human_prob);
+        const plbl = humLabel(mv.pred_human_prob);
         const prss = pressureInfo(mv.opp_pressure);
         const showDash = hasTrajData && showTraj && freq === 0;
 
@@ -841,7 +831,7 @@ export class Board {
           this._dbGroup.appendChild(_el("circle", { cx:x, cy:y, r: PIECE_R + 9,
             fill: "none", stroke: col, "stroke-width": 2.5, opacity: 0.7 }));
         }
-        if (slbl || olbl || dlbl || plbl || tlbl || prss || freq > 0 || showDash) {
+        if (slbl || olbl || dlbl || plbl || prss || freq > 0 || showDash) {
           const [x, y] = nodeXY(pos);
           const hasPiece = !!this.grid[pos];
           let ty = hasPiece ? y - PIECE_R - 5 : y - NODE_R - 5;
@@ -865,20 +855,11 @@ export class Board {
             ty -= 11;
           }
           if (plbl) {
-            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#ff6eb4",
+            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#a06fe0",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = plbl;
-            this._dbGroup.appendChild(t);
-            ty -= 11;
-          }
-          if (tlbl) {
-            const t = _el("text", { x, y: ty, "font-size":"9", fill:"#a06fe0",
-              "text-anchor":"middle", "font-family":"monospace",
-              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
-              "paint-order":"stroke" });
-            t.textContent = tlbl;
             this._dbGroup.appendChild(t);
             ty -= 11;
           }
@@ -941,11 +922,10 @@ export class Board {
         const slbl = selSrc ? sentinelLabel(mv.sentinel_score) : null;
         const olbl = selSrc ? overseerLabel(mv.overseer_prob)  : null;
         const dlbl = selSrc ? dtwLabel(mv.eg_dtw) : null;
-        const plbl = selSrc ? predLabel(mv.pred_human_prob) : null;
-        const tlbl = selSrc ? teacherLabel(mv.pred_human_prob) : null;
+        const plbl = selSrc ? humLabel(mv.pred_human_prob) : null;
         const prss = pressureInfo(mv.opp_pressure);
         const showDashMv = selSrc && hasTrajData && showTraj && freq === 0;
-        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl && !tlbl && !prss) continue;
+        if (!col && freq === 0 && !showDashMv && !slbl && !olbl && !dlbl && !plbl && !prss) continue;
 
         const [x1, y1] = nodeXY(mv.from);
         const [x2, y2] = nodeXY(mv.to);
@@ -975,7 +955,7 @@ export class Board {
             fill: "none", stroke: prss.color, "stroke-width": 1.5, opacity: 0.45,
             "stroke-dasharray": "4 3" }));
         }
-        if (slbl || olbl || dlbl || plbl || tlbl || prss || freq > 0 || showDashMv) {
+        if (slbl || olbl || dlbl || plbl || prss || freq > 0 || showDashMv) {
           const [x, y] = nodeXY(mv.to);
           let ty = y - PIECE_R - 4;
           if (freq > 0 && (!selSrc || mv.from === selSrc)) {
@@ -998,20 +978,11 @@ export class Board {
             ty -= 10;
           }
           if (plbl) {
-            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#ff6eb4",
+            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#a06fe0",
               "text-anchor":"middle", "font-family":"monospace",
               stroke:"white", "stroke-width":"2.5", "stroke-linejoin":"round",
               "paint-order":"stroke" });
             t.textContent = plbl;
-            this._dbGroup.appendChild(t);
-            ty -= 10;
-          }
-          if (tlbl) {
-            const t = _el("text", { x: x + 1, y: ty, "font-size":"8", fill:"#a06fe0",
-              "text-anchor":"middle", "font-family":"monospace",
-              stroke:"#1a1208", "stroke-width":"2.5", "stroke-linejoin":"round",
-              "paint-order":"stroke" });
-            t.textContent = tlbl;
             this._dbGroup.appendChild(t);
             ty -= 10;
           }
@@ -1115,35 +1086,11 @@ export class Board {
             srcHasSentP.add(mv.from);
         }
         for (const [src, prob] of srcBestPred) {
-          const lbl = predLabel(prob);
+          const lbl = humLabel(prob);
           if (!lbl) continue;
           const [x, y] = nodeXY(src);
           const sentOffset = srcHasSentP.has(src) ? -11 : 0;
           const t = _el("text", { x, y: y - PIECE_R - 3 + sentOffset,
-            "font-size":"10", "font-weight":"bold",
-            fill:"#ff6eb4", "text-anchor":"middle", "font-family":"monospace",
-            stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",
-            "paint-order":"stroke" });
-          t.textContent = lbl;
-          this._dbGroup.appendChild(t);
-        }
-      }
-
-      // Per-source best teacher-fallback probability when no piece is selected.
-      // Mirrors predLabel block — shown instead of pred when teacherFallback is on.
-      if (!selSrc && teacherFallback && !hasTrajData) {
-        const srcBestT = new Map();
-        for (const mv of moves) {
-          if (!mv.from || mv.pred_human_prob == null) continue;
-          const prev = srcBestT.get(mv.from);
-          if (prev == null || mv.pred_human_prob > prev)
-            srcBestT.set(mv.from, mv.pred_human_prob);
-        }
-        for (const [src, prob] of srcBestT) {
-          const lbl = teacherLabel(prob);
-          if (!lbl) continue;
-          const [x, y] = nodeXY(src);
-          const t = _el("text", { x, y: y - PIECE_R - 3,
             "font-size":"10", "font-weight":"bold",
             fill:"#a06fe0", "text-anchor":"middle", "font-family":"monospace",
             stroke:"#1a1208", "stroke-width":"3", "stroke-linejoin":"round",

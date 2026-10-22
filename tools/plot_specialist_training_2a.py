@@ -26,11 +26,19 @@ One column per specialist.  Defaults to open/mid/end/generalist when no folders 
 Refreshes every 20 minutes.
 
 Usage:
-    .venv/bin/python tools/plot_specialist_training.py
-    .venv/bin/python tools/plot_specialist_training.py learned_ai/checkpoints/scaffolded/s_gen_v2a
-    .venv/bin/python tools/plot_specialist_training.py s_open_v2 s_mid_v2
-    .venv/bin/python tools/plot_specialist_training.py --interval 5   # minutes
-    .venv/bin/python tools/plot_specialist_training.py --no-loop      # single render
+    .venv/bin/python tools/plot_specialist_training_2a.py
+    .venv/bin/python tools/plot_specialist_training_2a.py learned_ai/checkpoints/scaffolded/s_gen_v5/from_v4
+    .venv/bin/python tools/plot_specialist_training_2a.py --interval 5   # minutes
+    .venv/bin/python tools/plot_specialist_training_2a.py --no-loop      # single render
+
+    # Opening re-extraction tracking (post B-100 cardinal-mill fix 2026-10-16):
+    .venv/bin/python tools/plot_specialist_training_2a.py --openings s_gen_v5/from_v4
+    .venv/bin/python tools/plot_specialist_training_2a.py --openings --from-game 15800 s_gen_v5/from_v4
+
+    --openings filters to post-fix games only, queries specialist_db_v5 for post-fix position
+    counts, and draws a green dashed line at the estimated re-evaluation target game (when
+    post-fix positions reach 100,000 — the minimum for a meaningful opening extraction).
+    --from-game overrides the estimated fix-game cutoff with a known value.
 
 Folder arguments can be absolute paths or relative to the repo root or to
 learned_ai/checkpoints/scaffolded/ — whichever exists first.
@@ -50,6 +58,11 @@ import numpy as np
 
 ROOT      = Path(__file__).resolve().parent.parent
 CKPT_BASE = ROOT / "learned_ai" / "checkpoints" / "scaffolded"
+
+# ── Opening-extraction constants ──────────────────────────────────────────────
+_FIX_DATE        = "2026-10-16"   # B-100 cardinal-mill heuristic fix
+_BULK_CUTOFF     = "2026-10-03"   # positions before this are bulk import, not training games
+_TARGET_POST_FIX = 100_000        # post-fix position target before re-extraction is viable
 
 DEFAULT_SPECIALISTS = [
     ("Opening",    CKPT_BASE / "s_open_v2"),
@@ -82,7 +95,7 @@ def _resolve_folder(arg: str) -> Path:
     return (CKPT_BASE / p).resolve()
 
 
-def _load(path: Path) -> list[dict]:
+def _load(path: Path, min_game: int = 0) -> list[dict]:
     log = path / "train_log.jsonl"
     if not log.exists():
         return []
@@ -115,7 +128,60 @@ def _load(path: Path) -> list[dict]:
     for i, r in enumerate(rows):
         if i >= last_reset or "event" in r:
             result.append(r)
+    if min_game > 0:
+        result = [r for r in result if r.get("game", 0) >= min_game]
     return result
+
+
+def _get_openings_context(db_path: Path, max_game: int) -> "dict | None":
+    """Query specialist DB to estimate fix-date game cutoff and re-evaluation target game.
+
+    Uses specialist_db_v5 position last_seen dates to map the B-100 fix date (2026-10-16)
+    to an approximate training game number, and projects when post-fix positions will reach
+    _TARGET_POST_FIX — the minimum viable count for opening re-extraction.
+
+    Returns None if the DB is unavailable.
+    """
+    try:
+        import sqlite3
+        con = sqlite3.connect(str(db_path))
+        date_rows = con.execute(
+            "SELECT substr(last_seen,1,10), COUNT(*) FROM positions GROUP BY 1 ORDER BY 1"
+        ).fetchall()
+        con.close()
+    except Exception as exc:
+        print(f"[--openings] DB query failed: {exc}")
+        return None
+
+    incr_pre  = sum(c for d, c in date_rows if _BULK_CUTOFF <= d < _FIX_DATE)
+    post_fix  = sum(c for d, c in date_rows if d >= _FIX_DATE)
+    total_incr = incr_pre + post_fix
+
+    # Map fix date to a game number proportionally from incremental positions
+    fix_game_est = int(max_game * incr_pre / total_incr) if total_incr else 0
+
+    # Post-fix growth rate (positions per calendar day recorded)
+    post_day_counts = [c for d, c in date_rows if d >= _FIX_DATE]
+    growth_per_day  = post_fix / len(post_day_counts) if post_day_counts else 1.0
+
+    # Games per incremental calendar day
+    incr_day_count = len([d for d, _ in date_rows if d >= _BULK_CUTOFF])
+    games_per_day  = max_game / incr_day_count if incr_day_count else max_game
+
+    # Estimate game number when post_fix will reach target
+    if post_fix < _TARGET_POST_FIX:
+        days_to_target = (_TARGET_POST_FIX - post_fix) / growth_per_day
+        target_game    = max_game + int(days_to_target * games_per_day)
+    else:
+        target_game = max_game
+
+    return {
+        "fix_game_est":     fix_game_est,
+        "post_fix":         post_fix,
+        "target_positions": _TARGET_POST_FIX,
+        "target_game":      target_game,
+        "growth_per_day":   growth_per_day,
+    }
 
 
 def _smooth(values: list[float], window: int) -> np.ndarray:
@@ -272,7 +338,7 @@ def _caption(ax, text: str) -> None:
 
 # ── Main draw ─────────────────────────────────────────────────────────────────
 
-def draw(fig, _axes_unused, specialists):
+def draw(fig, _axes_unused, specialists, openings_ctx: "dict | None" = None):
     """Rebuild all panels from scratch on each refresh (handles twinx cleanly)."""
     n_cols = len(specialists)
     fig.clf()
@@ -283,8 +349,10 @@ def draw(fig, _axes_unused, specialists):
     else:
         axes = [list(row) for row in raw]
 
+    min_game = openings_ctx["fix_game_est"] if openings_ctx else 0
+
     for col, (name, ckpt_dir) in enumerate(specialists):
-        rows  = _load(ckpt_dir)
+        rows  = _load(ckpt_dir, min_game=min_game)
         n_games = sum(1 for r in rows if "event" not in r)
 
         ax_ent  = axes[0][col]   # entropy / confidence
@@ -453,6 +521,31 @@ def draw(fig, _axes_unused, specialists):
         # Re-render top panel legend so new vline labels appear alongside entropy/chosen prob.
         ax_ent.legend(fontsize=6, loc="upper right", ncol=2)
 
+        # ── --openings: re-evaluation target line + annotation ────────────
+        if openings_ctx:
+            tg   = openings_ctx["target_game"]
+            pf   = openings_ctx["post_fix"]
+            tgt  = openings_ctx["target_positions"]
+            gpd  = openings_ctx["growth_per_day"]
+            days_left = max(0.0, (tgt - pf) / gpd) if pf < tgt else 0.0
+            for _ax in _all_axes:
+                _ax.axvline(tg, color="#4CAF50", linewidth=1.3, linestyle="--",
+                            alpha=0.85, zorder=4,
+                            label="re-eval target" if _ax is ax_ent else None)
+            ax_ent.legend(fontsize=6, loc="upper right", ncol=2)
+            if col == 0:
+                ready = pf >= tgt
+                status = "READY" if ready else f"~{days_left:.0f} days"
+                color  = "#4CAF50" if ready else "#FF9800"
+                ax_ent.annotate(
+                    f"Post-fix positions: {pf:,} / {tgt:,}  [{status}]\n"
+                    f"Growth: {gpd:,.0f}/day · re-eval ≈ game {tg:,}",
+                    xy=(0.02, 0.97), xycoords="axes fraction",
+                    fontsize=6.5, color=color, va="top", ha="left",
+                    bbox=dict(boxstyle="round,pad=0.3", fc="#0d1a0d", alpha=0.85, lw=0),
+                    zorder=10,
+                )
+
         for ax in _all_axes:
             ax.tick_params(labelsize=6)
             ax.grid(True, alpha=0.3, linewidth=0.4)
@@ -491,6 +584,20 @@ def main():
                         help="Refresh interval in minutes (default 20)")
     parser.add_argument("--no-loop", action="store_true",
                         help="Render once and exit")
+    parser.add_argument("--openings", action="store_true",
+                        help=(
+                            f"Plot only post-fix training data (from game ~{_FIX_DATE}, "
+                            "B-100 cardinal-mill fix). Queries specialist DB for post-fix "
+                            "position count, growth rate, and estimated re-evaluation game "
+                            f"(when post-fix positions reach {_TARGET_POST_FIX:,}). "
+                            "Shows a green dashed line at the re-eval target game number."
+                        ))
+    parser.add_argument("--specialist-db",
+                        default=str(ROOT / "data" / "specialist_db_v5.sqlite"),
+                        help="Specialist DB path for --openings mode (default: specialist_db_v5.sqlite)")
+    parser.add_argument("--from-game", type=int, default=0,
+                        help="Override the fix-game cutoff used by --openings (e.g. --from-game 15800). "
+                             "When omitted, the cutoff is estimated from DB position counts.")
     args = parser.parse_args()
 
     if args.folders:
@@ -498,12 +605,42 @@ def main():
     else:
         specialists = DEFAULT_SPECIALISTS
 
+    # ── Resolve openings context (requires all logs to estimate max_game) ─────
+    openings_ctx = None
+    if args.openings:
+        all_game_rows = []
+        for _, ckpt_dir in specialists:
+            all_game_rows.extend(r for r in _load(ckpt_dir) if "event" not in r)
+        max_game = max((r.get("game", 0) for r in all_game_rows), default=0)
+        openings_ctx = _get_openings_context(Path(args.specialist_db), max_game)
+        if openings_ctx is None:
+            print(f"[--openings] Could not query {args.specialist_db} — plotting without context.")
+            if args.from_game:
+                openings_ctx = {
+                    "fix_game_est": args.from_game, "post_fix": 0,
+                    "target_positions": _TARGET_POST_FIX, "target_game": 0, "growth_per_day": 1.0,
+                }
+        else:
+            if args.from_game:
+                openings_ctx["fix_game_est"] = args.from_game
+            pf   = openings_ctx["post_fix"]
+            tgt  = openings_ctx["target_positions"]
+            fg   = openings_ctx["fix_game_est"]
+            tg   = openings_ctx["target_game"]
+            gpd  = openings_ctx["growth_per_day"]
+            days = max(0.0, (tgt - pf) / gpd)
+            print(
+                f"[--openings] Fix date {_FIX_DATE} ≈ game {fg:,}  |  "
+                f"Post-fix positions: {pf:,} / {tgt:,}  |  "
+                f"Growth: {gpd:,.0f}/day  |  Re-eval target: game {tg:,}  (~{days:.0f} days)"
+            )
+
     n_cols = len(specialists)
     fig_w  = max(6, 4.5 * n_cols)
     fig    = plt.figure(figsize=(fig_w, 21))
 
     plt.ion()
-    draw(fig, None, specialists)
+    draw(fig, None, specialists, openings_ctx=openings_ctx)
 
     if args.no_loop:
         plt.ioff()
@@ -516,7 +653,7 @@ def main():
             deadline = time.time() + interval_s
             while time.time() < deadline:
                 plt.pause(1.0)
-            draw(fig, None, specialists)
+            draw(fig, None, specialists, openings_ctx=openings_ctx)
     except KeyboardInterrupt:
         pass
 
